@@ -38,14 +38,14 @@ class C {}
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_C to i64), i64 1)
 // \ CHECK: }
 
-sil @top_level_code : $[thin] () -> () {
+sil @top_level_code : $@thin () -> () {
   %0 = tuple ()
   %1 = return %0 : $()
 }
 
 // CHECK: define [[REF]]* @ref_to_object_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* {{%.*}} to [[REF]]*
-sil @ref_to_object_pointer_cast : $[thin] C -> Builtin.ObjectPointer {
+sil @ref_to_object_pointer_cast : $@thin C -> Builtin.ObjectPointer {
 entry(%c : $C):
   %r = ref_to_object_pointer %c : $C to $Builtin.ObjectPointer
   return %r : $Builtin.ObjectPointer
@@ -53,7 +53,7 @@ entry(%c : $C):
 
 // CHECK: define [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* %0 to [[OBJCOBJ]]*
-sil @ref_to_objc_pointer_cast : $[thin] C -> Builtin.ObjCPointer {
+sil @ref_to_objc_pointer_cast : $@thin C -> Builtin.ObjCPointer {
 entry(%c : $C):
   %r = ref_to_object_pointer %c : $C to $Builtin.ObjCPointer
   return %r : $Builtin.ObjCPointer

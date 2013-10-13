@@ -5,7 +5,7 @@ import swift
 
 
 // CHECK-LABEL: sil @simple_reg_promotion
-sil @simple_reg_promotion : $[thin] (a : Int64) -> Int64 {
+sil @simple_reg_promotion : $@thin (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %1 = alloc_box $Int64                   // CHECK: alloc_box
   store %0 to %1#1 : $*Int64
@@ -25,7 +25,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 
 
 // CHECK-LABEL: sil @tuple_reg_promotion
-sil @tuple_reg_promotion : $[thin] (a : Int64) -> Int64 {
+sil @tuple_reg_promotion : $@thin (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %1 = alloc_box $(Int64, Int64)                   // CHECK: alloc_box
   
@@ -54,7 +54,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 
 
 // CHECK-LABEL: sil @use_before_init
-sil @use_before_init : $[thin] () -> Int64 {
+sil @use_before_init : $@thin () -> Int64 {
 bb0:
   %1 = alloc_box $Int64                   // expected-note {{variable defined here}}
   %4 = load %1#1 : $*Int64                // expected-error {{variable '<unknown>' used before being initialized}}
@@ -63,15 +63,15 @@ bb0:
 }
 
 
-sil @takes_Int_inout : $[thin] (a : [inout] Int64) -> ()
+sil @takes_Int_inout : $@thin (a : @inout Int64) -> ()
 
 // CHECK-LABEL: @inout_uninit
-sil @inout_uninit : $[thin] () -> () {
+sil @inout_uninit : $@thin () -> () {
 bb0:
   %1 = alloc_box $Int64                                   // expected-note {{variable defined here}}
 
-  %5 = function_ref @takes_Int_inout : $[thin] (a : [inout] Int64) -> ()
-  %6 = apply %5(%1#1) : $[thin] (a : [inout] Int64) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
+  %5 = function_ref @takes_Int_inout : $@thin (a : @inout Int64) -> ()
+  %6 = apply %5(%1#1) : $@thin (a : @inout Int64) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %0 = tuple ()
   strong_release %1#0 : $Builtin.ObjectPointer
@@ -89,7 +89,7 @@ bb0:
 //  return (t,a)
 //}
 // CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $[thin] (a : Int64) -> (Int64, Int64) {
+sil @used_by_inout : $@thin (a : Int64) -> (Int64, Int64) {
 bb0(%0 : $Int64):
   // This alloc_stack can't be removed since it is used by a inout call.
   // CHECK: %1 = alloc_box $Int64
@@ -98,8 +98,8 @@ bb0(%0 : $Int64):
   
   // This load should be eliminated.
   %3 = load %1#1 : $*Int64
-  %5 = function_ref @takes_Int_inout : $[thin] (a : [inout] Int64) -> ()
-  %6 = apply %5(%1#1) : $[thin] (a : [inout] Int64) -> ()
+  %5 = function_ref @takes_Int_inout : $@thin (a : @inout Int64) -> ()
+  %6 = apply %5(%1#1) : $@thin (a : @inout Int64) -> ()
   
   // This load is needed in case the callee modifies the allocation.
   // CHECK: [[RES:%[0-9]+]] = load
@@ -119,15 +119,15 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $[thin] () -> AddressOnlyStruct
+sil @returns_generic_struct : $@thin () -> AddressOnlyStruct
 
 // There should be no error in this function.
 // CHECK-LABEL: sil @call_struct_return_function
-sil @call_struct_return_function : $[thin] () -> Int64 {
+sil @call_struct_return_function : $@thin () -> Int64 {
 bb0:
   %1 = alloc_box $AddressOnlyStruct
-  %2 = function_ref @returns_generic_struct : $[thin] () -> AddressOnlyStruct
-  %3 = apply %2(%1#1) : $[thin] () -> AddressOnlyStruct
+  %2 = function_ref @returns_generic_struct : $@thin () -> AddressOnlyStruct
+  %3 = apply %2(%1#1) : $@thin () -> AddressOnlyStruct
   %4 = struct_element_addr %1#1 : $*AddressOnlyStruct, #b
   %5 = load %4 : $*Int64
   strong_release %1#0 : $Builtin.ObjectPointer
@@ -136,14 +136,14 @@ bb0:
 
 
 // CHECK-LABEL: sil @tuple_elements1
-sil @tuple_elements1 : $[thin] (a : Int64) -> () {
+sil @tuple_elements1 : $@thin (a : Int64) -> () {
 bb0(%0 : $Int64):
   %3 = alloc_box $(Int64, Int64)     // expected-note 2 {{variable defined here}}
   %4 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
   %5 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
-  %14 = function_ref @takes_Int_inout : $[thin] (a : [inout] Int64) -> ()
+  %14 = function_ref @takes_Int_inout : $@thin (a : @inout Int64) -> ()
   %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
-  %16 = apply %14(%15) : $[thin] (a : [inout] Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
+  %16 = apply %14(%15) : $@thin (a : @inout Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
   strong_release %3#0 : $Builtin.ObjectPointer   // expected-error {{variable '<unknown>.0' destroyed without being fully initialized on all paths}}
   %99 = tuple ()
@@ -151,7 +151,7 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil @tuple_elements2
-sil @tuple_elements2 : $[thin] (a : Int64) -> (Int64, Int64) {
+sil @tuple_elements2 : $@thin (a : Int64) -> (Int64, Int64) {
 bb0(%0 : $Int64):
   %3 = alloc_box $(Int64, Int64)     // expected-note {{variable defined here}}
   %18 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
@@ -168,7 +168,7 @@ struct XYStruct { var x, y : Int }
 
 
 // CHECK-LABEL: sil @copy_addr1
-sil @copy_addr1 : $[thin] <T> (v : T) -> T {
+sil @copy_addr1 : $@thin <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
   %4 = alloc_box $T
   copy_addr [take] %1 to [initialization] %4#1 : $*T
@@ -179,7 +179,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil @copy_addr2
-sil @copy_addr2 : $[thin] <T> (v : T) -> T {
+sil @copy_addr2 : $@thin <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
   %4 = alloc_box $T         // expected-note {{variable defined here}}
   copy_addr %4#1 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
@@ -189,19 +189,19 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 
-sil @takes_closure : $[thin] (x : () -> ()) -> ()
-sil @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+sil @takes_closure : $@thin (x : () -> ()) -> ()
+sil @closure0 : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
 
 // CHECK-LABEL: sil @closure_test
-sil @closure_test : $[thin] () -> () {
+sil @closure_test : $@thin () -> () {
 bb0:
   %0 = alloc_box $Int64    // expected-note {{variable defined here}}
 
-  %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
-  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+  %5 = function_ref @takes_closure : $@thin (x : () -> ()) -> ()
+  %6 = function_ref @closure0 : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
-  %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  %9 = apply %5(%8) : $@thin (x : () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
@@ -209,16 +209,16 @@ bb0:
 }
 
 // CHECK-LABEL: sil @closure_test2
-sil @closure_test2 : $[thin] (a : Int64) -> Int64 {
+sil @closure_test2 : $@thin (a : Int64) -> Int64 {
 bb0(%1 : $Int64):
   %0 = alloc_box $Int64
   store %1 to %0#1 : $*Int64  // CHECK: store
 
-  %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
-  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+  %5 = function_ref @takes_closure : $@thin (x : () -> ()) -> ()
+  %6 = function_ref @closure0 : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
-  %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
+  %9 = apply %5(%8) : $@thin (x : () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
   store %1 to %0#1 : $*Int64 // CHECK: store
@@ -232,11 +232,11 @@ bb0(%1 : $Int64):
 
 class SomeClass {}
 
-sil @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+sil @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
 
 
 // CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $[thin] (a : Int64) -> Int64 {
+sil @assign_test_trivial : $@thin (a : Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
 
@@ -256,22 +256,22 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil @assign_test_nontrivial
-sil @assign_test_nontrivial : $[thin] () -> () {
+sil @assign_test_nontrivial : $@thin () -> () {
 bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
 
   %c = alloc_box $SomeClass
-  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
-  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %4 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   assign %4 to %c#1 : $*SomeClass
   // CHECK-NEXT: store [[C1]]
 
-  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %8 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c#1 : $*SomeClass
@@ -286,7 +286,7 @@ bb0:
 
 
 // CHECK-LABEL: sil @assign_test_addressonly
-sil @assign_test_addressonly : $[thin] <T> (v : T) -> T {
+sil @assign_test_addressonly : $@thin <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
   %2 = alloc_box $T
   // CHECK: alloc_box
@@ -310,16 +310,16 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil @assign_test_weak
-sil @assign_test_weak : $[thin]() -> () {
+sil @assign_test_weak : $@thin() -> () {
 bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
   %c = alloc_box $@sil_weak SomeClass
-  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
-  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %4 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // THis should become an initialization.
@@ -329,7 +329,7 @@ bb0:
   strong_release %4 : $SomeClass
   // CHECK-NEXT: release [[C1]]
 
-  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %8 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   store_weak %8 to %c#1 : $*@sil_weak SomeClass
@@ -345,17 +345,17 @@ bb0:
 }
 
 // CHECK-LABEL: sil @assign_test_unowned
-sil @assign_test_unowned : $[thin]() -> () {
+sil @assign_test_unowned : $@thin() -> () {
 bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
   %c = alloc_box $@sil_unowned SomeClass
   // CHECK: [[BOX:%[0-9]+]] = alloc_box
-  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
-  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %4 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
@@ -368,7 +368,7 @@ bb0:
   // CHECK-NEXT: store [[C1u]] to [[BOX]]#1
   // CHECK-NEXT: strong_release [[C1]]
 
-  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %8 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   %9 = ref_to_unowned %8 : $SomeClass to $@sil_unowned SomeClass
@@ -394,7 +394,7 @@ struct ContainsObjectPointer {
   var y : Builtin.ObjectPointer
 }
 
-sil @test_struct : $[thin] (value : [inout] ContainsObjectPointer) -> () {
+sil @test_struct : $@thin (value : @inout ContainsObjectPointer) -> () {
 bb0(%0 : $*ContainsObjectPointer):
   %b = alloc_box $ContainsObjectPointer
   %1 = load %0 : $*ContainsObjectPointer
@@ -409,7 +409,7 @@ bb0(%0 : $*ContainsObjectPointer):
 // CHECK-NOT: load
 // CHECK: store
 // CHECK: return
-sil @non_box_assign_trivial : $[thin] (lhs : [inout] Bool, rhs : Bool) -> () {
+sil @non_box_assign_trivial : $@thin (lhs : @inout Bool, rhs : Bool) -> () {
 bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
@@ -420,7 +420,7 @@ bb0(%0 : $*Bool, %1 : $Bool):
 // CHECK: load
 // CHECK: store
 // CHECK: return
-sil @non_box_assign : $[thin] (lhs : [inout] SomeClass, rhs : SomeClass) -> () {
+sil @non_box_assign : $@thin (lhs : @inout SomeClass, rhs : SomeClass) -> () {
 bb0(%0 : $*SomeClass, %1 : $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
@@ -442,7 +442,7 @@ sil @test_tlc : $() -> () {
 }
 
 // CHECK-LABEL: sil @promote_alloc_stack
-sil @promote_alloc_stack : $[thin] (i : Int64) -> Builtin.Int64 {
+sil @promote_alloc_stack : $@thin (i : Int64) -> Builtin.Int64 {
 bb0(%0 : $Int64):
   %5 = integer_literal $Builtin.Int64, 1
   %18 = struct $Int64 (%5 : $Builtin.Int64)
@@ -454,7 +454,7 @@ bb0(%0 : $Int64):
   store %18 to %22#1 : $*Int64
   %24 = struct_element_addr %22#1 : $*Int64, #value
   %25 = load %24 : $*Builtin.Int64
-  dealloc_stack %22#0 : $*[local_storage] Int64
+  dealloc_stack %22#0 : $*@local_storage Int64
   // CHECK: return [[SE]]
   return %25 : $Builtin.Int64
 }

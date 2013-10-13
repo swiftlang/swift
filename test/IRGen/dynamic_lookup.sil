@@ -17,42 +17,42 @@ class X {
 }
 
 // [objc] t.X.f (t.X)() -> ()
-sil @_TToC14dynamic_lookup1X1ffS0_FT_T_ : $[cc(objc_method), thin] ((), X) -> () {
+sil @_TToC14dynamic_lookup1X1ffS0_FT_T_ : $@cc(objc_method) @thin ((), X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.metatype)() -> ()
-sil @_TToC14dynamic_lookup1X1gfMS0_FT_T_ : $[thin] ((), X.metatype) -> () {
+sil @_TToC14dynamic_lookup1X1gfMS0_FT_T_ : $@thin ((), X.metatype) -> () {
 bb0(%0 : $X.metatype):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
 }
 
-sil @_TToC14dynamic_lookup1X9subscriptFT1iSi_Sig : $[cc(objc_method), thin] ((), (i : Int64), X) -> Int64 {
+sil @_TToC14dynamic_lookup1X9subscriptFT1iSi_Sig : $@cc(objc_method) @thin ((), (i : Int64), X) -> Int64 {
 bb0(%0 : $Int64, %1 : $X):
-  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
+  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
   %5 = metatype $Int64.metatype                   // user: %7
   %6 = integer_literal $Builtin.Int64, 5          // user: %7
-  %7 = apply [transparent] %4(%6, %5) : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
+  %7 = apply [transparent] %4(%6, %5) : $@thin ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
   return %7 : $Int64
 }
 
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val : Builtin.Int64), Int64.metatype) -> Int64
 
 // [objc] dynamic_lookup.X.value.getter : swift.Int64
-sil @_TToC14dynamic_lookup1X5valueSig : $[cc(objc_method), thin] ((), X) -> Int64 {
+sil @_TToC14dynamic_lookup1X5valueSig : $@cc(objc_method) @thin ((), X) -> Int64 {
 bb0(%0 : $X):
-  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
+  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
   %5 = metatype $Int64.metatype                   // user: %7
   %6 = integer_literal $Builtin.Int64, 5          // user: %7
-  %7 = apply [transparent] %4(%6, %5) : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
+  %7 = apply [transparent] %4(%6, %5) : $@thin ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
   return %7 : $Int64
 }
 
 // CHECK: define void @dynamic_lookup_br(%objc_object*)
-sil @dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> () {
+sil @dynamic_lookup_br : $@thin (obj : DynamicLookup) -> () {
 bb0(%0 : $DynamicLookup):
   %1 = alloc_box $DynamicLookup                   
   store %0 to %1#1 : $*DynamicLookup
@@ -67,7 +67,7 @@ bb0(%0 : $DynamicLookup):
   // CHECK: br i1 [[HAS_SEL]]
   dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
 
-bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
+bb1(%8 : $@cc(objc_method) @thin ((), Builtin.ObjCPointer) -> ()):
   br bb3
 
 bb2:
@@ -79,14 +79,14 @@ bb3:
 }
 
 // CHECK: define void @dynamic_lookup_static_br(%swift.type*)
-sil @dynamic_lookup_static_br : $[thin] (objMeta : DynamicLookup.metatype) -> () {
+sil @dynamic_lookup_static_br : $@thin (objMeta : DynamicLookup.metatype) -> () {
 bb0(%0 : $DynamicLookup.metatype):
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(g)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
   dynamic_method_br %0 : $DynamicLookup.metatype, #X.g!1, bb1, bb2
 
-bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
+bb1(%8 : $@cc(objc_method) @thin ((), Builtin.ObjCPointer) -> ()):
   br bb3
 
 bb2:
@@ -97,7 +97,7 @@ bb3:
   return %43 : $()
 }
 
-sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : DynamicLookup) -> () {
+sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $@thin (x : DynamicLookup) -> () {
   bb0(%0 : $DynamicLookup):
   %1 = alloc_box $DynamicLookup
   store %0 to %1#1 : $*DynamicLookup
@@ -107,7 +107,7 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : Dyna
   %9 = ref_to_object_pointer %8 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
   dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.foreign, bb1, bb2
 
-bb1(%10 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> Int64):
+bb1(%10 : $@cc(objc_method) @thin ((), Builtin.ObjCPointer) -> Int64):
   br bb3
 
 bb2:
@@ -119,7 +119,7 @@ bb3:
 }
 
 // CHECK-LABEL: define void @_T1t16opt_to_subscriptFT3objPSo13DynamicLookup_1iSi_T_(%objc_object*, i64)
-sil @_T1t16opt_to_subscriptFT3objPSo13DynamicLookup_1iSi_T_ : $[thin] (obj : DynamicLookup, i : Int64) -> () {
+sil @_T1t16opt_to_subscriptFT3objPSo13DynamicLookup_1iSi_T_ : $@thin (obj : DynamicLookup, i : Int64) -> () {
 bb0(%0 : $DynamicLookup, %1 : $Int64):
   %2 = alloc_box $DynamicLookup
   %3 = alloc_box $Int64
@@ -135,8 +135,8 @@ bb0(%0 : $DynamicLookup, %1 : $Int64):
 
   dynamic_method_br %11 : $Builtin.ObjCPointer, #X.subscript!getter.2.foreign, bb1, bb2
 
-bb1(%13 : $[cc(objc_method), thin] ((), (i : Int64), Builtin.ObjCPointer) -> Int64): // Preds: bb0
-  %14 = partial_apply %13(%11) : $[cc(objc_method), thin] ((), (i : Int64), Builtin.ObjCPointer) -> Int64
+bb1(%13 : $@cc(objc_method) @thin ((), (i : Int64), Builtin.ObjCPointer) -> Int64): // Preds: bb0
+  %14 = partial_apply %13(%11) : $@cc(objc_method) @thin ((), (i : Int64), Builtin.ObjCPointer) -> Int64
   %15 = load %3#1 : $*Int64             
   %16 = apply %14(%15) : $Int64 -> Int64
   br bb3
@@ -149,7 +149,7 @@ bb3:
   return %30 : $()
 }
 
-sil @top_level_code : $[thin] () -> () {
+sil @top_level_code : $@thin () -> () {
   %0 = tuple ()
   %1 = return %0 : $()
 }

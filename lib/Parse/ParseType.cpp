@@ -36,8 +36,7 @@ ParserResult<TypeRepr> Parser::parseTypeAnnotation() {
 ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
   // Parse attributes.
   TypeAttributes attrs;
-  parseTypeAttributeList(attrs, true);
-  parseTypeAttributeList(attrs, false);
+  parseTypeAttributeList(attrs);
 
   // Parse the type.
   ParserResult<TypeRepr> Ty = parseType(message);
@@ -928,6 +927,26 @@ bool Parser::canParseTypeComposition() {
   return true;
 }
 
+static bool canParseAttributes(Parser &P) {
+  while (P.consumeIf(tok::at_sign)) {
+    if (!P.consumeIf(tok::identifier)) return false;
+    
+    if (P.consumeIf(tok::equal)) {
+      if (P.Tok.isNot(tok::identifier) &&
+          P.Tok.isNot(tok::integer_literal) &&
+          P.Tok.isNot(tok::floating_literal))
+        return false;
+      P.consumeToken();
+    } else if (P.Tok.is(tok::l_paren)) {
+      // Attributes like cc(x,y,z)
+      P.skipSingle();
+    }
+    
+    P.consumeIf(tok::comma);
+  }
+  return true;
+}
+
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
@@ -938,19 +957,9 @@ bool Parser::canParseTypeTupleBody() {
         consumeToken(tok::identifier);
         consumeToken(tok::colon);
 
-        // Parse attributes.
-        if (consumeIf(tok::l_square)) {
-          while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-                 Tok.isNot(tok::r_square) && Tok.isNot(tok::r_paren) &&
-                 !isStartOfDecl(Tok, peekToken()))
-            skipSingle();
-
-          if (!consumeIf(tok::r_square))
-            return false;
-        }
-
-        // Parse the type.
-        if (!canParseType())
+        // Parse attributes then a type.
+        if (!canParseAttributes(*this) ||
+            !canParseType())
           return false;
 
         // Parse default values. This aren't actually allowed, but we recover
@@ -970,16 +979,9 @@ bool Parser::canParseTypeTupleBody() {
       // Otherwise, this has to be a type.
 
       // Parse attributes.
-      if (consumeIf(tok::l_square)) {
-        while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-               Tok.isNot(tok::r_square) && Tok.isNot(tok::r_paren) &&
-               !isStartOfDecl(Tok, peekToken()))
-          skipSingle();
-
-        if (!consumeIf(tok::r_square))
-          return false;
-      }
-
+      if (!canParseAttributes(*this))
+        return false;
+ 
       if (!canParseType())
         return false;
     } while (consumeIf(tok::comma));

@@ -90,15 +90,15 @@ bb1(%0 : $Int64):
 
 
 
-sil @callee : $[thin] (a : [inout] Int64) -> ()
+sil @callee : $@thin (a : @inout Int64) -> ()
 
 // CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $[thin] () -> Int64 {
+sil @inout_nocapture : $@thin () -> Int64 {
 bb0:
   // CHECK: alloc_stack
   %1 = alloc_box $Int64
-  %6 = function_ref @callee : $[thin] (a : [inout] Int64) -> ()
-  %7 = apply %6(%1#1) : $[thin] (a : [inout] Int64) -> ()
+  %6 = function_ref @callee : $@thin (a : @inout Int64) -> ()
+  %7 = apply %6(%1#1) : $@thin (a : @inout Int64) -> ()
   %8 = load %1#1 : $*Int64
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $Int64
@@ -109,15 +109,15 @@ bb0:
 protocol P {
 }
 
-sil @returns_protocol : $[thin] () -> P
+sil @returns_protocol : $@thin () -> P
 
 // CHECK-LABEL: sil @test_indirect_return
-sil @test_indirect_return : $[thin] () -> () {
+sil @test_indirect_return : $@thin () -> () {
 bb0:
   // CHECK: alloc_stack
-  %1 = function_ref @returns_protocol : $[thin] () -> P
+  %1 = function_ref @returns_protocol : $@thin () -> P
   %2 = alloc_box $P
-  %3 = apply %1(%2#1) : $[thin] () -> P
+  %3 = apply %1(%2#1) : $@thin () -> P
   %5 = strong_release %2#0 : $Builtin.ObjectPointer
   %0 = tuple ()
   %6 = return %0 : $()
@@ -147,14 +147,14 @@ protocol LogicValue {
 }
 
 // CHECK-LABEL: @protocols
-sil @protocols : $[thin] ((v : LogicValue), Bool.metatype) -> Bool {
+sil @protocols : $@thin ((v : LogicValue), Bool.metatype) -> Bool {
 bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
   %2 = alloc_box $LogicValue
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
   %6 = project_existential %2#1 : $*LogicValue to $*@sil_self LogicValue
-  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $[cc(method)] ((), [inout] @sil_self LogicValue) -> Bool
-  %8 = apply %7(%6) : $[cc(method)] ((), [inout] @sil_self LogicValue) -> Bool
+  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $@cc(method) ((), @inout @sil_self LogicValue) -> Bool
+  %8 = apply %7(%6) : $@cc(method) ((), @inout @sil_self LogicValue) -> Bool
   strong_release %2#0 : $Builtin.ObjectPointer
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*@local_storage LogicValue
@@ -167,7 +167,7 @@ bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
 class Generic<T> {}
 
 // CHECK-LABEL: sil @dealloc_box
-sil @dealloc_box : $[thin] <T> () -> () {
+sil @dealloc_box : $@thin <T> () -> () {
   %1 = alloc_box $Generic<T>
   dealloc_box $Generic<T>, %1#0 : $Builtin.ObjectPointer
   // CHECK: %0 = alloc_stack $Generic<T>
@@ -186,19 +186,19 @@ enum SomeUnion {
 
 
 
-sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion 
-sil @_TC1t9SomeClassCfMS0_FT_S0_ : $[thin] ((), SomeClass.metatype) -> SomeClass 
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (SomeClass, SomeUnion.metatype) -> SomeUnion 
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin ((), SomeClass.metatype) -> SomeClass 
 
 // CHECK-LABEL: sil @union_test
-sil @union_test : $[thin] () -> () {
+sil @union_test : $@thin () -> () {
 bb0:
   %1 = alloc_box $SomeUnion
-  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion // user: %7
+  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (SomeClass, SomeUnion.metatype) -> SomeUnion // user: %7
   %3 = metatype $SomeUnion.metatype
-  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $[thin] ((), SomeClass.metatype) -> SomeClass // user: %6
+  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin ((), SomeClass.metatype) -> SomeClass // user: %6
   %5 = metatype $SomeClass.metatype
-  %6 = apply %4(%5) : $[thin] ((), SomeClass.metatype) -> SomeClass
-  %7 = apply %2(%6, %3) : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion
+  %6 = apply %4(%5) : $@thin ((), SomeClass.metatype) -> SomeClass
+  %7 = apply %2(%6, %3) : $@thin (SomeClass, SomeUnion.metatype) -> SomeUnion
   store %7 to %1#1 : $*SomeUnion
   strong_release %1#0 : $Builtin.ObjectPointer
   %10 = tuple ()
@@ -210,7 +210,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @multiple_release_test
-sil @multiple_release_test : $[thin] (x : Bool) -> Bool {
+sil @multiple_release_test : $@thin (x : Bool) -> Bool {
 bb0(%0 : $Bool):
   %1 = alloc_box $Bool
   store %0 to %1#1 : $*Bool

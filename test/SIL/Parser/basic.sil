@@ -65,7 +65,7 @@ sil @named_tuple : $() -> (x: Builtin.Int64, Builtin.Int64) {
   %10 = return %9 : $(x: Builtin.Int64, Builtin.Int64)
 }
 
-sil @return_int : $@thin (a: Int64) -> Int64 { // CHECK: $[thin] (a: Int64) -> Int64 {
+sil @return_int : $@thin (a: Int64) -> Int64 { // CHECK: $@thin (a: Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
   %1 = alloc_stack $Int64                  // CHECK: alloc_stack $Int64
   store %0 to %1#1 : $*Int64               // CHECK: store %0 to %1#1 : $*Int64
@@ -89,7 +89,7 @@ bb0(%0 : $() -> Int64):
 
 sil @return_constant : $@thin () -> Int64 {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
   %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
 
   // CHECK: metatype $Int64.metatype
@@ -108,7 +108,7 @@ sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.I
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
+sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), @inout Bool) -> Builtin.Int1
 sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
 
 // CHECK-LABEL: @_T4test1xFT1aSb_Si
@@ -119,16 +119,16 @@ bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
   // CHECK: store
   %2 = store %0 to %1#1 : $*Bool
-  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
-  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
+  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), @inout Bool) -> Builtin.Int1
+  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), @inout Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1#1) : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
+  %4 = apply %3(%1#1) : $@cc(method) @thin ((), @inout Bool) -> Builtin.Int1
   // CHECK: cond_br
   %5 = cond_br %4, bb1, bb2
 
 // CHECK: bb1:
 bb1:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: metatype $Int64.metatype
   %7 = metatype $Int64.metatype
@@ -143,7 +143,7 @@ bb1:
 
 // CHECK: bb2:
 bb2:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: metatype $Int64.metatype
   %13 = metatype $Int64.metatype
@@ -171,9 +171,9 @@ bb0(%0 : $*P):
   %1 = project_existential %0 : $*P to $*@sil_self P // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) ((), [inout] @sil_self P) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) ((), @inout @sil_self P) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $@cc(method) ((), [inout] @sil_self P) -> ()
+  %3 = apply %2(%1) : $@cc(method) ((), @inout @sil_self P) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 
@@ -232,16 +232,16 @@ protocol Runcible {
   static func static_method()
 }
 
-// CHECK: $[thin] <T : Runcible> (x: T) -> ()
+// CHECK: $@thin <T : Runcible> (x: T) -> ()
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (x: T) -> () {
 bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.free_method!1
-  %1 = archetype_method $*T, #Runcible.free_method!1 : $@cc(method) ((), [inout] T) -> Int64
-  %2 = apply %1(%0) : $@cc(method) ((), [inout] T) -> Int64
+  %1 = archetype_method $*T, #Runcible.free_method!1 : $@cc(method) ((), @inout T) -> Int64
+  %2 = apply %1(%0) : $@cc(method) ((), @inout T) -> Int64
   %3 = alloc_stack $T.U.metatype
   // CHECK: archetype_method $*T, #Runcible.associated_method!1
-  %4 = archetype_method $*T, #Runcible.associated_method!1 : $@cc(method) ((), [inout] T) -> T.U.metatype
-  %5 = apply %4(%0) : $@cc(method) ((), [inout] T) -> T.U.metatype
+  %4 = archetype_method $*T, #Runcible.associated_method!1 : $@cc(method) ((), @inout T) -> T.U.metatype
+  %5 = apply %4(%0) : $@cc(method) ((), @inout T) -> T.U.metatype
   %6 = store %5 to %3#1 : $*T.U.metatype
   %7 = metatype $T.metatype
   // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
@@ -255,7 +255,7 @@ bb0(%0 : $*T):
 
 protocol Bendable { }
 
-// CHECK: $[thin] (x: protocol<Bendable, Runcible>) -> Runcible
+// CHECK: $@thin (x: protocol<Bendable, Runcible>) -> Runcible
 sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (x: protocol<Bendable, Runcible>) -> Runcible {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
@@ -283,7 +283,7 @@ protocol [class_protocol] ClassBound {
   func classBoundMethod()
 }
 
-// CHECK: $[thin] (x: ClassBound) -> ()
+// CHECK: $@thin (x: ClassBound) -> ()
 sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (x: ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $ClassBound                // CHECK: alloc_box
@@ -303,7 +303,7 @@ bb0(%0 : $ClassBound):
 struct Val {
 }
 
-// CHECK: $[thin] ((), Val.metatype) -> Val
+// CHECK: $@thin ((), Val.metatype) -> Val
 sil @_TV4todo3ValCfMS0_FT_S0_ : $@thin ((), Val.metatype) -> Val {
 bb0(%0 : $Val.metatype):
   %1 = alloc_stack $Val // CHECK: alloc_stack
@@ -321,7 +321,7 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK: $[thin] ((a: Ref, b: Val), Aleph.metatype) -> Aleph
+// CHECK: $@thin ((a: Ref, b: Val), Aleph.metatype) -> Aleph
 sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin ((a: Ref, b: Val), Aleph.metatype) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
@@ -329,7 +329,7 @@ bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
   %4 = return %3 : $Aleph  // CHECK: return
 }
 
-// CHECK: $[thin] ((), Aleph.metatype) -> Aleph
+// CHECK: $@thin ((), Aleph.metatype) -> Aleph
 sil @_TV6struct5AlephCfMS0_FT_S0_ : $@thin ((), Aleph.metatype) -> Aleph {
 bb0(%0 : $Aleph.metatype):
   %1 = tuple ()
@@ -399,7 +399,7 @@ bb0(%0 : $*Gimel, %1 : $*Q):
 sil @_T5tuple5floatFT1xSf_T_ : $@thin (x : Float32) -> ()
 sil @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
 
-// CHECK: $[thin] (x: (Int64, Float32)) -> ()
+// CHECK: $@thin (x: (Int64, Float32)) -> ()
 sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (x: (Int64, Float32)) -> () {
 bb0(%0 : $Int64, %1 : $Float32):
   %2 = alloc_box $(Int64, Float32)
@@ -433,7 +433,7 @@ class M {
   var member: Int
 }
 
-// CHECK: $[cc(method), thin] ((x: Int64), M) -> ()
+// CHECK: $@cc(method) @thin ((x: Int64), M) -> ()
 sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin ((x: Int64), M) -> () {
 bb0(%0 : $Int64, %1 : $M):
   %2 = alloc_box $Int64     // CHECK: alloc_box $Int64
@@ -457,8 +457,8 @@ class GenericClass<Q> {
   var member: Q
 }
 
-// CHECK: sil @bound_generic_class_ref_element_addr : $[thin] GenericClass<Int64> -> Int64 {
-sil @bound_generic_class_ref_element_addr : $[thin] GenericClass<Int64> -> Int64 {
+// CHECK: sil @bound_generic_class_ref_element_addr : $@thin GenericClass<Int64> -> Int64 {
+sil @bound_generic_class_ref_element_addr : $@thin GenericClass<Int64> -> Int64 {
 entry(%0 : $GenericClass<Int64>):
   // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int64>, #member
   %1 = ref_element_addr %0 : $GenericClass<Int64>, #member
@@ -470,7 +470,7 @@ entry(%0 : $GenericClass<Int64>):
 class B { }
 class E : B { }
 
-// CHECK: $[thin] (b: B) -> Builtin.Int1
+// CHECK: $@thin (b: B) -> Builtin.Int1
 sil @_T4null3isaFT1bCS_1B_Sb : $@thin (b: B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B                           // CHECK: alloc_box
@@ -493,7 +493,7 @@ isa(%6 : $Builtin.Int1):
 sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin ((value: Builtin.FPIEEE64), Float64.metatype) -> Float64
 sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
 
-// CHECK: $[thin] () -> ()
+// CHECK: $@thin () -> ()
 sil @_T7literal8literalsFT_T_ : $@thin () -> () {
 bb0:
   %0 = tuple ()
@@ -690,10 +690,10 @@ bb0(%0 : $Bas):
   %5 = struct_extract %3 : $String, #str_value
   %6 = struct_extract %5 : $StringByteData, #owner
   strong_retain %6 : $Builtin.ObjectPointer
-  %8 = function_ref @swift_StringToNSString : $@thin (string: [inout] String) -> NSString
+  %8 = function_ref @swift_StringToNSString : $@thin (string: @inout String) -> NSString
   %9 = alloc_stack $String
   store %3 to %9#1 : $*String
-  %11 = apply %8(%9#1) : $@thin (string: [inout] String) -> NSString
+  %11 = apply %8(%9#1) : $@thin (string: @inout String) -> NSString
   dealloc_stack %9#0 : $*@local_storage String
   %13 = struct_extract %3 : $String, #str_value
   %14 = struct_extract %13 : $StringByteData, #owner
@@ -701,7 +701,7 @@ bb0(%0 : $Bas):
   // CHECK: autorelease_return %11 : $NSString
   autorelease_return %11 : $NSString
 }
-sil @swift_StringToNSString : $@thin (string: [inout] String) -> NSString
+sil @swift_StringToNSString : $@thin (string: @inout String) -> NSString
 
 // CHECK-LABEL: sil @test_super_method
 sil @test_super_method : $@cc(method) @thin ((), Bas) -> Bas {
@@ -748,7 +748,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   store %0 to %2#1 : $*Builtin.Int1
   store %1 to %3#1 : $*Builtin.Int1
   %6 = module #Builtin              // CHECK: module #Builtin
-  // CHECK: builtin_function_ref #Builtin.cmp_eq_Int1 : $[thin] (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  // CHECK: builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %7 = builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %8 = load %2#1 : $*Builtin.Int1
   %9 = load %3#1 : $*Builtin.Int1
@@ -780,16 +780,16 @@ bb0:
 
 // CHECK-LABEL: closure_test
 sil @takes_closure : $@thin (x : () -> ()) -> ()
-sil @closure0 : $@thin ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+sil @closure0 : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
 
 sil @closure_test : $@thin () -> () {
 bb0:
   %0 = alloc_box $Int64                           // users: %10, %8, %8, %7, %4
 
   %5 = function_ref @takes_closure : $@thin (x : () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+  %6 = function_ref @closure0 : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin ((), (Builtin.ObjectPointer, @inout Int64)) -> ()
   %9 = apply %5(%8) : $@thin (x : () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
@@ -842,7 +842,7 @@ sil @_T6switch1aFT_T_ : $@thin () -> ()
 sil @_T6switch1bFT_T_ : $@thin () -> ()
 sil @_T6switch1cFT_T_ : $@thin () -> ()
 
-// CHECK-LABEL: sil @test_switch_union : $[thin] (u: MaybePair) -> ()
+// CHECK-LABEL: sil @test_switch_union : $@thin (u: MaybePair) -> ()
 sil @test_switch_union : $@thin (u: MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
@@ -881,7 +881,7 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil @test_switch_union_addr : $[thin] (u: MaybeAddressOnlyPair) -> ()
+// CHECK-LABEL: sil @test_switch_union_addr : $@thin (u: MaybeAddressOnlyPair) -> ()
 sil @test_switch_union_addr : $@thin (u: MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: destructive_switch_enum_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
@@ -898,7 +898,7 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @test_switch_int : $[thin] (u: Builtin.Int64) -> ()
+// CHECK-LABEL: sil @test_switch_int : $@thin (u: Builtin.Int64) -> ()
 sil @test_switch_int : $@thin (u: Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   // CHECK: switch_int %{{.*}} : $Builtin.Int64, case 1: bb1, case 2: bb2
@@ -924,7 +924,7 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil @test_init_existential : $[thin] (x: Spoon) -> Bendable
+// CHECK-LABEL: sil @test_init_existential : $@thin (x: Spoon) -> Bendable
 sil @test_init_existential : $@thin (x: Spoon) -> Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
@@ -940,7 +940,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil @test_existential_ref : $[thin] (x: ConcreteClass) -> ClassP
+// CHECK-LABEL: sil @test_existential_ref : $@thin (x: ConcreteClass) -> ClassP
 sil @test_existential_ref : $@thin (x : ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
@@ -953,32 +953,32 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil @test_assign : $(x: Int64, y: [inout] Int64) -> () {    // CHECK-LABEL: sil @test_assign
+sil @test_assign : $(x: Int64, y: @inout Int64) -> () {    // CHECK-LABEL: sil @test_assign
 bb0(%0 : $Int64, %1 : $*Int64):
   assign %0 to %1 : $*Int64                   // CHECK:   assign %0 to %1
   unreachable
 }
 
-// CHECK-LABEL: sil @test_transparent : $[thin] () -> () {
+// CHECK-LABEL: sil @test_transparent : $@thin () -> () {
 sil @test_transparent : $@thin () -> () {
 bb0:
   %0 = function_ref @classes : $@thin () -> ()
-  // CHECK: apply [transparent] %{{.*}}() : $[thin] () -> ()
+  // CHECK: apply [transparent] %{{.*}}() : $@thin () -> ()
   %1 = apply [transparent] %0() : $@thin () -> ()
   %2 = tuple ()
   %3 = return %2 : $()
 }
 
-// CHECK-LABEL: sil @takes_unnamed_closure : $[thin] (() -> Int64) -> () -> () -> Int64
+// CHECK-LABEL: sil @takes_unnamed_closure : $@thin (() -> Int64) -> () -> () -> Int64
 sil @takes_unnamed_closure : $@thin (() -> Int64) -> () -> () -> Int64
 
 sil @takes_int64_float32 : $@thin (Int64, Float32) -> ()
 
-// CHECK-LABEL: sil @test_partial_apply : $[thin] Float32 -> Int64 -> () {
+// CHECK-LABEL: sil @test_partial_apply : $@thin Float32 -> Int64 -> () {
 sil @test_partial_apply : $@thin Float32 -> Int64 -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@thin (Int64, Float32) -> ()
-  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $[thin] (Int64, Float32) -> ()
+  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@thin (Int64, Float32) -> ()
   %2 = partial_apply %1(%0) : $@thin (Int64, Float32) -> ()
   %3 = return %2 : $Int64 -> ()
 }
@@ -987,7 +987,7 @@ class X {
   func [objc] f() { }
 }
 
-// CHECK-LABEL: sil @test_dynamic_lookup_br : $[thin] (obj: DynamicLookup) -> ()
+// CHECK-LABEL: sil @test_dynamic_lookup_br : $@thin (obj: DynamicLookup) -> ()
 sil @test_dynamic_lookup_br : $@thin (obj: DynamicLookup) -> () {
 bb0(%0 : $DynamicLookup):
   %1 = alloc_box $DynamicLookup

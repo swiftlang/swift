@@ -14,20 +14,20 @@ class [objc] ObjCClass {
   func method(x:Builtin.Int64) {}
 }
 
-sil @_TCSo9ObjCClasscfMS_FT_S_ : $[cc(method), thin] ((), ObjCClass) -> ObjCClass {
+sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin ((), ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClasscfMS_FT_S_ : $[cc(objc_method), thin] ((), ObjCClass) -> ObjCClass {
+sil @_TToCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin ((), ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.metatype)() -> ObjectiveC.ObjCClass
-  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $[cc(method), thin] ((), ObjCClass) -> ObjCClass // user: %2
-  %2 = apply %1(%0) : $[cc(method), thin] ((), ObjCClass) -> ObjCClass // user: %3
+  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin ((), ObjCClass) -> ObjCClass // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin ((), ObjCClass) -> ObjCClass // user: %3
   return %2 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClass6methodfS_FT1xBi64__T_ : $[cc(objc_method), thin] ((x : Builtin.Int64), ObjCClass) -> () {
+sil @_TToCSo9ObjCClass6methodfS_FT1xBi64__T_ : $@cc(objc_method) @thin ((x : Builtin.Int64), ObjCClass) -> () {
 entry(%x : $Builtin.Int64, %c : $ObjCClass):
   %v = tuple()
   return %v : $()
@@ -60,7 +60,7 @@ entry(%x : $Builtin.Int64, %c : $ObjCClass):
 // CHECK:   ret void
 // CHECK: }
 
-sil @indirect_partial_apply : $[thin] ((Builtin.Int64) -> (), Builtin.Int64) -> () -> () {
+sil @indirect_partial_apply : $@thin ((Builtin.Int64) -> (), Builtin.Int64) -> () -> () {
 entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
   %p = partial_apply %f(%x) : $(Builtin.Int64) -> ()
   return %p : $() -> ()
@@ -85,14 +85,14 @@ entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
 // CHECK:   ret void
 // CHECK: }
 
-sil @objc_partial_apply : $[thin] ObjCClass -> Builtin.Int64 -> () {
+sil @objc_partial_apply : $@thin ObjCClass -> Builtin.Int64 -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $[cc(objc_method), thin] ((x:Builtin.Int64), ObjCClass) -> ()
-  %p = partial_apply %m(%c) : $[cc(objc_method), thin] ((x:Builtin.Int64), ObjCClass) -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $@cc(objc_method) @thin ((x:Builtin.Int64), ObjCClass) -> ()
+  %p = partial_apply %m(%c) : $@cc(objc_method) @thin ((x:Builtin.Int64), ObjCClass) -> ()
   return %p : $Builtin.Int64 -> ()
 }
 
-sil @dummy : $[thin] Builtin.Int64 -> () {
+sil @dummy : $@thin Builtin.Int64 -> () {
 entry(%x : $Builtin.Int64):
   %v = tuple ()
   return %v : $()
@@ -103,17 +103,17 @@ entry(%x : $Builtin.Int64):
 // CHECK: define internal void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
 // CHECK:   load i8** @"\01L_selector(method:)", align 8
 
-sil @dynamic_lookup_br_partial_apply : $[thin] Builtin.ObjCPointer -> Builtin.Int64 -> () {
+sil @dynamic_lookup_br_partial_apply : $@thin Builtin.ObjCPointer -> Builtin.Int64 -> () {
 entry(%o : $Builtin.ObjCPointer):
   dynamic_method_br %o : $Builtin.ObjCPointer, #ObjCClass.method!1.foreign, yes, no
 
-yes(%m : $[cc(objc_method), thin] ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()):
-  %p = partial_apply %m(%o) : $[cc(objc_method), thin] ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()
+yes(%m : $@cc(objc_method) @thin ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()):
+  %p = partial_apply %m(%o) : $@cc(objc_method) @thin ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()
   br done(%p : $Builtin.Int64 -> ())
 
 no:
-  %q = function_ref @dummy : $[thin] Builtin.Int64 -> ()
-  %r = thin_to_thick_function %q : $[thin] Builtin.Int64 -> () to $Builtin.Int64 -> ()
+  %q = function_ref @dummy : $@thin Builtin.Int64 -> ()
+  %r = thin_to_thick_function %q : $@thin Builtin.Int64 -> () to $Builtin.Int64 -> ()
   br done(%r : $Builtin.Int64 -> ())
 
 done(%f : $Builtin.Int64 -> ()):

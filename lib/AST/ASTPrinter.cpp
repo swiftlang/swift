@@ -135,28 +135,6 @@ public:
     return OS << (AttrCount++ == 0 ? "[" : ", ");
   }
 
-  void printCC(AbstractCC CC) {
-    if (CC == AbstractCC::Freestanding)
-      return;
-
-    next() << "cc(";
-    switch (CC) {
-    case AbstractCC::Freestanding:
-      OS << "freestanding";
-      break;
-    case AbstractCC::Method:
-      OS << "method";
-      break;
-    case AbstractCC::C:
-      OS << "cdecl";
-      break;
-    case AbstractCC::ObjCMethod:
-      OS << "objc_method";
-      break;
-    }
-    OS << ")";
-  }
-
   void finish() {
     if (AttrCount > 0)
       OS << "] ";
@@ -1291,19 +1269,27 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
-    AttributePrinter attrs(OS);
-
     if (info.isAutoClosure())
-      attrs.next() << "auto_closure";
-    attrs.printCC(info.getCC());
-    if (info.isBlock())
-      attrs.next() << "objc_block";
-    if (info.isThin())
-      attrs.next() << "thin";
-    if (info.isNoReturn())
-      attrs.next() << "noreturn";
+      OS << "@auto_closure ";
+    switch (info.getCC()) {
+    case AbstractCC::Freestanding: break;
+    case AbstractCC::Method:
+      OS << "@cc(method) ";
+      break;
+    case AbstractCC::C:
+      OS << "@cc(cdecl) ";
+      break;
+    case AbstractCC::ObjCMethod:
+      OS << "@cc(objc_method) ";
+      break;
+    }
 
-    attrs.finish();
+    if (info.isBlock())
+      OS << "@objc_block ";
+    if (info.isThin())
+      OS << "@thin ";
+    if (info.isNoReturn())
+      OS << "@noreturn ";
   }
 
   void visitFunctionType(FunctionType *T) {
@@ -1435,7 +1421,7 @@ public:
   }
 
   void visitLValueType(LValueType *T) {
-    OS << "[inout";
+    OS << "@inout ";
 
     LValueType::Qual QS = T->getQualifiers();
     if (QS != LValueType::Qual::DefaultForType) {
@@ -1457,7 +1443,6 @@ public:
 
 #undef APPEND_QUAL
     }
-    OS << "] ";
     visit(T->getObjectType());
   }
 

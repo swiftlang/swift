@@ -622,8 +622,7 @@ bool SILParser::parseSILType(SILType &Result) {
 
   // Parse attributes.
   TypeAttributes attrs;
-  P.parseTypeAttributeList(attrs, false);
-  P.parseTypeAttributeList(attrs, true);
+  P.parseTypeAttributeList(attrs);
 
   // Handle @local_storage, which changes the SIL value category.
   if (attrs.has(TAK_local_storage)) {

@@ -1105,19 +1105,19 @@ public:
     
     require(operandFTy.getInput() == resultFTy.getInput(),
             "bridge_to_block operand and result types must differ only in "
-            "[objc_block]-ness");
+            "@objc_block-ness");
     require(operandFTy.getResult() == resultFTy.getResult(),
             "bridge_to_block operand and result types must differ only in "
-            "[objc_block]-ness");
+            "@objc_block-ness");
     require(operandFTy->isAutoClosure() == resultFTy->isAutoClosure(),
             "bridge_to_block operand and result types must differ only in "
-            "[objc_block]-ness");
-    require(!operandFTy->isThin(), "bridge_to_block operand cannot be [thin]");
-    require(!resultFTy->isThin(), "bridge_to_block result cannot be [thin]");
+            "@objc_block-ness");
+    require(!operandFTy->isThin(), "bridge_to_block operand cannot be @thin");
+    require(!resultFTy->isThin(), "bridge_to_block result cannot be @thin");
     require(!operandFTy->isBlock(),
-            "bridge_to_block operand cannot be [objc_block]");
+            "bridge_to_block operand cannot be @objc_block");
     require(resultFTy->isBlock(),
-            "bridge_to_block result must be [objc_block]");
+            "bridge_to_block result must be @objc_block");
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {

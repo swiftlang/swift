@@ -180,7 +180,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK:   phi <{ i64, i64 }>* [ [[ADDR]], %[[PREDEST]] ]
 // CHECK:   ret void
 // CHECK: }
-sil @singleton_switch_indirect : $([inout] Singleton) -> () {
+sil @singleton_switch_indirect : $(@inout Singleton) -> () {
 entry(%u : $*Singleton):
   destructive_switch_enum_addr %u : $*Singleton, case #Singleton.val!enumelt.1: dest
 dest(%u2 : $*(Builtin.Int64, Builtin.Int64)):
@@ -210,7 +210,7 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK:   store i64 %1, i64* [[DATA_1_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, [inout] Singleton) -> () {
+sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, @inout Singleton) -> () {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
   %a = enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
@@ -227,16 +227,16 @@ enum NoPayloads {
   case z
 }
 
-sil @a : $[thin] () -> ()
-sil @b : $[thin] () -> ()
-sil @c : $[thin] () -> ()
-sil @d : $[thin] () -> ()
-sil @e : $[thin] () -> ()
-sil @f : $[thin] () -> ()
+sil @a : $@thin () -> ()
+sil @b : $@thin () -> ()
+sil @c : $@thin () -> ()
+sil @d : $@thin () -> ()
+sil @e : $@thin () -> ()
+sil @f : $@thin () -> ()
 
 
 // CHECK: define void @no_payload_switch(i2) {
-sil @no_payload_switch : $[thin] (NoPayloads) -> () {
+sil @no_payload_switch : $@thin (NoPayloads) -> () {
 // CHECK: entry:
 entry(%u : $NoPayloads):
 // CHECK:   switch i2 %0, label %[[DFLT:[0-9]+]] [
@@ -252,22 +252,22 @@ entry(%u : $NoPayloads):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
 x_dest:
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
 y_dest:
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
 z_dest:
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -278,7 +278,7 @@ end:
 }
 
 // CHECK: define void @no_payload_switch_indirect(%O4enum10NoPayloads*) {
-sil @no_payload_switch_indirect : $[thin] ([inout] NoPayloads) -> () {
+sil @no_payload_switch_indirect : $@thin (@inout NoPayloads) -> () {
 entry(%u : $*NoPayloads):
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum10NoPayloads* %0, i32 0, i32 0
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]]
@@ -332,7 +332,7 @@ entry:
 // CHECK:   store i2 -2, i2* [[TAG_ADDR]], align 1
 // CHECK:   ret void
 // CHECK: }
-sil @no_payload_inject_z_indirect : $([inout] NoPayloads) -> () {
+sil @no_payload_inject_z_indirect : $(@inout NoPayloads) -> () {
 entry(%0 : $*NoPayloads):
   inject_enum_addr %0 : $*NoPayloads, #NoPayloads.z!enumelt
   %v = tuple ()
@@ -350,7 +350,7 @@ enum NoPayloads2 {
 }
 
 // CHECK: define void @no_payload_switch_2(i3) {
-sil @no_payload_switch_2 : $[thin] (NoPayloads2) -> () {
+sil @no_payload_switch_2 : $@thin (NoPayloads2) -> () {
 // CHECK: entry:
 entry(%u : $NoPayloads2):
 // CHECK:   switch i3 %0, label %[[DEFAULT_DEST:[0-9]+]] [
@@ -361,16 +361,16 @@ entry(%u : $NoPayloads2):
 // CHECK: ; <label>:[[U_DEST]]
 u_dest:
 // CHECK:   call void @a()
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[DEFAULT_DEST]]
 default_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -394,7 +394,7 @@ enum SinglePayloadNoXI2 {
 }
 
 // CHECK: define void @single_payload_no_xi_switch(i64, i1) {
-sil @single_payload_no_xi_switch : $[thin] (SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_switch : $@thin (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
@@ -414,24 +414,24 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
 x_dest:
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
 y_dest:
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
 z_dest:
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -442,7 +442,7 @@ end:
 }
 
 // CHECK: define void @single_payload_no_xi_switch_arg(i64, i1) {
-sil @single_payload_no_xi_switch_arg : $[thin] (SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_switch_arg : $@thin (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
@@ -465,24 +465,24 @@ entry(%u : $SinglePayloadNoXI2):
 x_dest(%u2 : $Builtin.Int64):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -513,7 +513,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, [inout] SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, @inout SinglePayloadNoXI2) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
   %a = enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
@@ -541,7 +541,7 @@ entry:
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_no_xi_inject_y_indirect : $([inout] SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_inject_y_indirect : $(@inout SinglePayloadNoXI2) -> () {
 entry(%0 : $*SinglePayloadNoXI2):
   inject_enum_addr %0 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.y!enumelt
   %v = tuple ()
@@ -568,7 +568,7 @@ enum AggregateSinglePayload {
 }
 
 // CHECK: define void @aggregate_single_payload_unpack(i128, i1) {
-sil @aggregate_single_payload_unpack : $[thin] (AggregateSinglePayload) -> () {
+sil @aggregate_single_payload_unpack : $@thin (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
 
@@ -611,7 +611,7 @@ enum AggregateSinglePayload2 {
 }
 
 // CHECK: define void @aggregate_single_payload_unpack_2(i256, i1) {
-sil @aggregate_single_payload_unpack_2 : $[thin] (AggregateSinglePayload2) -> () {
+sil @aggregate_single_payload_unpack_2 : $@thin (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
 
@@ -661,7 +661,7 @@ enum SinglePayloadSpareBit {
 }
 
 // CHECK: define void @single_payload_spare_bit_switch(i64) {
-sil @single_payload_spare_bit_switch : $[thin] (SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch : $@thin (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
 // CHECK:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
@@ -675,24 +675,24 @@ entry(%u : $SinglePayloadSpareBit):
 // CHECK: ; <label>:[[X_DEST]]
 x_dest:
 // CHECK:   call void @a()
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
 // CHECK:   br label %[[END]]
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -704,7 +704,7 @@ end:
 }
 
 // CHECK: define void @single_payload_spare_bit_switch_arg(i64) {
-sil @single_payload_spare_bit_switch_arg : $[thin] (SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch_arg : $@thin (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
 // CHECK:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
@@ -722,24 +722,24 @@ entry(%u : $SinglePayloadSpareBit):
 // CHECK:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Int63):
 // CHECK:   call void @a()
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
 // CHECK:   br label %[[END]]
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -750,7 +750,7 @@ end:
   return %x : $()
 }
 
-sil @single_payload_spare_bit_switch_indirect : $[thin] ([inout] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch_indirect : $@thin (@inout SinglePayloadSpareBit) -> () {
 entry(%u : $*SinglePayloadSpareBit):
 // CHECK:  [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // CHECK:  [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
@@ -763,8 +763,8 @@ entry(%u : $*SinglePayloadSpareBit):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i63* [ [[DATA_ADDR]], %[[X_PREDEST]] ]
 x_dest(%u2 : $*Builtin.Int63):
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 y_dest:
@@ -795,7 +795,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, [inout] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, @inout SinglePayloadSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
   %a = enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int63
@@ -822,7 +822,7 @@ entry:
 // CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_spare_bit_inject_y_indirect : $([inout] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_inject_y_indirect : $(@inout SinglePayloadSpareBit) -> () {
 entry(%0 : $*SinglePayloadSpareBit):
   inject_enum_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
   %v = tuple ()
@@ -996,40 +996,40 @@ entry(%u : $MultiPayloadNoSpareBits):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i64 [ %0, %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int64):
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int32):
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int63):
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $[thin] () -> ()
-  apply %d() : $[thin] () -> ()
+  %d = function_ref @d : $@thin () -> ()
+  apply %d() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $[thin] () -> ()
-  apply %e() : $[thin] () -> ()
+  %e = function_ref @e : $@thin () -> ()
+  apply %e() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $[thin] () -> ()
-  apply %f() : $[thin] () -> ()
+  %f = function_ref @f : $@thin () -> ()
+  apply %f() : $@thin () -> ()
   br end
 
 end:
@@ -1038,7 +1038,7 @@ end:
 }
 
 // CHECK: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits*) {
-sil @multi_payload_no_spare_bits_switch_indirect : $([inout] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bits_switch_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
@@ -1102,7 +1102,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK:   store i2 0, i2* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, [inout] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, @inout MultiPayloadNoSpareBits) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
@@ -1156,7 +1156,7 @@ entry:
 // CHECK:   store i2 -1, i2* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_no_spare_bit_inject_a_indirect : $([inout] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bit_inject_a_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%0 : $*MultiPayloadNoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
   %v = tuple ()
@@ -1237,40 +1237,40 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int63):
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $[thin] () -> ()
-  apply %d() : $[thin] () -> ()
+  %d = function_ref @d : $@thin () -> ()
+  apply %d() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $[thin] () -> ()
-  apply %e() : $[thin] () -> ()
+  %e = function_ref @e : $@thin () -> ()
+  apply %e() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $[thin] () -> ()
-  apply %f() : $[thin] () -> ()
+  %f = function_ref @f : $@thin () -> ()
+  apply %f() : $@thin () -> ()
   br end
 
 end:
@@ -1278,7 +1278,7 @@ end:
   return %v : $()
 }
 
-sil @multi_payload_one_spare_bit_switch_indirect : $([inout] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_switch_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
 entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
@@ -1355,7 +1355,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, [inout] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
   %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
@@ -1396,7 +1396,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK:   ret void
 // CHECK: }
 
-sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, [inout] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
   %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   store %0 to %a : $*Builtin.Int63
@@ -1439,7 +1439,7 @@ entry:
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_one_spare_bit_inject_a_indirect : $([inout] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_a_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $*MultiPayloadOneSpareBit):
   inject_enum_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
   %v = tuple ()
@@ -1521,40 +1521,40 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
-  %a = function_ref @a : $[thin] () -> ()
-  apply %a() : $[thin] () -> ()
+  %a = function_ref @a : $@thin () -> ()
+  apply %a() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int60):
-  %b = function_ref @b : $[thin] () -> ()
-  apply %b() : $[thin] () -> ()
+  %b = function_ref @b : $@thin () -> ()
+  apply %b() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
-  %c = function_ref @c : $[thin] () -> ()
-  apply %c() : $[thin] () -> ()
+  %c = function_ref @c : $@thin () -> ()
+  apply %c() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $[thin] () -> ()
-  apply %d() : $[thin] () -> ()
+  %d = function_ref @d : $@thin () -> ()
+  apply %d() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $[thin] () -> ()
-  apply %e() : $[thin] () -> ()
+  %e = function_ref @e : $@thin () -> ()
+  apply %e() : $@thin () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $[thin] () -> ()
-  apply %f() : $[thin] () -> ()
+  %f = function_ref @f : $@thin () -> ()
+  apply %f() : $@thin () -> ()
   br end
 
 end:
@@ -1584,7 +1584,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, [inout] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
@@ -1619,7 +1619,7 @@ entry(%0 : $Builtin.Int60):
 // CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, [inout] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   store %0 to %a : $*Builtin.Int60
@@ -1659,7 +1659,7 @@ entry:
 // CHECK:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_a_indirect : $([inout] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_a_indirect : $(@inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $*MultiPayloadTwoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
   %v = tuple ()

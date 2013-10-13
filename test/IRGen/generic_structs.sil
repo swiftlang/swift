@@ -67,7 +67,7 @@ struct ComplexDynamic<U, V> {
 }
 
 // CHECK-LABEL: define void @explode_complex_dynamic
-sil @explode_complex_dynamic : $<A, B> (ComplexDynamic<A, B>, [inout] Byteful, [inout] A, [inout] B, [inout] Chareth) -> () {
+sil @explode_complex_dynamic : $<A, B> (ComplexDynamic<A, B>, @inout Byteful, @inout A, @inout B, @inout Chareth) -> () {
 entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Chareth):
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #a2
 

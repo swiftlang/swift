@@ -3,24 +3,24 @@
 import Builtin
 import swift
 
-sil @test_circular_foo : $[thin] (x : Float32) -> Float32 {
+sil @test_circular_foo : $@thin (x : Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_bar : $[thin] (x : Float32) -> Float32
-  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_bar : $@thin (x : Float32) -> Float32
+  %5 = apply [transparent] %3(%0) : $@thin (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 
-sil @test_circular_bar : $[thin] (x : Float32) -> Float32 {
+sil @test_circular_bar : $@thin (x : Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_baz : $[thin] (x : Float32) -> Float32
-  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_baz : $@thin (x : Float32) -> Float32
+  %5 = apply [transparent] %3(%0) : $@thin (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 
-sil @test_circular_baz : $[thin] (x : Float32) -> Float32 {
+sil @test_circular_baz : $@thin (x : Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_foo : $[thin] (x : Float32) -> Float32
-  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_foo : $@thin (x : Float32) -> Float32
+  %5 = apply [transparent] %3(%0) : $@thin (x : Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 

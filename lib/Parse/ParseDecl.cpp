@@ -264,13 +264,10 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
 ///   attribute-type:
 ///     'noreturn'
 /// \endverbatim
-bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
+bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.
-  if (Tok.isNot(tok::identifier) &&
-      Tok.isNot(tok::kw_weak) &&
-      Tok.isNot(tok::kw_unowned)) {
+  if (Tok.isNot(tok::identifier)) {
     diagnose(Tok, diag::expected_attribute_name);
-    if (OldStyle) skipUntil(tok::r_square);
     return true;
   }
   
@@ -291,19 +288,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
       diagnose(Tok, diag::decl_attribute_applied_to_type);
     else
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
-    if (OldStyle)
-      skipUntil(tok::r_square);
-    else {
-      // Recover by eating @foo when foo is not known.
-      consumeToken();
+
+    // Recover by eating @foo when foo is not known.
+    consumeToken();
       
-      // Recovery by eating "@foo=bar" if present.
-      if (consumeIf(tok::equal)) {
-        if (Tok.is(tok::identifier) ||
-            Tok.is(tok::integer_literal) ||
-            Tok.is(tok::floating_literal))
-          consumeToken();
-      }
+    // Recovery by eating "@foo=bar" if present.
+    if (consumeIf(tok::equal)) {
+      if (Tok.is(tok::identifier) ||
+          Tok.is(tok::integer_literal) ||
+          Tok.is(tok::floating_literal))
+        consumeToken();
     }
     return true;
   }
@@ -377,16 +371,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
       } else {
         diagnose(Tok, diag::cc_attribute_expected_name);
       }
-      if (parseMatchingToken(tok::r_paren, endLoc,
-                             diag::cc_attribute_expected_rparen,
-                             beginLoc)) {
-        // If the name isn't immediately followed by a closing paren, recover
-        // by trying to find some closing paren.
-        if (OldStyle) {
-          skipUntil(tok::r_paren);
-          consumeIf(tok::r_paren);
-        }
-      }
+      parseMatchingToken(tok::r_paren, endLoc,
+                         diag::cc_attribute_expected_rparen,
+                         beginLoc);
     } else {
       diagnose(Tok, diag::cc_attribute_expected_lparen);
     }
@@ -469,36 +456,15 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
 ///     '@' attribute
 ///     '@' attribute ','? attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes,
-                                           bool OldStyle) {
-  if (OldStyle) {
-    Attributes.AtLoc = consumeToken(tok::l_square);
+bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
+  Attributes.AtLoc = Tok.getLoc();
+  do {
+    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
+        parseTypeAttribute(Attributes))
+      return true;
     
-    do {
-      SourceLoc RightLoc;
-      if (parseList(tok::r_square, Attributes.AtLoc, RightLoc,
-                    tok::comma, /*OptionalSep=*/false,
-                    diag::expected_in_attribute_list,
-                    [&] () -> bool {
-                      return parseTypeAttribute(Attributes, OldStyle);
-                    }))
-        return true;
-      
-      // A square bracket here begins another attribute-list-clause;
-      // consume it and continue.  Note that we'll overwrite
-      // Attributes.RSquareLoc so that it encompasses the entire range.
-    } while (consumeIf(tok::l_square));
-    
-  } else {
-    Attributes.AtLoc = Tok.getLoc();
-    do {
-      if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-          parseTypeAttribute(Attributes, OldStyle))
-        return true;
-      
-      // Attribute lists don't require separating commas.
-    } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
-  }
+    // Attribute lists don't require separating commas.
+  } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
   
   return false;
 }

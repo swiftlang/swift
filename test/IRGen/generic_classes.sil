@@ -232,7 +232,7 @@ entry(%c : $NonGenericInheritsGeneric):
   return %w : $Int
 }
 
-sil @top_level_code : $[thin] () -> () {
+sil @top_level_code : $@thin () -> () {
 entry:
   %v = tuple ()
   return %v : $()

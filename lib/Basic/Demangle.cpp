@@ -1738,7 +1738,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       toStringChildren(pointer, printer);
       break;
     case swift::Demangle::Node::Kind::InOut:
-      printer << "[inout] ";
+      printer << "@inout ";
       pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ObjCAttribute:
       printer << "[objc] ";
@@ -1856,7 +1856,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       break;
     }
     case swift::Demangle::Node::Kind::ObjCBlock: {
-      printer << "[objc_block] ";
+      printer << "@objc_block ";
       NodePointer tuple = pointer->child_at(0);
       NodePointer rettype = pointer->child_at(1);
       toString(tuple, printer);

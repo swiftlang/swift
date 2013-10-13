@@ -484,7 +484,7 @@ public:
                       DeclAttributes &Attributes,
                       PatternBindingDecl *PBD = nullptr);
   
-  bool parseAttributeList(DeclAttributes &Attributes, bool OldStyle) {
+  bool parseAttributeList(DeclAttributes &Attributes, bool OldStyle = false) {
     if (OldStyle) {
       if (Tok.is(tok::l_square))
         return parseAttributeListPresent(Attributes, OldStyle);
@@ -497,18 +497,13 @@ public:
   bool parseAttributeListPresent(DeclAttributes &Attributes, bool OldStyle);
   bool parseAttribute(DeclAttributes &Attributes, bool OldStyle);
   
-  bool parseTypeAttributeList(TypeAttributes &Attributes, bool OldStyle) {
-    if (OldStyle) {
-      if (Tok.is(tok::l_square))
-        return parseTypeAttributeListPresent(Attributes, OldStyle);
-    } else {
-      if (Tok.is(tok::at_sign))
-        return parseTypeAttributeListPresent(Attributes, OldStyle);
-    }
+  bool parseTypeAttributeList(TypeAttributes &Attributes) {
+    if (Tok.is(tok::at_sign))
+      return parseTypeAttributeListPresent(Attributes);
     return false;
   }
-  bool parseTypeAttributeListPresent(TypeAttributes &Attributes, bool OldStyle);
-  bool parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle);
+  bool parseTypeAttributeListPresent(TypeAttributes &Attributes);
+  bool parseTypeAttribute(TypeAttributes &Attributes);
   
   
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
