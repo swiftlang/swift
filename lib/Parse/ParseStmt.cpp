@@ -405,18 +405,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   ParserStatus Status = parseBraceItems(Entries, false /*NotTopLevel*/);
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
-    // Recover by setting the right brace location to the end location of the
-    // last parsed brace item.
-    if (Entries.empty())
-      RBLoc = LBLoc;
-    else {
-      if (auto *SubStmt = Entries.back().dyn_cast<Stmt *>())
-        RBLoc = SubStmt->getEndLoc();
-      else if (auto *SubExpr = Entries.back().dyn_cast<Expr *>())
-        RBLoc = SubExpr->getEndLoc();
-      else
-        RBLoc = Entries.back().get<Decl *>()->getEndLoc();
-    }
+    RBLoc = PreviousLoc;
   }
 
   return makeParserResult(Status,
