@@ -86,28 +86,20 @@ void AttributedTypeRepr::printImpl(llvm::raw_ostream &OS) const {
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
-  OS << '[';
   const TypeAttributes &Attrs = getAttrs();
-  llvm::SmallString<64> AttrStr;
-  llvm::raw_svector_ostream AttrOS(AttrStr);
-  if (Attrs.has(TAK_inout)) AttrOS << "inout,";
-  if (Attrs.has(TAK_auto_closure)) AttrOS << "auto_closure,";
-  if (Attrs.has(TAK_thin)) AttrOS << "thin,";
-  if (Attrs.has(TAK_noreturn)) AttrOS << "noreturn,";
-  if (Attrs.has(TAK_objc_block)) AttrOS << "objc_block,";
+  if (Attrs.has(TAK_inout))        OS << "@inout ";
+  if (Attrs.has(TAK_auto_closure)) OS << "@auto_closure ";
+  if (Attrs.has(TAK_thin))         OS << "@thin ";
+  if (Attrs.has(TAK_noreturn))     OS << "@noreturn ";
+  if (Attrs.has(TAK_objc_block))   OS << "@objc_block ";
   if (Attrs.cc.hasValue()) {
-    AttrOS << "cc(";
     switch (Attrs.cc.getValue()) {
-    case AbstractCC::C: AttrOS << "cdecl"; break;
-    case AbstractCC::ObjCMethod: AttrOS << "objc_method"; break;
-    case AbstractCC::Freestanding: AttrOS << "freestanding"; break;
-    case AbstractCC::Method: AttrOS << "method"; break;
+    case AbstractCC::C:            OS << "@cc(cdecl)"; break;
+    case AbstractCC::ObjCMethod:   OS << "@cc(objc_method)"; break;
+    case AbstractCC::Freestanding: OS << "@cc(freestanding)"; break;
+    case AbstractCC::Method:       OS << "@cc(method)"; break;
     }
-    AttrOS << "),";
   }
-  AttrOS.flush();
-  AttrStr.pop_back(); // Remove last comma.
-  OS << AttrStr << ']';
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
