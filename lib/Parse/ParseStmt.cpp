@@ -649,7 +649,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
-    parseAttributeList(Attributes, AK_DeclAttributes, false);
+    parseAttributeList(Attributes, false);
     ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
