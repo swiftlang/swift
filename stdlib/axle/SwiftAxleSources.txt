@@ -1,9 +1,0 @@
-#
-# This file lists the sources for the swift standard library in a
-# common place that can be used by both CMake and Make.  It should
-# always begin with a comment.  Filenames should not contain spaces
-# and should be listed one-per-line.  Comments, which are ignored,
-# begin with "#" and extend to the end of the line.
-#
-AxleBuiltins.swift
-#Matrix4f.swift

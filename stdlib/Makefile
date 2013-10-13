@@ -13,6 +13,6 @@
 SWIFT_LEVEL := ..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-DIRS := runtime core axle POSIX objc
+DIRS := runtime core POSIX objc
 
 include $(SWIFT_LEVEL)/Makefile

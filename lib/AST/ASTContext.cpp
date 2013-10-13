@@ -218,7 +218,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
     StdlibModuleName(getIdentifier("swift")),
-    AxleStdlibModuleName(getIdentifier("axle")),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this, AllocationArena::Permanent)

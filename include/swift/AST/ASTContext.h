@@ -169,9 +169,6 @@ public:
   /// The name of the standard library module "swift".
   Identifier StdlibModuleName;
 
-  /// The name of the standard library module "axle".
-  Identifier AxleStdlibModuleName;
-
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;
 

@@ -49,35 +49,13 @@ set_target_properties(swift_stdlib_core PROPERTIES
                                         LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
 add_dependencies(swift_stdlib_core swift)
 
+
 # Create the symlinks necessary to get the compiler to find the
 # swift runtime during development with Xcode.
 add_custom_command(TARGET swift_stdlib_core PRE_BUILD
   COMMAND ln "-fhs" "${SWIFTLIB_DIR}" "${CMAKE_BINARY_DIR}/bin/lib"
   COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
-  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/axle"
   COMMAND ln "-fhs" "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang" "${SWIFTLIB_DIR}/swift/clang")
-
-
-# The stdlib will be cut down further than what we have included here.
-configure_file(AxleSwiftLibSources.txt AxleSwiftLibSources.txt.copy)
-file(STRINGS AxleSwiftLibSources.txt AXLE_SWIFTLIB_SOURCES)
-string(REPLACE ";Word.swift" ";Word${word_size}.swift" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
-if(SWIFT_ASSERTS)
-  string(REPLACE ";Assert.swift" ";AssertDebug.swift" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
-endif()
-# Strip comments and blank lines
-string(REGEX REPLACE " *#[^;]*" "" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
-string(REGEX REPLACE ";;+" ";" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
-
-add_swift_library(swift_stdlib_axle_core INSTALL AXLE IS_STDLIB_CORE
-  ${AXLE_SWIFTLIB_SOURCES}
-  DEPENDS swift_runtime)
-add_dependencies(swift_stdlib_axle_core swift)
-add_swift_optimization_flags(swift_stdlib_axle_core)
-set_target_properties(swift_stdlib_axle_core PROPERTIES
-                                             LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
-add_dependencies(swift_stdlib_axle_core swift)
-
 
 # Install Clang headers under the Swift library so that an installed swift's
 # module importer can find the compiler headers corresponding to its clang.
