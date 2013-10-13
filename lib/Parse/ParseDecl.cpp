@@ -1574,9 +1574,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
-  // FIXME: Implicitly add immutable attribute.
-  parseAttributeList(Attributes, true);
-
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
