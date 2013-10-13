@@ -10,7 +10,7 @@ entry:
   return %v : $()
 }
 
-class [objc] ObjCClass {
+@objc class ObjCClass {
   func method(x:Builtin.Int64) {}
 }
 

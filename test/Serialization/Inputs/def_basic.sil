@@ -272,7 +272,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   %11 = return %7 : $()
 }
 
-protocol [class_protocol] ClassBound {
+@class_protocol protocol ClassBound {
   func classBoundMethod()
 }
 
@@ -767,7 +767,7 @@ bb0:
   return %11 : $()
 }
 
-protocol [class_protocol] ClassP {}
+@class_protocol protocol ClassP {}
 
 enum MaybePair {
   case Neither

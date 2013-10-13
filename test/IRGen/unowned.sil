@@ -8,7 +8,7 @@
 // CHECK: [[A:%V7unowned1A]] = type <{ [[C]]* }>
 
 class C {}
-protocol [class_protocol] P {
+@class_protocol protocol P {
   func explode()
 }
 

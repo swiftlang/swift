@@ -10,7 +10,7 @@ class X {
     return 17
   }
 
-  subscript [objc] (i : Int) -> Int {
+  @objc subscript (i : Int) -> Int {
   get:
     return i
   }

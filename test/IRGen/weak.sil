@@ -12,7 +12,7 @@
 import swift
 
 class C {}
-protocol [class_protocol] P {
+@class_protocol protocol P {
   func explode()
 }
 
