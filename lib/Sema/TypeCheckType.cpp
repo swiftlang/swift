@@ -627,8 +627,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.
     if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
-        attrs.isThin() || attrs.isNoReturn() || 
-        attrs.getKernelOrShaderKind() != KernelOrShaderKind::Default) {
+        attrs.isThin() || attrs.isNoReturn()) {
       FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
       TupleType *InputTy = 0;
       if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
@@ -649,23 +648,14 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
         if (attrs.isNoReturn())
           diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "noreturn");
-        if (attrs.isKernel())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "kernel");
-        if (attrs.isVertex())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "vertex");
-        if (attrs.isFragment())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "fragment");
       } else if (attrs.isAutoClosure() &&
                  (InputTy == 0 || !InputTy->getFields().empty())) {
         // auto_closures must take () syntactically.
         diagnose(attrs.AtLoc, diag::autoclosure_function_input_nonunit,
                  FT->getInput());
       } else {
-        // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
-        // bit.
+        // Otherwise, we're ok, rebuild type, adding the AutoClosure and
+        // ObjcBlock bit.
         auto Info = FunctionType::ExtInfo(attrs.hasCC()
                                           ? attrs.getAbstractCC()
                                           : AbstractCC::Freestanding,
@@ -673,8 +663,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                                           attrs.isNoReturn(),
                                           attrs.isAutoClosure(),
                                           attrs.isObjCBlock());
-        Ty = FunctionType::get(FT->getInput(), FT->getResult(),
-                               Info,
+        Ty = FunctionType::get(FT->getInput(), FT->getResult(), Info,
                                Context);
       }
       attrs.clearAttribute(AK_auto_closure);
@@ -683,12 +672,9 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
       attrs.clearAttribute(AK_noreturn);
       attrs.clearAttribute(AK_cc);
       attrs.cc = Nothing;
-      attrs.clearAttribute(AK_kernel);
-      attrs.clearAttribute(AK_fragment);
-      attrs.clearAttribute(AK_vertex);
     }
 
-    // In SIL translation units *only*, permit [weak] and [unowned] to
+    // In SIL translation units *only*, permit @weak and @unowned to
     // apply directly to types.
     if (attrs.hasOwnership() && Ty->hasReferenceSemantics()) {
       auto TU = dyn_cast<TranslationUnit>(DC->getParentModule());
@@ -698,7 +684,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
       }
     }
 
-    // Diagnose [local_storage] in nested positions.
+    // Diagnose @local_storage in nested positions.
     if (attrs.isLocalStorage()) {
       assert(cast<TranslationUnit>(DC->getParentModule())
                ->MainSourceFile->Kind == SourceFile::SIL);
