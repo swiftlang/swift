@@ -1,4 +1,4 @@
-//===--- ConstraintSystem.h - Constraint-based Type Checking --------------===//
+//===--- ConstraintSystem.h - Constraint-based Type Checking ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -620,7 +620,8 @@ public:
   Solution(Solution &&other)
     : constraintSystem(other.constraintSystem),
       typeBindings(std::move(other.typeBindings)),
-      overloadChoices(std::move(other.overloadChoices))
+      overloadChoices(std::move(other.overloadChoices)),
+      constraintRestrictions(std::move(other.constraintRestrictions))
   {
   }
 
@@ -628,6 +629,7 @@ public:
     constraintSystem = other.constraintSystem;
     typeBindings = std::move(other.typeBindings);
     overloadChoices = std::move(other.overloadChoices);
+    constraintRestrictions = std::move(other.constraintRestrictions);
     return *this;
   }
 
@@ -640,6 +642,11 @@ public:
   /// \brief The set of overload choices along with their types.
   llvm::SmallDenseMap<ConstraintLocator *,
                       std::pair<OverloadChoice, Type>> overloadChoices;
+
+  /// The set of constraint restrictions used to arrive at this restriction,
+  /// which informs constraint application.
+  llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
+    constraintRestrictions;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -785,6 +792,13 @@ struct ResolvedOverloadSetListItem {
                        = alignof(ResolvedOverloadSetListItem));
 };
 
+/// Identifies a specific conversion from
+struct SpecificConstraint {
+  CanType First;
+  CanType Second;
+  ConstraintKind Kind;
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -855,6 +869,15 @@ private:
     /// current path.
     SmallVector<Constraint *, 32> retiredConstraints;
 
+    /// \brief The set of constraint restrictions used to reach this state.
+    ///
+    /// Constraint restrictions help describe which path the solver took when
+    /// there are multiple ways in which one type could convert to another, e.g.,
+    /// given class types A and B, the solver might choose either a superclass
+    /// conversion or a user-defined conversion.
+    SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
+      constraintRestrictions;
+
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
@@ -894,6 +917,9 @@ public:
 
     /// \brief The length of \c retiredConstraints.
     unsigned numRetiredConstraints;
+
+    /// \brief The length of \c constraintRestrictions.
+    unsigned numConstraintRestrictions;
 
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;

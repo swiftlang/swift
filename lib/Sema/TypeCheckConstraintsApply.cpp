@@ -243,6 +243,18 @@ namespace {
                               int toScalarIdx,
                               ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce the expression to another type via a user-defined
+    /// conversion.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toType The tupe to which the expression will be coerced.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \return The coerced expression, whose type will be equivalent to
+    /// \c toType.
+    Expr *coerceViaUserConversion(Expr *expr, Type toType,
+                                  ConstraintLocatorBuilder locator);
+
   public:
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
@@ -2414,6 +2426,93 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                             injectionFn);
 }
 
+Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
+                                            ConstraintLocatorBuilder locator) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+
+  // Determine the locator that corresponds to the conversion member.
+  auto storedLocator
+    = cs.getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ConversionMember));
+  auto knownOverload = solution.overloadChoices.find(storedLocator);
+  if (knownOverload != solution.overloadChoices.end()) {
+    auto selected = knownOverload->second;
+
+    // FIXME: Location information is suspect throughout.
+    // Form a reference to the conversion member.
+    auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
+                                    selected.first.getDecl(),
+                                    expr->getEndLoc(),
+                                    selected.second,
+                                    locator,
+                                    /*Implicit=*/true);
+
+    // Form an empty tuple.
+    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
+                                            nullptr, expr->getEndLoc(),
+                                            /*hasTrailingClosure=*/false,
+                                            /*Implicit=*/true,
+                                            TupleType::getEmpty(tc.Context));
+
+    // Call the conversion function with an empty tuple.
+    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
+                                                 /*Implicit=*/true);
+    auto openedType = selected.second->castTo<FunctionType>()->getResult();
+    expr = finishApply(apply, openedType,
+                       ConstraintLocatorBuilder(
+                         cs.getConstraintLocator(apply, { })));
+
+    if (!expr)
+      return nullptr;
+
+    return coerceToType(expr, toType, locator);
+  }
+
+  // If there was no conversion member, look for a constructor member.
+  // This is only used for handling interpolated string literals, where
+  // we allow construction or conversion.
+  storedLocator
+    = cs.getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ConstructorMember));
+  knownOverload = solution.overloadChoices.find(storedLocator);
+  assert(knownOverload != solution.overloadChoices.end());
+
+  auto selected = knownOverload->second;
+
+  // If we chose the identity constructor, coerce to the expected type
+  // based on the application argument locator.
+  if (selected.first.getKind() == OverloadChoiceKind::IdentityFunction) {
+    return coerceToType(expr, toType,
+                        locator.withPathElement(
+                          ConstraintLocator::ApplyArgument));
+  }
+
+  // FIXME: Location information is suspect throughout.
+  // Form a reference to the constructor.
+
+  // Form a reference to the constructor or enum declaration.
+  Expr *typeBase = new (tc.Context) MetatypeExpr(
+                                      nullptr,
+                                      expr->getStartLoc(),
+                                      MetaTypeType::get(toType,tc.Context));
+  Expr *declRef = buildMemberRef(typeBase, expr->getStartLoc(),
+                                 selected.first.getDecl(),
+                                 expr->getStartLoc(),
+                                 selected.second,
+                                 storedLocator,
+                                 /*Implicit=*/true);
+
+  // FIXME: Lack of openedType here is an issue.
+  ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr,
+                                               /*Implicit=*/true);
+  expr = finishApply(apply, toType, locator);
+  if (!expr)
+    return nullptr;
+
+  return coerceToType(expr, toType, locator);
+}
+
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
   auto &tc = cs.getTypeChecker();
@@ -2424,6 +2523,41 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // If the types are already equivalent, we don't have to do anything.
   if (fromType->isEqual(toType))
     return expr;
+
+  // If the solver recorded what we should do here, just do it immediately.
+  auto knownRestriction = solution.constraintRestrictions.find(
+                            { fromType->getCanonicalType(),
+                              toType->getCanonicalType() });
+  if (knownRestriction != solution.constraintRestrictions.end()) {
+    switch (knownRestriction->second) {
+    case ConversionRestrictionKind::TupleToTuple:
+      llvm_unreachable("Can't apply tuple-to-tuple conversion directly");
+
+    case ConversionRestrictionKind::ScalarToTuple: {
+      auto toTuple = toType->castTo<TupleType>();
+      return coerceScalarToTuple(expr, toTuple,
+                                 toTuple->getFieldForScalarInit(), locator);
+    }
+
+    case ConversionRestrictionKind::Existential:
+      llvm_unreachable("Can't apply existential conversion directly");
+
+    case ConversionRestrictionKind::ValueToOptional: {
+      auto toGenericType = toType->castTo<BoundGenericType>();
+      assert(toGenericType->getDecl() == tc.Context.getOptionalDecl());
+      tc.requireOptionalIntrinsics(expr->getLoc());
+
+      Type valueType = toGenericType->getGenericArgs()[0];
+      expr = coerceToType(expr, valueType, locator);
+      if (!expr) return nullptr;
+
+      return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+    }
+
+    case ConversionRestrictionKind::User:
+      return coerceViaUserConversion(expr, toType, locator);
+    }
+  }
 
   // Coercions to tuple type.
   if (auto toTuple = toType->getAs<TupleType>()) {
@@ -2613,79 +2747,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       fromType->is<ArchetypeType>() ||
       toType->getNominalOrBoundGenericNominal() ||
       toType->is<ArchetypeType>()) {
-    // Determine the locator that corresponds to the conversion member.
-    auto storedLocator
-      = cs.getConstraintLocator(
-          locator.withPathElement(ConstraintLocator::ConversionMember));
-    auto knownOverload = solution.overloadChoices.find(storedLocator);
-    if (knownOverload != solution.overloadChoices.end()) {
-      auto selected = knownOverload->second;
-      
-      // FIXME: Location information is suspect throughout.
-      // Form a reference to the conversion member.
-      auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
-                                      selected.first.getDecl(),
-                                      expr->getEndLoc(),
-                                      selected.second,
-                                      locator,
-                                      /*Implicit=*/true);
-
-      // Form an empty tuple.
-      Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
-                                              nullptr, expr->getEndLoc(),
-                                              /*hasTrailingClosure=*/false,
-                                              /*Implicit=*/true,
-                                              TupleType::getEmpty(tc.Context));
-
-      // Call the conversion function with an empty tuple.
-      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
-                                                   /*Implicit=*/true);
-      auto openedType = selected.second->castTo<FunctionType>()->getResult();
-      expr = finishApply(apply, openedType,
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(apply, { })));
-    } else {
-      // If there was no conversion member, look for a constructor member.
-      // This is only used for handling interpolated string literals, where
-      // we allow construction or conversion.
-      storedLocator
-        = cs.getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::ConstructorMember));
-      knownOverload = solution.overloadChoices.find(storedLocator);
-      assert(knownOverload != solution.overloadChoices.end());
-
-      auto selected = knownOverload->second;
-
-      // If we chose the identity constructor, coerce to the expected type
-      // based on the application argument locator.
-      if (selected.first.getKind() == OverloadChoiceKind::IdentityFunction) {
-        return coerceToType(expr, toType,
-                            locator.withPathElement(
-                              ConstraintLocator::ApplyArgument));
-      }
-
-      // FIXME: Location information is suspect throughout.
-      // Form a reference to the constructor.
-      
-      // Form a reference to the constructor or enum declaration.
-      Expr *typeBase = new (tc.Context) MetatypeExpr(
-                                          nullptr,
-                                          expr->getStartLoc(),
-                                          MetaTypeType::get(toType,tc.Context));
-      Expr *declRef = buildMemberRef(typeBase, expr->getStartLoc(),
-                                     selected.first.getDecl(),
-                                     expr->getStartLoc(),
-                                     selected.second,
-                                     storedLocator,
-                                     /*Implicit=*/true);
-
-      // FIXME: Lack of openedType here is an issue.
-      ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr,
-                                                   /*Implicit=*/true);
-      expr = finishApply(apply, toType, locator);
-    }
-
-    return coerceToType(expr, toType, locator);
+    return coerceViaUserConversion(expr, toType, locator);
   }
 
   // Coercion from one metatype to another.

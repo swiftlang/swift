@@ -108,10 +108,40 @@ enum class ConstraintClassification : char {
   Disjunction
 };
 
+/// Specifies a restriction on the kind of conversion that should be
+/// performed between the types in a constraint.
+///
+/// It's common for there to be multiple potential conversions that can
+/// apply between two types, e.g., given class types A and B, there might be
+/// a superclass conversion from A to B or there might be a user-defined
+/// conversion from A to B. The solver may need to explore both paths.
+enum class ConversionRestrictionKind {
+  /// Tuple-to-tuple conversion.
+  TupleToTuple,
+  /// Scalar-to-tuple conversion.
+  ScalarToTuple,
+#if 0
+  /// Subclass-to-superclass conversion.
+  Superclass,
+#endif
+  /// Value to existential value conversion.
+  Existential,
+  /// Value to optional conversion.
+  ValueToOptional,
+  /// User-defined conversions.
+  User
+};
+
 /// \brief A constraint between two type variables.
 class Constraint {
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
+
+  /// The kind of restricrion placed on this constraint.
+  ConversionRestrictionKind Restriction : 7;
+
+  /// Whether the \c Restriction field is valid.
+  unsigned HasRestriction : 1;
 
   union {
     struct {
@@ -148,19 +178,26 @@ class Constraint {
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> disjunction,
              ConstraintLocator *locator)
-    : Kind(kind), Nested(disjunction), Locator(locator) {
+    : Kind(kind), HasRestriction(false), Nested(disjunction), Locator(locator) {
     assert(kind == ConstraintKind::Conjunction ||
            kind == ConstraintKind::Disjunction);
   }
 
 public:
+  /// Constraint a new constraint.
   Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
              ConstraintLocator *locator);
 
   /// Construct a new overload-binding constraint.
   Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator)
-    : Kind(ConstraintKind::BindOverload), Overload{type, choice},
-      Locator(locator) { }
+    : Kind(ConstraintKind::BindOverload), HasRestriction(false),
+      Overload{type, choice}, Locator(locator) { }
+
+  /// Constraint a restricted constraint.
+  Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
+             Type first, Type second, ConstraintLocator *locator)
+    : Kind(kind), Restriction(restriction), HasRestriction(true),
+      Types{ first, second, Identifier() }, Locator(locator) { }
 
   /// Create a new conjunction constraint.
   static Constraint *createConjunction(ConstraintSystem &cs,
@@ -174,6 +211,14 @@ public:
 
   /// \brief Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
+
+  /// Retrieve the restriction placed on this constraint.
+  Optional<ConversionRestrictionKind> getRestriction() const {
+    if (!HasRestriction)
+      return Nothing;
+
+    return Restriction;
+  }
 
   /// \brief Determine the classification of this constraint, providing
   /// a broader categorization than \c getKind().
@@ -268,6 +313,5 @@ public:
 };
 
 } } // end namespace swift::constraints
-
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_H

@@ -25,7 +25,8 @@ using namespace constraints;
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
                        Identifier Member,
                        ConstraintLocator *locator)
-  : Kind(Kind), Types { First, Second, Member }, Locator(locator)
+  : Kind(Kind), HasRestriction(false), Types { First, Second, Member },
+    Locator(locator)
 {
   switch (Kind) {
   case ConstraintKind::Bind:
@@ -145,6 +146,30 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   if (!skipSecond)
     Types.Second->print(Out);
+
+  if (auto restriction = getRestriction()) {
+    switch (*restriction) {
+    case ConversionRestrictionKind::TupleToTuple:
+      Out << " [tuple-to-tuple]";
+      break;
+
+    case ConversionRestrictionKind::ScalarToTuple:
+      Out << " [scalar-to-tuple]";
+      break;
+
+    case ConversionRestrictionKind::Existential:
+      Out << " [existential]";
+      break;
+
+    case ConversionRestrictionKind::ValueToOptional:
+      Out << " [value-to-optional]";
+      break;
+
+    case ConversionRestrictionKind::User:
+      Out << " [user]";
+      break;
+    }
+  }
 
   if (Locator) {
     Out << " [[";

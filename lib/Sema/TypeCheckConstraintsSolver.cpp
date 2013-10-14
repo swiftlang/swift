@@ -70,6 +70,17 @@ Solution ConstraintSystem::finalize() {
       = { resolved->Choice, resolved->ImpliedType };
   }
 
+  // For each of the constraint restrictions, record it with simplified,
+  // canonical types.
+  if (solverState) {
+    for (auto &restriction : solverState->constraintRestrictions) {
+      using std::get;
+      CanType first = simplifyType(get<0>(restriction))->getCanonicalType();
+      CanType second = simplifyType(get<1>(restriction))->getCanonicalType();
+      solution.constraintRestrictions[{first, second}] = get<2>(restriction);
+    }
+  }
+
   return std::move(solution);
 }
 
@@ -367,6 +378,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   numRetiredConstraints = cs.solverState->retiredConstraints.size();
+  numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
@@ -405,6 +417,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                       }),
                        cs.Constraints.end());
   truncate(cs.solverState->generatedConstraints, numGeneratedConstraints);
+
+  // Remove any constraint restrictions.
+  truncate(cs.solverState->constraintRestrictions, numConstraintRestrictions);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
