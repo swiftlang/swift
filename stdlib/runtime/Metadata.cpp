@@ -992,8 +992,16 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                             size_t numFields,
                                             const Metadata * const *fieldTypes,
                                             size_t *fieldOffsets) {
-  // FIXME: We should start from the superclass's size and alignment.
+  // Start layout by appending to a standard heap object header.
   auto layout = BasicLayout::initialForHeapObject();
+  // If we have a superclass, start from its size and alignment instead.
+  if (super) {
+    layout.size = super->InstanceSize;
+    layout.flags = layout.flags.withAlignmentMask(super->InstanceAlignMask);
+    layout.stride = llvm::RoundUpToAlignment(super->InstanceSize,
+                                             super->InstanceAlignMask+1);
+  }
+  
   performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const Metadata *fieldType, size_t offset) {
       fieldOffsets[i] = offset;
