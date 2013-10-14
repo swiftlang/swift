@@ -1354,6 +1354,10 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), FieldNo(FieldNo) {}
   
   unsigned getFieldNo() const { return FieldNo; }
+
+  TupleType *getTupleType() const {
+    return getOperand().getType().getSwiftRValueType()->castTo<TupleType>();
+  }
 };
 
 /// Derive the address of a numbered element from the address of a tuple.
@@ -1367,6 +1371,11 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), FieldNo(FieldNo) {}
   
   unsigned getFieldNo() const { return FieldNo; }
+
+
+  TupleType *getTupleType() const {
+    return getOperand().getType().getSwiftRValueType()->castTo<TupleType>();
+  }
 };
   
 /// Extract a physical, fragile field out of a value of struct type.
@@ -1380,6 +1389,13 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
   
   VarDecl *getField() const { return Field; }
+
+  StructDecl *getStructDecl() const {
+    CanType T = getOperand().getType().getSwiftRValueType();
+    if (auto *ST = T->getAs<StructType>())
+      return ST->getDecl();
+    return T->castTo<BoundGenericStructType>()->getDecl();
+  }
 };
 
 /// Derive the address of a physical field from the address of a struct.
@@ -1393,6 +1409,13 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
   
   VarDecl *getField() const { return Field; }
+
+  StructDecl *getStructDecl() const {
+    CanType T = getOperand().getType().getSwiftRValueType();
+    if (auto *ST = T->getAs<StructType>())
+      return ST->getDecl();
+    return T->castTo<BoundGenericStructType>()->getDecl();
+  }
 };
 
 /// RefElementAddrInst - Derive the address of a named element in a reference
