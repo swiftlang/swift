@@ -1385,6 +1385,13 @@ private:
                                   ConstraintLocatorBuilder locator,
                                   bool &trivial);
 
+  /// \brief Subroutine of \c matchTypes(), which matches up a value to a
+  /// superclass.
+  SolutionKind matchSuperclassTypes(Type type1, Type type2,
+                                    TypeMatchKind kind, unsigned flags,
+                                    ConstraintLocatorBuilder locator,
+                                    bool &trivial);
+
   /// \brief Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   SolutionKind matchExistentialTypes(Type type1, Type type2,

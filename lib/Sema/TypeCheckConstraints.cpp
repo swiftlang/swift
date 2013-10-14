@@ -1191,6 +1191,53 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   return result;
 }
 
+/// \brief Map a failed type-matching kind to a failure kind, generically.
+static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
+  switch (kind) {
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::SameType:
+    return Failure::TypesNotEqual;
+
+  case TypeMatchKind::TrivialSubtype:
+    return Failure::TypesNotTrivialSubtypes;
+
+  case TypeMatchKind::Subtype:
+    return Failure::TypesNotSubtypes;
+
+  case TypeMatchKind::Conversion:
+    return Failure::TypesNotConvertible;
+  }
+
+  llvm_unreachable("unhandled type matching kind");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
+                                       TypeMatchKind kind, unsigned flags,
+                                       ConstraintLocatorBuilder locator,
+                                       bool &trivial) {
+  auto classDecl2 = type2->getClassOrBoundGenericClass();
+  bool done = false;
+  for (auto super1 = TC.getSuperClassOf(type1);
+       !done && super1;
+       super1 = TC.getSuperClassOf(super1)) {
+    if (super1->getClassOrBoundGenericClass() != classDecl2)
+      continue;
+
+    return matchTypes(super1, type2, TypeMatchKind::SameType,
+                      TMF_GenerateConstraints, locator, trivial);
+  }
+
+  // Record this failure.
+  // FIXME: Specialize diagnostic.
+  if (shouldRecordFailures()) {
+    recordFailure(getConstraintLocator(locator),
+                  getRelationalFailureKind(kind), type1, type2);
+  }
+
+  return SolutionKind::Error;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         TypeMatchKind kind, unsigned flags,
@@ -1244,26 +1291,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
-  }
-
-  llvm_unreachable("unhandled type matching kind");
-}
-
-/// \brief Map a failed type-matching kind to a failure kind, generically.
-static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
-  switch (kind) {
-  case TypeMatchKind::BindType:
-  case TypeMatchKind::SameType:
-    return Failure::TypesNotEqual;
-
-  case TypeMatchKind::TrivialSubtype:
-    return Failure::TypesNotTrivialSubtypes;
-
-  case TypeMatchKind::Subtype:
-    return Failure::TypesNotSubtypes;
-
-  case TypeMatchKind::Conversion:
-    return Failure::TypesNotConvertible;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -1565,7 +1592,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::TriviallySolved;
 
         // Match up the parents, exactly.
-        // FIXME: If the parents fail to match, try conversions.
         return matchTypes(nominal1->getParent(), nominal2->getParent(),
                           TypeMatchKind::SameType, subFlags,
                           locator.withPathElement(
@@ -1778,7 +1804,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // most one non-defaulted element.
       if (kind >= TypeMatchKind::Conversion) {
         if (tuple2->getFieldForScalarInit() >= 0) {
-          potentialConversions.push_back(ConversionRestrictionKind::ScalarToTuple);
+          potentialConversions.push_back(
+            ConversionRestrictionKind::ScalarToTuple);
           goto commit_to_conversions;
         }
       }
@@ -1797,33 +1824,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     
     if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass()) {
-      bool tryUserConversions = shouldTryUserConversion(*this, type1);
-      auto classDecl2 = type2->getClassOrBoundGenericClass();
-      bool done = false;
-      for (auto super1 = TC.getSuperClassOf(type1);
-           !done && super1;
-           super1 = TC.getSuperClassOf(super1)) {
-        if (super1->getClassOrBoundGenericClass() != classDecl2)
-          continue;
-
-        // FIXME: If we end up generating any constraints from this
-        // match, we can't solve them immediately. We'll need to
-        // split into another system.
-        switch (auto result = matchTypes(super1, type2,
-                                         TypeMatchKind::SameType,
-                                         TMF_GenerateConstraints, locator,
-                                         trivial)) {
-        case SolutionKind::Error:
-          if (!tryUserConversions)
-            return result;
-          break;
-
-        case SolutionKind::Solved:
-        case SolutionKind::TriviallySolved:
-        case SolutionKind::Unsolved:
-          return result;
-        }
-      }
+      potentialConversions.push_back(ConversionRestrictionKind::Superclass);
     }
   }
 
@@ -1929,6 +1930,10 @@ commit_to_conversions:
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
                                    subFlags, locator, trivial);
+
+  case ConversionRestrictionKind::Superclass:
+    return matchSuperclassTypes(type1, type2, kind, flags, locator,
+                                trivial);
 
   case ConversionRestrictionKind::Existential:
     return matchExistentialTypes(type1, type2, kind, flags, locator,
@@ -2741,6 +2746,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                    ->castTo<TupleType>(),
                                  matchKind, TMF_GenerateConstraints,
                                  constraint.getLocator(), trivial);
+        break;
+
+      case ConversionRestrictionKind::Superclass:
+        result = matchSuperclassTypes(constraint.getFirstType(),
+                                       constraint.getSecondType(),
+                                       matchKind, TMF_GenerateConstraints,
+                                       constraint.getLocator(), trivial);
         break;
 
       case ConversionRestrictionKind::Existential:

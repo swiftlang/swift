@@ -2575,6 +2575,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getFieldForScalarInit(), locator);
     }
 
+     case ConversionRestrictionKind::Superclass: {
+      // Coercion from archetype to its (concrete) superclass.
+      if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
+        expr = new (tc.Context) ArchetypeToSuperExpr(
+                                  expr,
+                                  fromArchetype->getSuperclass());
+
+        // If we are done succeeded, use the coerced result.
+        if (expr->getType()->isEqual(toType)) {
+          return expr;
+        }
+
+        fromType = expr->getType();
+      }
+
+      // Coercion from subclass to superclass.
+      return new (tc.Context) DerivedToBaseExpr(expr, toType);
+     }
+
     case ConversionRestrictionKind::Existential:
       return coerceExistential(expr, toType, locator);
 

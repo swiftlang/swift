@@ -120,10 +120,8 @@ enum class ConversionRestrictionKind {
   TupleToTuple,
   /// Scalar-to-tuple conversion.
   ScalarToTuple,
-#if 0
   /// Subclass-to-superclass conversion.
   Superclass,
-#endif
   /// Value to existential value conversion.
   Existential,
   /// Value to optional conversion.
