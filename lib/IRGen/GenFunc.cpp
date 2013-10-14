@@ -1847,11 +1847,39 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            SILType substType,
                                            SILType outType,
                                            Explosion &out) {
+  // If we have a single Swift-refcounted context value, we can adopt it
+  // directly as our closure context without creating a box and thunk.
+  enum HasSingleSwiftRefcountedContext { Maybe, Yes, No }
+    hasSingleSwiftRefcountedContext = Maybe;
+  
   // Collect the type infos for the context types.
   // FIXME: Keep LValueTypes out of this.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   for (SILType argType : argTypes) {
-    argTypeInfos.push_back(&IGF.getTypeInfo(argType.getSwiftType()));
+    auto &ti = IGF.getTypeInfo(argType.getSwiftType());
+    argTypeInfos.push_back(&ti);
+
+    // Update the single-swift-refcounted check, unless we already ruled that
+    // out.
+    if (hasSingleSwiftRefcountedContext == No)
+      continue;
+    
+    // Empty values don't matter.
+    auto schema = ti.getSchema(out.getKind());
+    if (schema.size() == 0)
+      continue;
+    
+    // Adding nonempty values when we already have a single refcounted pointer
+    // ruins it.
+    if (hasSingleSwiftRefcountedContext == Yes) {
+      hasSingleSwiftRefcountedContext = No;
+      continue;
+    }
+      
+    if (ti.isSingleRetainablePointer(ResilienceScope::Local))
+      hasSingleSwiftRefcountedContext = Yes;
+    else
+      hasSingleSwiftRefcountedContext = No;
   }
   
   // Include the context pointer, if any, in the function arguments.
@@ -1859,6 +1887,10 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     args.add(fnContext);
     argTypeInfos.push_back(
                  &IGF.IGM.getTypeInfo(IGF.IGM.Context.TheObjectPointerType));
+    // If this is the only context argument we end up with, we can just share
+    // it.
+    if (args.size() == 1)
+      hasSingleSwiftRefcountedContext = Yes;
   }
   
   // Collect the polymorphic arguments.
@@ -1886,7 +1918,19 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   } else {
     assert(subs.empty() && "substitutions for non-polymorphic function?!");
   }
-
+  
+  // If we have a single refcounted pointer context (and no polymorphic args
+  // to capture), skip building the box and thunk and just take the pointer as
+  // context.
+  if (args.size() == 1 && hasSingleSwiftRefcountedContext == Yes) {
+    fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+    out.add(fnPtr);
+    llvm::Value *ctx = args.claimNext();
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    out.add(ctx);
+    return;
+  }
+  
   // If the function pointer is dynamic, include it in the context.
   auto staticFn = dyn_cast<llvm::Function>(fnPtr);
   if (!staticFn) {

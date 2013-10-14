@@ -120,3 +120,31 @@ done(%f : $Builtin.Int64 -> ()):
   return %f : $Builtin.Int64 -> ()
 }
 
+class SwiftClass {}
+
+sil @partially_applyable_to_class : $@thin SwiftClass -> ()
+
+// CHECK: define { i8*, %swift.refcounted* } @partial_apply_class(%C13partial_apply10SwiftClass*) {
+// CHECK: entry:
+// CHECK:   %1 = bitcast %C13partial_apply10SwiftClass* %0 to %swift.refcounted*
+// CHECK:   %2 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%C13partial_apply10SwiftClass*)* @partially_applyable_to_class to i8*), %swift.refcounted* undef }, %swift.refcounted* %1, 1
+// CHECK:   ret { i8*, %swift.refcounted* } %2
+// CHECK: }
+sil @partial_apply_class : $@thin SwiftClass -> () -> () {
+entry(%c : $SwiftClass):
+  %f = function_ref @partially_applyable_to_class : $@thin SwiftClass -> ()
+  %g = partial_apply %f(%c) : $@thin SwiftClass -> ()
+  return %g : $() -> ()
+}
+
+sil @partially_applyable_to_pure_objc : $@thin Gizmo -> ()
+
+// CHECK: define { i8*, %swift.refcounted* } @partial_apply_pure_objc
+// CHECK:   @swift_allocObject
+sil @partial_apply_pure_objc : $@thin Gizmo -> () -> () {
+entry(%c : $Gizmo):
+  %f = function_ref @partially_applyable_to_pure_objc : $@thin Gizmo -> ()
+  %g = partial_apply %f(%c) : $@thin Gizmo -> ()
+  return %g : $() -> ()
+}
+
