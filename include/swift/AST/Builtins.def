@@ -207,6 +207,9 @@ BUILTIN_MISC_OPERATION(STruncWithOverflow, "strunc_with_overflow", "n", Special)
 /// UTruncWithOverflow has type (Integer) -> Integer
 BUILTIN_MISC_OPERATION(UTruncWithOverflow, "utrunc_with_overflow", "n", Special)
 
+/// IntToFPWithOverflow has type (Integer) -> Float
+BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
+
 // FIXME: shufflevector
 
 #undef BUILTIN_MISC_OPERATION

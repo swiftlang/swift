@@ -160,7 +160,6 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
     // integer literals.
     case BuiltinValueKind::STruncWithOverflow:
     case BuiltinValueKind::UTruncWithOverflow: {
-
       // Get the value. It should be a constant in most cases.
       // Note, this will not always be a constant, for example, when analyzing
       // _convertFromBuiltinIntegerLiteral function itself.
@@ -207,6 +206,40 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                     TruncVal);
     }
 
+    case BuiltinValueKind::IntToFPWithOverflow: {
+      // Get the value. It should be a constant in most cases.
+      // Note, this will not always be a constant, for example, when analyzing
+      // _convertFromBuiltinIntegerLiteral function itself.
+      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+      if (!V)
+        return nullptr;
+      APInt SrcVal = V->getValue();
+
+      Type DestTy = Builtin.Types[1];
+
+      APFloat TruncVal(
+          DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+      APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
+          SrcVal, /*isSigned=*/true, APFloat::rmNearestTiesToEven);
+
+      SILLocation Loc = AI->getLoc();
+      const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+
+      // Check for overflow.
+      if (ConversionStatus & APFloat::opOverflow) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow,
+                 CE ? CE->getType() : DestTy);
+      }
+
+      // The call to the builtin should be replaced with the constant value.
+      SILBuilder B(AI);
+      return B.createFloatLiteral(Loc,
+                                  SILType::getPrimitiveType(CanType(DestTy),
+                                                      SILValueCategory::Object),
+                                  TruncVal);
+
+    }
     }
   return nullptr;
 }

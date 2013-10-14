@@ -1115,6 +1115,20 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     llvm::Value *V = IGF.Builder.CreateTrunc(Arg, ToTy);
     return out->add(V);
   }
+  // TODO: replace with an assert - these should be constant folded.
+  // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
+  // which will call the builtin and pass it a non-compile-time-const parameter.
+  if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
+    auto TruncTy = IGF.IGM.getTypeInfo(
+        BuiltinIntegerType::get(32, IGF.IGM.Context)).getStorageType();
+    const BuiltinInfo &IInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
+    auto ToTy = IGF.IGM.getTypeInfo(IInfo.Types[1]).getStorageType();
+    using namespace llvm;
+    llvm::Value *Arg = args.claimNext();
+    llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
+    llvm::Value *V = IGF.Builder.CreateSIToFP(Truncated, ToTy);
+    return out->add(V);
+  }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

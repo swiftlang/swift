@@ -512,8 +512,23 @@ static ValueDecl *getTruncWithOverflowOperation(ASTContext &Context,
     return nullptr;
 
   TupleTypeElt ArgElts[] = { InTy };
+  Type ResultTy = OutTy;
 
-  return getBuiltinFunction(Context, Id, ArgElts, OutTy);
+  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+}
+
+static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
+                                                  Identifier Id, Type InputTy,
+                                                  Type OutputTy) {
+  auto InTy = InputTy->getAs<BuiltinIntegerType>();
+  auto OutTy = OutputTy->getAs<BuiltinFloatType>();
+  if (!InTy || !OutTy)
+    return nullptr;
+
+  TupleTypeElt ArgElts[] = { InTy };
+  Type ResultTy = OutTy;
+
+  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
 /// An array of the overloaded builtin kinds.
@@ -897,6 +912,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     if (Types.size() != 2) return nullptr;
     return getTruncWithOverflowOperation(Context, Id, Types[0], Types[1]);
 
+  case BuiltinValueKind::IntToFPWithOverflow:
+    if (Types.size() != 2) return nullptr;
+    return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
   }
   llvm_unreachable("bad builtin value!");
 }
