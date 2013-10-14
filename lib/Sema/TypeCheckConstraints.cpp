@@ -3270,7 +3270,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   // If the scores are different, we have a winner.
   if (score1 != score2) {
-    assert(!identical && "Identical systems with non-zero score");
     return score1 > score2? SolutionCompareResult::Better
                           : SolutionCompareResult::Worse;
   }
