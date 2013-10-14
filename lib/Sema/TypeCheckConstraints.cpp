@@ -1361,7 +1361,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                    cs.getConstraintLocator(
                      locator.withPathElement(
                        ConstraintLocator::ConversionResult)));
-  
+
   return ConstraintSystem::SolutionKind::Solved;
 }
 
@@ -1849,16 +1849,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // For a subtyping relation involving two existential types, or a conversion
-  // from any type, check whether the first type conforms to each of the
+  // For a subtyping relation involving two existential types or subtyping of
+  // a class existential type, or a conversion from any type to an
+  // existential type, check whether the first type conforms to each of the
   // protocols in the second type.
-  if ((kind >= TypeMatchKind::Conversion ||
-        (kind == TypeMatchKind::Subtype && type1->isExistentialType())) &&
-      type2->isExistentialType()) {
+  if (type2->isExistentialType() &&
+      (kind >= TypeMatchKind::Conversion ||
+      (kind == TypeMatchKind::Subtype &&
+       (type1->isExistentialType() || type2->isClassExistentialType())))) {
     potentialConversions.push_back(ConversionRestrictionKind::Existential);
-
-    // FIXME: Should allow other conversions.
-    goto commit_to_conversions;
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
@@ -2245,31 +2244,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // Check whether this type conforms to the protocol.
   if (TC.conformsToProtocol(type, protocol, DC))
     return SolutionKind::TriviallySolved;
-
-  // FIXME: If we're dealing with _Nil, allow user conversions. This should be
-  // general, but we can't break the recursion without fixing locators to
-  // not lose information. Ugh!
-  SmallVector<LocatorPathElt, 4> pathElts;
-  (void)locator.getLocatorParts(pathElts);
-  if (type->is<StructType>() &&
-      !type->castTo<StructType>()->getDecl()->getName().empty() &&
-      (type->castTo<StructType>()->getDecl()->getName().str().equals("_Nil") ||        type->castTo<StructType>()->getDecl()->getName().str().equals("String"))) {
-    // If the type has any user-defined conversions, one of them might work.
-    // Break this constraint down into a conformance constraint on the result of
-    // conversion.
-    switch (tryUserConversion(*this, type, ConstraintKind::ConformsTo,
-                              protocol->getDeclaredType(), locator)) {
-    case SolutionKind::Error:
-      return SolutionKind::Error;
-
-    case SolutionKind::Unsolved:
-      break;
-
-    case SolutionKind::Solved:
-    case SolutionKind::TriviallySolved:
-      return SolutionKind::Solved;
-    }
-  }
 
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
@@ -2770,7 +2744,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         break;
 
       case ConversionRestrictionKind::Existential:
-        llvm_unreachable("Existential conversion not yet handled");
+        result = matchExistentialTypes(constraint.getFirstType(),
+                                       constraint.getSecondType(),
+                                       matchKind, TMF_GenerateConstraints,
+                                       constraint.getLocator(), trivial);
+        break;
 
       case ConversionRestrictionKind::ValueToOptional:
         assert(constraint.getSecondType()->castTo<BoundGenericType>()->getDecl()

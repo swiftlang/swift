@@ -243,6 +243,17 @@ namespace {
                               int toScalarIdx,
                               ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce the given value to existential type.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toType The tupe to which the expression will be coerced.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \return The coerced expression, whose type will be equivalent to
+    /// \c toType.
+    Expr *coerceExistential(Expr *expr, Type toType,
+                            ConstraintLocatorBuilder locator);
+
     /// \brief Coerce the expression to another type via a user-defined
     /// conversion.
     ///
@@ -2426,6 +2437,31 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                             injectionFn);
 }
 
+Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
+                                      ConstraintLocatorBuilder locator) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+  Type fromType = expr->getType();
+
+  // Compute the conformances for each of the protocols in the existential
+  // type.
+  SmallVector<ProtocolDecl *, 4> protocols;
+  bool isExistential = toType->isExistentialType(protocols);
+  assert(isExistential && "Not converting to existential?");
+  (void)isExistential;
+  SmallVector<ProtocolConformance *, 4> conformances;
+  for (auto proto : protocols) {
+    ProtocolConformance *conformance = nullptr;
+    bool conforms = tc.conformsToProtocol(fromType, proto, cs.DC, &conformance);
+    assert(conforms && "Type does not conform to protocol?");
+    (void)conforms;
+    conformances.push_back(conformance);
+  }
+
+  // If we have all of the conformances we need, create an erasure expression.
+  return new (tc.Context) ErasureExpr(expr, toType,
+                                      tc.Context.AllocateCopy(conformances));
+}
+
 Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                             ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
@@ -2540,7 +2576,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::Existential:
-      llvm_unreachable("Can't apply existential conversion directly");
+      return coerceExistential(expr, toType, locator);
 
     case ConversionRestrictionKind::ValueToOptional: {
       auto toGenericType = toType->castTo<BoundGenericType>();
@@ -2699,34 +2735,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Coercions from a type to an existential type.
   if (toType->isExistentialType()) {
-    // Compute the conformances for each of the protocols in the existential
-    // type.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    toType->isExistentialType(protocols);
-    SmallVector<ProtocolConformance *, 4> conformances;
-    bool failed = false;
-    for (auto proto : protocols) {
-      ProtocolConformance *conformance = nullptr;
-      if (!tc.conformsToProtocol(fromType, proto, cs.DC, &conformance)) {
-        failed = true;
-        break;
-      }
-
-      conformances.push_back(conformance);
-    }
-
-    // If we have all of the conformances we need, create an erasure expression.
-    if (!failed) {
-      expr = new (tc.Context) ErasureExpr(
-                                expr, toType,
-                                tc.Context.AllocateCopy(conformances));
-      return expr;
-    }
-
-    // Fall through to handle user-defined conversions.
-    // FIXME: Can the type checker cope with the crazy case where we can
-    // call a user-defined conversion on an existential to produce an
-    // existential of some related kind?
+    return coerceExistential(expr, toType, locator);
   }
 
   // Coercion to Optional<T>.
