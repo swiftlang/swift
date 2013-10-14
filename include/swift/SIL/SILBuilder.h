@@ -30,13 +30,6 @@ class SILBuilder {
   /// instruction is recorded in this list.
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
 public:
-  static SILType getTupleElementType(SILType Ty, unsigned EltNo,
-                                     SILValueCategory Cat);
-  static SILType getStructFieldType(SILType Ty, VarDecl *Field,
-                                    SILValueCategory Cat);
-  static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
-                                           SILModule &M);
-
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
   explicit SILBuilder(SILInstruction *I,
@@ -117,6 +110,18 @@ public:
   SmallVectorImpl<SILInstruction*> *getTrackingList() {
     return InsertedInstrs;
   }
+
+  //===--------------------------------------------------------------------===//
+  // Type remapping
+  //===--------------------------------------------------------------------===//
+
+  static SILType getTupleElementType(SILType Ty, unsigned EltNo,
+                                     SILValueCategory Cat);
+  static SILType getStructFieldType(SILType Ty, VarDecl *Field,
+                                    SILValueCategory Cat);
+  static CanType getStructFieldType(CanType Ty, VarDecl *Field);
+  static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
+                                           SILModule &M);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
