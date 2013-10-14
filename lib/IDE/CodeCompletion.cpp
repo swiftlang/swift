@@ -417,14 +417,14 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : P.Context.SourceMgr.getCodeCompletionLoc();
-      // FIXME: closures.
-      // For now, just find the nearest outer function.
+      // Find the nearest outer function.
       DeclContext *DCToTypeCheck = DC;
       while (!DCToTypeCheck->isModuleContext() &&
              !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
       // First, type check the nominal decl that contains the function.
       typecheckContextImpl(DCToTypeCheck->getParent());
+      // Then type check the function itself.
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
         return typeCheckAbstractFunctionBodyUntil(P.Context, AFD,
                                                   EndTypeCheckLoc);
