@@ -189,8 +189,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -fno-rtti -fno
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
-function(compile_swift_files)	
-  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS" "IS_MAIN;IS_STDLIB_CORE"
+#     [AXLE]                            # This is compile for axle
+function(compile_swift_files)
+  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS" "IS_MAIN;IS_STDLIB_CORE;AXLE"
     ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
@@ -248,20 +249,35 @@ function(compile_swift_files)
       "${CMAKE_CURRENT_BINARY_DIR}/${objfile}")
   endif()
 
+  # Set destination directory name.
+  if (SWIFTFILE_AXLE)
+    set(DEST_DIRNAME "axle")
+  else()
+    set(DEST_DIRNAME "swift")
+  endif()
+
   if(SWIFTFILE_IS_MAIN)
     set(module_source_file)
     set(postprocessing)
   else()
     get_filename_component(module_source_name ${objfile} NAME_WE)
-    set(module_source_dir ${SWIFTLIB_DIR}/swift)
+    set(module_source_dir ${SWIFTLIB_DIR}/${DEST_DIRNAME})
 
-    set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
-    set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
+    # We should find a better way of handling this. Currently, we use the same
+    # module name for the axle library but we need a different object name to
+    # compile for it.
+    if (SWIFTFILE_IS_STDLIB_CORE AND SWIFTFILE_AXLE)
+      set(module_source_file ${module_source_dir}/swift.swiftmodule)
+      set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/swift.swiftmodule)    
+    else()
+      set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
+      set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
+    endif()
     list(APPEND swift_flags -emit-module)
     set(postprocessing COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
 
     install(FILES ${module_source_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${DEST_DIRNAME})
   endif()
 
   set(stdlib_dep)
@@ -299,7 +315,7 @@ endfunction()
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar target)
 function(handle_swift_sources sourcesvar externalvar target)
-  parse_arguments(SWIFTSOURCES  "" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
+  parse_arguments(SWIFTSOURCES  "" "IS_MAIN;IS_STDLIB_CORE;AXLE" ${ARGN})
 
   set(result)
   set(swift_sources)
@@ -324,14 +340,21 @@ function(handle_swift_sources sourcesvar externalvar target)
   if(SWIFTSOURCES_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
+  set(AXLE_arg)
+  if (SWIFTSOURCES_AXLE)
+    set(AXLE_arg AXLE)
+  endif()
 
   if(swift_sources)
-
     # Special-case hack to create swift.o for the swift_stdlib_* targets
     if(target STREQUAL swift_stdlib_core)
       set(swift_obj_base "swift")
     elseif(target STREQUAL swift_stdlib_posix)
       set(swift_obj_base "POSIX")
+    elseif (target STREQUAL swift_stdlib_axle_core)
+      set(swift_obj_base "swift_axle")
+    elseif(target STREQUAL swift_stdlib_axle)
+       set(swift_obj_base "axle")
     else()
       # Otherwise, get the name from the first swift input file.  Also
       # a hack!
@@ -343,7 +366,7 @@ function(handle_swift_sources sourcesvar externalvar target)
     compile_swift_files(OUTPUT ${swift_obj}
       SOURCES ${swift_sources}
       FLAGS ${swift_flags}
-      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
+      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} ${AXLE_arg})
     list(APPEND result ${swift_obj})
   endif()
 
@@ -365,9 +388,10 @@ set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
+#     [AXLE]                         # Compile for axle so install in lib/axle
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE"
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE;AXLE"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
@@ -389,13 +413,23 @@ macro(add_swift_library name)
     set(libkind)
   endif()
 
+  # Set destination directory name.
+  set(AXLE_arg)
+  if (SWIFTLIB_AXLE)
+    set(DEST_DIRNAME "axle")
+    set(AXLE_arg AXLE)
+  else()
+    set(DEST_DIRNAME "swift")
+  endif(SWIFTLIB_AXLE)
+
+
   set(IS_STDLIB_CORE_arg)
   if(SWIFTLIB_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
   
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
-    ${IS_STDLIB_CORE_arg})
+    ${IS_STDLIB_CORE_arg} ${AXLE_arg})
   add_library( ${name} ${libkind}
     ${SWIFTLIB_SOURCES}
     ${SWIFTLIB_EXTERNAL_SOURCES})
@@ -411,7 +445,7 @@ macro(add_swift_library name)
   set_source_files_properties(${SWIFTLIB_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/swift" ${SWIFTLIB_DEPENDS} )
+  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${DEST_DIRNAME}" ${SWIFTLIB_DEPENDS} )
   llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
   link_system_libs( ${name} )
@@ -427,14 +461,14 @@ macro(add_swift_library name)
 
   if(SWIFTLIB_INSTALL)
     set_target_properties(${name} PROPERTIES
-      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib/swift")
+      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib/${DEST_DIRNAME}")
 
-    # Install runtime libraries to lib/swift instead of lib. This works around
+    # Install runtime libraries to lib/[swift|axle] instead of lib. This works around
     # the fact that -isysroot prevents linking to libraries in the system
     # /usr/lib if Swift is installed in /usr.
     set_target_properties(${name} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift)
+      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${DEST_DIRNAME}
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${DEST_DIRNAME})
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
@@ -447,13 +481,13 @@ macro(add_swift_library name)
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
       set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift)
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${DEST_DIRNAME}
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${DEST_DIRNAME})
     endforeach()
 
     install(TARGETS ${name}
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${DEST_DIRNAME}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${DEST_DIRNAME})
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.

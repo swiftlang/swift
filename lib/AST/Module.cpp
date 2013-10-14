@@ -1084,6 +1084,7 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 
   // If we're building the standard library, import the magic Builtin module,
   // otherwise, import the standard library.
+  std::pair<Module::ImportedModule, bool> Imports[2];
   Module *M;
   if (hasBuiltinModuleAccess)
     M = SF.TU.Ctx.TheBuiltinModule;
@@ -1095,8 +1096,16 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  auto Import = std::make_pair(Module::ImportedModule({}, M), false);
-  SF.setImports(SF.TU.Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
+  Imports[0] = std::make_pair(Module::ImportedModule({}, M), false);
+  if (SF.TU.Ctx.LangOpts.Axle && !hasBuiltinModuleAccess) {
+    Module* AxleM =
+      SF.TU.Ctx.getModule({{SF.TU.Ctx.AxleStdlibModuleName, SourceLoc()}});
+    Imports[1] = std::make_pair(Module::ImportedModule({}, AxleM), false);
+
+    SF.setImports(SF.TU.Ctx.AllocateCopy(llvm::makeArrayRef(Imports, 2)));
+  } else
+    SF.setImports(SF.TU.Ctx.AllocateCopy(llvm::makeArrayRef(Imports, 1)));
+
 }
 
 SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,

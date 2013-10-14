@@ -76,6 +76,10 @@ ifndef SWIFT_HEADER_DIR
   SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
 endif
 
+ifndef AXLE_SWIFT_HEADER_DIR
+  AXLE_SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/axle
+endif
+
 
 ###
 # Settings for .swift files in Swift compiler and stdlib

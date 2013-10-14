@@ -22,6 +22,7 @@ SHARED_LIBRARY := 1
 #
 # sed is used here to strip comments.
 SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/core/SwiftLibSources.txt" )
+AXLE_SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/core/AxleSwiftLibSources.txt" )
 
 # Replace Word.swift with Word64.swift or Word32.swift, according to
 # the target architecture
@@ -72,9 +73,30 @@ $(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PR
 	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -module-name=swift -emit-module -module-link-name $(LIBRARYNAME) -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) -c -o $@ 
 	@mv $(ObjDir)/swift.swiftmodule $(SWIFT_HEADER_DIR)
 
+
+# Build Axle version of the stdlib.
+AXLE_SWIFT_SOURCES := $(subst Word.swift,Word$(WORD_SIZE).swift,$(AXLE_SWIFT_SOURCES))
+ifneq ($(DISABLE_ASSERTIONS),1)
+  AXLE_SWIFT_SOURCES := $(subst Assert.swift,AssertDebug.swift,$(AXLE_SWIFT_SOURCES))
+endif
+
+PATH_TO_AXLE_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(AXLE_SWIFT_SOURCES))
+$(AXLE_SWIFT_HEADER_DIR)/swift.swiftmodule: $(ObjDir)/swift_axle.o $(AXLE_SWIFT_HEADER_DIR)
+
+$(AXLE_SWIFT_HEADER_DIR):
+	$(MKDIR) $(AXLE_SWIFT_HEADER_DIR)
+
+# Serialize builds of swift module since they are using the same module name.
+$(ObjDir)/swift_axle.o: $(PATH_TO_AXLE_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a $(AXLE_SWIFT_HEADER_DIR) $(ObjDir)/swift.o 
+	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-name swift -parse-stdlib -parse-as-library $(PATH_TO_AXLE_SWIFT_SOURCES) 
+	$(Echo) "mv $(ObjDir)/swift.swiftmodule $(AXLE_SWIFT_HEADER_DIR)"
+	@mv $(ObjDir)/swift.swiftmodule $(AXLE_SWIFT_HEADER_DIR)
+
+
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
 	ln -s ../$(@F) $@
 
 $(SharedLibDir)/%.$(SHLIBEXT): $(SharedLibDir)/swift/%.$(SHLIBEXT)
 
-all-local:: $(SWIFT_HEADER_DIR)/swift.swiftmodule
+all-local:: $(SWIFT_HEADER_DIR)/swift.swiftmodule $(AXLE_SWIFT_HEADER_DIR)/swift.swiftmodule
