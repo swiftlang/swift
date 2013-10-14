@@ -79,7 +79,23 @@ import gizmo
 // CHECK:   i64 40
 // CHECK: }
 
-// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric
+// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}} i64 } {
+// --       template fill function
+// CHECK:   void (i8*, i8*)* [[FILL_GENERICINHERITSGENERIC:@fill_generic_metadata[0-9]*]],
+// --       RootGeneric vtable
+//          @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// --       RootGeneric field offset placeholders
+// CHECK:   i64 16, i64 0, i64 0
+// --       GenericInheritsGeneric vtable
+// CHECK:   @_TC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
+// CHECK:   @_TC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
+// CHECK:   @_TC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
+// --       GenericInheritsGeneric field offset placeholder
+// CHECK:   i64 0
+// CHECK: }
+
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
 // CHECK: @_TMPdCSo19GenericInheritsObjC
 // CHECK: @_TMPdCSo20GenericInheritsObjC2
@@ -121,6 +137,10 @@ class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
+
+  func zippity()
+  func doo()
+  func dah()
 }
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
@@ -252,4 +272,15 @@ entry:
 // CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})
-// }
+// CHECK: }
+
+// CHECK: define internal void [[FILL_GENERICINHERITSGENERIC]](i8*, i8*) {
+// -- copy parent field offsets from super metadata
+// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64* {{%.*}}, i32 11
+// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64* {{%.*}}, i32 11
+// CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
+// CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
+// CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
+// -- initialize our own dependent field offsets
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* {{%.*}}, i64 1, %swift.type** {{%.*}}, i64* {{%.*}})
+// CHECK: }

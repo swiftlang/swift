@@ -145,12 +145,17 @@ private:
           if (!field->isComputed())
             addFieldEntries(field);
       }
+      asImpl().noteEndOfFieldOffsets(theClass);
     }
   }
   
   /// Notes the beginning of the field offset vector for a particular ancestor
   /// of a generic-layout class.
   void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
+
+  /// Notes the end of the field offset vector for a particular ancestor
+  /// of a generic-layout class.
+  void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
 
 private:
   /// Add fields related to the generics of this class declaration.

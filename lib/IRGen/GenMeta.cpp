@@ -627,9 +627,6 @@ namespace {
     /// This is not really something we need to track.
     unsigned NumGenericWitnesses = 0;
 
-    /// The index of the address point in the type we're emitting.
-    unsigned AddressPoint = 0;
-
     struct FillOp {
       unsigned FromIndex;
       unsigned ToIndex;
@@ -643,6 +640,9 @@ namespace {
     enum { TemplateHeaderFieldCount = 5 };
 
   protected:
+    /// The index of the address point in the type we're emitting.
+    unsigned AddressPoint = 0;
+    
     IRGenModule &IGM = super::IGM;
     using super::Fields;
     using super::asImpl;
@@ -1140,6 +1140,9 @@ namespace {
 
     bool HasDependentSuperclass = false;
     bool HasDependentFieldOffsetVector = false;
+    
+    std::vector<std::tuple<ClassDecl*, int, int>>
+      AncestorFieldOffsetVectors;
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 const StructLayout &layout,
@@ -1160,12 +1163,30 @@ namespace {
     }
                         
     void noteStartOfFieldOffsets(ClassDecl *whichClass) {
-      // If the metadata contains any field offset vector, then we need to
-      // initialize it at runtime.
-      // FIXME: Fill superclass field offset vectors from the superclass
-      // metadata.
-      HasDependentFieldOffsetVector = true;
       HasDependentMetadata = true;
+
+      if (whichClass == TargetClass) {
+        // If the metadata contains a field offset vector for the class itself,
+        // then we need to initialize it at runtime.
+        HasDependentFieldOffsetVector = true;
+        return;
+      }
+      
+      // If we have a field offset vector for an ancestor class, we will copy
+      // it from our superclass metadata at instantiation time.
+      AncestorFieldOffsetVectors.emplace_back(whichClass, getNextIndex(), ~0U);
+    }
+    
+    void noteEndOfFieldOffsets(ClassDecl *whichClass) {
+      if (whichClass == TargetClass)
+        return;
+      
+      // Mark the end of the ancestor field offset vector.
+      assert(!AncestorFieldOffsetVectors.empty()
+             && "no start of ancestor field offsets?!");
+      assert(std::get<0>(AncestorFieldOffsetVectors.back()) == whichClass
+             && "mismatched start of ancestor field offsets?!");
+      std::get<2>(AncestorFieldOffsetVectors.back()) = getNextIndex();
     }
 
     void emitInitializeMetadata(IRGenFunction &IGF,
@@ -1175,7 +1196,9 @@ namespace {
                                                       TargetClass,
                                                       metadata);
 
-      assert((HasDependentSuperclass || HasDependentFieldOffsetVector)
+      assert((HasDependentSuperclass
+              || HasDependentFieldOffsetVector
+              || !AncestorFieldOffsetVectors.empty())
              && "no dependent metadata parts?!");
       
       assert(!HasDependentVWT && "class should never have dependent VWT");
@@ -1197,6 +1220,38 @@ namespace {
         Address superField
           = emitAddressOfSuperclassRefInClassMetadata(IGF,TargetClass,metadata);
         IGF.Builder.CreateStore(superMetadata, superField);
+      }
+      
+      // If we have any ancestor field offset vectors, copy them from the
+      // superclass metadata.
+      if (!AncestorFieldOffsetVectors.empty()) {
+        Address superBase(superMetadata, IGF.IGM.getPointerAlignment());
+        Address selfBase(metadata, IGF.IGM.getPointerAlignment());
+        superBase = IGF.Builder.CreateBitCast(superBase,
+                                              IGF.IGM.SizeTy->getPointerTo());
+        selfBase = IGF.Builder.CreateBitCast(selfBase,
+                                             IGF.IGM.SizeTy->getPointerTo());
+        
+        for (auto &ancestorFields : AncestorFieldOffsetVectors) {
+          ClassDecl *ancestor;
+          unsigned startIndex, endIndex;
+          std::tie(ancestor, startIndex, endIndex) = ancestorFields;
+          if (startIndex == endIndex)
+            continue;
+          assert(startIndex <= endIndex);
+          unsigned size = endIndex - startIndex;
+          startIndex -= (int)AddressPoint;
+          
+          Address superVec = IGF.Builder.CreateConstArrayGEP(superBase,
+                                         startIndex, IGF.IGM.getPointerSize());
+          Address selfVec = IGF.Builder.CreateConstArrayGEP(selfBase,
+                                         startIndex, IGF.IGM.getPointerSize());
+          
+          IGF.Builder.CreateMemCpy(selfVec.getAddress(),
+                                   superVec.getAddress(),
+                                   IGF.IGM.getPointerSize().getValue() * size,
+                                   IGF.IGM.getPointerAlignment().getValue());
+        }
       }
       
       // If the field layout is dependent, ask the runtime to populate the
