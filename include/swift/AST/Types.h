@@ -1913,8 +1913,8 @@ class MatrixType : public SyntaxSugarType, public llvm::FoldingSetNode {
              bool hasTypeVariable)
     : SyntaxSugarType(TypeKind::Matrix, ctx, base, hasTypeVariable),
       Rows(rows),
-      Columns(columns? *columns : rows),
-      ColumnsSpecified(columns) { }
+      Columns(columns ? *columns : rows),
+      ColumnsSpecified(columns.hasValue()) { }
 
 public:
   /// Return a uniqued optional type with the specified base type.

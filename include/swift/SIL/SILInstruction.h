@@ -2093,7 +2093,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
-    return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
+    return ArrayRef<SILSuccessor>{getSuccessorBuf(),
+                                  static_cast<size_t>(NumCases + HasDefault)};
   }
   
   unsigned getNumCases() const { return NumCases; }
@@ -2168,7 +2169,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
-    return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
+    return ArrayRef<SILSuccessor>{getSuccessorBuf(),
+                                  static_cast<size_t>(NumCases + HasDefault)};
   }
   
   unsigned getNumCases() const { return NumCases; }
