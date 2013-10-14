@@ -1937,6 +1937,7 @@ commit_to_conversions:
 
   case ConversionRestrictionKind::ValueToOptional: {
     auto boundGenericType2 = type2->castTo<BoundGenericType>();
+    (void)boundGenericType2;
     assert(boundGenericType2->getDecl() == TC.Context.getOptionalDecl());
     assert(boundGenericType2->getGenericArgs().size() == 1);
     return matchTypes(type1,
