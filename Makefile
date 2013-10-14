@@ -91,12 +91,15 @@ else
   SWIFT_DEBUGFLAG :=
 endif
 
+ifndef SWIFT_OPTIMIZED
+  SWIFT_OPTIMIZED := 1
+endif
+
 # Optimization flags for .swift files
-ifeq ($(ENABLE_OPTIMIZED),1)
+ifeq ($(SWIFT_OPTIMIZED),1)
   SWIFT_OPTFLAG := -O3
 else
-  # FIXME: Temporarily set to -O2 instead of -O0, until rdar://15221815 is fixed.
-  SWIFT_OPTFLAG := -O2
+  SWIFT_OPTFLAG := -O0
 endif
 
 # All options for .swift files
