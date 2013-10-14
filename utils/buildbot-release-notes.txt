@@ -34,6 +34,8 @@
   (see above). Fully general unconditional casts can still be expressed using
   'as' and postfix '!' together, '(x as T)!'.
 
+* The old "square bracket" attribute syntax has been removed.
+
 2013-10-09
 ----------
 
