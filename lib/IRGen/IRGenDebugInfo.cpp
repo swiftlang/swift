@@ -274,8 +274,6 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
     L = LastLoc;
-    //L.Line = LastLoc.Line;
-    //L.Col = LastLoc.Col;
   }
   LastLoc = L;
   LastScope = DS;

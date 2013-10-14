@@ -645,6 +645,17 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
   
   IGF.Builder.SetInsertPoint(llBB);
+  if (IGF.IGM.DebugInfo) {
+    // Use the location of the first instruction in the basic block
+    // for the φ-nodes.
+    if (!silBB->empty()) {
+      SILInstruction &I = *silBB->begin();
+      auto DS = I.getDebugScope();
+      if (!DS) DS = IGF.CurSILFn->getDebugScope();
+      IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
+    }
+  }
+
   for (SILArgument *arg : make_range(silBB->bbarg_begin(), silBB->bbarg_end())) {
     size_t first = phis.size();
     
@@ -674,7 +685,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
       IGF.setLoweredExplosion(SILValue(arg,0), argValue);
     }
   }
-  
+
   return phis;
 }
 
