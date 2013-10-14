@@ -776,6 +776,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
         return;
     }
   }
+
   emitVariableDeclaration(B, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable, Indirect);
 }
@@ -844,8 +845,19 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   if (Artificial)
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
+  // There are variables without storage, such as "struct { func foo() {} }".
+  if (isa<llvm::UndefValue>(Storage)) {
+    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
+    DBuilder.createStaticVariable(Scope, Name,
+                                  Name, Unit, Line,
+                                  DTy, true,
+                                  llvm::ConstantInt::get(Int64Ty, 0));
+    return;
+  }
+
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
+
   if (Indirect) {
     // Classes are always passed by reference.
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
