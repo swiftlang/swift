@@ -141,19 +141,32 @@ else:
 
   typealias DistanceType = ${Self}
   @@transparent 
-  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
-    var tmp = Builtin.int_${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value)
+  static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
+    var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+  @@transparent 
+  static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
+    var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
+    return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+  @@transparent 
+  static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+    var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
+    return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+
+  @@transparent 
+  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
+    return sub(lhs, rhs, true)
   }
   @@transparent 
   static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
-    var tmp = Builtin.int_${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value)
-    return (${Self}(tmp.0), _getBool(tmp.1))
+    return add(lhs, rhs, true)
   }
   @@transparent 
   static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
-    var tmp = Builtin.int_${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value)
-    return (${Self}(tmp.0), _getBool(tmp.1))
+    return mul(lhs, rhs, true)
   }
 }
 
@@ -192,7 +205,7 @@ func +(rhs: ${Self}) -> ${Self} { return rhs }
 @ for op,method in ('+','add'), ('*','mul'), ('-','sub'):
 @@transparent
 func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}.${method}(lhs, rhs).0
+  return ${Self}.${method}(lhs, rhs, false).0
 }
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
