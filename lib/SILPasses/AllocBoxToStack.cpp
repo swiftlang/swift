@@ -16,6 +16,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SILPasses/Utils/Local.h"
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
@@ -299,7 +300,24 @@ static bool areAllocStackUsesSafeToRemove(SILValue V) {
 static void eraseUsesOfInstruction(SILInstruction *Inst) {
   for (auto UI : Inst->getUses()) {
     auto *User = cast<SILInstruction>(UI->getUser());
+    
+    // If the instruction itself has any uses, recursively zap them so that
+    // nothing uses this instruction.
     eraseUsesOfInstruction(User);
+    
+    // Walk through the operand list and delete any random instructions that
+    // will become trivially dead when this instruction is removed.
+    
+    for (auto &Op : User->getAllOperands()) {
+      if (auto *OpI = dyn_cast<SILInstruction>(Op.get().getDef())) {
+        // Don't recursively delete the pointer we're getting in.
+        if (OpI != Inst) {
+          Op.drop();
+          recursivelyDeleteTriviallyDeadInstructions(OpI);
+        }
+      }
+    }
+    
     User->eraseFromParent();
   }
 }
