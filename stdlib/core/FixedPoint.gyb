@@ -67,8 +67,6 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
     value = v
   }
 
-  // FIXME: We will start warning on 64 bit integer overflows after the "support
-  // for negative literals" patch goes in.
   @@transparent
   static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val))
