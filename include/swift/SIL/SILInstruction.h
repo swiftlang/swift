@@ -1391,10 +1391,9 @@ public:
   VarDecl *getField() const { return Field; }
 
   StructDecl *getStructDecl() const {
-    CanType T = getOperand().getType().getSwiftRValueType();
-    if (auto *ST = T->getAs<StructType>())
-      return ST->getDecl();
-    return T->castTo<BoundGenericStructType>()->getDecl();
+    auto s = getOperand().getType().getStructOrBoundGenericStruct();
+    assert(s);
+    return s;
   }
 };
 
@@ -1411,10 +1410,9 @@ public:
   VarDecl *getField() const { return Field; }
 
   StructDecl *getStructDecl() const {
-    CanType T = getOperand().getType().getSwiftRValueType();
-    if (auto *ST = T->getAs<StructType>())
-      return ST->getDecl();
-    return T->castTo<BoundGenericStructType>()->getDecl();
+    auto s = getOperand().getType().getStructOrBoundGenericStruct();
+    assert(s);
+    return s;
   }
 };
 
