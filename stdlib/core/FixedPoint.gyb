@@ -31,7 +31,9 @@ maxBits = max(allBits)
 
 # Number of bits in an Int
 intBits = 64
-builtinIntLiteralBits = 136
+
+# Number of bits in integer literals.
+builtinIntLiteralBits = 2048
 
 assert(intBits in allBits)
 

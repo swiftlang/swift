@@ -83,7 +83,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name.substr(0, 3) == "Int") {
     unsigned BitWidth;
     if (!Name.substr(3).getAsInteger(10, BitWidth) &&
-        BitWidth <= 1024 && BitWidth != 0)  // Cap to prevent insane things.
+        BitWidth <= 2048 && BitWidth != 0)  // Cap to prevent insane things.
       return BuiltinIntegerType::get(BitWidth, Context);
   }
   
