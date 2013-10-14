@@ -275,9 +275,23 @@ entry:
 // CHECK: }
 
 // CHECK: define internal void [[FILL_GENERICINHERITSGENERIC]](i8*, i8*) {
-// -- copy parent field offsets from super metadata
-// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64* {{%.*}}, i32 11
-// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64* {{%.*}}, i32 11
+// -- initialize our generic parameters
+// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE:%.*]], i32 16
+// CHECK:   [[A_ARG_ADDR:%.*]] = getelementptr inbounds i64* [[GENERIC_ARGS:%.*]], i32 0
+// CHECK:   [[A:%.*]] = load i64* [[A_ARG_ADDR]], align 8
+// CHECK:   store i64 [[A]], i64* [[A_ADDR]], align 8
+// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE]], i32 17
+// CHECK:   [[B_ARG_ADDR:%.*]] = getelementptr inbounds i64* [[GENERIC_ARGS]], i32 1
+// CHECK:   [[B:%.*]] = load i64* [[B_ARG_ADDR]], align 8
+// CHECK:   store i64 [[B]], i64* [[B_ADDR]], align 8
+// -- copy super generic args from super metadata
+// CHECK:   [[SUPER_T_ADDR:%.*]] = getelementptr inbounds i64* [[SUPER:%.*]], i32 7
+// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds i64* [[SELF:%.*]], i32 7
+// CHECK:   [[T:%.*]] = load i64* [[SUPER_T_ADDR]], align 8
+// CHECK:   store i64 [[T]], i64* [[SELF_T_ADDR]], align 8
+// -- copy super field offsets from super metadata
+// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SUPER]], i32 11
+// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SELF]], i32 11
 // CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
 // CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)

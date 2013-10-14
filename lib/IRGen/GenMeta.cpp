@@ -1143,6 +1143,8 @@ namespace {
     
     std::vector<std::tuple<ClassDecl*, int, int>>
       AncestorFieldOffsetVectors;
+    
+    std::vector<int> AncestorFillOps;
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 const StructLayout &layout,
@@ -1188,6 +1190,40 @@ namespace {
              && "mismatched start of ancestor field offsets?!");
       std::get<2>(AncestorFieldOffsetVectors.back()) = getNextIndex();
     }
+    
+    // Suppress GenericMetadataBuilderBase's default behavior of introducing
+    // fill ops for generic arguments unless they belong directly to the target
+    // class and not its ancestors.
+
+    void addGenericArgument(ArchetypeType *type, ClassDecl *forClass) {
+      if (forClass == TargetClass) {
+        // Introduce the fill op.
+        GenericMetadataBuilderBase::addGenericArgument(type, forClass);
+      } else {
+        // Lay out the field, but don't provide the fill op, which we'll get
+        // from the superclass.
+        HasDependentMetadata = true;
+        AncestorFillOps.push_back(getNextIndex());
+        ClassMetadataBuilderBase::addGenericArgument(type, forClass);
+      }
+    }
+    
+    void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol,
+                                ClassDecl *forClass) {
+      if (forClass == TargetClass) {
+        // Introduce the fill op.
+        GenericMetadataBuilderBase::addGenericWitnessTable(type, protocol,
+                                                           forClass);
+      } else {
+        // Lay out the field, but don't provide the fill op, which we'll get
+        // from the superclass.
+
+        HasDependentMetadata = true;
+        AncestorFillOps.push_back(getNextIndex());
+        ClassMetadataBuilderBase::addGenericWitnessTable(type, protocol,
+                                                         forClass);
+      }
+    }
 
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
@@ -1198,7 +1234,8 @@ namespace {
 
       assert((HasDependentSuperclass
               || HasDependentFieldOffsetVector
-              || !AncestorFieldOffsetVectors.empty())
+              || !AncestorFieldOffsetVectors.empty()
+              || !AncestorFillOps.empty())
              && "no dependent metadata parts?!");
       
       assert(!HasDependentVWT && "class should never have dependent VWT");
@@ -1222,15 +1259,24 @@ namespace {
         IGF.Builder.CreateStore(superMetadata, superField);
       }
       
-      // If we have any ancestor field offset vectors, copy them from the
-      // superclass metadata.
-      if (!AncestorFieldOffsetVectors.empty()) {
+      // If we have any ancestor generic parameters or field offset vectors,
+      // copy them from the superclass metadata.
+      if (!AncestorFieldOffsetVectors.empty() || !AncestorFillOps.empty()) {
         Address superBase(superMetadata, IGF.IGM.getPointerAlignment());
         Address selfBase(metadata, IGF.IGM.getPointerAlignment());
         superBase = IGF.Builder.CreateBitCast(superBase,
                                               IGF.IGM.SizeTy->getPointerTo());
         selfBase = IGF.Builder.CreateBitCast(selfBase,
                                              IGF.IGM.SizeTy->getPointerTo());
+        
+        for (int ancestorOp : AncestorFillOps) {
+          ancestorOp -= (int)AddressPoint;
+          Address superOp = IGF.Builder.CreateConstArrayGEP(superBase,
+                                         ancestorOp, IGF.IGM.getPointerSize());
+          Address selfOp = IGF.Builder.CreateConstArrayGEP(selfBase,
+                                         ancestorOp, IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(IGF.Builder.CreateLoad(superOp), selfOp);
+        }
         
         for (auto &ancestorFields : AncestorFieldOffsetVectors) {
           ClassDecl *ancestor;
@@ -1292,6 +1338,7 @@ namespace {
                                 fields.getAddress(), fieldVector);
       }
     }
+    
   };
 }
 
