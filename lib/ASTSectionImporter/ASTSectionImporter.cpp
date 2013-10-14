@@ -57,7 +57,7 @@ bool parseASTSection(SerializedModuleLoader* SML, StringRef Buf,
       continue;
 
     // Get the access path.
-    if (sizeof(h)+h->name_len > size) {
+    if (sizeof(struct apple_ast_hdr)+h->name_len > size) {
       llvm::dbgs() << "Impossible access path length. Section corrupted?\n";
       return false;
     }
