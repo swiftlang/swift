@@ -976,8 +976,8 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
                                 llvm::DIFile File, unsigned Line,
                                 unsigned Flags) {
   unsigned SizeOfByte = TargetInfo.getCharWidth();
-  unsigned SizeInBits = (unsigned)DbgTy.size * SizeOfByte;
-  unsigned AlignInBits = (unsigned)DbgTy.align * SizeOfByte;
+  unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
+  unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   // FIXME: Is DW_TAG_union_type the right thing here?
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
