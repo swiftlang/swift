@@ -275,7 +275,12 @@ static bool areAllocStackUsesSafeToRemove(SILValue V) {
       continue;
     
     // Zero initializations can be dropped.
-    if (isa<InitializeVarInst>(User))
+    if (isa<InitializeVarInst>(User) ||
+        
+        // destroy_addrs can be dropped as well, the initialization is being
+        // removed so this effectively eliminates the copy entirely.
+        isa<DestroyAddrInst>(User) ||
+        isa<InitExistentialInst>(User))
       continue;
 
     // Recursively check uses of instructions that derive a pointer from the
