@@ -23,7 +23,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
-#include <pthread.h>
 
 using namespace swift;
 
@@ -45,9 +44,7 @@ swift::swift_allocObject(HeapMetadata const *metadata,
     if (object) {
       break;
     }
-    if (pthread_is_threaded_np() == 0)
-      abort();
-    sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
+    abort(); // FIXME -- switch to a wait queue iff concurrent
   }
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
