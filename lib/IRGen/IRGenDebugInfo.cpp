@@ -187,10 +187,6 @@ static Location getASTLocation(SourceManager &SM, Optional<SILLocation> OptLoc) 
 ///
 /// This returns a FullLocation, which contains the location that
 /// should be used for the linetable and the "true" AST location.
-///
-/// NOTE: Depending on how we decide to resolve
-/// rdar://problem/14627460, we may want to use the regular
-/// getLoc instead and rather use the column info.
 static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
@@ -199,10 +195,14 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
 
   if (Loc.isNull()) return {};
   if (Expr *E = Loc.getAsASTNode<Expr>()) {
-    // closures should not show up in the line table. Note that the
-    // closure function still has a valid DW_AT_decl_line.
+    // Code that has an autoclosure as location should not show up in
+    // the line table (rdar://problem/14627460). Note also that the
+    // closure function still has a valid DW_AT_decl_line.  Depending
+    // on how we decide to resolve rdar://problem/14627460, we may
+    // want to use the regular getLoc instead and rather use the
+    // column info.
     auto ELoc = getLoc(SM, E);
-    if (isa<AbstractClosureExpr>(E))
+    if (isa<AutoClosureExpr>(E))
       return {{}, ELoc};
     return {ELoc, ELoc};
   }
@@ -252,6 +252,15 @@ static bool isExplicitClosure(SILDebugScope *DS) {
   return false;
 }
 
+/// Determine whether this location is some kind of closure.
+static bool isAbstractClosure(const SILLocation &Loc) {
+    if (Expr *E = Loc.getAsASTNode<Expr>())
+      if (isa<AbstractClosureExpr>(E))
+        return true;
+  return false;
+}
+
+
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
@@ -269,6 +278,20 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
     auto File = getOrCreateFile(L.LocForLinetable.Filename);
     Scope = DBuilder.createLexicalBlockFile(Scope, File);
   }
+
+  // Both the code that is used to set up a closure object and the
+  // (beginning of) the closure itself has the AbstractClosureExpr as
+  // location. We are only interested in the latter case and want to
+  // ignore the setup code.
+  //
+  // callWithClosure(
+  //  { // <-- a breakpoint here should only stop inside of the closure.
+  //    foo();
+  //  })
+  //
+  // The actual closure has a closure expression as scope.
+  if (Loc && isAbstractClosure(*Loc) && !isAbstractClosure(DS->Loc))
+    return;
 
   if (L.LocForLinetable.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
@@ -482,8 +505,9 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   Location L = {};
   Location PrologLoc = {};
   if (DS) {
-    L = getLocation(SM, DS->Loc).Loc;
-    PrologLoc = getLocation(SM, DS->Loc).LocForLinetable;
+    auto FL = getLocation(SM, DS->Loc);
+    L = FL.Loc;
+    PrologLoc = FL.LocForLinetable;
     Name = getName(DS->Loc);
   }
   assert(Fn);
