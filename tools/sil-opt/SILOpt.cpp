@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
       break;
     case PassKind::CapturePromotion:
       performSILCapturePromotion(CI.getSILModule());
+      break;
     case PassKind::SILCleanup:
       performSILCleanup(CI.getSILModule());
       break;
