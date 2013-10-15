@@ -1,4 +1,10 @@
-cmake_minimum_required(VERSION 2.8.9)
+if (XCODE)
+  # Xcode + asm works on 2.8.10 or newer.
+  cmake_minimum_required(VERSION 2.8.10)
+else()
+  cmake_minimum_required(VERSION 2.8)
+endif()
+
 set(CMAKE_ASM_COMPILER_ID "Clang")
 enable_language(ASM)
 
