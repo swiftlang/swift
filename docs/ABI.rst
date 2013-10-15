@@ -43,10 +43,11 @@ is as follows:
 Note that this differs from C or LLVM's normal layout rules in that *size*
 and *stride* are distinct; whereas C layout requires that an embedded struct's
 size be padded out to its alignment and that nothing be laid out there,
-Swift layout allows an outer struct to lay out fields in the inner struct
-s tail padding, alignment permitting. The Swift compiler emits LLVM packed
-struct types with manual padding to get the necessary control over the binary
-layout. Some examples:
+Swift layout allows an outer struct to lay out fields in the inner struct's
+tail padding, alignment permitting. Unlike C, zero-sized structs and tuples
+are also allowed, and take up no storage in enclosing aggregates. The Swift
+compiler emits LLVM packed struct types with manual padding to get the
+necessary control over the binary layout. Some examples:
 
 ::
 
@@ -61,6 +62,16 @@ layout. Some examples:
     var x: UInt8
     var s: S
     var y: UInt8
+  }
+
+  // LLVM <{}>
+  struct Empty {}
+
+  // LLVM <{ i64, i64 }>
+  struct ContainsEmpty {
+    var x: Int
+    var y: Empty
+    var z: Int
   }
 
 Class Layout
@@ -261,7 +272,9 @@ All metadata records share a common header, with the following fields:
     protocol types and for protocol compositions.
   * `Metatype metadata`_ has a kind of **13**.
   * `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
-    pointing to the class's metaclass record.
+    pointing to the class's metaclass record. This isa pointer is guaranteed
+    to have an integer value larger than **4096** and so can be discriminated
+    from non-class kind values.
 
 Struct Metadata
 ~~~~~~~~~~~~~~~
@@ -305,7 +318,6 @@ contain the following fields:
 
 - If the enum is generic, then the
   `generic parameter vector`_ begins at **offset 3**.
-
 
 Tuple Metadata
 ~~~~~~~~~~~~~~
