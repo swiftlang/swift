@@ -1132,6 +1132,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
     
+    bool Negative = false;
+    if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
+      Negative = true;
+      P.consumeToken();
+    }
     if (P.Tok.getKind() != tok::integer_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
       return true;
@@ -1148,6 +1153,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     assert(!error && "integer_literal token did not parse as APInt?!");
     (void)error;
     
+    if (Negative)
+      value = -value; 
     if (value.getBitWidth() != intTy->getBitWidth())
       value = value.zextOrTrunc(intTy->getBitWidth());
     

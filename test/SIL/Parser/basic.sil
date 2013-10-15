@@ -40,6 +40,8 @@ bb1:
   %c = integer_literal $Builtin.Int64, 1
   // CHECK: alloc_array $String, %{{.*}} : $Builtin.Int64
   %d = alloc_array $String, %c : $Builtin.Int64
+  // CHECK: integer_literal $Builtin.Int64, -1
+  %e = integer_literal $Builtin.Int64, -1
   return %0 : $()                     // CHECK:   return %0 : $()
 }
 
