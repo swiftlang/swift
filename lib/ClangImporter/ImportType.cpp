@@ -476,7 +476,8 @@ namespace {
       // result type, map it to String.
       if (canBridgeTypes() &&
           !imported->getName().empty() &&
-          imported->getName().str() == "NSString") {
+          imported->getName().str() == "NSString" &&
+          Impl.hasFoundationModule()) {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "String");
       }
 
@@ -770,6 +771,16 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
 
   return known->second;
 }
+
+bool ClangImporter::Implementation::hasFoundationModule() {
+  if (!checkedFoundationModule) {
+    Identifier name = SwiftContext.getIdentifier("Foundation");
+    auto mod = SwiftContext.getModule({ {name, SourceLoc()} });
+    checkedFoundationModule = (mod != nullptr);
+  }
+  return checkedFoundationModule.getValue();
+}
+
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
                                                       StringRef name) {

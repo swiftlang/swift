@@ -241,7 +241,11 @@ public:
 
   /// \brief Clang's setObject:forKeyedSubscript: selector.
   clang::Selector setObjectForKeyedSubscript;
-  
+
+private:
+  Optional<bool> checkedFoundationModule;
+
+public:
   /// \brief Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -330,6 +334,12 @@ public:
   ///
   /// \returns The named module, or null if the module has not been imported.
   Module *getNamedModule(StringRef name);
+
+  /// \brief Returns true if the "Foundation" module can be loaded.
+  ///
+  /// After this has been called, the Foundation module will or won't be loaded
+  /// into the ASTContext.
+  bool hasFoundationModule();
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
