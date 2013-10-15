@@ -155,17 +155,15 @@ static void getPathStringToElement(CanType T, unsigned Element,
 /// Given a pointer to an aggregate type, compute the addresses of each
 /// element and add them to the ElementAddrs vector.
 static void getScalarizedElementAddresses(SILValue Pointer,
-                              SmallVectorImpl<SILInstruction*> &ElementAddrs) {
+                                          SILBuilder &B,
+                                          SILLocation Loc,
+                                      SmallVectorImpl<SILValue> &ElementAddrs) {
   CanType AggType = Pointer.getType().getSwiftRValueType();
-
-  SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
-  SILBuilder B(++SILBasicBlock::iterator(PointerInst));
 
   if (TupleType *TT = AggType->getAs<TupleType>()) {
     for (auto &Field : TT->getFields()) {
       (void)Field;
-      ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
-                                                      Pointer,
+      ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer,
                                                       ElementAddrs.size()));
     }
     return;
@@ -175,8 +173,7 @@ static void getScalarizedElementAddresses(SILValue Pointer,
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
 
   for (auto *VD : SD->getStoredProperties()) {
-    ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
-                                                     Pointer, VD));
+    ElementAddrs.push_back(B.createStructElementAddr(Loc, Pointer, VD));
   }
 }
 
@@ -238,7 +235,7 @@ static void RemoveDeadAddressingInstructions(SILValue Pointer) {
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
-                              SmallVectorImpl<SILInstruction*> &ElementAddrs,
+                              SmallVectorImpl<SILValue> &ElementAddrs,
                         SmallVectorImpl<SILInstruction*> *NewLoads = nullptr) {
   SILBuilder B(LI);
   SmallVector<SILValue, 4> ElementTmps;
@@ -886,18 +883,41 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     return ProducedSomething;
   }
 
-
-#if 0
-  // FIXME: CopyAddr
+  // If we get here with a copy_addr, it must be storing into the element. Check
+  // to see if any loaded subelements are being used, and if so, explode the
+  // copy_addr to its individual pieces.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    // Temporarily gate copyaddr forwarding by a command line flag.
-    if (!EnableCopyAddrForwarding)
+    unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
+    CanType ValTy = Inst->getOperand(1).getType().getSwiftRValueType();
+
+    bool AnyRequired = false;
+    for (unsigned i = 0, e = getNumSubElements(ValTy); i != e; ++i) {
+      // If this element is not required, don't fill it in.
+      AnyRequired = RequiredElts[StartSubElt+i];
+      if (AnyRequired) break;
+    }
+
+    // If this is a copy addr that doesn't intersect the loaded subelements,
+    // just continue with an unmodified load mask.
+    if (!AnyRequired)
       return false;
-    // We've already filtered to only look at stores to the box, this can't just
-    // be a "load" copy_addr from the box (unless it loads *and* stores).
-    ComputeAccessPath(CAI->getDest(), TheMemory);
+
+    // If the copyaddr is of an non-loadable type, we can't promote it.  Just
+    // consider it to be a clobber.
+    if (CAI->getOperand(0).getType().isLoadable(CAI->getModule())) {
+      // Otherwise, some part of the copy_addr's value is demanded by a load, so
+      // we need to explode it to its component pieces.  This only expands one
+      // level of the copyaddr.
+      SILValue StoredValue;
+      explodeCopyAddr(CAI, StoredValue);
+
+      // The copy_addr doesn't provide any values, but we've arranged for our
+      // iterators to visit the newly generated instructions, which do.
+      return false;
+    }
   }
-#endif
+
+
 
   // TODO: inout apply's should only clobber pieces passed in.
 
@@ -933,20 +953,26 @@ computeAvailableValues(SILInstruction *StartingFrom,
   // to see if the store or escape is before or after the load.  If it is
   // before, check to see if it produces the value we are looking for.
   if (PerBlockInfo[InstBB].HasNonLoadUse) {
-    for (SILBasicBlock::iterator BBI = StartingFrom, E = InstBB->begin();
-         BBI != E;) {
-      SILInstruction *TheInst = --BBI;
+    for (SILBasicBlock::iterator BBI = StartingFrom; BBI != InstBB->begin();) {
+      SILInstruction *TheInst = std::prev(BBI);
 
       // If this instruction is unrelated to the element, ignore it.
-      if (NonLoadUses.count(TheInst)) {
-        FoundSomeValues |= updateAvailableValues(TheInst, RequiredElts, Result);
-
-        // If this satisfied all of the demanded values, we're done.
-        if (RequiredElts.none())
-          return !FoundSomeValues;
-
-        // Otherwise, keep scanning the block.
+      if (!NonLoadUses.count(TheInst)) {
+        --BBI;
+        continue;
       }
+
+      
+      FoundSomeValues |= updateAvailableValues(TheInst, RequiredElts, Result);
+
+      // If this satisfied all of the demanded values, we're done.
+      if (RequiredElts.none())
+        return !FoundSomeValues;
+
+      // Otherwise, keep scanning the block.  If the instruction we were looking
+      // at just got exploded, don't skip the next instruction.
+      if (&*std::prev(BBI) == TheInst)
+        --BBI;
     }
   }
 
@@ -1192,47 +1218,20 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
       NewInst->dump();
       assert(0 && "Unknown instruction generated by copy_addr lowering");
 
-
     case ValueKind::StoreInst:
       Uses.push_back({ NewInst, CopyAddrKind });
       NonLoadUses.insert(NewInst);
       continue;
 
     case ValueKind::LoadInst: {
-#if 0
-      auto *LI = cast<LoadInst>(NewInst);
-
       // If this is the load of the input, ignore it.  Note that copy_addrs can
       // have both their input and result in the same memory object.
-      AccessPathTy NewLoadAccessPath;
-      if (!TryComputingAccessPath(LI->getOperand(), NewLoadAccessPath,
-                                  TheMemory))
+      unsigned SE = 0;
+      if (!TryComputingAccessPath(NewInst->getOperand(0), SE, TheMemory))
         continue;
-
-      // If the copy addr was of an aggregate type (a struct or tuple), we want
-      // to make sure to scalarize the load completely to make store->load
-      // forwarding simple.
-      if (isStructOrTupleToScalarize(LI->getType())) {
-        // Scalarize LoadInst.  Compute the addresses of the elements, then
-        // scalarize it into smaller loads.
-        SmallVector<SILInstruction*, 4> ElementAddrs;
-        getScalarizedElementAddresses(LI->getOperand(), ElementAddrs);
-
-        SmallVector<SILInstruction*, 4> NewLoads;
-        SILValue Result = scalarizeLoad(LI, ElementAddrs, &NewLoads);
-        SILValue(LI, 0).replaceAllUsesWith(Result);
-        LI->eraseFromParent();
-
-        // Make sure we process the newly generated loads.  They may need to be
-        // recursively scalarized and need to be registered as uses.
-        NewLoads.append(NewLoads.begin(), NewLoads.end());
-        continue;
-      }
-#endif
 
       // If it is a load from the memory object, track it as an access.
       Uses.push_back({ NewInst, Load });
-
       continue;
     }
 
@@ -1316,10 +1315,10 @@ collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt) {
 
   auto *TEAI = cast<TupleElementAddrInst>(ElementPtr);
 
-  // If we're walking into a tuple within a struct, don't adjust the BaseElt.
-  // the uses hanging off the tuple_element_addr are going to be counted as uses
-  // of the struct itself.
-  if (InStructSubElement)
+  // If we're walking into a tuple within a struct or enum, don't adjust the
+  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
+  // counted as uses of the struct or enum itself.
+  if (InStructSubElement || InEnumSubElement)
     return collectUses(SILValue(TEAI, 0), BaseElt);
 
   // tuple_element_addr P, 42 indexes into the current element.  Recursively
@@ -1380,14 +1379,22 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         assert(!isa<StoreWeakInst>(User) &&
                "Can't weak store a struct or tuple");
         UsesToScalarize.push_back(User);
-      } else {
-        auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
-        Uses[BaseElt].push_back({ User, Kind });
+        continue;
       }
+      
+      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+      Uses[BaseElt].push_back({ User, Kind });
       continue;
     }
 
     if (isa<CopyAddrInst>(User)) {
+      // If this is a copy of a tuple, we should scalarize it so that we don't
+      // have an access that crosses elements.
+      if (PointeeType.is<TupleType>()) {
+        UsesToScalarize.push_back(User);
+        continue;
+      }
+      
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is a store.  Note that we'll revisit this
       // instruction and add it to Uses twice if it is both a load and store to
@@ -1498,8 +1505,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   // Now that we've walked all of the immediate uses, scalarize any elements
   // that we need to for canonicalization or analysis reasons.
   if (!UsesToScalarize.empty()) {
-    SmallVector<SILInstruction*, 4> ElementAddrs;
-    getScalarizedElementAddresses(Pointer, ElementAddrs);
+    SILInstruction *PointerInst = cast<SILInstruction>(Pointer);
+    SmallVector<SILValue, 4> ElementAddrs;
+    SILBuilder AddrBuilder(++SILBasicBlock::iterator(PointerInst));
+    getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
+                                  ElementAddrs);
+
     
     SmallVector<SILValue, 4> ElementTmps;
     for (auto *User : UsesToScalarize) {
@@ -1528,19 +1539,42 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       }
       
       // Scalarize StoreInst
-      auto *SI = cast<StoreInst>(User);
-      getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
+        
+        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
+          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
+        SI->eraseFromParent();
+        continue;
+      }
       
-      for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-        B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
-      SI->eraseFromParent();
+      // Scalarize CopyAddrInst.
+      auto *CAI = cast<CopyAddrInst>(User);
+
+      // Determine if this is a copy *from* or *to* "Pointer".
+      if (CAI->getSrc() == Pointer) {
+        // Copy from pointer.
+        getScalarizedElementAddresses(CAI->getDest(), B, CAI->getLoc(),
+                                      ElementTmps);
+        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
+        B.createCopyAddr(CAI->getLoc(), ElementAddrs[i], ElementTmps[i],
+                         CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+        
+      } else {
+        getScalarizedElementAddresses(CAI->getSrc(), B, CAI->getLoc(),
+                                      ElementTmps);
+        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
+        B.createCopyAddr(CAI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                         CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+      }
+      CAI->eraseFromParent();
     }
     
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
     for (auto EltPtr : ElementAddrs)
-      collectElementUses(EltPtr, BaseElt);
+      collectElementUses(cast<SILInstruction>(EltPtr), BaseElt);
   }
 }
 
