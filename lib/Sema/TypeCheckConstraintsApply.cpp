@@ -2575,7 +2575,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getFieldForScalarInit(), locator);
     }
 
-     case ConversionRestrictionKind::Superclass: {
+    case ConversionRestrictionKind::DeepEquality:
+      llvm_unreachable("Equality handled above");
+
+    case ConversionRestrictionKind::Superclass: {
       // Coercion from archetype to its (concrete) superclass.
       if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
         expr = new (tc.Context) ArchetypeToSuperExpr(
@@ -2592,7 +2595,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Coercion from subclass to superclass.
       return new (tc.Context) DerivedToBaseExpr(expr, toType);
-     }
+    }
 
     case ConversionRestrictionKind::Existential:
       return coerceExistential(expr, toType, locator);
@@ -3460,9 +3463,9 @@ int Solution::getFixedScore() const {
     if (choice.getKind() != OverloadChoiceKind::Decl)
       continue;
 
-    // -2 penalty for each user-defined conversion.
+    // -3 penalty for each user-defined conversion.
     if (choice.getDecl()->getAttrs().isConversion())
-      score -= 2;
+      score -= 3;
   }
 
   // Consider type bindings.

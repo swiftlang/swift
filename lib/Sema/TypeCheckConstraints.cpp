@@ -1269,6 +1269,85 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
+                                         ConstraintLocatorBuilder locator) {
+  // Handle nominal types that are not directly generic.
+  if (auto nominal1 = type1->getAs<NominalType>()) {
+    auto nominal2 = type2->castTo<NominalType>();
+
+    assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
+           "Mismatched parents of nominal types");
+
+    if (!nominal1->getParent())
+      return SolutionKind::TriviallySolved;
+
+    // Match up the parents, exactly.
+    bool trivial = true;
+    return matchTypes(nominal1->getParent(), nominal2->getParent(),
+                      TypeMatchKind::SameType, TMF_GenerateConstraints,
+                      locator.withPathElement(ConstraintLocator::ParentType),
+                      trivial);
+  }
+
+  auto bound1 = type1->castTo<BoundGenericType>();
+  auto bound2 = type2->castTo<BoundGenericType>();
+
+  // Match up the parents, exactly, if there are parents.
+  SolutionKind result = SolutionKind::TriviallySolved;
+  assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
+         "Mismatched parents of bound generics");
+  bool trivial = true;
+  if (bound1->getParent()) {
+    switch (matchTypes(bound1->getParent(), bound2->getParent(),
+                       TypeMatchKind::SameType, TMF_GenerateConstraints,
+                       locator.withPathElement(ConstraintLocator::ParentType),
+                       trivial)) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+
+    case SolutionKind::TriviallySolved:
+      break;
+
+    case SolutionKind::Solved:
+      result = SolutionKind::Solved;
+      break;
+
+    case SolutionKind::Unsolved:
+      result = SolutionKind::Unsolved;
+      break;
+    }
+  }
+
+  // Match up the generic arguments, exactly.
+  auto args1 = bound1->getGenericArgs();
+  auto args2 = bound2->getGenericArgs();
+  assert(args1.size() == args2.size() && "Mismatched generic args");
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
+                       TMF_GenerateConstraints,
+                       locator.withPathElement(
+                         LocatorPathElt::getGenericArgument(i)),
+                       trivial)) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+
+    case SolutionKind::TriviallySolved:
+      break;
+
+    case SolutionKind::Solved:
+      result = SolutionKind::Solved;
+      break;
+
+    case SolutionKind::Unsolved:
+      result = SolutionKind::Unsolved;
+      break;
+    }
+  }
+
+  return result;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         TypeMatchKind kind, unsigned flags,
                                         ConstraintLocatorBuilder locator,
@@ -1590,18 +1669,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
-        assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
-               "Mismatched parents of nominal types");
-
-        if (!nominal1->getParent())
-          return SolutionKind::TriviallySolved;
-
-        // Match up the parents, exactly.
-        return matchTypes(nominal1->getParent(), nominal2->getParent(),
-                          TypeMatchKind::SameType, subFlags,
-                          locator.withPathElement(
-                            ConstraintLocator::ParentType),
-                          trivial);
+        potentialConversions.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
     }
@@ -1680,95 +1748,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto bound2 = cast<BoundGenericType>(desugar2);
       
       if (bound1->getDecl() == bound2->getDecl()) {
-        // Match up the parents, exactly, if there are parents.
-        SolutionKind result = SolutionKind::TriviallySolved;
-        bool checkConversions = false;
-        assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
-               "Mismatched parents of bound generics");
-        if (bound1->getParent()) {
-          switch (matchTypes(bound1->getParent(), bound2->getParent(),
-                             TypeMatchKind::SameType, TMF_GenerateConstraints,
-                             locator.withPathElement(
-                               ConstraintLocator::ParentType),
-                             trivial)) {
-          case SolutionKind::Error:
-            // There may still be a conversion that can satisfy the constraint.
-            // FIXME: The recursive match may have introduced new equality
-            // constraints that are now invalid. rdar://problem/13140447
-            if (kind >= TypeMatchKind::Conversion) {
-              checkConversions = true;
-              break;
-            }
-
-            // Record this failure.
-            if (shouldRecordFailures()) {
-              recordFailure(getConstraintLocator(
-                              locator.withPathElement(
-                                ConstraintLocator::ParentType)),
-                            getRelationalFailureKind(kind), type1, type2);
-            }
-
-            return SolutionKind::Error;
-
-          case SolutionKind::TriviallySolved:
-            break;
-
-          case SolutionKind::Solved:
-            result = SolutionKind::Solved;
-            break;
-
-          case SolutionKind::Unsolved:
-            result = SolutionKind::Unsolved;
-            break;
-          }
-        }
-        if (checkConversions)
-          break;
-        
-        // Match up the generic arguments, exactly.
-        auto args1 = bound1->getGenericArgs();
-        auto args2 = bound2->getGenericArgs();
-        assert(args1.size() == args2.size() && "Mismatched generic args");
-        for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-          switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
-                             TMF_GenerateConstraints,
-                             locator.withPathElement(
-                               LocatorPathElt::getGenericArgument(i)),
-                             trivial)) {
-          case SolutionKind::Error:
-            // There may still be a conversion that can satisfy this constraint.
-            // FIXME: The recursive match may have introduced new equality
-            // constraints that are now invalid. rdar://problem/13140447
-            if (kind >= TypeMatchKind::Conversion) {
-              checkConversions = true;
-              break;
-            }
-
-            // Record this failure.
-            if (shouldRecordFailures()) {
-              recordFailure(getConstraintLocator(
-                              locator.withPathElement(
-                                LocatorPathElt::getGenericArgument(i))),
-                            getRelationalFailureKind(kind), type1, type2);
-            }
-
-            return SolutionKind::Error;
-
-          case SolutionKind::TriviallySolved:
-            break;
-
-          case SolutionKind::Solved:
-            result = SolutionKind::Solved;
-            break;
-
-          case SolutionKind::Unsolved:
-            result = SolutionKind::Unsolved;
-            break;
-          }
-        }
-
-        if (!checkConversions)
-          return result;
+        potentialConversions.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
     }
@@ -1826,9 +1806,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           trivial);
       }
     }
-    
+
+    // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass() &&
-        type2->getClassOrBoundGenericClass()) {
+        type2->getClassOrBoundGenericClass() &&
+        type1->getClassOrBoundGenericClass()
+          != type2->getClassOrBoundGenericClass()) {
       potentialConversions.push_back(ConversionRestrictionKind::Superclass);
     }
   }
@@ -1915,8 +1898,14 @@ commit_to_conversions:
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
     for (auto potential : potentialConversions) {
+      // Determine the constraint kind. For a deep equality constraint, only
+      // perform equality.
+      auto constraintKind = getConstraintKind(kind);
+      if (potential == ConversionRestrictionKind::DeepEquality)
+        constraintKind = ConstraintKind::Equal;
+
       constraints.push_back(
-        new (*this) Constraint(getConstraintKind(kind), potential, type1, type2,
+        new (*this) Constraint(constraintKind, potential, type1, type2,
                                fixedLocator));
     }
     addConstraint(Constraint::createDisjunction(*this, constraints,
@@ -1935,6 +1924,9 @@ commit_to_conversions:
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
                                    subFlags, locator, trivial);
+
+  case ConversionRestrictionKind::DeepEquality:
+    return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
     return matchSuperclassTypes(type1, type2, kind, flags, locator,
@@ -2753,6 +2745,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                  constraint.getLocator(), trivial);
         break;
 
+      case ConversionRestrictionKind::DeepEquality:
+        return matchDeepEqualityTypes(constraint.getFirstType(),
+                                      constraint.getSecondType(),
+                                      constraint.getLocator());
+
       case ConversionRestrictionKind::Superclass:
         result = matchSuperclassTypes(constraint.getFirstType(),
                                        constraint.getSecondType(),
@@ -3186,7 +3183,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     type1 = stripInitializers(cs.getTypeChecker(), type1);
     type2 = stripInitializers(cs.getTypeChecker(), type2);
 
-    
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
       continue;
@@ -3212,6 +3208,25 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       if (type2Better)
         ++score2;
+
+      // Prefer a bare type to the same type type in a single-element tuple.
+      // FIXME: It's unfortunate that this ever fires.
+      auto tuple1 = type1->getAs<TupleType>();
+      auto tuple2 = type2->getAs<TupleType>();
+      if (static_cast<bool>(tuple1) != static_cast<bool>(tuple2)) {
+        auto theTuple = tuple1? tuple1 : tuple2;
+        auto theType = tuple1? type2 : type1;
+        if (theTuple->getNumElements() == 1 &&
+            !theTuple->getFields()[0].isVararg() &&
+            theTuple->getElementType(0)->isEqual(theType)) {
+          if (tuple1)
+            ++score2;
+          else
+            ++score1;
+          continue;
+        }
+      }
+
       continue;
     }
 

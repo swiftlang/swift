@@ -1392,6 +1392,11 @@ private:
                                     ConstraintLocatorBuilder locator,
                                     bool &trivial);
 
+  /// \brief Subroutine of \c matchTypes(), which matches up two types that
+  /// refer to the same declaration via their generic arguments.
+  SolutionKind matchDeepEqualityTypes(Type type1, Type type2,
+                                      ConstraintLocatorBuilder locator);
+
   /// \brief Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   SolutionKind matchExistentialTypes(Type type1, Type type2,

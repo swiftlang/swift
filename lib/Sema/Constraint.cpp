@@ -157,6 +157,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << " [scalar-to-tuple]";
       break;
 
+    case ConversionRestrictionKind::DeepEquality:
+      Out << " [deep equality]";
+      break;
+
     case ConversionRestrictionKind::Superclass:
       Out << " [superclass]";
       break;

@@ -827,9 +827,30 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       llvm::errs() << '\n';
     }
 
-    addConstraint(constraint);
-    if (!solve(solutions, allowFreeTypeVariables))
-      anySolved = true;
+    // Simplify this term in the disjunction.
+    switch (simplifyConstraint(*constraint)) {
+    case SolutionKind::Error:
+      if (!failedConstraint)
+        failedConstraint = constraint;
+      break;
+
+    case SolutionKind::TriviallySolved:
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Unsolved:
+      Constraints.push_back(constraint);
+      break;
+    }
+
+    // Record this as a generated constraint.
+    solverState->generatedConstraints.push_back(constraint);
+
+    if (!solve(solutions, allowFreeTypeVariables)) {
+      if (!failedConstraint) {
+        failedConstraint = constraint;
+      }
+    }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       llvm::errs().indent(solverState->depth * 2) << ")\n";
