@@ -17,7 +17,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/Basic/Fixnum.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -26,9 +25,6 @@ using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
-
-static llvm::cl::opt<bool>
-EnableCopyAddrForwarding("enable-copyaddr-forwarding");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
@@ -481,21 +477,17 @@ namespace {
       // mark_uninitialized.
       return TheMemory->getType(0).getObjectType().getSwiftRValueType();
     }
-
-    void handleLoadUse(SILInstruction *Inst);
-    void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
-    void handleInOutUse(SILInstruction *Inst);
-    void handleEscape(SILInstruction *Inst);
-    void handleRelease(SILInstruction *Inst);
-
-    void promoteLoad(SILInstruction *Inst);
-
+    
     enum DIKind {
       DI_Yes,
       DI_No,
       DI_Partial
     };
     DIKind checkDefinitelyInit(SILInstruction *Inst);
+
+    void handleStoreUse(SILInstruction *Inst, DIKind Kind, bool isPartialStore);
+
+    void promoteLoad(SILInstruction *Inst);
 
     bool isLiveOut(SILBasicBlock *BB);
 
@@ -589,6 +581,28 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   diagnose(Use->getModule(), TheMemory->getLoc(), diag::variable_defined_here);
 }
 
+static bool isStoreObviouslyAnInitialization(SILInstruction *Inst) {
+  if (isa<AssignInst>(Inst))
+    return false;
+  
+  else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
+    if (CA->isInitializationOfDest()) return true;
+  } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
+    if (SW->isInitializationOfDest()) return true;
+  } else if (isa<InitExistentialInst>(Inst) ||
+             isa<UpcastExistentialInst>(Inst) ||
+             isa<EnumDataAddrInst>(Inst) ||
+             isa<InjectEnumAddrInst>(Inst)) {
+    // These instructions *on a box* are only formed by direct initialization
+    // like "var x : Proto = foo".
+    return true;
+  } else {
+    return true;
+  }
+
+  return false;
+}
+
 
 void ElementPromotion::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
@@ -598,17 +612,67 @@ void ElementPromotion::doIt() {
   // Note that this should not use a for-each loop, as the Uses list can grow
   // and reallocate as we iterate over it.
   for (unsigned i = 0; i != Uses.size(); ++i) {
-    auto &Use = Uses[i];
+    auto *Inst = Uses[i].first;
     // Ignore entries for instructions that got expanded along the way.
-    if (Use.first == nullptr) continue;
+    if (Inst == nullptr) continue;
 
-    switch (Use.second) {
-    case UseKind::Load:         handleLoadUse(Use.first); break;
-    case UseKind::Store:        handleStoreUse(Use.first, false); break;
-    case UseKind::PartialStore: handleStoreUse(Use.first, true); break;
-    case UseKind::InOutUse:     handleInOutUse(Use.first); break;
-    case UseKind::Escape:       handleEscape(Use.first); break;
-    case UseKind::Release:      handleRelease(Use.first); break;
+    // We assume that SILGen knows what it is doing when it produces
+    // initializations of variables, because it only produces them when it knows
+    // they are correct, and this is a super common case for "var x = 4" cases.
+    if (Uses[i].second == UseKind::Store &&
+        isStoreObviouslyAnInitialization(Inst))
+      continue;
+    
+    // Check to see if the value is known-initialized here or not.
+    DIKind DI = checkDefinitelyInit(Inst);
+    
+    switch (Uses[i].second) {
+    case UseKind::Store:
+      handleStoreUse(Inst, DI, false);
+      break;
+    case UseKind::PartialStore:
+      handleStoreUse(Inst, DI, true);
+      break;
+
+    case UseKind::Load:
+      // If the value is not definitively initialized, emit an error.
+      // TODO: In the "No" case, we can emit a fixit adding a default
+      // initialization of the type.
+      // TODO: In the "partial" case, we can produce a more specific diagnostic
+      // indicating where the control flow merged.
+      if (DI != DI_Yes) {
+        // Otherwise, this is a use of an uninitialized value.  Emit a
+        // diagnostic.
+        diagnoseInitError(Inst, diag::variable_used_before_initialized);
+      }
+      break;
+      
+    case UseKind::InOutUse:
+      if (DI != DI_Yes) {
+        // This is a use of an uninitialized value.  Emit a diagnostic.
+        diagnoseInitError(Inst, diag::variable_inout_before_initialized);
+      }
+      break;
+      
+    case UseKind::Escape:
+      if (DI != DI_Yes) {
+        // This is a use of an uninitialized value.  Emit a diagnostic.
+        if (isa<MarkFunctionEscapeInst>(Inst))
+          diagnoseInitError(Inst, diag::global_variable_function_use_uninit);
+        else
+          diagnoseInitError(Inst, diag::variable_escape_before_initialized);
+      }
+      break;
+
+    case UseKind::Release:
+      /// TODO: We could make this more powerful to directly support these
+      /// cases, at least when the value doesn't escape.
+      ///
+      if (DI != DI_Yes) {
+        // This is a release of an uninitialized value.  Emit a diagnostic.
+        diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
+      }
+      break;
     }
 
     if (HadError) return;
@@ -624,54 +688,8 @@ void ElementPromotion::doIt() {
   }
 }
 
-/// Given a load (i.e., a LoadInst, CopyAddr, LoadWeak, or ProjectExistential),
-/// determine whether the loaded value is definitely assigned or not.  If not,
-/// produce a diagnostic.
-void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
-  auto DI = checkDefinitelyInit(Inst);
-
-  // If the value is not definitively initialized, emit an error.
-
-  // TODO: In the "No" case, we can emit a fixit adding a default initialization
-  // of the type.
-  // TODO: In the "partial" case, we can produce a more specific diagnostic
-  // indicating where the control flow merged.
-  if (DI != DI_Yes) {
-    // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-    diagnoseInitError(Inst, diag::variable_used_before_initialized);
-    return;
-  }
-}
-
-
-
 void ElementPromotion::handleStoreUse(SILInstruction *Inst,
-                                      bool isPartialStore) {
-
-  // We assume that SILGen knows what it is doing when it produces
-  // initializations of variables, because it only produces them when it knows
-  // they are correct, and this is a super common case for "var x = 4" cases.
-  if (!isPartialStore) {
-    if (isa<AssignInst>(Inst))
-      ;
-    else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
-      if (CA->isInitializationOfDest()) return;
-    } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
-      if (SW->isInitializationOfDest()) return;
-    } else if (isa<InitExistentialInst>(Inst) ||
-               isa<UpcastExistentialInst>(Inst) ||
-               isa<EnumDataAddrInst>(Inst) ||
-               isa<InjectEnumAddrInst>(Inst)) {
-      // These instructions *on a box* are only formed by direct initialization
-      // like "var x : Proto = foo".
-      return;
-    } else {
-      return;
-    }
-  }
-
-  // Check to see if the value is known-initialized here or not.
-  auto DI = checkDefinitelyInit(Inst);
+                                      DIKind DI, bool isPartialStore) {
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
@@ -722,47 +740,6 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
       }
     }
   }
-}
-
-
-/// Given a inout use (an Apply), determine whether the loaded
-/// value is definitely assigned or not.  If not, produce a diagnostic.
-void ElementPromotion::handleInOutUse(SILInstruction *Inst) {
-  auto DI = checkDefinitelyInit(Inst);
-  if (DI == DI_Yes)
-    return;
-
-  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_inout_before_initialized);
-}
-
-void ElementPromotion::handleEscape(SILInstruction *Inst) {
-  auto DI = checkDefinitelyInit(Inst);
-  if (DI == DI_Yes)
-    return;
-
-  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  if (isa<MarkFunctionEscapeInst>(Inst))
-    diagnoseInitError(Inst, diag::global_variable_function_use_uninit);
-  else
-    diagnoseInitError(Inst, diag::variable_escape_before_initialized);
-}
-
-/// At the time when a box is destroyed, it might be completely uninitialized,
-/// and if it is a tuple, it may only be partially initialized.  To avoid
-/// ambiguity, we require that all elements of the value are completely
-/// initialized at the point of a release.
-///
-/// TODO: We could make this more powerful to directly support these cases, at
-/// lease when the value doesn't escape.
-///
-void ElementPromotion::handleRelease(SILInstruction *Inst) {
-  auto DI = checkDefinitelyInit(Inst);
-  if (DI == DI_Yes)
-    return;
-
-  // Otherwise, this is a release of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
 }
 
 
@@ -1744,9 +1721,6 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through and promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
-
-    if (EnableCopyAddrForwarding)
-      Fn.dump();
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     lowerRawSILOperations(Fn);
