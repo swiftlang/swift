@@ -38,15 +38,15 @@
 
 * Overflows on construction of integer and floating point values from integer 
   literals that are too large to fit the type are now reported by the compiler.
-  (The support for reporting overflows in constant expressions is coming soon.)
   Here are some examples:
 
-  var x = Int8(-129)
-  // error: integer literal overflows when stored into 'Int8'
+      var x = Int8(-129)
+      // error: integer literal overflows when stored into 'Int8'
 
-  var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
-  // error: integer literal overflows when stored into 'Int'
+      var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+      // error: integer literal overflows when stored into 'Int'
 
+  Support for reporting overflows in constant expressions is coming soon.
 
 2013-10-09
 ----------
