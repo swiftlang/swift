@@ -924,6 +924,25 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   }
 }
 
+/// Asserts if the declaration has any attributes other than the ones
+/// specified in the template parameters.
+///
+/// This is a no-op in release builds.
+template <AttrKind ...KINDS>
+static void checkAllowedAttributes(const Decl *D) {
+#ifndef NDEBUG
+  DeclAttributes attrs = D->getAttrs();
+  for (AttrKind AK : { KINDS... })
+    attrs.clearAttribute(AK);
+  assert(attrs.empty());
+#endif
+}
+
+template<>
+void checkAllowedAttributes(const Decl *D) {
+  assert(D->getAttrs().empty());
+}
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -943,11 +962,9 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
 
-    DeclAttributes remainingAttrs = extension->getAttrs();
     // @transparent on extensions is propagated down to the methods and
     // constructors during serialization.
-    remainingAttrs.clearAttribute(AK_transparent);
-    assert(remainingAttrs.empty() && "unhandled extension attrs");
+    checkAllowedAttributes<AK_transparent>(extension);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
@@ -976,6 +993,8 @@ void Serializer::writeDecl(const Decl *D) {
       
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
+    checkAllowedAttributes<>(binding);
+
     const Decl *DC = getDeclForContext(binding->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
@@ -994,6 +1013,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
+    checkAllowedAttributes<>(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
     auto associativity = getRawStableAssociativity(op->getAssociativity());
@@ -1009,6 +1029,7 @@ void Serializer::writeDecl(const Decl *D) {
       
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
+    checkAllowedAttributes<>(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1021,6 +1042,7 @@ void Serializer::writeDecl(const Decl *D) {
     
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
+    checkAllowedAttributes<>(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1034,10 +1056,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
     assert(!typeAlias->isObjC() && "ObjC typealias is not meaningful");
-
-    // FIXME: Handle attributes.
-    // FIXME: Do typealiases have any interesting attributes? Resilience?
-    assert(typeAlias->getAttrs().empty() && "typealias attrs not handled");
+    checkAllowedAttributes<>(typeAlias);
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
@@ -1059,10 +1078,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
-
-    // FIXME: Handle attributes.
-    // FIXME: Do generic params have any interesting attributes?
-    assert(genericParam->getAttrs().empty() && "generic attrs not handled");
+    checkAllowedAttributes<>(genericParam);
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
@@ -1084,11 +1100,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
-
-    // FIXME: Handle attributes.
-    // FIXME: Do associated types have any interesting attributes?
-    assert(assocType->getAttrs().empty() &&
-           "associated type attrs not handled");
+    checkAllowedAttributes<>(assocType);
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
@@ -1108,9 +1120,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Struct: {
     auto theStruct = cast<StructDecl>(D);
-    
-    // FIXME: Handle attributes.
-    assert(theStruct->getAttrs().empty() && "struct attrs not handled");
+    checkAllowedAttributes<>(theStruct);
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
@@ -1130,9 +1140,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Enum: {
     auto theEnum = cast<EnumDecl>(D);
-
-    // FIXME: Handle attributes.
-    assert(theEnum->getAttrs().empty() && "enum attrs not handled");
+    checkAllowedAttributes<>(theEnum);
 
     const Decl *DC = getDeclForContext(theEnum->getDeclContext());
 
@@ -1153,10 +1161,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
-
-    DeclAttributes remainingAttrs = theClass->getAttrs();
-    remainingAttrs.clearAttribute(AK_objc);
-    assert(remainingAttrs.empty() && "unhandled class attrs");
+    checkAllowedAttributes<AK_objc>(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
@@ -1179,12 +1184,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    
-    DeclAttributes remainingAttrs = proto->getAttrs();
-    remainingAttrs.clearAttribute(AK_class_protocol);
-    remainingAttrs.clearAttribute(AK_objc);
-
-    assert(remainingAttrs.empty() && "unhandled protocol attrs");
+    checkAllowedAttributes<AK_class_protocol, AK_objc>(proto);
 
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
@@ -1209,13 +1209,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
-
-    DeclAttributes remainingAttrs = var->getAttrs();
-    // FIXME: We need some representation of these for source fidelity.
-    remainingAttrs.clearAttribute(AK_objc);
-    remainingAttrs.clearAttribute(AK_iboutlet);
-
-    assert(remainingAttrs.empty() && "unhandled var attrs");
+    checkAllowedAttributes<AK_iboutlet, AK_objc>(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
@@ -1236,22 +1230,10 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
-
-    DeclAttributes remainingAttrs = fn->getAttrs();
-    // FIXME: We need some representation of these for source fidelity.
-    remainingAttrs.clearAttribute(AK_prefix);
-    remainingAttrs.clearAttribute(AK_postfix);
-    remainingAttrs.clearAttribute(AK_infix);
-    remainingAttrs.clearAttribute(AK_assignment);
-    remainingAttrs.clearAttribute(AK_conversion);
-    remainingAttrs.AsmName = {};
-    remainingAttrs.clearAttribute(AK_asmname);
-    remainingAttrs.clearAttribute(AK_noreturn);
-    remainingAttrs.clearAttribute(AK_objc);
-    remainingAttrs.clearAttribute(AK_ibaction);
-    remainingAttrs.clearAttribute(AK_transparent);
-
-    assert(remainingAttrs.empty() && "unhandled func attrs");
+    checkAllowedAttributes<
+      AK_asmname, AK_assignment, AK_conversion, AK_ibaction, AK_infix,
+      AK_noreturn, AK_objc, AK_postfix, AK_prefix, AK_transparent
+    >(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 
@@ -1291,9 +1273,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::EnumElement: {
     auto elem = cast<EnumElementDecl>(D);
-
-    // FIXME: Handle attributes.
-    assert(elem->getAttrs().empty() && "unhandled enum element attrs");
+    checkAllowedAttributes<>(elem);
 
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
@@ -1310,10 +1290,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
-
-    DeclAttributes remainingAttrs = subscript->getAttrs();
-    remainingAttrs.clearAttribute(AK_objc);
-    assert(remainingAttrs.empty() && "unhandled subscript attrs");
+    checkAllowedAttributes<AK_objc>(subscript);
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
 
@@ -1335,12 +1312,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-
-    DeclAttributes remainingAttrs = ctor->getAttrs();
-    remainingAttrs.clearAttribute(AK_objc);
-    remainingAttrs.clearAttribute(AK_transparent);
-
-    assert(remainingAttrs.empty() && "unhandled constructor attrs");
+    checkAllowedAttributes<AK_objc, AK_transparent>(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
     auto implicitSelf = ctor->getImplicitSelfDecl();
@@ -1364,10 +1336,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Destructor: {
     auto dtor = cast<DestructorDecl>(D);
-
-    DeclAttributes remainingAttrs = dtor->getAttrs();
-    remainingAttrs.clearAttribute(AK_objc);
-    assert(remainingAttrs.empty() && "unhandled destructor attrs");
+    checkAllowedAttributes<AK_objc>(dtor);
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
     auto implicitSelf = dtor->getImplicitSelfDecl();
