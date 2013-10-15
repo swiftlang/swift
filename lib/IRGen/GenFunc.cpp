@@ -932,7 +932,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
 if (Builtin.ID == BuiltinValueKind::id) { \
   SmallVector<llvm::Type*, 2> ArgTys; \
-  ArgTys.push_back(IGF.IGM.getTypeInfo(IInfo.Types[0]).getStorageType()); \
+  const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn); \
+  ArgTys.push_back(IGF.IGM.getTypeInfo(BInfo.Types[0]).getStorageType()); \
   auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module, \
     getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), ArgTys); \
   SmallVector<llvm::Value*, 2> IRArgs; \
@@ -1125,8 +1126,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::STruncWithOverflow ||
       Builtin.ID == BuiltinValueKind::UTruncWithOverflow) {
-    const BuiltinInfo &IInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getTypeInfo(IInfo.Types[1]).getStorageType();
+    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
+    auto ToTy = IGF.IGM.getTypeInfo(BInfo.Types[1]).getStorageType();
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *V = IGF.Builder.CreateTrunc(Arg, ToTy);
@@ -1138,8 +1139,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
     auto TruncTy = IGF.IGM.getTypeInfo(
         BuiltinIntegerType::get(32, IGF.IGM.Context)).getStorageType();
-    const BuiltinInfo &IInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getTypeInfo(IInfo.Types[1]).getStorageType();
+    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
+    auto ToTy = IGF.IGM.getTypeInfo(BInfo.Types[1]).getStorageType();
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
