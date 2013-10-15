@@ -39,8 +39,7 @@ static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
 static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
-                                   bool isInitialization,
-                                   SILValue IncomingVal) {
+                                   bool isInitialization) {
   DEBUG(llvm::errs() << "  *** Lowering [isInit=" << isInitialization << "]: "
             << *Inst << "\n");
 
@@ -59,21 +58,18 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   // initialization, we can also replace it with a store.
   if (isInitialization || destTL.isTrivial()) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
-    Inst->eraseFromParent();
-    return;
+  } else {
+    // Otherwise, we need to replace the assignment with the full
+    // load/store/release dance.  Note that the new value is already
+    // considered to be retained (by the semantics of the storage type),
+    // and we're transfering that ownership count into the destination.
+
+    // This is basically destTL.emitStoreOfCopy, except that if we have
+    // a known incoming value, we can avoid the load.
+    SILValue IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
+    B.createStore(Inst->getLoc(), Src, Inst->getDest());
+    destTL.emitDestroyValue(B, Inst->getLoc(), IncomingVal);
   }
-
-  // Otherwise, we need to replace the assignment with the full
-  // load/store/release dance.  Note that the new value is already
-  // considered to be retained (by the semantics of the storage type),
-  // and we're transfering that ownership count into the destination.
-
-  // This is basically destTL.emitStoreOfCopy, except that if we have
-  // a known incoming value, we can avoid the load.
-  if (!IncomingVal)
-    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
-  B.createStore(Inst->getLoc(), Src, Inst->getDest());
-  destTL.emitDestroyValue(B, Inst->getLoc(), IncomingVal);
 
   Inst->eraseFromParent();
 }
@@ -281,20 +277,10 @@ static unsigned getNumSubElements(CanType T) {
   return 1;
 }
 
-
-
-// An access path is an array of tuple or struct members.  Note that the path
-// is actually stored backwards for efficiency, the back() is the element
-// closest to the underlying alloc_box.
-typedef Fixnum<31, unsigned> TupleIndexTy;
-typedef PointerUnion<VarDecl*, TupleIndexTy> StructOrTupleElement;
-typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
-
 /// Given a pointer that is known to be derived from an alloc_box, chase up to
 /// the alloc box, computing the access path.  This returns true if the access
 /// path to the specified RootInst was successfully computed, false otherwise.
-static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
-                                   unsigned &SubEltNumber,
+static bool TryComputingAccessPath(SILValue Pointer, unsigned &SubEltNumber,
                                    SILInstruction *RootInst) {
   SubEltNumber = 0;
   while (1) {
@@ -309,8 +295,6 @@ static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
       for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i)
         SubEltNumber += getNumSubElements(TT->getElementType(i)
                                           ->getCanonicalType());
-
-      AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
       Pointer = TEAI->getOperand();
     } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
       CanType ST = SEAI->getOperand().getType().getSwiftRValueType();
@@ -322,7 +306,6 @@ static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
         SubEltNumber += getNumSubElements(SILBuilder::getStructFieldType(ST,D));
       }
 
-      AccessPath.push_back(SEAI->getField());
       Pointer = SEAI->getOperand();
     } else {
       return false;
@@ -341,34 +324,15 @@ static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
 /// This will return an access path of [struct: 'b', tuple: 0] and a base
 /// element of 2.
 ///
-static unsigned ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
-                                  SILInstruction *RootInst) {
+static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
   unsigned FirstSubElement = 0;
-  bool Result = TryComputingAccessPath(Pointer, AccessPath, FirstSubElement,
-                                       RootInst);
+  bool Result = TryComputingAccessPath(Pointer, FirstSubElement, RootInst);
   assert(Result && "Failed to compute an access path to our root?");
   (void)Result;
 
   return FirstSubElement;
 }
 
-
-/// Given an aggregate value and an access path, extract the value indicated by
-/// the path.
-static SILValue ExtractElement(SILValue Val,
-                               ArrayRef<StructOrTupleElement> AccessPath,
-                               SILBuilder &B, SILLocation Loc) {
-  for (auto I = AccessPath.rbegin(), E = AccessPath.rend(); I != E; ++I) {
-    StructOrTupleElement Elt = *I;
-
-    if (Elt.is<VarDecl*>())
-      Val = B.createStructExtract(Loc, Val, Elt.get<VarDecl*>());
-    else
-      Val = B.createTupleExtract(Loc, Val, Elt.get<TupleIndexTy>());
-  }
-
-  return Val;
-}
 
 /// Given an aggregate value and an access path, extract the value indicated by
 /// the path.
@@ -534,11 +498,7 @@ namespace {
       DI_No,
       DI_Partial
     };
-    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr,
-                               AccessPathTy *AccessPath = nullptr);
-    bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
-                                            SILValue &LoadResultVal,
-                                            AccessPathTy &LoadAccessPath);
+    DIKind checkDefinitelyInit(SILInstruction *Inst);
 
     bool isLiveOut(SILBasicBlock *BB);
 
@@ -713,33 +673,8 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     }
   }
 
-  SILType StoredType = Inst->getOperand(1).getType().getObjectType();
-
-  // If we are lowering/expanding an "assign", we may turn it into a read/write
-  // operation to release the old value.  If so, we want to determine a live-in
-  // value and classify the type a bit.
-  bool HasTrivialType = false;
-  bool WantsValue = false;
-  AccessPathTy AccessPath;
-  if (isa<AssignInst>(Inst)) {
-    HasTrivialType = Inst->getModule().
-      Types.getTypeLowering(StoredType).isTrivial();
-
-    // Only compute the live-in type if we have a complete store of a
-    // non-trivial type.
-    WantsValue = !HasTrivialType && !isPartialStore;
-
-    if (WantsValue)
-      ComputeAccessPath(Inst->getOperand(1), AccessPath, TheMemory);
-  }
-
-  // Check to see if the value is known-initialized here or not.  If the assign
-  // has non-trivial type, then we're interested in using any live-in value that
-  // is available.
-  SILValue IncomingVal;
-  auto DI = checkDefinitelyInit(Inst,
-                                WantsValue ? &IncomingVal : nullptr,
-                                WantsValue ? &AccessPath : nullptr);
+  // Check to see if the value is known-initialized here or not.
+  auto DI = checkDefinitelyInit(Inst);
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
@@ -778,12 +713,17 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     SmallVector<SILInstruction*, 8> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
 
-    LowerAssignInstruction(B, AI, HasTrivialType || DI == DI_No, IncomingVal);
+    LowerAssignInstruction(B, AI, DI == DI_No);
 
     // If lowering of the assign introduced any new stores, keep track of them.
-    for (auto I : InsertedInsts)
-      if (isa<StoreInst>(I))
+    for (auto I : InsertedInsts) {
+      if (isa<StoreInst>(I)) {
         NonLoadUses.insert(I);
+        Uses.push_back({ I, Store });
+      } else if (isa<LoadInst>(I)) {
+        Uses.push_back({ I, Load });
+      }
+    }
   }
 }
 
@@ -865,13 +805,8 @@ bool ElementPromotion::isLiveOut(SILBasicBlock *BB) {
 /// The specified instruction is a use of the element.  Determine whether the
 /// element is definitely initialized at this point or not.  If the value is
 /// initialized on some paths, but not others, this returns a partial result.
-///
-/// In addition to computing whether a value is definitely initialized or not,
-/// if AV is non-null, this function can return the currently live value in some
-/// cases.
 ElementPromotion::DIKind
-ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
-                                      AccessPathTy *AccessPath) {
+ElementPromotion::checkDefinitelyInit(SILInstruction *Inst) {
   SILBasicBlock *InstBB = Inst->getParent();
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it produces the value
@@ -890,16 +825,6 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
       if (TheInst == TheMemory)
         return DI_No;
 
-      // If we're trying to compute a value (due to a load), check to see if the
-      // loaded pointer's access path and this potential store are to the same
-      // sub-element member.  If not, this is a store to some other struct
-      // member.  If it is to the right member, try to compute the available
-      // value that can replace the load.
-      if (AV) {
-        if (checkLoadAccessPathAndComputeValue(TheInst, *AV, *AccessPath))
-          continue;
-      }
-
       return DI_Yes;
     }
   }
@@ -914,86 +839,6 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
 
   return DI_Yes;
 }
-
-
-/// If the specified instruction is a store of some value, check to see if it is
-/// storing to something that intersects the access path of a load.  If the two
-/// accesses are non-intersecting, return true.  Otherwise, attempt to compute
-/// the accessed subelement value and return it in LoadResultVal.
-bool ElementPromotion::
-checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
-                                   SILValue &LoadResultVal,
-                                   AccessPathTy &LoadAccessPath) {
-  // Get the access path for the store/assign.
-  AccessPathTy StoreAccessPath;
-
-  // We can always try to store forward from store and assign's.
-  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
-    ComputeAccessPath(Inst->getOperand(1), StoreAccessPath, TheMemory);
-  } else if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-
-    // Temporarily gate copyaddr forwarding by a command line flag.
-    if (!EnableCopyAddrForwarding)
-      return false;
-
-
-    // We've already filtered to only look at stores to the box, this can't just
-    // be a "load" copy_addr from the box (unless it loads *and* stores).
-    ComputeAccessPath(CAI->getDest(), StoreAccessPath, TheMemory);
-  } else {
-    return false;
-  }
-
-  // Since loads are always completely scalarized, we know that the load access
-  // path will either be non-intersecting or that the load is deeper-or-equal in
-  // length than the store.
-  if (LoadAccessPath.size() < StoreAccessPath.size()) return true;
-
-  // In the case when the load is deeper (not equal) to the stored value, we'll
-  // have to do a number of extracts.  Compute how many.
-  unsigned LoadUnwrapLevel = LoadAccessPath.size()-StoreAccessPath.size();
-
-  // Ignoring those extracts, the remaining access path needs to be exactly
-  // identical.  If not, we have a non-intersecting access.
-  if (ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(LoadUnwrapLevel) !=
-      ArrayRef<StructOrTupleElement>(StoreAccessPath))
-    return true;
-
-  // Set up a builder for anything we need to emit after this instruction.
-  SILBuilder B(Inst);
-  auto Loc = Inst->getLoc();
-
-  // Handle StoreInst and AssignInst, since they always have a value ready to
-  // use.
-  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
-    LoadResultVal = Inst->getOperand(0);
-  } else {
-    // Otherwise, this is a CopyAddr, which is a fused load+copy_value+store
-    // sequence.  Explode out the copyaddr to its relevant parts so that we can
-    // get access to the intermediate value that is stored, and return the newly
-    // available value stored to memory.
-
-    // Move the insertion point of the builder to after the copy_addr, which is
-    // going to get removed when it is exploded.
-    B.setInsertionPoint(B.getInsertionBB(), ++B.getInsertionPoint());
-
-    // Explode it, replacing it with its composite pieces and getting the
-    // LoadResultVal.
-    explodeCopyAddr(cast<CopyAddrInst>(Inst), LoadResultVal);
-  }
-
-  // If the load is to a subelement of the available value, generate an extract
-  // value of the available value.
-  if (LoadUnwrapLevel != 0) {
-    ArrayRef<StructOrTupleElement> LoadPathRef(LoadAccessPath);
-    LoadResultVal = ExtractElement(LoadResultVal,
-                                   LoadPathRef.slice(0, LoadUnwrapLevel),
-                                   B, Loc);
-  }
-  
-  return false;
-}
-
 
 
 //===----------------------------------------------------------------------===//
@@ -1020,14 +865,11 @@ bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
 bool ElementPromotion::
 updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
-  AccessPathTy AccessPath;
-
 
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
     bool ProducedSomething = false;
-    unsigned StartSubElt =
-      ComputeAccessPath(Inst->getOperand(1), AccessPath, TheMemory);
+    unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
     CanType ValTy = Inst->getOperand(0).getType().getSwiftRValueType();
 
     for (unsigned i = 0, e = getNumSubElements(ValTy); i != e; ++i) {
@@ -1053,7 +895,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
       return false;
     // We've already filtered to only look at stores to the box, this can't just
     // be a "load" copy_addr from the box (unless it loads *and* stores).
-    ComputeAccessPath(CAI->getDest(), StoreAccessPath, TheMemory);
+    ComputeAccessPath(CAI->getDest(), TheMemory);
   }
 #endif
 
@@ -1247,9 +1089,7 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
 
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
-  AccessPathTy AccessPath;
-  unsigned FirstElt =
-    ComputeAccessPath(Inst->getOperand(0), AccessPath, TheMemory);
+  unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
 
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
@@ -1824,7 +1664,7 @@ static void lowerRawSILOperations(SILFunction &Fn) {
       // Unprocessed assigns just lower into assignments, not initializations.
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
         SILBuilder B(AI);
-        LowerAssignInstruction(B, AI, false, SILValue());
+        LowerAssignInstruction(B, AI, false);
         // Assign lowering may split the block. If it did,
         // reset our iteration range to the block after the insertion.
         if (B.getInsertionBB() != &BB)
