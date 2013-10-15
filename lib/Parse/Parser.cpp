@@ -115,7 +115,7 @@ void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
     TheParser.parseDeclDelayed();
     break;
   }
-  
+
   if (CodeCompletion)
     CodeCompletion->doneParsing();
 }

@@ -453,7 +453,8 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
         || Tok2.isContextualKeyword("infix"));
 }
 
-void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
+void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
+                         bool IsTopLevel) {
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
@@ -466,6 +467,12 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
   State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags,
                    CurDeclContext, { BeginLoc, EndLoc },
                    BeginParserPosition.PreviousLoc);
+
+  if (IsTopLevel) {
+    // Skip the rest of the file to prevent the parser from constructing the
+    // AST for it.  Forward references are not allowed at the top level.
+    skipUntil(tok::eof);
+  }
 }
 
 /// \brief Parse a single syntactic declaration and return a list of decl
@@ -586,7 +593,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
       !CurDeclContext->isModuleContext()) {
     // Only consume non-toplevel decls.
-    consumeDecl(BeginParserPosition, Flags);
+    consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
     // Pretend that there was no error.
     return makeParserSuccess();

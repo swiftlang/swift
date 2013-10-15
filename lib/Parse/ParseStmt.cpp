@@ -133,7 +133,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   }
 }
 
-void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
+void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
+                                 TopLevelCodeDecl *TLCD) {
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
@@ -146,9 +147,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   // this decl that are past the code completion token.
   skipUntilDeclStmtRBrace(tok::l_brace);
   SourceLoc EndLoc = Tok.getLoc();
-  State->delayDecl(PersistentParserState::DelayedDeclKind::TopLevelCodeDecl, 0,
-                   CurDeclContext, { BeginLoc, EndLoc },
-                   BeginParserPosition.PreviousLoc);
+  State->delayTopLevel(TLCD, { BeginLoc, EndLoc },
+                       BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
@@ -239,7 +239,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         NeedParseErrorRecovery = true;
         if (Status.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
-          consumeTopLevelDecl(BeginParserPosition);
+          consumeDecl(BeginParserPosition, 0U, IsTopLevel);
           return Status;
         }
       }
@@ -258,7 +258,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
       ParserStatus Status = parseExprOrStmt(Result);
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
-        consumeTopLevelDecl(BeginParserPosition);
+        consumeTopLevelDecl(BeginParserPosition, TLCD);
+        auto Brace = BraceStmt::create(Context, StartLoc, {}, Tok.getLoc());
+        TLCD->setBody(Brace);
+        Entries.push_back(TLCD);
         return Status;
       }
       if (Status.isError())
@@ -339,14 +342,20 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // Rewind to the beginning of the top-level code.
   restoreParserPosition(BeginParserPosition);
 
-  // No need to re-enter the scope: parseBraceItems() will create a scope
-  // anyway.
+  // Re-enter the lexical scope.
+  Scope S(this, DelayedState->takeScope());
 
   // Re-enter the top-level decl context.
-  ContextChange CC(*this, DelayedState->ParentContext);
+  auto *TLCD = cast<TopLevelCodeDecl>(DelayedState->ParentContext);
+  ContextChange CC(*this, TLCD);
 
-  SmallVector<ExprStmtOrDecl, 4> Entries;
-  parseBraceItems(Entries, true, BraceItemListKind::TopLevelCode);
+  SourceLoc StartLoc = Tok.getLoc();
+  ExprStmtOrDecl Result;
+  parseExprOrStmt(Result);
+  if (!Result.isNull()) {
+    auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
+    TLCD->setBody(Brace);
+  }
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to

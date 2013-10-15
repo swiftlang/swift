@@ -186,22 +186,24 @@ public:
 
   void restoreParserPosition(ParserPosition PP) {
     L->restoreState(PP.LS);
-    PreviousLoc = PP.PreviousLoc;
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
     Tok.setKind(tok::unknown);
     consumeToken();
+
+    PreviousLoc = PP.PreviousLoc;
   }
 
   void backtrackToPosition(ParserPosition PP) {
     L->backtrackToState(PP.LS);
-    PreviousLoc = PP.PreviousLoc;
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
     Tok.setKind(tok::unknown);
     consumeToken();
+
+    PreviousLoc = PP.PreviousLoc;
   }
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -218,7 +220,7 @@ public:
       P.backtrackToPosition(PP);
     }
   };
-  
+
   /// RAII object for managing 'var' patterns. Inside a 'var' pattern, bare
   /// identifiers are parsed as new VarDecls instead of references to existing
   /// ones.
@@ -439,7 +441,8 @@ public:
                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
                  std::function<bool()> callback);
 
-  void consumeTopLevelDecl(ParserPosition BeginParserPosition);
+  void consumeTopLevelDecl(ParserPosition BeginParserPosition,
+                           TopLevelCodeDecl *TLCD);
 
   ParserStatus parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                                bool IsTopLevel,
@@ -455,7 +458,8 @@ public:
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
   bool parseTopLevel();
-  void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags);
+  void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
+                   bool IsTopLevel);
   ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   void parseDeclDelayed();
   enum {

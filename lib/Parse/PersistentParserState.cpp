@@ -53,3 +53,10 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
+void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
+                                          SourceRange BodyRange,
+                                          SourceLoc PreviousLoc) {
+  delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
+            PreviousLoc);
+}
+

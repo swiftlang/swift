@@ -31,7 +31,7 @@ namespace swift {
   /// \brief Typecheck a declaration parsed during code completion.
   ///
   /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(ASTContext &Ctx, Decl *D);
+  bool typeCheckCompletionDecl(Decl *D);
 
   /// \brief Typecheck an expression parsed during code completion.
   ///
@@ -40,9 +40,13 @@ namespace swift {
                                       Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyUntil(ASTContext &Ctx,
-                                          AbstractFunctionDecl *AFD,
+  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
+
+  /// \brief Typecheck top-level code parsed during code completion.
+  ///
+  /// \returns true on success, false on error.
+  bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   /// A unique_ptr for LazyResolver that can perform additional cleanup.
   using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;

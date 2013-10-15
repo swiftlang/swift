@@ -2168,7 +2168,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // FIXME: This case is hit when code completion occurs in a function
       // parameter list. Previous parameters are definitely in scope, but
       // we don't really know how to type-check them.
-      assert(isa<AbstractFunctionDecl>(D->getDeclContext()));
+      assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
+             isa<TopLevelCodeDecl>(D->getDeclContext()));
       D->setType(ErrorType::get(Context));
     }
     break;

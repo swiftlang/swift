@@ -103,6 +103,9 @@ public:
                  DeclContext *ParentContext,
                  SourceRange BodyRange, SourceLoc PreviousLoc);
 
+  void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
+                     SourceLoc PreviousLoc);
+
   bool hasDelayedDecl() {
     return CodeCompletionDelayedDeclState.get() != nullptr;
   }

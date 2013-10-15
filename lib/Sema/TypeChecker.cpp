@@ -715,10 +715,13 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   }
 }
 
-bool swift::typeCheckCompletionDecl(ASTContext &Ctx, Decl *D) {
+bool swift::typeCheckCompletionDecl(Decl *D) {
+  auto &Ctx = D->getASTContext();
+
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(Ctx.SourceMgr);
   TypeChecker TC(Ctx, Diags);
+
   TC.typeCheckDecl(D, true);
   return true;
 }
@@ -736,17 +739,29 @@ bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
                     && !parsedExpr->getType()->is<ErrorType>();
 }
 
-bool swift::typeCheckAbstractFunctionBodyUntil(ASTContext &Ctx,
-                                               AbstractFunctionDecl *AFD,
+bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
   if (AFD->isInvalid())
     return false;
+
+  auto &Ctx = AFD->getASTContext();
 
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(Ctx.SourceMgr);
 
   TypeChecker TC(Ctx, Diags);
   return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+}
+
+bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+  auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
+
+  // Set up a diagnostics engine that swallows diagnostics.
+  DiagnosticEngine Diags(Ctx.SourceMgr);
+
+  TypeChecker TC(Ctx, Diags);
+  TC.typeCheckTopLevelCodeDecl(TLCD);
+  return true;
 }
 
 static void deleteTypeCheckerAndDiags(LazyResolver *resolver) {

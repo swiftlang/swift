@@ -715,7 +715,8 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
     SF.Decls.push_back(D);
 
     TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
-    if (TLCD == 0) continue;
+    if (!TLCD || TLCD->getBody()->getElements().empty())
+      continue;
 
     auto Entry = TLCD->getBody()->getElements()[0];
 

@@ -426,8 +426,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       typecheckContextImpl(DCToTypeCheck->getParent());
       // Then type check the function itself.
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
-        return typeCheckAbstractFunctionBodyUntil(P.Context, AFD,
-                                                  EndTypeCheckLoc);
+        return typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
       return false;
     }
     if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
@@ -436,7 +435,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       typecheckContextImpl(DC->getParent());
       if (NTD->hasType())
         return true;
-      return typeCheckCompletionDecl(P.Context, cast<NominalTypeDecl>(DC));
+      return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
+    }
+    if (DC->getContextKind() == DeclContextKind::TopLevelCodeDecl) {
+      return typeCheckTopLevelCodeDecl(dyn_cast<TopLevelCodeDecl>(DC));
     }
     return true;
   }
@@ -449,7 +451,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckDelayedParsedDecl() {
     assert(DelayedParsedDecl && "should have a delayed parsed decl");
-    return typeCheckCompletionDecl(P.Context, DelayedParsedDecl);
+    return typeCheckCompletionDecl(DelayedParsedDecl);
   }
 
   /// \returns true on success, false on failure.
