@@ -53,6 +53,13 @@
       // error: arithmetic operation '125 + 125' (on type 'Int8') results in 
       //        an overflow
 
+* Generic structs with type parameters as field types are now fully supported.
+
+      struct Pair<T, U> {
+        var first: T
+        var second: U
+      }
+
 2013-10-09
 ----------
 
