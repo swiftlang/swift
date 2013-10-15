@@ -3166,6 +3166,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
+  auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
@@ -3199,20 +3200,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If one type is a subtype of the other, but not vice-verse,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    bool type1Trivial = false;
-    bool type1Better = cs.matchTypes(type1, type2,
-                                     TypeMatchKind::Subtype,
-                                     TMF_None,
-                                     ConstraintLocatorBuilder(nullptr),
-                                     type1Trivial)
-                                       == SolutionKind::TriviallySolved;
-    bool type2Trivial = false;
-    bool type2Better = cs.matchTypes(type2, type1,
-                                     TypeMatchKind::Subtype,
-                                     TMF_None,
-                                     ConstraintLocatorBuilder(nullptr),
-                                     type2Trivial)
-                                       == SolutionKind::TriviallySolved;
+    bool type1Trivial = true;
+    bool type1Better = tc.isSubtypeOf(type1, type2, cs.DC, type1Trivial);
+    bool type2Trivial = true;
+    bool type2Better = tc.isSubtypeOf(type2, type1, cs.DC, type2Trivial);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
@@ -3222,20 +3213,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
 
     // If one type is convertible to of the other, but not vice-versa.
-    type1Trivial = false;
-    type1Better = cs.matchTypes(type1, type2,
-                                TypeMatchKind::Conversion,
-                                TMF_None,
-                                ConstraintLocatorBuilder(nullptr),
-                                type1Trivial)
-                                  == SolutionKind::TriviallySolved;
-    type2Trivial = false;
-    type2Better = cs.matchTypes(type2, type1,
-                                TypeMatchKind::Conversion,
-                                TMF_None,
-                                ConstraintLocatorBuilder(nullptr),
-                                type2Trivial)
-                                  == SolutionKind::TriviallySolved;
+    type1Better = tc.isConvertibleTo(type1, type2, cs.DC);
+    type2Better = tc.isConvertibleTo(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
