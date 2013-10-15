@@ -286,9 +286,9 @@ contain the following fields:
 
   TODO: The nominal type descriptor is currently always null.
 
-- The **parent** metadata record is stored at **offset 2**. For structs that
-  are members of an enclosing nominal type, this is a reference to the enclosing
-  type's metadata. For top-level structs, this is null.
+- A reference to the **parent** metadata record is stored at **offset 2**. For
+  structs that are members of an enclosing nominal type, this is a reference
+  to the enclosing type's metadata. For top-level structs, this is null.
 
   TODO: The parent pointer is currently always null.
 
@@ -372,7 +372,10 @@ Class Metadata
 ~~~~~~~~~~~~~~
 
 Class metadata is designed to interoperate with Objective-C; all class metadata
-records are also valid Objective-C ``Class`` objects.
+records are also valid Objective-C ``Class`` objects. Class metadata pointers
+are used as the values of class metatypes, so a derived class's metadata
+record also serves as a valid class metatype value for all of its ancestor
+classes.
 
 - The **destructor pointer** is stored at **offset -2** from the metadata
   pointer, behind the value witness table. This function is invoked by Swift's
@@ -383,14 +386,48 @@ records are also valid Objective-C ``Class`` objects.
   stored at **offset 1**. If the class is a root class, it is null.
 - Two words are reserved for use by the Objective-C runtime at **offset 2**
   and **offset 3**.
-- A third word at **offset 4** is reserved for use by Objective-C, except that
-  **the low bit is always set to 1** for Swift classes and always set to 0 for
+- The **rodata pointer** is stored at **offset 4**; it points to an Objective-C
+  compatible rodata record for the class. This pointer value includes a tag.
+  The **low bit is always set to 1** for Swift classes and always set to 0 for
   Objective-C classes.
+- The **instance size** is stored at **offset 5**. This is the total allocation
+  size for an instance of the class, including the size of its
+  `heap object header`_.
+- The **instance alignment** is stored at **offset 6**.
+- For each Swift class in the class's inheritance hierarchy, in order starting
+  from the root class and working down to the most derived class, the following
+  fields are present:
 
-TODO: other class fields, vtable, generic parameter vector
+  * First, a reference to the **parent** metadata record is stored.
+    For classes that are members of an enclosing nominal type, this is a
+    reference to the enclosing type's metadata. For top-level classes, this is
+    null.
+
+    TODO: The parent pointer is currently always null.
+
+  * If the class is generic, its `generic parameter vector`_ is stored inline.
+  * The **vtable** is stored inline and contains a function pointer to the
+    implementation of every method of the class in declaration order.
+  * If the layout of a class instance is dependent on its generic parameters,
+    then a **field offset vector** is stored inline, containing offsets in
+    bytes from an instance pointer to each field of the class in declaration
+    order. (For classes with fixed layout, the field offsets are accessible
+    statically from global variables, similar to Objective-C ivar offsets.)
+
+  Note that none of these fields are present for Objective-C base classes in
+  the inheritance hierarchy.
 
 Generic Parameter Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+Heap Objects
+------------
+
+Heap Metadata
+~~~~~~~~~~~~~
+
+Heap Object Header
+~~~~~~~~~~~~~~~~~~
 
 Mangling
 --------
