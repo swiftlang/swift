@@ -943,6 +943,12 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
 
+    DeclAttributes remainingAttrs = extension->getAttrs();
+    // @transparent on extensions is propagated down to the methods and
+    // constructors during serialization.
+    remainingAttrs.clearAttribute(AK_transparent);
+    assert(remainingAttrs.empty() && "unhandled extension attrs");
+
     const Decl *DC = getDeclForContext(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
 
@@ -1260,7 +1266,7 @@ void Serializer::writeDecl(const Decl *D) {
                              fn->getAttrs().isConversion(),
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
-                           fn->getAttrs().isTransparent(),
+                           fn->isTransparent(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
@@ -1345,6 +1351,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isImplicit(),
                                   ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
+                                  ctor->isTransparent(),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(implicitSelf));

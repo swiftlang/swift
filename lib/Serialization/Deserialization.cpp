@@ -944,15 +944,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit, hasSelectorStyleSignature, isObjC;
+    bool isImplicit, hasSelectorStyleSignature, isObjC, isTransparent;
     TypeID signatureID;
     TypeID interfaceID;
     DeclID implicitSelfID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
-                                               isObjC, signatureID,
-                                               interfaceID,
+                                               isObjC, isTransparent,
+                                               signatureID, interfaceID,
                                                implicitSelfID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
@@ -1026,6 +1026,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (hasSelectorStyleSignature)
       ctor->setHasSelectorStyleSignature();
     ctor->setIsObjC(isObjC);
+    if (isTransparent)
+      ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
 
     if (genericParams)
       for (auto &genericParam : *ctor->getGenericParams())

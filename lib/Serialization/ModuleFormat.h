@@ -625,6 +625,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has selector-style signature?
     BCFixed<1>,  // objc?
+    BCFixed<1>,  // transparent?
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField  // implicit this decl
@@ -654,7 +655,7 @@ namespace decls_block {
     BCFixed<1>,   // class method?
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // iboutlet?
+    BCFixed<1>,   // ibaction?
     BCFixed<1>,   // transparent?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
