@@ -71,9 +71,10 @@ public:
     ReturnKind = 2,
     ImplicitReturnKind = 3,
     InlinedKind = 4,
-    CleanupKind = 5,
-    ArtificialUnreachableKind = 6,
-    SILFileKind = 7
+    MandatoryInlinedKind = 5,
+    CleanupKind = 6,
+    ArtificialUnreachableKind = 7,
+    SILFileKind = 8
   };
 
 protected:
@@ -354,7 +355,8 @@ private:
 };
 
 /// \brief Marks instructions that correspond to inlined function body and
-/// setup code.
+/// setup code. This location should not be used for inlined transparent
+/// bodies, see MandatoryInlinedLocation.
 ///
 /// This location wraps the call site ASTNode.
 ///
@@ -386,6 +388,43 @@ private:
     return L.getKind() == InlinedKind;
   }
   InlinedLocation() : SILLocation(InlinedKind) {}
+};
+
+/// \brief Marks instructions that correspond to inlined function body and
+/// setup code for transparent functions, inlined as part of mandatory inlining
+/// pass.
+///
+/// This location wraps the call site ASTNode.
+///
+/// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.
+class MandatoryInlinedLocation : public SILLocation {
+public:
+  MandatoryInlinedLocation(Expr *CallSite) :
+    SILLocation(CallSite, MandatoryInlinedKind) {}
+
+  MandatoryInlinedLocation(Decl *D) : SILLocation(D, MandatoryInlinedKind) {}
+
+  /// Constructs an inlined location when the call site is represented by a
+  /// SILFile location.
+  MandatoryInlinedLocation(SourceLoc L) : SILLocation(MandatoryInlinedKind) {
+    SILFileSourceLoc = L;
+  }
+
+  /// \brief If this location represents a SIL file location, returns the source
+  /// location.
+  SourceLoc getFileLocation() {
+    assert(ASTNode.isNull());
+    return SILFileSourceLoc;
+  }
+
+  static MandatoryInlinedLocation getMandatoryInlinedLocation(SILLocation L);
+
+private:
+  friend class SILLocation;
+  static bool isKind(const SILLocation& L) {
+    return L.getKind() == MandatoryInlinedKind;
+  }
+  MandatoryInlinedLocation() : SILLocation(MandatoryInlinedKind) {}
 };
 
 /// \brief Used on the instruction performing auto-generated cleanup such as

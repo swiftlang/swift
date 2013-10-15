@@ -396,6 +396,8 @@ public:
             OS << ":imp_return"; break;
           case SILLocation::InlinedKind :
             OS << ":inlined"; break;
+          case SILLocation::MandatoryInlinedKind :
+              OS << ":minlined"; break;
           case SILLocation::CleanupKind :
             OS << ":cleanup"; break;
           case SILLocation::ArtificialUnreachableKind :

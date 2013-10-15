@@ -47,16 +47,16 @@ bb0(%0 : $Int64):
   // CHECK-LABEL: sil @inline_test_add : $@thin (x: Int64) -> Int64 {
   // CHECK: [[VAL9:%.*]] = apply                               {{.*}} line:36:9:sil
   // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:37:9:sil 
-  // CHECK: [[VAL11:%.*]] = alloc_box $Int64              {{.*}} line:38:9:inlined
-  // CHECK: store [[VAL10]] to [[VAL11]]#1                {{.*}} line:38:9:inlined
-  // CHECK: [[VAL13:%.*]] = function_ref @plus            {{.*}} line:38:9:inlined
-  // CHECK: [[VAL14:%.*]] = load [[VAL11]]#1              {{.*}} line:38:9:inlined
-  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral     {{.*}} line:38:9:inlined
-  // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype      {{.*}} line:38:9:inlined
-  // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20       {{.*}} line:38:9:inlined
-  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])     {{.*}} line:38:9:inlined
-  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])     {{.*}} line:38:9:inlined
-  // CHECK: strong_release [[VAL11]]#0                    {{.*}} line:38:9:inlined
+  // CHECK: [[VAL11:%.*]] = alloc_box $Int64              {{.*}} line:38:9:minlined
+  // CHECK: store [[VAL10]] to [[VAL11]]#1                {{.*}} line:38:9:minlined
+  // CHECK: [[VAL13:%.*]] = function_ref @plus            {{.*}} line:38:9:minlined
+  // CHECK: [[VAL14:%.*]] = load [[VAL11]]#1              {{.*}} line:38:9:minlined
+  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral     {{.*}} line:38:9:minlined
+  // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype      {{.*}} line:38:9:minlined
+  // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20       {{.*}} line:38:9:minlined
+  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])     {{.*}} line:38:9:minlined
+  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])     {{.*}} line:38:9:minlined
+  // CHECK: strong_release [[VAL11]]#0                    {{.*}} line:38:9:minlined
   // CHECK: [[VAL21:%.*]] = function_ref @fromLiteral     {{.*}} line:39:9
   // CHECK: [[VAL22:%.*]] = metatype $Int64.metatype      {{.*}} line:40:9
   // CHECK: [[VAL23:%.*]] = integer_literal $Builtin.Int128, 30       {{.*}} line:41:9
