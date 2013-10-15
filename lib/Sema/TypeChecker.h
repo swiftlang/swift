@@ -267,32 +267,24 @@ public:
   /// the type has no supertype.
   Type getSuperClassOf(Type type);
 
-  /// \brief Determine whether one type is a subtype of another.
+  /// \brief Determine whether one type is a trivial subtype of another.
   ///
-  /// \param t1 The potential subtype.
-  /// \param t2 The potential supertype.
+  /// \param t1 The potential trivial subtype.
+  /// \param t2 The potential trivial supertype.
   /// \param dc The context of the check.
   ///
-  /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc) {
-    bool isTrivial;
-    return isSubtypeOf(t1, t2, dc, isTrivial);
-  }
+  /// \returns true if \c t1 is a trivial subtype of \c t2.
+  bool isTrivialSubtypeOf(Type t1, Type t2, DeclContext *dc);
 
   /// \brief Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.
-  ///
   /// \param t2 The potential supertype.
-  ///
   /// \param dc The context of the check.
   ///
-  /// \param isTrivial Will indicate whether this is a trivial subtyping
-  /// relationship.
-  ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc, bool &isTrivial);
-  
+  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
+
   /// \brief Determine whether one type is implicitly convertible to another.
   ///
   /// \param t1 The potential source type of the conversion.

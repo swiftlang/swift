@@ -3205,10 +3205,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If one type is a subtype of the other, but not vice-verse,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    bool type1Trivial = true;
-    bool type1Better = tc.isSubtypeOf(type1, type2, cs.DC, type1Trivial);
-    bool type2Trivial = true;
-    bool type2Better = tc.isSubtypeOf(type2, type1, cs.DC, type2Trivial);
+    bool type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
+    bool type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
@@ -4353,10 +4351,18 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return false;
 }
 
-bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc,
-                              bool &isTrivial) {
+bool TypeChecker::isTrivialSubtypeOf(Type type1, Type type2, DeclContext *dc) {
   ConstraintSystem cs(*this, dc);
-  return cs.isSubtypeOf(type1, type2, isTrivial);
+  cs.addConstraint(ConstraintKind::TrivialSubtype, type1, type2);
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions);
+}
+
+bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
+  ConstraintSystem cs(*this, dc);
+  cs.addConstraint(ConstraintKind::Subtype, type1, type2);
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions);
 }
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {

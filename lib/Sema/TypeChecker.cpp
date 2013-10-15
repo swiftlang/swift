@@ -325,18 +325,14 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
             MemberVD->getType()->getAs<AnyFunctionType>();
         AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
         if (MemberFTy && OtherFTy) {
-          bool Trivial;
-          isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
-                                     OtherFTy->getResult(),
-                                     CD->getDeclContext(),
-                                     Trivial) && Trivial;
+          isSubtype = TC.isTrivialSubtypeOf(MemberFTy->getResult(),
+                                            OtherFTy->getResult(),
+                                            CD->getDeclContext());
         }
       } else {
-        bool Trivial;
-        isSubtype = TC.isSubtypeOf(MemberVD->getType(),
-                                   BaseMemberTy,
-                                   CD->getDeclContext(),
-                                   Trivial) && Trivial;
+        isSubtype = TC.isTrivialSubtypeOf(MemberVD->getType(),
+                                          BaseMemberTy,
+                                          CD->getDeclContext());
       }
       if (isSubtype) {
         if (OverriddenDecl) {
