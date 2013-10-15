@@ -1240,6 +1240,10 @@ private:
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
+  // Don't produce any results in an enum case.
+  if (InEnumCaseRawValue)
+    return;
+
   Kind = CompletionKind::DotExpr;
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
@@ -1247,6 +1251,10 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
+
+  // Don't produce any results in an enum case.
+  if (InEnumCaseRawValue)
+    return;
 
   Kind = CompletionKind::PostfixExprBeginning;
   CurDeclContext = P.CurDeclContext;
@@ -1257,18 +1265,30 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   assert(P.Tok.is(tok::code_complete));
 
+  // Don't produce any results in an enum case.
+  if (InEnumCaseRawValue)
+    return;
+
   Kind = CompletionKind::PostfixExpr;
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
+  // Don't produce any results in an enum case.
+  if (InEnumCaseRawValue)
+    return;
+
   Kind = CompletionKind::SuperExpr;
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
+  // Don't produce any results in an enum case.
+  if (InEnumCaseRawValue)
+    return;
+
   Kind = CompletionKind::SuperExprDot;
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;

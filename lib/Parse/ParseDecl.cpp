@@ -1893,7 +1893,11 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
-      RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+      {
+        CodeCompletionCallbacks::InEnumCaseRawValueRAII InEnumCaseRawValue(
+            CodeCompletion);
+        RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+      }
       if (RawValueExpr.hasCodeCompletion()) {
         Status.setHasCodeCompletion();
         return Status;

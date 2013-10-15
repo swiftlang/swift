@@ -33,6 +33,10 @@ protected:
   /// for loop statement, this is the declaration of the iteration variable.
   Decl *CStyleForLoopIterationVariable = nullptr;
 
+  /// True if code completion is done inside a raw value expression of an enum
+  /// case.
+  bool InEnumCaseRawValue = false;
+
 public:
   CodeCompletionCallbacks(Parser &P)
       : P(P), Context(P.Context) {
@@ -48,12 +52,12 @@ public:
     DelayedParsedDecl = D;
   }
 
-  class InCStyleForExpr {
+  class InCStyleForExprRAII {
     CodeCompletionCallbacks *Callbacks;
 
   public:
-    InCStyleForExpr(CodeCompletionCallbacks *Callbacks,
-                    Decl *IterationVariable)
+    InCStyleForExprRAII(CodeCompletionCallbacks *Callbacks,
+                        Decl *IterationVariable)
         : Callbacks(Callbacks) {
       if (Callbacks)
         Callbacks->CStyleForLoopIterationVariable = IterationVariable;
@@ -64,8 +68,24 @@ public:
         Callbacks->CStyleForLoopIterationVariable = nullptr;
     }
 
-    ~InCStyleForExpr() {
+    ~InCStyleForExprRAII() {
       finished();
+    }
+  };
+
+  class InEnumCaseRawValueRAII {
+    CodeCompletionCallbacks *Callbacks;
+
+  public:
+    InEnumCaseRawValueRAII(CodeCompletionCallbacks *Callbacks)
+        : Callbacks(Callbacks) {
+      if (Callbacks)
+        Callbacks->InEnumCaseRawValue = true;
+    }
+
+    ~InEnumCaseRawValueRAII() {
+      if (Callbacks)
+        Callbacks->InEnumCaseRawValue = false;
     }
   };
 
