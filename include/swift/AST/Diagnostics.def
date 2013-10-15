@@ -1495,13 +1495,6 @@ ERROR(repl_must_be_initialized,sil_analysis,none,
 
 
 // Control flow diagnostics.
-ERROR(arithmetic_operation_overflow,sil_analysis,none,
-      "arithmetic operation '%0 %1 %2' (on type %3) results in an overflow",
-      (StringRef, StringRef, StringRef, Type))
-ERROR(arithmetic_operation_overflow_generic_type,sil_analysis,none,
-      "arithmetic operation '%0 %1 %2' (on %select{unsigned|signed}3 "
-      "%4-bit integer type) results in an overflow",
-      (StringRef, StringRef, StringRef, bool, unsigned))
 WARNING(missing_return,sil_analysis,none,
       "missing return in the function expected to return %0", (Type))
 ERROR(return_from_noreturn,sil_analysis,none, 
@@ -1518,6 +1511,13 @@ NOTE(note_while_inlining,sil_analysis,none,
 ERROR(integer_literal_overflow,sil_gen,none, 
       "integer literal overflows when stored into %0",
       (Type))
+ERROR(arithmetic_operation_overflow,sil_analysis,none,
+      "arithmetic operation '%0 %1 %2' (on type %3) results in an overflow",
+      (StringRef, StringRef, StringRef, Type))
+ERROR(arithmetic_operation_overflow_generic_type,sil_analysis,none,
+      "arithmetic operation '%0 %1 %2' (on %select{unsigned|signed}3 "
+      "%4-bit integer type) results in an overflow",
+      (StringRef, StringRef, StringRef, bool, unsigned))
 
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.
