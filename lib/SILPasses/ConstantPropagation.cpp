@@ -109,12 +109,43 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   // If we can statically determine that the operation overflows,
   // warn about it.
   if (Overflow && ReportOverflow) {
-    diagnose(M.getASTContext(),
-             AI->getLoc().getSourceLoc(),
-             diag::arithmetic_operation_overflow,
-             LHSInt.toString(/*Radix*/ 10, Signed),
-             Operator,
-             RHSInt.toString(/*Radix*/ 10, Signed));
+    // Try to infer the type of the constant expression that the user operates
+    // on. If the intrinsic was lowered from a call to a function that takes
+    // two arguments of the same type, use the type of the LHS argument.
+    // This would detect '+'/'+=' and such.
+    Type OpType;
+    SILLocation Loc = AI->getLoc();
+    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+    if (CE) {
+      const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
+      if (Args && Args->getNumElements() == 2) {
+        CanType LHSTy = Args->getElement(0)->getType()->getCanonicalType();
+        CanType RHSTy = Args->getElement(0)->getType()->getCanonicalType();
+        if (LHSTy == RHSTy)
+          OpType = Args->getElement(1)->getType();
+      }
+    }
+
+    if (!OpType.isNull()) {
+      diagnose(M.getASTContext(),
+               AI->getLoc().getSourceLoc(),
+               diag::arithmetic_operation_overflow,
+               LHSInt.toString(/*Radix*/ 10, Signed),
+               Operator,
+               RHSInt.toString(/*Radix*/ 10, Signed),
+               OpType);
+    } else {
+      // If we cannot get the type info in an expected way, describe the type.
+      diagnose(M.getASTContext(),
+               AI->getLoc().getSourceLoc(),
+               diag::arithmetic_operation_overflow_generic_type,
+               LHSInt.toString(/*Radix*/ 10, Signed),
+               Operator,
+               RHSInt.toString(/*Radix*/ 10, Signed),
+               Signed,
+               LHSInt.getBitWidth());
+
+    }
   }
 
   return B.createTuple(AI->getLoc(), FuncResType, Result);
