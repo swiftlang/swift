@@ -114,12 +114,14 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying a simple loaded lvalue.
-  if (auto load = dyn_cast<LoadExpr>(E)) {
-    auto lv = emitLValue(load->getSubExpr());
-    emitCopyLValueInto(E, lv, I);
-    return;
+  if (getASTContext().LangOpts.SILGenLValuePeepholes) {
+    if (auto load = dyn_cast<LoadExpr>(E)) {
+      auto lv = emitLValue(load->getSubExpr());
+      emitCopyLValueInto(E, lv, I);
+      return;
+    }
   }
-
+  
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
     std::move(result).forwardInto(*this, I, E);

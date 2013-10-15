@@ -35,6 +35,9 @@ namespace swift {
 
     /// \brief Whether to enable Axle features.
     bool Axle = false;
+    
+    /// \brief Whether to enable SILGen peepholes for lvalue-to-lvalue copies.
+    bool SILGenLValuePeepholes = false;
   };
 }
 
