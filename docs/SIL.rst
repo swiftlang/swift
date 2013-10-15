@@ -559,7 +559,7 @@ implements the method for that class::
 
   sil @C_bas : $((), C) -> ()
 
-  sil_vtable B {
+  sil_vtable C {
     #A.foo!1: @A_foo
     #B.bar!1: @B_bar
     #C.bas!1: @C_bas
