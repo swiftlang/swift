@@ -68,6 +68,9 @@ bool Parser::parseTopLevel() {
   } else if (Tok.is(tok::kw_sil_stage)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseDeclSILStage();
+  } else if (Tok.is(tok::kw_sil_vtable)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
+    parseSILVTable();
   } else {
     parseBraceItems(Items, true,
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode

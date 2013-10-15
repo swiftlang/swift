@@ -2427,3 +2427,66 @@ bool Parser::parseDeclSILStage() {
   SIL->S->DidParseSILStage = true;
   return false;
 }
+
+/// decl-sil-vtable: [[only in SIL mode]]
+///   'sil_vtable' ClassName decl-sil-vtable-body
+/// decl-sil-vtable-body:
+///   '{' sil-vtable-entry+ '}'
+/// sil-vtable-entry:
+///   SILDeclRef ':' SILFunctionName
+bool Parser::parseSILVTable() {
+  consumeToken(tok::kw_sil_vtable);
+  SILParser VTableState(*this);
+
+  // Parse the class name.
+  Identifier Name;
+  SourceLoc Loc;
+  if (VTableState.parseSILIdentifier(Name, Loc,
+                                     diag::expected_sil_value_name))
+    return true;
+
+  // Find the class decl.
+  SmallVector<ValueDecl*, 4> CurModuleResults;
+  SF.TU.lookupValue(Module::AccessPathTy(), Name,
+                    NLKind::UnqualifiedLookup, CurModuleResults);
+  if (CurModuleResults.size() != 1) {
+    diagnose(Loc, diag::sil_vtable_class_not_found, Name);
+    return true;
+  }
+  ClassDecl *theClass = dyn_cast<ClassDecl>(CurModuleResults[0]);
+  if (!theClass) {
+    diagnose(Loc, diag::sil_vtable_class_not_found, Name);
+    return true;
+  }
+
+  SourceLoc LBraceLoc = Tok.getLoc();
+  if (consumeIf(tok::l_brace)) {
+    // We need to turn on InSILBody to parse SILDeclRef.
+    Lexer::SILBodyRAII Tmp(*L);
+    // Parse the entry list.
+    std::vector<SILVTable::Pair> vtableEntries;
+    do {
+      SILDeclRef Ref;
+      Identifier FuncName;
+      SourceLoc FuncLoc;
+      if (VTableState.parseSILDeclRef(Ref) ||
+          parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
+          VTableState.parseSILIdentifier(FuncName, FuncLoc,
+                                         diag::expected_sil_value_name))
+        return true;
+      SILFunction *Func = SIL->M->lookup(FuncName.str());
+      if (!Func) {
+        diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
+        return true;
+      }
+      vtableEntries.emplace_back(Ref, Func);
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+
+    SourceLoc RBraceLoc;
+    parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                       LBraceLoc);
+
+    SILVTable::create(*SIL->M, theClass, vtableEntries);
+  }
+  return false;
+}

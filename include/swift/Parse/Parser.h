@@ -565,6 +565,7 @@ public:
 
   bool parseDeclSIL();
   bool parseDeclSILStage();
+  bool parseSILVTable();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

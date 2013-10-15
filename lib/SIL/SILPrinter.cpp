@@ -1165,10 +1165,6 @@ void ValueBase::printInContext(llvm::raw_ostream &OS) const {
 }
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
-  // FIXME: When the parser learns to parse back sil_vtable, remove the /**/
-  // from the output here.
-  
-  OS << "/*\n";
   OS << "sil_vtable " << getClass()->getName() << " {\n";
   for (auto &entry : getEntries()) {
     OS << "  ";
@@ -1176,7 +1172,6 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << ": " << entry.second->getName() << "\n";
   }
   OS << "}\n";
-  OS << "*/\n\n";
 }
 
 void SILVTable::dump() const {

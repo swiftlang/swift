@@ -524,8 +524,9 @@ void Lexer::lexIdentifier() {
 #include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
-  // "sil" and "sil_stage" are only keywords in SIL mode.
-  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage) && !InSILMode)
+  // "sil", "sil_stage" and "sil_vtable" are only keywords in SIL mode.
+  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
+       Kind == tok::kw_sil_vtable) && !InSILMode)
     Kind = tok::identifier;
   
   return formToken(Kind, TokStart);

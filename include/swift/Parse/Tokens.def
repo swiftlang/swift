@@ -47,6 +47,7 @@ KEYWORD(var)
 
 KEYWORD(sil)        // This is only enabled when parsing .sil files.
 KEYWORD(sil_stage)  // This is only enabled when parsing .sil files.
+KEYWORD(sil_vtable) // This is only enabled when parsing .sil files.
 
 // Statement keywords.
 KEYWORD(if)

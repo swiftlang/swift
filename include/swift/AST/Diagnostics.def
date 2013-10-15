@@ -429,6 +429,14 @@ ERROR(expected_sil_stage_name, decl_parsing, none,
 ERROR(multiple_sil_stage_decls, decl_parsing, none,
       "sil_stage declared multiple times", ())
 
+// SIL VTable
+ERROR(expected_sil_vtable_colon, decl_parsing,none,
+      "expected ':' in a vtable entry", ())
+ERROR(sil_vtable_func_not_found, decl_parsing,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_vtable_class_not_found, decl_parsing,none,
+      "sil class not found %0", (Identifier))
+
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
