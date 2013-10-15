@@ -11,16 +11,13 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   store %0 to %1#1 : $*Int64
   %3 = alloc_box $Int64                   // CHECK: alloc_box
   %4 = load %1#1 : $*Int64
-  // CHECK-NEXT: struct $Int64
-  // CHECK-NEXT: struct_extract
   store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
   %6 = load %3#1 : $*Int64
-  // CHECK-NEXT: struct $Int64
   strong_release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
   strong_release %1#0 : $Builtin.ObjectPointer
   return %6 : $Int64
 
-  // CHECK: return {{.*}} : $Int64
+  // CHECK: return %0 : $Int64
 }
 
 
@@ -33,7 +30,6 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %b = tuple_element_addr %1#1 : $*(Int64, Int64), 1
   store %0 to %a : $*Int64
   // CHECK: store %0 to
- //CHECK-NEXT: struct_extract %0
   store %0 to %b : $*Int64
   // CHECK-NEXT: store %0 to 
 
@@ -244,15 +240,13 @@ bb0(%0 : $Int64):
   // they all turn into stores.
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
-  // CHECK-NEXT: struct_extract
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
-  // CHECK-NEXT: struct $Int64
 
   %2 = load %1#1 : $*Int64
   strong_release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: strong_release %1#0
 
   // Verify that the load got forwarded from an assign.
-  return %2 : $Int64                        // CHECK: return {{.*}} : $Int64
+  return %2 : $Int64                        // CHECK: return %0 : $Int64
 }
 
 // CHECK-LABEL: sil @assign_test_nontrivial
@@ -448,8 +442,8 @@ bb0(%0 : $Int64):
   %18 = struct $Int64 (%5 : $Builtin.Int64)
   %22 = alloc_stack $Int64
 
-  // CHECK: [[SE:%[0-9]+]] = struct_extract
   // CHECK: store
+  // CHECK: [[SE:%[0-9]+]] = struct_extract
 
   store %18 to %22#1 : $*Int64
   %24 = struct_element_addr %22#1 : $*Int64, #value

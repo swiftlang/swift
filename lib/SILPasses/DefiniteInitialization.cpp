@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
 
@@ -83,9 +84,10 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 // Tuple Element Flattening/Counting Logic
 //===----------------------------------------------------------------------===//
 
-/// getElementCount - Return the number of elements in the flattened SILType.
-/// For tuples, this is the (recursive) count of the fields it contains.
-static unsigned getElementCount(CanType T) {
+/// getTupleElementCount - Return the number of elements in the flattened
+/// SILType.  For tuples, this is the (recursive) count of the fields it
+/// contains.
+static unsigned getTupleElementCount(CanType T) {
   TupleType *TT = T->getAs<TupleType>();
 
   // If this isn't a tuple, it is a single element.
@@ -93,9 +95,33 @@ static unsigned getElementCount(CanType T) {
 
   unsigned NumElements = 0;
   for (auto &Elt : TT->getFields())
-    NumElements += getElementCount(Elt.getType()->getCanonicalType());
+    NumElements += getTupleElementCount(Elt.getType()->getCanonicalType());
   return NumElements;
 }
+
+#if 0
+/// Given a symbolic element number, return the type of the element.
+static CanType getTupleElementType(CanType T, unsigned EltNo) {
+  TupleType *TT = T->getAs<TupleType>();
+
+  // If this isn't a tuple, it is a leaf element.
+  if (!TT) {
+    assert(EltNo == 0);
+    return T;
+  }
+
+  for (auto &Elt : TT->getFields()) {
+    auto FieldType = Elt.getType()->getCanonicalType();
+    unsigned NumFields = getTupleElementCount(FieldType);
+    if (EltNo < NumFields)
+      return getTupleElementType(FieldType, EltNo);
+    EltNo -= NumFields;
+  }
+
+  assert(0 && "invalid element number");
+  abort();
+}
+#endif
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
@@ -107,7 +133,7 @@ static void getPathStringToElement(CanType T, unsigned Element,
   unsigned FieldNo = 0;
   for (auto &Field : TT->getFields()) {
     unsigned ElementsForField =
-      getElementCount(Field.getType()->getCanonicalType());
+      getTupleElementCount(Field.getType()->getCanonicalType());
     
     if (Element < ElementsForField) {
       Result += '.';
@@ -129,12 +155,6 @@ static void getPathStringToElement(CanType T, unsigned Element,
 //===----------------------------------------------------------------------===//
 // Scalarization Logic
 //===----------------------------------------------------------------------===//
-
-static bool isStructOrTupleToScalarize(SILType T) {
-  return T.is<TupleType>() || T.is<StructType>() ||
-         T.is<BoundGenericStructType>();
-}
-
 
 /// Given a pointer to an aggregate type, compute the addresses of each
 /// element and add them to the ElementAddrs vector.
@@ -242,6 +262,27 @@ static SILValue scalarizeLoad(LoadInst *LI,
 // Access Path Analysis Logic
 //===----------------------------------------------------------------------===//
 
+static unsigned getNumSubElements(CanType T) {
+  if (TupleType *TT = T->getAs<TupleType>()) {
+    unsigned NumElements = 0;
+    for (auto &Elt : TT->getFields())
+      NumElements += getNumSubElements(Elt.getType()->getCanonicalType());
+    return NumElements;
+  }
+
+  if (auto *SD = T->getStructOrBoundGenericStruct()) {
+    unsigned NumElements = 0;
+    for (auto *D : SD->getStoredProperties())
+      NumElements += getNumSubElements(SILBuilder::getStructFieldType(T, D));
+    return NumElements;
+  }
+
+  // If this isn't a tuple or struct, it is a single element.
+  return 1;
+}
+
+
+
 // An access path is an array of tuple or struct members.  Note that the path
 // is actually stored backwards for efficiency, the back() is the element
 // closest to the underlying alloc_box.
@@ -253,16 +294,34 @@ typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
 /// the alloc box, computing the access path.  This returns true if the access
 /// path to the specified RootInst was successfully computed, false otherwise.
 static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
+                                   unsigned &SubEltNumber,
                                    SILInstruction *RootInst) {
+  SubEltNumber = 0;
   while (1) {
     // If we got to the root, we're done.
     if (RootInst == Pointer.getDef())
       return true;
 
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+      TupleType *TT = TEAI->getTupleType();
+
+      // Keep track of what subelement is being referenced.
+      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i)
+        SubEltNumber += getNumSubElements(TT->getElementType(i)
+                                          ->getCanonicalType());
+
       AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
       Pointer = TEAI->getOperand();
     } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
+      CanType ST = SEAI->getOperand().getType().getSwiftRValueType();
+
+      // Keep track of what subelement is being referenced.
+      StructDecl *SD = SEAI->getStructDecl();
+      for (auto *D : SD->getStoredProperties()) {
+        if (D == SEAI->getField()) break;
+        SubEltNumber += getNumSubElements(SILBuilder::getStructFieldType(ST,D));
+      }
+
       AccessPath.push_back(SEAI->getField());
       Pointer = SEAI->getOperand();
     } else {
@@ -271,11 +330,26 @@ static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
   }
 }
 
-static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
-                              SILInstruction *RootInst) {
-  bool Result = TryComputingAccessPath(Pointer, AccessPath, RootInst);
+/// Compute the access path indicated by the specified pointer (which is derived
+/// from the root by a series of tuple/struct element addresses) and return
+/// the first subelement addressed by the address.  For example, given:
+///
+///   root = alloc { a: { c: i64, d: i64 }, b: (i64, i64) }
+///   tmp1 = struct_element_addr root, 1
+///   tmp2 = tuple_element_addr tmp1, 0
+///
+/// This will return an access path of [struct: 'b', tuple: 0] and a base
+/// element of 2.
+///
+static unsigned ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
+                                  SILInstruction *RootInst) {
+  unsigned FirstSubElement = 0;
+  bool Result = TryComputingAccessPath(Pointer, AccessPath, FirstSubElement,
+                                       RootInst);
   assert(Result && "Failed to compute an access path to our root?");
   (void)Result;
+
+  return FirstSubElement;
 }
 
 
@@ -296,6 +370,51 @@ static SILValue ExtractElement(SILValue Val,
   return Val;
 }
 
+/// Given an aggregate value and an access path, extract the value indicated by
+/// the path.
+static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
+                                  SILBuilder &B, SILLocation Loc) {
+  CanType ValTy = Val.getType().getSwiftRValueType();
+
+  // Extract tuple elements.
+  if (TupleType *TT = ValTy->getAs<TupleType>()) {
+    unsigned EltNo = 0;
+    for (auto &Elt : TT->getFields()) {
+      // Keep track of what subelement is being referenced.
+      unsigned NumSubElt = getNumSubElements(Elt.getType()->getCanonicalType());
+      if (SubElementNumber < NumSubElt) {
+        Val = B.createTupleExtract(Loc, Val, EltNo);
+        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+      }
+
+      SubElementNumber -= NumSubElt;
+      ++EltNo;
+    }
+
+    assert(0 && "Didn't find field");
+  }
+
+  // Extract struct elements.
+  if (auto *SD = ValTy->getStructOrBoundGenericStruct()) {
+    for (auto *D : SD->getStoredProperties()) {
+      unsigned NumSubElt =
+        getNumSubElements(SILBuilder::getStructFieldType(ValTy, D));
+
+      if (SubElementNumber < NumSubElt) {
+        Val = B.createStructExtract(Loc, Val, D);
+        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+      }
+
+      SubElementNumber -= NumSubElt;
+
+    }
+    assert(0 && "Didn't find field");
+  }
+
+  // Otherwise, we're down to a scalar.
+  assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
+  return Val;
+}
 
 
 
@@ -368,6 +487,11 @@ namespace {
     /// lifetime of the value being analyzed.
     SILInstruction *TheMemory;
     unsigned ElementNumber;
+
+    /// The number of primitive subelements across all elements of this memory
+    /// value.
+    unsigned NumMemorySubElements;
+
     ElementUses &Uses;
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
@@ -388,11 +512,22 @@ namespace {
     void doIt();
 
   private:
+    CanType getTheMemoryType() const {
+      if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
+        return ABI->getElementType().getSwiftRValueType();
+      if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
+        return ASI->getElementType().getSwiftRValueType();
+      // mark_uninitialized.
+      return TheMemory->getType(0).getObjectType().getSwiftRValueType();
+    }
+
     void handleLoadUse(SILInstruction *Inst);
     void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
     void handleInOutUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
     void handleRelease(SILInstruction *Inst);
+
+    void promoteLoad(SILInstruction *Inst);
 
     enum DIKind {
       DI_Yes,
@@ -404,13 +539,22 @@ namespace {
     bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
                                             SILValue &LoadResultVal,
                                             AccessPathTy &LoadAccessPath);
-    void explodeCopyAddr(CopyAddrInst *CAI, SILValue &StoredValue);
 
     bool isLiveOut(SILBasicBlock *BB);
 
-    bool hasEscapedAt(SILInstruction *I);
-
     void diagnoseInitError(SILInstruction *Use, Diag<StringRef> DiagMessage);
+
+    // Load promotion.
+    bool hasEscapedAt(SILInstruction *I);
+    bool updateAvailableValues(SILInstruction *Inst,
+                               llvm::SmallBitVector &RequiredElts,
+                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+    bool computeAvailableValues(SILInstruction *StartingFrom,
+                                llvm::SmallBitVector &RequiredElts,
+                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+
+    void explodeCopyAddr(CopyAddrInst *CAI, SILValue &StoredValue);
+
   };
 } // end anonymous namespace
 
@@ -418,6 +562,8 @@ namespace {
 ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
                                    unsigned ElementNumber, ElementUses &Uses)
   : TheMemory(TheMemory), ElementNumber(ElementNumber), Uses(Uses) {
+
+  NumMemorySubElements = getNumSubElements(getTheMemoryType());
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -473,13 +619,7 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy;
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-    AllocTy = ABI->getElementType().getSwiftRValueType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
-    AllocTy = ASI->getElementType().getSwiftRValueType();
-  else
-    AllocTy = TheMemory->getType(0).getObjectType().getSwiftRValueType();
+  CanType AllocTy = getTheMemoryType();
   getPathStringToElement(AllocTy, ElementNumber, Name);
   
   diagnose(Use->getModule(), Use->getLoc(), DiagMessage, Name);
@@ -514,39 +654,24 @@ void ElementPromotion::doIt() {
     case UseKind::Release:      handleRelease(Use.first); break;
     }
 
-    if (HadError) break;
+    if (HadError) return;
+  }
+
+  // If we've successfully checked all of the definitive initialization
+  // requirements, try to promote loads.
+  for (unsigned i = 0; i != Uses.size(); ++i) {
+    auto &Use = Uses[i];
+    // Ignore entries for instructions that got expanded along the way.
+    if (Use.first && Use.second == UseKind::Load)
+      promoteLoad(Use.first);
   }
 }
 
 /// Given a load (i.e., a LoadInst, CopyAddr, LoadWeak, or ProjectExistential),
 /// determine whether the loaded value is definitely assigned or not.  If not,
-/// produce a diagnostic.  If so, attempt to promote the value into SSA form.
+/// produce a diagnostic.
 void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
-  SILValue Result;
-
-  // If this is a Load (not a CopyAddr or LoadWeak), we try to compute the
-  // loaded value as an SSA register.  Otherwise, we don't ask for an available
-  // value to avoid constructing SSA for the value.
-  bool WantValue = isa<LoadInst>(Inst);
-
-  // If the box has escaped at this instruction, we do not want to promote the
-  // load, so don't try to compute the result value.
-  if (WantValue && hasEscapedAt(Inst))
-    WantValue = false;
-
-  // If this is a load from a struct field that we want to promote, compute the
-  // access path down to the field so we can determine precise def/use behavior.
-  AccessPathTy AccessPath;
-  if (WantValue)
-    ComputeAccessPath(Inst->getOperand(0), AccessPath, TheMemory);
-
-  // Note that we intentionally don't support forwarding of weak pointers,
-  // because the underlying value may drop be deallocated at any time.  We would
-  // have to prove that something in this function is holding the weak value
-  // live across the promoted region and that isn't desired for a stable
-  // diagnostics pass this like one.
-  auto DI = checkDefinitelyInit(Inst, WantValue ? &Result : nullptr,
-                                      WantValue ? &AccessPath : nullptr);
+  auto DI = checkDefinitelyInit(Inst);
 
   // If the value is not definitively initialized, emit an error.
 
@@ -559,21 +684,6 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
     diagnoseInitError(Inst, diag::variable_used_before_initialized);
     return;
   }
-
-  // If the value is definitely initialized, check to see if this is a load
-  // that we have a value available for.
-  if (!Result) return;
-
-  assert(!isStructOrTupleToScalarize(Inst->getType(0)));
-
-  DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
-  DEBUG(llvm::errs() << "      To value: " << Result.getDef() << "\n");
-
-  SILValue(Inst, 0).replaceAllUsesWith(Result);
-  SILValue Addr = Inst->getOperand(0);
-  Inst->eraseFromParent();
-  RemoveDeadAddressingInstructions(Addr);
-  ++NumLoadPromoted;
 }
 
 
@@ -716,13 +826,6 @@ void ElementPromotion::handleRelease(SILInstruction *Inst) {
 
   // Otherwise, this is a release of an uninitialized value.  Emit a diagnostic.
   diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
-}
-
-/// hasEscapedAt - Return true if the box has escaped at the specified
-/// instruction.  We are not allowed to do load promotion in an escape region.
-bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
-  // FIXME: This is not an aggressive implementation.  :)
-  return HasAnyEscape;
 }
 
 
@@ -892,6 +995,301 @@ checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
 }
 
 
+
+//===----------------------------------------------------------------------===//
+//                              Load Promotion
+//===----------------------------------------------------------------------===//
+
+/// hasEscapedAt - Return true if the box has escaped at the specified
+/// instruction.  We are not allowed to do load promotion in an escape region.
+bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
+  // FIXME: This is not an aggressive implementation.  :)
+
+  // TODO: At some point, we should special case closures that just *read* from
+  // the escaped value (by looking at the body of the closure).  They should not
+  // prevent load promotion, and will allow promoting values like X in regions
+  // dominated by "... && X != 0".
+  return HasAnyEscape;
+}
+
+
+/// The specified instruction is a non-load access of the element being
+/// promoted.  See if it provides a value or refines the demanded element mask
+/// used for load promotion.  If an available value is provided, this returns
+/// true.
+bool ElementPromotion::
+updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
+                      SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
+  AccessPathTy AccessPath;
+
+
+  // Handle store and assign.
+  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
+    bool ProducedSomething = false;
+    unsigned StartSubElt =
+      ComputeAccessPath(Inst->getOperand(1), AccessPath, TheMemory);
+    CanType ValTy = Inst->getOperand(0).getType().getSwiftRValueType();
+
+    for (unsigned i = 0, e = getNumSubElements(ValTy); i != e; ++i) {
+      // If this element is not required, don't fill it in.
+      if (!RequiredElts[StartSubElt+i]) continue;
+
+      Result[StartSubElt+i] = { Inst->getOperand(0), i };
+
+      // This element is now provided.
+      RequiredElts[StartSubElt+i] = false;
+      ProducedSomething = true;
+    }
+
+    return ProducedSomething;
+  }
+
+
+#if 0
+  // FIXME: CopyAddr
+  if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
+    // Temporarily gate copyaddr forwarding by a command line flag.
+    if (!EnableCopyAddrForwarding)
+      return false;
+    // We've already filtered to only look at stores to the box, this can't just
+    // be a "load" copy_addr from the box (unless it loads *and* stores).
+    ComputeAccessPath(CAI->getDest(), StoreAccessPath, TheMemory);
+  }
+#endif
+
+  // TODO: inout apply's should only clobber pieces passed in.
+
+  // Otherwise, this is some unknown instruction, conservatively assume that all
+  // values are clobbered.
+  RequiredElts.clear();
+  return false;
+}
+
+
+/// Try to find available values of a set of subelements of the current value,
+/// starting right before the specified instruction.
+///
+/// The bitvector indicates which subelements we're interested in, and result
+/// captures the available value (plus an indicator of which subelement of that
+/// value is needed).  This method returns true if no available values were
+/// found or false if some were.
+///
+bool ElementPromotion::
+computeAvailableValues(SILInstruction *StartingFrom,
+                       llvm::SmallBitVector &RequiredElts,
+                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
+
+  // If no bits are demanded, we trivially succeed.  This can happen when there
+  // is a load of an empty struct.
+  if (RequiredElts.none())
+    return false;
+
+  bool FoundSomeValues = false;
+  SILBasicBlock *InstBB = StartingFrom->getParent();
+
+  // If there is a potential modification in the current block, scan the block
+  // to see if the store or escape is before or after the load.  If it is
+  // before, check to see if it produces the value we are looking for.
+  if (PerBlockInfo[InstBB].HasNonLoadUse) {
+    for (SILBasicBlock::iterator BBI = StartingFrom, E = InstBB->begin();
+         BBI != E;) {
+      SILInstruction *TheInst = --BBI;
+
+      // If this instruction is unrelated to the element, ignore it.
+      if (NonLoadUses.count(TheInst)) {
+        FoundSomeValues |= updateAvailableValues(TheInst, RequiredElts, Result);
+
+        // If this satisfied all of the demanded values, we're done.
+        if (RequiredElts.none())
+          return !FoundSomeValues;
+
+        // Otherwise, keep scanning the block.
+      }
+    }
+  }
+
+
+  // Otherwise, we need to scan up the CFG looking for available values.
+  // TODO: Implement this, for now we just return failure as though there is
+  // nothing available.
+  return !FoundSomeValues;
+}
+
+static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
+                       ArrayRef<std::pair<SILValue, unsigned>> &Values) {
+  while (NumSubElts) {
+    if (!Values[StartSubElt].first.isValid()) return true;
+    ++StartSubElt;
+    --NumSubElts;
+  }
+  return false;
+}
+
+
+/// AggregateAvailableValues - Given a bunch of primitive subelement values,
+/// build out the right aggregate type (LoadTy) by emitting tuple and struct
+/// instructions as necessary.
+static SILValue
+AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
+                         SILValue Address,
+                       ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
+                         unsigned FirstElt) {
+
+  // Check to see if the requested value is fully available, as an aggregate.
+  // This is a super-common case for single-element structs, but is also a
+  // general answer for arbitrary structs and tuples as well.
+  if (FirstElt < AvailableValues.size()) {  // #Elements may be zero.
+    SILValue FirstVal = AvailableValues[FirstElt].first;
+    if (FirstVal.isValid() && AvailableValues[FirstElt].second == 0 &&
+        FirstVal.getType().getSwiftRValueType() == LoadTy) {
+      // If the first element of this value is available, check any extra ones
+      // before declaring success.
+      bool AllMatch = true;
+      for (unsigned i = 0, e = getNumSubElements(LoadTy); i != e; ++i)
+        if (AvailableValues[FirstElt+i].first != FirstVal ||
+            AvailableValues[FirstElt+i].second != i) {
+          AllMatch = false;
+          break;
+        }
+        
+      if (AllMatch)
+        return FirstVal;
+    }
+  }
+
+
+  SILBuilder B(Inst);
+
+  if (TupleType *TT = LoadTy->getAs<TupleType>()) {
+    SmallVector<SILValue, 4> ResultElts;
+
+    unsigned EltNo = 0;
+    for (auto &Elt : TT->getFields()) {
+      CanType EltTy = Elt.getType()->getCanonicalType();
+      unsigned NumSubElt = getNumSubElements(EltTy);
+
+      // If we are missing any of the available values in this struct element,
+      // compute an address to load from.
+      SILValue EltAddr;
+      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
+        EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo);
+
+      ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
+                                                    AvailableValues, FirstElt));
+      FirstElt += NumSubElt;
+      ++EltNo;
+    }
+
+    return B.createTuple(Inst->getLoc(),
+                         SILType::getPrimitiveObjectType(LoadTy),
+                         ResultElts);
+  }
+
+  // Extract struct elements.
+  if (auto *SD = LoadTy->getStructOrBoundGenericStruct()) {
+    SmallVector<SILValue, 4> ResultElts;
+
+    for (auto *FD : SD->getStoredProperties()) {
+      CanType EltTy = SILBuilder::getStructFieldType(LoadTy, FD);
+      unsigned NumSubElt = getNumSubElements(EltTy);
+
+      // If we are missing any of the available values in this struct element,
+      // compute an address to load from.
+      SILValue EltAddr;
+      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
+        EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD);
+
+      ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
+                                                    AvailableValues, FirstElt));
+      FirstElt += NumSubElt;
+    }
+    return B.createStruct(Inst->getLoc(),
+                          SILType::getPrimitiveObjectType(LoadTy),
+                          ResultElts);
+  }
+
+  // Otherwise, we have a simple primitive.  If the value is available, use it,
+  // otherwise emit a load of the value.
+  auto Val = AvailableValues[FirstElt];
+  if (!Val.first.isValid())
+    return B.createLoad(Inst->getLoc(), Address);
+
+  SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
+  // It must be the same type as LoadTy if available.
+  assert(EltVal.getType().getSwiftRValueType() == LoadTy &&
+         "Subelement types mismatch");
+  return EltVal;
+}
+
+
+/// At this point, we know that this element satisfies the definitive init
+/// requirements, so we can try to promote loads to enable SSA-based dataflow
+/// analysis.  We know that accesses to this element only access this element,
+/// cross element accesses have been scalarized.
+///
+void ElementPromotion::promoteLoad(SILInstruction *Inst) {
+  // Note that we intentionally don't support forwarding of weak pointers,
+  // because the underlying value may drop be deallocated at any time.  We would
+  // have to prove that something in this function is holding the weak value
+  // live across the promoted region and that isn't desired for a stable
+  // diagnostics pass this like one.
+
+
+  // We only handle load right now, not copy_addr.
+  if (!isa<LoadInst>(Inst)) return;
+
+  // If the box has escaped at this instruction, we can't safely promote the
+  // load.
+  if (hasEscapedAt(Inst))
+    return;
+
+  CanType LoadTy = Inst->getType(0).getSwiftRValueType();
+
+  // If this is a load from a struct field that we want to promote, compute the
+  // access path down to the field so we can determine precise def/use behavior.
+  AccessPathTy AccessPath;
+  unsigned FirstElt =
+    ComputeAccessPath(Inst->getOperand(0), AccessPath, TheMemory);
+
+  // Set up the bitvector of elements being demanded by the load.
+  llvm::SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(FirstElt, FirstElt+getNumSubElements(LoadTy));
+
+  SmallVector<std::pair<SILValue, unsigned>, 8> AvailableValues;
+  AvailableValues.resize(NumMemorySubElements);
+
+  // If there are no values available at this load point, then we fail to
+  // promote this load and there is nothing to do.
+  if (computeAvailableValues(Inst, RequiredElts, AvailableValues))
+    return;
+
+  // Verify that we actually got some values back when computeAvailableValues
+  // claims it produced them.
+#ifndef NDEBUG
+  {bool AnyAvailable = getNumSubElements(LoadTy) == 0;
+    for (unsigned i = 0, e = AvailableValues.size(); i != e; ++i)
+      AnyAvailable |= AvailableValues[i].first.isValid();
+    assert(AnyAvailable && "Didn't get any available values!");
+  }
+#endif
+
+  // Ok, we have some available values.  Aggregate together all of the
+  // subelements into something that has the same type as the load did, and emit
+  // (smaller) loads for any subelements that were not available.
+  auto NewVal = AggregateAvailableValues(Inst, LoadTy, Inst->getOperand(0),
+                                         AvailableValues, FirstElt);
+
+  DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
+  DEBUG(llvm::errs() << "      To value: " << *NewVal.getDef() << "\n");
+
+  SILValue(Inst, 0).replaceAllUsesWith(NewVal);
+  SILValue Addr = Inst->getOperand(0);
+  Inst->eraseFromParent();
+  RemoveDeadAddressingInstructions(Addr);
+  ++NumLoadPromoted;
+}
+
+
 /// Explode a copy_addr instruction of a loadable type into lower level
 /// operations like loads, stores, retains, releases, copy_value, etc.  This
 /// returns the first instruction of the generated sequence.
@@ -961,6 +1359,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
       continue;
 
     case ValueKind::LoadInst: {
+#if 0
       auto *LI = cast<LoadInst>(NewInst);
 
       // If this is the load of the input, ignore it.  Note that copy_addrs can
@@ -989,6 +1388,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
         NewLoads.append(NewLoads.begin(), NewLoads.end());
         continue;
       }
+#endif
 
       // If it is a load from the memory object, track it as an access.
       Uses.push_back({ NewInst, Load });
@@ -1055,7 +1455,7 @@ void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
   // things that come after it in a parent tuple.
   unsigned Slots = 1;
   if (!InStructSubElement && !InEnumSubElement)
-    Slots = getElementCount(UseTy.getSwiftRValueType());
+    Slots = getTupleElementCount(UseTy.getSwiftRValueType());
   
   for (unsigned i = 0; i != Slots; ++i)
     Uses[BaseElt+i].push_back({ User, Kind });
@@ -1082,16 +1482,14 @@ collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt) {
   if (InStructSubElement)
     return collectUses(SILValue(TEAI, 0), BaseElt);
 
-  auto RValueType = TEAI->getOperand().getType().getSwiftRValueType();
-  
   // tuple_element_addr P, 42 indexes into the current element.  Recursively
   // process its uses with the adjusted element number.
   unsigned FieldNo = TEAI->getFieldNo();
-  auto *TT = RValueType->castTo<TupleType>();
+  auto *TT = TEAI->getTupleType();
   unsigned NewBaseElt = BaseElt;
   for (unsigned i = 0; i != FieldNo; ++i) {
     CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    NewBaseElt += getElementCount(EltTy);
+    NewBaseElt += getTupleElementCount(EltTy);
   }
   
   collectUses(SILValue(TEAI, 0), NewBaseElt);
@@ -1120,7 +1518,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     
     // Loads are a use of the value.
     if (isa<LoadInst>(User)) {
-      if (isStructOrTupleToScalarize(PointeeType))
+      if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
         Uses[BaseElt].push_back({User, UseKind::Load});
@@ -1136,7 +1534,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
-      // We only scalarize stores of aggregate stores of tuples to their
+      // We only scalarize aggregate stores of tuples to their
       // elements, we do not scalarize stores of structs to their elements.
       if (PointeeType.is<TupleType>()) {
         assert(!isa<StoreWeakInst>(User) &&
@@ -1314,7 +1712,7 @@ static void processAllocBox(AllocBoxInst *ABI) {
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getElementCount(ABI->getElementType().getSwiftRValueType()));
+  Uses.resize(getTupleElementCount(ABI->getElementType().getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
   ElementUseCollector(Uses).collectUses(SILValue(ABI, 1), 0);
@@ -1343,7 +1741,7 @@ static void processAllocStack(AllocStackInst *ASI) {
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getElementCount(ASI->getElementType().getSwiftRValueType()));
+  Uses.resize(getTupleElementCount(ASI->getElementType().getSwiftRValueType()));
   
   // Walk the use list of the pointer, collecting them into the Uses array.
   ElementUseCollector(Uses).collectUses(SILValue(ASI, 1), 0);
@@ -1373,7 +1771,7 @@ static void processMarkUninitialized(MarkUninitializedInst *MUI) {
   // allocation that are being used.  This matters for element-wise tuples and
   // fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getElementCount(MUI->getType().getObjectType()
+  Uses.resize(getTupleElementCount(MUI->getType().getObjectType()
                                      .getSwiftRValueType()));
   
   // Walk the use list of the pointer, collecting them into the Uses array.
