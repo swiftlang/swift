@@ -79,6 +79,8 @@ public:
       RightAngle,
       Dot,
       Comma,
+      ExclamationMark,
+      QuestionMark,
 
       /// The first chunk of a substring that describes the parameter for a
       /// generic type.
@@ -122,6 +124,8 @@ public:
              Kind == ChunkKind::RightAngle ||
              Kind == ChunkKind::Dot ||
              Kind == ChunkKind::Comma ||
+             Kind == ChunkKind::ExclamationMark ||
+             Kind == ChunkKind::QuestionMark ||
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
@@ -410,6 +414,17 @@ public:
       Text = ",";
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Comma, Text);
   }
+
+  void addExclamationMark() {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::ExclamationMark, "!");
+  }
+
+  void addQuestionMark() {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
+  }
+
 
   void addCallParameter(Identifier Name, StringRef Type) {
     CurrentNestingLevel++;

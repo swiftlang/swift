@@ -77,6 +77,8 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::RightAngle:
     case Chunk::ChunkKind::Dot:
     case Chunk::ChunkKind::Comma:
+    case Chunk::ChunkKind::ExclamationMark:
+    case Chunk::ChunkKind::QuestionMark:
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
@@ -317,6 +319,8 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::RightAngle:
     case CodeCompletionString::Chunk::ChunkKind::Dot:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
+    case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
+    case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
       return C.getText();
 
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
@@ -1081,6 +1085,36 @@ public:
     }
   }
 
+  void tryAddStlibOptionalCompletions(Type ExprType) {
+    // If there is a dot, we don't have any special completions for
+    // Optional<T>.
+    if (!needDot())
+      return;
+
+    ExprType = ExprType->getRValueType();
+    Type Unwrapped = ExprType->getOptionalObjectType(Ctx);
+    if (!Unwrapped)
+      return;
+    // FIXME: consider types convertible to T?.
+
+    {
+      CodeCompletionResultBuilder Builder(
+          CompletionContext,
+          CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::ExpressionSpecific);
+      Builder.addExclamationMark();
+      addTypeAnnotation(Builder, Unwrapped);
+    }
+    {
+      CodeCompletionResultBuilder Builder(
+          CompletionContext,
+          CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::ExpressionSpecific);
+      Builder.addQuestionMark();
+      addTypeAnnotation(Builder, Unwrapped);
+    }
+  }
+
   void getValueExprCompletions(Type ExprType) {
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
@@ -1102,6 +1136,7 @@ public:
         Done = true;
       }
     }
+    tryAddStlibOptionalCompletions(ExprType);
     if (!Done) {
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                                TypeResolver.get());
