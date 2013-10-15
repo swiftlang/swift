@@ -539,6 +539,31 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
   return false;
 }
 
+static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
+                                        TypeVariableType *typeVar) {
+  while (auto fixed = cs.getFixedType(typeVar)) {
+    typeVar = fixed->getAs<TypeVariableType>();
+    if (!typeVar)
+      return fixed;
+  }
+  return nullptr;
+}
+
+/// \brief Retrieve the fixed type for this type variable, looking through a
+/// chain of type variables to get at the underlying type.
+static Type getFixedTypeRecursive(ConstraintSystem &cs,
+                                  Type type, TypeVariableType *&typeVar) {
+  auto desugar = type->getDesugaredType();
+  typeVar = desugar->getAs<TypeVariableType>();
+  if (typeVar) {
+    if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar)) {
+      type = fixed;
+      typeVar = nullptr;
+    }
+  }
+  return type;
+}
+
 // A variable or subscript is settable if:
 // - its base type (the type of the 'a' in 'a[n]' or 'a.b') either has
 //   reference semantics or has value semantics and is settable, AND
@@ -685,7 +710,9 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                 bool isTypeReference,
                                                 bool isDynamicResult) {
   // Figure out the instance type used for the base.
-  Type baseObjTy = baseTy->getRValueType();
+  TypeVariableType *baseTypeVar = nullptr;
+  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
+                     ->getRValueType();
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -708,7 +735,10 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // subtyping suffices. However, the owner might be a protocol and the base a
     // type that implements that protocol, if which case we need to model this
     // with a conversion constraint.
-    addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
+    if (ownerTy->is<ProtocolType>())
+      addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
+    else
+      addConstraint(ConstraintKind::Subtype, baseObjTy, ownerTy);
   }
 
   // Determine the type of the member.
@@ -1294,31 +1324,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   }
 
   llvm_unreachable("unhandled type matching kind");
-}
-
-static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
-                                        TypeVariableType *typeVar) {
-  while (auto fixed = cs.getFixedType(typeVar)) {
-    typeVar = fixed->getAs<TypeVariableType>();
-    if (!typeVar)
-      return fixed;
-  }
-  return nullptr;
-}
-
-/// \brief Retrieve the fixed type for this type variable, looking through a
-/// chain of type variables to get at the underlying type.
-static Type getFixedTypeRecursive(ConstraintSystem &cs,
-                                  Type type, TypeVariableType *&typeVar) {
-  auto desugar = type->getDesugaredType();
-  typeVar = desugar->getAs<TypeVariableType>();
-  if (typeVar) {
-    if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar)) {
-      type = fixed;
-      typeVar = nullptr;
-    }
-  }
-  return type;
 }
 
 /// Determine whether we should attempt a user-defined conversion.

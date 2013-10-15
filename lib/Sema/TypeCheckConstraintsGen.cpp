@@ -1199,7 +1199,7 @@ namespace {
       }
 
       if (auto type = CG.visit(expr)) {
-        expr->setType(type);
+        expr->setType(CG.getConstraintSystem().simplifyType(type));
         return expr;
       }
 
