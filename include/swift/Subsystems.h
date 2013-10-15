@@ -159,10 +159,6 @@ namespace swift {
   /// serialized modules.
   void performSILLinking(SILModule *M);
 
-  /// \brief Analyze the SIL module for correcntess and generate user
-  /// diagnostics if any.
-  void emitSILDataflowDiagnostics(SILModule *M);
-
   /// \brief Optimize away shadow variables for any inout arguments that don't
   /// escape.
   void performInOutDeshadowing(SILModule *M);
@@ -170,6 +166,13 @@ namespace swift {
   /// \brief Inline functions marked transparent. Diagnose attempts to
   /// circularly inline
   void performSILMandatoryInlining(SILModule *M);
+
+  /// \brief Promote closure captures from [inout] to by-value.
+  void performSILCapturePromotion(SILModule *M);
+
+  /// \brief Analyze the SIL module for correcntess and generate user
+  /// diagnostics if any.
+  void emitSILDataflowDiagnostics(SILModule *M);
 
   /// Serializes a translation unit to the given output file.
   ///

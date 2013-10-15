@@ -32,6 +32,7 @@ enum class PassKind {
   DataflowDiagnostics,
   InOutDeshadowing,
   MandatoryInlining,
+  CapturePromotion,
   SILCleanup
 };
 
@@ -65,6 +66,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
                                    "Inline transparent functions"),
+                        clEnumValN(PassKind::CapturePromotion,
+                                   "capture-promotion",
+                                   "Promote closure capture variables"),
                         clEnumValN(PassKind::SILCleanup,
                                    "cleanup",
                                    "Cleanup SIL in preparation for IRGen"),
@@ -154,6 +158,8 @@ int main(int argc, char **argv) {
     case PassKind::MandatoryInlining:
       performSILMandatoryInlining(CI.getSILModule());
       break;
+    case PassKind::CapturePromotion:
+      performSILCapturePromotion(CI.getSILModule());
     case PassKind::SILCleanup:
       performSILCleanup(CI.getSILModule());
       break;

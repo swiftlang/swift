@@ -1,0 +1,627 @@
+//===--- CapturePromotion.cpp - Promotes closure captures -----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#define DEBUG_TYPE "capture-promotion"
+#include "swift/Subsystems.h"
+#include "swift/SIL/SILCloner.h"
+#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
+#include <queue>
+using namespace swift;
+
+typedef llvm::SmallSet<unsigned, 4> IndicesSet;
+typedef llvm::DenseMap<PartialApplyInst*, unsigned> PartialApplyIndexMap;
+typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
+
+STATISTIC(NumCapturesPromoted, "Number of captures promoted");
+
+namespace {
+class ReachabilityInfo {
+  llvm::DenseMap<SILBasicBlock*, unsigned> BlockMap;
+  std::vector<llvm::BitVector> BitVectors;
+
+public:
+  ReachabilityInfo(SILFunction *F);
+
+  bool isReachable(SILBasicBlock *From, SILBasicBlock *To) const;
+};
+
+/// \brief A SILCloner subclass which clones a closure function while converting
+/// one or more captures from [inout] (by-reference) to by-value.
+class ClosureCloner : public SILCloner<ClosureCloner> {
+public:
+  friend class SILVisitor<ClosureCloner>;
+  friend class SILCloner<ClosureCloner>;
+
+  ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices);
+
+  void populateCloned();
+
+  SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+private:
+  static SILFunction *initCloned(SILFunction *Orig,
+                                 IndicesSet &PromotableIndices);
+
+  void visitStrongReleaseInst(StrongReleaseInst *Inst);
+  void visitStructElementAddrInst(StructElementAddrInst *Inst);
+  void visitLoadInst(LoadInst *Inst);
+
+  SILFunction *Orig;
+  IndicesSet &PromotableIndices;
+  llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
+  llvm::DenseMap<SILArgument*, SILValue> AddrArgumentMap;
+};
+} // end anonymous namespace.
+
+/// \brief Initialize ReachabilityInfo so that it can answer queries about
+/// whether a given basic block in a function is reachable from another basic
+/// block in the function
+ReachabilityInfo::ReachabilityInfo(SILFunction *F) {
+  unsigned N = 0;
+  for (auto &BB : *F)
+    BlockMap.insert(std::make_pair(&BB, N++));
+  BitVectors.resize(N);
+  for (auto &Bits : BitVectors)
+    Bits.resize(N, false);
+
+  bool Changed;
+  do {
+    Changed = false;
+    llvm::BitVector NewBits;
+    for (auto &BlockPair : BlockMap) {
+      llvm::BitVector &Bits = BitVectors[BlockPair.second];
+      if (!Changed) {
+        // If we have not detected a change yet, then calculate new
+        // reachabilities into a new bit vector so we can determine if any
+        // change has occured.
+        llvm::BitVector NewBits = Bits;
+        for (auto PI = BlockPair.first->pred_begin(),
+                  PE = BlockPair.first->pred_end(); PI != PE; ++PI) {
+          unsigned I = BlockMap[*PI];
+          NewBits |= BitVectors[I];
+          NewBits.set(I);
+        }
+        if (Bits != NewBits) {
+          Bits.swap(NewBits);
+          Changed = true;
+        }
+      } else {
+        // Otherwise, just update the existing reachabilities in-place
+        for (auto PI = BlockPair.first->pred_begin(),
+                  PE = BlockPair.first->pred_end(); PI != PE; ++PI) {
+          unsigned I = BlockMap[*PI];
+          Bits |= BitVectors[I];
+          Bits.set(I);
+        }
+      }
+    }
+  } while (Changed);
+}
+
+/// \brief Return true if the To basic block is reachable from the From basic
+/// block. A block is considered reachable from itself only if its entry can be
+/// recursively reached from its own exit.
+bool
+ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) const {
+  auto FI = BlockMap.find(From), TI = BlockMap.find(To);
+  assert(FI != BlockMap.end() && TI != BlockMap.end());
+  return BitVectors[TI->second].test(FI->second);
+}
+
+ClosureCloner::ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices)
+  : SILCloner<ClosureCloner>(*initCloned(Orig, PromotableIndices)),
+    Orig(Orig), PromotableIndices(PromotableIndices) {
+}
+
+/// \brief Create the function corresponding to the clone of the original
+/// closure with the signature modified to reflect promotable captures (which
+/// are givien by PromotableIndices, such that each entry in the set is the
+/// index of the box containing the variable in the closure's argument list, and
+/// the address of the box's contents is the argument immediately following each
+/// box argument); does not actually clone the body of the function
+SILFunction*
+ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
+  SILModule &M = Orig->getModule();
+
+  // Suffix the function name with "_promoteX", where X is the first integer
+  // that does not result in a conflict
+  unsigned Counter = 0;
+  std::string ClonedName;
+  do {
+    ClonedName.clear();
+    llvm::raw_string_ostream buffer(ClonedName);
+    buffer << Orig->getName() << "_promote" << Counter++;
+  } while (M.lookup(ClonedName));
+
+  SILType OrigLoweredTy = Orig->getLoweredType();
+  SILFunctionType *OrigFTI = OrigLoweredTy.getFunctionTypeInfo(M);
+  SmallVector<TupleTypeElt, 4> ClonedArgTys;
+  auto OrigParams = OrigFTI->getParameters();
+  // Iterate over the argument types of the original function, collapsing each
+  // pair of a promotable box argument and the address of its contents into a
+  // single argument of the object (rather than address) type of the box's
+  // contents
+  unsigned Index = 0;
+  for (auto &param : OrigParams) {
+    if (Index && PromotableIndices.count(Index - 1)) {
+      Type type = param.getSILType().getObjectType().getSwiftType();
+      ClonedArgTys.push_back(type);
+    } else if (!PromotableIndices.count(Index)) {
+      Type type = param.getType();
+      if (param.isIndirectInOut())
+        type = param.getSILType().getSwiftType();
+      ClonedArgTys.push_back(type);
+    }
+    ++Index;
+  }
+  // Create the thin function type for the cloned closure
+  Type ClonedTy = Lowering::getThinFunctionType(
+    FunctionType::get(TupleType::get(ClonedArgTys, M.getASTContext()),
+                      OrigLoweredTy.getAs<AnyFunctionType>().getResult(),
+                      M.getASTContext()));
+  return new (M) SILFunction(M, SILLinkage::Internal, ClonedName,
+                             M.Types.getLoweredType(ClonedTy));
+}
+
+/// \brief Populate the body of the cloned closure, modifying instructions as
+/// necessary to take into consideration the promoted capture(s)
+void
+ClosureCloner::populateCloned() {
+  SILFunction *Cloned = getCloned();
+  SILModule &M = Cloned->getModule();
+
+  // Create arguments for the entry block
+  SILBasicBlock* OrigEntryBB = Orig->begin();
+  SILBasicBlock* ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  unsigned ArgNo = 0;
+  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  while (I != E) {
+    if (PromotableIndices.count(ArgNo)) {
+      // Handle the case of a promoted capture argument
+      SILArgument *ReleaseArgument = *I++;
+      SILValue MappedValue =
+        new (M) SILArgument((*I)->getType().getObjectType(),
+                            ClonedEntryBB);
+      BoxArgumentMap.insert(std::make_pair(ReleaseArgument, MappedValue));
+      AddrArgumentMap.insert(std::make_pair(*I, MappedValue));
+      ++ArgNo;
+    } else {
+      // Otherwise, create a new argument which copies the original argument
+      SILValue MappedValue =
+        new (M) SILArgument((*I)->getType(), ClonedEntryBB);
+      ValueMap.insert(std::make_pair(*I, MappedValue));
+    }
+    ++ArgNo;
+    ++I;
+  }
+
+  getBuilder().setInsertionPoint(ClonedEntryBB);
+  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
+  // Recursively visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions other than terminators.
+  visitSILBasicBlock(OrigEntryBB);
+
+  // Now iterate over the BBs and fix up the terminators.
+  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
+    getBuilder().setInsertionPoint(BI->second);
+    visit(BI->first->getTerminator());
+  }
+}
+
+/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// it is a strong release of a promoted box argument, then it is replaced wit
+/// a destroyValue of the new object type argument, otherwise it is handled
+/// normally.
+void
+ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand.getDef())) {
+    assert(Operand.getResultNumber() == 0);
+    auto I = BoxArgumentMap.find(A);
+    if (I != BoxArgumentMap.end()) {
+      // Releases of the box arguments get replaced with destroyValue of the new
+      // object type argument.
+      SILFunction &F = getBuilder().getFunction();
+      auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
+      typeLowering.emitDestroyValue(getBuilder(), Inst->getLoc(), I->second);
+      return;
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
+}
+
+/// \brief Handle a struct_element_addr instruction during cloning of a closure;
+/// if its operand is the promoted address argument then ignore it, otherwise it
+/// is handled normally.
+void
+ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand.getDef())) {
+    assert(Operand.getResultNumber() == 0);
+    auto I = AddrArgumentMap.find(A);
+    if (I != AddrArgumentMap.end())
+      return;
+  }
+
+  SILCloner<ClosureCloner>::visitStructElementAddrInst(Inst);
+}
+
+/// \brief Handle a load instruction during cloning of a closure; the two
+/// relevant cases are a direct load from a promoted address argument or a load
+/// of a struct_element_addr of a promoted address argument.
+void
+ClosureCloner::visitLoadInst(LoadInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (auto *A = dyn_cast<SILArgument>(Operand.getDef())) {
+    assert(Operand.getResultNumber() == 0);
+    auto I = AddrArgumentMap.find(A);
+    if (I != AddrArgumentMap.end()) {
+      // Loads of the address argument get eliminated completely; the uses of
+      // the loads get mapped to uses of the new object type argument.
+      ValueMap.insert(std::make_pair(Inst, I->second));
+      return;
+    }
+  } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand.getDef())) {
+    assert(Operand.getResultNumber() == 0);
+    if (auto *A = dyn_cast<SILArgument>(SEAI->getOperand().getDef())) {
+      assert(SEAI->getOperand().getResultNumber() == 0);
+      auto I = AddrArgumentMap.find(A);
+      if (I != AddrArgumentMap.end()) {
+        // Loads of a struct_element_addr of an argument get replaced with
+        // struct_extract of the new object type argument.
+        SILValue V = getBuilder().createStructExtract(Inst->getLoc(), I->second,
+                                                      SEAI->getField(),
+                                                      Inst->getType());
+        ValueMap.insert(std::make_pair(Inst, V));
+        return;
+      }
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitLoadInst(Inst);
+}
+
+/// \brief Given a partial_apply instruction and the argument index into its
+/// callee's argument list of a box argument (which is followed by an argument
+/// for the address of the box's contents), return true if the closure is known
+/// not to mutate the captured variable.
+static bool
+isNonmutatingCapture(PartialApplyInst *PAI, unsigned Index) {
+  // Return false if the callee is not a function with accessible contents.
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+  if (!FRI)
+    return false;
+  assert(PAI->getCallee().getResultNumber() == 0);
+  SILFunction *Orig = FRI->getReferencedFunction();
+  if (!Orig || Orig->empty())
+    return false;
+
+  // Obtain the arguments for the box and the address of its contents.
+  SILBasicBlock* OrigEntryBB = Orig->begin();
+  assert(Index + 1 < OrigEntryBB->bbarg_size() &&
+         "Too few arguments to entry block of capturing closure");
+  SILArgument* BoxArg = OrigEntryBB->getBBArgs()[Index];
+  SILArgument* AddrArg = OrigEntryBB->getBBArgs()[Index + 1];
+
+  // TODO: handle address-only types
+  // (For now, return false is the address argument is an address-only type,
+  // since we currently assume loadable types only)
+  SILModule &M = PAI->getFunction()->getModule();
+  if (AddrArg->getType().isAddressOnly(M))
+    return false;
+
+  // Conservatively do not allow any use of the box argument other than a
+  // strong_release, since this is the pattern expected from SILGen
+  for (auto *O : BoxArg->getUses())
+    if (!isa<StrongReleaseInst>(O->getUser()))
+      return false;
+
+  // Only allow loads of the address argument, either directly or via
+  // struct_element_addr instructions
+  for (auto *O : AddrArg->getUses()) {
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(O->getUser())) {
+      for (auto *UO : SEAI->getUses())
+        if (!isa<LoadInst>(UO->getUser()))
+          return false;
+      continue;
+    }
+    if (!isa<LoadInst>(O->getUser()))
+      return false;
+  }
+
+  return true;
+}
+
+/// \brief Given a use of an alloc_box instruction, return true if the use
+/// definitely does not allow the box to escape; also, if the use is an
+/// instruction which possibly mutates the contents of the box, then add it to
+/// the Mutations vector.
+static bool
+isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*>& Mutations) {
+  auto *U = O->getUser();
+  // A store or assign is ok if the alloc_box is the destination.
+  if (isa<StoreInst>(U) || isa<AssignInst>(U)) {
+    if (O->getOperandNumber() != 1)
+      return false;
+    Mutations.push_back(cast<SILInstruction>(U));
+    return true;
+  }
+  // copy_addr is ok, but counts as a mutation if the use is as the
+  // destination or the copy_addr is a take.
+  if (auto *CAI = dyn_cast<CopyAddrInst>(U)) {
+    if (O->getOperandNumber() == 1 || CAI->isTakeOfSrc())
+      Mutations.push_back(CAI);
+    return true;
+  }
+  // Recursively see through struct_element_addr, tuple_element_addr, and
+  // project_existential instructions.
+  if (isa<StructElementAddrInst>(U) || isa<TupleElementAddrInst>(U) ||
+      isa<ProjectExistentialInst>(U)) {
+    for (auto *UO : U->getUses())
+      if (!isNonescapingUse(UO, Mutations))
+        return false;
+    return true;
+  }
+  // An apply is ok if the argument is used as an [inout] parameter or an
+  // indirect return, but counts as a possible mutation in both cases.
+  if (auto *AI = dyn_cast<ApplyInst>(U)) {
+    if (AI->getFunctionTypeInfo(AI->getModule())
+          ->getParameters()[O->getOperandNumber()-1].isIndirect()) {
+      Mutations.push_back(AI);
+      return true;
+    }
+    return false;
+  }
+  // These instructions are ok but count as mutations.
+  if (isa<InitializeVarInst>(U) || isa<DeallocBoxInst>(U)) {
+    Mutations.push_back(cast<SILInstruction>(U));
+    return true;
+  }
+  // These remaining instructions are ok and don't count as mutations.
+  if (isa<StrongRetainInst>(U) || isa<StrongReleaseInst>(U) ||
+      isa<LoadInst>(U) || isa<ProtocolMethodInst>(U))
+    return true;
+  return false;
+}
+
+/// \brief Examine an alloc_box insturctions, returning true if there is at
+/// least one capture of the boxed variable is promotable; if so, then the pair
+/// of the partial_apply instruction and the index of the box argument in the
+/// closure's argument list is added to IM.
+static bool
+examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
+                    PartialApplyIndexMap &IM) {
+  SILModule &M = ABI->getFunction()->getModule();
+
+  SmallVector<SILInstruction*, 32> Mutations;
+
+  for (auto *O : ABI->getUses()) {
+    if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
+      unsigned OpNo = O->getOperandNumber();
+      assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
+      if (O->get().getResultNumber() == 1) {
+        if (OpNo < 2 ||
+            PAI->getAllOperands()[OpNo - 1].get() != SILValue(ABI, 0))
+          return false;
+        continue;
+      }
+      assert(O->get().getResultNumber() == 0 &&
+             "Unexpected result number of alloc box instruction used?");
+
+      // If we've already seen this partial apply, then it means the same alloc
+      // box is being captured twice by the same closure, which is odd and
+      // unexpected: bail instead of trying to handle this case.
+      if (IM.find(PAI) != IM.end())
+        return false;
+
+      // Verify that the next operand of the partial apply is the second result
+      // of the alloc_box.
+      if (OpNo + 1 >= PAI->getNumOperands())
+        return false;
+      if (PAI->getAllOperands()[OpNo + 1].get() != SILValue(ABI, 1))
+        return false;
+
+      // We currently can only handle non-polymorphic closures
+      if (PAI->hasSubstitutions() || !PAI->getType().is<FunctionType>())
+        return false;
+
+      // Calculate the index into the closure's argument list of the captured
+      // box pointer (the captured address is always the immediately following
+      // index so is not stored separately);
+      unsigned Index = OpNo - 1 +
+        PAI->getType().getFunctionTypeInfo(M)->getParameters().size();
+
+      // Verify that this closure is known not to mutate the captured value; if
+      // it does, then conservatively refuse to promote any captures of this
+      // value.
+      if (!isNonmutatingCapture(PAI, Index))
+        return false;
+
+      // Record the index and continue.
+      IM.insert(std::make_pair(PAI, Index));
+      continue;
+    }
+
+    // Verify that this this use does not allow the alloc_box to escape
+    if (!isNonescapingUse(O, Mutations))
+      return false;
+  }
+
+  // Helper lambda function to determine if instruction b is strictly after
+  // instruction a, assuming both are in the same basic block.
+  auto isAfter = [](SILInstruction *a, SILInstruction *b) {
+    SILInstruction *f = b->getParent()->begin();
+    while (b != f) {
+      b = b->getPrevNode();
+      if (a == b)
+        return true;
+    }
+    return false;
+  };
+
+  // Loop over all mutations to possibly invalidate captures.
+  for (auto *I : Mutations) {
+    auto Iter = IM.begin();
+    while (Iter != IM.end()) {
+      auto *PAI = Iter->first;
+      // The mutation invalidates a capture if it occurs in a block reachable
+      // from the block the partial_apply is in, or if it is in the same
+      // block is after the partial_apply.
+      if (RI.isReachable(PAI->getParent(), I->getParent()) ||
+          (PAI->getParent() == I->getParent() && isAfter(PAI, I))) {
+        auto Prev = Iter++;
+        IM.erase(Prev);
+        continue;
+      }
+      ++Iter;
+    }
+    // If there are no valid captures left, then stop.
+    if (!IM.size())
+      return false;
+  }
+
+  return true;
+}
+
+/// \brief Erase a retain of BoxValue preceding a partial_apply instruction if
+/// one is easily found; return true if so and false otherwise.
+static bool
+eraseRetainIfPresent(PartialApplyInst *PAI, SILValue BoxValue) {
+  auto I = SILBasicBlock::iterator(PAI), B = PAI->getParent()->begin();
+  while (I != B) {
+    --I;
+    if (auto *SRI = dyn_cast<StrongRetainInst>(I)) {
+      if (SRI->getOperand() == BoxValue) {
+        I->eraseFromParent();
+        return true;
+      }
+      continue;
+    }
+    if (!isa<FunctionRefInst>(I) && !isa<LoadInst>(I) &&
+        !isa<CopyValueInst>(I))
+      break;
+  }
+  return false;
+}
+
+/// \brief Given a partial_apply instruction and a set of promotable indices,
+/// clone the closure with the promoted captures and replace the partial_apply
+/// with a partial_apply of the new closure, fixing up reference counting as
+/// necessary. Also, if the closure is cloned, the cloned function is added to
+/// the worklist.
+static void
+processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
+                        SmallVectorImpl<SILFunction*> &Worklist) {
+  SILModule &M = PAI->getModule();
+
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+  assert(FRI && PAI->getCallee().getResultNumber() == 0);
+
+  // Clone the closure with the given promoted captures.
+  ClosureCloner cloner(FRI->getReferencedFunction(), PromotableIndices);
+  cloner.populateCloned();
+  Worklist.push_back(cloner.getCloned());
+
+  // Initialize a SILBuilder and create a function_ref referencing the cloned
+  // closure.
+  SILBuilder B(*PAI->getFunction());
+  B.setInsertionPoint(PAI);
+  SILValue FnVal = B.createFunctionRef(PAI->getLoc(), cloner.getCloned());
+  SILType FnTy = FnVal.getType();
+
+  // Populate the argument list for a new partial_apply instruction, taking into
+  // consideration any captures.
+  unsigned FirstIndex =
+    PAI->getType().getFunctionTypeInfo(M)->getParameters().size();
+  unsigned OpNo = 1, OpCount = PAI->getAllOperands().size();
+  SmallVector<SILValue, 16> Args;
+  while (OpNo != OpCount) {
+    unsigned Index = OpNo - 1 + FirstIndex;
+    if (PromotableIndices.count(Index)) {
+      SILValue BoxValue = PAI->getAllOperands()[OpNo].get();
+      SILValue AddrValue = PAI->getAllOperands()[OpNo + 1].get();
+      assert(BoxValue.getDef() == AddrValue.getDef() &&
+             BoxValue.getResultNumber() == 0 &&
+             AddrValue.getResultNumber() == 1);
+
+      // Try to net out (i.e. erase) a retain of the box value.
+      if (!eraseRetainIfPresent(PAI, BoxValue))
+        // Otherwise, add a new release of the box value
+        B.createStrongReleaseInst(PAI->getLoc(), BoxValue);
+
+      // Load and copy from the address value, passing the result as an argument
+      // to the new closure.
+      auto &typeLowering = M.getTypeLowering(AddrValue.getType());
+      Args.push_back(
+        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), AddrValue, IsNotTake));
+      ++OpNo;
+      ++NumCapturesPromoted;
+    } else {
+      Args.push_back(PAI->getAllOperands()[OpNo].get());
+    }
+    ++OpNo;
+  }
+
+  // Create a new partial apply with the new arguments.
+  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, FnTy, {}, Args,
+                                      PAI->getType());
+  SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
+  auto OrigCallee = PAI->getCallee();
+  PAI->eraseFromParent();
+  if (auto *OrigCalleeInst = dyn_cast<SILInstruction>(OrigCallee.getDef()))
+    if (OrigCalleeInst->use_empty())
+      OrigCalleeInst->eraseFromParent();
+}
+
+static void
+runOnFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
+  ReachabilityInfo RS(F);
+
+  // This is a map from each partial apply to a set of indices of promotable
+  // box variables.
+  PartialApplyIndicesMap IndicesMap;
+
+  // This is a map from each partial apply to a single index which is a
+  // promotable box variable for the alloc_box currently being considered
+  PartialApplyIndexMap IndexMap;
+
+  // Consider all alloc_box instructions in the function
+  for (auto &BB : *F)
+    for (auto &I : BB)
+      if (auto *ABI = dyn_cast<AllocBoxInst>(&I)) {
+        IndexMap.clear();
+        if (examineAllocBoxInst(ABI, RS, IndexMap))
+          // If we are able to promote at least one capture of the alloc_box,
+          // then add the promotable indices to the main map.
+          for (auto &IndexPair : IndexMap)
+            IndicesMap[IndexPair.first].insert(IndexPair.second);
+      }
+
+  // Do the actual promotions; all promotions on a single partial_apply are
+  // handled together
+  for (auto &IndicesPair : IndicesMap)
+    processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
+}
+
+void
+swift::performSILCapturePromotion(SILModule *M) {
+  SmallVector<SILFunction*, 128> Worklist;
+  for (auto &F : *M)
+    Worklist.push_back(&F);
+  while (Worklist.size() != 0)
+    runOnFunction(Worklist.pop_back_val(), Worklist);
+}
