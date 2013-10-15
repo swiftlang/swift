@@ -1,6 +1,7 @@
 add_subdirectory(Utils)
 add_swift_library(swiftSILPasses
   AllocBoxToStack.cpp
+  CapturePromotion.cpp
   ConstantPropagation.cpp
   DataflowDiagnostics.cpp
   DeadCodeElimination.cpp
