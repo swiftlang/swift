@@ -3492,8 +3492,9 @@ int Solution::getFixedScore() const {
       continue;
 
     // +1 if the bound type matches the default type for this literal protocol.
-    // FIXME: Doesn't work properly for Slice<T> et al.
-    if (defaultType->isEqual(binding.second))
+    // Literal types are always nominal, so we simply check the nominal
+    // declaration. This covers e.g., Slice vs. Slice<T>.
+    if (defaultType->getAnyNominal() == binding.second->getAnyNominal())
       ++score;
   }
 
