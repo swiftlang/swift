@@ -1133,20 +1133,25 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
 void SILGenFunction::emitCopyLValueInto(SILLocation loc,
                                         const LValue &src,
                                         Initialization *dest) {
-  // If the destination is a single address, and there's no semantic conversion
-  // necessary, do a copy_addr from the lvalue into the destination.
-  if (auto destAddr = dest->getAddressOrNull()) {
-    if (src.getTypeOfRValue().getSwiftRValueType()
-          == destAddr.getType().getSwiftRValueType()) {
-      auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
-      B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
-      dest->finishInitialization(*this);
-      return;
+  auto skipPeephole = [&]{
+    if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
+      RValue(*this, loaded, loc).forwardInto(*this, dest, loc);
     }
-  }
+  };
   
-  // Otherwise, load the lvalue normally into the initialization.
-  if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
-    RValue(*this, loaded, loc).forwardInto(*this, dest, loc);
-  }
+  // If the source is a physical lvalue, the destination is a single address,
+  // and there's no semantic conversion necessary, do a copy_addr from the
+  // lvalue into the destination.
+  if (!src.isPhysical())
+    return skipPeephole();
+  auto destAddr = dest->getAddressOrNull();
+  if (!destAddr)
+    return skipPeephole();
+  if (src.getTypeOfRValue().getSwiftRValueType()
+        != destAddr.getType().getSwiftRValueType())
+    return skipPeephole();
+  
+  auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
+  B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
+  dest->finishInitialization(*this);
 }

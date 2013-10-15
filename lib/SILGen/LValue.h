@@ -181,7 +181,7 @@ public:
         return false;
     return true;
   }
-
+  
   /// Add a new component at the end of the access path of this lvalue.
   template <class T, class... A> T &add(A &&...args) {
     T &component = Path.add<T>(std::forward<A>(args)...);
