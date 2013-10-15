@@ -236,6 +236,72 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                     CastResV);
     }
 
+    // Fold constant division operations and report div by zero.
+    case BuiltinValueKind::SDiv:
+    case BuiltinValueKind::ExactSDiv:
+    case BuiltinValueKind::SRem:
+    case BuiltinValueKind::UDiv:
+    case BuiltinValueKind::ExactUDiv:
+    case BuiltinValueKind::URem: {
+      // Get the denominator.
+      IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
+      if (!Denom)
+        return nullptr;
+      APInt DenomVal = Denom->getValue();
+
+      // Reoprt an error if the denominator is zero.
+      if (DenomVal == 0) {
+        diagnose(M.getASTContext(),
+                 AI->getLoc().getSourceLoc(),
+                 diag::division_by_zero);
+        return nullptr;
+      }
+
+      // Get the numerator.
+      IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
+      if (!Num)
+        return nullptr;
+      APInt NumVal = Num->getValue();
+
+      APInt ResVal;
+      bool Overflowed = false;
+      switch (Builtin.ID) {
+        // We do not cover all the cases below - only the ones taht are easily
+        // computable for APInt.
+        default : return nullptr;
+        case BuiltinValueKind::SDiv:
+          ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
+          break;
+        case BuiltinValueKind::SRem:
+          ResVal = NumVal.srem(DenomVal);
+          break;
+        case BuiltinValueKind::UDiv:
+          ResVal = NumVal.udiv(DenomVal);
+          break;
+        case BuiltinValueKind::URem:
+          ResVal = NumVal.urem(DenomVal);
+          break;
+      }
+
+      if (Overflowed) {
+        diagnose(M.getASTContext(),
+                 AI->getLoc().getSourceLoc(),
+                 diag::division_overflow,
+                 NumVal.toString(/*Radix*/ 10, /*Signed*/true),
+                 "/",
+                 DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+        return nullptr;
+      }
+
+      // Add the literal instruction to represnet the result of the division.
+      SILBuilder B(AI);
+      Type DestTy = Builtin.Types[0];
+      return B.createIntegerLiteral(AI->getLoc(),
+               SILType::getPrimitiveType(CanType(DestTy),
+                                         SILValueCategory::Object),
+               ResVal);
+    }
+
     // Deal with special builtins that are designed to check overflows on
     // integer literals.
     case BuiltinValueKind::STruncWithOverflow:
@@ -276,6 +342,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow,
                  CE ? CE->getType() : DestTy);
+        return nullptr;
       }
 
       // The call to the builtin should be replaced with the constant value.
@@ -310,6 +377,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow,
                  CE ? CE->getType() : DestTy);
+        return nullptr;
       }
 
       // The call to the builtin should be replaced with the constant value.

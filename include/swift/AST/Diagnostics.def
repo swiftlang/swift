@@ -1507,7 +1507,7 @@ ERROR(circular_transparent,sil_analysis,none,
 NOTE(note_while_inlining,sil_analysis,none,
      "while inlining here", ())
 
-// Integer overflow diagnostics.
+// Arithmetic diagnostics.
 ERROR(integer_literal_overflow,sil_gen,none, 
       "integer literal overflows when stored into %0",
       (Type))
@@ -1518,6 +1518,10 @@ ERROR(arithmetic_operation_overflow_generic_type,sil_analysis,none,
       "arithmetic operation '%0 %1 %2' (on %select{unsigned|signed}3 "
       "%4-bit integer type) results in an overflow",
       (StringRef, StringRef, StringRef, bool, unsigned))
+ERROR(division_overflow,sil_analysis,none,
+      "division '%0 %1 %2' results in an overflow",
+      (StringRef, StringRef, StringRef))
+ERROR(division_by_zero,sil_gen,none, "division by zero", ())
 
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.

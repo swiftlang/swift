@@ -138,3 +138,33 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @testDivision : $@thin () -> Builtin.Int8 {
+bb0:
+  %0 = builtin_function_ref #Builtin.sdiv_Int8 : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
+  %1 = integer_literal $Builtin.Int8, 6
+  %2 = integer_literal $Builtin.Int8, 3
+  %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
+  return %3 : $Builtin.Int8
+
+// CHECK-LABEL: sil @testDivision
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int8, 2
+// CHECK-NEXT: return %0 : $Builtin.Int8
+// CHECK-NEXT: }
+}
+
+sil @testRem : $@thin () -> Builtin.Int64 {
+bb0:
+  %0 = builtin_function_ref #Builtin.urem_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  return %3 : $Builtin.Int64
+
+// CHECK-LABEL: sil @testRem
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+}
+
