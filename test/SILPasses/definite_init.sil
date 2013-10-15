@@ -460,7 +460,6 @@ bb0(%0 : $Int64):
   store %0 to %1#1 : $*Int64  // CHECK: store
   %2 = alloc_stack $Int64     // CHECK: alloc_stack
   
-  // CHECK-NEXT: [[SE:%[0-9]+]] = load
   // CHECK-NEXT: store
   copy_addr %1#1 to [initialization] %2#1 : $*Int64
 
@@ -468,7 +467,26 @@ bb0(%0 : $Int64):
 
   dealloc_stack %2#0 : $*@local_storage Int64  // CHECK-NEXT: dealloc_stack
   dealloc_stack %1#0 : $*@local_storage Int64  // CHECK-NEXT: dealloc_stack
-  // CHECK: return [[SE]]
+  // CHECK: return %0
   return %3 : $Int64
+}
+
+// rdar://15170149
+// CHECK-LABEL: sil @store_to_copyaddr
+sil @store_to_copyaddr : $() -> () {
+bb0:
+  %0 = enum $Bool, #Bool.true!enumelt  // CHECK: %0 = enum $Bool
+  %1 = alloc_stack $Bool               // CHECK-NEXT: alloc_stack
+  store %0 to %1#1 : $*Bool            // CHECK-NEXT: store
+  %3 = alloc_stack $Bool               // CHECK-NEXT: alloc_stack
+  copy_addr %1#1 to [initialization] %3#1 : $*Bool  // CHECK-NEXT: store
+  %5 = load %3#1 : $*Bool
+  copy_addr %3#1 to %1#1 : $*Bool      // CHECK-NEXT: store
+  dealloc_stack %3#0 : $*@local_storage Bool // CHECK-NEXT: dealloc_stack
+  dealloc_stack %1#0 : $*@local_storage Bool // CHECK-NEXT: dealloc_stack
+  %12 = tuple ()
+  return %12 : $()
+  
+
 }
 

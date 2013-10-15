@@ -510,7 +510,7 @@ namespace {
                                 llvm::SmallBitVector &RequiredElts,
                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
 
-    void explodeCopyAddr(CopyAddrInst *CAI, SILValue &StoredValue);
+    void explodeCopyAddr(CopyAddrInst *CAI);
 
   };
 } // end anonymous namespace
@@ -908,8 +908,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
       // Otherwise, some part of the copy_addr's value is demanded by a load, so
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
-      SILValue StoredValue;
-      explodeCopyAddr(CAI, StoredValue);
+      explodeCopyAddr(CAI);
 
       // The copy_addr doesn't provide any values, but we've arranged for our
       // iterators to visit the newly generated instructions, which do.
@@ -1102,16 +1101,22 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // live across the promoted region and that isn't desired for a stable
   // diagnostics pass this like one.
 
+  // We only handle load and copy_addr right now.
+  if (!isa<LoadInst>(Inst) && !isa<CopyAddrInst>(Inst)) return;
 
-  // We only handle load right now, not copy_addr.
-  if (!isa<LoadInst>(Inst)) return;
-
+  
+  // If this is a CopyAddr, verify that the element type is loadable.  If not,
+  // we can't explode to a load.
+  if (isa<CopyAddrInst>(Inst) &&
+      !Inst->getOperand(0).getType().isLoadable(Inst->getModule()))
+    return;
+  
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
   if (hasEscapedAt(Inst))
     return;
 
-  CanType LoadTy = Inst->getType(0).getSwiftRValueType();
+  CanType LoadTy = Inst->getOperand(0).getType().getSwiftRValueType();
 
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
@@ -1138,29 +1143,38 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
     assert(AnyAvailable && "Didn't get any available values!");
   }
 #endif
-
-  // Ok, we have some available values.  Aggregate together all of the
-  // subelements into something that has the same type as the load did, and emit
-  // (smaller) loads for any subelements that were not available.
+  
+  // Ok, we have some available values.  If we have a copy_addr, explode it now,
+  // exposing the load operation within it.  Subsequent optimization passes will
+  // see the load and propagate the available values into it.
+  if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
+    explodeCopyAddr(CAI);
+    return;
+  }
+  
+  // Aggregate together all of the subelements into something that has the same
+  // type as the load did, and emit smaller) loads for any subelements that were
+  // not available.
   auto NewVal = AggregateAvailableValues(Inst, LoadTy, Inst->getOperand(0),
                                          AvailableValues, FirstElt);
 
+  ++NumLoadPromoted;
+
+  // If the load access is a LoadInst, simply replace the load.
+  assert(isa<LoadInst>(Inst));
   DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
   DEBUG(llvm::errs() << "      To value: " << *NewVal.getDef() << "\n");
-
+  
   SILValue(Inst, 0).replaceAllUsesWith(NewVal);
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
   RemoveDeadAddressingInstructions(Addr);
-  ++NumLoadPromoted;
 }
 
 
 /// Explode a copy_addr instruction of a loadable type into lower level
-/// operations like loads, stores, retains, releases, copy_value, etc.  This
-/// returns the first instruction of the generated sequence.
-void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
-                                       SILValue &StoredValue) {
+/// operations like loads, stores, retains, releases, copy_value, etc.
+void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
   SILType ValTy = CAI->getDest().getType().getObjectType();
   auto &TL = CAI->getModule().getTypeLowering(ValTy);
 
@@ -1171,8 +1185,8 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
 
   // Use type lowering to lower the copyaddr into a load sequence + store
   // sequence appropriate for the type.
-  StoredValue = TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(),
-                                  CAI->isTakeOfSrc());
+  SILValue StoredValue = TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(),
+                                           CAI->isTakeOfSrc());
 
   TL.emitStoreOfCopy(B, CAI->getLoc(), StoredValue, CAI->getDest(),
                      CAI->isInitializationOfDest());
@@ -1187,20 +1201,20 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
   // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
   // times if the source and dest are to elements within a single aggregate, but
   // we only want to pick up the CopyAddrKind from the store.
-  UseKind CopyAddrKind = Release;
+  UseKind CopyAddrStoreKind = Release;
   for (auto &Use : Uses) {
     if (Use.first == CAI) {
       Use.first = nullptr;
 
       if (Use.second != UseKind::Load)
-        CopyAddrKind = Use.second;
+        CopyAddrStoreKind = Use.second;
 
       // Keep scanning in case the copy_addr appears multiple times.
     }
   }
 
-  assert(CopyAddrKind != Release && "Didn't find entry for copyaddr?");
-  assert((CopyAddrKind == Store || CopyAddrKind == PartialStore) &&
+  assert((CopyAddrStoreKind == Store || CopyAddrStoreKind == PartialStore ||
+          CopyAddrStoreKind == Release /*not a store to this element*/) &&
          "Expected copy_addrs that store");
 
 
@@ -1210,17 +1224,17 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
 
   // Update the instructions that touch the memory.  NewInst can grow as this
   // iterates, so we can't use a foreach loop.
-  for (unsigned i = 0; i != NewInsts.size(); ++i) {
-    auto *NewInst = NewInsts[i];
-
+  for (auto *NewInst : NewInsts) {
     switch (NewInst->getKind()) {
     default:
       NewInst->dump();
       assert(0 && "Unknown instruction generated by copy_addr lowering");
 
     case ValueKind::StoreInst:
-      Uses.push_back({ NewInst, CopyAddrKind });
-      NonLoadUses.insert(NewInst);
+      if (CopyAddrStoreKind != Release) {
+        Uses.push_back({ NewInst, CopyAddrStoreKind });
+        NonLoadUses.insert(NewInst);
+      }
       continue;
 
     case ValueKind::LoadInst: {
