@@ -4361,8 +4361,9 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc,
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   ConstraintSystem cs(*this, dc);
-  bool isTrivial;
-  return cs.isConvertibleTo(type1, type2, isTrivial);
+  cs.addConstraint(ConstraintKind::Conversion, type1, type2);
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions);
 }
 
 bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2,

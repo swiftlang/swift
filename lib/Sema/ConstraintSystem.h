@@ -1443,25 +1443,6 @@ public:
     }
   }
 
-  /// \brief Determine whether a given type is convertible to.
-  ///
-  /// This operation is meant to be used only with concrete types.
-  bool isConvertibleTo(Type type1, Type type2, bool &isTrivial) {
-    isTrivial = true;
-    switch (matchTypes(type1, type2, TypeMatchKind::Conversion, TMF_None,
-                       nullptr, isTrivial)) {
-      case SolutionKind::Error:
-        return false;
-
-      case SolutionKind::Solved:
-      case SolutionKind::TriviallySolved:
-        return true;
-
-      case SolutionKind::Unsolved:
-        llvm_unreachable("couldn't solve subtype problem");
-    }
-  }
-
   /// \brief Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice);
