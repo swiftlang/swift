@@ -1209,7 +1209,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
-    checkAllowedAttributes<AK_iboutlet, AK_objc>(var);
+    checkAllowedAttributes<AK_iboutlet, AK_objc, AK_unowned, AK_weak>(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
