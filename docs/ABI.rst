@@ -420,6 +420,35 @@ classes.
 Generic Parameter Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+Metadata records for instances of generic types contain information about their
+generic parameters. For each parameter of the type:
+
+- A reference to the metadata record for the type argument is stored.
+- If there are protocol requirements on the type parameter, a reference to
+  the witness table for each protocol the type argument is required to conform
+  to is stored in declaration order after its metadata record.
+
+For example, given a generic type with the parameters ``<T, U, V>``, its
+generic parameter record will consist of references to the metadata records
+for ``T``, ``U``, and ``V`` in succession, as if laid out in a C struct::
+
+  struct GenericParameterVector {
+    TypeMetadata *T, *U, *V;
+  };
+
+If we add protocol requirements to the parameters, for example,
+``<T: Runcible, U: protocol<Fungible, Ansible>, V>``, then the type's generic
+parameter vector contains witness tables for those protocols, as if laid out::
+
+  struct GenericParameterVector {
+    TypeMetadata *T;
+    RuncibleWitnessTable *T_Runcible;
+    TypeMetadata *U;
+    FungibleWitnessTable *U_Fungible;
+    AnsibleWitnessTable *U_Ansible;
+    TypeMetadata *V;
+  };
+
 Heap Objects
 ------------
 
