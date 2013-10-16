@@ -103,23 +103,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   static func min() -> ${Self} { return ${'-%s-1' % max if signed else '0'} }
 }
 
-extension ${Self} : RandomAccessIndex, Hashable {
-  @@transparent
-  func __equal__(rhs: ${Self}) -> Bool {
-    return _getBool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
-  }
-  @@transparent
-  func __less__(rhs: ${Self}) -> Bool {
-    return _getBool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
-  }
-  @@transparent
-  func succ() -> ${Self} {
-    return self + 1
-  }
-  @@transparent
-  func pred() -> ${Self} {
-    return self - 1
-  }
+extension ${Self} : Hashable {
   func hashValue() -> Int {
 @{
 if bits <= intBits:
@@ -143,33 +127,42 @@ else:
 }@
     return ${hashValue}
   }
+}
 
+@@transparent
+extension ${Self} : RandomAccessIndex {
+  func __equal__(rhs: ${Self}) -> Bool {
+    return _getBool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
+  }
+  func __less__(rhs: ${Self}) -> Bool {
+    return _getBool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
+  }
+  func succ() -> ${Self} {
+    return self + 1
+  }
+  func pred() -> ${Self} {
+    return self - 1
+  }
   typealias DistanceType = ${Self}
-  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
     var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
 
-  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     return sub(lhs, rhs, true)
   }
-  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     return add(lhs, rhs, true)
   }
-  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return mul(lhs, rhs, true)
   }
