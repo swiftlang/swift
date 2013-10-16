@@ -2649,26 +2649,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Coercions to tuple type.
-  if (auto toTuple = toType->getAs<TupleType>()) {
-    // Coerce from a tuple to a tuple.
-    if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs,
-                               hasMandatoryTupleLabels(expr))) {
-        return coerceTupleToTuple(expr, fromTuple, toTuple,
-                                  locator, sources, variadicArgs);
-      }
-    }
-
-    // Coerce scalar to tuple.
-    int toScalarIdx = toTuple->getFieldForScalarInit();
-    if (toScalarIdx != -1) {
-      return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
-    }
-  }
-  
   // Coercions from an lvalue: requalify and load. We perform these coercions
   // first because they are often the first step in a multi-step coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
@@ -2691,13 +2671,50 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                 LValueType::get(fromLValue->getObjectType(),
                                                 toLValue->getQualifiers(),
                                                 tc.Context));
-    } else {
-      // Load from the lvalue.
-      expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
+
+      // Coerce the result.
+      return coerceToType(expr, toType, locator);
     }
 
-    // Coerce the result.
-    return coerceToType(expr, toType, locator);
+    if (fromLValue->getQualifiers().isImplicit()) {
+      // If we're actually turning this into an lvalue tuple element, don't
+      // load.
+      bool performLoad = true;
+      if (auto toTuple = toType->getAs<TupleType>()) {
+        int scalarIdx = toTuple->getFieldForScalarInit();
+        if (scalarIdx >= 0 &&
+            toTuple->getElementType(scalarIdx)->is<LValueType>())
+          performLoad = false;
+      }
+
+      if (performLoad) {
+        // Load from the lvalue.
+        expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
+
+        // Coerce the result.
+        return coerceToType(expr, toType, locator);
+      }
+    }
+  }
+
+  // Coercions to tuple type.
+  if (auto toTuple = toType->getAs<TupleType>()) {
+    // Coerce from a tuple to a tuple.
+    if (auto fromTuple = fromType->getAs<TupleType>()) {
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs,
+                               hasMandatoryTupleLabels(expr))) {
+        return coerceTupleToTuple(expr, fromTuple, toTuple,
+                                  locator, sources, variadicArgs);
+      }
+    }
+
+    // Coerce scalar to tuple.
+    int toScalarIdx = toTuple->getFieldForScalarInit();
+    if (toScalarIdx != -1) {
+      return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
+    }
   }
 
   // Coercions to an lvalue: materialize the value.
