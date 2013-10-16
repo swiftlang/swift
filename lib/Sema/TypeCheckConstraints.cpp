@@ -4675,8 +4675,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   Type origFromType = fromType;
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
-  bool toExistential = toType->isExistentialType();
-  bool fromExistential = fromType->isExistentialType();
+  SmallVector<ProtocolDecl*, 2> toProtocols;
+  bool toExistential = toType->isExistentialType(toProtocols);
+  SmallVector<ProtocolDecl*, 2> fromProtocols;
+  bool fromExistential = fromType->isExistentialType(fromProtocols);
   
   // If the from/to types are equivalent or implicitly convertible,
   // this should have been a coercion rather than a
@@ -4685,9 +4687,30 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::InvalidCoercible;
   }
   
-  // We can't downcast to an existential.
+  // We can only downcast to an existential if the destination protocols are
+  // objc and the source type is an objc class or an existential bounded by objc
+  // protocols.
   if (toExistential) {
-    diagnose(diagLoc, diag::downcast_to_existential,
+    if (fromExistential) {
+      for (auto fromProtocol : fromProtocols) {
+        if (!fromProtocol->isObjC())
+          goto unsupported_existential_cast;
+      }
+    } else {
+      auto fromClass = fromType->getClassOrBoundGenericClass();
+      if (!fromClass || !fromClass->isObjC())
+        goto unsupported_existential_cast;
+    }
+
+    for (auto toProtocol : toProtocols) {
+      if (!toProtocol->isObjC())
+        goto unsupported_existential_cast;
+    }
+    
+    return CheckedCastKind::ConcreteToUnrelatedExistential;
+    
+  unsupported_existential_cast:
+    diagnose(diagLoc, diag::downcast_to_non_objc_existential,
              origFromType, toType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
@@ -4730,15 +4753,28 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ArchetypeToConcrete;
   }
   
-  //   - convert from a superclass to an archetype.
   if (toArchetype) {
-    auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
-
-    // Coerce to the supertype of the archetype.
-    if (convertToType(toSuperType))
-      return CheckedCastKind::Unresolved;
+    //   - convert from a superclass to an archetype.
+    if (auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass()) {
+      // Coerce to the supertype of the archetype.
+      if (convertToType(toSuperType))
+        return CheckedCastKind::Unresolved;
+      
+      return CheckedCastKind::SuperToArchetype;
+    }
     
-    return CheckedCastKind::SuperToArchetype;
+    //  - convert a concrete type to an archetype for which it fulfills
+    //    constraints.
+    if (isSubstitutableFor(fromType, toType->castTo<ArchetypeType>(), dc)) {
+      return CheckedCastKind::ConcreteToArchetype;
+    }
+    
+    diagnose(diagLoc,
+             diag::downcast_from_concrete_to_unrelated_archetype,
+             origFromType, toType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+    return CheckedCastKind::Unresolved;
   }
 
   // The remaining case is a class downcast.
