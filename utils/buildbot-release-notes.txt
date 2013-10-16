@@ -1,3 +1,8 @@
+2013-10-23
+----------
+
+* Missing return statement from a non-Void function is diagnosed as an error.
+
 2013-10-16
 ----------
 
@@ -52,6 +57,11 @@
       var y : Int8 = x + 125
       // error: arithmetic operation '125 + 125' (on type 'Int8') results in 
       //        an overflow
+
+* Division by zero in constant expressions is now detected by the compiler:
+
+      var z: Int = 0
+      var x = 5 / z  // error: division by zero
 
 * Generic structs with type parameters as field types are now fully supported.
 
