@@ -55,27 +55,27 @@ def int_name(bits, signed):
 @   Self = int_name(bits, signed)
 @   ArrayBound = 'ArrayBound, ' if bits > 8 and bits < 128 else ''
 
-struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible, 
+struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
                 ${ArrayBound}ReplPrintable {
-  var value : Builtin.Int${bits}
+  var value: Builtin.Int${bits}
 
   init() {
-    var maxWidthZero : Int${str(maxBits)} = 0
+    var maxWidthZero: Int${str(maxBits)} = 0
     value = ${'maxWidthZero.value' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(maxWidthZero.value)' % (maxBits, bits) )}
   }
 
   @@transparent
-  init (v : Builtin.Int${bits}) {
+  init(v: Builtin.Int${bits}) {
     value = v
   }
 
   @@transparent
-  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val))
   }
 
-  @@transparent 
-  static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
+  @@transparent
+  static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 @ if ArrayBound:
@@ -140,31 +140,31 @@ else:
   }
 
   typealias DistanceType = ${Self}
-  @@transparent 
+  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
     var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  @@transparent 
+  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  @@transparent 
+  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
 
-  @@transparent 
+  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     return sub(lhs, rhs, true)
   }
-  @@transparent 
+  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     return add(lhs, rhs, true)
   }
-  @@transparent 
+  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return mul(lhs, rhs, true)
   }
@@ -241,7 +241,7 @@ func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
 @ end
 @ end  # for bits in all_ints
 
-// FIXME: rdar://14897572 
+// FIXME: rdar://14897572
 // hack to make non-x86 architectures build at a reasonable speed
 struct Hack14897572 { }
 extension UInt32 {
