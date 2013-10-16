@@ -1378,6 +1378,15 @@ private:
                                        ConstraintLocatorBuilder locator,
                                        bool &trivial);
 
+  /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
+  /// a single-element tuple type.
+  ///
+  /// \returns the result of performing the tuple-to-scalar conversion.
+  SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
+                                       TypeMatchKind kind, unsigned flags,
+                                       ConstraintLocatorBuilder locator,
+                                       bool &trivial);
+
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,

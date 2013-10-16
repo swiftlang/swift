@@ -1076,6 +1076,19 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
+                                          TypeMatchKind kind, unsigned flags,
+                                          ConstraintLocatorBuilder locator,
+                                          bool &trivial) {
+  assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
+  assert(!tuple1->getFields()[0].isVararg() && "Should not be variadic");
+  return matchTypes(tuple1->getElementType(0),
+                    type2, kind, flags,
+                    locator.withPathElement(LocatorPathElt::getTupleElement(0)),
+                    trivial);
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator,
@@ -1586,31 +1599,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
 
     case TypeKind::Tuple: {
-      auto tuple2 = cast<TupleType>(desugar2);
-
       // Try the tuple-to-tuple conversion.
       potentialConversions.push_back(ConversionRestrictionKind::TupleToTuple);
 
-      // If the second tuple can be initialized with a scalar, and if 
-      // the first tuple doesn't have labels that conflict, try the
-      // scalar-to-tuple conversion.
-      int scalar2 = tuple2->getFieldForScalarInit();
-      if (scalar2 >= 0) {
-        if (kind >= TypeMatchKind::Conversion ||
-            (kind >= TypeMatchKind::TrivialSubtype &&
-             tuple2->getFields().size() == 1 &&
-             !tuple2->getFields()[0].isVararg())) {
-          auto tuple1 = cast<TupleType>(desugar1);
-          int scalar1 = tuple1->getFieldForScalarInit();
-          if (scalar1 == -1 ||
-              tuple1->getFields()[scalar1].getName() 
-                == tuple2->getFields()[scalar2].getName())
-            potentialConversions.push_back(
-              ConversionRestrictionKind::ScalarToTuple);
-        }
-      }
-
-      goto commit_to_conversions;
+      break;
     }
 
     case TypeKind::Enum:
@@ -1730,20 +1722,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // A scalar type is a trivial subtype of a one-element, non-variadic tuple
       // containing a single element if the scalar type is a subtype of
       // the type of that tuple's element.
-      if (tuple2->getFields().size() == 1 &&
-          !tuple2->getFields()[0].isVararg()) {
-        potentialConversions.push_back(ConversionRestrictionKind::ScalarToTuple);
-        goto commit_to_conversions;
-      }
-
+      //
       // A scalar type can be converted to a tuple so long as there is at
       // most one non-defaulted element.
-      if (kind >= TypeMatchKind::Conversion) {
-        if (tuple2->getFieldForScalarInit() >= 0) {
-          potentialConversions.push_back(
-            ConversionRestrictionKind::ScalarToTuple);
-          goto commit_to_conversions;
-        }
+      if ((tuple2->getFields().size() == 1 &&
+           !tuple2->getFields()[0].isVararg()) ||
+          (kind >= TypeMatchKind::Conversion &&
+           tuple2->getFieldForScalarInit() >= 0)) {
+        potentialConversions.push_back(
+          ConversionRestrictionKind::ScalarToTuple);
+
+        // FIXME: Prohibits some user-defined conversions for tuples.
+        goto commit_to_conversions;
       }
     }
 
@@ -1751,10 +1741,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // A single-element tuple can be a trivial subtype of a scalar.
       if (tuple1->getFields().size() == 1 &&
           !tuple1->getFields()[0].isVararg()) {
-        return matchTypes(tuple1->getElementType(0), type2, kind, subFlags,
-                          locator.withPathElement(
-                            LocatorPathElt::getTupleElement(0)),
-                          trivial);
+        potentialConversions.push_back(
+          ConversionRestrictionKind::TupleToScalar);
       }
     }
 
@@ -1875,6 +1863,10 @@ commit_to_conversions:
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
                                    subFlags, locator, trivial);
+
+  case ConversionRestrictionKind::TupleToScalar:
+    return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
+                                   kind, subFlags, locator, trivial);
 
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
@@ -2679,6 +2671,14 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     if (auto restriction = constraint.getRestriction()) {
       SolutionKind result;
       switch (*restriction) {
+      case ConversionRestrictionKind::TupleToTuple:
+        result = matchTupleTypes(constraint.getFirstType()->castTo<TupleType>(),
+                                 constraint.getSecondType()
+                                   ->castTo<TupleType>(),
+                                 matchKind, TMF_GenerateConstraints,
+                                 constraint.getLocator(), trivial);
+        break;
+
       case ConversionRestrictionKind::ScalarToTuple:
         result = matchScalarToTupleTypes(constraint.getFirstType(),
                                          constraint.getSecondType()
@@ -2687,13 +2687,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getLocator(), trivial);
         break;
 
-
-      case ConversionRestrictionKind::TupleToTuple:
-        result = matchTupleTypes(constraint.getFirstType()->castTo<TupleType>(),
-                                 constraint.getSecondType()
-                                   ->castTo<TupleType>(),
-                                 matchKind, TMF_GenerateConstraints,
-                                 constraint.getLocator(), trivial);
+      case ConversionRestrictionKind::TupleToScalar:
+        result = matchTupleToScalarTypes(constraint.getFirstType()
+                                           ->castTo<TupleType>(),
+                                         constraint.getSecondType(),
+                                         matchKind, TMF_GenerateConstraints,
+                                         constraint.getLocator(), trivial);
         break;
 
       case ConversionRestrictionKind::DeepEquality:

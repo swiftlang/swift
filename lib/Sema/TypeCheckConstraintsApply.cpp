@@ -2590,6 +2590,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getFieldForScalarInit(), locator);
     }
 
+    case ConversionRestrictionKind::TupleToScalar: {
+      // Extract the element.
+      auto fromTuple = fromType->castTo<TupleType>();
+      expr = new (cs.getASTContext()) TupleElementExpr(
+                                        expr,
+                                        expr->getLoc(),
+                                        0,
+                                        expr->getLoc(),
+                                        fromTuple->getElementType(0));
+      expr->setImplicit(true);
+
+      // Coerce the element to the expected type.
+      return coerceToType(expr, toType,
+                          locator.withPathElement(
+                            LocatorPathElt::getTupleElement(0)));
+    }
+
     case ConversionRestrictionKind::DeepEquality:
       llvm_unreachable("Equality handled above");
 
