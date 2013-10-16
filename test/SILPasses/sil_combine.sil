@@ -1,0 +1,160 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+
+import Builtin
+import swift
+
+//////////////////////
+// Simple DCE Tests //
+//////////////////////
+
+// CHECK-LABEL: sil @dead_inst_elimination_one_bb
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+sil @dead_inst_elimination_one_bb : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int64, 24
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @dead_inst_elimination_diamond
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK-NOT: integer_literal $Builtin.Int64, 48
+sil @dead_inst_elimination_diamond : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int64, 24
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 48
+  br bb3
+
+bb2:
+  %3 = integer_literal $Builtin.Int64, 96
+  br bb3
+
+bb3:
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil @random_counter : $@thin () -> Builtin.Int1
+
+// CHECK-LABEL: sil @dead_inst_elimination_loop
+// CHECK: bb0
+// CHECK-NOT: integer_literal
+// CHECK: bb1
+// CHECK: function_ref
+// CHECK: apply
+// CHECK-NOT: integer_literal
+// CHECK: bb2
+// CHECK-NOT: integer_literal
+// CHECK: tuple
+// CHECK: return
+sil @dead_inst_elimination_loop : $@thin () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 24
+  br bb1
+
+bb1:
+  %2 = function_ref @random_counter : $@thin () -> Builtin.Int1
+  %3 = apply %2() : $@thin () -> Builtin.Int1
+  %4 = integer_literal $Builtin.Int64, 48
+  cond_br %3, bb1, bb2
+
+bb2:
+  %5 = integer_literal $Builtin.Int64, 59
+  %6 = tuple()
+  return %6 : $()
+}
+
+// For now until the proper unreachable pruning code is committed for
+// SILCombine, we should not dce dead instructions in unreachable code.
+
+// CHECK-LABEL: sil @dead_inst_elimination_ignore_unreachable
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK: integer_literal $Builtin.Int64, 48
+sil @dead_inst_elimination_ignore_unreachable : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 24
+  br bb2
+
+bb1:
+  %1 = integer_literal $Builtin.Int64, 48
+  br bb2
+
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}
+
+//////////////////////////////////////////////////////////
+// Other DCE Tests taken from dead_code_elimination.sil //
+//////////////////////////////////////////////////////////
+
+class B { }
+class E : B { }
+
+sil @exit : $@thin @noreturn () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @removeTriviallyDeadInstructions
+// CHECK: store
+// CHECK: strong_retain
+// CHECK-NOT: ref_to_object_pointer
+// CHECK: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NOT: object_pointer_to_ref
+sil @removeTriviallyDeadInstructions : $@thin (b : B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = load %1#1 : $*B
+  %4 = strong_retain %3 : $B
+  %5 = ref_to_object_pointer %3 : $B to $Builtin.ObjectPointer
+  %7 = strong_release %3 : $B
+  %8 = strong_release %1#0 : $Builtin.ObjectPointer
+  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@thin @noreturn () -> ()
+  %6 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B
+  %11 = tuple()
+  %12 = return %11 : $()
+}
+
+// CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
+// CHECK-NOT: ref_to_object_pointer
+// CHECK: cond_br
+// CHECK-NOT: object_pointer_to_ref
+// CHECK: }
+sil @removeTriviallyDeadCrossBasicBlocks : $@thin (b : B, m : Builtin.Int1) -> () {
+bb0(%0:  $B, %1: $Builtin.Int1):
+  %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer
+  %13 = cond_br %1, bb1, bb2
+bb1:
+  %22 = br bb2
+bb2:
+  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@thin @noreturn () -> ()
+  %21 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B
+  %32 = tuple ()
+  %33 = return %32 : $()
+}
+
+// CHECK-LABEL: sil @dead_use_of_alloc_stack
+// CHECK: bb
+// CHECK: alloc_stack
+// CHECK: dealloc_stack
+// CHECK: }
+sil @dead_use_of_alloc_stack : $@thin () -> () {
+bb0:
+  %1 = alloc_stack $((), (), ())
+  %2 = tuple_element_addr %1#1 : $*((), (), ()), 0
+  dealloc_stack %1#0 : $*@local_storage ((), (), ())
+  %3 = tuple ()
+  return %3 : $()
+}

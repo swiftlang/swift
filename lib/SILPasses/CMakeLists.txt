@@ -10,5 +10,6 @@ add_swift_library(swiftSILPasses
   MandatoryInlining.cpp
   DefiniteInitialization.cpp
   SILCleanup.cpp
+  SILCombine.cpp
   DEPENDS swiftSILPassesUtils)
 

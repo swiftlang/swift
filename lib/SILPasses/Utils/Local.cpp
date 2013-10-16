@@ -35,8 +35,8 @@ static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
 
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
-/// This rutine only examines the state of the instruction at hand.
-static bool isInstructionTriviallyDead(SILInstruction *I) {
+/// This routine only examines the state of the instruction at hand.
+bool swift::isInstructionTriviallyDead(SILInstruction *I) {
   if (!I->use_empty() || isa<TermInst>(I))
     return false;
 

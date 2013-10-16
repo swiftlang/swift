@@ -27,6 +27,11 @@ namespace swift {
   bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
                                                   bool Force = false);
 
+  /// \brief Perform a fast local check to see if the instruction is dead.
+  ///
+  /// This routine only examines the state of the instruction at hand.
+  bool isInstructionTriviallyDead(SILInstruction *I);
+
 } // end namespace swift
 
 #endif
