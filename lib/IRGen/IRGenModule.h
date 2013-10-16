@@ -220,6 +220,7 @@ public:
   llvm::Constant *getAddrOfGlobalString(StringRef string);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
+  llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr);
 
@@ -236,13 +237,15 @@ private:
   /// out.
   SmallVector<llvm::WeakVH, 4> LLVMUsed;
 
-  /// ObjCClasses - List of Objective-C classes, bitcast to i8*.
+  /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCClasses;
-  /// ObjCCategories - List of Objective-C categories, bitcast to i8*.
+  /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
-  /// ObjCCategoryDecls - List of ExtensionDecls corresponding to the generated
+  /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+  /// Map of Objective-C protocol references, bitcast to i8*.
+  llvm::DenseMap<ProtocolDecl*, llvm::WeakVH> ObjCProtocolRefs;
 
   void emitGlobalLists();
 

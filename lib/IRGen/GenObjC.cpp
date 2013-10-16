@@ -35,6 +35,7 @@
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenFunction.h"
@@ -187,6 +188,49 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // Cache and return.
   entry = global;
   return global;
+}
+
+/// Get or create an ObjC protocol reference. Always returns an i8**. We lazily
+/// create ObjC protocol_t records for protocols, storing references to the
+/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// fixed up by the runtime.
+llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto) {
+  // See whether we already emitted this protocol reference.
+  auto found = ObjCProtocolRefs.find(proto);
+  if (found != ObjCProtocolRefs.end()) {
+    return cast<llvm::Constant>(found->second);
+  }
+  
+  // Emit the protocol record.
+  llvm::Constant *protocolRecord = emitObjCProtocolData(*this, proto);
+  protocolRecord = llvm::ConstantExpr::getBitCast(protocolRecord, Int8PtrTy);
+
+  // Introduce a variable to label the protocol.
+  auto *protocolLabel
+    = new llvm::GlobalVariable(Module, protocolRecord->getType(),
+                               /*constant*/ false,
+                               llvm::GlobalValue::WeakAnyLinkage,
+                               protocolRecord,
+                               llvm::Twine("\01l_OBJC_LABEL_PROTOCOL_$_")
+                                 + getObjCProtocolName(proto));
+  protocolLabel->setAlignment(getPointerAlignment().getValue());
+  protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  protocolLabel->setSection("__DATA,__objc_protolist,coalesced,no_dead_strip");
+  
+  // Introduce a variable to reference the protocol.
+  auto *protocolRef
+    = new llvm::GlobalVariable(Module, protocolRecord->getType(),
+                               /*constant*/ false,
+                               llvm::GlobalValue::WeakAnyLinkage,
+                               protocolRecord,
+                               llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_")
+                                 + getObjCProtocolName(proto));
+  protocolRef->setAlignment(getPointerAlignment().getValue());
+  protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  protocolRef->setSection("__DATA,__objc_protorefs,coalesced,no_dead_strip");
+  ObjCProtocolRefs.insert({proto, protocolRef});
+  
+  return protocolRef;
 }
 
 namespace {
@@ -656,6 +700,10 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
 static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
                                             const Selector &selector,
                                             ValueDecl *property) {
+  // Protocol properties have no impl.
+  if (isa<ProtocolDecl>(property->getDeclContext()))
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
@@ -679,6 +727,10 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
 static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
                                             const Selector &selector,
                                             ValueDecl *property) {
+  // Protocol properties have no impl.
+  if (isa<ProtocolDecl>(property->getDeclContext()))
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
   assert(property->isSettable() && "property is not settable?!");
   
   // FIXME: Explosion level
@@ -704,6 +756,10 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                             const Selector &selector,
                                             FuncDecl *method) {
+  // Protocol methods have no impl.
+  if (isa<ProtocolDecl>(method->getDeclContext()))
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
   auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
                              absCallee.getMaxUncurryLevel());
@@ -724,6 +780,10 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                             const Selector &selector,
                                             ConstructorDecl *constructor) {
+  // Protocol methods have no impl.
+  if (isa<ProtocolDecl>(constructor->getDeclContext()))
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, constructor);
   llvm::Function *swiftImpl
     = IGM.getAddrOfConstructor(constructor, ConstructorKind::Initializing,

@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
+#include "swift/AST/Decl.h"
+
 namespace llvm {
   class Type;
 }
@@ -211,6 +213,16 @@ namespace irgen {
                                            SILType srcType,
                                            SILType destType,
                                            CheckedCastMode mode);
+  
+  /// Get the ObjC name for an Objc protocol.
+  inline StringRef getObjCProtocolName(ProtocolDecl *proto) {
+    // FIXME: Trim the 'Proto' suffix added by the Clang importer.
+    StringRef name = proto->getName().str();
+    if (name.endswith("Proto") && proto->hasClangNode()) {
+      name = name.slice(0, name.size() - 5);
+    }
+    return name;
+  }
 } // end namespace irgen
 } // end namespace swift
 

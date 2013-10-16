@@ -4370,15 +4370,16 @@ Address irgen::emitOpaqueExistentialDowncast(IRGenFunction &IGF,
 /// Emit a Protocol* value referencing an ObjC protocol.
 static llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
                                                 ProtocolDecl *proto) {
-  assert(proto->isObjC());
+  assert(proto->isObjC() && "not an objc protocol");
   
-  // FIXME: Can we emit a static reference instead of using a runtime call?
-  StringRef name = proto->getName().str();
-  // FIXME: Remove the goofy 'Proto' suffix the Clang import tags names with
-  if (name.endswith("Proto"))
-    name = name.slice(0, name.size() - 5);
-  llvm::Value *protoName = IGF.IGM.getAddrOfGlobalString(name);
-  return IGF.Builder.CreateCall(IGF.IGM.getObjCGetProtocolFn(), protoName);
+  // Get the address of the global variable the protocol reference gets
+  // indirected through.
+  llvm::Constant *protocolRefAddr
+    = IGF.IGM.getAddrOfObjCProtocolRef(proto);
+  
+  // Load the protocol reference.
+  Address addr(protocolRefAddr, IGF.IGM.getPointerAlignment());
+  return IGF.Builder.CreateLoad(addr);
 }
 
 /// Emit a checked cast to an Objective-C protocol or protocol composition.

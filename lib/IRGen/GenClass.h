@@ -24,13 +24,14 @@ namespace llvm {
 }
 
 namespace swift {
+  class CanType;
   class ClassDecl;
   class ExtensionDecl;
   class MemberRefExpr;
-  class CanType;
-  class VarDecl;
+  class ProtocolDecl;
   class SILType;
   class Type;
+  class VarDecl;
 
 namespace irgen {
   class HeapLayout;
@@ -45,6 +46,7 @@ namespace irgen {
 
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
+  llvm::Constant *emitObjCProtocolData(IRGenModule &IGM, ProtocolDecl *ext);
 
   /// Emit an allocation of a class.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType);
@@ -78,7 +80,7 @@ namespace irgen {
   /// type in the ObjC world.
   bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
   
-  /// Does the given class have a Swift refcount?
+  /// Do instances of the given class have a Swift refcount?
   bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift

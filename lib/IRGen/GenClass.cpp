@@ -700,14 +700,31 @@ namespace {
   /// e.g., NSObject (MySwiftModule1).
   llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
 
-  /// A class for building class data (in Objective-C terms, class_ro_t) or
-  /// category data (category_t).
+  /// A class for building ObjC class data (in Objective-C terms, class_ro_t),
+  /// category data (category_t), or protocol data (protocol_t).
   class ClassDataBuilder : public ClassMemberVisitor<ClassDataBuilder> {
     IRGenModule &IGM;
-    ClassDecl *TheClass;
+    PointerUnion<ClassDecl *, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
     const LayoutClass *Layout;
     const StructLayout *FieldLayout;
+    
+    ClassDecl *getClass() const {
+      return TheEntity.get<ClassDecl*>();
+    }
+    ProtocolDecl *getProtocol() const {
+      return TheEntity.get<ProtocolDecl*>();
+    }
+    
+    bool isBuildingClass() const {
+      return TheEntity.is<ClassDecl*>() && !TheExtension;
+    }
+    bool isBuildingCategory() const {
+      return TheEntity.is<ClassDecl*>() && TheExtension;
+    }
+    bool isBuildingProtocol() const {
+      return TheEntity.is<ProtocolDecl*>();
+    }
 
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
@@ -726,17 +743,17 @@ namespace {
                      const LayoutClass &layout,
                      const StructLayout &fieldLayout,
                      unsigned firstField)
-        : IGM(IGM), TheClass(theClass), TheExtension(nullptr),
+        : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
           Layout(&layout), FieldLayout(&fieldLayout),
           FirstFieldIndex(firstField),
           NextFieldIndex(firstField)
     {
-      visitMembers(TheClass);
+      visitMembers(theClass);
     }
     
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
-      : IGM(IGM), TheClass(theClass), TheExtension(theExtension),
+      : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
         Layout(nullptr), FieldLayout(nullptr)
     {
       buildCategoryName(CategoryName);
@@ -750,6 +767,13 @@ namespace {
            i < size; ++i)
         visitObjCConformance(TheExtension->getProtocols()[i],
                              TheExtension->getConformances()[i]);
+    }
+    
+    ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
+      : IGM(IGM), TheEntity(theProtocol), TheExtension(nullptr)
+    {
+      for (Decl *member : theProtocol->getMembers())
+        visit(member);
     }
     
     void visitObjCConformance(ProtocolDecl *protocol,
@@ -781,8 +805,8 @@ namespace {
       // If this class has no formal superclass, then its actual
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
-      if (TheClass->hasSuperclass()) {
-        auto base = TheClass->getSuperclass()->getClassOrBoundGenericClass();
+      if (getClass()->hasSuperclass()) {
+        auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
         superPtr = IGM.getAddrOfMetaclassObject(base);
       } else {
         superPtr = rootPtr;
@@ -801,7 +825,7 @@ namespace {
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));
       auto metaclass =
-        cast<llvm::GlobalVariable>(IGM.getAddrOfMetaclassObject(TheClass));
+        cast<llvm::GlobalVariable>(IGM.getAddrOfMetaclassObject(getClass()));
       metaclass->setInitializer(init);
     }
     
@@ -818,7 +842,7 @@ namespace {
       
       os << TheModule->Name;
       
-      unsigned categoryCount = CategoryCounts[{TheClass, TheModule}]++;
+      unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;
       if (categoryCount > 0)
         os << categoryCount;
         
@@ -833,11 +857,11 @@ namespace {
       //   char const *name;
       fields.push_back(IGM.getAddrOfGlobalString(CategoryName));
       //   const class_t *theClass;
-      if (TheClass->hasClangNode())
-        fields.push_back(IGM.getAddrOfObjCClass(TheClass));
+      if (getClass()->hasClangNode())
+        fields.push_back(IGM.getAddrOfObjCClass(getClass()));
       else {
         llvm::Constant *metadata = tryEmitConstantHeapMetadataRef(IGM,
-                      TheClass->getDeclaredTypeOfContext()->getCanonicalType());
+                    getClass()->getDeclaredTypeOfContext()->getCanonicalType());
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.push_back(metadata);
@@ -853,6 +877,40 @@ namespace {
       // };
       
       return buildGlobalVariable(fields, "_CATEGORY_");
+    }
+    
+    llvm::Constant *emitProtocol() {
+      SmallVector<llvm::Constant*, 11> fields;
+      
+      assert(isBuildingProtocol() && "not emitting a protocol");
+      
+      // struct protocol_t {
+      //   Class super;
+      fields.push_back(null());
+      //   char const *name;
+      fields.push_back(IGM.getAddrOfGlobalString(getEntityName()));
+      //   const protocol_list_t *baseProtocols;
+      fields.push_back(buildProtocolList());
+      //   const method_list_t *requiredInstanceMethods;
+      fields.push_back(buildInstanceMethodList());
+      //   const method_list_t *requiredClassMethods;
+      fields.push_back(buildClassMethodList());
+      //   const method_list_t *optionalInstanceMethods;
+      // FIXME: when we import optional protocol methods, populate this
+      fields.push_back(null());
+      //   const method_list_t *optionalClassMethods;
+      fields.push_back(null());
+      //   const property_list_t *properties;
+      fields.push_back(buildPropertyList());
+      //   uint32_t size;
+      unsigned size = IGM.getPointerSize().getValue() * fields.size();
+      size += 8; // 'size' and 'flags' fields that haven't been added yet.
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, size));
+      //   uint32_t flags; // always set to zero by compiler
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, 0));
+      // };
+      
+      return buildGlobalVariable(fields, "_PROTOCOL_");
     }
 
     llvm::Constant *emitROData(ForMetaClass_t forMeta) {
@@ -952,13 +1010,13 @@ namespace {
 
       // If the class is being exported as an Objective-C class, we
       // should export it under its formal name.
-      if (TheClass->isObjC()) {
-        Name = IGM.getAddrOfGlobalString(TheClass->getName().str());
+      if (getClass()->isObjC()) {
+        Name = IGM.getAddrOfGlobalString(getClass()->getName().str());
         return Name;
       }
 
       // Otherwise, we need to mangle the type.
-      auto type = TheClass->getDeclaredType()->getCanonicalType();
+      auto type = getClass()->getDeclaredType()->getCanonicalType();
 
       // We add the "_Tt" prefix to make this a reserved name that
       // will not conflict with any valid Objective-C class name.
@@ -977,7 +1035,8 @@ namespace {
   public:
     /// Methods need to be collected into the appropriate methods list.
     void visitFuncDecl(FuncDecl *method) {
-      if (!requiresObjCMethodDescriptor(method)) return;
+      if (!isBuildingProtocol() &&
+          !requiresObjCMethodDescriptor(method)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
         InstanceMethods.push_back(entry);
@@ -988,22 +1047,38 @@ namespace {
 
     /// Constructors need to be collected into the appropriate methods list.
     void visitConstructorDecl(ConstructorDecl *constructor) {
-      if (!requiresObjCMethodDescriptor(constructor)) return;
+      if (!isBuildingProtocol() &&
+          !requiresObjCMethodDescriptor(constructor)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, constructor);
       InstanceMethods.push_back(entry);
     }
 
   private:
-    llvm::Constant *buildClassMethodList()  {
-      return buildMethodList(ClassMethods, TheExtension
-                               ? "_CATEGORY_CLASS_METHODS_"
-                               : "_CLASS_METHODS_");
+    StringRef chooseNamePrefix(StringRef forClass,
+                               StringRef forCategory,
+                               StringRef forProtocol) {
+      if (isBuildingCategory())
+        return forCategory;
+      if (isBuildingClass())
+        return forClass;
+      if (isBuildingProtocol())
+        return forProtocol;
+      
+      llvm_unreachable("not a class, category, or protocol?!");
+    }
+    
+    llvm::Constant *buildClassMethodList() {
+      return buildMethodList(ClassMethods,
+                             chooseNamePrefix("_CLASS_METHODS_",
+                                              "_CATEGORY_CLASS_METHODS_",
+                                              "_PROTOCOL_CLASS_METHODS_"));
     }
 
-    llvm::Constant *buildInstanceMethodList()  {
-      return buildMethodList(InstanceMethods, TheExtension
-                               ? "_CATEGORY_INSTANCE_METHODS_"
-                               : "_INSTANCE_METHODS_");
+    llvm::Constant *buildInstanceMethodList() {
+      return buildMethodList(InstanceMethods,
+                             chooseNamePrefix("_INSTANCE_METHODS_",
+                                              "_CATEGORY_INSTANCE_METHODS_",
+                                              "_PROTOCOL_INSTANCE_METHODS_"));
     }
 
     /// struct method_list_t {
@@ -1033,9 +1108,10 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildProtocolList() {
-      return buildOptionalList(Protocols, Size(0), TheExtension
-                                ? "_CATEGORY_PROTOCOLS_"
-                                : "_PROTOCOLS_");
+      return buildOptionalList(Protocols, Size(0),
+                               chooseNamePrefix("_PROTOCOLS_",
+                                                "_CATEGORY_PROTOCOLS_",
+                                                "_PROTOCOL_PROTOCOLS_"));
     }
 
     /*** Ivars *************************************************************/
@@ -1043,7 +1119,7 @@ namespace {
   public:
     /// Variables might be stored or computed.
     void visitVarDecl(VarDecl *var) {
-      if (var->isComputed()) {
+      if (isBuildingProtocol() || var->isComputed()) {
         visitProperty(var);
       } else {
         visitStoredVar(var);
@@ -1221,9 +1297,10 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildPropertyList() {
       Size eltSize = 2 * IGM.getPointerSize();
-      return buildOptionalList(Properties, eltSize, TheExtension
-                                ? "_CATEGORY_PROPERTIES_"
-                                : "_PROPERTIES_");
+      return buildOptionalList(Properties, eltSize,
+                               chooseNamePrefix("_PROPERTIES_",
+                                                "_CATEGORY_PROPERTIES_",
+                                                "_PROTOCOL_PROPERTIES_"));
     }
 
     /*** General ***********************************************************/
@@ -1259,6 +1336,20 @@ namespace {
 
       return buildGlobalVariable(fields, nameBase);
     }
+    
+    /// Get the name of the class or protocol to mangle into the ObjC symbol
+    /// name.
+    StringRef getEntityName() const {
+      if (auto theClass = TheEntity.dyn_cast<ClassDecl*>()) {
+        return theClass->getName().str();
+      }
+      
+      if (auto theProtocol = TheEntity.dyn_cast<ProtocolDecl*>()) {
+        return getObjCProtocolName(theProtocol);
+      }
+      
+      llvm_unreachable("not a class or protocol?!");
+    }
 
     /// Build a private global variable as a structure containing the
     /// given fields.
@@ -1270,7 +1361,7 @@ namespace {
                                         llvm::GlobalVariable::PrivateLinkage,
                                         init,
                                         Twine(nameBase) 
-                                          + TheClass->getName().str()
+                                          + getEntityName()
                                           + (TheExtension
                                              ? Twine("_$_") + CategoryName.str()
                                              : Twine()));
@@ -1322,8 +1413,6 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   return builder.emitROData(ForClass);
 }
   
-/// Emit the constant allocation size of a class
-  
 /// Emit the metadata for an ObjC category.
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
@@ -1335,6 +1424,14 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
   ClassDataBuilder builder(IGM, cls, ext);
   
   return builder.emitCategory();
+}
+  
+/// Emit the metadata for an ObjC protocol.
+llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
+                                            ProtocolDecl *proto) {
+  assert(proto->isObjC() && "not an objc protocol");
+  ClassDataBuilder builder(IGM, proto);
+  return builder.emitProtocol();
 }
 
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
