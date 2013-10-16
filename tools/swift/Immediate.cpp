@@ -238,7 +238,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
     std::unique_ptr<SILModule> SILMod = performSILGeneration(SubTU);
-
+    performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
       return false;
