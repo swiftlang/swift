@@ -42,8 +42,8 @@ class SILCombineWorklist {
   llvm::DenseMap<SILInstruction*, unsigned> WorklistMap;
   llvm::SmallVector<SILInstruction *, 8> TrackingList;
 
-  void operator=(const SILCombineWorklist&RHS) LLVM_DELETED_FUNCTION;
-  SILCombineWorklist(const SILCombineWorklist&) LLVM_DELETED_FUNCTION;
+  void operator=(const SILCombineWorklist&RHS) = delete;
+  SILCombineWorklist(const SILCombineWorklist&) = delete;
 public:
   SILCombineWorklist() {}
 
