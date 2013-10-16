@@ -960,6 +960,9 @@ class ParenExpr : public Expr {
   /// FIXME: Pack bit into superclass.
   bool HasTrailingClosure;
 
+  // FIXME: Hack for CollectionExpr::getElements()
+  friend class CollectionExpr;
+
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
@@ -1086,7 +1089,10 @@ public:
   /// of the container.
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
-  
+
+  /// Retrieve the elements stored in the collection.
+  ArrayRef<Expr *> getElements() const;
+
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
   SourceRange getSourceRange() const {

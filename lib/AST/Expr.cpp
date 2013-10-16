@@ -250,6 +250,16 @@ SourceRange TupleExpr::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
+ArrayRef<Expr *> CollectionExpr::getElements() const {
+  if (auto paren = dyn_cast<ParenExpr>(SubExpr)) {
+    // FIXME: Hack. When this goes away, remove ParenExpr's friendship of
+    // CollectionExpr.
+    return llvm::makeArrayRef(&paren->SubExpr, 1);
+  }
+
+  return cast<TupleExpr>(SubExpr)->getElements();
+}
+
 ExistentialSubscriptExpr::
 ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ExistentialSubscript, /*Implicit=*/false,

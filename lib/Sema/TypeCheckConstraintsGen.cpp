@@ -514,19 +514,18 @@ namespace {
       CS.addTypeMemberConstraint(arrayTy,
                                  C.getIdentifier("Element"),
                                  arrayElementTy);
-      
-      Type arrayEltsTy = tc.getArraySliceType(expr->getLoc(), arrayElementTy);
-      TupleTypeElt arrayEltsElt{arrayEltsTy,
-                                /*name=*/ Identifier(),
-                                DefaultArgumentKind::None,
-                                /*isVararg=*/true};
-      Type arrayEltsTupleTy = TupleType::get(arrayEltsElt, C);
-      CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getSubExpr()->getType(),
-                       arrayEltsTupleTy,
-                       CS.getConstraintLocator(
-                         expr,
-                         ConstraintLocator::ApplyArgument));
+
+      // Introduce conversions from each element to the element type of the
+      // array.
+      unsigned index = 0;
+      for (auto element : expr->getElements()) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         element->getType(),
+                         arrayElementTy,
+                         CS.getConstraintLocator(
+                           expr,
+                           LocatorPathElt::getTupleElement(index++)));
+      }
 
       return arrayTy;
     }
