@@ -4373,7 +4373,11 @@ static llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
   assert(proto->isObjC());
   
   // FIXME: Can we emit a static reference instead of using a runtime call?
-  llvm::Value *protoName = IGF.IGM.getAddrOfGlobalString(proto->getName().str());
+  StringRef name = proto->getName().str();
+  // FIXME: Remove the goofy 'Proto' suffix the Clang import tags names with
+  if (name.endswith("Proto"))
+    name = name.slice(0, name.size() - 5);
+  llvm::Value *protoName = IGF.IGM.getAddrOfGlobalString(name);
   return IGF.Builder.CreateCall(IGF.IGM.getObjCGetProtocolFn(), protoName);
 }
 
