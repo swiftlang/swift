@@ -102,6 +102,14 @@ enum class MappedLanguages {
   All = ObjC1
 };
 
+/// \brief Describes certain kinds of methods that need to be specially
+/// handled by the importer.
+enum class SpecialMethodKind {
+  Regular,
+  Constructor,
+  NSDictionarySubscriptGetter
+};
+
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
   /// \brief Describes how a particular C enumeration type will be imported
@@ -371,6 +379,9 @@ public:
   /// \brief Retrieve the NSObject type.
   Type getNSObjectType();
 
+  /// \brief Retrieve the NSCopying protocol type.
+  Type getNSCopyingType();
+
   /// \brief Import the given Clang type into Swift.
   ///
   /// \param type The Clang type to import.
@@ -396,8 +407,8 @@ public:
   /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
   ///   whether the created arg/body patterns are different (selector-style).
   /// \param selector The Objective-C method selector to use for the names.
-  /// \param isConstructor Whether we're building a function type for a
-  /// constructor.
+  /// \param kind Controls whether we're building a type for a method that
+  ///        needs special handling.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
@@ -408,7 +419,7 @@ public:
                           SmallVectorImpl<Pattern*> &bodyPatterns,
                           bool *pHasSelectorStyleSignature = nullptr,
                           clang::Selector selector = clang::Selector(),
-                          bool isConstructor = false);
+                          SpecialMethodKind kind = SpecialMethodKind::Regular);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type

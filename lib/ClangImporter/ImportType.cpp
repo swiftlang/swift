@@ -601,7 +601,7 @@ Type ClangImporter::Implementation::importFunctionType(
        SmallVectorImpl<Pattern*> &bodyPatterns,
        bool *pHasSelectorStyleSignature,
        clang::Selector selector,
-       bool isConstructor) {
+       SpecialMethodKind kind) {
 
   if (pHasSelectorStyleSignature)
     *pHasSelectorStyleSignature = false;
@@ -629,14 +629,21 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Import the parameter type into Swift.
-    auto swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+    Type swiftParamTy;
+    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
+        paramTy->isObjCIdType()) {
+      swiftParamTy = getNSCopyingType();
+    }
+    if (!swiftParamTy)
+      swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
     if (!swiftParamTy)
       return Type();
 
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
     Identifier name = bodyName;
-    if ((index > 0 || isConstructor) && index < selector.getNumArgs()) {
+    if ((index > 0 || kind == SpecialMethodKind::Constructor) &&
+        index < selector.getNumArgs()) {
       // For parameters after the first, or all parameters in a constructor,
       // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
@@ -645,7 +652,8 @@ Type ClangImporter::Implementation::importFunctionType(
       // prefer and lowercase the first letter of the remainder (unless the
       // second letter is also uppercase, in which case we probably have an
       // acronym anyway).
-      if (index == 0 && isConstructor && !name.empty()) {
+      if (index == 0 && kind == SpecialMethodKind::Constructor &&
+          !name.empty()) {
         llvm::SmallString<32> buffer;
         auto newName = getFirstInitParameterName(name.str(), buffer);
         if (newName.empty())
@@ -710,7 +718,8 @@ Type ClangImporter::Implementation::importFunctionType(
   // If we have a constructor with no parameters and a unary selector that is
   // not 'init', synthesize a Void parameter with the name following 'init',
   // suitably modified for a parameter name.
-  if (isConstructor && selector.isUnarySelector() && params.empty()) {
+  if (kind == SpecialMethodKind::Constructor && selector.isUnarySelector() &&
+      params.empty()) {
     llvm::SmallString<32> buffer;
     auto paramName = getFirstInitParameterName(
                        selector.getIdentifierInfoForSlot(0)->getName(),
@@ -845,6 +854,28 @@ Type ClangImporter::Implementation::getNSObjectType() {
       if (auto classDecl = dyn_cast<ClassDecl>(swiftDecl)) {
         NSObjectTy = classDecl->getDeclaredType();
         return NSObjectTy;
+      }
+    }
+  }
+
+  return Type();
+}
+
+Type ClangImporter::Implementation::getNSCopyingType() {
+  auto &sema = Instance->getSema();
+  auto clangName = &getClangASTContext().Idents.get("NSCopying");
+  assert(clangName);
+
+  // Perform name lookup into the global scope.
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   clang::Sema::LookupObjCProtocolName);
+  if (!sema.LookupName(lookupResult, /*Scope=*/0))
+    return Type();
+
+  for (auto decl : lookupResult) {
+    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
+      if (auto protoDecl = dyn_cast<ProtocolDecl>(swiftDecl)) {
+        return protoDecl->getDeclaredType();
       }
     }
   }

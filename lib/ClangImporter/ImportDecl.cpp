@@ -192,6 +192,17 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   return std::make_pair(SwiftType, SwiftTypeName);
 }
 
+static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
+                                 clang::Selector cmd) {
+  if (MD->getSelector() != cmd)
+    return false;
+  if (isa<clang::ObjCProtocolDecl>(MD->getDeclContext()))
+    return false;
+  if (MD->getClassInterface()->getName() != "NSDictionary")
+    return false;
+  return true;
+}
+
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
@@ -949,7 +960,11 @@ namespace {
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
       bool hasSelectorStyleSignature;
-      
+
+      SpecialMethodKind kind = SpecialMethodKind::Regular;
+      if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
+        kind = SpecialMethodKind::NSDictionarySubscriptGetter;
+
       // Import the type that this method will have.
       auto type = Impl.importFunctionType(decl->getResultType(),
                                           { decl->param_begin(),
@@ -958,7 +973,8 @@ namespace {
                                           argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
-                                          decl->getSelector());
+                                          decl->getSelector(),
+                                          kind);
       if (!type)
         return nullptr;
 
@@ -1225,7 +1241,7 @@ namespace {
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
                                           objcMethod->getSelector(),
-                                          /*isConstructor=*/true);
+                                          SpecialMethodKind::Constructor);
       assert(type && "Type has already been successfully converted?");
 
       // A constructor returns an object of the type, not 'id'.
