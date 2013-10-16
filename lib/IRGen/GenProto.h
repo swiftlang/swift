@@ -204,6 +204,13 @@ namespace irgen {
                                         SILType srcType,
                                         SILType destType,
                                         CheckedCastMode mode);
+  
+  /// Emit a checked cast to an Objective-C protocol or protocol composition.
+  llvm::Value *emitObjCExistentialDowncast(IRGenFunction &IGF,
+                                           llvm::Value *orig,
+                                           SILType srcType,
+                                           SILType destType,
+                                           CheckedCastMode mode);
 } // end namespace irgen
 } // end namespace swift
 

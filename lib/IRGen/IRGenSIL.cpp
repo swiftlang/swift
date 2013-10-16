@@ -2278,8 +2278,12 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     }
   }
   case CheckedCastKind::ConcreteToUnrelatedExistential: {
-    IGF.unimplemented(SourceLoc(), "downcast to protocol type");
-    exit(1);
+    Explosion from = IGF.getLoweredExplosion(operand);
+    llvm::Value *fromValue = from.claimNext();
+    llvm::Value *cast = emitObjCExistentialDowncast(IGF, fromValue,
+                                                    operand.getType(),
+                                                    destTy, mode);
+    return Address(cast, Alignment(1));
   }
   }
 }

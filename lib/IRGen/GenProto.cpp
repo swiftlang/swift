@@ -4366,3 +4366,57 @@ Address irgen::emitOpaqueExistentialDowncast(IRGenFunction &IGF,
 
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }
+
+/// Emit a Protocol* value referencing an ObjC protocol.
+static llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
+                                                ProtocolDecl *proto) {
+  assert(proto->isObjC());
+  
+  // FIXME: Can we emit a static reference instead of using a runtime call?
+  llvm::Value *protoName = IGF.IGM.getAddrOfGlobalString(proto->getName().str());
+  return IGF.Builder.CreateCall(IGF.IGM.getObjCGetProtocolFn(), protoName);
+}
+
+/// Emit a checked cast to an Objective-C protocol or protocol composition.
+llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
+                                                llvm::Value *orig,
+                                                SILType srcType,
+                                                SILType destType,
+                                                CheckedCastMode mode) {
+  orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
+  SmallVector<ProtocolDecl*, 4> protos;
+  bool isObjC = destType.getSwiftRValueType()->isExistentialType(protos);
+  assert(isObjC); (void)isObjC;
+  
+  // Get references to the ObjC Protocol* values for each protocol.
+  Address protoRefsBuf = IGF.createAlloca(llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
+                                                               protos.size()),
+                                          IGF.IGM.getPointerAlignment(),
+                                          "objc_protocols");
+  protoRefsBuf = IGF.Builder.CreateBitCast(protoRefsBuf,
+                                           IGF.IGM.Int8PtrPtrTy);
+  
+  unsigned index = 0;
+  for (auto proto : protos) {
+    Address protoRefSlot = IGF.Builder.CreateConstArrayGEP(protoRefsBuf, index,
+                                                     IGF.IGM.getPointerSize());
+    auto protoRef = emitReferenceToObjCProtocol(IGF, proto);
+    IGF.Builder.CreateStore(protoRef, protoRefSlot);
+    ++index;
+  }
+  
+  // Perform the cast.
+  llvm::Value *castFn;
+  switch (mode) {
+  case CheckedCastMode::Unconditional:
+    castFn = IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn();
+    break;
+  case CheckedCastMode::Conditional:
+    castFn = IGF.IGM.getDynamicCastObjCProtocolConditionalFn();
+    break;
+  }
+  
+  return IGF.Builder.CreateCall3(castFn, orig,
+                                 IGF.IGM.getSize(Size(protos.size())),
+                                 protoRefsBuf.getAddress());
+}
