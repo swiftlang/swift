@@ -847,9 +847,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     solverState->generatedConstraints.push_back(constraint);
 
     if (!solve(solutions, allowFreeTypeVariables)) {
-      if (!failedConstraint) {
-        failedConstraint = constraint;
-      }
+      anySolved = true;
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
