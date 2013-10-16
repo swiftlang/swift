@@ -576,18 +576,18 @@ namespace {
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
-      Type dictionaryEltsTy = tc.getArraySliceType(expr->getLoc(), elementTy);
-      TupleTypeElt dictionaryEltsElt(dictionaryEltsTy,
-                                     /*name=*/ Identifier(),
-                                     DefaultArgumentKind::None,
-                                     /*isVararg=*/true);
-      Type dictionaryEltsTupleTy = TupleType::get(dictionaryEltsElt, C);
-      CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getSubExpr()->getType(),
-                       dictionaryEltsTupleTy,
-                       CS.getConstraintLocator(
-                         expr,
-                         ConstraintLocator::ApplyArgument));
+
+      // Introduce conversions from each element to the element type of the
+      // dictionary.
+      unsigned index = 0;
+      for (auto element : expr->getElements()) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         element->getType(),
+                         elementTy,
+                         CS.getConstraintLocator(
+                           expr,
+                           LocatorPathElt::getTupleElement(index++)));
+      }
 
       return dictionaryTy;
     }
