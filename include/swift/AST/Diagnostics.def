@@ -1515,6 +1515,9 @@ NOTE(note_while_inlining,sil_analysis,none,
 ERROR(integer_literal_overflow,sil_gen,none, 
       "integer literal overflows when stored into %0",
       (Type))
+WARNING(integer_literal_overflow_warn,sil_gen,none,
+      "integer literal overflows when stored into %0",
+      (Type))
 ERROR(arithmetic_operation_overflow,sil_analysis,none,
       "arithmetic operation '%0 %1 %2' (on type %3) results in an overflow",
       (StringRef, StringRef, StringRef, Type))

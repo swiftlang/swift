@@ -339,6 +339,15 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
       // Check for overflow.
       if (SrcVal != T) {
+        // FIXME: This will prevent hard error in cases the error is comming
+        // from ObjC interoperability code. Currently, we treat NSUInteger as
+        // Int.
+        if (Loc.getSourceLoc().isInvalid()) {
+          diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                   diag::integer_literal_overflow_warn,
+                   CE ? CE->getType() : DestTy);
+          return nullptr;
+        }
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow,
                  CE ? CE->getType() : DestTy);
