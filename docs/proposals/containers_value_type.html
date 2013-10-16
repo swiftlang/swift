@@ -199,7 +199,7 @@ The Impact on Mutable Containers
 <p>
 The ability to locally reason about the behavior of <code>doWork</code>
 in the previous section applies to mutable containers such as
-<code>Vector</code> and <code>String</code> just as much as it applies
+<code>Array</code> and <code>String</code> just as much as it applies
 to the <code>Int</code> parameter.
 </p>
 
@@ -207,12 +207,12 @@ to the <code>Int</code> parameter.
 For performance reasons, we need to have mutable containers.  Otherwise
 operations such as continuously appending become too expensive.  But we
 need to be able to locally reason about code which uses these
-containers.  If we make <code>Vector</code> a reference type, then Swift
+containers.  If we make <code>Array</code> a reference type, then Swift
 will compile this code:
 </p>
 
 <blockquote><pre>
-func foo(v : Vector, i : Int)  <font color="#C80000">// define foo</font>
+func foo(v : Array, i : Int)  <font color="#C80000">// define foo</font>
 
 func doWork() {
   <font color="#C80000">// ...</font>
@@ -225,7 +225,7 @@ func doWork() {
 <p>
 But the human reader of this code will have to perform a non-local
 analysis to figure out what <code>doWork</code> is doing with the
-<code>Vector</code> (whether or not it is modified in or under
+<code>Array</code> (whether or not it is modified in or under
 <code>foo</code>, and thus what value is used in <code>bar</code>). Or
 rely on a high quality and strictly followed naming conventions such as
 those used in Cocoa.  Now there is absolutely nothing wrong with high
@@ -236,7 +236,7 @@ argument can be modified / no, that argument can not be modified; is a
 </p>
 
 <p>
-If <code>Vector</code> has value semantics, then we only need to glance at
+If <code>Array</code> has value semantics, then we only need to glance at
 <code>doWork()</code> to discover that both <code>foo</code> and <code>bar</code>
 receive the same value in <code>v</code> (just like <code>i</code>).
 </p>
@@ -386,7 +386,7 @@ passed, semantically, <i>by-value</i>.
 </p>
 
 <blockquote><pre>
-func _backgroundSortNewFilteredMessages(messages : Vector) -&gt; _FilteredListInfo {
+func _backgroundSortNewFilteredMessages(messages : Array) -&gt; _FilteredListInfo {
     // ...
     res.filteredMessages = messages;  <font color="#C80000">// copy here!</font>
     // ...
@@ -451,7 +451,7 @@ In making Swift containers behave just like <code>Int</code>, not only
 is the overall Swift API simplified, but this is also a boon to generic
 algorithms. For example one can confidently write a generic sorting
 algorithm that works for sequences of <code>Int</code>, and for
-sequences of <code>Vector&lt;Int&gt;</code>. The generic code need not
+sequences of <code>Array&lt;Int&gt;</code>. The generic code need not
 concern itself with the question of whether or not the type has value
 semantics or reference semantics.
 </p>

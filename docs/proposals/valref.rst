@@ -273,8 +273,8 @@ TODO: Consider generic classes/structs
 As with an array's element type, a generic type parameter can also be bound to
 a ``ref`` or a ``val`` type.
 
-   var rv = new Vector<ref Int>       // Create a vector of Ints-on-the-heap
-   var vv = new Vector<val SomeClass> // Create a vector that owns its SomeClasses
+   var rv = new Array<ref Int>       // Create a vector of Ints-on-the-heap
+   var vv = new Array<val SomeClass> // Create a vector that owns its SomeClasses
 
 The rules for declarations in terms of ``ref`` or ``val`` types are that
 an explicit ``val`` or ``ref`` overrides any ``val``- or ``ref``-ness of the

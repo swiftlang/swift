@@ -183,7 +183,7 @@ in the usual way::
 The new stored variable may have observing accessors::
 
   class MemoryColorful : Base {
-    var oldColors : Vector<Color> = []
+    var oldColors : Array<Color> = []
   
     var color : Color {
     willSet:

@@ -548,7 +548,7 @@
   and checked for nullness before use like a true [weak] reference.
 
     class Parent {
-      var children : Vector<Child>
+      var children : Array<Child>
 
       func addChild(c:Child) {
         c.parent = this

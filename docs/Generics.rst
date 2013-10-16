@@ -804,13 +804,13 @@ Parsing Issues
 The use of angle brackets to supply arguments to a generic type, while familiar
 to C++/C#/Java programmers, cause some parsing problems. The problem stems from
 the fact that '<', '>', and '>>' (the latter of which will show up in generic
-types such as Vector<Vector<Int>>) match the 'operator' terminal in the grammar,
+types such as Array<Array<Int>>) match the 'operator' terminal in the grammar,
 and we wish to continue using this as operators.
 
 When we're in the type grammar, this is a minor inconvenience for the parser,
 because code like this::
 
-  var x : Vector<Int>
+  var x : Array<Int>
 
 will essentially parse the type as::
 
@@ -819,7 +819,7 @@ will essentially parse the type as::
 and verify that the operators are '<' and '>', respectively. Cases
 involving <> are more interesting, because the type of::
 
-  var y : Vector<Vector<Int>>
+  var y : Array<Array<Int>>
 
 is effectively parsed as::
 
