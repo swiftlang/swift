@@ -1032,7 +1032,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   fn = link.createFunction(*this, fnType, cc, attrs);
 
-  if (DebugInfo)
+  // Unless this is an external reference, emit debug info for it.
+  if (DebugInfo && !f->isExternalDeclaration())
     DebugInfo->emitFunction(f, fn);
 
   return fn;
