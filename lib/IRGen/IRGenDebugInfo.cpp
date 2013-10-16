@@ -927,12 +927,13 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
 llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
                                                llvm::DIDescriptor Scope,
                                                llvm::DIFile File,
-                                               unsigned Flags) {
+                                               unsigned Flags,
+                                               DeclContext *DeclContext) {
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
-  for (auto Elem : TupleTy->getElementTypes()) {
-    CanType CanTy = Elem->getCanonicalType();
-    DebugTypeInfo DTI(CanTy, Types.getCompleteTypeInfo(CanTy));
+  for (auto ElemTy : TupleTy->getElementTypes()) {
+    VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), ElemTy, DeclContext);
+    DebugTypeInfo DTI(&VD, Types.getCompleteTypeInfo(ElemTy->getCanonicalType()));
     Elements.push_back(createMemberType(DTI, OffsetInBits, Scope, File, Flags));
   }
   return DBuilder.getOrCreateArray(Elements);
@@ -1035,11 +1036,9 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
 {
   if (auto Decl = DbgTy.getDecl()) {
     VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
-    DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);
-    return getOrCreateType(DTI, Scope);
+    return getOrCreateType(DebugTypeInfo(&VD, DbgTy.size, DbgTy.align), Scope);
   }
-  DebugTypeInfo DTI(Ty, DbgTy.size, DbgTy.align);
-  return getOrCreateType(DTI, Scope);
+  return getOrCreateType(DebugTypeInfo(Ty, DbgTy.size, DbgTy.align), Scope);
 }
 
 
@@ -1259,7 +1258,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Tuple: {
     Name = getMangledName(DbgTy);
     auto TupleTy = BaseTy->castTo<TupleType>();
-    Location L = getLoc(SM, DbgTy.getDecl());
+    auto Decl = DbgTy.getDecl();
+    Location L = getLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
     return DBuilder.
@@ -1267,7 +1267,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                        File, L.Line,
                        SizeInBits, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
-                       getTupleElements(TupleTy, Scope, File, Flags),
+                       getTupleElements(TupleTy, Scope, File, Flags,
+                                        Decl ? Decl->getDeclContext() : nullptr),
                        DW_LANG_Swift);
   }
 
@@ -1280,10 +1281,26 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Archetype: {
-    // FIXME
     auto Archetype = BaseTy->castTo<ArchetypeType>();
-    Name = Archetype->getName().str();
-    break;
+    Name = getMangledName(DbgTy);
+    Location L = getLoc(SM, Archetype->getAssocType());
+    auto Superclass = Archetype->getSuperclass();
+    auto DerivedFrom = Superclass.isNull() ? llvm::DIType() :
+      getOrCreateType(DebugTypeInfo(Superclass,
+                                    Types.getCompleteTypeInfo
+                                    (Superclass->getCanonicalType())), File);
+    auto DITy = DBuilder.createStructType(Scope, Name, File, L.Line,
+                                          SizeInBits, AlignInBits, Flags,
+                                          DerivedFrom, llvm::DIArray());
+    SmallVector<llvm::Value *, 4> Protocols;
+    for (auto ProtocolDecl : Archetype->getConformsTo()) {
+      auto PTy = ProtocolDecl->getType()->getCanonicalType();
+      auto PDbgTy = DebugTypeInfo(ProtocolDecl, Types.getCompleteTypeInfo(PTy));
+      auto PDITy = getOrCreateType(PDbgTy, Scope);
+      Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
+    }
+    DITy.setTypeArray(DBuilder.getOrCreateArray(Protocols));
+    return DITy;
   }
 
   case TypeKind::MetaType: {
@@ -1387,7 +1404,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Substituted: {
     Name = getMangledName(DbgTy);
     auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
-    auto OrigTy = SubstitutedTy->getOriginal();
+    auto OrigTy = SubstitutedTy->getReplacementType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(OrigTy, DbgTy, Scope),

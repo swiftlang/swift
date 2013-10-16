@@ -978,7 +978,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
           auto Name = Arg->getDecl()->getName().str();
           auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
-          DebugTypeInfo DTI(Arg->getType().getSwiftType(),
+          DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                             getTypeInfo(Arg->getType()));
           IGM.DebugInfo->emitArgVariableDeclaration
             (Builder, AddrIR, DTI, Name, ArgNo, IsIndirect);
