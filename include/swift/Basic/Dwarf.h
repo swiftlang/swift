@@ -34,6 +34,9 @@ namespace swift {
 // by fixing that in LLVM we would hint at developing a new language.
 // So instead, let's hijack a language with a very low potential for
 // accidental conflicts for now.
+//
+// NOTE: Ocaml might beat us: http://www.dwarfstd.org/ShowIssue.php?issue=131009.1
+//
 typedef enum {
   DW_LANG_Swift = 0xf,
   DW_LANG_ObjC = llvm::dwarf::DW_LANG_ObjC, // For symmetry.
