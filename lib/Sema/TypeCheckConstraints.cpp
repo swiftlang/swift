@@ -876,67 +876,6 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint simplification
 
-/// Determine whether we should attempt a tuple-to-tuple match.
-///
-/// FIXME: Most of this is a hack to try to get scalar-to-tuple conversions in
-/// those places where they might work.
-///
-/// \returns true if we should attempt a tuple-to-tuple match, or false if
-/// we should fall back to a scalar-to-tuple match.
-static bool shouldTryTupleToTupleMatch(TupleType *tuple1, TupleType *tuple2,
-                                       TypeMatchKind kind,
-                                       const ConstraintLocatorBuilder &locator){
-  // If the second tuple can't be initialized with a scalar, we have to try
-  // a tuple-to-tuple match.
-  if (tuple2->getFieldForScalarInit() == -1)
-    return true;
-
-  if (kind < TypeMatchKind::Conversion) {
-    // If we're not converting, the number of fields must be equivalent in
-    // the two tuple types.
-    if (tuple1->getFields().size() != tuple2->getFields().size())
-      return false;
-
-    // Compare the element names.
-    for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
-      const auto &elt1 = tuple1->getFields()[i];
-      const auto &elt2 = tuple2->getFields()[i];
-
-      // If the names don't match, we may have a conflict.
-      if (elt1.getName() != elt2.getName()) {
-        // Same-type matches require the element names to be the same.
-        if (kind == TypeMatchKind::SameType)
-          return false;
-
-        // For subtyping constraints, just make sure that this name isn't
-        // used at some other position.
-        if (!elt2.getName().empty() &&
-            tuple1->getNamedElementId(elt2.getName()) != -1)
-          return false;
-      }
-
-      // Variadic bit must match.
-      if (elt1.isVararg() != elt2.isVararg())
-        return false;
-    }
-
-    // Okay, perform the tuple-to-tuple conversion.
-    return true;
-  }
-
-  assert(kind == TypeMatchKind::Conversion);
-
-  // Compute the element shuffles for conversions.
-  SmallVector<int, 16> sources;
-  SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
-                          ::hasMandatoryTupleLabels(locator)))
-    return false;
-
-  // Okay, perform the tuple-to-tuple conversion.
-  return true;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
@@ -1647,19 +1586,31 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
 
     case TypeKind::Tuple: {
-      auto tuple1 = cast<TupleType>(desugar1);
       auto tuple2 = cast<TupleType>(desugar2);
 
-      if (shouldTryTupleToTupleMatch(tuple1, tuple2, kind, locator)) {
-        potentialConversions.push_back(ConversionRestrictionKind::TupleToTuple);
+      // Try the tuple-to-tuple conversion.
+      potentialConversions.push_back(ConversionRestrictionKind::TupleToTuple);
 
-        // FIXME: We should only commit to this conversion when tuple2 cannot
-        // be initialized with a scalar.
-        goto commit_to_conversions;
+      // If the second tuple can be initialized with a scalar, and if 
+      // the first tuple doesn't have labels that conflict, try the
+      // scalar-to-tuple conversion.
+      int scalar2 = tuple2->getFieldForScalarInit();
+      if (scalar2 >= 0) {
+        if (kind >= TypeMatchKind::Conversion ||
+            (kind >= TypeMatchKind::TrivialSubtype &&
+             tuple2->getFields().size() == 1 &&
+             !tuple2->getFields()[0].isVararg())) {
+          auto tuple1 = cast<TupleType>(desugar1);
+          int scalar1 = tuple1->getFieldForScalarInit();
+          if (scalar1 == -1 ||
+              tuple1->getFields()[scalar1].getName() 
+                == tuple2->getFields()[scalar2].getName())
+            potentialConversions.push_back(
+              ConversionRestrictionKind::ScalarToTuple);
+        }
       }
 
-      // Break out to attempt scalar-to-tuple conversion, below.
-      break;
+      goto commit_to_conversions;
     }
 
     case TypeKind::Enum:
@@ -3186,15 +3137,13 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
       continue;
-
-    // The two systems are not identical.
-    identical = false;
-
+    
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
     // (when it's sane) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
+      identical = false;
       continue;
     }
 
@@ -3209,26 +3158,26 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (type2Better)
         ++score2;
 
-      // Prefer a bare type to the same type type in a single-element tuple.
-      // FIXME: It's unfortunate that this ever fires.
-      auto tuple1 = type1->getAs<TupleType>();
-      auto tuple2 = type2->getAs<TupleType>();
-      if (static_cast<bool>(tuple1) != static_cast<bool>(tuple2)) {
-        auto theTuple = tuple1? tuple1 : tuple2;
-        auto theType = tuple1? type2 : type1;
-        if (theTuple->getNumElements() == 1 &&
-            !theTuple->getFields()[0].isVararg() &&
-            theTuple->getElementType(0)->isEqual(theType)) {
-          if (tuple1)
-            ++score2;
-          else
-            ++score1;
+      // Prefer the unlabeled form of a type.
+      auto unlabeled1 = type1->getUnlabeledType(cs.getASTContext());
+      auto unlabeled2 = type2->getUnlabeledType(cs.getASTContext());
+      if (unlabeled1->isEqual(unlabeled2)) {
+        if (type1->isEqual(unlabeled1)) {
+          ++score1;
+          continue;
+        }
+        if (type2->isEqual(unlabeled2)) {
+          ++score2;
           continue;
         }
       }
 
+      identical = false;
       continue;
     }
+
+    // The systems are not considered equivalent.
+    identical = false;
 
     // If one type is convertible to of the other, but not vice-versa.
     type1Better = tc.isConvertibleTo(type1, type2, cs.DC);

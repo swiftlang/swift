@@ -2570,8 +2570,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.constraintRestrictions.end()) {
     switch (knownRestriction->second) {
-    case ConversionRestrictionKind::TupleToTuple:
-      llvm_unreachable("Can't apply tuple-to-tuple conversion directly");
+    case ConversionRestrictionKind::TupleToTuple: {
+      auto fromTuple = expr->getType()->castTo<TupleType>();
+      auto toTuple = toType->castTo<TupleType>();
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      bool failed = computeTupleShuffle(fromTuple, toTuple, sources,
+                                        variadicArgs,
+                                        hasMandatoryTupleLabels(expr));
+      assert(!failed && "Couldn't convert tuple to tuple?");
+      (void)failed;
+      return coerceTupleToTuple(expr, fromTuple, toTuple, locator, sources,
+                                variadicArgs);
+    }
 
     case ConversionRestrictionKind::ScalarToTuple: {
       auto toTuple = toType->castTo<TupleType>();

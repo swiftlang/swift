@@ -848,6 +848,13 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     if (!solve(solutions, allowFreeTypeVariables)) {
       anySolved = true;
+
+      // If we see a tuple-to-tuple conversion that succeeded, we're done.
+      // FIXME: This should be more general.
+      if (auto restriction = constraint->getRestriction()) {
+        if (*restriction == ConversionRestrictionKind::TupleToTuple)
+          break;
+      }
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
