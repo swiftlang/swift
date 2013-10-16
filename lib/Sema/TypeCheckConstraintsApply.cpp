@@ -1789,6 +1789,8 @@ namespace {
       case CheckedCastKind::ArchetypeToConcrete:
       case CheckedCastKind::ExistentialToArchetype:
       case CheckedCastKind::ExistentialToConcrete:
+      case CheckedCastKind::ConcreteToArchetype:
+      case CheckedCastKind::ConcreteToUnrelatedExistential:
         expr->setCastKind(castKind);
         break;
       }
@@ -1839,6 +1841,8 @@ namespace {
       case CheckedCastKind::ArchetypeToConcrete:
       case CheckedCastKind::ExistentialToArchetype:
       case CheckedCastKind::ExistentialToConcrete:
+      case CheckedCastKind::ConcreteToArchetype:
+      case CheckedCastKind::ConcreteToUnrelatedExistential:
         expr->setCastKind(castKind);
         break;
       }

@@ -2243,7 +2243,8 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   }
       
   case CheckedCastKind::ArchetypeToArchetype:
-  case CheckedCastKind::ArchetypeToConcrete: {
+  case CheckedCastKind::ArchetypeToConcrete:
+  case CheckedCastKind::ConcreteToArchetype: {
     if (operand.getType().isAddress()) {
       Address archetype = IGF.getLoweredAddress(operand);
       return emitOpaqueArchetypeDowncast(IGF, archetype,
@@ -2275,6 +2276,10 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
       llvm::Value *toValue = IGF.emitDowncast(instance, destTy, mode);
       return Address(toValue, Alignment(1));
     }
+  }
+  case CheckedCastKind::ConcreteToUnrelatedExistential: {
+    IGF.unimplemented(SourceLoc(), "downcast to protocol type");
+    exit(1);
   }
   }
 }

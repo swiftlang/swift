@@ -630,6 +630,10 @@ public:
       return "existential_to_archetype";
     case CheckedCastKind::ExistentialToConcrete:
       return "existential_to_concrete";
+    case CheckedCastKind::ConcreteToArchetype:
+      return "concrete_to_archetype";
+    case CheckedCastKind::ConcreteToUnrelatedExistential:
+      return "concrete_to_unrelated_existential";
     }
   }
   

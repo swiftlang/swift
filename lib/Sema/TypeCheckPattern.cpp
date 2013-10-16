@@ -756,6 +756,8 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     case CheckedCastKind::ArchetypeToConcrete:
     case CheckedCastKind::ExistentialToArchetype:
     case CheckedCastKind::ExistentialToConcrete:
+    case CheckedCastKind::ConcreteToArchetype:
+    case CheckedCastKind::ConcreteToUnrelatedExistential:
       IP->setCastKind(castKind);
       break;
     }

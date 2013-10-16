@@ -1064,6 +1064,16 @@ public:
               "existential_to_concrete must convert from protocol type");
       return;
     }
+    case CheckedCastKind::ConcreteToArchetype: {
+      require(toTy.getAs<ArchetypeType>(),
+              "concrete_to_archetype must convert to archetype type");
+      return;
+    }
+    case CheckedCastKind::ConcreteToUnrelatedExistential: {
+      require(toTy.isExistentialType(),
+              "concrete_to_existential must convert to protocol type");
+      return;
+    }
     }
   }
   

@@ -2495,6 +2495,11 @@ enum class CheckedCastKind {
   ExistentialToArchetype,
   /// A cast from an existential type to a concrete type.
   ExistentialToConcrete,
+  /// A cast from a concrete type to a type parameter.
+  ConcreteToArchetype,
+  /// A cast from a concrete type to an existential type it is not statically
+  /// known to conform to.
+  ConcreteToUnrelatedExistential,
 };
   
 /// \brief Abstract base class for checked casts 'as' and 'is'. These represent
