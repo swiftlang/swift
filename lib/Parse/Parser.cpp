@@ -463,7 +463,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   case tok::r_paren:  OtherNote = diag::opening_paren;    break;
   case tok::r_square: OtherNote = diag::opening_bracket;  break;
   case tok::r_brace:  OtherNote = diag::opening_brace;    break;
-  default:            assert(!"unknown matching token!"); break;
+  default:            llvm_unreachable("unknown matching token!"); break;
   }
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
