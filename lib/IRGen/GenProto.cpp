@@ -4343,9 +4343,6 @@ Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
                                            SILType srcType,
                                            SILType destType,
                                            CheckedCastMode mode) {
-  assert(srcType.is<ArchetypeType>());
-  assert(!srcType.castTo<ArchetypeType>()->requiresClass());
-  
   llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }
