@@ -59,6 +59,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
                 ${ArrayBound}ReplPrintable {
   var value: Builtin.Int${bits}
 
+  @@transparent
   init() {
     var maxWidthZero: Int${str(maxBits)} = 0
     value = ${'maxWidthZero.value' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(maxWidthZero.value)' % (maxBits, bits) )}
@@ -103,15 +104,19 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 }
 
 extension ${Self} : RandomAccessIndex, Hashable {
+  @@transparent
   func __equal__(rhs: ${Self}) -> Bool {
     return _getBool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
   }
+  @@transparent
   func __less__(rhs: ${Self}) -> Bool {
     return _getBool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
   }
+  @@transparent
   func succ() -> ${Self} {
     return self + 1
   }
+  @@transparent
   func pred() -> ${Self} {
     return self - 1
   }
@@ -178,6 +183,7 @@ extension ${Self} : SignedNumber {
 @ end
 
 // construction from other integer types
+@@transparent
 extension ${Self} {
 @ for (src_bits, src_signed) in all_ints():
 @    That = int_name(src_bits, src_signed)
