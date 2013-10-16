@@ -1240,8 +1240,8 @@ private:
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
-  // Don't produce any results in an enum case.
-  if (InEnumCaseRawValue)
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::DotExpr;
@@ -1252,8 +1252,8 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
 
-  // Don't produce any results in an enum case.
-  if (InEnumCaseRawValue)
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::PostfixExprBeginning;
@@ -1265,8 +1265,8 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   assert(P.Tok.is(tok::code_complete));
 
-  // Don't produce any results in an enum case.
-  if (InEnumCaseRawValue)
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::PostfixExpr;
@@ -1275,8 +1275,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
-  // Don't produce any results in an enum case.
-  if (InEnumCaseRawValue)
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::SuperExpr;
@@ -1285,8 +1285,8 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
-  // Don't produce any results in an enum case.
-  if (InEnumCaseRawValue)
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::SuperExprDot;

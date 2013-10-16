@@ -1894,8 +1894,8 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
       {
-        CodeCompletionCallbacks::InEnumCaseRawValueRAII InEnumCaseRawValue(
-            CodeCompletion);
+        CodeCompletionCallbacks::InEnumElementRawValueRAII
+            InEnumElementRawValue(CodeCompletion);
         RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
       }
       if (RawValueExpr.hasCodeCompletion()) {

@@ -35,7 +35,7 @@ protected:
 
   /// True if code completion is done inside a raw value expression of an enum
   /// case.
-  bool InEnumCaseRawValue = false;
+  bool InEnumElementRawValue = false;
 
 public:
   CodeCompletionCallbacks(Parser &P)
@@ -73,19 +73,19 @@ public:
     }
   };
 
-  class InEnumCaseRawValueRAII {
+  class InEnumElementRawValueRAII {
     CodeCompletionCallbacks *Callbacks;
 
   public:
-    InEnumCaseRawValueRAII(CodeCompletionCallbacks *Callbacks)
+    InEnumElementRawValueRAII(CodeCompletionCallbacks *Callbacks)
         : Callbacks(Callbacks) {
       if (Callbacks)
-        Callbacks->InEnumCaseRawValue = true;
+        Callbacks->InEnumElementRawValue = true;
     }
 
-    ~InEnumCaseRawValueRAII() {
+    ~InEnumElementRawValueRAII() {
       if (Callbacks)
-        Callbacks->InEnumCaseRawValue = false;
+        Callbacks->InEnumElementRawValue = false;
     }
   };
 
