@@ -1760,8 +1760,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
       if (lvalue1->getQualifiers().isImplicit()) {
-        return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
-                          locator, trivial);
+        potentialConversions.push_back(
+          ConversionRestrictionKind::LValueToRValue);
       }
     }
 
@@ -1874,6 +1874,10 @@ commit_to_conversions:
   case ConversionRestrictionKind::Superclass:
     return matchSuperclassTypes(type1, type2, kind, flags, locator,
                                 trivial);
+
+  case ConversionRestrictionKind::LValueToRValue:
+    return matchTypes(type1->getRValueType(), type2, kind, subFlags, locator,
+                      trivial);
 
   case ConversionRestrictionKind::Existential:
     return matchExistentialTypes(type1, type2, kind, flags, locator,
@@ -2705,6 +2709,14 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                        constraint.getSecondType(),
                                        matchKind, TMF_GenerateConstraints,
                                        constraint.getLocator(), trivial);
+        break;
+
+      case ConversionRestrictionKind::LValueToRValue:
+        result = matchTypes(constraint.getFirstType()->getRValueType(),
+                            constraint.getSecondType(),
+                            matchKind, TMF_GenerateConstraints,
+                            constraint.getLocator(),
+                            trivial);
         break;
 
       case ConversionRestrictionKind::Existential:

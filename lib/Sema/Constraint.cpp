@@ -169,6 +169,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << " [superclass]";
       break;
 
+    case ConversionRestrictionKind::LValueToRValue:
+      Out << " [lvalue-to-rvalue]";
+      break;
+
     case ConversionRestrictionKind::Existential:
       Out << " [existential]";
       break;

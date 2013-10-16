@@ -126,6 +126,8 @@ enum class ConversionRestrictionKind {
   DeepEquality,
   /// Subclass-to-superclass conversion.
   Superclass,
+  /// Lvalue-to-rvalue conversion.
+  LValueToRValue,
   /// Value to existential value conversion.
   Existential,
   /// Value to optional conversion.

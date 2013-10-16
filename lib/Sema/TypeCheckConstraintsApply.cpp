@@ -2629,6 +2629,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) DerivedToBaseExpr(expr, toType);
     }
 
+    case ConversionRestrictionKind::LValueToRValue: {
+      // Load from the lvalue.
+      expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
+
+      // Coerce the result.
+      return coerceToType(expr, toType, locator);
+    }
+
     case ConversionRestrictionKind::Existential:
       return coerceExistential(expr, toType, locator);
 
