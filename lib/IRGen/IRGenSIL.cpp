@@ -972,16 +972,16 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         LoweredValue const &LoweredArg = getLoweredValue(Arg);
         if (LoweredArg.isAddress()) {
           // LValues are indirect by definition.
-          bool IsIndirect = true;
+          auto Indirection = IndirectValue;
           if (Arg->getDecl()->getType()->getKind() == TypeKind::LValue)
-            IsIndirect = false;
+            Indirection = DirectValue;
 
           auto Name = Arg->getDecl()->getName().str();
           auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
           DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                             getTypeInfo(Arg->getType()));
           IGM.DebugInfo->emitArgVariableDeclaration
-            (Builder, AddrIR, DTI, Name, ArgNo, IsIndirect);
+            (Builder, AddrIR, DTI, Name, ArgNo, Indirection);
         }
       }
     }
@@ -2065,10 +2065,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredAddress(ptrValue, addr.getAddress());
 
   if (IGM.DebugInfo) {
-    bool IsIndirect = true;
+    auto Indirection = IndirectValue;
     // LValues [inout] are implicitly indirect because of their type.
     if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
-      IsIndirect = false;
+      Indirection = DirectValue;
     // FIXME: [inout] arguments that are not promoted are emitted as
     // arguments and also boxed and thus may show up twice. This may
     // or may not be bad.
@@ -2077,7 +2077,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
        emitShadowCopy(addr.getAddress(), Name),
        Decl ? DebugTypeInfo(Decl, type)
             : DebugTypeInfo(i->getElementType().getSwiftType(), type),
-       Name, i, IsIndirect);
+       Name, i, Indirection);
   }
 }
 

@@ -715,11 +715,10 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
                                                 StringRef Name,
                                                 SILFunction *Fn,
                                                 SILValue Value,
-                                                bool Indirect) {
+                                                IndirectionKind Indirection) {
   if (auto SILArg = dyn_cast<SILArgument>(Value)) {
     emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                               getArgNo(Fn, SILArg),
-                               Indirect);
+                               getArgNo(Fn, SILArg), Indirection);
     return true;
   }
   return false;
@@ -745,7 +744,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   DebugTypeInfo Ty,
                                                   StringRef Name,
                                                   SILInstruction *I,
-                                                  bool Indirect) {
+                                                  IndirectionKind Indirection) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
@@ -758,7 +757,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name,
-                                     I->getFunction(), Src, Indirect))
+                                     I->getFunction(), Src, Indirection))
         return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
       // Generic type metadata?
@@ -767,18 +766,18 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
           auto TName = BumpAllocatedString(("$swift.type."+Name).str());
           emitVariableDeclaration(B, Call->getArgOperand(1), getSwiftType(),
                                   TName, llvm::dwarf::DW_TAG_auto_variable,
-                                  0, DirectValue, true);
+                                  0, DirectValue, ArtificialValue);
 
 
         }
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
-                                     CopyAddr->getSrc(), Indirect))
+                                     CopyAddr->getSrc(), Indirection))
         return;
     }
   }
 
   emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, Indirect);
+                          llvm::dwarf::DW_TAG_auto_variable, 0, Indirection);
 }
 
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
@@ -786,10 +785,10 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
                                                 unsigned ArgNo,
-                                                bool Indirect) {
+                                                IndirectionKind Indirection) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirect,
-                          Name == "self");
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirection,
+                          Name == "self" ? ArtificialValue : RealValue);
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -819,8 +818,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo,
-                                             bool Indirect,
-                                             bool Artificial) {
+                                             IndirectionKind Indirection,
+                                             ArtificialKind Artificial) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
   llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
   // If this is an argument, attach it to the current function scope.
@@ -858,7 +857,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
 
-  if (Indirect) {
+  if (Indirection) {
     // Classes are always passed by reference.
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;

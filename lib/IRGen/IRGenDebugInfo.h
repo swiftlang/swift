@@ -66,7 +66,7 @@ typedef struct {
 
 
 enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
-enum ArtificialKind: bool { RealMcCoy = false, Artificial = true };
+enum ArtificialKind: bool { RealValue = false, ArtificialValue = true };
 
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
@@ -168,8 +168,8 @@ public:
                                StringRef Name,
                                unsigned Tag,
                                unsigned ArgNo = 0,
-                               bool Indirect = false,
-                               bool Artificial = false);
+                               IndirectionKind Indirection = DirectValue,
+                               ArtificialKind = RealValue);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
@@ -178,7 +178,7 @@ public:
                                     DebugTypeInfo Ty,
                                     StringRef Name,
                                     swift::SILInstruction *I,
-                                    bool Indirect = false);
+                                    IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
@@ -186,7 +186,7 @@ public:
                                   DebugTypeInfo Ty,
                                   StringRef Name,
                                   unsigned ArgNo,
-                                  bool Indirect = false);
+                                  IndirectionKind Indirection = DirectValue);
 
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
@@ -268,7 +268,7 @@ private:
                                   StringRef Name,
                                   SILFunction *Fn,
                                   SILValue Value,
-                                  bool Indirect);
+                                  IndirectionKind Indirection);
   DebugTypeInfo &getSwiftType();
 };
 
