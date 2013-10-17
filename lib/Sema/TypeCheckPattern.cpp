@@ -266,7 +266,7 @@ public:
                                        /*diagnoseErrors*/false,
                                        &resolver);
     
-    EnumDecl *enumDecl = ty->getEnumOrBoundGenericEnum();
+    auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
 
@@ -420,7 +420,7 @@ public:
       return nullptr;
     
     Type enumTy = repr->Components.end()[-2].getBoundType();
-    EnumDecl *enumDecl = enumTy->getEnumOrBoundGenericEnum();
+    auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
     if (!enumDecl)
       return nullptr;
     
@@ -454,7 +454,8 @@ public:
 /// Perform top-down syntactic disambiguation of a pattern. Where ambiguous
 /// expr/pattern productions occur (tuples, function calls, etc.), favor the
 /// pattern interpretation if it forms a valid pattern; otherwise, leave it as
-/// an expression.
+/// an expression. This does no type-checking except for the bare minimum to
+/// disambiguate semantics-dependent pattern forms.
 Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
   return ResolvePattern(*this, DC).visit(P);
 }
@@ -766,6 +767,12 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
         return true;
     }
     OP->setType(type);
+    
+    // Ensure that the type of our TypeLoc is fully resolved. If an unbound
+    // generic type was spelled in the source (e.g. `case Optional.None:`) this
+    // will fill in the generic parameters.
+    OP->getParentType().setType(type, /*validated*/ true);
+    
     return false;
   }
       
