@@ -739,11 +739,18 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(P);
     
+    auto *enumDecl = type->getEnumOrBoundGenericEnum();
+    
+    if (!enumDecl) {
+      diagnose(OP->getLoc(), diag::enum_element_pattern_not_enum, type);
+      return true;
+    }
+    
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
       EnumElementDecl *element
-        = lookupEnumMemberElement(*this, type->getEnumOrBoundGenericEnum(),
+        = lookupEnumMemberElement(*this, enumDecl,
                                   type, OP->getName());
       if (!element) {
         diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
@@ -752,10 +759,17 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
       }
       OP->setElementDecl(element);
     }
+
+    EnumElementDecl *elt = OP->getElementDecl();
+    // Is the enum element actually part of the enum type we're matching?
+    if (elt->getParentEnum() != enumDecl) {
+      diagnose(OP->getLoc(), diag::enum_element_pattern_not_member_of_enum,
+               OP->getName().str(), type);
+      return true;
+    }
     
     // If there is a subpattern, push the enum element type down onto it.
     if (OP->hasSubPattern()) {
-      EnumElementDecl *elt = OP->getElementDecl();
       Type elementType;
       if (elt->hasArgumentType())
         elementType = type->getTypeOfMember(elt->getModuleContext(),
