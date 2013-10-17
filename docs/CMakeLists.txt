@@ -1,3 +1,5 @@
+add_subdirectory(tools)
+
 find_program(SPHINX_EXECUTABLE
   NAMES sphinx-build
   HINTS $ENV{SPHINX_DIR}

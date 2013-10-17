@@ -1,0 +1,26 @@
+=pod
+
+=head1 NAME
+
+swift - the amazingly new programming language
+
+=head1 SYNOPSIS
+
+B<swift> [B<-c>|B<-S>|B<-i>] B<-sdk=>I<SDK-path> B<-g>
+  [B<-O0>|B<-O1>|B<-O2>|B<-O3>]
+  B<-o> I<output-file>
+  I<input-filenames>
+
+=head1 DESCRIPTION
+
+B<Swift> is a new, high performance systems programming language.  It has a clean
+and modern syntax, and offers seamless access to existing C and Objective-C code
+and frameworks, and is memory safe (by default).
+
+Although inspired by Objective-C and many other languages, Swift is not itself a
+C-derived language. As a complete and independent language, Swift packages core
+features like flow control, data structures, and functions, with high-level
+constructs like objects, protocols, closures, and generics.  Swift embraces
+modules, eliminating the need for headers and the code duplication they entail.
+
+=cut

@@ -580,6 +580,29 @@ macro(add_swift_optimization_flags name)
   endif()
 endmacro(add_swift_optimization_flags)
 
+macro(manpage PODFILE DESC MANFILE SECTION)
+  find_program(POD2MAN pod2man)
+
+  if(POD2MAN)
+    add_custom_command(
+      OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION}
+      DEPENDS ${PODFILE}
+      COMMAND ${POD2MAN}
+        ARGS --section ${SECTION} --center ${DESC} --release --stderr --name ${MANFILE}
+        ${PODFILE} > ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION}
+    )
+  
+    set(MANPAGE_TARGET "man-${MANFILE}")
+  
+    add_custom_target(${MANPAGE_TARGET} ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION})
+  
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION}
+            DESTINATION share/man/man${SECTION} )
+  else()
+    message(WARNING "Need pod2man installed to generate man page")
+  endif()
+endmacro(manpage)
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(MODULES_SDK "" CACHE PATH
       "Path to the modules-enabled SDK to use")
