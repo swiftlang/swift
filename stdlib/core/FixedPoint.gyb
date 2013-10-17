@@ -4,10 +4,6 @@
 //// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly ////
 //// To regenerate:                                                     ////
 ////         ../../utils/gyb FixedPoint.gyb -o FixedPoint.swift         ////
-func overflowCheck<T: RandomAccessIndex>(arg: T, overflow: Bool) -> T {
-  alwaysTrap(overflow == false)
-  return arg
-}
 @{
 #
 # Utility code for later in this template
@@ -208,7 +204,11 @@ func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return overflowCheck(${Self}.${method}(lhs, rhs))
+  var tmp = ${Self}.${method}(lhs, rhs)
+  if tmp.1 {
+    Builtin.int_trap()
+  }
+  return tmp.0
 }
 @ end
 
@@ -220,6 +220,16 @@ func ~(rhs: ${Self}) -> ${Self} {
                'UInt64(%s).value' % (maskBits(bits))}
   return ${Self}(Builtin.xor_Int${bits}(rhs.value, mask))
 }
+
+@ for op, name in (
+@  ('==','eq'), ('!=','ne'),
+@  ('<',sign+'lt'), ('<=',sign+'le'),
+@  ('>',sign+'gt'), ('>=',sign+'ge')):
+@@transparent
+func ${op}(lhs: ${Self}, rhs: ${Self}) -> Bool {
+  return _getBool(Builtin.cmp_${name}_Int${bits}(lhs.value, rhs.value))
+}
+@ end
 
 @ for op, name in (
 @  ('/',sign+'div'), ('%',sign+'rem'),
