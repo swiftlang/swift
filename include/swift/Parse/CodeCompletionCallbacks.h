@@ -24,6 +24,7 @@ protected:
   Parser &P;
   ASTContext &Context;
   Parser::ParserPosition ExprBeginPosition;
+  SourceLoc SwitchCasePatternBeginLoc;
 
   /// The declaration parsed during delayed parsing that was caused by code
   /// completion.  This declaration contained the code completion token.
@@ -46,6 +47,10 @@ public:
 
   void setExprBeginning(Parser::ParserPosition PP) {
     ExprBeginPosition = PP;
+  }
+
+  void setSwitchCasePatternBeginning(SourceLoc Loc) {
+    SwitchCasePatternBeginLoc = Loc;
   }
 
   void setDelayedParsedDecl(Decl *D) {
@@ -86,6 +91,23 @@ public:
     ~InEnumElementRawValueRAII() {
       if (Callbacks)
         Callbacks->InEnumElementRawValue = false;
+    }
+  };
+
+  class InSwitchCasePatternRAII {
+    CodeCompletionCallbacks *Callbacks;
+
+  public:
+    InSwitchCasePatternRAII(CodeCompletionCallbacks *Callbacks,
+                            SourceLoc BeginLoc)
+        : Callbacks(Callbacks) {
+      if (Callbacks)
+        Callbacks->SwitchCasePatternBeginLoc = BeginLoc;
+    }
+
+    ~InSwitchCasePatternRAII() {
+      if (Callbacks)
+        Callbacks->SwitchCasePatternBeginLoc = SourceLoc();
     }
   };
 

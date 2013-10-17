@@ -939,6 +939,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
+    rBraceLoc = Tok.getLoc();
   }
 
   return makeParserResult(
@@ -970,6 +971,8 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
       // Parse comma-separated patterns.
       SmallVector<Pattern *, 2> patterns;
       do {
+        CodeCompletionCallbacks::InSwitchCasePatternRAII InSwitchCasePatternRAII(
+            CodeCompletion, Tok.getLoc());
         ParserResult<Pattern> pattern = parseMatchingPattern();
         Status |= pattern;
         if (pattern.isNonNull()) {

@@ -1,4 +1,5 @@
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ModuleLoadListener.h"
@@ -54,6 +55,48 @@ std::string swift::ide::removeCodeCompletionTokens(
   }
   return CleanFile;
 }
+
+namespace {
+class StmtFinder : public ASTWalker {
+  SourceManager &SM;
+  SourceLoc Loc;
+  StmtKind Kind;
+  Stmt *Found = nullptr;
+
+public:
+  StmtFinder(SourceManager &SM, SourceLoc Loc, StmtKind Kind)
+      : SM(SM), Loc(Loc), Kind(Kind) {}
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (SM.rangeContainsTokenLoc(S->getSourceRange(), Loc))
+      return { true, S };
+    else
+      return { false, S };
+  }
+
+  Stmt *walkToStmtPost(Stmt *S) override {
+    if (S->getKind() == Kind) {
+      Found = S;
+      return nullptr;
+    }
+    return S;
+  }
+
+  Stmt *getFoundStmt() const {
+    return Found;
+  }
+};
+
+Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
+                      StmtKind Kind) {
+  auto &SM = AFD->getASTContext().SourceMgr;
+  assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
+  StmtFinder Finder(SM, Loc, Kind);
+  // FIXME: this is not thread-safe.
+  const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
+  return Finder.getFoundStmt();
+}
+} // unnamed namespace
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   Chunk *TailChunks = reinterpret_cast<Chunk *>(this + 1);
@@ -546,6 +589,7 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   enum class LookupKind {
     ValueExpr,
     ValueInDeclContext,
+    EnumElement,
     Type,
     TypeInDeclContext,
   };
@@ -713,7 +757,6 @@ public:
       for (auto TupleElt : TP->getFields()) {
         if (NeedComma)
           Builder.addComma(", ");
-        StringRef BoundNameStr;
         Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
                                  TupleElt.getPattern()->getType().getString());
         NeedComma = true;
@@ -726,6 +769,38 @@ public:
     }
     auto *TP = cast<TypedPattern>(P);
     Builder.addCallParameter(TP->getBoundName(), TP->getType().getString());
+  }
+
+  void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
+                              Identifier Label) {
+    if (auto *TT = T->getAs<TupleType>()) {
+      if (!Label.empty()) {
+        Builder.addTextChunk(Label.str());
+        Builder.addTextChunk(": ");
+      }
+      Builder.addLeftParen();
+      bool NeedComma = false;
+      for (auto TupleElt : TT->getFields()) {
+        if (NeedComma)
+          Builder.addComma(", ");
+        addPatternFromTypeImpl(Builder, TupleElt.getType(),
+                               TupleElt.getName());
+        NeedComma = true;
+      }
+      Builder.addRightParen();
+      return;
+    }
+    if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
+      Builder.addCallParameter(Identifier(),
+                               PT->getUnderlyingType().getString());
+      return;
+    }
+
+    Builder.addCallParameter(Label, T.getString());
+  }
+
+  void addPatternFromType(CodeCompletionResultBuilder &Builder, Type T) {
+    addPatternFromTypeImpl(Builder, T, Identifier());
   }
 
   void addFunctionCall(const AnyFunctionType *AFT) {
@@ -768,6 +843,7 @@ public:
           FD->getDeclContext() == CurrentMethod->getDeclContext() &&
           InsideStaticMethod && !FD->isStatic();
       break;
+    case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       llvm_unreachable("can not have a method call while doing a "
@@ -916,6 +992,23 @@ public:
                       MetaTypeType::get(AT->getDeclaredType(), Ctx));
   }
 
+  void addEnumElementRef(const EnumElementDecl *EED,
+                         DeclVisibilityKind Reason,
+                         bool HasTypeContext) {
+    CodeCompletionResultBuilder Builder(
+      CompletionContext,
+      CodeCompletionResult::ResultKind::Declaration,
+      HasTypeContext ? SemanticContextKind::ExpressionSpecific
+                     : getSemanticContext(EED, Reason));
+    Builder.setAssociatedDecl(EED);
+    if (HasTypeContext)
+      Builder.addLeadingDot();
+    Builder.addTextChunk(EED->getName().str());
+    if (EED->hasArgumentType())
+      addPatternFromType(Builder, EED->getArgumentType());
+    addTypeAnnotation(Builder, EED->getType());
+  }
+
   void addKeyword(StringRef Name, Type TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -1059,6 +1152,12 @@ public:
 
       return;
 
+    case LookupKind::EnumElement:
+      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+        addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
+      }
+      return;
+
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -1173,9 +1272,40 @@ public:
     addKeyword("__COLUMN__", "Int");
 
     if (Ctx.LangOpts.Axle)
-      addAxleSugarTypeCompletions(/*metatypeAnnotation=*/true);
+      addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/true);
 
     CompletionContext.includeUnqualifiedClangResults();
+  }
+
+  void getEnumElementCompletions(SourceLoc Loc) {
+    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
+        Kind, LookupKind::EnumElement);
+
+    const DeclContext *FunctionDC = CurrDeclContext;
+    const AbstractFunctionDecl *CurrentFunction = nullptr;
+    while (FunctionDC->isLocalContext()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
+        CurrentFunction = AFD;
+        break;
+      }
+      FunctionDC = FunctionDC->getParent();
+    }
+    if (!CurrentFunction)
+      return;
+
+    auto *Switch = cast_or_null<SwitchStmt>(
+        findNearestStmt(CurrentFunction, Loc, StmtKind::Switch));
+    if (!Switch)
+      return;
+    auto Ty = Switch->getSubjectExpr()->getType();
+    if (!Ty)
+      return;
+    auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
+    if (!TheEnumDecl)
+      return;
+    for (auto Element : TheEnumDecl->getAllElements()) {
+      foundDecl(Element, DeclVisibilityKind::MemberOfCurrentNominal);
+    }
   }
 
   void getTypeCompletions(Type BaseType) {
@@ -1190,11 +1320,11 @@ public:
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
 
     if (Ctx.LangOpts.Axle)
-      addAxleSugarTypeCompletions(/*metatypeAnnotation=*/false);
+      addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/false);
   }
 
 private:
-  void addAxleSugarTypeCompletions(bool metatypeAnnotation) {
+  void addAxleSugarTypeCompletions(bool MetatypeAnnotation) {
     {
       // Vec<type, length>
       CodeCompletionResultBuilder Builder(
@@ -1208,7 +1338,7 @@ private:
       Builder.addGenericParameter("length");
       Builder.addRightAngle();
 
-      if (metatypeAnnotation) {
+      if (MetatypeAnnotation) {
         Builder.addTypeAnnotation("Vec<...>.metatype");
       }
     }
@@ -1229,11 +1359,10 @@ private:
       Builder.addGenericParameter("columns");
       Builder.addRightAngle();
 
-      if (metatypeAnnotation) {
+      if (MetatypeAnnotation) {
         Builder.addTypeAnnotation("Matrix<...>.metatype");
       }
     }
-
   }
 };
 
@@ -1364,8 +1493,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprBeginning: {
     if (CStyleForLoopIterationVariable)
       Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
-    Lookup.getValueCompletionsInDeclContext(
-        P.Context.SourceMgr.getCodeCompletionLoc());
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getValueCompletionsInDeclContext(Loc);
+    Lookup.getEnumElementCompletions(Loc);
     break;
   }
 
