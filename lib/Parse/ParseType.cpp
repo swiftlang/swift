@@ -707,6 +707,7 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   case tok::comma:
   case tok::semi:
   case tok::eof:
+  case tok::code_complete:
     return true;
   
   case tok::period_prefix:
