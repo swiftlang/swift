@@ -3,7 +3,7 @@
 @# Ignore the following admonition; it applies to the resulting .swift file only
 //// Automatically Generated From AxleBuiltins.gyb.  Do Not Edit Directly ////
 //// To regenerate:                                                       ////
-////         ../../tools/gyb AxleBuiltins.gyb -o AxleBuiltins.swift       ////
+////         ../../utils/gyb AxleBuiltins.gyb -o AxleBuiltins.swift       ////
 
 // 2.2.1 Vertex Functions
 @@asmname="llvm.air.get_vertex_id"

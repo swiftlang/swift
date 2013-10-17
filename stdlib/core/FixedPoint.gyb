@@ -3,7 +3,7 @@
 @# Ignore the following admonition; it applies to the resulting .swift file only
 //// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly ////
 //// To regenerate:                                                     ////
-////         ../../tools/gyb FixedPoint.gyb -o FixedPoint.swift         ////
+////         ../../utils/gyb FixedPoint.gyb -o FixedPoint.swift         ////
 func overflowCheck<T: RandomAccessIndex>(arg: T, overflow: Bool) -> T {
   alwaysTrap(overflow == false)
   return arg
