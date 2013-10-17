@@ -748,6 +748,7 @@ namespace {
           FirstFieldIndex(firstField),
           NextFieldIndex(firstField)
     {
+      visitConformances(theClass->getProtocols());
       visitMembers(theClass);
     }
     
@@ -757,6 +758,8 @@ namespace {
         Layout(nullptr), FieldLayout(nullptr)
     {
       buildCategoryName(CategoryName);
+
+      visitConformances(theClass->getProtocols());
 
       for (Decl *member : TheExtension->getMembers())
         visit(member);
@@ -772,8 +775,23 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
       : IGM(IGM), TheEntity(theProtocol), TheExtension(nullptr)
     {
+      visitConformances(theProtocol->getProtocols());
+
       for (Decl *member : theProtocol->getMembers())
         visit(member);
+    }
+    
+    void visitConformances(ArrayRef<ProtocolDecl*> allProtocols) {
+      // Gather protocol records for all of the formal ObjC protocol
+      // conformances.
+      for (ProtocolDecl *p : allProtocols) {
+        if (!p->isObjC())
+          continue;
+        // Don't emit the magic DynamicLookup conformance.
+        if (p == IGM.Context.getProtocol(KnownProtocolKind::DynamicLookup))
+          continue;
+        Protocols.push_back(buildProtocolRef(p));
+      }
     }
     
     void visitObjCConformance(ProtocolDecl *protocol,
@@ -1097,8 +1115,8 @@ namespace {
 
     /// typedef uintptr_t protocol_ref_t;  // protocol_t*, but unremapped
     llvm::Constant *buildProtocolRef(ProtocolDecl *protocol) {
-      // FIXME
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      assert(protocol->isObjC());
+      return IGM.getAddrOfObjCProtocolRecord(protocol);
     }
     
     /// struct protocol_list_t {

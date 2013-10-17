@@ -190,15 +190,35 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   return global;
 }
 
+/// Get or create an ObjC protocol record. Always returns an i8*. We lazily
+/// create ObjC protocol_t records for protocols, storing references to the
+/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// fixed up by the runtime.
+///
+/// It is not correct to use this value as a Protocol* reference directly. The
+/// ObjC runtime requires protocol references to be loaded from an
+/// indirect variable, the address of which is given by
+/// getAddrOfObjCProtocolRef.
+llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto) {
+  return const_cast<llvm::Constant*>
+    (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).record));
+}
+
 /// Get or create an ObjC protocol reference. Always returns an i8**. We lazily
 /// create ObjC protocol_t records for protocols, storing references to the
 /// record into the __objc_protolist and  and __objc_protorefs sections to be
 /// fixed up by the runtime.
 llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto) {
+  return const_cast<llvm::Constant*>
+    (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).ref));
+}
+
+IRGenModule::ObjCProtocolPair
+IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   // See whether we already emitted this protocol reference.
-  auto found = ObjCProtocolRefs.find(proto);
-  if (found != ObjCProtocolRefs.end()) {
-    return cast<llvm::Constant>(found->second);
+  auto found = ObjCProtocols.find(proto);
+  if (found != ObjCProtocols.end()) {
+    return found->second;
   }
   
   // Emit the protocol record.
@@ -228,9 +248,11 @@ llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto) {
   protocolRef->setAlignment(getPointerAlignment().getValue());
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection("__DATA,__objc_protorefs,coalesced,no_dead_strip");
-  ObjCProtocolRefs.insert({proto, protocolRef});
+
+  ObjCProtocolPair pair{protocolRecord, protocolRef};
+  ObjCProtocols.insert({proto, pair});
   
-  return protocolRef;
+  return pair;
 }
 
 namespace {

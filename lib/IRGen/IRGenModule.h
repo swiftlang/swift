@@ -220,6 +220,7 @@ public:
   llvm::Constant *getAddrOfGlobalString(StringRef string);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
+  llvm::Constant *getAddrOfObjCProtocolRecord(ProtocolDecl *proto);
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr);
@@ -244,9 +245,21 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
-  /// Map of Objective-C protocol references, bitcast to i8*.
-  llvm::DenseMap<ProtocolDecl*, llvm::WeakVH> ObjCProtocolRefs;
 
+  /// Map of Objective-C protocols and protocol references, bitcast to i8*.
+  /// The interesting global variables relating to an ObjC protocol.
+  struct ObjCProtocolPair {
+    /// The global variable that contains the protocol record.
+    llvm::WeakVH record;
+    /// The global variable that contains the indirect reference to the
+    /// protocol record.
+    llvm::WeakVH ref;
+  };
+  
+  llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
+
+  ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
+  
   void emitGlobalLists();
 
 //--- Runtime ---------------------------------------------------------------
