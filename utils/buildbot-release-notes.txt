@@ -2,7 +2,11 @@
 ----------
 
 * Missing return statement from a non-Void function is diagnosed as an error.
-* Vector<T> is dead. Long live Array<T> (and value semantics)!
+* Vector<T> has been replaced with Array<T>. This is a complete rewrite to use
+  value-semantics and copy-on-write behavior. The former means that you never
+  need to defensively copy again (or remember to attribute a property as "copy")
+  and the later yields better performance than defensive copying. Dictionary<T>
+  is next.
 
 2013-10-16
 ----------
