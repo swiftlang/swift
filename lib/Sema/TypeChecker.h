@@ -158,6 +158,14 @@ public:
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
+  /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
+  /// Type or an ErrorType in case of error.
+  Type resolveIdentifierType(DeclContext *DC,
+                             IdentTypeRepr *IdType,
+                             bool allowUnboundGenerics,
+                             bool diagnoseErrors,
+                             GenericTypeResolver *resolver);
+  
   /// \brief Validate the given type.
   ///
   /// Type validation performs name binding, checking of generic arguments,

@@ -25,200 +25,35 @@
 using namespace swift;
 
 namespace {
+  
+/// Find an unqualified enum element.
+EnumElementDecl *
+lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
+                                   Identifier name) {
+  UnqualifiedLookup lookup(name, DC, &TC, SourceLoc(), /*typeLookup*/false);
+  
+  if (!lookup.isSuccess())
+    return nullptr;
 
-/// Resolves an expression consisting of nested member references ending in a
-/// decl reference to a type, returning true on success or false on failure.
-class ResolveTypeReference : public ASTVisitor<ResolveTypeReference,
-                                               /*ExprRetTy=*/ bool>
-{
-public:
-  TypeChecker &TC;
-  SmallVectorImpl<IdentTypeRepr::Component> &components;
-  llvm::PointerUnion<Module*, TypeDecl*> curScope;
-  Type curType;
-  DeclContext *rootDC;
+  // See if there is any enum element in there.
+  EnumElementDecl *foundElement = nullptr;
+  for (auto result : lookup.Results) {
+    if (!result.hasValueDecl())
+      continue;
+    auto *oe = dyn_cast<EnumElementDecl>(result.getValueDecl());
+    if (!oe)
+      continue;
+    // Ambiguities should be ruled out by parsing.
+    assert(!foundElement && "ambiguity in enum case name lookup?!");
+    foundElement = oe;
+  }
+  return foundElement;
+}
 
-  ResolveTypeReference(TypeChecker &TC,
-                       SmallVectorImpl<IdentTypeRepr::Component> &components,
-                       DeclContext *rootDC)
-    : TC(TC), components(components), rootDC(rootDC) {}
-  
-  Type doIt(Expr *e) {
-    if (!visit(e))
-      return Type();
-    // If we succeeded, store the resolved type in the final component of the
-    // identifier.
-    if (curType)
-      components.back().setValue(curType);
-    
-    return curType;
-  }
-  
-  bool visitExpr(Expr *e) {
-    return false;
-  }
-  
-  bool visitDeclRefExpr(DeclRefExpr *dre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    assert(!curScope && "decl ref should be root element of expr");
-    
-    // Get the declared type.
-    auto *td = dyn_cast<TypeDecl>(dre->getDecl());
-    if (!td)
-      return false;
-    
-    curScope = td;
-    curType = td->getDeclaredType();
-    
-    // Track the AST location of the component.
-    components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}});
-    components.back().setValue(curScope.get<TypeDecl*>());
-    return true;
-  }
-  
-  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    assert(!curScope && "decl ref should be root element of expr");
-    
-    // Look up the type.
-    UnqualifiedLookup lookup(udre->getName(), rootDC, &TC);
-    if (!lookup.isSuccess())
-      return false;
-    
-    bool foundComponent = false;
-    
-    // Prefer a type result if we find one, but accept a module too.
-    for (auto &result : lookup.Results) {
-      switch (result.Kind) {
-      case UnqualifiedLookupResult::ModuleName:
-        // If we see two modules, bail on ambiguity.
-        if (curScope.is<Module*>())
-          return false;
-        // If we already have a type, favor it.
-        if (curScope.is<TypeDecl*>())
-          continue;
-
-        foundComponent = true;
-        curScope = result.getNamedModule();
-        break;
-      
-      // Ignore kinds that never refer to types.
-      case UnqualifiedLookupResult::MemberProperty:
-      case UnqualifiedLookupResult::MemberFunction:
-        continue;
-          
-      // See whether we resolved a type.
-      case UnqualifiedLookupResult::ModuleMember:
-      case UnqualifiedLookupResult::LocalDecl:
-      case UnqualifiedLookupResult::MetatypeMember:
-      case UnqualifiedLookupResult::ExistentialMember:
-      case UnqualifiedLookupResult::ArchetypeMember:
-      case UnqualifiedLookupResult::MetaArchetypeMember: {
-        auto *td = dyn_cast<TypeDecl>(result.getValueDecl());
-        if (!td)
-          continue;
-        // If we already have a type, bail on ambiguity.
-        if (curScope.is<TypeDecl*>())
-          continue;
-        
-        foundComponent = true;
-        curScope = td;
-        curType = td->getDeclaredType();
-        break;
-      }
-      }
-    }
-
-    if (!foundComponent)
-      return false;
-    
-    assert(curScope && "shouldn't have got past the loop without a curScope");
-    
-    // Track the AST location of the component.
-    components.push_back({udre->getLoc(), udre->getName(), {}});
-    if (curScope.is<TypeDecl*>())
-      components.back().setValue(curScope.get<TypeDecl*>());
-    else
-      components.back().setValue(curScope.get<Module*>());
-    return true;
-  }
-  
-  bool visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    if (!visit(ude->getBase()))
-      return false;
-    
-    assert(!components.empty() && "no components before dot expr?!");
-    assert(curScope && "no base context?!");
-    
-    // Do qualified lookup into the current scope.
-    LookupTypeResult lookup;
-    if (TypeDecl *td = curScope.dyn_cast<TypeDecl*>()) {
-      // Only nominal types have members.
-      auto *ntd = dyn_cast<NominalTypeDecl>(td);
-      if (!ntd)
-        return false;
-      
-      // Find a type member by the given name.
-      lookup = TC.lookupMemberType(td->getDeclaredType(), ude->getName(),
-                                   rootDC);
-    } else if (Module *m = curScope.dyn_cast<Module*>()) {
-      // Look into the module.
-      lookup = TC.lookupMemberType(ModuleType::get(m), ude->getName(), rootDC);
-    } else
-      llvm_unreachable("invalid curType");
-    
-    // Make sure the lookup succeeded.
-    if (!lookup || lookup.isAmbiguous())
-      return false;
-    
-    curScope = lookup[0].first;
-    curType = lookup[0].second;
-    
-    // Track the AST location of the new component.
-    components.push_back({ude->getLoc(), ude->getName(), {}});
-    components.back().setValue(curScope.get<TypeDecl*>());
-    return true;
-  }
-  
-  bool visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
-    if (!visit(use->getSubExpr()))
-      return false;
-    
-    assert(!components.empty() && "no components before generic args?!");
-    assert(curScope && "no base context?!");
-    
-    // Generic parameters don't affect lookup (yet; GADTs or
-    // constrained extensions would change this), but apply the parameters for
-    // validation and source tracking purposes.
-    
-    curType = TC.applyGenericArguments(curType, use->getLoc(), rootDC,
-                                       use->getUnresolvedParams(),
-                                       nullptr);
-    if (!curType)
-      return false;
-    
-    // Track the AST location of the generic arguments.
-    SmallVector<TypeRepr*, 4> argTypeReprs;
-    for (auto &arg : use->getUnresolvedParams())
-      argTypeReprs.push_back(arg.getTypeRepr());
-    
-    auto origComponent = components.back();
-    components.back() = {origComponent.getIdLoc(),
-                         origComponent.getIdentifier(),
-                         TC.Context.AllocateCopy(argTypeReprs)};
-    components.back().setValue(origComponent.getBoundDecl());
-    return true;
-  }
-};
-  
 /// Find an enum element in an enum type.
 EnumElementDecl *
-lookupEnumMemberElement(TypeChecker &TC, Type ty, Identifier name) {
-  // The type must be an enum.
-  EnumDecl *oof = ty->getEnumOrBoundGenericEnum();
-  if (!oof)
-    return nullptr;
-  
+lookupEnumMemberElement(TypeChecker &TC, EnumDecl *oof, Type ty,
+                        Identifier name) {
   // Look up the case inside the enum.
   LookupResult foundElements = TC.lookupMember(ty, name, oof,
                                                /*allowDynamicLookup=*/false);
@@ -239,34 +74,80 @@ lookupEnumMemberElement(TypeChecker &TC, Type ty, Identifier name) {
   return foundElement;
 }
   
-/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to an enum element
-/// reference, returning a TypeLoc over the type reference and the referenced
-/// EnumElementDecl if successful, or returning null on failure.
-static std::pair<TypeLoc, EnumElementDecl*>
-lookupEnumElementReference(TypeChecker &TC,
-                            UnresolvedDotExpr *refExpr,
-                            DeclContext *DC) {
-  // The left side of the dot needs to be a type; do type lookup on it.
-  SmallVector<IdentTypeRepr::Component, 4> components;
-  
-  Type ty = ResolveTypeReference(TC, components, DC).doIt(refExpr->getBase());
-  if (!ty)
-    return {{}, nullptr};
-  
-  // Look up the case inside the enum.
-  EnumElementDecl *foundElement
-    = lookupEnumMemberElement(TC, ty, refExpr->getName());
-  if (!foundElement)
-    return {{}, nullptr};
-  
-  // Build a TypeLoc to preserve AST location info for the reference chain.
-  TypeRepr *repr
-    = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
-  TypeLoc loc(repr);
-  loc.setType(ty);
-  return {loc, foundElement};
-}
+// 'T(x...)' is treated as a NominalTypePattern if 'T' references a type
+// by name, or an EnumElementPattern if 'T' references an enum element.
+// Build up an IdentTypeRepr and see what it resolves to.
+struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
+{
+  SmallVectorImpl<IdentTypeRepr::Component> &components;
+  ASTContext &C;
 
+  ExprToIdentTypeRepr(decltype(components) &components, ASTContext &C)
+    : components(components), C(C) {}
+  
+  bool visitExpr(Expr *e) {
+    return false;
+  }
+
+  bool visitDeclRefExpr(DeclRefExpr *dre) {
+    assert(components.empty() && "decl ref should be root element of expr");
+    
+    // Get the declared type.
+    if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
+      components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}});
+      components.back().setValue(td);
+      return true;
+    }
+    return false;
+  }
+  
+  bool visitModuleExpr(ModuleExpr *me) {
+    assert(components.empty() && "decl ref should be root element of expr");
+    
+    // Add the declared module.
+    auto module = me->getType()->getAs<ModuleType>()->getModule();
+    components.push_back({me->getLoc(), module->Name, {}});
+    components.back().setValue(module);
+    return true;
+  }
+  
+  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
+    assert(components.empty() && "decl ref should be root element of expr");
+    // Track the AST location of the component.
+    components.push_back({udre->getLoc(), udre->getName(), {}});
+    return true;
+  }
+  
+  bool visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
+    if (!visit(ude->getBase()))
+      return false;
+    
+    assert(!components.empty() && "no components before dot expr?!");
+
+    // Track the AST location of the new component.
+    components.push_back({ude->getLoc(), ude->getName(), {}});
+    return true;
+  }
+  
+  bool visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
+    if (!visit(use->getSubExpr()))
+      return false;
+    
+    assert(!components.empty() && "no components before generic args?!");
+    
+    // Track the AST location of the generic arguments.
+    SmallVector<TypeRepr*, 4> argTypeReprs;
+    for (auto &arg : use->getUnresolvedParams())
+      argTypeReprs.push_back(arg.getTypeRepr());
+    auto origComponent = components.back();
+    components.back() = {origComponent.getIdLoc(),
+      origComponent.getIdentifier(),
+      C.AllocateCopy(argTypeReprs)};
+
+    return true;
+  }
+};
+  
 class ResolvePattern : public ASTVisitor<ResolvePattern,
                                          /*ExprRetTy=*/Pattern*,
                                          /*StmtRetTy=*/void,
@@ -371,32 +252,82 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    TypeLoc referencedType;
-    EnumElementDecl *referencedDecl;
-    std::tie(referencedType, referencedDecl)
-      = lookupEnumElementReference(TC, ude, DC);
-    
-    if (!referencedDecl)
+    DependentGenericTypeResolver resolver;
+    SmallVector<IdentTypeRepr::Component, 2> components;
+    if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
     
-    return new (TC.Context) EnumElementPattern(referencedType,
-                                                ude->getDotLoc(),
-                                                ude->getNameLoc(),
-                                                ude->getName(),
-                                                referencedDecl,
-                                                nullptr);
+    auto *repr
+      = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+      
+    // See if the repr resolves to a type.
+    Type ty = TC.resolveIdentifierType(DC, repr,
+                                       /*allowUnboundGenerics*/true,
+                                       /*diagnoseErrors*/false,
+                                       &resolver);
     
-    return nullptr;
+    EnumDecl *enumDecl = ty->getEnumOrBoundGenericEnum();
+    if (!enumDecl)
+      return nullptr;
+
+    EnumElementDecl *referencedElement
+      = lookupEnumMemberElement(TC, enumDecl, ty, ude->getName());
+    
+    // Build a TypeRepr from the head of the full path.
+    TypeLoc loc(repr);
+    loc.setType(ty);
+    return new (TC.Context) EnumElementPattern(loc,
+                                               ude->getDotLoc(),
+                                               ude->getNameLoc(),
+                                               ude->getName(),
+                                               referencedElement,
+                                               nullptr);
+  }
+  
+  // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
+  Pattern *visitDeclRefExpr(DeclRefExpr *de) {
+    auto *elt = dyn_cast<EnumElementDecl>(de->getDecl());
+    if (!elt)
+      return nullptr;
+    
+    // Use the type of the enum from context.
+    TypeLoc loc = TypeLoc::withoutLoc(
+                            elt->getParentEnum()->getDeclaredTypeInContext());
+    return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
+                                               de->getLoc(),
+                                               elt->getName(),
+                                               elt,
+                                               nullptr);
+  }
+  Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
+    // Try looking up an enum element in context.
+    EnumElementDecl *referencedElement
+      = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName());
+    
+    if (!referencedElement)
+      return nullptr;
+    
+    auto *enumDecl = referencedElement->getParentEnum();
+    auto enumTy = enumDecl->getDeclaredTypeInContext();
+    TypeLoc loc = TypeLoc::withoutLoc(enumTy);
+    
+    return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
+                                               ude->getLoc(),
+                                               ude->getName(),
+                                               referencedElement,
+                                               nullptr);
   }
   
   // Call syntax forms a pattern if:
-  // - the callee in 'T.Element(x...)' or '.Element(x...)'
+  // - the callee in 'Element(x...)' or '.Element(x...)'
   //   references an enum element. The arguments then form a tuple
   //   pattern matching the element's data.
   // - the callee in 'T(...)' is a struct or class type. The argument tuple is
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
+    DependentGenericTypeResolver resolver;
+    
     // '.Element(x...)' is always treated as an EnumElementPattern.
     if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
       auto *subPattern = getSubExprPattern(ce->getArg());
@@ -407,16 +338,27 @@ public:
                                          subPattern);
     }
     
-    // 'T(x...)' is treated as a NominalTypePattern if 'T' references a type
-    // by name.
     SmallVector<IdentTypeRepr::Component, 2> components;
-    if (Type ty = ResolveTypeReference(TC, components, DC).doIt(ce->getFn())) {
+    if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
+      return nullptr;
+    
+    auto *repr
+      = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+    
+    // See first if the entire repr resolves to a type.
+    Type ty = TC.resolveIdentifierType(DC, repr,
+                                       /*allowUnboundGenerics*/true,
+                                       /*diagnoseErrors*/false,
+                                       &resolver);
+    
+    // If we got a fully valid type, then this is a nominal type pattern.
+    if (!ty->is<ErrorType>()) {
       // Validate the argument tuple elements as nominal type pattern fields.
       // They must all have keywords. For recovery, we still form the pattern
       // even if one or more elements are missing keywords.
       auto *argTuple = dyn_cast<TupleExpr>(ce->getArg());
       SmallVector<NominalTypePattern::Element, 4> elements;
-
+      
       if (!argTuple) {
         TC.diagnose(ce->getArg()->getLoc(),
                     diag::nominal_type_subpattern_without_property_name);
@@ -437,46 +379,73 @@ public:
       }
       
       // Build a TypeLoc to preserve AST location info for the reference chain.
-      TypeRepr *repr
-        = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
       TypeLoc loc(repr);
       loc.setType(ty);
-
+      
       return NominalTypePattern::create(loc,
                                         ce->getArg()->getStartLoc(),
                                         elements,
                                         ce->getArg()->getEndLoc(),
                                         TC.Context);
     }
-    
-    // 'T.Element(...)' is treated as an EnumElementPattern if
-    // the dotted path references an enum element, or a NominalTypePattern if it
-    // references a type.
-    
-    // FIXME: This redundantly resolves the left side of the dot and should be
-    // integrated with the NominalTypePattern resolution above.
-    
-    if (auto *ude = dyn_cast<UnresolvedDotExpr>(ce->getFn())) {
-      TypeLoc referencedType;
-      EnumElementDecl *referencedDecl;
-      std::tie(referencedType, referencedDecl)
-        = lookupEnumElementReference(TC, ude, DC);
+
+    // If we had a single component, try looking up an enum element in context.
+    if (repr->Components.size() == 1) {
+      auto &backComp = repr->Components.back();
+      // Try looking up an enum element in context.
+      EnumElementDecl *referencedElement
+        = lookupUnqualifiedEnumMemberElement(TC, DC, backComp.getIdentifier());
       
-      if (!referencedDecl)
+      if (!referencedElement)
         return nullptr;
       
-      if (auto oofElt = dyn_cast<EnumElementDecl>(referencedDecl)) {
-        auto *subPattern = getSubExprPattern(ce->getArg());
-        return new (TC.Context) EnumElementPattern(referencedType,
-                                                    ude->getDotLoc(),
-                                                    ude->getNameLoc(),
-                                                    ude->getName(),
-                                                    oofElt,
-                                                    subPattern);
-      }
-    }
+      auto *enumDecl = referencedElement->getParentEnum();
+      auto enumTy = enumDecl->getDeclaredTypeInContext();
+      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
 
-    return nullptr;
+      auto *subPattern = getSubExprPattern(ce->getArg());
+      return new (TC.Context) EnumElementPattern(loc,
+                                                 SourceLoc(),
+                                                 backComp.getIdLoc(),
+                                                 backComp.getIdentifier(),
+                                                 referencedElement,
+                                                 subPattern);
+    }
+    
+    // Otherwise, see whether we had an enum type as the penultimate component,
+    // and look up an element inside it.
+    if (repr->Components.empty())
+      return nullptr;
+    if (!repr->Components.end()[-2].isBoundType())
+      return nullptr;
+    
+    Type enumTy = repr->Components.end()[-2].getBoundType();
+    EnumDecl *enumDecl = enumTy->getEnumOrBoundGenericEnum();
+    if (!enumDecl)
+      return nullptr;
+    
+    auto &tailComponent = repr->Components.back();
+    
+    EnumElementDecl *referencedElement
+      = lookupEnumMemberElement(TC, enumDecl, enumTy,
+                                tailComponent.getIdentifier());
+    if (!referencedElement)
+      return nullptr;
+    
+    // Build a TypeRepr from the head of the full path.
+    TypeLoc loc;
+    auto subRepr = new (TC.Context) IdentTypeRepr(
+                    repr->Components.slice(0, repr->Components.size() - 1));
+    loc = TypeLoc(subRepr);
+    loc.setType(enumTy);
+    
+    auto *subPattern = getSubExprPattern(ce->getArg());
+    return new (TC.Context) EnumElementPattern(loc,
+                                               SourceLoc(),
+                                               tailComponent.getIdLoc(),
+                                               tailComponent.getIdentifier(),
+                                               referencedElement,
+                                               subPattern);
   }
 };
 
@@ -773,7 +742,8 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
       EnumElementDecl *element
-        = lookupEnumMemberElement(*this, type, OP->getName());
+        = lookupEnumMemberElement(*this, type->getEnumOrBoundGenericEnum(),
+                                  type, OP->getName());
       if (!element) {
         diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
                  OP->getName().str(), type);

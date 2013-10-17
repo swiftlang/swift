@@ -524,10 +524,11 @@ public:
   void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
   
   SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
   SourceLoc getStartLoc() const {
-    return ParentType.hasLocation() ? ParentType.getSourceRange().Start
-                                    : DotLoc;
+    return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
+           DotLoc.isValid()         ? DotLoc
+                                    : NameLoc;
   }
   SourceLoc getEndLoc() const {
     return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
