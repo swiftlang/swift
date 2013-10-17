@@ -181,7 +181,7 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
         --submit http://localhost:32169/submitRun) || exit 1
 
   # If the performance tests failed, fail the build.
-  if [ "$PERFORMANCE_TESTS_PASSED" -ne 0 ]; then
+  if [ "$PERFORMANCE_TESTS_PASSED" -ne 1 ]; then
       echo "*** ERROR: Swift Performance Tests failed ***"
       exit 1
   fi
