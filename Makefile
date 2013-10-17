@@ -112,9 +112,14 @@ SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -triple $(TARGET_TRIPLE) -I=$
 CXX.Flags += -std=gnu++0x -Wno-nested-anon-types -Wdocumentation
 
 CPP.Flags += -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/include \
-             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include \
-             -I$(LLVM_SRC_ROOT)/tools/clang/include \
+             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include
+ifneq ($(CLANG_SRC_ROOT),)
+CPP.Flags += -I$(CLANG_SRC_ROOT)/include \
              -I$(LLVM_OBJ_ROOT)/tools/clang/include
+else
+CPP.Flags += -I$(LLVM_SRC_ROOT)/tools/clang/include \
+             -I$(LLVM_OBJ_ROOT)/tools/clang/include
+endif
 ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
