@@ -37,6 +37,7 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
+  class SILExternalSource;
   class SILFunction;
   class SILVTable;
   class SILTypeList;
@@ -108,6 +109,9 @@ private:
 
   /// The stage of processing this module is at.
   SILStage Stage;
+
+  /// The external SIL source to use when linking this module.
+  SILExternalSource *ExternalSource = nullptr;
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
@@ -201,6 +205,12 @@ public:
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
+  }
+
+  SILExternalSource *getExternalSource() const { return ExternalSource; }
+  void setExternalSource(SILExternalSource *S) {
+    assert(!ExternalSource && "External source already set");
+    ExternalSource = S;
   }
 
   /// \brief Run the SIL verifier to make sure that all Functions follow

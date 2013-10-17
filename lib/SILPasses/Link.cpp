@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "link"
 #include "swift/AST/Module.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/Statistic.h"
@@ -38,6 +39,9 @@ void swift::performSILLinking(SILModule *M) {
  
   SerializedSILLoader *SILLoader = SerializedSILLoader::create(
                                      M->getASTContext(), M);
+
+  SILExternalSource *ExternalSource = M->getExternalSource();
+
   SmallVector<SILFunction*, 128> Worklist;
   for (auto &Fn : *M)
     Worklist.push_back(&Fn);
@@ -77,6 +81,13 @@ void swift::performSILLinking(SILModule *M) {
               Worklist.push_back(NewFn);
               ++NumFuncLinked;
               continue;
+            }
+            if (ExternalSource) {
+              if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
+                Worklist.push_back(NewFn);
+                ++NumFuncLinked;
+                continue;
+              }
             }
           }
           // FIXME: Make sure the declaration has external linkage?

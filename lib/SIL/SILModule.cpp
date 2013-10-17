@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -33,6 +34,10 @@ namespace swift {
     }
   };
 } // end namespace swift.
+
+void SILExternalSource::anchor()
+{
+}
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILModule that these things are uniqued into.
