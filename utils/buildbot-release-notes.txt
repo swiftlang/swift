@@ -2,6 +2,7 @@
 ----------
 
 * Missing return statement from a non-Void function is diagnosed as an error.
+* Vector<T> is dead. Long live Array<T> (and value semantics)!
 
 2013-10-16
 ----------
