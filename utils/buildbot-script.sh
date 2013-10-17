@@ -164,9 +164,13 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   echo "--- Running Swift Performance Tests ---"
   export CLANG="$TOOLCHAIN/usr/bin/clang"
   export SWIFT="$WORKSPACE/swift/build/bin/swift"
-  (cd "$WORKSPACE/swift/build" &&
-    "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
-        -j1 --output benchmark/results.json) || exit 1
+  if (cd "$WORKSPACE/swift/build" &&
+          "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
+              -j1 --output benchmark/results.json); then
+      PERFORMANCE_TESTS_PASSED=1
+  else
+      PERFORMANCE_TESTS_PASSED=0
+  fi
   echo "--- Submitting Swift Performance Tests ---"
   swift_source_revision="$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")"
   (cd "$WORKSPACE/swift/build" &&
@@ -175,6 +179,12 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
         --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
         --run-order "$swift_source_revision" \
         --submit http://localhost:32169/submitRun) || exit 1
+
+  # If the performance tests failed, fail the build.
+  if [ "$PERFORMANCE_TESTS_PASSED" -ne 0 ]; then
+      echo "*** ERROR: Swift Performance Tests failed ***"
+      exit 1
+  fi
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
