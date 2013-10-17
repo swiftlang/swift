@@ -26,11 +26,13 @@ public:
   SILExternalSource() { }
   virtual ~SILExternalSource() = default;
 
-  // SILExternalSource gets called for each external function
-  // that the SIL linker would try to load SIL for.  In particular
-  // this means transparent functions.
-  // callee is the (usually empty) called function.
+  /// SILExternalSource gets called for each external function
+  /// that the SIL linker would try to load SIL for.  In particular
+  /// this means transparent functions.
+  ///
+  /// \param callee is the (usually empty) called function.
   virtual SILFunction *lookupSILFunction(SILFunction *callee) = 0;
+
 private:
   virtual void anchor();
 };
