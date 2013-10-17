@@ -1715,6 +1715,15 @@ namespace {
       auto resultTy = simplifyType(expr->getType());
       expr->setType(resultTy);
 
+      // Convert the condition to a logic value.
+      auto cond
+        = solution.convertToLogicValue(expr->getCondExpr(),
+                                       cs.getConstraintLocator(expr, { }));
+      if (!cond)
+        return nullptr;
+      expr->setCondExpr(cond);
+
+      // Coerce the then/else branches to the common type.
       expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
                                      ConstraintLocatorBuilder(
                                        cs.getConstraintLocator(expr, { }))
@@ -3155,22 +3164,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         Rewriter.visitNewArrayExpr(newArray);
-        return { false, expr };
-      }
-
-      // For ternary expressions, visit the then and else branches;
-      // the condition was checked separately.
-      if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
-        // FIXME: Record failures.
-        if (auto thenExpr = ifExpr->getThenExpr()->walk(*this)) {
-          ifExpr->setThenExpr(thenExpr);
-        }
-
-        if (auto elseExpr = ifExpr->getElseExpr()->walk(*this)) {
-          ifExpr->setElseExpr(elseExpr);
-        }
-
-        Rewriter.visitIfExpr(ifExpr);
         return { false, expr };
       }
 

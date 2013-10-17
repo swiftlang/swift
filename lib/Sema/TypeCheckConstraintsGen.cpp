@@ -910,14 +910,17 @@ namespace {
     }
     
     Type visitIfExpr(IfExpr *expr) {
-      // The condition expression must be convertible with getLogicValue.
-      // We handle this type-check completely separately, because it has no
-      // bearing on the results of the type-check of the expression containing
-      // the ternary.
+      // The conditional expression must conform to LogicValue.
       Expr *condExpr = expr->getCondExpr();
-      // FIXME: Mark expression as an error if this fails.
-      CS.getTypeChecker().typeCheckCondition(condExpr, CS.DC);
-      expr->setCondExpr(condExpr);
+      auto logicValue
+        = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
+                                          KnownProtocolKind::LogicValue);
+      if (!logicValue)
+        return Type();
+
+      CS.addConstraint(ConstraintKind::ConformsTo, condExpr->getType(),
+                       logicValue->getDeclaredType(),
+                       CS.getConstraintLocator(expr, { }));
 
       // The branches must be convertible to a common type.
       auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
