@@ -655,8 +655,134 @@ struct HeapMetadata : Metadata {
   constexpr HeapMetadata(const Metadata &base) : Metadata(base) {}
 };
 
-/// Information about a nominal type.  Not described for now.
-struct NominalTypeDescriptor;
+/// Header for a generic parameter descriptor. This is a variable-sized
+/// structure that describes how to find and parse a generic parameter vector
+/// within
+struct GenericParameterDescriptor {
+  /// The offset of the descriptor in the metadata record. If NumParams is zero,
+  /// this value is meaningless.
+  uintptr_t Offset;
+  /// The number of type parameters. A value of zero means there is no generic
+  /// parameter vector.
+  uintptr_t NumParams;
+  
+  /// True if the nominal type has generic parameters.
+  bool hasGenericParams() const { return NumParams > 0; }
+  
+  /// A type parameter.
+  struct Parameter {
+    /// The number of protocol witness tables required by this type parameter.
+    uintptr_t NumWitnessTables;
+    
+    // TODO: This is the bare minimum to be able to parse an opaque generic
+    // parameter vector. Should we include additional info, such as the
+    // required protocols?
+  };
+
+  /// The parameter descriptors are in a tail-emplaced array of NumParams
+  /// elements.
+  Parameter Parameters[1];
+  
+  /// Return an opaque pointer past the end of the generic parameter descriptor.
+  void *getEndOfDescriptor() {
+    return reinterpret_cast<void*>(Parameters + NumParams);
+  }
+  
+  const void *getEndOfDescriptor() const {
+    return reinterpret_cast<const void*>(Parameters + NumParams);
+  }
+};
+  
+struct ClassTypeDescriptor;
+struct StructTypeDescriptor;
+struct EnumTypeDescriptor;
+  
+/// Common information about all nominal types. For generic types, this
+/// descriptor is shared for all instantiations of the generic type.
+struct NominalTypeDescriptor {
+  /// The kind of nominal type descriptor.
+  NominalTypeKind Kind;
+  /// The mangled name of the nominal type, with no generic parameters.
+  const char *Name;
+  /// The generic parameter descriptor header. This describes how to find and
+  /// parse the generic parameter vector in metadata records for this nominal
+  /// type.
+  GenericParameterDescriptor GenericParams;
+  
+  // NOTE: GenericParams ends with a tail-allocated array, so it cannot be
+  // followed by additional fields.
+  
+  /// Get the class type descriptor. The nominal type descriptor must be for a
+  /// class type.
+  ClassTypeDescriptor &getClassTypeDescriptor() {
+    return *reinterpret_cast<ClassTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+  const ClassTypeDescriptor &getClassTypeDescriptor() const {
+    return *reinterpret_cast<const ClassTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+  
+  /// Get the struct type descriptor. The nominal type descriptor must be for a
+  /// struct type.
+  StructTypeDescriptor &getStructTypeDescriptor() {
+    return *reinterpret_cast<StructTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+  const StructTypeDescriptor &getStructTypeDescriptor() const {
+    return *reinterpret_cast<const StructTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+
+  /// Get the enum type descriptor. The nominal type descriptor must be for an
+  /// enum type.
+  EnumTypeDescriptor &getEnumTypeDescriptor() {
+    return *reinterpret_cast<EnumTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+  const EnumTypeDescriptor &getEnumTypeDescriptor() const {
+    return *reinterpret_cast<const EnumTypeDescriptor*>
+      (GenericParams.getEndOfDescriptor());
+  }
+};
+
+/// Information about class types. Part of a NominalTypeDescriptor.
+struct ClassTypeDescriptor {
+  /// The number of stored properties in the class, not including its
+  /// superclasses.
+  uintptr_t NumStoredProperties;
+  /// The offset of the field offset vector for this class's stored properties
+  /// in its metadata, if any. 0 means there is no field offset vector.
+  uintptr_t FieldOffsetVectorOffset;
+  
+  /// True if metadata records for this type have a field offset vector for its
+  /// stored properties.
+  bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
+
+  // TODO: Field names? Some description of how to derive field types?
+};
+
+/// Information about struct types. Part of a NominalTypeDescriptor.
+struct StructTypeDescriptor {
+  /// The number of stored properties in the struct, not including its
+  /// superclasses.
+  uintptr_t NumStoredProperties;
+  /// The offset of the field offset vector for this struct's stored properties
+  /// in its metadata, if any. 0 means there is no field offset vector.
+  uintptr_t FieldOffsetVectorOffset;
+  
+  /// True if metadata records for this type have a field offset vector for its
+  /// stored properties.
+  bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
+  
+  // TODO: Field names? Some description of how to derive field types?
+};
+  
+/// Information about enum types. Part of a NominalTypeDescriptor.
+struct EnumTypeDescriptor {
+  // TODO: Layout strategy? Number of cases? Names of cases? Some description of
+  // how to derive case types?
+};
 
 /// The structure of all class metadata.  This structure is embedded
 /// directly within the class's heap metadata structure and therefore

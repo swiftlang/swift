@@ -32,8 +32,8 @@ enum class MetadataKind : uintptr_t {
   /// A struct type.
   Struct        = 1,
 
-  /// A union type.
-  /// If we add reference unions, that needs to go here.
+  /// An enum type.
+  /// If we add reference enums, that needs to go here.
   Enum          = 2,
 
   /// A type whose value is not exposed in the metadata system.
@@ -71,6 +71,16 @@ enum class MetadataKind : uintptr_t {
   
   /// Anything greater than this is a class isa pointer.
   MetadataKind_Last = HeapArray
+};
+  
+/// Kinds of Swift nominal type descriptor records.
+enum class NominalTypeKind : uintptr_t {
+  /// A class type.
+  Class = uintptr_t(MetadataKind::Class),
+  /// A struct type.
+  Struct = uintptr_t(MetadataKind::Struct),
+  /// An enum type.
+  Enum = uintptr_t(MetadataKind::Enum),
 };
 
 }
