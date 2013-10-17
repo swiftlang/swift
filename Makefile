@@ -113,8 +113,8 @@ CXX.Flags += -std=gnu++0x -Wno-nested-anon-types -Wdocumentation
 
 CPP.Flags += -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/include \
              -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include \
-             -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/../clang/include \
-             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/../clang/include
+             -I$(LLVM_SRC_ROOT)/tools/clang/include \
+             -I$(LLVM_OBJ_ROOT)/tools/clang/include
 ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
