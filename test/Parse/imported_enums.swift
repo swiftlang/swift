@@ -1,9 +1,9 @@
 // RUN: %swift -parse %s
 
 // This is used by the matching_patterns test to test qualified reference to
-// union elements.
+// enum elements.
 
-union ImportedUnion {
+enum ImportedEnum {
   case Simple
   case Compound(Int)
 }
