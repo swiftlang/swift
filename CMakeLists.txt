@@ -143,6 +143,8 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
+set(SWIFT_EXTRA_FLAGS "" CACHE STRING
+  "Extra flags to pass when compiling swift files")
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
@@ -239,6 +241,8 @@ function(compile_swift_files)
   if (SWIFT_MODULE_CACHE_PATH)
     list(APPEND swift_flags "-module-cache-path=${SWIFT_MODULE_CACHE_PATH}")
   endif()
+
+  list(APPEND swift_flags "${SWIFT_EXTRA_FLAGS}")
 
   # FIXME: Cleaner way to do this?
 
