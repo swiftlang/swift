@@ -1001,7 +1001,7 @@ public:
       HasTypeContext ? SemanticContextKind::ExpressionSpecific
                      : getSemanticContext(EED, Reason));
     Builder.setAssociatedDecl(EED);
-    if (HasTypeContext)
+    if (needDot() || HasTypeContext)
       Builder.addLeadingDot();
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
@@ -1096,6 +1096,10 @@ public:
           addConstructorCall(CD, Reason);
         }
         return;
+      }
+
+      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
       }
 
       if (HaveDot)

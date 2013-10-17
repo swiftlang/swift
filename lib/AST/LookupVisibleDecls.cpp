@@ -87,6 +87,11 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     if (!(LS.isQualified() && LS.isOnMetatype()) && FD->isStatic())
       return false;
   }
+  if (isa<EnumElementDecl>(Member)) {
+    // Can not reference enum elements on non-metatypes.
+    if (!(LS.isQualified() && LS.isOnMetatype()))
+      return false;
+  }
   if (LS.isQualified() && LS.isOnSuperclass() && isa<ConstructorDecl>(Member)) {
     // Can not call constructors from a superclass.
     return false;
