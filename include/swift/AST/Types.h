@@ -1981,6 +1981,11 @@ public:
     return T->getKind() == TypeKind::Protocol;
   }
 
+  /// Canonicalizes the given set of protocols by eliminating any mentions
+  /// of protocols that are already covered by inheritance due to other entries
+  /// in the protocol list, then sorting them in some stable order.
+  static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+
 private:
   friend class NominalTypeDecl;
   ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);

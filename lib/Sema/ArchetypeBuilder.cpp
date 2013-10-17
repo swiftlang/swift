@@ -659,3 +659,47 @@ void ArchetypeBuilder::dump() {
     PA.second->dump(llvm::errs(), 2);
   }
 }
+
+Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
+  // If the type is not dependent, there's nothing to map.
+  if (!type->isDependentType())
+    return type;
+
+  auto genericParams = dc->getGenericParamsOfContext();
+  assert(genericParams && "Missing generic parameters for dependent context");
+  unsigned genericParamsDepth = genericParams->getDepth();
+  return type.transform(dc->getASTContext(),
+                        [&](Type type) -> Type {
+    // Map a generic parameter type to its archetype.
+    if (auto gpType = type->getAs<GenericTypeParamType>()) {
+      auto index = gpType->getIndex();
+      unsigned depth = gpType->getDepth();
+
+      // Skip down to the generic parameter list that houses the corresponding
+      // generic parameter.
+      auto myGenericParams = genericParams;
+      unsigned skipLevels = genericParamsDepth - depth;
+      while (skipLevels > 0) {
+        myGenericParams = genericParams->getOuterParameters();
+        assert(myGenericParams && "Wrong number of levels?");
+        --skipLevels;
+      }
+
+      // Extract the generic parameter.
+      auto gp = myGenericParams->getParams()[index];
+
+      // Return the archetype.
+      return gp.getAsTypeParam()->getArchetype();
+    }
+
+    // Map a dependent member to the corresponding nested archetype.
+    if (auto dependentMember = type->getAs<DependentMemberType>()) {
+      auto base = mapTypeIntoContext(dc, dependentMember->getBase());
+      auto baseArchetype = base->castTo<ArchetypeType>();
+      return baseArchetype->getNestedType(dependentMember->getName());
+    }
+
+    return type;
+  });
+}
+

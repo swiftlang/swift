@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/SourceManager.h"
@@ -911,6 +912,137 @@ namespace {
       return verifyParsed(cast<AbstractFunctionDecl>(DD));
     }
 
+    /// Check that the generic requirements line up with the archetypes.
+    void checkGenericRequirements(Decl *decl,
+                                  DeclContext *dc,
+                                  GenericFunctionType *genericTy) {
+
+      // We need to have generic parameters here.
+      auto genericParams = dc->getGenericParamsOfContext();
+      if (!genericParams) {
+        Out << "Missing generic parameters\n";
+        decl->dump();
+        abort();
+      }
+
+      // Step through the list of requirements in the generic type.
+      auto requirements = genericTy->getRequirements();
+
+      // Skip to the next conformance requirement.
+      auto skipToNextConformanceRequirement = [&]() {
+        for (; !requirements.empty(); requirements = requirements.slice(1)) {
+          switch (requirements.front().getKind()) {
+          case RequirementKind::Conformance:
+            break;
+
+          case RequirementKind::SameType:
+            // Skip the next same-type constraint.
+            continue;
+          }
+
+          // If the second type is a protocol type, we're done.
+          if (requirements.front().getSecondType()->is<ProtocolType>())
+            break;
+        }
+      };
+      skipToNextConformanceRequirement();
+
+      // Collect all of the generic parameter lists.
+      SmallVector<GenericParamList *, 4> allGenericParamLists;
+      for (auto gpList = genericParams; gpList;
+           gpList = gpList->getOuterParameters()) {
+        allGenericParamLists.push_back(gpList);
+      }
+      std::reverse(allGenericParamLists.begin(), allGenericParamLists.end());
+
+      // Helpers that diagnose failures when generic requirements mismatch.
+      bool failed = false;
+      auto noteFailure =[&]() {
+        if (failed)
+          return;
+
+        Out << "Generic requirements don't match all archetypes\n";
+        decl->dump();
+
+        Out << "\nGeneric type: " << genericTy->getString() << "\n";
+        Out << "Expected requirements: ";
+        bool first = true;
+        for (auto gpList : allGenericParamLists) {
+          for (auto archetype : gpList->getAllArchetypes()) {
+            for (auto proto : archetype->getConformsTo()) {
+              if (first)
+                first = false;
+              else
+                Out << ", ";
+
+              Out << archetype->getString() << " : "
+                  << proto->getDeclaredType()->getString();
+            }
+          }
+        }
+        Out << "\n";
+
+        failed = true;
+      };
+
+      // Walk through all of the archetypes in the generic parameter lists,
+      // matching up their conformance requirements with those in the
+      for (auto gpList : allGenericParamLists) {
+        for (auto archetype : gpList->getAllArchetypes()) {
+          for (auto proto : archetype->getConformsTo()) {
+            // If there are no requirements left, we're missing requirements.
+            if (requirements.empty()) {
+              noteFailure();
+              Out << "No requirement for " << archetype->getString()
+                  << " : " << proto->getDeclaredType()->getString() << "\n";
+              continue;
+            }
+
+            auto firstReqType = ArchetypeBuilder::mapTypeIntoContext(
+                                  dc,
+                                  requirements.front().getFirstType());
+            auto secondReqType = ArchetypeBuilder::mapTypeIntoContext(
+                                  dc,
+                                  requirements.front().getSecondType());
+
+            // If the requirements match up, move on to the next requirement.
+            if (firstReqType->isEqual(archetype) &&
+                secondReqType->isEqual(proto->getDeclaredType())) {
+              requirements = requirements.slice(1);
+              skipToNextConformanceRequirement();
+              continue;
+            }
+
+            noteFailure();
+
+            // If the requirements don't match up, complain.
+            if (!firstReqType->isEqual(archetype)) {
+              Out << "Mapped archetype " << firstReqType->getString()
+                  << " does not match expected " << archetype->getString()
+                  << "\n";
+              continue;
+            }
+
+            Out << "Mapped conformance " << secondReqType->getString()
+                << " does not match expected "
+                << proto->getDeclaredType()->getString() << "\n";
+          }
+        }
+      }
+
+      if (!requirements.empty()) {
+        noteFailure();
+        Out << "Extra requirement "
+            << requirements.front().getFirstType()->getString()
+            << " : "
+            << requirements.front().getSecondType()->getString()
+            << "\n";
+      }
+
+      if (failed)
+        abort();
+    }
+
     void verifyChecked(AbstractFunctionDecl *AFD) {
       // If this function is generic or is within a generic type, it should
       // have an interface type.
@@ -942,6 +1074,12 @@ namespace {
           Out << "Unresolved dependent member type ";
           unresolvedDependentTy->print(Out);
           abort();
+        }
+
+        // If the interface type is generic, make sure its requirements
+        // line up with the archetypes.
+        if (auto genericTy = interfaceTy->getAs<GenericFunctionType>()) {
+          checkGenericRequirements(AFD, AFD, genericTy);
         }
       }
     }

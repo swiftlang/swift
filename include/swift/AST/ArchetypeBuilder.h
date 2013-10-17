@@ -30,6 +30,7 @@ namespace swift {
 class AbstractTypeParamDecl;
 class ArchetypeType;
 class AssociatedTypeDecl;
+class DeclContext;
 class Module;
 class Pattern;
 class ProtocolDecl;
@@ -191,6 +192,17 @@ public:
 
   // FIXME: Compute the set of 'extra' witness tables needed to express this
   // requirement set.
+
+  /// Map the given type, which is based on an interface type and may therefore
+  /// be dependent, to a type based on the archetypes of the given declaration
+  /// context.
+  ///
+  /// \param dc The declaration context in which we should perform the mapping.
+  /// \param type The type to map into the given declaration context.
+  ///
+  /// \returns the mapped type, which will involve archetypes rather than
+  /// dependent types.
+  static Type mapTypeIntoContext(DeclContext *dc, Type type);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   void dump();

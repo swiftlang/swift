@@ -388,15 +388,27 @@ addRequirements(
   }
 
   // Add conformance requirements.
-  for (auto proto : pa->getConformsTo()) {
+  SmallVector<ProtocolDecl *, 4> protocols(pa->getConformsTo().begin(),
+                                           pa->getConformsTo().end());
+  ProtocolType::canonicalizeProtocols(protocols);
+  for (auto proto : protocols) {
     requirements.push_back(Requirement(RequirementKind::Conformance,
                                        type, proto->getDeclaredType()));
   }
+}
+
+static void
+addNestedRequirements(
+    Module &mod, Type type,
+    ArchetypeBuilder::PotentialArchetype *pa,
+    llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
+    SmallVectorImpl<Requirement> &requirements) {
+  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
 
   // Collect the nested types, sorted by name.
   // FIXME: Could collect these from the conformance requirements, above.
   SmallVector<std::pair<Identifier, PotentialArchetype*>, 16>
-  nestedTypes(pa->getNestedTypes().begin(), pa->getNestedTypes().end());
+    nestedTypes(pa->getNestedTypes().begin(), pa->getNestedTypes().end());
   std::sort(nestedTypes.begin(), nestedTypes.end(),
             OrderPotentialArchetypeByName());
 
@@ -412,6 +424,7 @@ addRequirements(
       auto nestedType = DependentMemberType::get(type, assocType,
                                                  mod.getASTContext());
       addRequirements(mod, nestedType, rep, knownPAs, requirements);
+      addNestedRequirements(mod, nestedType, rep, knownPAs, requirements);
     }
   }
 }
@@ -440,12 +453,34 @@ static void collectRequirements(ArchetypeBuilder &builder,
       primary.push_back(param);
   }
 
-  // For each of the primary potential archetypes, add the requirements,
-  // along with the requirements of its nested types.
-  for (auto param : primary) {
-    auto pa = builder.resolveType(param)->getRepresentative();
-    addRequirements(builder.getModule(), param, pa, knownPAs,
-                    requirements);
+  unsigned primaryIdx = 0, numPrimary = primary.size();
+  while (primaryIdx < numPrimary) {
+    unsigned depth = primary[primaryIdx]->getDepth();
+
+    // For each of the primary potential archetypes, add the requirements.
+    // Stop when we hit a parameter at a different depth.
+    // FIXME: This algorithm falls out from the way the "all archetypes" lists
+    // are structured. Once those lists no longer exist or are no longer
+    // "the truth", we can simplify this algorithm considerably.
+    unsigned lastPrimaryIdx = primaryIdx;
+    for (unsigned idx = primaryIdx;
+         idx < numPrimary && primary[idx]->getDepth() == depth;
+         ++idx, ++lastPrimaryIdx) {
+      auto param = primary[idx];
+      auto pa = builder.resolveType(param)->getRepresentative();
+      addRequirements(builder.getModule(), param, pa, knownPAs,
+                      requirements);
+    }
+
+    // For each of the primary potential archetypes, add the nested requirements.
+    for (unsigned idx = primaryIdx; idx < lastPrimaryIdx; ++idx) {
+      auto param = primary[idx];
+      auto pa = builder.resolveType(param)->getRepresentative();
+      addNestedRequirements(builder.getModule(), param, pa, knownPAs,
+                            requirements);
+    }
+
+    primaryIdx = lastPrimaryIdx;
   }
 }
 

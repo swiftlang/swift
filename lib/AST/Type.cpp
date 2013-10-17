@@ -462,53 +462,8 @@ static void addMinimumProtocols(Type T,
   }
 }
 
-/// \brief 'Minimize' the given set of protocols by eliminating any mentions of
-/// protocols that are already covered by inheritance due to other entries in
-/// the protocol list.
-static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
-  llvm::SmallDenseMap<ProtocolDecl *, unsigned> Known;
-  llvm::SmallPtrSet<ProtocolDecl *, 16> Visited;
-  SmallVector<ProtocolDecl *, 16> Stack;
-  bool ZappedAny = false;
-
-  // Seed the stack with the protocol declarations in the original list.
-  // Zap any obvious duplicates along the way.
-  for (unsigned I = 0, N = Protocols.size(); I != N; ++I) {
-    // Check whether we've seen this protocol before.
-    auto KnownPos = Known.find(Protocols[I]);
-    
-    // If we have not seen this protocol before, record it's index.
-    if (KnownPos == Known.end()) {
-      Known[Protocols[I]] = I;
-      Stack.push_back(Protocols[I]);
-      continue;
-    }
-    
-    // We have seen this protocol before; zap this occurrance.
-    Protocols[I] = 0;
-    ZappedAny = true;
-  }
-  
-  // Walk the inheritance hierarchies of all of the protocols. If we run into
-  // one of the known protocols, zap it from the original list.
-  while (!Stack.empty()) {
-    ProtocolDecl *Current = Stack.back();
-    Stack.pop_back();
-    
-    // Add the protocols we inherited.
-    for (auto Inherited : Current->getProtocols()) {
-      addMinimumProtocols(Inherited->getDeclaredType(), Protocols, Known,
-                          Visited, Stack, ZappedAny);
-    }
-  }
-  
-  if (ZappedAny)
-    Protocols.erase(std::remove(Protocols.begin(), Protocols.end(), nullptr),
-                    Protocols.end());
-}
-
 /// \brief Compare two protocols to establish an ordering between them.
-static int compareProtocols(ProtocolDecl * const* PP1, 
+static int compareProtocols(ProtocolDecl * const* PP1,
                             ProtocolDecl * const* PP2) {
   auto *P1 = *PP1;
   auto *P2 = *PP2;
@@ -518,9 +473,56 @@ static int compareProtocols(ProtocolDecl * const* PP1,
   // Try ordering based on module name, first.
   if (int result = M1->Name.str().compare(M2->Name.str()))
     return result;
-  
+
   // Order based on protocol name.
   return P1->getName().str().compare(P2->getName().str());
+}
+
+void ProtocolType::canonicalizeProtocols(
+       SmallVectorImpl<ProtocolDecl *> &protocols) {
+  llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
+  llvm::SmallPtrSet<ProtocolDecl *, 16> visited;
+  SmallVector<ProtocolDecl *, 16> stack;
+  bool zappedAny = false;
+
+  // Seed the stack with the protocol declarations in the original list.
+  // Zap any obvious duplicates along the way.
+  for (unsigned I = 0, N = protocols.size(); I != N; ++I) {
+    // Check whether we've seen this protocol before.
+    auto knownPos = known.find(protocols[I]);
+    
+    // If we have not seen this protocol before, record it's index.
+    if (knownPos == known.end()) {
+      known[protocols[I]] = I;
+      stack.push_back(protocols[I]);
+      continue;
+    }
+    
+    // We have seen this protocol before; zap this occurrence.
+    protocols[I] = 0;
+    zappedAny = true;
+  }
+  
+  // Walk the inheritance hierarchies of all of the protocols. If we run into
+  // one of the known protocols, zap it from the original list.
+  while (!stack.empty()) {
+    ProtocolDecl *Current = stack.back();
+    stack.pop_back();
+    
+    // Add the protocols we inherited.
+    for (auto Inherited : Current->getProtocols()) {
+      addMinimumProtocols(Inherited->getDeclaredType(), protocols, known,
+                          visited, stack, zappedAny);
+    }
+  }
+  
+  if (zappedAny)
+    protocols.erase(std::remove(protocols.begin(), protocols.end(), nullptr),
+                    protocols.end());
+
+  // Sort the set of protocols by module + name, to give a stable
+  // ordering.
+  llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
 }
 
 /// getCanonicalType - Return the canonical version of this type, which has
@@ -1244,9 +1246,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
   for (auto P : ConformsTo) {
     addProtocols(P, ConformsToProtos);
   }
-  minimizeProtocols(ConformsToProtos);
-  llvm::array_pod_sort(ConformsToProtos.begin(), ConformsToProtos.end(),
-                       compareProtocols);
+  ProtocolType::canonicalizeProtocols(ConformsToProtos);
 
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
@@ -1261,8 +1261,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass, Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
-  minimizeProtocols(ConformsTo);
-  llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
+  ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
@@ -1359,16 +1358,11 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     addProtocols(t, Protocols);
   
   // Minimize the set of protocols composed together.
-  minimizeProtocols(Protocols);
+  ProtocolType::canonicalizeProtocols(Protocols);
 
   // If one protocol remains, its nominal type is the canonical type.
   if (Protocols.size() == 1)
     return Protocols.front()->getDeclaredType();
-
-  // Sort the set of protocols by module + name, to give a stable
-  // ordering.
-  // FIXME: Consider namespaces here as well.
-  llvm::array_pod_sort(Protocols.begin(), Protocols.end(), compareProtocols);
 
   // Form the set of canonical protocol types from the protocol
   // declarations, and use that to buid the canonical composition type.
