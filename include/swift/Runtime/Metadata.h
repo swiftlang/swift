@@ -769,9 +769,11 @@ struct ClassMetadata : public HeapMetadata {
   constexpr ClassMetadata(const HeapMetadata &base,
                           const ClassMetadata *superClass,
                           uintptr_t data,
+                          const NominalTypeDescriptor *description,
                           uintptr_t size, uintptr_t alignMask)
     : HeapMetadata(base), SuperClass(superClass),
-      CacheData{ nullptr, nullptr }, Data(data),
+      CacheData{nullptr, nullptr}, Data(data),
+      Description(description),
       InstanceSize(size), InstanceAlignMask(alignMask) {}
 
   /// The metadata for the super class.  This is null for the root class.
@@ -792,6 +794,9 @@ struct ClassMetadata : public HeapMetadata {
   bool isTypeMetadata() const {
     return Data & 1;
   }
+
+  /// An out-of-line Swift-specific description of the type.
+  const NominalTypeDescriptor *Description;
   
   /// The size and alignment mask of instances of this type.
   uintptr_t InstanceSize, InstanceAlignMask;

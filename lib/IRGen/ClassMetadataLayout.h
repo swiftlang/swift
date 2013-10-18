@@ -80,6 +80,7 @@ public:
       asImpl().addClassDataPointer();
     }
 
+    asImpl().addNominalTypeDescriptor();
     asImpl().addInstanceSize();
     asImpl().addInstanceAlignMask();
     
@@ -239,6 +240,7 @@ protected:
 
 public:
   void addMetadataFlags() { NextIndex++; }
+  void addNominalTypeDescriptor() { NextIndex++; }
   void addValueWitnessTable() { NextIndex++; }
   void addDestructorFunction() { NextIndex++; }
   void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }

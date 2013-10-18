@@ -79,7 +79,7 @@ TEST(MetadataTest, getGenericMetadata) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &_TWVBo } },
-  { { { MetadataKind::Class } }, nullptr, 0, 0, 0 }
+  { { { MetadataKind::Class } }, nullptr, 0, nullptr, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {

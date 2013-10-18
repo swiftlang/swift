@@ -1245,6 +1245,11 @@ namespace {
       Fields.push_back(IGM.getAddrOfDestructor(TargetClass,
                                                DestructorKind::Deallocating));
     }
+    
+    void addNominalTypeDescriptor() {
+      Fields.push_back(
+                   ClassNominalTypeDescriptorBuilder(IGM, TargetClass).emit());
+    }
 
     void addParentMetadataRef(ClassDecl *forClass) {
       // FIXME: this is wrong for multiple levels of generics; we need
