@@ -105,7 +105,8 @@ class CategoryInitializerVisitor
 {
   IRGenFunction &IGF;
   
-  llvm::Function *class_replaceMethod;
+  llvm::Constant *class_replaceMethod;
+  llvm::Constant *class_addProtocol;
   
   llvm::Constant *classMetadata;
   llvm::Constant *metaclassMetadata;
@@ -114,30 +115,9 @@ public:
   CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
     : IGF(IGF)
   {
-    // FIXME: Should also register new ObjC protocol conformances using
-    // class_addProtocol.
+    class_replaceMethod = IGF.IGM.getClassReplaceMethodFn();
+    class_addProtocol = IGF.IGM.getClassAddProtocolFn();
 
-    // IMP class_replaceMethod(Class cls, SEL name, IMP imp, const char *types);
-    llvm::Type *class_replaceMethod_params[] = {
-      IGF.IGM.TypeMetadataPtrTy,
-      IGF.IGM.Int8PtrTy,
-      IGF.IGM.Int8PtrTy,
-      IGF.IGM.Int8PtrTy
-    };
-    llvm::FunctionType *class_replaceMethod_ty =
-      llvm::FunctionType::get(IGF.IGM.Int8PtrTy,
-                              class_replaceMethod_params,
-                              false);
-    class_replaceMethod = IGF.IGM.Module.getFunction("class_replaceMethod");
-    if (!class_replaceMethod) {
-      class_replaceMethod = llvm::Function::Create(class_replaceMethod_ty,
-                                             llvm::GlobalValue::ExternalLinkage,
-                                             "class_replaceMethod",
-                                             &IGF.IGM.Module);
-      if (IGF.IGM.DebugInfo)
-        IGF.IGM.DebugInfo->emitArtificialFunction(IGF, class_replaceMethod);
-    }
-    
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
     classMetadata = tryEmitConstantHeapMetadataRef(IGF.IGM, origTy);
     assert(classMetadata &&
@@ -148,6 +128,15 @@ public:
                                        origTy->getClassOrBoundGenericClass());
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGF.IGM.TypeMetadataPtrTy);
+
+    // Register ObjC protocol conformances.
+    for (auto *p : ext->getProtocols()) {
+      if (!p->isObjC())
+        continue;
+      
+      auto proto = IGF.IGM.getAddrOfObjCProtocolRecord(p);
+      IGF.Builder.CreateCall2(class_addProtocol, classMetadata, proto);
+    }
   }
   
   void visitMembers(ExtensionDecl *ext) {

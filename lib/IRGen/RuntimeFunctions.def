@@ -471,8 +471,14 @@ FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper2_stret, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
 FUNCTION(ObjCSelRegisterName, sel_registerName, C_CC,
          RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone))
-FUNCTION(ObjCGetProtocol, objc_getProtocol, C_CC,
-         RETURNS(Int8PtrTy), ARGS(Int8PtrTy), ATTRS(NoUnwind))
+FUNCTION(ClassReplaceMethod, class_replaceMethod, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ClassAddProtocol, class_addProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
 
 #undef RETURNS
 #undef ARGS
