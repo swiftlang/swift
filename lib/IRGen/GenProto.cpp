@@ -182,7 +182,7 @@ namespace {
       // really a structural guarantee we can rely on here.
       for (auto baseProto : protocol->getProtocols()) {
         // ObjC protocols do not have witnesses.
-        if (baseProto->isObjC())
+        if (!requiresProtocolWitnessTable(baseProto))
           continue;
 
         asDerived().addOutOfLineBaseProtocol(baseProto);
@@ -3049,7 +3049,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     
     // ObjC protocols need no layout or witness table info. All dispatch is done
     // through objc_msgSend.
-    if (protocol->isObjC())
+    if (!requiresProtocolWitnessTable(protocol))
       continue;
     
     // Find the protocol layout.
@@ -3853,7 +3853,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
   for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
-    if (!destProtocols[i]->isObjC())
+    if (requiresProtocolWitnessTable(destProtocols[i]))
       witnessConformances.push_back(conformances[i]);
 
   assert(protocols.size() == witnessConformances.size() &&
@@ -4390,8 +4390,8 @@ llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
                                                 CheckedCastMode mode) {
   orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
   SmallVector<ProtocolDecl*, 4> protos;
-  bool isObjC = destType.getSwiftRValueType()->isExistentialType(protos);
-  assert(isObjC); (void)isObjC;
+  bool isProtocol = destType.getSwiftRValueType()->isExistentialType(protos);
+  assert(isProtocol); (void)isProtocol;
   
   // Get references to the ObjC Protocol* values for each protocol.
   Address protoRefsBuf = IGF.createAlloca(llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
@@ -4424,4 +4424,17 @@ llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
   return IGF.Builder.CreateCall3(castFn, orig,
                                  IGF.IGM.getSize(Size(protos.size())),
                                  protoRefsBuf.getAddress());
+}
+
+StringRef irgen::getObjCProtocolName(ProtocolDecl *proto) {
+  // FIXME: Trim the 'Proto' suffix added by the Clang importer.
+  StringRef name = proto->getName().str();
+  if (name.endswith("Proto") && proto->hasClangNode()) {
+    name = name.slice(0, name.size() - 5);
+  }
+  return name;
+}
+
+bool irgen::requiresProtocolWitnessTable(ProtocolDecl *protocol) {
+  return !protocol->isObjC();
 }

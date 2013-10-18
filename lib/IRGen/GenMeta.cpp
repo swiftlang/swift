@@ -684,7 +684,7 @@ namespace {
         // Count the protocol conformances that require witness tables.
         unsigned count = std::count_if(archetype->getConformsTo().begin(),
                                        archetype->getConformsTo().end(),
-                                 [](ProtocolDecl *p) { return !p->isObjC(); });
+               [](ProtocolDecl *p) { return requiresProtocolWitnessTable(p); });
         addConstantSize(count);
       }
       // };

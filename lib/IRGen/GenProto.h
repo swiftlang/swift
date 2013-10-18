@@ -17,8 +17,6 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
-#include "swift/AST/Decl.h"
-
 namespace llvm {
   class Type;
 }
@@ -148,7 +146,7 @@ namespace irgen {
                                 Explosion &args);
 
   /// True if a type has a generic-parameter-dependent value witness table.
-  /// Currently, This is true if the size and/or alignment of the type is
+  /// Currently, this is true if the size and/or alignment of the type is
   /// dependent on its generic parameters.
   bool hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty);
   
@@ -214,15 +212,12 @@ namespace irgen {
                                            SILType destType,
                                            CheckedCastMode mode);
   
-  /// Get the ObjC name for an Objc protocol.
-  inline StringRef getObjCProtocolName(ProtocolDecl *proto) {
-    // FIXME: Trim the 'Proto' suffix added by the Clang importer.
-    StringRef name = proto->getName().str();
-    if (name.endswith("Proto") && proto->hasClangNode()) {
-      name = name.slice(0, name.size() - 5);
-    }
-    return name;
-  }
+  /// Get the ObjC name of an ObjC protocol.
+  StringRef getObjCProtocolName(ProtocolDecl *proto);
+  
+  /// True if the protocol requires a witness table for method dispatch.
+  bool requiresProtocolWitnessTable(ProtocolDecl *protocol);
+  
 } // end namespace irgen
 } // end namespace swift
 

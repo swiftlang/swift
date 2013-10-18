@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Decl.h"
+#include "GenProto.h"
 
 namespace swift {
 namespace irgen {
@@ -70,7 +71,7 @@ public:
     for (auto archetype : generics.getAllArchetypes()) {
       asImpl().beginGenericWitnessTables(archetype, args...);
       for (auto protocol : archetype->getConformsTo()) {
-        if (!protocol->isObjC())
+        if (requiresProtocolWitnessTable(protocol))
           asImpl().addGenericWitnessTable(archetype, protocol, args...);
       }
       asImpl().endGenericWitnessTables(archetype, args...);
