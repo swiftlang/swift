@@ -201,8 +201,7 @@ void CodeCompletionResult::dump() const {
 
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  Chunks.push_back(CodeCompletionString::Chunk::createWithText(
-      Kind, CurrentNestingLevel, Context.copyString(Text)));
+  addChunkWithTextNoCopy(Kind, Context.copyString(Text));
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
@@ -756,7 +755,7 @@ public:
       bool NeedComma = false;
       for (auto TupleElt : TP->getFields()) {
         if (NeedComma)
-          Builder.addComma(", ");
+          Builder.addComma();
         Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
                                  TupleElt.getPattern()->getType().getString());
         NeedComma = true;
@@ -782,7 +781,7 @@ public:
       bool NeedComma = false;
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
-          Builder.addComma(", ");
+          Builder.addComma();
         addPatternFromTypeImpl(Builder, TupleElt.getType(),
                                TupleElt.getName());
         NeedComma = true;
@@ -813,7 +812,7 @@ public:
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
-          Builder.addComma(", ");
+          Builder.addComma();
         Builder.addCallParameter(TupleElt.getName(),
                                  TupleElt.getType().getString());
         NeedComma = true;
@@ -1366,7 +1365,7 @@ private:
       Builder.addTextChunk("Vec");
       Builder.addLeftAngle();
       Builder.addGenericParameter("type");
-      Builder.addComma(", ");
+      Builder.addComma();
       Builder.addGenericParameter("length");
       Builder.addRightAngle();
 
@@ -1384,10 +1383,10 @@ private:
       Builder.addTextChunk("Matrix");
       Builder.addLeftAngle();
       Builder.addGenericParameter("type");
-      Builder.addComma(", ");
+      Builder.addComma();
       Builder.addGenericParameter("rows");
       // FIXME: Make this a default argument.
-      Builder.addComma(", ");
+      Builder.addComma();
       Builder.addGenericParameter("columns");
       Builder.addRightAngle();
 

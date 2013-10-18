@@ -343,6 +343,12 @@ class CodeCompletionResultBuilder {
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
 
+  void addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind Kind,
+                              StringRef Text) {
+    Chunks.push_back(CodeCompletionString::Chunk::createWithText(
+        Kind, CurrentNestingLevel, Text));
+  }
+
   void addSimpleChunk(CodeCompletionString::Chunk::ChunkKind Kind) {
     Chunks.push_back(
         CodeCompletionString::Chunk::createSimple(Kind,
@@ -377,27 +383,33 @@ public:
   }
 
   void addLeftParen() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::LeftParen, "(");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::LeftParen, "(");
   }
 
   void addRightParen() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
   }
 
   void addLeftBracket() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
   }
 
   void addRightBracket() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightBracket, "]");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::RightBracket, "]");
   }
 
   void addLeftAngle() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::LeftAngle, "<");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::LeftAngle, "<");
   }
 
   void addRightAngle() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightAngle, ">");
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::RightAngle, ">");
   }
 
   void addLeadingDot() {
@@ -406,22 +418,21 @@ public:
   }
 
   void addDot() {
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Dot, ".");
+    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Dot, ".");
   }
 
-  void addComma(StringRef Text) {
-    if (Text.empty())
-      Text = ",";
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Comma, Text);
+  void addComma() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::Comma, ", ");
   }
 
   void addExclamationMark() {
-    addChunkWithText(
+    addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::ExclamationMark, "!");
   }
 
   void addQuestionMark() {
-    addChunkWithText(
+    addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
