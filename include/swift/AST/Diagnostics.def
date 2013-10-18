@@ -1506,6 +1506,8 @@ ERROR(missing_return,sil_analysis,none,
 ERROR(return_from_noreturn,sil_analysis,none, 
       "return from a 'noreturn' function", ())
 ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
+WARNING(unreachable_code,sil_gen,none, "will never be executed", ())
+
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,sil_analysis,none,

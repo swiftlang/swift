@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "dead-code-elimination"
-#include "swift/Subsystems.h"
+
+#include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -22,6 +24,38 @@ using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
 STATISTIC(NumInstructionsRemoved, "Number of unreachable instructions removed");
+
+typedef llvm::SmallPtrSet<SILBasicBlock*, 16> SILBasicBlockSet;
+
+template<typename...T, typename...U>
+static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+                     U &&...args) {
+  Context.Diags.diagnose(loc,
+                         diag, std::forward<U>(args)...);
+}
+
+/// \class UnreachableUserCodeReportingState Contains extra state we need to
+/// communicate from condition branch folding stage to the unreachable blocks
+/// removal stage of the path.
+///
+/// To report unreachable user code, we detect the blocks that contain user
+/// code and are not reachable (along any of the preceeding paths). Note that we
+/// only want to report the first statement on the unreachable path. Keeping
+/// the info about which branch folding had produced the unreachable block makes
+/// it possible.
+class UnreachableUserCodeReportingState {
+public:
+  /// The set of blocks that became unreachbale due to conditional branch
+  /// folding, etc.
+  /// Make this a set vector since several blocks may lead to the same error
+  /// report and we iterate through these when producing the diagnostic.
+  llvm::SetVector<const SILBasicBlock*> UnreachableBlocks;
+
+  /// The set of blocks in which we reported unreachable code errors.
+  /// These are used to ensure that we don't issue duplicate reports.
+  llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
+};
+
 
 /// \brief Deletes the instrcutions in the set and any instructions that could
 /// become dead after their removal.
@@ -165,13 +199,15 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   eraseAndCleanup(ToBeDeleted);
 }
 
-static bool constantFoldTerminator(SILBasicBlock &BB) {
+static bool constantFoldTerminator(SILBasicBlock &BB,
+                                   UnreachableUserCodeReportingState *State) {
   TermInst *TI = BB.getTerminator();
 
   // Process conditional branches with constant conditions.
   if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(TI)) {
     SILValue V = CBI->getCondition();
     SILInstruction *CondI = dyn_cast<SILInstruction>(V.getDef());
+    SILLocation Loc = CBI->getLoc();
 
     if (IntegerLiteralInst *ConstCond =
           dyn_cast_or_null<IntegerLiteralInst>(CondI)) {
@@ -179,21 +215,27 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
 
       // Determine which of the successors is unreachable and create a new
       // terminator that only branches to the reachable sucessor.
+      SILBasicBlock *UnreachableBlock = nullptr;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
-        B.createBranch(CBI->getLoc(),
+        B.createBranch(Loc,
                        CBI->getFalseBB(), CBI->getFalseArgs());
+        UnreachableBlock = CBI->getTrueBB();
       } else {
         assert(ConstCond->getValue() == APInt(1, /*value*/ 1, false) &&
                "Our representation of true/false does not match.");
-        B.createBranch(CBI->getLoc(),
+        B.createBranch(Loc,
                        CBI->getTrueBB(), CBI->getTrueArgs());
+        UnreachableBlock = CBI->getFalseBB();
       }
-
-      // TODO: Produce an unreachable code warning here if the basic blocks
-      // contains user code. Only if we are not within an inlined or generic
-      // function.
-
       eraseAndCleanup(TI);
+
+      // Produce an unreachable code warning for this basic block if it
+      // contains user code (only if we are not within an inlined function or a
+      // template instantiation).
+      // FIXME: Do not report if we are within a template instatiation.
+      if (Loc.is<RegularLocation>() && State)
+        State->UnreachableBlocks.insert(UnreachableBlock);
+
       return true;
     }
   }
@@ -325,11 +367,66 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
   return true;
 }
 
-static bool removeUnreachableBlocks(SILFunction &F) {
+/// \brief Issue an "unreachable code" diagnostic if the blocks contains or
+/// leads to another block that contains user code.
+///
+/// Note, we rely on SILLocation inforamtion to determine if SILInstructions
+/// correspond to user code.
+static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
+                                     SILModule &M,
+                                     const SILBasicBlockSet &Reachable,
+                                     UnreachableUserCodeReportingState *State) {
+  assert(State);
+  for (auto I = B.begin(), E = B.end(); I != E; ++I) {
+    SILLocation Loc = I->getLoc();
+
+    // Skip branch instructions. These could belong to the control flow
+    // statement we are folding (ex: while loop).
+    if (isa<BranchInst>(I) && Loc.is<RegularLocation>())
+      break;
+
+    // If we've reached an implicit return, we have not found any user code and
+    // can stop searching for it.
+    if (Loc.is<ImplicitReturnLocation>())
+      return false;
+
+    // If the instruction corresponds to user-written return or some other
+    // statement, we know it corresponds to user code.
+    // Check BlocksWithErrors to make sure we don't report an error twice.
+    if ((Loc.is<RegularLocation>() || Loc.is<ReturnLocation>()) &&
+        !State->BlocksWithErrors.count(&B)) {
+      diagnose(M.getASTContext(), Loc.getSourceLoc(),
+               diag::unreachable_code);
+      State->BlocksWithErrors.insert(&B);
+      return true;
+    }
+  }
+
+  // If we have not found user code in this block, inspect it's successors.
+  // Check if at least one of the sucessors contains user code.
+  for (auto I = B.succ_begin(), E = B.succ_end(); I != E; ++I) {
+    SILBasicBlock *SB = *I;
+    bool HasReachablePred = false;
+    for (auto PI = SB->pred_begin(), PE = SB->pred_end(); PI != PE; ++PI) {
+      if (Reachable.count(*PI))
+        HasReachablePred = true;
+    }
+
+    // If all of the predecessors of this sucessor are unreachable, check if
+    // it contains user code.
+    if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable, State))
+      return true;
+  }
+  
+  return false;
+}
+
+static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
+                                    UnreachableUserCodeReportingState *State) {
   if (F.empty())
     return false;
 
-  llvm::SmallPtrSet<SILBasicBlock*, 16> Reachable;
+  SILBasicBlockSet Reachable;
   SmallVector<SILBasicBlock*, 128> Worklist;
   Worklist.push_back(&F.front());
   Reachable.insert(&F.front());
@@ -347,6 +444,14 @@ static bool removeUnreachableBlocks(SILFunction &F) {
   // If everything is reachable, we are done.
   if (Reachable.size() == F.size())
     return false;
+
+  // Diagnose user written unreachable code.
+  if (State) {
+    for (auto BI = State->UnreachableBlocks.begin(),
+              BE = State->UnreachableBlocks.end(); BI != BE; ++BI) {
+      diagnoseUnreachableBlock(**BI, M, Reachable, State);
+    }
+  }
 
   // Remove references from the dead blocks.
   for (auto I = F.begin(), E = F.end(); I != E; ++I) {
@@ -387,9 +492,11 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
     DEBUG(llvm::errs() << "*** Dead Code Elimination processing: "
           << Fn.getName() << "\n");
 
+    UnreachableUserCodeReportingState State;
+
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
-      if (constantFoldTerminator(BB))
+      if (constantFoldTerminator(BB, &State))
         continue;
 
       // Remove instructions from the basic block after a call to a noreturn
@@ -399,7 +506,7 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
     }
 
     // Remove unreachable blocks.
-    removeUnreachableBlocks(Fn);
+    removeUnreachableBlocks(Fn, *M, &State);
 
     for (auto &BB : Fn) {
       propagateBasicBlockArgs(BB);
@@ -407,7 +514,7 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
 
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
-      if (constantFoldTerminator(BB)) {
+      if (constantFoldTerminator(BB, &State)) {
         continue;
       }
       // Remove instructions from the basic block after a call to a noreturn
@@ -417,6 +524,6 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
     }
 
     // Remove unreachable blocks.
-    removeUnreachableBlocks(Fn);
+    removeUnreachableBlocks(Fn, *M, &State);
   }
 }
