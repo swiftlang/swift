@@ -1570,6 +1570,11 @@ ERROR(error_missing_arg_value,frontend,none,
   (StringRef, unsigned))
 ERROR(error_invalid_arg_value,frontend,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
+ERROR(error_immediate_mode_missing_stdlib,frontend,none,
+  "could not load the swift standard library", ())
+ERROR(error_immediate_mode_missing_library,frontend,none,
+  "could not load %select{shared library|framework}0 '%1'",
+  (unsigned, StringRef))
 
 //==============================================================================
 // Axle Diagnostics.

@@ -18,6 +18,7 @@
 
 namespace swift {
 
+// Must be kept in sync with diag::error_immediate_mode_missing_library.
 enum class LibraryKind {
   Library = 0,
   Framework

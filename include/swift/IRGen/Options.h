@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_OPTIONS_H
 #define SWIFT_IRGEN_OPTIONS_H
 
+#include "swift/AST/LinkLibrary.h"
 #include <string>
 
 namespace swift {
@@ -49,6 +50,9 @@ public:
   std::string Triple;
   // The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
+
+  /// The libraries and frameworks specified on the command line.
+  SmallVector<LinkLibrary, 4> LinkLibraries;
 
   /// The kind of compilation we should do.
   OutputKind OutputKind : 3;

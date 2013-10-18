@@ -161,7 +161,8 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLine) {
+static bool loadRuntimeLib(StringRef sharedLibName,
+                           const ProcessCmdLine &CmdLine) {
   // FIXME: Need error-checking.
   llvm::SmallString<128> LibPath(
       llvm::sys::fs::getMainExecutable(CmdLine[0].data(),
@@ -169,34 +170,21 @@ static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLin
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift", sharedLibName);
-  if (!dlopen(LibPath.c_str(), 0)) {
-    // FIXME: Use diagnostics machinery.
-    fprintf(stderr, "Could not load shared library '%s'.\n", LibPath.c_str());
-  }
+  return dlopen(LibPath.c_str(), 0);
 }
 
-static void loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
-  loadRuntimeLib("libswift_stdlib_core.dylib", CmdLine);
+static bool loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
+  return loadRuntimeLib("libswift_stdlib_core.dylib", CmdLine);
 }
 
-static bool IRGenImportedModules(CompilerInstance &CI,
-                                 llvm::Module &Module,
-                                 const ProcessCmdLine &CmdLine,
-                                 llvm::SmallPtrSet<TranslationUnit*, 8>
-                                     &ImportedModules,
-                                 SmallVectorImpl<llvm::Function*> &InitFns,
-                                 irgen::Options &Options,
-                                 bool IsREPL = true) {
-  TranslationUnit *TU = CI.getTU();
-  // Perform autolinking.
-  TU->collectLinkLibraries([&](LinkLibrary linkLib) {
-    // If we have an absolute path, just try to load it now.
-    llvm::SmallString<128> path = linkLib.getName();
-    if (llvm::sys::path::is_absolute(linkLib.getName())) {
-      dlopen(path.c_str(), 0);
-      return;
-    }
-
+static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
+                           DiagnosticEngine &diags) {
+  // If we have an absolute path, just try to load it now.
+  llvm::SmallString<128> path = linkLib.getName();
+  bool success;
+  if (llvm::sys::path::is_absolute(path.str())) {
+    success = dlopen(path.c_str(), 0);
+  } else {
     switch (linkLib.getKind()) {
     case LibraryKind::Library: {
       // FIXME: Try the appropriate extension for the current platform?
@@ -216,18 +204,45 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     }
 
     // Let dlopen determine the best search paths.
-    bool success = dlopen(path.c_str(), 0);
+    success = dlopen(path.c_str(), 0);
     if (!success && linkLib.getKind() == LibraryKind::Library) {
       // Try our runtime library path.
-      loadRuntimeLib(path, CmdLine);
+      success = loadRuntimeLib(path, CmdLine);
     }
-  });
-  
+  }
+
+  if (!success) {
+    diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_library,
+                   (unsigned)linkLib.getKind(),
+                   llvm::sys::path::stem(path));
+  }
+  return success;
+}
+
+static bool IRGenImportedModules(CompilerInstance &CI,
+                                 llvm::Module &Module,
+                                 const ProcessCmdLine &CmdLine,
+                                 llvm::SmallPtrSet<TranslationUnit*, 8>
+                                     &ImportedModules,
+                                 SmallVectorImpl<llvm::Function*> &InitFns,
+                                 irgen::Options &Options,
+                                 bool IsREPL = true) {
+  TranslationUnit *TU = CI.getTU();
+  bool hadError = false;
+
+  // Perform autolinking.
+  auto addLinkLibrary = [&](LinkLibrary linkLib) {
+    if (!tryLoadLibrary(linkLib, CmdLine, CI.getDiags()))
+      hadError = true;
+  };
+  std::for_each(Options.LinkLibraries.begin(), Options.LinkLibraries.end(),
+                addLinkLibrary);
+  TU->collectLinkLibraries(addLinkLibrary);
+
   // IRGen the modules this module depends on.
   // FIXME: "all visible modules" may not actually include "all modules this
   // module depends on". This is just a stopgap measure before we have real
   // autolinking.
-  bool hadError = false;
   TU->forAllVisibleModules(Nothing, [&](Module::ImportedModule ModPair) -> bool{
     TranslationUnit *SubTU = dyn_cast<TranslationUnit>(ModPair.second);
     if (!SubTU)
@@ -301,7 +316,11 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(Module);
 
-  loadSwiftRuntime(CmdLine);
+  if (!loadSwiftRuntime(CmdLine)) {
+    CI.getDiags().diagnose(SourceLoc(),
+                           diag::error_immediate_mode_missing_stdlib);
+    return;
+  }
 
   // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
@@ -1020,7 +1039,15 @@ public:
         /*RanREPLApplicationMain*/ false
       }
   {
-    loadSwiftRuntime(CmdLine);
+    if (!loadSwiftRuntime(CmdLine)) {
+      CI.getDiags().diagnose(SourceLoc(),
+                             diag::error_immediate_mode_missing_stdlib);
+      return;
+    }
+    std::for_each(CI.getLinkLibraries().begin(), CI.getLinkLibraries().end(),
+                  [&](LinkLibrary linkLib) {
+      tryLoadLibrary(linkLib, CmdLine, CI.getDiags());
+    });
 
     llvm::EngineBuilder builder(&Module);
     std::string ErrorMsg;
@@ -1258,6 +1285,8 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 
 void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine);
+  if (CI.getASTContext().hadError())
+    return;
 
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
@@ -1269,6 +1298,8 @@ void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
 
 void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine);
+  if (CI.getASTContext().hadError())
+    return;
   
   CFMessagePortContext portContext;
   portContext.version = 0;
