@@ -6,4 +6,9 @@ add_swift_library(swiftObjectiveC INSTALL
   DEPENDS swift_stdlib_core)
 
 add_subdirectory(Foundation)
-add_subdirectory(AppKit)
+
+if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
+  add_subdirectory(AppKit)
+else()
+  add_subdirectory(UIKit)
+endif()

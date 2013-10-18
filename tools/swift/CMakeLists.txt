@@ -12,7 +12,7 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(swift edit ${CORE_FOUNDATION})
 
-if(HAVE_DARWIN_MODULES_SDK)
+if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
                    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
@@ -30,3 +30,18 @@ endif()
 
 install(TARGETS swift
   RUNTIME DESTINATION bin)
+
+# Add a symlink to clang's includes so the built swift 
+# can find its resource dir when run in place.
+add_custom_command(TARGET swift POST_BUILD
+  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
+  COMMAND ln "-fhs" "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang" "${SWIFTLIB_DIR}/swift/clang"
+  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/axle"
+  COMMAND ln "-fhs" "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang" "${SWIFTLIB_DIR}/axle/clang")
+
+# If we are building both the swift compiler and its stdlib, also add symlinks 
+# so the built compiler can find the built stdlib when run in place.
+if (SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB)
+  add_custom_command(TARGET swift POST_BUILD
+    COMMAND ln "-fhs" "${SWIFTLIB_DIR}" "${CMAKE_BINARY_DIR}/bin/lib")
+endif()

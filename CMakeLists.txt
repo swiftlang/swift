@@ -8,6 +8,24 @@ endif()
 set(CMAKE_ASM_COMPILER_ID "Clang")
 enable_language(ASM)
 
+# Set sizeof(void*) if cross-compiling.
+if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
+  if (CMAKE_SYSTEM_PROCESSOR MATCHES "/64$/")
+    set(CMAKE_SIZEOF_VOID_P 8)
+  else()
+    set(CMAKE_SIZEOF_VOID_P 4)
+  endif()
+endif()
+
+# Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
+# CMake refuses to use `uname -m` on OS X 
+# http://public.kitware.com/Bug/view.php?id=10326
+if (NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
+  execute_process(COMMAND uname -m
+                  OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
 # Support building Swift as a standalone project, using LLVM as an
 # external library.
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
@@ -23,7 +41,7 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
       message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_SOURCE to the root directory of LLVM source code.")
     else()
       get_filename_component(LLVM_MAIN_SRC_DIR ${SWIFT_PATH_TO_LLVM_SOURCE}
-	ABSOLUTE)
+        ABSOLUTE)
       list(APPEND CMAKE_MODULE_PATH "${LLVM_MAIN_SRC_DIR}/cmake/modules")
     endif()
   endif()
@@ -143,16 +161,22 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
+
+option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
+option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
+
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
+
+set(SWIFT_COMPILER "swift" CACHE FILEPATH "Path to Swift compiler")
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
   # Force usage of Clang.
   set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
       CACHE STRING "Xcode Compiler")
-  # Use C++'0X.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x"
+  # Use C++'11.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11"
       CACHE STRING "Xcode C++ Language Standard")
   # Use libc++.
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++"
@@ -186,8 +210,6 @@ check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLA
 if( CXX_SUPPORTS_DOCUMENTATION_FLAG )
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdocumentation" )
 endif()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -fno-rtti -fno-exceptions")
 
 # Compile a swift file into an object file (as a library).
 #
@@ -227,14 +249,22 @@ function(compile_swift_files)
     list(APPEND swift_flags "-O0")
   endif()
 
+  # Allow import of other Swift modules we just built.
+  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/swift")
+
   # Turn on debug symbols in debug builds.
   if(CMAKE_BUILD_TYPE MATCHES Debug)
     list(APPEND swift_flags "-g")
   endif()
   
   # If we have a modules SDK, use it for building.
-  if (HAVE_DARWIN_MODULES_SDK)
+  if (MODULES_SDK)
     list(APPEND swift_flags "-sdk=${MODULES_SDK}")
+  endif()
+
+  # If we have a host triple, use it.
+  if (SWIFT_HOST_TRIPLE)
+    list(APPEND swift_flags "-triple=${SWIFT_HOST_TRIPLE}")
   endif()
 
   # If we have a custom module cache path, use it.
@@ -298,9 +328,9 @@ function(compile_swift_files)
 
   add_custom_command(
     OUTPUT ${objfile} ${module_source_file}
-    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
+    COMMAND ${SWIFT_COMPILER} "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
     ${postprocessing} 
-    DEPENDS swift ${stdlib_dep} ${source_files}
+    DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
@@ -610,9 +640,10 @@ macro(manpage PODFILE DESC MANFILE SECTION)
 endmacro(manpage)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  # Choose an SDK if none was set.
   set(MODULES_SDK "" CACHE PATH
       "Path to the modules-enabled SDK to use")
-  if (MODULES_SDK STREQUAL "")
+  if (NOT MODULES_SDK)
     execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
       OUTPUT_VARIABLE MODULES_SDK
       OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -620,7 +651,55 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if(NOT EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
     message(FATAL_ERROR "A modules-enabled SDK is required for Swift on OS X.")
   endif()
-  set(HAVE_DARWIN_MODULES_SDK YES)
+
+  # Choose a deployment target if none was set.
+  set(SWIFT_DEPLOYMENT_TARGET "" CACHE STRING 
+      "Deployment target for Swift compiler and libraries.")
+  if (NOT SWIFT_DEPLOYMENT_TARGET)
+    execute_process(COMMAND sw_vers -productVersion
+                    OUTPUT_VARIABLE SWIFT_DEPLOYMENT_TARGET
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+
+  # Choose a deployment OS if none was set.
+  set(SWIFT_DEPLOYMENT_OS "macosx" CACHE STRING
+      "Deployment OS for Swift compiler and libraries [macosx, iphoneos, iphonesimulator].")
+
+  # Sadly there are three OS naming conventions.
+  # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
+  # -mOS-version-min: macosx ios      ios-simulator
+  # swift -triple:    macosx ios      ios
+
+  if (SWIFT_DEPLOYMENT_OS MATCHES "^iphoneos")
+    set(version_min_os "ios")
+    set(triple_os "ios")
+  elseif (SWIFT_DEPLOYMENT_OS MATCHES "^iphonesimulator")
+    set(version_min_os "ios-simulator")
+    set(triple_os "ios")
+  elseif (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
+    set(version_min_os "macosx")
+    set(triple_os "macosx")
+  else()
+    message(FATAL_ERROR "Can't understand SWIFT_DEPLOYMENT OS '${SWIFT_DEPLOYMENT_OS};")
+  endif()
+
+  # Add host triple to swift compiler flags.
+  set(SWIFT_HOST_TRIPLE "${CMAKE_SYSTEM_PROCESSOR}-apple-${triple_os}${SWIFT_DEPLOYMENT_TARGET}" CACHE STRING "triple")
+
+  # Add deployment target to C/C++ compiler and linker flags.
+  # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
+  if (XCODE)
+    if (${SWIFT_DEPLOYMENT_OS} MATCHES "^macosx") 
+      set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
+    else()
+      set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
+    endif()
+  else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+  endif()
 endif()
 
 # We'll need this once we have generated headers
@@ -630,9 +709,13 @@ include_directories(BEFORE
   )
 
 # Add all of the subdirectories, where we actually do work.
-add_subdirectory(lib)
-add_subdirectory(tools)
-add_subdirectory(stdlib)
+if (SWIFT_BUILD_TOOLS)
+  add_subdirectory(lib)
+  add_subdirectory(tools)
+endif (SWIFT_BUILD_TOOLS)
+if (SWIFT_BUILD_STDLIB)
+  add_subdirectory(stdlib)
+endif (SWIFT_BUILD_STDLIB)
 add_subdirectory(utils)
   add_subdirectory(examples)
 

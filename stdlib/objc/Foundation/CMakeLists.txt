@@ -1,9 +1,17 @@
 set(SHARED_LIBRARY ON)
+set(SWIFTFOUNDATION_SOURCES
+    Foundation.swift
+    BridgeNSString.mm
+    Misc.mm
+)
+
+if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
+  list(APPEND SWIFTFOUNDATION_SOURCES 
+    Foundation-macosx.swift)
+endif()
+
 add_swift_library(swiftFoundation INSTALL
-  Foundation.swift
-  Foundation-macosx.swift
-  BridgeNSString.mm
-  Misc.mm
+  ${SWIFTFOUNDATION_SOURCES}
   DEPENDS swift_stdlib_core swiftObjectiveC)
 
 add_swift_optimization_flags(swiftFoundation)

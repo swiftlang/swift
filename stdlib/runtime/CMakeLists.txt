@@ -17,5 +17,3 @@ set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS OFF
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
-
-add_swift_compiler_flags(swift_runtime "-isysroot ${MODULES_SDK}")

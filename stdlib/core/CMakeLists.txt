@@ -27,7 +27,8 @@ if(SWIFT_ASSERTS)
 endif()
 
 # Remove Float80.swift on non-x86 architectures
-if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL i386)
+if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL i386 AND
+    NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
   string(REPLACE ";Float80.swift" "" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 endif()
 
@@ -49,13 +50,11 @@ set_target_properties(swift_stdlib_core PROPERTIES
                                         LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
 add_dependencies(swift_stdlib_core swift)
 
-# Create the symlinks necessary to get the compiler to find the
-# swift runtime during development with Xcode.
+# Create some output directories.
 add_custom_command(TARGET swift_stdlib_core PRE_BUILD
-  COMMAND ln "-fhs" "${SWIFTLIB_DIR}" "${CMAKE_BINARY_DIR}/bin/lib"
   COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
   COMMAND mkdir "-p" "${SWIFTLIB_DIR}/axle"
-  COMMAND ln "-fhs" "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang" "${SWIFTLIB_DIR}/swift/clang")
+)
 
 
 # The stdlib will be cut down further than what we have included here.
