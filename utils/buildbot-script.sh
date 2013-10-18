@@ -151,7 +151,7 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
   export LLDB_MODULEIMPORT_TEST="$WORKSPACE/swift/build/bin/lldb-moduleimport-test"
   echo "--- Running Swift Tests ---"
   (cd "$WORKSPACE/swift/build" &&
-    "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
+    make check-swift) || exit 1
 fi
 
 # Run the Swift performance tests.
