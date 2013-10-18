@@ -834,7 +834,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
         failedConstraint = constraint;
       break;
 
-    case SolutionKind::TriviallySolved:
     case SolutionKind::Solved:
       break;
 

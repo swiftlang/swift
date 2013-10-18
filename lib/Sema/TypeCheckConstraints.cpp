@@ -226,7 +226,6 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 
     return false;
 
-  case SolutionKind::TriviallySolved:
   case SolutionKind::Solved:
     // This constraint has already been solved; there is nothing more
     // to do.
@@ -895,7 +894,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       return SolutionKind::Error;
     }
 
-    SolutionKind result = SolutionKind::TriviallySolved;
     for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
       const auto &elt1 = tuple1->getFields()[i];
       const auto &elt2 = tuple2->getFields()[i];
@@ -953,19 +951,12 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       case SolutionKind::Error:
         return SolutionKind::Error;
 
-      case SolutionKind::TriviallySolved:
-        break;
-
       case SolutionKind::Solved:
-        result = SolutionKind::Solved;
-        break;
-
       case SolutionKind::Unsolved:
-        result = SolutionKind::Unsolved;
         break;
       }
     }
-    return result;
+    return SolutionKind::Solved;
   }
 
   assert(kind == TypeMatchKind::Conversion);
@@ -987,7 +978,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
   // Check each of the elements.
   bool hasVarArg = false;
-  SolutionKind result = SolutionKind::TriviallySolved;
   for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
     // Default-initialization always allowed for conversions.
     if (sources[idx2] == TupleShuffleExpr::DefaultInitialize) {
@@ -1013,15 +1003,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     case SolutionKind::Error:
       return SolutionKind::Error;
 
-    case SolutionKind::TriviallySolved:
-      break;
-
     case SolutionKind::Solved:
-      result = SolutionKind::Solved;
-      break;
-
     case SolutionKind::Unsolved:
-      result = SolutionKind::Unsolved;
       break;
     }
 
@@ -1040,21 +1023,14 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       case SolutionKind::Error:
         return SolutionKind::Error;
 
-      case SolutionKind::TriviallySolved:
-        break;
-
       case SolutionKind::Solved:
-        result = SolutionKind::Solved;
-        break;
-
       case SolutionKind::Unsolved:
-        result = SolutionKind::Unsolved;
         break;
       }
     }
   }
 
-  return result;
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -1149,9 +1125,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case SolutionKind::Error:
     return SolutionKind::Error;
 
-  case SolutionKind::TriviallySolved:
-    break;
-
   case SolutionKind::Solved:
     result = SolutionKind::Solved;
     break;
@@ -1221,7 +1194,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
            "Mismatched parents of nominal types");
 
     if (!nominal1->getParent())
-      return SolutionKind::TriviallySolved;
+      return SolutionKind::Solved;
 
     // Match up the parents, exactly.
     return matchTypes(nominal1->getParent(), nominal2->getParent(),
@@ -1233,7 +1206,6 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   auto bound2 = type2->castTo<BoundGenericType>();
 
   // Match up the parents, exactly, if there are parents.
-  SolutionKind result = SolutionKind::TriviallySolved;
   assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
          "Mismatched parents of bound generics");
   if (bound1->getParent()) {
@@ -1243,15 +1215,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     case SolutionKind::Error:
       return SolutionKind::Error;
 
-    case SolutionKind::TriviallySolved:
-      break;
-
     case SolutionKind::Solved:
-      result = SolutionKind::Solved;
-      break;
-
     case SolutionKind::Unsolved:
-      result = SolutionKind::Unsolved;
       break;
     }
   }
@@ -1268,20 +1233,13 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     case SolutionKind::Error:
       return SolutionKind::Error;
 
-    case SolutionKind::TriviallySolved:
-      break;
-
     case SolutionKind::Solved:
-      result = SolutionKind::Solved;
-      break;
-
     case SolutionKind::Unsolved:
-      result = SolutionKind::Unsolved;
       break;
     }
   }
 
-  return result;
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -1295,18 +1253,15 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   assert(existential && "Bogus existential match");
   (void)existential;
 
-  bool addedConstraint = false;
   for (auto proto : protocols) {
     switch (simplifyConformsToConstraint(type1, proto, locator)) {
       case SolutionKind::Solved:
-      case SolutionKind::TriviallySolved:
         break;
 
       case SolutionKind::Unsolved:
         // Add the constraint.
         addConstraint(ConstraintKind::ConformsTo, type1,
                       proto->getDeclaredType());
-        addedConstraint = true;
         break;
 
       case SolutionKind::Error:
@@ -1314,8 +1269,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  return addedConstraint? SolutionKind::Solved
-                        : SolutionKind::TriviallySolved;
+  return SolutionKind::Solved;
 }
 
 /// \brief Map a type-matching kind to a constraint kind.
@@ -1427,7 +1381,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1 == desugar2)
-    return SolutionKind::TriviallySolved;
+    return SolutionKind::Solved;
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
@@ -1440,7 +1394,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (rep1 == rep2) {
           // We already merged these two types, so this constraint is
           // trivially solved.
-          return SolutionKind::TriviallySolved;
+          return SolutionKind::Solved;
         }
 
         // If exactly one of the type variables can bind to an lvalue, we
@@ -1528,7 +1482,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
       if (typeVar1 && typeVar2)
-        return typeVar1 == typeVar2? SolutionKind::TriviallySolved
+        return typeVar1 == typeVar2? SolutionKind::Solved
                                    : SolutionKind::Unsolved;
         
       break;
@@ -1557,7 +1511,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 #include "swift/AST/TypeNodes.def"
     case TypeKind::Module:
       if (desugar1 == desugar2) {
-        return SolutionKind::TriviallySolved;
+        return SolutionKind::Solved;
       }
 
       // Record this failure.
@@ -2165,7 +2119,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // Check whether this type conforms to the protocol.
   if (TC.conformsToProtocol(type, protocol, DC))
-    return SolutionKind::TriviallySolved;
+    return SolutionKind::Solved;
 
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
@@ -2459,7 +2413,7 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   }
 
   if (baseTy->is<ArchetypeType>()) {
-    return SolutionKind::TriviallySolved;
+    return SolutionKind::Solved;
   }
 
   // Record this failure.
@@ -2489,11 +2443,11 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
     return SolutionKind::Unsolved;
 
   if (baseTy->getClassOrBoundGenericClass())
-    return SolutionKind::TriviallySolved;
+    return SolutionKind::Solved;
 
   if (auto archetype = baseTy->getAs<ArchetypeType>()) {
     if (archetype->requiresClass())
-      return SolutionKind::TriviallySolved;
+      return SolutionKind::Solved;
   }
 
   // Record this failure.
@@ -2517,7 +2471,7 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
   if (auto protoTy = baseTy->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(
                               KnownProtocolKind::DynamicLookup))
-      return SolutionKind::TriviallySolved;
+      return SolutionKind::Solved;
   }
 
   // Record this failure.
@@ -2549,7 +2503,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
 
   // If the types are obviously equivalent, we're done.
   if (type1.getPointer() == desugar2)
-    return SolutionKind::TriviallySolved;
+    return SolutionKind::Solved;
 
   // If right-hand side is a type variable, the constraint is unsolved.
   if (typeVar2) {
@@ -2724,7 +2678,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         break;
 
       case SolutionKind::Solved:
-      case SolutionKind::TriviallySolved:
         assert(solverState && "Can't record restriction without solver state");
         if (constraint.getKind() == ConstraintKind::Conversion) {
           solverState->constraintRestrictions.push_back(

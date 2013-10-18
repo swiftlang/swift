@@ -1325,9 +1325,6 @@ public:
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
-    /// \brief The constraint has been trivially solved, by not introducing
-    /// any additional constraints.
-    TriviallySolved,
     /// \brief The constraint has been solved completely, and provides no
     /// more information.
     Solved,
