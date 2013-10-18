@@ -1578,7 +1578,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   // FIXME: We should do this for any declaration within a class. However,
   // IRGen doesn't yet have the machinery for handling class_method on
   // getters and setters.
-  if (decl->isObjC()) {
+  if (gen.SGM.requiresObjCDispatch(decl)) {
     return Callee::forClassMethod(gen, selfValue.peekScalarValue(), constant,
                                   loc);
   }
