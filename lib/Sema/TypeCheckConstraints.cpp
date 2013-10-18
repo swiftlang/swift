@@ -879,8 +879,7 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
-                                  ConstraintLocatorBuilder locator,
-                                  bool &trivial) {
+                                  ConstraintLocatorBuilder locator) {
   unsigned subFlags = flags | TMF_GenerateConstraints;
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
@@ -950,8 +949,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       // Compare the element types.
       switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
                          locator.withPathElement(
-                           LocatorPathElt::getTupleElement(i)),
-                         trivial)) {
+                           LocatorPathElt::getTupleElement(i)))) {
       case SolutionKind::Error:
         return SolutionKind::Error;
 
@@ -1011,8 +1009,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     switch (matchTypes(elt1.getType(), elt2.getType(),
                        TypeMatchKind::Conversion, subFlags,
                        locator.withPathElement(
-                         LocatorPathElt::getTupleElement(idx1)),
-                       trivial)) {
+                         LocatorPathElt::getTupleElement(idx1)))) {
     case SolutionKind::Error:
       return SolutionKind::Error;
 
@@ -1039,8 +1036,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       switch (matchTypes(tuple1->getElementType(idx1),
                          eltType2, TypeMatchKind::Conversion, subFlags,
                          locator.withPathElement(
-                           LocatorPathElt::getTupleElement(idx1)),
-                         trivial)) {
+                           LocatorPathElt::getTupleElement(idx1)))) {
       case SolutionKind::Error:
         return SolutionKind::Error;
 
@@ -1064,35 +1060,31 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                                           TypeMatchKind kind, unsigned flags,
-                                          ConstraintLocatorBuilder locator,
-                                          bool &trivial) {
+                                          ConstraintLocatorBuilder locator) {
   int scalarFieldIdx = tuple2->getFieldForScalarInit();
   assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
   const auto &elt = tuple2->getFields()[scalarFieldIdx];
   auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
   return matchTypes(type1, scalarFieldTy, kind, flags,
-                    locator.withPathElement(ConstraintLocator::ScalarToTuple),
-                    trivial);
+                    locator.withPathElement(ConstraintLocator::ScalarToTuple));
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
                                           TypeMatchKind kind, unsigned flags,
-                                          ConstraintLocatorBuilder locator,
-                                          bool &trivial) {
+                                          ConstraintLocatorBuilder locator) {
   assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
   assert(!tuple1->getFields()[0].isVararg() && "Should not be variadic");
   return matchTypes(tuple1->getElementType(0),
                     type2, kind, flags,
-                    locator.withPathElement(LocatorPathElt::getTupleElement(0)),
-                    trivial);
+                    locator.withPathElement(
+                      LocatorPathElt::getTupleElement(0)));
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
-                                     ConstraintLocatorBuilder locator,
-                                     bool &trivial) {
+                                     ConstraintLocatorBuilder locator) {
   // An [auto_closure] function type can be a subtype of a
   // non-[auto_closure] function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
@@ -1145,16 +1137,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
                                    subKind, subFlags,
                                    locator.withPathElement(
-                                     ConstraintLocator::FunctionArgument),
-                                   trivial);
+                                     ConstraintLocator::FunctionArgument));
   if (result == SolutionKind::Error)
     return SolutionKind::Error;
 
   // Result type can be covariant (or equal).
   switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
                      subFlags,
-                     locator.withPathElement(ConstraintLocator::FunctionResult),
-                     trivial)) {
+                     locator.withPathElement(
+                       ConstraintLocator::FunctionResult))) {
   case SolutionKind::Error:
     return SolutionKind::Error;
 
@@ -1196,8 +1187,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
                                        TypeMatchKind kind, unsigned flags,
-                                       ConstraintLocatorBuilder locator,
-                                       bool &trivial) {
+                                       ConstraintLocatorBuilder locator) {
   auto classDecl2 = type2->getClassOrBoundGenericClass();
   bool done = false;
   for (auto super1 = TC.getSuperClassOf(type1);
@@ -1207,7 +1197,7 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
       continue;
 
     return matchTypes(super1, type2, TypeMatchKind::SameType,
-                      TMF_GenerateConstraints, locator, trivial);
+                      TMF_GenerateConstraints, locator);
   }
 
   // Record this failure.
@@ -1234,11 +1224,9 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return SolutionKind::TriviallySolved;
 
     // Match up the parents, exactly.
-    bool trivial = true;
     return matchTypes(nominal1->getParent(), nominal2->getParent(),
                       TypeMatchKind::SameType, TMF_GenerateConstraints,
-                      locator.withPathElement(ConstraintLocator::ParentType),
-                      trivial);
+                      locator.withPathElement(ConstraintLocator::ParentType));
   }
 
   auto bound1 = type1->castTo<BoundGenericType>();
@@ -1248,12 +1236,10 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   SolutionKind result = SolutionKind::TriviallySolved;
   assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
          "Mismatched parents of bound generics");
-  bool trivial = true;
   if (bound1->getParent()) {
     switch (matchTypes(bound1->getParent(), bound2->getParent(),
                        TypeMatchKind::SameType, TMF_GenerateConstraints,
-                       locator.withPathElement(ConstraintLocator::ParentType),
-                       trivial)) {
+                       locator.withPathElement(ConstraintLocator::ParentType))){
     case SolutionKind::Error:
       return SolutionKind::Error;
 
@@ -1278,8 +1264,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
                        TMF_GenerateConstraints,
                        locator.withPathElement(
-                         LocatorPathElt::getGenericArgument(i)),
-                       trivial)) {
+                         LocatorPathElt::getGenericArgument(i)))) {
     case SolutionKind::Error:
       return SolutionKind::Error;
 
@@ -1302,8 +1287,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         TypeMatchKind kind, unsigned flags,
-                                        ConstraintLocatorBuilder locator,
-                                        bool &trivial) {
+                                        ConstraintLocatorBuilder locator) {
   // FIXME: Should allow other conversions as well.
   SmallVector<ProtocolDecl *, 4> protocols;
 
@@ -1330,7 +1314,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  trivial = false;
   return addedConstraint? SolutionKind::Solved
                         : SolutionKind::TriviallySolved;
 }
@@ -1431,8 +1414,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
-                             ConstraintLocatorBuilder locator,
-                             bool &trivial) {
+                             ConstraintLocatorBuilder locator) {
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   TypeVariableType *typeVar1;
@@ -1631,14 +1613,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
                         subKind, subFlags,
                         locator.withPathElement(
-                          ConstraintLocator::InstanceType),
-                        trivial);
+                          ConstraintLocator::InstanceType));
     }
 
     case TypeKind::Function: {
       auto func1 = cast<FunctionType>(desugar1);
       auto func2 = cast<FunctionType>(desugar2);
-      return matchFunctionTypes(func1, func2, kind, flags, locator, trivial);
+      return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
     case TypeKind::PolymorphicFunction:
@@ -1651,8 +1632,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return matchTypes(array1->getBaseType(), array2->getBaseType(),
                         TypeMatchKind::SameType, subFlags,
                         locator.withPathElement(
-                          ConstraintLocator::ArrayElementType),
-                        trivial);
+                          ConstraintLocator::ArrayElementType));
     }
 
     case TypeKind::ProtocolComposition:
@@ -1677,8 +1657,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
                         locator.withPathElement(
-                          ConstraintLocator::ArrayElementType),
-                        trivial);
+                          ConstraintLocator::ArrayElementType));
     }
 
     case TypeKind::UnboundGeneric:
@@ -1769,10 +1748,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // an implicit closure.
     if (auto function2 = type2->getAs<FunctionType>()) {
       if (function2->isAutoClosure()) {
-        trivial = false;
         return matchTypes(type1, function2->getResult(), kind, subFlags,
-                          locator.withPathElement(ConstraintLocator::Load),
-                          trivial);
+                          locator.withPathElement(ConstraintLocator::Load));
       }
     }
   }
@@ -1858,30 +1835,27 @@ commit_to_conversions:
   case ConversionRestrictionKind::TupleToTuple:
     return matchTupleTypes(type1->castTo<TupleType>(),
                            type2->castTo<TupleType>(),
-                           kind, flags, locator, trivial);
+                           kind, flags, locator);
 
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
-                                   subFlags, locator, trivial);
+                                   subFlags, locator);
 
   case ConversionRestrictionKind::TupleToScalar:
     return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
-                                   kind, subFlags, locator, trivial);
+                                   kind, subFlags, locator);
 
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
-    return matchSuperclassTypes(type1, type2, kind, flags, locator,
-                                trivial);
+    return matchSuperclassTypes(type1, type2, kind, flags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
-    return matchTypes(type1->getRValueType(), type2, kind, subFlags, locator,
-                      trivial);
+    return matchTypes(type1->getRValueType(), type2, kind, subFlags, locator);
 
   case ConversionRestrictionKind::Existential:
-    return matchExistentialTypes(type1, type2, kind, flags, locator,
-                                 trivial);
+    return matchExistentialTypes(type1, type2, kind, flags, locator);
 
   case ConversionRestrictionKind::ValueToOptional: {
     auto boundGenericType2 = type2->castTo<BoundGenericType>();
@@ -1890,7 +1864,7 @@ commit_to_conversions:
     assert(boundGenericType2->getGenericArgs().size() == 1);
     return matchTypes(type1,
                       type2->castTo<BoundGenericType>()->getGenericArgs()[0],
-                      kind, subFlags, locator, trivial);
+                      kind, subFlags, locator);
   }
 
   case ConversionRestrictionKind::User:
@@ -2092,9 +2066,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 
   case TypeKind::Tuple: {
     // Tuple construction is simply tuple conversion.
-    bool trivial = false;
     return matchTypes(argType, valueType, TypeMatchKind::Conversion,
-                      flags|TMF_GenerateConstraints, locator, trivial);
+                      flags|TMF_GenerateConstraints, locator);
   }
 
   case TypeKind::Enum:
@@ -2588,7 +2561,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   if (desugar2->getKind() == TypeKind::Function) {
     auto func1 = type1->castTo<FunctionType>();
     auto func2 = cast<FunctionType>(desugar2);
-    bool trivial = true;
 
     assert(func1->getInput()->is<TypeVariableType>() &&
            "the input of funct1 is a free variable by construction");
@@ -2597,15 +2569,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
 
     if (matchTypes(func1->getInput(), func2->getInput(),
                    TypeMatchKind::BindType, flags,
-                   locator.withPathElement(ConstraintLocator::FunctionArgument),
-                   trivial) == SolutionKind::Error)
+                   locator.withPathElement(
+                     ConstraintLocator::FunctionArgument))
+          == SolutionKind::Error)
       return SolutionKind::Error;
 
     if (matchTypes(func1->getResult(), func2->getResult(),
                    TypeMatchKind::BindType,
                    flags,
-                   locator.withPathElement(ConstraintLocator::FunctionResult),
-                   trivial) == SolutionKind::Error)
+                   locator.withPathElement(ConstraintLocator::FunctionResult))
+          == SolutionKind::Error)
       return SolutionKind::Error;
     return SolutionKind::Solved;
   }
@@ -2668,7 +2641,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Conversion: {
     // For relational constraints, match up the types.
     auto matchKind = getTypeMatchKind(constraint.getKind());
-    bool trivial = true;
 
     // If there is a restriction on this constraint, apply it directly rather
     // than going through the general \c matchTypes() machinery.
@@ -2680,7 +2652,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                  constraint.getSecondType()
                                    ->castTo<TupleType>(),
                                  matchKind, TMF_GenerateConstraints,
-                                 constraint.getLocator(), trivial);
+                                 constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::ScalarToTuple:
@@ -2688,7 +2660,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getSecondType()
                                            ->castTo<TupleType>(),
                                          matchKind, TMF_GenerateConstraints,
-                                         constraint.getLocator(), trivial);
+                                         constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::TupleToScalar:
@@ -2696,7 +2668,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                            ->castTo<TupleType>(),
                                          constraint.getSecondType(),
                                          matchKind, TMF_GenerateConstraints,
-                                         constraint.getLocator(), trivial);
+                                         constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::DeepEquality:
@@ -2708,22 +2680,21 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         result = matchSuperclassTypes(constraint.getFirstType(),
                                        constraint.getSecondType(),
                                        matchKind, TMF_GenerateConstraints,
-                                       constraint.getLocator(), trivial);
+                                       constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::LValueToRValue:
         result = matchTypes(constraint.getFirstType()->getRValueType(),
                             constraint.getSecondType(),
                             matchKind, TMF_GenerateConstraints,
-                            constraint.getLocator(),
-                            trivial);
+                            constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::Existential:
         result = matchExistentialTypes(constraint.getFirstType(),
                                        constraint.getSecondType(),
                                        matchKind, TMF_GenerateConstraints,
-                                       constraint.getLocator(), trivial);
+                                       constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::ValueToOptional:
@@ -2734,7 +2705,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                               ->castTo<BoundGenericType>()
                               ->getGenericArgs()[0],
                             matchKind, TMF_GenerateConstraints,
-                            constraint.getLocator(), trivial);
+                            constraint.getLocator());
         break;
 
       case ConversionRestrictionKind::User:
@@ -2768,7 +2739,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       matchKind,
-                      TMF_None, constraint.getLocator(), trivial);
+                      TMF_None, constraint.getLocator());
   }
 
   case ConstraintKind::ApplicableFunction: {

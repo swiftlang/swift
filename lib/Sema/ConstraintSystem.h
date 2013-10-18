@@ -1366,8 +1366,7 @@ private:
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                          TypeMatchKind kind, unsigned flags,
-                                         ConstraintLocatorBuilder locator,
-                                         bool &trivial);
+                                         ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
@@ -1375,8 +1374,7 @@ private:
   /// \returns the result of performing the scalar-to-tuple conversion.
   SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                                        TypeMatchKind kind, unsigned flags,
-                                       ConstraintLocatorBuilder locator,
-                                       bool &trivial);
+                                       ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
   /// a single-element tuple type.
@@ -1384,22 +1382,19 @@ private:
   /// \returns the result of performing the tuple-to-scalar conversion.
   SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
                                        TypeMatchKind kind, unsigned flags,
-                                       ConstraintLocatorBuilder locator,
-                                       bool &trivial);
+                                       ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                   TypeMatchKind kind, unsigned flags,
-                                  ConstraintLocatorBuilder locator,
-                                  bool &trivial);
+                                  ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
                                     TypeMatchKind kind, unsigned flags,
-                                    ConstraintLocatorBuilder locator,
-                                    bool &trivial);
+                                    ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
   /// refer to the same declaration via their generic arguments.
@@ -1410,8 +1405,7 @@ private:
   /// existential type.
   SolutionKind matchExistentialTypes(Type type1, Type type2,
                                      TypeMatchKind kind, unsigned flags,
-                                     ConstraintLocatorBuilder locator,
-                                     bool &trivial);
+                                     ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.
@@ -1429,13 +1423,9 @@ private:
   /// \param locator The locator that will be used to track the location of
   /// the specific types being matched.
   ///
-  /// \param trivial Will be set false if any non-trivial subtyping or
-  /// conversion is applied.
-  ///
   /// \returns the result of attempting to solve this constraint.
   SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                          unsigned flags, ConstraintLocatorBuilder locator,
-                          bool &trivial);
+                          unsigned flags, ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Resolve the given overload set to the given choice.
