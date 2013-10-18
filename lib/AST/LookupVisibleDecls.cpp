@@ -410,6 +410,10 @@ public:
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
+  // We can not refer to any declarations based on a tuple type.
+  if (BaseTy->is<TupleType>())
+    return;
+
   OverrideFilteringConsumer ConsumerWrapper;
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,

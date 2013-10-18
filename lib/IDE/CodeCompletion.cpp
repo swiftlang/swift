@@ -1188,6 +1188,30 @@ public:
     }
   }
 
+  void getTupleExprCompletions(TupleType *ExprType) {
+    unsigned Index = 0;
+    for (auto TupleElt : ExprType->getFields()) {
+      CodeCompletionResultBuilder Builder(
+          CompletionContext,
+          CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::CurrentNominal);
+      if (needDot())
+        Builder.addLeadingDot();
+      if (TupleElt.hasName()) {
+        Builder.addTextChunk(TupleElt.getName().str());
+      } else {
+        llvm::SmallString<4> IndexStr;
+        {
+          llvm::raw_svector_ostream OS(IndexStr);
+          OS << Index;
+        }
+        Builder.addTextChunk(IndexStr.str());
+      }
+      addTypeAnnotation(Builder, TupleElt.getType());
+      Index++;
+    }
+  }
+
   void tryAddStlibOptionalCompletions(Type ExprType) {
     // If there is a dot, we don't have any special completions for
     // Optional<T>.
@@ -1238,6 +1262,10 @@ public:
         CompletionContext.includeQualifiedClangResults(M, needDot());
         Done = true;
       }
+    }
+    if (auto *TT = ExprType->getRValueType()->getAs<TupleType>()) {
+      getTupleExprCompletions(TT);
+      Done = true;
     }
     tryAddStlibOptionalCompletions(ExprType);
     if (!Done) {
