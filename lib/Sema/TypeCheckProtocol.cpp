@@ -225,19 +225,21 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
 
   // Open up the type of the requirement and witness, replacing any unresolved
   // archetypes with type variables.
-  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
   SmallVector<ArchetypeType *, 4> unresolvedArchetypes;
   if (!unresolvedAssocTypes.empty()) {
     for (auto assoc : unresolvedAssocTypes)
       unresolvedArchetypes.push_back(assoc->getArchetype());
 
-    reqType = cs.openType(reqType, unresolvedArchetypes, replacements);
+    reqType = cs.openType(reqType, unresolvedArchetypes, replacements,
+                          req->getInnermostDeclContext());
   }
   
-  llvm::DenseMap<ArchetypeType *, TypeVariableType *> witnessReplacements;
+  llvm::DenseMap<CanType, TypeVariableType *> witnessReplacements;
   SmallVector<ArchetypeType *, 4> witnessArchetypes;
   auto openWitnessType = cs.openType(witnessType, witnessArchetypes,
-                                     witnessReplacements);
+                                     witnessReplacements,
+                                     witness->getInnermostDeclContext());
 
   bool anyRenaming = false;
   if (decomposeFunctionType) {
@@ -315,7 +317,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   if (!replacements.empty()) {
     for (auto assocType : unresolvedAssocTypes) {
       auto archetype = assocType->getArchetype();
-      auto known = replacements.find(archetype);
+      auto known = replacements.find(archetype->getCanonicalType());
       if (known == replacements.end())
         continue;
 
@@ -332,7 +334,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   
   // Save archetype mappings we deduced for the witness.
   for (auto &witnessReplacement : witnessReplacements) {
-    auto archetype = witnessReplacement.first;
+    auto archetype = witnessReplacement.first->castTo<ArchetypeType>();
     auto typeVar = witnessReplacement.second;
     
     auto sub = solution.simplifyType(tc, typeVar);

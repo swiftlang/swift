@@ -3090,8 +3090,8 @@ static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
                                    GenericParamList *&genericParams) {
   ConstraintSystem cs(tc, dc);
 
-  // The archetypes that have been opened up and replaced with type variables.
-  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+  // The types that have been opened up and replaced with type variables.
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
 
   // Open up the owning context of the member.
   Type ownerTy = cs.openTypeOfContext(member->getDeclContext(), replacements,
@@ -3111,7 +3111,7 @@ static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
   // Fill in the set of substitutions.
   auto &solution = solutions.front();
   for (auto replacement : replacements) {
-    substitutions[replacement.first]
+    substitutions[replacement.first->castTo<ArchetypeType>()]
       = solution.simplifyType(tc, replacement.second);
   }
 

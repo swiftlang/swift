@@ -17,6 +17,7 @@
 
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
@@ -256,14 +257,25 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 Type ConstraintSystem::openType(
        Type startingType,
        ArrayRef<ArchetypeType *> archetypes,
-       llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements) {
-  struct GetTypeVariable {
+       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+       DeclContext *dc) {
+  class GetTypeVariable {
     ConstraintSystem &CS;
-    llvm::DenseMap<ArchetypeType *, TypeVariableType *> &Replacements;
+    llvm::DenseMap<CanType, TypeVariableType *> &Replacements;
+
+    /// The type variables introduced for (base type, associated type) pairs.
+    llvm::DenseMap<std::pair<CanType, AssociatedTypeDecl *>,
+                   TypeVariableType *>
+      MemberReplacements;
+
+  public:
+    GetTypeVariable(ConstraintSystem &cs,
+                    llvm::DenseMap<CanType, TypeVariableType *> &replacements)
+      : CS(cs), Replacements(replacements) { }
 
     TypeVariableType *operator()(ArchetypeType *archetype) const {
       // Check whether we already have a replacement for this archetype.
-      auto known = Replacements.find(archetype);
+      auto known = Replacements.find(archetype->getCanonicalType());
       if (known != Replacements.end())
         return known->second;
 
@@ -294,7 +306,7 @@ Type ConstraintSystem::openType(
       }
 
       // Record the type variable that corresponds to this archetype.
-      Replacements[archetype] = tv;
+      Replacements[archetype->getCanonicalType()] = tv;
 
       // Build archetypes for each of the nested types.
       for (auto nested : archetype->getNestedTypes()) {
@@ -302,6 +314,34 @@ Type ConstraintSystem::openType(
         CS.addTypeMemberConstraint(tv, nested.first, nestedTv);
       }
 
+      return tv;
+    }
+
+    TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
+      auto known = MemberReplacements.find({base->getCanonicalType(), member});
+      if (known != MemberReplacements.end())
+        return known->second;
+
+      auto archetype =base->castTo<TypeVariableType>()->getImpl().getArchetype()
+                        ->getNestedType(member->getName());
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(
+                                        (Expr *)nullptr,
+                                        LocatorPathElt(archetype)),
+                                      TVO_PrefersSubtypeBinding);
+      MemberReplacements[{base->getCanonicalType(), member}] = tv;
+      CS.addTypeMemberConstraint(base, member->getName(), tv);
+
+      // Add associated type constraints.
+      // FIXME: Would be better to walk the requirements of the protocol
+      // of which the associated type is a member.
+      if (auto superclass = member->getSuperclass()) {
+        CS.addConstraint(ConstraintKind::Subtype, tv, superclass);
+      }
+
+      for (auto proto : member->getArchetype()->getConformsTo()) {
+        CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                         proto->getDeclaredType());
+      }
       return tv;
     }
   } getTypeVariable{*this, replacements};
@@ -314,11 +354,33 @@ Type ConstraintSystem::openType(
   replaceArchetypes = [&](Type type) -> Type {
     // Replace archetypes with fresh type variables.
     if (auto archetype = type->getAs<ArchetypeType>()) {
-      auto known = replacements.find(archetype);
+      auto known = replacements.find(archetype->getCanonicalType());
       if (known != replacements.end())
         return known->second;
 
       return archetype;
+    }
+
+    // Replace a generic type parameter with its corresponding type variable.
+    if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+      auto known = replacements.find(genericParam->getCanonicalType());
+      assert(known != replacements.end());
+      return known->second;
+    }
+
+    // Replace a dependent member with a fresh type variable and make it a
+    // member of its base type.
+    if (auto dependentMember = type->getAs<DependentMemberType>()) {
+      // Check whether we've already dealt with this dependent member.
+      auto known = replacements.find(dependentMember->getCanonicalType());
+      if (known != replacements.end())
+        return known->second;
+
+      // Replace archetypes in the base type.
+      auto base = replaceArchetypes(dependentMember->getBase());
+      auto result = getTypeVariable(base, dependentMember->getAssocType());
+      replacements[dependentMember->getCanonicalType()] = result;
+      return result;
     }
 
     // Create type variables for all of the archetypes in a polymorphic
@@ -337,6 +399,60 @@ Type ConstraintSystem::openType(
         return Type();
 
       // Build the resulting (non-polymorphic) function type.
+      return FunctionType::get(inputTy, resultTy, TC.Context);
+    }
+
+    // Create type variables for all of the parameters in a generic function
+    // type.
+    if (auto genericFn = type->getAs<GenericFunctionType>()) {
+      // Create the type variables for the generic parameters.
+      for (auto gp : genericFn->getGenericParams()) {
+        ArchetypeType *archetype = ArchetypeBuilder::mapTypeIntoContext(dc, gp)
+                                     ->castTo<ArchetypeType>();
+        auto typeVar = createTypeVariable(getConstraintLocator(
+                                            (Expr *)nullptr,
+                                            LocatorPathElt(archetype)),
+                                          TVO_PrefersSubtypeBinding);
+        replacements[gp->getCanonicalType()] = typeVar;
+      }
+
+      // Add the requirements as constraints.
+      for (auto req : genericFn->getRequirements()) {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance: {
+          auto subjectTy = TC.transformType(req.getFirstType(),
+                                            replaceArchetypes);
+          if (auto proto = req.getSecondType()->getAs<ProtocolType>())
+            addConstraint(ConstraintKind::ConformsTo, subjectTy,
+                          proto);
+          else
+            addConstraint(ConstraintKind::Subtype, subjectTy,
+                          req.getSecondType());
+          break;
+        }
+
+        case RequirementKind::SameType: {
+          auto firstTy = TC.transformType(req.getFirstType(),
+                                          replaceArchetypes);
+          auto secondTy = TC.transformType(req.getSecondType(),
+                                           replaceArchetypes);
+          addConstraint(ConstraintKind::Bind, firstTy, secondTy);
+          break;
+        }
+        }
+      }
+
+      // Transform the input and output types.
+      Type inputTy = TC.transformType(genericFn->getInput(), replaceArchetypes);
+      if (!inputTy)
+        return Type();
+
+      Type resultTy = TC.transformType(genericFn->getResult(),
+                                       replaceArchetypes);
+      if (!resultTy)
+        return Type();
+
+      // Build the resulting (non-generic) function type.
       return FunctionType::get(inputTy, resultTy, TC.Context);
     }
 
@@ -367,8 +483,8 @@ Type ConstraintSystem::openType(
   return TC.transformType(startingType, replaceArchetypes);
 }
 
-Type ConstraintSystem::openBindingType(Type type) {
-  Type result = openType(type);
+Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
+  Type result = openType(type, dc);
   // FIXME: Better way to identify Slice<T>.
   if (auto boundStruct
         = dyn_cast<BoundGenericStructType>(result.getPointer())) {
@@ -588,9 +704,10 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Find the archetype for 'Self'. We'll be opening it.
     auto selfArchetype = proto->getSelf()->getArchetype();
-    llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+    llvm::DenseMap<CanType, TypeVariableType *> replacements;
     type = adjustLValueForReference(openType(type, { &selfArchetype, 1 },
-                                             replacements),
+                                             replacements,
+                                             value->getInnermostDeclContext()),
                                     func->getAttrs().isAssignment(),
                                     TC.Context);
 
@@ -599,7 +716,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // FIXME: We may eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
     // a class conforms (if there's a default implementation).
-    addArchetypeConstraint(replacements[selfArchetype]);
+    addArchetypeConstraint(replacements[selfArchetype->getCanonicalType()]);
     
     return type;
   }
@@ -613,7 +730,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
       return nullptr;
 
     // Open the type.
-    type = openType(type);
+    type = openType(type, value->getInnermostDeclContext());
 
     // If it's a type reference, we're done.
     if (isTypeReference)
@@ -625,7 +742,18 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Determine the type of the value, opening up that type if necessary.
   Type valueType = TC.getUnopenedTypeOfReference(value);
-  valueType = adjustLValueForReference(openType(valueType),
+
+  // If the declaration has an interface type, use it.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (auto interfaceTy = func->getInterfaceType()) {
+      valueType = interfaceTy;
+    }
+  }
+
+  // Up and adjust the type of the reference.
+  valueType = adjustLValueForReference(openType(
+                                         valueType,
+                                         value->getInnermostDeclContext()),
                                        value->getAttrs().isAssignment(),
                                        TC.Context);
   return valueType;
@@ -658,7 +786,7 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
 
 Type ConstraintSystem::openTypeOfContext(
        DeclContext *dc,
-       llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
+       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
        GenericParamList **genericParams) {
   GenericParamList *dcGenericParams = nullptr;
   Type result;
@@ -702,7 +830,7 @@ Type ConstraintSystem::openTypeOfContext(
     }
   }
 
-  return openType(result, openArchetypes, replacements);
+  return openType(result, openArchetypes, replacements, dc);
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
@@ -722,8 +850,8 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (baseObjTy->is<ModuleType>())
     return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
 
-  // The archetypes that have been opened up and replaced with type variables.
-  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+  // The types that have been opened up and replaced with type variables.
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
 
   // Figure out the type of the owner.
   Type ownerTy = openTypeOfContext(value->getDeclContext(), replacements,
@@ -809,7 +937,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     }
   }
 
-  type = openType(type, { }, replacements);
+  type = openType(type, { }, replacements, value->getInnermostDeclContext());
 
   // Skip the 'self' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
@@ -4275,8 +4403,8 @@ bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2,
                                      DeclContext *dc) {
   ConstraintSystem cs(*this, dc);
   
-  llvm::DenseMap<ArchetypeType*, TypeVariableType*> replacements;
-  Type type2var = cs.openType(type2, type2, replacements);
+  llvm::DenseMap<CanType, TypeVariableType*> replacements;
+  Type type2var = cs.openType(type2, type2, replacements, nullptr);
 
   cs.addConstraint(ConstraintKind::Equal, type1, type2var);
   

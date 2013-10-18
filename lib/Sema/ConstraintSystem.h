@@ -1193,15 +1193,16 @@ public:
     typeVar->getImpl().assignFixedType(type, getSavedBindings());
   }
 
-  /// \brief "Open" the given type by replacing any occurrences of archetypes
-  /// (including those implicit in unbound generic types) with fresh type
+  /// \brief "Open" the given type by replacing any occurrences of archetypes,
+  /// generic parameter types, and dependent member types with fresh type
   /// variables.
   ///
   /// \param type The type to open.
-  /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type) {
-    llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
-    return openType(type, { }, replacements);
+  /// \param dc The declaration context in which the type occurs.
+  /// \returns The opened type.
+  Type openType(Type type, DeclContext *dc = nullptr) {
+    llvm::DenseMap<CanType, TypeVariableType *> replacements;
+    return openType(type, { }, replacements, dc);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -1212,12 +1213,16 @@ public:
   ///
   /// \param archetypes The set of archetypes we're opening.
   ///
-  /// \param replacements The mapping from opened archetypes to the type
+  /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
+  /// \param dc The declaration context in which the type occurs.
+  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, ArrayRef<ArchetypeType *> archetypes,
-         llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements);
+  Type openType(
+         Type type, ArrayRef<ArchetypeType *> archetypes,
+         llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+         DeclContext *dc = nullptr);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
@@ -1229,15 +1234,14 @@ public:
   ///
   /// \param type The type to open.
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type);
+  Type openBindingType(Type type, DeclContext *dc = nullptr);
 
   /// \brief "Open" the type of a declaration context, which must be a type or
   /// extension.
   ///
   /// \param dc The context to open.
   ///
-  /// \param replacements Will receive the set of type variable replacements
-  /// for each of the archetypes in \c dc.
+  /// \param replacements Will receive the set of type variable replacements.
   ///
   /// \param genericParams If non-null, will receive the set of generic
   /// parameters opened up by this routine.
@@ -1245,7 +1249,7 @@ public:
   /// \returns The opened type of the base.
   Type openTypeOfContext(
          DeclContext *dc,
-         llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
+         llvm::DenseMap<CanType, TypeVariableType *> &replacements,
          GenericParamList **genericParams);
 
   /// \brief Retrieve the type of a reference to the given value declaration.

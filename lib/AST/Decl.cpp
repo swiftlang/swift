@@ -47,6 +47,20 @@ StringRef Decl::getKindName(DeclKind K) {
   }
 }
 
+DeclContext *Decl::getInnermostDeclContext() {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this))
+    return func;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
+    return nominal;
+  if (auto ext = dyn_cast<ExtensionDecl>(this))
+    return ext;
+  if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
+    return topLevel;
+
+  return getDeclContext();
+
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }

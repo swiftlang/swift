@@ -287,6 +287,11 @@ public:
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC) { Context = DC; }
 
+  /// Retrieve the innermost declaration context corresponding to this
+  /// declaration, which will either be the declaration itself (if it's
+  /// also a declaration context) or its declaration context.
+  DeclContext *getInnermostDeclContext();
+
   /// \brief Retrieve the module in which this declaration resides.
   Module *getModuleContext() const;
 

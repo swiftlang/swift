@@ -821,7 +821,7 @@ namespace {
     }
 
     Type visitZeroValueExpr(ZeroValueExpr *expr) {
-      return CS.openType(expr->getType());
+      return expr->getType();
     }
 
     Type visitDefaultValueExpr(DefaultValueExpr *expr) {
