@@ -2074,7 +2074,10 @@ namespace {
       importObjCMembers(decl, result, members);
 
       // Import inherited constructors.
-      importInheritedConstructors(decl, result, members);
+      // FIXME: Don't create constructors for class Protocol
+      if (decl->getDeclName().getAsString() != "Protocol") {
+        importInheritedConstructors(decl, result, members);
+      }
 
       // Import mirrored declarations for protocols to which this class
       // conforms.
