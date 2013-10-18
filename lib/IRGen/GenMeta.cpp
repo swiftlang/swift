@@ -39,6 +39,7 @@
 #include "GenStruct.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "Linking.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
 #include "StructLayout.h"
@@ -608,6 +609,327 @@ void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
   llvm::Value *metadata = IGF.emitTypeMetadataRef(type);
   explosion.add(metadata);
 }
+
+/*****************************************************************************/
+/** Nominal Type Descriptor Emission *****************************************/
+/*****************************************************************************/
+
+namespace {
+  template<class Impl>
+  class NominalTypeDescriptorBuilderBase {
+    Impl &asImpl() { return *static_cast<Impl*>(this); }
+
+  protected:
+    IRGenModule &IGM;
+    std::vector<llvm::Constant*> Fields;
+    
+  public:
+    NominalTypeDescriptorBuilderBase(IRGenModule &IGM)
+      : IGM(IGM) {}
+    
+    void layout() {
+      asImpl().addKind();
+      asImpl().addName();
+      asImpl().addKindDependentFields();
+      asImpl().addGenericParams();
+    }
+    
+    void addConstantSize(intptr_t value) {
+      Fields.push_back(llvm::ConstantInt::get(IGM.SizeTy, value));
+    }
+    
+    void addKind() {
+      addConstantSize(asImpl().getKind());
+    }
+    
+    void addName() {
+      NominalTypeDecl *ntd = asImpl().getTarget();
+      auto name = LinkEntity::forTypeMangling(
+                                    ntd->getDeclaredType()->getCanonicalType());
+      llvm::SmallString<32> mangling;
+      name.mangle(mangling);
+      Fields.push_back(IGM.getAddrOfGlobalString(mangling));
+    }
+    
+    void addGenericParams() {
+      NominalTypeDecl *ntd = asImpl().getTarget();
+      if (!ntd->getGenericParams()) {
+        // If there are no generic parameters, there is no generic parameter
+        // vector.
+        addConstantSize(0);
+        addConstantSize(0);
+        return;
+      }
+      
+      // uintptr_t GenericParameterVectorOffset;
+      addConstantSize(asImpl().getGenericParamsOffset());
+
+      // The archetype order here needs to be consistent with
+      // MetadataLayout::addGenericFields.
+      
+      // Note that we intentionally don't forward the generic arguments.
+      
+      // Add all the primary archetypes.
+      // TODO: only the *primary* archetypes.
+      // TODO: not archetypes from outer contexts.
+      auto allArchetypes = ntd->getGenericParams()->getAllArchetypes();
+      
+      // uintptr_t NumGenericParameters;
+      addConstantSize(allArchetypes.size());
+      
+      // GenericParameter Parameters[NumGenericParameters];
+      // struct GenericParameter {
+      for (auto archetype : allArchetypes) {
+        //   uintptr_t NumWitnessTables;
+        // Count the protocol conformances that require witness tables.
+        unsigned count = std::count_if(archetype->getConformsTo().begin(),
+                                       archetype->getConformsTo().end(),
+                                 [](ProtocolDecl *p) { return !p->isObjC(); });
+        addConstantSize(count);
+      }
+      // };
+    }
+    
+    llvm::Constant *emit() {
+      asImpl().layout();
+      auto init = llvm::ConstantStruct::getAnon(Fields);
+      
+      auto var = cast<llvm::GlobalVariable>(
+                      IGM.getAddrOfNominalTypeDescriptor(asImpl().getTarget(),
+                                                         init->getType()));
+      var->setInitializer(init);
+      return var;
+    }
+    
+    // Derived class must provide:
+    //   NominalTypeDecl *getTarget();
+    //   unsigned getKind();
+    //   unsigned getGenericParamsOffset();
+    //   void addKindDependentFields();
+  };
+  
+  class StructNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>
+  {
+    using super
+      = NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>;
+    
+    // Offsets of key fields in the metadata records.
+    unsigned FieldVectorOffset, GenericParamsOffset;
+    
+    StructDecl *Target;
+    
+  public:
+    StructNominalTypeDescriptorBuilder(IRGenModule &IGM,
+                                       StructDecl *s)
+      : super(IGM), Target(s)
+    {
+      // Scan the metadata layout for the struct to find the key offsets to
+      // put in our descriptor.
+      struct ScanForDescriptorOffsets
+        : StructMetadataScanner<ScanForDescriptorOffsets>
+      {
+        ScanForDescriptorOffsets(IRGenModule &IGM, StructDecl *Target)
+          : StructMetadataScanner(IGM, Target) {}
+        
+        unsigned AddressPoint = ~0U, FieldVectorOffset = ~0U,
+                 GenericParamsOffset = ~0U;
+        
+        void noteAddressPoint() { AddressPoint = NextIndex; }
+        void noteStartOfFieldOffsets() { FieldVectorOffset = NextIndex; }
+        void addGenericFields(const GenericParamList &g) {
+          GenericParamsOffset = NextIndex;
+          StructMetadataScanner::addGenericFields(g);
+        }
+      };
+      
+      ScanForDescriptorOffsets scanner(IGM, Target);
+      scanner.layout();
+      assert(scanner.AddressPoint != ~0U
+             && scanner.FieldVectorOffset != ~0U
+             && "did not find required fields in struct metadata?!");
+      assert(scanner.FieldVectorOffset >= scanner.AddressPoint
+             && "found field offset vector after address point?!");
+      assert(scanner.GenericParamsOffset >= scanner.AddressPoint
+             && "found generic param vector after address point?!");
+      FieldVectorOffset = scanner.FieldVectorOffset - scanner.AddressPoint;
+      GenericParamsOffset = scanner.GenericParamsOffset == ~0U
+        ? 0
+        : scanner.GenericParamsOffset - scanner.AddressPoint;
+    }
+    
+    StructDecl *getTarget() { return Target; }
+    
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Struct);
+    }
+    
+    unsigned getGenericParamsOffset() {
+      return GenericParamsOffset;
+    }
+    
+    void addKindDependentFields() {
+      // Build the field name list.
+      llvm::SmallString<64> fieldNames;
+      unsigned numFields = 0;
+      
+      for (auto prop : Target->getStoredProperties()) {
+        fieldNames.append(prop->getName().str());
+        fieldNames.push_back('\0');
+        ++numFields;
+      }
+      // The final null terminator is provided by getAddrOfGlobalString.
+      
+      addConstantSize(numFields);
+      addConstantSize(FieldVectorOffset);
+      Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
+    }
+  };
+  
+  class ClassNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<ClassNominalTypeDescriptorBuilder>
+  {
+    using super
+      = NominalTypeDescriptorBuilderBase<ClassNominalTypeDescriptorBuilder>;
+    
+    // Offsets of key fields in the metadata records.
+    unsigned FieldVectorOffset, GenericParamsOffset;
+    
+    ClassDecl *Target;
+    
+  public:
+    ClassNominalTypeDescriptorBuilder(IRGenModule &IGM,
+                                       ClassDecl *c)
+      : super(IGM), Target(c)
+    {
+      // Scan the metadata layout for the class to find the key offsets to
+      // put in our descriptor.
+      struct ScanForDescriptorOffsets
+        : ClassMetadataScanner<ScanForDescriptorOffsets>
+      {
+        ScanForDescriptorOffsets(IRGenModule &IGM, ClassDecl *Target)
+          : ClassMetadataScanner(IGM, Target) {}
+        
+        unsigned AddressPoint = ~0U, FieldVectorOffset = ~0U,
+                 GenericParamsOffset = ~0U;
+        
+        void noteAddressPoint() { AddressPoint = NextIndex; }
+        void noteStartOfFieldOffsets(ClassDecl *c) {
+          if (c == TargetClass) {
+            FieldVectorOffset = NextIndex;
+          }
+        }
+        void addGenericFields(const GenericParamList &g, ClassDecl *c) {
+          if (c == TargetClass) {
+            GenericParamsOffset = NextIndex;
+          }
+          ClassMetadataScanner::addGenericFields(g, c);
+        }
+      };
+      
+      ScanForDescriptorOffsets scanner(IGM, Target);
+      scanner.layout();
+      assert(scanner.AddressPoint != ~0U
+             && "did not find fields in Class metadata?!");
+      assert(scanner.FieldVectorOffset >= scanner.AddressPoint
+             && "found field offset vector after address point?!");
+      assert(scanner.GenericParamsOffset >= scanner.AddressPoint
+             && "found generic param vector after address point?!");
+      FieldVectorOffset = scanner.FieldVectorOffset == ~0U
+        ? 0 : scanner.FieldVectorOffset - scanner.AddressPoint;
+      GenericParamsOffset = scanner.GenericParamsOffset == ~0U
+        ? 0 : scanner.GenericParamsOffset - scanner.AddressPoint;
+    }
+    
+    ClassDecl *getTarget() { return Target; }
+    
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Class);
+    }
+    
+    unsigned getGenericParamsOffset() {
+      return GenericParamsOffset;
+    }
+    
+    void addKindDependentFields() {
+      // Build the field name list.
+      llvm::SmallString<64> fieldNames;
+      unsigned numFields = 0;
+      
+      for (auto prop : Target->getStoredProperties()) {
+        fieldNames.append(prop->getName().str());
+        fieldNames.push_back('\0');
+        ++numFields;
+      }
+      // The final null terminator is provided by getAddrOfGlobalString.
+      
+      addConstantSize(numFields);
+      addConstantSize(FieldVectorOffset);
+      Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
+    }
+  };
+  
+  class EnumNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<EnumNominalTypeDescriptorBuilder>
+  {
+    using super
+      = NominalTypeDescriptorBuilderBase<EnumNominalTypeDescriptorBuilder>;
+    
+    // Offsets of key fields in the metadata records.
+    unsigned GenericParamsOffset;
+    
+    EnumDecl *Target;
+    
+  public:
+    EnumNominalTypeDescriptorBuilder(IRGenModule &IGM, EnumDecl *c)
+      : super(IGM), Target(c)
+    {
+      // Scan the metadata layout for the class to find the key offsets to
+      // put in our descriptor.
+      struct ScanForDescriptorOffsets
+        : EnumMetadataScanner<ScanForDescriptorOffsets>
+      {
+        ScanForDescriptorOffsets(IRGenModule &IGM, EnumDecl *Target)
+          : EnumMetadataScanner(IGM, Target) {}
+        
+        unsigned AddressPoint = ~0U, FieldVectorOffset = ~0U,
+                 GenericParamsOffset = ~0U;
+        
+        void noteAddressPoint() { AddressPoint = NextIndex; }
+        void addGenericFields(const GenericParamList &g) {
+          GenericParamsOffset = NextIndex;
+        }
+      };
+      
+      ScanForDescriptorOffsets scanner(IGM, Target);
+      scanner.layout();
+      assert(scanner.AddressPoint != ~0U
+             && "did not find fields in Enum metadata?!");
+      assert(scanner.GenericParamsOffset >= scanner.AddressPoint
+             && "found generic param vector after address point?!");
+      GenericParamsOffset = scanner.GenericParamsOffset == ~0U
+        ? 0 : scanner.GenericParamsOffset - scanner.AddressPoint;
+    }
+    
+    EnumDecl *getTarget() { return Target; }
+    
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Enum);
+    }
+    
+    unsigned getGenericParamsOffset() {
+      return GenericParamsOffset;
+    }
+    
+    void addKindDependentFields() {
+      // FIXME: Populate.
+      addConstantSize(0);
+      addConstantSize(0);
+      addConstantSize(0);
+    }
+  };
+}
+
 
 /*****************************************************************************/
 /** Metadata Emission ********************************************************/
@@ -2269,7 +2591,7 @@ namespace {
 
     void addNominalTypeDescriptor() {
       // FIXME!
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      Fields.push_back(StructNominalTypeDescriptorBuilder(IGM, Target).emit());
     }
 
     void addParentMetadataRef() {
@@ -2414,6 +2736,7 @@ class EnumMetadataBuilderBase : public EnumMetadataLayout<Impl> {
 
 protected:
   using super::IGM;
+  using super::Target;
   SmallVector<llvm::Constant *, 8> Fields;
 
   unsigned getNextIndex() const { return Fields.size(); }
@@ -2428,7 +2751,7 @@ public:
   
   void addNominalTypeDescriptor() {
     // FIXME!
-    Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    Fields.push_back(EnumNominalTypeDescriptorBuilder(IGM, Target).emit());
   }
   
   void addParentMetadataRef() {

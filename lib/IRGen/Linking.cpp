@@ -131,6 +131,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
                               ExplosionKind::Minimal);
     return;
+      
+  //   global ::= 'Mn' type                       // nominal type descriptor
+  case Kind::NominalTypeDescriptor:
+    buffer << "_TMn";
+    mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
+                              ExplosionKind::Minimal);
+    return;
 
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:

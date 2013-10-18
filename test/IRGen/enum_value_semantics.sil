@@ -21,10 +21,10 @@ import Builtin
 // CHECK:   i8* inttoptr (i64 16 to i8*)
 // CHECK: ]
 
-// CHECK: @_TMdO20enum_value_semantics20SinglePayloadTrivial = constant { i8**, i64, i8*, %swift.type* } {
+// CHECK: @_TMdO20enum_value_semantics20SinglePayloadTrivial = constant { {{.*}}* } {
 // CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
 // CHECK:   i64 2,
-// CHECK:   i8* null,
+// CHECK:   {{.*}}* @_TMnO20enum_value_semantics20SinglePayloadTrivial,
 // CHECK:   %swift.type* null
 // CHECK: }
 
@@ -47,10 +47,10 @@ import Builtin
 // CHECK:   i8* inttoptr (i64 16 to i8*)
 // CHECK: ]
 
-// CHECK: @_TMdO20enum_value_semantics23SinglePayloadNontrivial = constant { i8**, i64, i8*, %swift.type* } {
+// CHECK: @_TMdO20enum_value_semantics23SinglePayloadNontrivial = constant { {{.*}}* } {
 // CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
 // CHECK:   i64 2,
-// CHECK:   i8* null,
+// CHECK:   {{.*}}* @_TMnO20enum_value_semantics23SinglePayloadNontrivial,
 // CHECK:   %swift.type* null
 // CHECK: }
 
@@ -60,7 +60,7 @@ import Builtin
 // CHECK:   [8 x i8*] zeroinitializer,
 // CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics18GenericFixedLayout, i32 0, i32 0),
 // CHECK:   i64 2,
-// CHECK:   i8* null,
+// CHECK:   {{.*}}* @_TMnO20enum_value_semantics18GenericFixedLayout,
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.type* null
 // CHECK: }

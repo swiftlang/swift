@@ -591,6 +591,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
+  case Kind::NominalTypeDescriptor:
   case Kind::DebuggerDeclTypeMangling:
     return isLocalLinkageDecl(getDecl());
   
@@ -1156,6 +1157,14 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
 
   return addr;
+}
+
+llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
+                                                            llvm::Type* ty){
+  auto entity = LinkEntity::forNominalTypeDescriptor(D);
+  return getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                               ty, ty, ty->getPointerTo(),
+                               DebugTypeInfo());
 }
 
 /// Fetch the declaration of the given known function.

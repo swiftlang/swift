@@ -126,6 +126,10 @@ class LinkEntity {
     /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
     SwiftMetaclassStub,
 
+    /// The nominal type descriptor for a nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    NominalTypeDescriptor,
+    
     /// A type which is being mangled for the DWARF debug info.
     /// The pointer is a ValueDecl*.
     DebuggerDeclTypeMangling,
@@ -166,10 +170,10 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     ValueWitnessTable,
 
-    /// The metadata or metadata template for a class.
+    /// The metadata or metadata template for a type.
     /// The pointer is a canonical TypeBase*.
     TypeMetadata,
-
+    
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
@@ -342,6 +346,13 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect))
                 | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
+    return entity;
+  }
+  
+  static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::NominalTypeDescriptor,
+                      decl, Mangle::ExplosionKind::Minimal, 0);
     return entity;
   }
 

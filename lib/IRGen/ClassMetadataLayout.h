@@ -164,7 +164,7 @@ private:
   /// section should be enough.
   void addGenericClassFields(ClassDecl *theClass,
                              const GenericParamList &generics) {
-    this->addGenericFields(generics, theClass);
+    asImpl().addGenericFields(generics, theClass);
   }
 
   void addFieldEntries(VarDecl *field) {

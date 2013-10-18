@@ -475,6 +475,7 @@ Globals
   global ::= 'M' directness type         // type metadata
   global ::= 'MP' directness type        // type metadata pattern
   global ::= 'Mm' type                   // class metaclass
+  global ::= 'Mn' nominal-type           // nominal type descriptor
   global ::= 'nk_' entity                // protocol witness
   global ::= 'PA' .*                     // partial application forwarder
   global ::= 'PAo' .*                    // ObjC partial application forwarder

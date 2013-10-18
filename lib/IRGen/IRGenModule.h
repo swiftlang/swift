@@ -348,6 +348,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
+  llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
+                                                 llvm::Type *ty = nullptr);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);

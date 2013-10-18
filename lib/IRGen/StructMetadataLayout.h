@@ -58,7 +58,7 @@ public:
 
     // Instantiation-specific.
     if (auto generics = Target->getGenericParamsOfContext()) {
-      this->addGenericFields(*generics);
+      asImpl().addGenericFields(*generics);
     }
   }
   

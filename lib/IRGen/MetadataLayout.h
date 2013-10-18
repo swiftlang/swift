@@ -54,6 +54,9 @@ public:
   template <class... T>
   void addGenericFields(const GenericParamList &generics,
                         T &&...args) {
+    // The archetype order here needs to be consistent with
+    // NominalTypeDescriptorBase::addGenericParams.
+    
     // Note that we intentionally don't forward the generic arguments.
 
     // Add all the primary archetypes.
@@ -67,7 +70,8 @@ public:
     for (auto archetype : generics.getAllArchetypes()) {
       asImpl().beginGenericWitnessTables(archetype, args...);
       for (auto protocol : archetype->getConformsTo()) {
-        asImpl().addGenericWitnessTable(archetype, protocol, args...);
+        if (!protocol->isObjC())
+          asImpl().addGenericWitnessTable(archetype, protocol, args...);
       }
       asImpl().endGenericWitnessTables(archetype, args...);
     }

@@ -75,8 +75,22 @@ import Builtin
 //    we fill in on instantiation.
 //    The witness table pattern includes extra inhabitant witness
 //    implementations which are used if the instance has extra inhabitants.
+// CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private unnamed_addr constant [25 x i8] c"O4enum16DynamicSingleton\00"
+// CHECK: @_TMnO4enum16DynamicSingleton = global { {{.*}} i64 } {
+// --       2 = enum
+// CHECK:   i64 2,
+// CHECK:   i8* getelementptr inbounds ([25 x i8]* [[DYNAMICSINGLETON_NAME]], i64 0, i64 0),
+// --       FIXME
+// CHECK:   i64 0, i64 0, i64 0,
+// --       generic parameter vector offset
+// CHECK:   i64 3,
+// --       generic parameter vector length; witness table counts
+// CHECK:   i64 1, i64 0
+// CHECK: }
+
 // CHECK: @_TMPdO4enum16DynamicSingleton = global { {{.*}}* } {
 // CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLETON_FILL:@fill_generic_metadata[0-9]*]]
+// CHECK:   @_TMnO4enum16DynamicSingleton
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum16DynamicSingleton to i8*),
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum16DynamicSingleton to i8*),
 // CHECK:   i8* null
