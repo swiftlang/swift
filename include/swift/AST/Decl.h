@@ -2527,11 +2527,6 @@ class EnumElementDecl : public ValueDecl {
   /// definitions.
   TypeLoc ArgumentType;
   
-  SourceLoc ResultArrowLoc;
-  /// The optional refined type of the case. Must be an instance of the generic
-  /// type of the containing enum.
-  TypeLoc ResultType;
-  
   SourceLoc EqualsLoc;
   
   /// The raw value literal for the enum element, or null.
@@ -2542,15 +2537,11 @@ class EnumElementDecl : public ValueDecl {
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
                   TypeLoc ArgumentType,
-                  SourceLoc ArrowLoc,
-                  TypeLoc ResultType,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
     ArgumentType(ArgumentType),
-    ResultArrowLoc(ArrowLoc),
-    ResultType(ResultType),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {}
@@ -2558,10 +2549,6 @@ public:
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
   TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-
-  bool hasResultType() const { return !ResultType.getType().isNull(); }
-  Type getResultType() const { return ResultType.getType(); }
-  TypeLoc &getResultTypeLoc() { return ResultType; }
   
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
@@ -2582,7 +2569,6 @@ public:
   SourceLoc getStartLoc() const {
     return getNameLoc();
   }
-  SourceLoc getResultArrowLoc() const { return ResultArrowLoc; }
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {

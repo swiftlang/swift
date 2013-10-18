@@ -1430,12 +1430,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::ENUM_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID argTypeID, resTypeID, ctorTypeID;
+    TypeID argTypeID, ctorTypeID;
     bool isImplicit;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID, contextID,
-                                                argTypeID, resTypeID,
-                                                ctorTypeID,
+                                                argTypeID, ctorTypeID,
                                                 isImplicit);
 
     DeclContext *DC = getDeclContext(contextID);
@@ -1443,13 +1442,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto argTy = getType(argTypeID);
-    auto resTy = getType(resTypeID);
     // FIXME: Deserialize the literal raw value, if any.
     auto elem = new (ctx) EnumElementDecl(SourceLoc(),
                                           getIdentifier(nameID),
                                           TypeLoc::withoutLoc(argTy),
-                                          SourceLoc(),
-                                          TypeLoc::withoutLoc(resTy),
                                           SourceLoc(),
                                           nullptr,
                                           DC);

@@ -1812,7 +1812,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
 ///
 /// \verbatim
 ///   enum-case:
-///      identifier type-tuple? ('->' type)?
+///      identifier type-tuple?
 ///   decl-enum-element:
 ///      'case' attribute-list enum-case (',' enum-case)*
 /// \endverbatim
@@ -1871,22 +1871,6 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
       }
     }
     
-    // See if there's a result type.
-    SourceLoc ArrowLoc;
-    ParserResult<TypeRepr> ResultType;
-    if (Tok.is(tok::arrow)) {
-      ArrowLoc = consumeToken();
-      ResultType = parseType(diag::expected_type_enum_element_result);
-      if (ResultType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        return Status;
-      }
-      if (ResultType.isNull()) {
-        Status.setIsParseError();
-        return Status;
-      }
-    }
-    
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
@@ -1930,8 +1914,6 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     // Create the element.
     auto *result = new (Context) EnumElementDecl(NameLoc, Name,
                                                  ArgType.getPtrOrNull(),
-                                                 ArrowLoc,
-                                                 ResultType.getPtrOrNull(),
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);

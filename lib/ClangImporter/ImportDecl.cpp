@@ -719,7 +719,6 @@ namespace {
         auto element
           = new (context) EnumElementDecl(SourceLoc(),
                                           name, TypeLoc(),
-                                          SourceLoc(), TypeLoc(),
                                           SourceLoc(), nullptr,
                                           dc);
 

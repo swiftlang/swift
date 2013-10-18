@@ -462,8 +462,6 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 
 // Enum Types
-ERROR(expected_type_enum_element_result,type_parsing,PointsToFirstBadToken,
-      "expected type after '->' in 'case'", ())
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "expected expression after '=' in 'case'", ())
 ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,

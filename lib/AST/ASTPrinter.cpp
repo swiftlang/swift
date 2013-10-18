@@ -699,12 +699,7 @@ static void printEnumElement(raw_ostream &OS, EnumElementDecl *elt) {
   OS << elt->getName();
   
   if (elt->hasArgumentType())
-    elt->getArgumentType().print(OS);
-  
-  if (elt->hasResultType()) {
-    OS << " -> ";
-    elt->getResultType().print(OS);
-  }
+    elt->getArgumentType().print(OS);  
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {

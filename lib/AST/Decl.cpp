@@ -1153,8 +1153,6 @@ StringRef SubscriptDecl::getObjCSetterSelector() const {
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
-  if (ResultType.hasLocation())
-    return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())
     return {getStartLoc(), ArgumentType.getSourceRange().End};
   return {getStartLoc(), getNameLoc()};

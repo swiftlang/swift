@@ -1716,16 +1716,6 @@ public:
         ED->setInvalid();
         return;
       }
-    if (!ED->getResultTypeLoc().isNull()) {
-      if (TC.validateType(ED->getResultTypeLoc(), ED->getDeclContext())) {
-        ED->overwriteType(ErrorType::get(TC.Context));
-        ED->setInvalid();
-        return;
-      }
-      if (ED->getResultType()->getEnumOrBoundGenericEnum() != UD)
-        TC.diagnose(ED->getLoc(), diag::invalid_enum_case_result_type);
-      ElemTy = ED->getResultType();
-    }
 
     // Check the raw value, if we have one.
     if (auto *rawValue = ED->getRawValueExpr()) {
