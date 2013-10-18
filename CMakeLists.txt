@@ -509,6 +509,12 @@ macro(add_swift_library name)
     endforeach(external_source)
   endif(SWIFTLIB_INSTALL)
 
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set_target_properties(${name}
+      PROPERTIES
+      INSTALL_NAME_DIR "@rpath")
+  endif()
+
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
 endmacro(add_swift_library)
 
