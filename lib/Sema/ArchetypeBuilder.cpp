@@ -220,6 +220,9 @@ struct ArchetypeBuilder::Implementation {
   DenseMap<AbstractTypeParamDecl *, PotentialArchetype *> PotentialArchetypes;
   DenseMap<AbstractTypeParamDecl *, ArchetypeType *> PrimaryArchetypeMap;
   SmallVector<ArchetypeType *, 4> AllArchetypes;
+
+  SmallVector<std::pair<PotentialArchetype *, PotentialArchetype *>, 4>
+    SameTypeRequirements;
 };
 
 ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
@@ -352,14 +355,14 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   // Set the superclass.
   T->Superclass = Superclass;
 
-  // FIXME: Add protocol conformances for all of the protocols to which this
-  // class conforms? Needed for type checking.
   return false;
 }
 
 bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
                                               SourceLoc EqualLoc,
                                               PotentialArchetype *T2) {
+  auto OrigT1 = T1, OrigT2 = T2;
+
   // Operate on the representatives
   T1 = T1->getRepresentative();
   T2 = T2->getRepresentative();
@@ -393,6 +396,9 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
+
+  // Record this same-type requirement.
+  Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto Proto : T2->ConformsTo)
@@ -500,6 +506,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
     PotentialArchetype *secondPA = resolveType(req.getSecondType());
     assert(secondPA && "Re-introducing invalid requirement");
     addSameTypeRequirement(firstPA, SourceLoc(), secondPA);
+    return;
   }
   }
   
@@ -651,6 +658,12 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   }
 
   return Impl->AllArchetypes;
+}
+
+ArrayRef<std::pair<ArchetypeBuilder::PotentialArchetype *,
+                   ArchetypeBuilder::PotentialArchetype *>>
+ArchetypeBuilder::getSameTypeRequirements() const {
+  return Impl->SameTypeRequirements;
 }
 
 void ArchetypeBuilder::dump() {

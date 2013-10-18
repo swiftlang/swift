@@ -429,14 +429,58 @@ addNestedRequirements(
   }
 }
 
+/// Resolve the given potential archetype to a dependent type.
+static Type resolvePotentialArchetypeToType(
+              ArchetypeBuilder &builder,
+              ArrayRef<GenericTypeParamType *> params,
+              ArchetypeBuilder::PotentialArchetype *pa) {
+  // If the potential archetype has a parent, it resolves to a dependent member
+  // type.
+  if (auto parentPA = pa->getParent()) {
+    auto parentTy = resolvePotentialArchetypeToType(builder, params, parentPA);
+
+    // Find the protocol that has an associated type with this name.
+    AssociatedTypeDecl *associatedType = nullptr;
+    auto &ctx = builder.getASTContext();
+    auto name = ctx.getIdentifier(pa->getName());
+    auto &mod = builder.getModule();
+    for (auto proto : parentPA->getConformsTo()) {
+      SmallVector<ValueDecl *, 2> decls;
+      if (mod.lookupQualified(proto->getDeclaredType(), name,
+                              NL_VisitSupertypes, nullptr, decls)) {
+        for (auto decl : decls) {
+          associatedType = dyn_cast<AssociatedTypeDecl>(decl);
+          if (associatedType)
+            break;
+        }
+      }
+    }
+    assert(associatedType && "Couldn't find associated type?");
+
+    return DependentMemberType::get(parentTy, associatedType, ctx);
+  }
+
+  // For potential archetypes that do not have parents, find the corresponding
+  // generic parameter.
+  // FIXME: O(n).
+  for (auto param : params) {
+    if (builder.resolveType(param) == pa)
+      return param;
+  }
+
+  llvm_unreachable("Couldn't find generic parameter");
+}
+
 /// Collect the set of requirements placed on the given generic parameters and
 /// their associated types.
 static void collectRequirements(ArchetypeBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
                                 SmallVectorImpl<Requirement> &requirements) {
+  typedef ArchetypeBuilder::PotentialArchetype PotentialArchetype;
+
   // Find the "primary" potential archetypes, from which we'll collect all
   // of the requirements.
-  llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> knownPAs;
+  llvm::SmallPtrSet<PotentialArchetype *, 16> knownPAs;
   llvm::SmallVector<GenericTypeParamType *, 8> primary;
   for (auto param : params) {
     auto pa = builder.resolveType(param);
@@ -453,6 +497,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
       primary.push_back(param);
   }
 
+  // Add all of the conformance and superclass requirements placed on the given
+  // generic parameters and their associated types.
   unsigned primaryIdx = 0, numPrimary = primary.size();
   while (primaryIdx < numPrimary) {
     unsigned depth = primary[primaryIdx]->getDepth();
@@ -481,6 +527,17 @@ static void collectRequirements(ArchetypeBuilder &builder,
     }
 
     primaryIdx = lastPrimaryIdx;
+  }
+
+
+  // Add all of the same-type requirements.
+  for (auto req : builder.getSameTypeRequirements()) {
+    auto firstType = resolvePotentialArchetypeToType(builder, params,
+                                                     req.first);
+    auto secondType = resolvePotentialArchetypeToType(builder, params,
+                                                      req.second);
+    requirements.push_back(Requirement(RequirementKind::SameType,
+                                       firstType, secondType));
   }
 }
 

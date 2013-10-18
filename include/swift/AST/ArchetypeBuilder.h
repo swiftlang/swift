@@ -105,6 +105,9 @@ public:
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
+  /// Retrieve the AST context.
+  ASTContext &getASTContext() const { return Context; }
+
   /// Retrieve the module.
   Module &getModule() const { return Mod; }
 
@@ -189,6 +192,11 @@ public:
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
   ArrayRef<ArchetypeType *> getAllArchetypes();
+
+  /// Retrieve the set of same-type requirements that apply to the potential
+  /// archetypes known to this builder.
+  ArrayRef<std::pair<PotentialArchetype *, PotentialArchetype *>>
+  getSameTypeRequirements() const;
 
   // FIXME: Compute the set of 'extra' witness tables needed to express this
   // requirement set.
