@@ -1,3 +1,15 @@
+//===- CodeCompletion.cpp - Code completion implementation ----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
@@ -18,6 +30,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "clang/Basic/Module.h"
+#include "CodeCompletionResultBuilder.h"
 #include <algorithm>
 #include <functional>
 #include <string>
