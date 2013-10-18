@@ -144,7 +144,7 @@ public:
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
 
-      addChunkWithText(
+      addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
@@ -164,7 +164,7 @@ public:
   }
 
   void addDynamicLookupMethodCallTail() {
-    addChunkWithText(
+    addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail,
         "?|!");
     getLastChunk().setIsAnnotation();
