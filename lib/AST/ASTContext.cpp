@@ -1242,7 +1242,7 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
   if (isCanonical ) {
     for (const auto &req : requirements) {
       if (!req.getFirstType()->isCanonical() ||
-          !req.getSecondType()->isCanonical()) {
+          (req.getSecondType() && !req.getSecondType()->isCanonical())) {
         isCanonical = false;
         break;
       }
