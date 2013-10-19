@@ -1,30 +1,4 @@
-if (XCODE)
-  # Xcode + asm works on 2.8.10 or newer.
-  cmake_minimum_required(VERSION 2.8.10)
-else()
-  cmake_minimum_required(VERSION 2.8)
-endif()
-
-set(CMAKE_ASM_COMPILER_ID "Clang")
-enable_language(ASM)
-
-# Set sizeof(void*) if cross-compiling.
-if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
-  if (CMAKE_SYSTEM_PROCESSOR MATCHES "/64$/")
-    set(CMAKE_SIZEOF_VOID_P 8)
-  else()
-    set(CMAKE_SIZEOF_VOID_P 4)
-  endif()
-endif()
-
-# Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
-# CMake refuses to use `uname -m` on OS X 
-# http://public.kitware.com/Bug/view.php?id=10326
-if (NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-  execute_process(COMMAND uname -m
-                  OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
+cmake_minimum_required(VERSION 2.8)
 
 # Support building Swift as a standalone project, using LLVM as an
 # external library.
@@ -209,6 +183,24 @@ endif ()
 check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
 if( CXX_SUPPORTS_DOCUMENTATION_FLAG )
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdocumentation" )
+endif()
+
+# Set sizeof(void*) if cross-compiling.
+if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
+  if (CMAKE_SYSTEM_PROCESSOR MATCHES "64$")
+    set(CMAKE_SIZEOF_VOID_P 8)
+  else()
+    set(CMAKE_SIZEOF_VOID_P 4)
+  endif()
+endif()
+
+# Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
+# CMake refuses to use `uname -m` on OS X 
+# http://public.kitware.com/Bug/view.php?id=10326
+if (NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
+  execute_process(COMMAND uname -m
+                  OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
 # Compile a swift file into an object file (as a library).
