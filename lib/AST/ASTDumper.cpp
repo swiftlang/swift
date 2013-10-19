@@ -1540,3 +1540,14 @@ void TypeRepr::dump() const {
   PrintTypeRepr(llvm::errs(), 0).visit(const_cast<TypeRepr*>(this));
   llvm::errs() << '\n';
 }
+
+void Substitution::print(llvm::raw_ostream &os) const {
+  Archetype->print(os);
+  os << " = ";
+  Replacement->print(os);
+}
+
+void Substitution::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}

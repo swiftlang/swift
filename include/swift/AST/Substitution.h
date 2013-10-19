@@ -20,6 +20,10 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
   class ArchetypeType;
   class ProtocolConformance;
@@ -30,6 +34,9 @@ public:
   ArchetypeType *Archetype;
   Type Replacement;
   ArrayRef<ProtocolConformance *> Conformance;
+  
+  void print(llvm::raw_ostream &os) const;
+  void dump() const;
 };
 
 } // end namespace swift
