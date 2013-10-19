@@ -155,16 +155,16 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
   Location L = {};
   if (S == nullptr) return L;
 
-  SourceLoc StartLoc = End ? S->getEndLoc() : S->getStartLoc();
-  if (StartLoc.isInvalid())
+  SourceLoc Loc = End ? S->getEndLoc() : S->getStartLoc();
+  if (Loc.isInvalid())
     // This may be a deserialized or clang-imported decl. And modules
     // don't come with SourceLocs right now. Get at least the name of
     // the module.
     return getDeserializedLoc(S);
 
-  unsigned BufferID = SM.findBufferContainingLoc(StartLoc);
+  unsigned BufferID = SM.findBufferContainingLoc(Loc);
   L.Filename = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
-  std::tie(L.Line, L.Col) = SM.getLineAndColumn(StartLoc, BufferID);
+  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc, BufferID);
   return L;
 }
 
@@ -235,8 +235,12 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
 
     // FIXME: It may or may not be better to fix this in SILLocation.
     // If this is an implicit return, we want the end of the
-    // AbstructFunctionDecl's body.
-    auto DLoc = getLoc(SM, D, Loc.getKind() == SILLocation::ImplicitReturnKind);
+    // AbstractFunctionDecl's body.
+    if (Loc.getKind() == SILLocation::ImplicitReturnKind ||
+        Loc.getKind() == SILLocation::CleanupKind)
+      return {getLoc(SM, D, true), getLoc(SM, D, false)};
+
+    auto DLoc = getLoc(SM, D);
     return {DLoc, DLoc};
   }
 
