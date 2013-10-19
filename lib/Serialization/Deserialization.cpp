@@ -526,6 +526,13 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
                                                             second));
         break;
       }
+
+      case ValueWitnessMarker: {
+        // Shouldn't happen where we have requirement representations.
+        error();
+        break;
+      }
+
       default:
         // Unknown requirement kind. Drop the requirement and continue, but log
         // an error so that we don't actually try to generate code.
@@ -603,6 +610,14 @@ void ModuleFile::readGenericRequirements(
 
         requirements.push_back(Requirement(RequirementKind::SameType,
                                            first, second));
+        break;
+      }
+      case GenericRequirementKind::ValueWitnessMarker: {
+        assert(rawTypeIDs.size() == 1);
+        auto first = getType(rawTypeIDs[0]);
+
+        requirements.push_back(Requirement(RequirementKind::ValueWitnessMarker,
+                                           first, Type()));
         break;
       }
       default:

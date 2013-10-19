@@ -294,6 +294,9 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       }
       
       break;
+
+    case RequirementKind::ValueWitnessMarker:
+      llvm_unreachable("value witness markers in syntactic requirement?");
     }
     
     if (builder && builder->addRequirement(req)) {
@@ -379,6 +382,10 @@ addRequirements(
     SmallVectorImpl<Requirement> &requirements) {
   using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
 
+  // Add a value witness marker.
+  requirements.push_back(Requirement(RequirementKind::ValueWitnessMarker,
+                                     type, Type()));
+
   // Add superclass requirement, if needed.
   if (auto superclass = pa->getSuperclass()) {
     // FIXME: Distinguish superclass from conformance?
@@ -423,6 +430,7 @@ addNestedRequirements(
 
       auto nestedType = DependentMemberType::get(type, assocType,
                                                  mod.getASTContext());
+
       addRequirements(mod, nestedType, rep, knownPAs, requirements);
       addNestedRequirements(mod, nestedType, rep, knownPAs, requirements);
     }
@@ -514,6 +522,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
          ++idx, ++lastPrimaryIdx) {
       auto param = primary[idx];
       auto pa = builder.resolveType(param)->getRepresentative();
+
+      // Add other requirements.
       addRequirements(builder.getModule(), param, pa, knownPAs,
                       requirements);
     }

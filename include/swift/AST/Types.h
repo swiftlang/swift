@@ -2799,10 +2799,21 @@ case TypeKind::Id:
       for (auto param : function->getGenericParams())
         if (Type(param).findIf(pred))
           return true;
-      for (const auto &req : function->getRequirements())
-        if (req.getFirstType().findIf(pred) ||
-            req.getSecondType().findIf(pred))
+      for (const auto &req : function->getRequirements()) {
+        if (req.getFirstType().findIf(pred))
           return true;
+
+        switch (req.getKind()) {
+        case RequirementKind::SameType:
+        case RequirementKind::Conformance:
+          if (req.getSecondType().findIf(pred))
+            return true;
+          break;
+
+        case RequirementKind::ValueWitnessMarker:
+          break;
+        }
+      }
       return function->getInput().findIf(pred) ||
              function->getResult().findIf(pred);
     }
@@ -3100,9 +3111,12 @@ case TypeKind::Id:
       if (!firstType)
         return Type();
 
-      auto secondType = req.getSecondType().transform(ctx, fn);
-      if (!secondType)
-        return Type();
+      Type secondType = req.getSecondType();
+      if (secondType) {
+        secondType = secondType.transform(ctx, fn);
+        if (!secondType)
+          return Type();
+      }
 
       if (firstType->isDependentType() || secondType->isDependentType()) {
         if (firstType.getPointer() != req.getFirstType().getPointer() ||

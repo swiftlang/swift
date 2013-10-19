@@ -468,6 +468,9 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     }
     return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);
   }
+
+  case RequirementKind::ValueWitnessMarker:
+    llvm_unreachable("Value witness marker in requirement");
   }
 
   llvm_unreachable("Unhandled requirement?");
@@ -508,8 +511,11 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
     addSameTypeRequirement(firstPA, SourceLoc(), secondPA);
     return;
   }
+
+  case RequirementKind::ValueWitnessMarker:
+    return;
   }
-  
+
   llvm_unreachable("Unhandled requirement?");
 }
 

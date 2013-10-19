@@ -439,6 +439,9 @@ Type ConstraintSystem::openType(
           addConstraint(ConstraintKind::Bind, firstTy, secondTy);
           break;
         }
+
+        case RequirementKind::ValueWitnessMarker:
+          break;
         }
       }
 

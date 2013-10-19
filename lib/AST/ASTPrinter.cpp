@@ -284,17 +284,19 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 
   auto Requirements = Params->getRequirements();
   if (!Requirements.empty()) {
-    OS << " where";
     bool IsFirst = true;
     for (auto &Req : Requirements) {
-      if (Req.isInvalid())
+      if (Req.isInvalid() ||
+          Req.getKind() == RequirementKind::ValueWitnessMarker)
         continue;
+
       if (IsFirst) {
-        OS << " ";
+        OS << " where ";
         IsFirst = false;
       } else {
         OS << ", ";
       }
+
       switch (Req.getKind()) {
       case RequirementKind::Conformance:
         printTypeLoc(Req.getSubjectLoc());
@@ -306,6 +308,8 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
         OS << " == ";
         printTypeLoc(Req.getSecondTypeLoc());
         break;
+      case RequirementKind::ValueWitnessMarker:
+        llvm_unreachable("Handled above");
       }
     }
   }
@@ -1299,6 +1303,9 @@ public:
     // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : T->getRequirements()) {
+      if (req.getKind() == RequirementKind::ValueWitnessMarker)
+        continue;
+
       if (isFirstReq) {
         OS << " where ";
         isFirstReq = false;
@@ -1315,6 +1322,9 @@ public:
       case RequirementKind::SameType:
         OS << " == ";
         break;
+
+      case RequirementKind::ValueWitnessMarker:
+        llvm_unreachable("Handled above");
       }
       visit(req.getSecondType());
     }

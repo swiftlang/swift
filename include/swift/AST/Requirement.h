@@ -25,18 +25,24 @@ namespace swift {
 /// \brief Describes the kind of a requirement that occurs within a requirements
 /// clause.
 enum class RequirementKind : unsigned int {
-  /// \brief A conformance requirement T : P, where T is a type that depends
+  /// A conformance requirement T : P, where T is a type that depends
   /// on a generic parameter and P is a protocol to which T must conform.
   Conformance,
-  /// \brief A same-type requirement T == U, where T and U are types that
-  /// shall be equivalent.
-  SameType
+  /// A same-type requirement T == U, where T and U are types that shall be
+  /// equivalent.
+  SameType,
+  /// A marker that indicates where the value witness for the given (first)
+  /// type should be located.
+  ///
+  /// FIXME: This is a crutch used to help us eliminate various walks over
+  /// "all archetypes".
+  ValueWitnessMarker
 };
 
 /// \brief A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
-  llvm::PointerIntPair<Type, 1, RequirementKind> FirstTypeAndKind;
+  llvm::PointerIntPair<Type, 2, RequirementKind> FirstTypeAndKind;
   Type SecondType;
 
 public:

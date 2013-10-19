@@ -529,6 +529,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   switch (kind) {
   CASE(Conformance)
   CASE(SameType)
+  CASE(ValueWitnessMarker)
   }
 #undef CASE
 }
@@ -540,12 +541,25 @@ void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
     return;
 
   auto reqAbbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
-  for (const auto &req : requirements) {
-    GenericRequirementLayout::emitRecord(
-                                Out, ScratchRecord, reqAbbrCode,
-                                getRawStableRequirementKind(req.getKind()),
-                                addTypeRef(req.getFirstType()),
-                                addTypeRef(req.getSecondType()));
+  for (const auto &req : requirements) { {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+      GenericRequirementLayout::emitRecord(
+        Out, ScratchRecord, reqAbbrCode,
+        getRawStableRequirementKind(req.getKind()),
+        addTypeRef(req.getFirstType()),
+        addTypeRef(req.getSecondType()));
+      break;
+
+    case RequirementKind::ValueWitnessMarker:
+      GenericRequirementLayout::emitRecord(
+        Out, ScratchRecord, reqAbbrCode,
+        getRawStableRequirementKind(req.getKind()),
+        llvm::makeArrayRef(addTypeRef(req.getFirstType())));
+      break;
+    }
+  }
   }
 }
 
@@ -586,6 +600,9 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
                                       GenericRequirementKind::SameType,
                                       addTypeRef(next.getFirstType()),
                                       addTypeRef(next.getSecondType()));
+      break;
+    case RequirementKind::ValueWitnessMarker:
+      llvm_unreachable("Can't show up in requirement representations");
       break;
     }
   }

@@ -649,9 +649,10 @@ CanType TypeBase::getCanonicalType() {
     SmallVector<Requirement, 4> requirements;
     for (const auto &req : function->getRequirements()) {
       auto firstType = req.getFirstType()->getCanonicalType();
-      auto secondType = req.getSecondType()->getCanonicalType();
-      requirements.push_back(Requirement(req.getKind(), firstType,
-                                         secondType));
+      auto secondType = req.getSecondType();
+      if (secondType)
+        secondType = secondType->getCanonicalType();
+      requirements.push_back(Requirement(req.getKind(), firstType, secondType));
     }
 
     // Transform input type.

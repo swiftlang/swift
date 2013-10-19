@@ -128,9 +128,10 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 // VERSION_MAJOR.
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
-  SameType
+  SameType,
+  ValueWitnessMarker
 };
-using GenericRequirementKindField = BCFixed<1>;
+using GenericRequirementKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -814,7 +815,8 @@ namespace decls_block {
   using GenericRequirementLayout = BCRecordLayout<
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
-    BCArray<TypeIDField>         // types involved (currently always two)
+    BCArray<TypeIDField>         // types involved (two for conformance,
+                                 // same-type; one for value witness marker)
   >;
 
   /// Placeholder that marks the last generic requirement in the generic

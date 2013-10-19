@@ -928,24 +928,32 @@ namespace {
       // Step through the list of requirements in the generic type.
       auto requirements = genericTy->getRequirements();
 
-      // Skip to the next conformance requirement.
-      auto skipToNextConformanceRequirement = [&]() {
+      // Skip over same-type requirements.
+      auto skipUnrepresentedRequirements = [&]() {
         for (; !requirements.empty(); requirements = requirements.slice(1)) {
+          bool done = false;
           switch (requirements.front().getKind()) {
           case RequirementKind::Conformance:
+            // If the second type is a protocol type, we're done.
+            if (requirements.front().getSecondType()->is<ProtocolType>())
+              done = true;
+
             break;
 
           case RequirementKind::SameType:
             // Skip the next same-type constraint.
             continue;
+
+          case RequirementKind::ValueWitnessMarker:
+            done = true;
+            break;
           }
 
-          // If the second type is a protocol type, we're done.
-          if (requirements.front().getSecondType()->is<ProtocolType>())
+          if (done)
             break;
         }
       };
-      skipToNextConformanceRequirement();
+      skipUnrepresentedRequirements();
 
       // Collect all of the generic parameter lists.
       SmallVector<GenericParamList *, 4> allGenericParamLists;
@@ -989,6 +997,33 @@ namespace {
       // matching up their conformance requirements with those in the
       for (auto gpList : allGenericParamLists) {
         for (auto archetype : gpList->getAllArchetypes()) {
+          // Make sure we have the value witness marker.
+          if (requirements.empty()) {
+            noteFailure();
+            Out << "Ran out of requirements before we ran out of archetypes\n";
+            break;
+          }
+
+          if (requirements.front().getKind()
+                == RequirementKind::ValueWitnessMarker) {
+            auto type = ArchetypeBuilder::mapTypeIntoContext(
+                          dc,
+                          requirements.front().getFirstType());
+            if (type->isEqual(archetype)) {
+              requirements = requirements.slice(1);
+              skipUnrepresentedRequirements();
+            } else {
+              noteFailure();
+              Out << "Value witness marker for " << type->getString()
+                  << " does not match expected " << archetype->getString()
+                  << "\n";
+            }
+          } else {
+            noteFailure();
+            Out << "Missing value witness marker for "
+                << archetype->getString() << "\n";
+          }
+
           for (auto proto : archetype->getConformsTo()) {
             // If there are no requirements left, we're missing requirements.
             if (requirements.empty()) {
@@ -1009,7 +1044,7 @@ namespace {
             if (firstReqType->isEqual(archetype) &&
                 secondReqType->isEqual(proto->getDeclaredType())) {
               requirements = requirements.slice(1);
-              skipToNextConformanceRequirement();
+              skipUnrepresentedRequirements();
               continue;
             }
 
