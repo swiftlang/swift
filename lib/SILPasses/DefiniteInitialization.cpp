@@ -495,10 +495,10 @@ namespace {
 
     // Load promotion.
     bool hasEscapedAt(SILInstruction *I);
-    bool updateAvailableValues(SILInstruction *Inst,
+    void updateAvailableValues(SILInstruction *Inst,
                                llvm::SmallBitVector &RequiredElts,
                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
-    bool computeAvailableValues(SILInstruction *StartingFrom,
+    void computeAvailableValues(SILInstruction *StartingFrom,
                                 llvm::SmallBitVector &RequiredElts,
                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
 
@@ -834,15 +834,13 @@ bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
 
 /// The specified instruction is a non-load access of the element being
 /// promoted.  See if it provides a value or refines the demanded element mask
-/// used for load promotion.  If an available value is provided, this returns
-/// true.
-bool ElementPromotion::
+/// used for load promotion.
+void ElementPromotion::
 updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
 
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
-    bool ProducedSomething = false;
     unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
     CanType ValTy = Inst->getOperand(0).getType().getSwiftRValueType();
 
@@ -854,10 +852,9 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
 
       // This element is now provided.
       RequiredElts[StartSubElt+i] = false;
-      ProducedSomething = true;
     }
 
-    return ProducedSomething;
+    return;
   }
 
   // If we get here with a copy_addr, it must be storing into the element. Check
@@ -877,7 +874,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     // If this is a copy addr that doesn't intersect the loaded subelements,
     // just continue with an unmodified load mask.
     if (!AnyRequired)
-      return false;
+      return;
 
     // If the copyaddr is of an non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
@@ -889,7 +886,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
 
       // The copy_addr doesn't provide any values, but we've arranged for our
       // iterators to visit the newly generated instructions, which do.
-      return false;
+      return;
     }
   }
 
@@ -900,7 +897,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   // Otherwise, this is some unknown instruction, conservatively assume that all
   // values are clobbered.
   RequiredElts.clear();
-  return false;
+  return;
 }
 
 
@@ -909,20 +906,13 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
 ///
 /// The bitvector indicates which subelements we're interested in, and result
 /// captures the available value (plus an indicator of which subelement of that
-/// value is needed).  This method returns true if no available values were
-/// found or false if some were.
+/// value is needed).
 ///
-bool ElementPromotion::
+void ElementPromotion::
 computeAvailableValues(SILInstruction *StartingFrom,
                        llvm::SmallBitVector &RequiredElts,
                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
 
-  // If no bits are demanded, we trivially succeed.  This can happen when there
-  // is a load of an empty struct.
-  if (RequiredElts.none())
-    return false;
-
-  bool FoundSomeValues = false;
   SILBasicBlock *InstBB = StartingFrom->getParent();
 
   // If there is a potential modification in the current block, scan the block
@@ -938,12 +928,14 @@ computeAvailableValues(SILInstruction *StartingFrom,
         continue;
       }
 
-      
-      FoundSomeValues |= updateAvailableValues(TheInst, RequiredElts, Result);
+      // Given an interesting instruction, incorporate it into the set of
+      // results, and filter down the list of demanded subelements that we still
+      // need.
+      updateAvailableValues(TheInst, RequiredElts, Result);
 
       // If this satisfied all of the demanded values, we're done.
       if (RequiredElts.none())
-        return !FoundSomeValues;
+        return;
 
       // Otherwise, keep scanning the block.  If the instruction we were looking
       // at just got exploded, don't skip the next instruction.
@@ -956,7 +948,7 @@ computeAvailableValues(SILInstruction *StartingFrom,
   // Otherwise, we need to scan up the CFG looking for available values.
   // TODO: Implement this, for now we just return failure as though there is
   // nothing available.
-  return !FoundSomeValues;
+  return;
 }
 
 static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
@@ -1098,28 +1090,32 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
-
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy);
+  
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt+getNumSubElements(LoadTy));
+  RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
 
   SmallVector<std::pair<SILValue, unsigned>, 8> AvailableValues;
   AvailableValues.resize(NumMemorySubElements);
 
-  // If there are no values available at this load point, then we fail to
-  // promote this load and there is nothing to do.
-  if (computeAvailableValues(Inst, RequiredElts, AvailableValues))
-    return;
+  // Find out if we have any available values.  If no bits are demanded, we
+  // trivially succeed. This can happen when there is a load of an empty struct.
+  if (NumLoadSubElements != 0) {
+    computeAvailableValues(Inst, RequiredElts, AvailableValues);
 
-  // Verify that we actually got some values back when computeAvailableValues
-  // claims it produced them.
-#ifndef NDEBUG
-  {bool AnyAvailable = getNumSubElements(LoadTy) == 0;
+    // If there are no values available at this load point, then we fail to
+    // promote this load and there is nothing to do.
+    bool AnyAvailable = false;
     for (unsigned i = 0, e = AvailableValues.size(); i != e; ++i)
-      AnyAvailable |= AvailableValues[i].first.isValid();
-    assert(AnyAvailable && "Didn't get any available values!");
+      if (AvailableValues[i].first.isValid()) {
+        AnyAvailable = true;
+        break;
+      }
+  
+    if (!AnyAvailable)
+      return;
   }
-#endif
   
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
   // exposing the load operation within it.  Subsequent optimization passes will
