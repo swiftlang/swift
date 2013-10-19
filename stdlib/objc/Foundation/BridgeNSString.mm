@@ -173,4 +173,34 @@ block_type _TTbbTSSGVSs13UnsafePointerV10ObjectiveC8ObjCBool__T_(
   });
 }
 
+/*
+
+// ************** FIXME: DELETE THIS ************
+
+extern "C" id
+swift_CocoaStringLiteral() {
+  return @"String✩Literal";
+}
+
+extern "C" id
+swift_CocoaString() {
+  return [swift_CocoaStringLiteral() stringByAppendingString: @"PlusMore"];
+}
+
+extern "C" id
+swift_CocoaASCIIStringLiteral() {
+  return @"StringLiteral";
+}
+
+extern "C" id
+swift_CocoaACIIString() {
+  return [swift_CocoaASCIIStringLiteral() stringByAppendingString: @"PlusMore"];
+}
+
+extern "C" int
+swift_SameObject(id a, id b) {
+  return a == b;
+}
+*/
+
 @end
