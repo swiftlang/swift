@@ -321,7 +321,9 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
       if (known == replacements.end())
         continue;
 
-      auto replacement = solution.simplifyType(tc, known->second);
+      auto replacement =
+          solution.simplifyType(tc, known->second,
+                                /*RemoveAllTypeVariables=*/false);
       assert(replacement && "Couldn't simplify type variable?");
 
       // If the replacement still contains a type variable, we didn't deduce it.

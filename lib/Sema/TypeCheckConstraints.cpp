@@ -2875,7 +2875,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
-Type Solution::simplifyType(TypeChecker &tc, Type type) const {
+Type Solution::simplifyType(TypeChecker &tc, Type type,
+                            bool removeAllTypeVariables) const {
   return tc.transformType(type,
            [&](Type type) -> Type {
              if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
@@ -2883,6 +2884,14 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
                assert(known != typeBindings.end());
                type = known->second;
              }
+             if (removeAllTypeVariables) {
+               if (isa<TypeVariableType>(type.getPointer())) {
+                 type = GenericTypeParamType::get(
+                     0, 0, constraintSystem->TC.Context);
+               }
+             }
+             assert(!removeAllTypeVariables ||
+                    !dyn_cast<TypeVariableType>(type.getPointer()));
 
              return type;
            });
@@ -3788,7 +3797,8 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType,
-                                      bool discardedExpr){
+                                      bool discardedExpr,
+                                      bool allowFreeTypeVariables) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -3823,7 +3833,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
+  if (cs.solve(viable, allowFreeTypeVariables)) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
       return true;

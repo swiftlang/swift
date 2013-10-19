@@ -446,7 +446,8 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType, bool discardedExpr);
+                           Type convertType, bool discardedExpr,
+                           bool allowFreeTypeVariables = false);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.

@@ -650,7 +650,8 @@ public:
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
-  Type simplifyType(TypeChecker &tc, Type type) const;
+  Type simplifyType(TypeChecker &tc, Type type,
+                    bool removeAllTypeVariables = true) const;
 
   /// \brief Coerce the given expression to the given type.
   ///
