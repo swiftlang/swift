@@ -106,6 +106,9 @@ function build_stdlib()
   CC=`xcrun -sdk $SDK -find clang`
   CXX=`xcrun -sdk $SDK -find clang++`
 
+  # Strip extensions like version or .internal from SDK
+  OS=`echo $SDK | sed -E -e 's/^([a-zA-Z]+).*/\1/'`
+
   # FIXME CMAKE_OSX_DEPLOYMENT_TARGET falls over on iOS version numbers
 
   SWIFT_ASSERTS=ON
@@ -115,11 +118,11 @@ function build_stdlib()
     SWIFT_OPTIMIZED=ON
   fi
 
-  echo "--- Building Swift stdlib $SDK $VERS $ARCH ---"
-  mkdir -p "$WORKSPACE/swift/build/stdlib/$SDK-$ARCH"
-  (cd "$WORKSPACE/swift/build/stdlib/$SDK-$ARCH" &&
-    "$CMAKE" -G "Xcode" \
-      -DCMAKE_SYSTEM_NAME="Darwin" \
+  echo "--- Building Swift stdlib $OS $VERS $ARCH ---"
+  mkdir -p "$WORKSPACE/swift/build/stdlib/$OS-$ARCH"
+  (cd "$WORKSPACE/swift/build/stdlib/$OS-$ARCH" &&
+    "$CMAKE" -G "Unix Makefiles" \
+      -DCMAKE_TOOLCHAIN_FILE=$OS.cmake \
       -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
       -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
@@ -132,7 +135,7 @@ function build_stdlib()
       -DSWIFT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
-      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift/build/stdlib/$SDK-$ARCH/swift-module-cache" \
+      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift/build/stdlib/$OS-$ARCH/swift-module-cache" \
       -DSWIFT_BUILD_TOOLS="NO" \
       -DSWIFT_COMPILER="$WORKSPACE/swift/build/bin/swift" \
       -DSWIFT_INCLUDE_DOCS="OFF" \
@@ -140,7 +143,7 @@ function build_stdlib()
       -DSWIFT_ASSERTS="$SWIFT_ASSERTS" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
       ../../.. &&
-    xcodebuild -arch $ARCH) || exit 1
+    make -j8 ) || exit 1
 }
 
 
@@ -152,9 +155,8 @@ if [ \! "$SKIP_BUILD_SWIFT_STDLIB" ]; then
   build_stdlib arm64  iphoneos.internal 6.0
 
   # Symlink OS X stdlib into built tools so that the tools can be run in-place
-  # (Xcode version)
-  ln -fhs "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/$BUILD_TYPE/axle/"* "$WORKSPACE/swift/build/lib/axle/"
-  ln -fhs "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/$BUILD_TYPE/swift/"* "$WORKSPACE/swift/build/lib/swift/"
+  ln -fhs "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/axle/"* "$WORKSPACE/swift/build/lib/axle/"
+  ln -fhs "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/swift/"* "$WORKSPACE/swift/build/lib/swift/"
 fi
 
 # Run the Swift tests.
