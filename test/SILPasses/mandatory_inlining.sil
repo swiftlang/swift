@@ -278,14 +278,14 @@ sil @inline_test_control_flow : $@thin (x: Float32) -> Float32 {
   // CHECK: store [[VAL23]] to [[VAL24]]#1
   // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]]#1)
   // CHECK: dealloc_stack [[VAL24]]#0
-  // CHECK: cond_br [[VAL26]], [[BB1:.*]], [[BB2:.*]]
+  // CHECK: cond_br [[VAL26]], [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: [[BB1]]:
   // CHECK: [[VAL29:%.*]] = load [[VAL15]]#1
   // CHECK: unreachable
 
 // CHECK: [[BB2]]:
-  // CHECK: br [[BB3:.*]]
+  // CHECK: br [[BB3:bb[0-9]+]]
 
 // CHECK: [[BB3]]:
   // CHECK: [[VAL32:%.*]] = function_ref @get_logic_value
@@ -296,7 +296,7 @@ sil @inline_test_control_flow : $@thin (x: Float32) -> Float32 {
   // CHECK: store [[VAL35]] to [[VAL36]]#1
   // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]]#1)
   // CHECK: dealloc_stack [[VAL36]]#0
-  // CHECK: cond_br [[VAL38]], [[BB4:.*]], [[BB5:.*]]
+  // CHECK: cond_br [[VAL38]], [[BB4:bb[0-9]+]], [[BB5:bb[0-9]+]]
 
 // CHECK: [[BB4]]:
   // CHECK: [[VAL41:%.*]] = function_ref @add_floats
@@ -457,7 +457,7 @@ sil @test_short_circuit : $@thin (x: Bool, y: Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit : $@thin (x: Bool, y: Bool) -> Bool {
 
-  // CHECK: cond_br {{%.*}}, [[BB1:.*]], [[BB3:.*]]
+  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
 
 // CHECK: bb1:
   // CHECK: br [[BB2:.*]](

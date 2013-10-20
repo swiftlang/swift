@@ -353,9 +353,14 @@ public:
     // Print the value.
     visit(V);
 
-    // Print users.
+    // Print users, or id for valueless instructions.
     bool printedSlashes = false;
-    if (!V->use_empty()) {
+
+    if (!V->hasValue()) {
+      OS.PadToColumn(50);
+      OS << "// id: " << getID(V);
+      printedSlashes = true;
+    } else if (!V->use_empty()) {
       OS.PadToColumn(50);
       OS << "// user";
       if (std::next(V->use_begin()) != V->use_end())
