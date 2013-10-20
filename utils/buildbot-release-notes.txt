@@ -23,7 +23,7 @@
       println("square")
     case Rect(size: Size(w: var w, h: var h)) where w > h:
       println("long rectangle")
-    case Rect(size: Size(w: var w, h: var h)) where w < h:
+    default:
       println("tall rectangle")
     }
   
