@@ -1116,7 +1116,8 @@ public:
 
   /// Return the Operand associated with the given VarDecl.
   Operand *getOperandForField(VarDecl *V) {
-    return const_cast<Operand *>(getOperandForField(V));
+    VarDecl const * ConstV = V;
+    return const_cast<Operand *>(getOperandForField(ConstV));
   }
 
   Operand const *getOperandForField(VarDecl const *V) const {
