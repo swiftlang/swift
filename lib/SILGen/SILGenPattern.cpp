@@ -1434,7 +1434,6 @@ public:
   /// branch is unconditional, and this terminates the current block and
   /// returns true. Otherwise, it dispatches conditionally on the guard, leaves
   /// the insertion branch on the not-taken path, and returns false.
-  /// If the case is entered,
   bool emitDispatch(SILGenFunction &gen,
                     unsigned r,
                     CaseMap &caseMap) const {
@@ -1673,66 +1672,74 @@ recur:
   // If we have no specializations, recur into the default matrix immediately.
   if (specializers.empty()) {
     DEBUG(dumpDepth(depth, llvm::dbgs());
-          llvm::dbgs() << "Reducing to default row " << skipRows << '\n');
+          llvm::dbgs() << "Reducing to default, at row " << skipRows << '\n');
     clauses.reduceToDefault(gen, skipRows);
     goto recur;
   }
   
   // Emit the dispatch table.
   DispatchedPatternVector dispatches;
+  SILBasicBlock *defaultBB;
+  {
+    CleanupLocation contLoc(const_cast<Pattern*>(specializers[0].pattern));
+    JumpDest contDest = JumpDest(contBB, gen.Cleanups.getCleanupsDepth(),
+                                 contLoc);
+    Scope dispatchScope(gen.Cleanups, contLoc);
 
-  SILBasicBlock *defaultBB
-    = emitDispatchAndDestructure(gen, specializers, clauses.getOccurrences()[0],
-                                 dispatches, stmt);
-  assert(dispatches.size() == specializers.size() &&
-         "dispatch table doesn't match specializing pattern set");
-  
-  // Emit each specialized branch.
-  for (size_t i = 0, e = specializers.size(); i < e; ++i) {
-    SILBasicBlock *bodyBB = dispatches[i].first;
-    ArrayRef<SILValue> bodyOccurrences = dispatches[i].second;
+    defaultBB
+      = emitDispatchAndDestructure(gen, specializers,
+                                   clauses.getOccurrences()[0],
+                                   dispatches, stmt);
+    assert(dispatches.size() == specializers.size() &&
+           "dispatch table doesn't match specializing pattern set");
     
-    assert(!gen.B.hasValidInsertionPoint() && "dispatch did not close bb");
-    gen.B.emitBlock(bodyBB);
-    
-    // Create a nested scope and cont bb to clean up var bindings exposed by
-    // specializing the matrix.
-    SILBasicBlock *innerContBB = gen.createBasicBlock();
-    
-    {
-      Scope patternVarScope(gen.Cleanups,
-                CleanupLocation(const_cast<Pattern*>(specializers[i].pattern)));
+    // Emit each specialized branch.
+    for (size_t i = 0, e = specializers.size(); i < e; ++i) {
+      SILBasicBlock *bodyBB = dispatches[i].first;
+      ArrayRef<SILValue> bodyOccurrences = dispatches[i].second;
       
-      ClauseMatrix submatrix = clauses.emitSpecialization(gen, specializers[i],
-                                              bodyOccurrences,
-                                              gen.Cleanups.getCleanupsDepth(),
-                                              innerContBB);
-      DEBUG(dumpDepth(depth, llvm::dbgs());
-            llvm::dbgs() << "Specializing on ";
-            dumpPattern(specializers[i].pattern, llvm::dbgs());
-            llvm::dbgs() << " row " << specializers[i].row << '\n');
+      assert(!gen.B.hasValidInsertionPoint() && "dispatch did not close bb");
+      gen.B.emitBlock(bodyBB);
       
-      // Emit the submatrix into the true branch of the specialization.
-      emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB,
-                       depth + 1);
-      assert(!gen.B.hasValidInsertionPoint()
-             && "recursive emitDecisionTree did not terminate all its BBs");
+      // Create a nested scope and cont bb to clean up var bindings exposed by
+      // specializing the matrix.
+      SILBasicBlock *innerContBB = gen.createBasicBlock();
       
-      // Emit cases in this scope.
-      emitCasesForScope(gen, innerContBB, caseMap);
-      
-      if (innerContBB->pred_empty()) {
-        // If the continuation wasn't used, kill it.
-        innerContBB->eraseFromParent();
-        gen.B.clearInsertionPoint();
-      } else {
-        // Otherwise, emit scope cleanups into the continuation BB.
-        gen.B.emitBlock(innerContBB);
+      {
+        Scope patternVarScope(gen.Cleanups,
+                  CleanupLocation(const_cast<Pattern*>(specializers[i].pattern)));
+        
+        ClauseMatrix submatrix = clauses.emitSpecialization(gen, specializers[i],
+                                                bodyOccurrences,
+                                                gen.Cleanups.getCleanupsDepth(),
+                                                innerContBB);
+        DEBUG(dumpDepth(depth, llvm::dbgs());
+              llvm::dbgs() << "Specializing on ";
+              dumpPattern(specializers[i].pattern, llvm::dbgs());
+              llvm::dbgs() << ", at row " << specializers[i].row << '\n');
+        
+        // Emit the submatrix into the true branch of the specialization.
+        emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB,
+                         depth + 1);
+        assert(!gen.B.hasValidInsertionPoint()
+               && "recursive emitDecisionTree did not terminate all its BBs");
+        
+        // Emit cases in this scope.
+        emitCasesForScope(gen, innerContBB, caseMap);
+        
+        if (innerContBB->pred_empty()) {
+          // If the continuation wasn't used, kill it.
+          innerContBB->eraseFromParent();
+          gen.B.clearInsertionPoint();
+        } else {
+          // Otherwise, emit scope cleanups into the continuation BB.
+          gen.B.emitBlock(innerContBB);
+        }
       }
+      // Chain the inner continuation to the outer.
+      if (gen.B.hasValidInsertionPoint())
+        gen.Cleanups.emitBranchAndCleanups(contDest, stmt);
     }
-    // Chain the inner continuation to the outer.
-    if (gen.B.hasValidInsertionPoint())
-      gen.B.createBranch(stmt, contBB);
   }
 
   // If the dispatch was exhaustive, then emitDispatchAndDestructure returns
@@ -1745,7 +1752,7 @@ recur:
   
   gen.B.emitBlock(defaultBB, stmt);
   DEBUG(dumpDepth(depth, llvm::dbgs());
-        llvm::dbgs() << "Reducing to default row " << skipRows << '\n');
+        llvm::dbgs() << "Reducing to default, at row " << skipRows << '\n');
   clauses.reduceToDefault(gen, skipRows);
   goto recur;
 }
