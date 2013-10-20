@@ -26,7 +26,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "clang/Basic/Module.h"
@@ -517,10 +516,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool typecheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
-    DEBUG(llvm::dbgs() << "\nparsed:\n";
-          ParsedExpr->print(llvm::dbgs());
-          llvm::dbgs() << "\n");
-
     Expr *TypecheckedExpr = ParsedExpr;
     if (!typeCheckCompletionContextExpr(P.Context, CurDeclContext,
                                         TypecheckedExpr))
@@ -530,10 +525,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       return false;
 
     ParsedExpr = TypecheckedExpr;
-
-    DEBUG(llvm::dbgs() << "\type checked:\n";
-          ParsedExpr->print(llvm::dbgs());
-          llvm::dbgs() << "\n");
     return true;
   }
 
@@ -1499,7 +1490,6 @@ static bool isDynamicLookup(Type T) {
 
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
-    DEBUG(llvm::dbgs() << "did not get a completion callback");
     return;
   }
 
