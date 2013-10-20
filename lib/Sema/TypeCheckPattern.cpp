@@ -654,10 +654,32 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
 
     if (type->is<ErrorType>())
       hadError = true;
+    
+    // Sometimes a paren is just a paren. If the tuple pattern has a single
+    // element, we can reduce it to a paren pattern.
+    bool canDecayToParen = TP->getNumFields() == 1;
+    auto decayToParen = [&]() -> bool {
+      assert(canDecayToParen);
+      Pattern *sub = TP->getFields()[0].getPattern();
+      if (this->coerceToType(sub, dc, type, false, resolver))
+        return true;
+      
+      if (TP->getLParenLoc().isValid()) {
+        P = new (Context) ParenPattern(TP->getLParenLoc(), sub,
+                                       TP->getRParenLoc(),
+                                       /*implicit*/ TP->isImplicit());
+        P->setType(sub->getType());
+      } else {
+        P = sub;
+      }
+      return false;
+    };
 
     // The context type must be a tuple.
     TupleType *tupleTy = type->getAs<TupleType>();
     if (!tupleTy && !hadError) {
+      if (canDecayToParen)
+        return decayToParen();
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_in_non_tuple_context,
                type);
       hadError = true;
@@ -666,6 +688,8 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     // The number of elements must match exactly.
     // TODO: incomplete tuple patterns, with some syntax.
     if (!hadError && tupleTy->getFields().size() != TP->getNumFields()) {
+      if (canDecayToParen)
+        return decayToParen();
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_length_mismatch, type);
       hadError = true;
     }
