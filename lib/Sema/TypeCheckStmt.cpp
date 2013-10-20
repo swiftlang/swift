@@ -321,8 +321,10 @@ public:
     
     // Coerce the pattern to the element type, now that we know the element
     // type.
-    if (TC.coerceToType(S->getPattern(), DC, ElementTy))
+    Pattern *pattern = S->getPattern();
+    if (TC.coerceToType(pattern, DC, ElementTy))
       return nullptr;
+    S->setPattern(pattern);
     
     // Type-check the body of the loop.
     AddLoopNest loopNest(*this);

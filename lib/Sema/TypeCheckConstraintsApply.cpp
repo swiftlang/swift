@@ -3297,8 +3297,10 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
-        if (tc.coerceToType(closure->getParams(), closure, fnType->getInput()))
+        Pattern *params = closure->getParams();
+        if (tc.coerceToType(params, closure, fnType->getInput()))
           return { false, nullptr };
+        closure->setParams(params);
 
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.

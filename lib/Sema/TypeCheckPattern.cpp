@@ -519,8 +519,11 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, isVararg, resolver);
-    hadError |= coerceToType(TP->getSubPattern(), dc, P->getType(), false,
-                             resolver);
+    Pattern *subPattern = TP->getSubPattern();
+    if (coerceToType(subPattern, dc, P->getType(), false, resolver))
+      hadError = true;
+    else
+      TP->setSubPattern(subPattern);
     return hadError;
   }
 
@@ -587,18 +590,28 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
+bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
                                bool isVararg, GenericTypeResolver *resolver) {
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
-  case PatternKind::Paren:
-    P->setType(type);
-    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), dc, type,
-                        false, resolver);
-  case PatternKind::Var:
-    P->setType(type);
-    return coerceToType(cast<VarPattern>(P)->getSubPattern(), dc, type,
-                        false, resolver);
+  case PatternKind::Paren: {
+    auto PP = cast<ParenPattern>(P);
+    PP->setType(type);
+    Pattern *sub = PP->getSubPattern();
+    if (coerceToType(sub, dc, type, false, resolver))
+      return true;
+    PP->setSubPattern(sub);
+    return false;
+  }
+  case PatternKind::Var: {
+    auto VP = cast<VarPattern>(P);
+    VP->setType(type);
+    Pattern *sub = VP->getSubPattern();
+    if (coerceToType(sub, dc, type, false, resolver))
+      return true;
+    VP->setSubPattern(sub);
+    return false;
+  }
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -614,8 +627,10 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
       }
     }
 
-    hadError |= coerceToType(TP->getSubPattern(), dc, TP->getType(), false,
-                             resolver);
+    Pattern *sub = TP->getSubPattern();
+    hadError |= coerceToType(sub, dc, TP->getType(), false, resolver);
+    if (!hadError)
+      TP->setSubPattern(sub);
     return hadError;
   }
 
@@ -672,6 +687,8 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
         CoercionType = tupleTy->getFields()[i].getType();
 
       hadError |= coerceToType(pattern, dc, CoercionType, isVararg, resolver);
+      if (!hadError)
+        elt.setPattern(pattern);
 
       // Type-check the initialization expression.
       if (ExprHandle *initHandle = elt.getInit()) {
@@ -777,8 +794,10 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
                                             elt->getArgumentType());
       else
         elementType = TupleType::getEmpty(Context);
-      if (coerceToType(OP->getSubPattern(), dc, elementType, false, resolver))
+      Pattern *sub = OP->getSubPattern();
+      if (coerceToType(sub, dc, elementType, false, resolver))
         return true;
+      OP->setSubPattern(sub);
     }
     OP->setType(type);
     
@@ -853,9 +872,11 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
       }
       
       // Coerce the subpattern.
-      if (coerceToType(elt.getSubPattern(), dc, elt.getProperty()->getType(),
+      auto sub = elt.getSubPattern();
+      if (coerceToType(sub, dc, elt.getProperty()->getType(),
                        false, resolver))
         return true;
+      elt.setSubPattern(sub);
     }
     NP->setType(patTy);
     return false;

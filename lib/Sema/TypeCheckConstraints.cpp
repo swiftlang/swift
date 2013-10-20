@@ -4076,6 +4076,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
     init->dump();
   }
 
+  binding->setPattern(pattern);
   binding->setInit(init);
   cleanup.disable();
   return false;

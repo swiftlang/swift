@@ -337,6 +337,7 @@ public:
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }
+  void setPattern(Pattern *p) { Pat = p; }
   
   /// getContainer - Retrieve the container whose elements will be visited
   /// by this foreach loop, as it was written in the source code and

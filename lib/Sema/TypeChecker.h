@@ -508,7 +508,8 @@ public:
                         bool allowUnknownTypes,
                         bool isVararg = false,
                         GenericTypeResolver *resolver = nullptr);
-  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg = false,
+  bool coerceToType(Pattern *&P, DeclContext *dc, Type Ty,
+                    bool isVararg = false,
                     GenericTypeResolver *resolver = nullptr);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
