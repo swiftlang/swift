@@ -1115,18 +1115,17 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   /// Return the Operand associated with the given VarDecl.
-  Operand *getOperandForField(VarDecl *V) {
-    VarDecl const * ConstV = V;
-    return const_cast<Operand *>(getOperandForField(ConstV));
+  const Operand *getOperandForField(const VarDecl *V) const {
+    return const_cast<StructInst*>(this)->getOperandForField(V);
   }
 
-  Operand const *getOperandForField(VarDecl const *V) const {
+  Operand *getOperandForField(const VarDecl *V) {
     // If V is null or is computed, there is no operand associated with it.
     if (!V || V->isComputed())
       return nullptr;
 
     StructDecl *S = getType().getStructOrBoundGenericStruct();
-    assert(S && "A struct should always have a StructDecl associated with it.");
+    assert(S && "A struct should always have a StructDecl associated with it");
 
     NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
     unsigned Index = 0;
