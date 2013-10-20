@@ -140,12 +140,90 @@ namespace {
     /// The number of rows to skip in the specialization.
     unsigned row;
   };
+
+  /// Typedef for the vector of basic blocks and destructured values produced by
+  /// emitDispatchAndDestructure.
+  using DispatchedPatternVector
+    = std::vector<std::pair<SILBasicBlock*, std::vector<SILValue>>>;
 }
 
-/// Typedef for the vector of basic blocks and destructured values produced by
-/// emitDispatchAndDestructure.
-using DispatchedPatternVector
-  = std::vector<std::pair<SILBasicBlock*, std::vector<SILValue>>>;
+/// Load a computed property from a reference type.
+static SILValue emitGetComputedPropertyFromRefTypeRValue(SILGenFunction &gen,
+                                                         SILLocation loc,
+                                                         SILValue aggregate,
+                                                         VarDecl *property,
+                                                         CanType propTy) {
+  // FIXME: class, class archetype, and class protocol type properties
+  llvm_unreachable("not implemented");
+}
+
+/// Load a stored property from a reference type (in other words a class).
+static SILValue emitGetStoredPropertyFromRefTypeRValue(SILGenFunction &gen,
+                                                       SILLocation loc,
+                                                       SILValue aggregate,
+                                                       VarDecl *property,
+                                                       CanType propTy) {
+  assert(aggregate.getType().getClassOrBoundGenericClass());
+  auto &propTL = gen.getTypeLowering(propTy);
+  SILValue addr = gen.B.createRefElementAddr(loc, aggregate, property,
+                                     propTL.getLoweredType().getAddressType());
+  return gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake).forward(gen);
+}
+
+/// Load a computed property from a value type.
+static SILValue emitGetComputedPropertyFromValueTypeRValue(SILGenFunction &gen,
+                                                           SILLocation loc,
+                                                           SILValue aggregate,
+                                                           VarDecl *property,
+                                                           CanType propTy) {
+  // FIXME: struct, archetype, and protocol type properties
+  llvm_unreachable("not implemented");
+}
+
+/// Load a stored property from a value type (in other words a struct).
+static SILValue emitGetStoredPropertyFromValueTypeRValue(SILGenFunction &gen,
+                                                         SILLocation loc,
+                                                         SILValue aggregate,
+                                                         VarDecl *property,
+                                                         CanType propTy) {
+  assert(aggregate.getType().getStructOrBoundGenericStruct());
+  auto &propTL = gen.getTypeLowering(propTy);
+  if (aggregate.getType().isAddress()) {
+    // Load from an address-only struct.
+    SILValue addr = gen.B.createStructElementAddr(loc, aggregate, property,
+                                      propTL.getLoweredType().getAddressType());
+    return gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake)
+      .forward(gen);
+  } else {
+    // Extract from a loadable struct.
+    SILValue field = gen.B.createStructExtract(loc, aggregate, property,
+                                               propTL.getLoweredType());
+    // FIXME: Make unowned field strong.
+    return gen.B.createCopyValue(loc, field);
+  }
+}
+
+/// Load a property from a struct or class rvalue as an independent rvalue.
+/// Does not consume the source aggregate.
+static SILValue emitGetPropertyFromRValue(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          SILValue aggregate,
+                                          VarDecl *property,
+                                          CanType propTy) {
+  if (aggregate.getType().hasReferenceSemantics()) {
+    if (property->isComputed())
+      return emitGetComputedPropertyFromRefTypeRValue(gen, loc, aggregate,
+                                                      property, propTy);
+    return emitGetStoredPropertyFromRefTypeRValue(gen, loc, aggregate,
+                                                  property, propTy);
+  }
+  
+  if (property->isComputed())
+    return emitGetComputedPropertyFromValueTypeRValue(gen, loc, aggregate,
+                                                      property, propTy);
+  return emitGetStoredPropertyFromValueTypeRValue(gen, loc, aggregate,
+                                                  property, propTy);
+}
 
 /// Emit a conditional branch testing if a value matches one of the given
 /// pattern nodes.
@@ -332,10 +410,28 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     return defaultBB;
   }
       
-  case PatternKind::NominalType:
-    // NB: When we support destructuring of class types, release the class
-    // instance after extracting the destructured properties.
-    llvm_unreachable("not implemented");
+  case PatternKind::NominalType: {
+    // Nominal type patterns are irrefutable; destructure without branching.
+    auto *np = cast<NominalTypePattern>(headPattern);
+    RegularLocation loc(const_cast<NominalTypePattern*>(np));
+    
+    // Copy out the needed property values.
+    std::vector<SILValue> destructured;
+    
+    for (auto &elt : np->getElements()) {
+      destructured.push_back(emitGetPropertyFromRValue(gen, loc, v,
+                           elt.getProperty(),
+                           elt.getSubPattern()->getType()->getCanonicalType()));
+    }
+      
+    // Release the aggregate.
+    auto &vTL = gen.getTypeLowering(v.getType());
+    vTL.emitDestroyRValue(gen.B, loc, v);
+    
+    dispatches.emplace_back(gen.B.getInsertionBB(), std::move(destructured));
+    gen.B.clearInsertionPoint();
+    return nullptr;
+  }
     
   case PatternKind::Paren:
   case PatternKind::Typed:
@@ -348,10 +444,10 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
 /// matrix.
 /// Destructured wildcards are represented with null Pattern* pointers.
 /// p must be non-orthogonal to this pattern constructor.
-void destructurePattern(SILGenFunction &gen,
-                        const Pattern *specializer,
-                        const Pattern *p,
-                        SmallVectorImpl<const Pattern *> &destructured) {
+static void destructurePattern(SILGenFunction &gen,
+                               const Pattern *specializer,
+                               const Pattern *p,
+                               SmallVectorImpl<const Pattern *> &destructured) {
   specializer = specializer->getSemanticsProvidingPattern();
   assert(p && !isWildcardPattern(p) &&
          "wildcard patterns shouldn't be passed here");
@@ -455,8 +551,34 @@ void destructurePattern(SILGenFunction &gen,
     return;
   }
       
-  case PatternKind::NominalType:
-    llvm_unreachable("not implemented");
+  case PatternKind::NominalType: {
+    // TODO: Interaction of NominalType and Isa patterns is possible and needs
+    // consideration.
+    
+    auto *np = cast<NominalTypePattern>(p);
+    auto *specializerNP = cast<NominalTypePattern>(specializer);
+    
+    // Extract the property subpatterns in specializer order. If a property
+    // isn't mentioned in the specializee, it's a wildcard.
+    size_t base = destructured.size();
+    // Extend the destructured vector with all wildcards.
+    destructured.append(specializerNP->getElements().size(), nullptr);
+    // Figure out the offsets for all the fields from the specializer.
+    llvm::DenseMap<VarDecl*, size_t> offsets;
+    size_t i = base;
+    for (auto &specElt : specializerNP->getElements()) {
+      offsets.insert({specElt.getProperty(), i});
+      ++i;
+    }
+    
+    // Drop in the subpatterns from the specializee.
+    for (auto &elt : np->getElements()) {
+      assert(offsets.count(elt.getProperty()));
+      destructured[offsets[elt.getProperty()]] = elt.getSubPattern();
+    }
+    
+    return;
+  }
       
   case PatternKind::Paren:
   case PatternKind::Typed:
@@ -537,8 +659,20 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
     return usub->getElementDecl() == usup->getElementDecl();
   }
     
-  case PatternKind::NominalType:
-    llvm_unreachable("not implemented");
+  case PatternKind::NominalType: {
+    // FIXME interaction with IsaPattern
+    auto *nsub = cast<NominalTypePattern>(sub);
+    auto *nsup = cast<NominalTypePattern>(super);
+    
+    assert(nsub->getType()->getCanonicalType()
+             == nsup->getType()->getCanonicalType() &&
+           "nominal type patterns should match same type");
+    
+    (void)nsub;
+    (void)nsup;
+    
+    return true;
+  }
     
   case PatternKind::Paren:
   case PatternKind::Typed:
@@ -555,7 +689,83 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
 static const Pattern *combineAndFilterSubsumedPatterns(
                                 const Pattern *specializer,
                                 SmallVectorImpl<SpecializingPattern> &patterns,
-                                unsigned beginIndex, unsigned endIndex) {
+                                unsigned beginIndex, unsigned endIndex,
+                                ASTContext &C) {
+  // For nominal type patterns, we want to combine all the following subsumed
+  // nominal type patterns into one pattern with all of the necessary properties
+  // to match all of the patterns together.
+  if (auto *specNP = dyn_cast<NominalTypePattern>(specializer)) {
+    llvm::MapVector<VarDecl *, NominalTypePattern::Element> neededProperties;
+    for (auto &elt : specNP->getElements()) {
+      neededProperties.insert({elt.getProperty(), elt});
+    }
+    // An existing pattern with all of the needed properties, if any.
+    const NominalTypePattern *superPattern = specNP;
+    
+    // NB: Removes elements from 'patterns' mid-loop.
+    for (unsigned i = beginIndex; i < endIndex; ++i) {
+      while (auto *subNP = dyn_cast<NominalTypePattern>(patterns[i].pattern)) {
+        // FIXME: Ensure synchronicity with isPatternSubsumed. These should be
+        // integrated.
+        assert(isPatternSubsumed(subNP, specializer));
+        patterns.erase(patterns.begin() + i);
+        --endIndex;
+        
+        // Count whether this pattern matches all the needed properties.
+        unsigned propCount = neededProperties.size();
+        for (auto &elt : subNP->getElements()) {
+          if (neededProperties.count(elt.getProperty())) {
+            --propCount;
+          } else {
+            // This patterns adds a property. Invalidate superPattern.
+            neededProperties.insert({elt.getProperty(), elt});
+            superPattern = nullptr;
+          }
+        }
+        
+        // Use this pattern as the new super-pattern if it has all the needed
+        // properties.
+        if (!superPattern && propCount == 0)
+          superPattern = subNP;
+        
+        if (i >= endIndex)
+          break;
+      }
+      // FIXME: Ensure synchronicity with isPatternSubsumed. These should be
+      // integrated.
+      assert(i >= endIndex
+             || !isPatternSubsumed(patterns[i].pattern, specializer));
+    }
+    
+    // If we didn't find an existing "super" pattern, we have to make one.
+    if (!superPattern) {
+      SmallVector<NominalTypePattern::Element, 4> superElts;
+      for (auto &prop : neededProperties)
+        superElts.push_back(prop.second);
+      auto newPat = NominalTypePattern::create(specNP->getCastTypeLoc(),
+                                        specNP->getLParenLoc(),
+                                        superElts,
+                                        specNP->getRParenLoc(), C);
+      newPat->setType(specNP->getType());
+      superPattern = newPat;
+    }
+    
+    // Check that the superPattern is as super as we need it to be.
+    assert([&]{
+      for (auto prop : neededProperties) {
+        for (auto &elt : superPattern->getElements())
+          if (elt.getProperty() == prop.first)
+            goto next;
+        return false;
+      next:;
+      }
+      return true;
+    }() && "missing properties from subsuming nominal type pattern");
+    
+    return superPattern;
+  }
+  
+  // NB: Removes elements from 'patterns' mid-loop.
   for (unsigned i = beginIndex; i < endIndex; ++i) {
     while (isPatternSubsumed(patterns[i].pattern, specializer)) {
       patterns.erase(patterns.begin() + i);
@@ -570,7 +780,7 @@ static const Pattern *combineAndFilterSubsumedPatterns(
 
 /// True if two pattern nodes are orthogonal, that is, they never both match
 /// the same value.
-bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
+static bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   // Wildcards are never orthogonal.
   if (!a) return false;
   if (!b) return false;
@@ -669,14 +879,22 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   case PatternKind::EnumElement: {
     auto *ua = cast<EnumElementPattern>(a);
     auto *ub = cast<EnumElementPattern>(b);
-    if (!ub)
-      return false;
     
     return ua->getElementDecl() != ub->getElementDecl();
   }
       
-  case PatternKind::NominalType:
-    llvm_unreachable("not implemented");
+  case PatternKind::NominalType: {
+    // Nominal types can only match other patterns of the same nominal type,
+    // to which they are never orthogonal (TODO: or IsaPatterns).
+    auto *na = cast<NominalTypePattern>(a);
+    auto *nb = cast<NominalTypePattern>(b);
+    
+    assert(na->getType()->isEqual(nb->getType()));
+    (void)na;
+    (void)nb;
+    
+    return false;
+  }
       
   case PatternKind::Paren:
   case PatternKind::Typed:
@@ -824,7 +1042,7 @@ public:
 
 /// Get a pattern as an ExprPattern, unwrapping semantically transparent
 /// pattern nodes.
-const ExprPattern *getAsExprPattern(const Pattern *p) {
+static const ExprPattern *getAsExprPattern(const Pattern *p) {
   if (!p) return nullptr;
 
   switch (p->getKind()) {
@@ -1448,7 +1666,8 @@ recur:
   for (unsigned i = 0; i < specializers.size(); ++i) {
     specializers[i].pattern
       = combineAndFilterSubsumedPatterns(specializers[i].pattern, specializers,
-                                         i+1, specializers.size());
+                                         i+1, specializers.size(),
+                                         gen.getASTContext());
   }
 
   // If we have no specializations, recur into the default matrix immediately.
