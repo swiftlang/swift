@@ -497,10 +497,17 @@ namespace {
     bool hasEscapedAt(SILInstruction *I);
     void updateAvailableValues(SILInstruction *Inst,
                                llvm::SmallBitVector &RequiredElts,
-                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+                               llvm::SmallBitVector &ConflictingValues);
     void computeAvailableValues(SILInstruction *StartingFrom,
                                 llvm::SmallBitVector &RequiredElts,
                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+    void computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
+                                    SILBasicBlock *BB,
+                                    llvm::SmallBitVector &RequiredElts,
+                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+   llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
+                                    llvm::SmallBitVector &ConflictingValues);
 
     void explodeCopyAddr(CopyAddrInst *CAI);
 
@@ -837,7 +844,8 @@ bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
 /// used for load promotion.
 void ElementPromotion::
 updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
-                      SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
+                      SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+                      llvm::SmallBitVector &ConflictingValues) {
 
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
@@ -848,7 +856,14 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
 
-      Result[StartSubElt+i] = { Inst->getOperand(0), i };
+      // If there is no result computed for this subelement, record it.  If
+      // there already is a result, check it for conflict.  If there is no
+      // conflict, then we're ok.
+      auto &Entry = Result[StartSubElt+i];
+      if (Entry.first == SILValue())
+        Entry = { Inst->getOperand(0), i };
+      else if (Entry.first != Inst->getOperand(0) || Entry.second != i)
+        ConflictingValues[StartSubElt+i] = true;
 
       // This element is now provided.
       RequiredElts[StartSubElt+i] = false;
@@ -897,6 +912,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   // Otherwise, this is some unknown instruction, conservatively assume that all
   // values are clobbered.
   RequiredElts.clear();
+  ConflictingValues = llvm::SmallBitVector(Result.size(), true);
   return;
 }
 
@@ -912,44 +928,98 @@ void ElementPromotion::
 computeAvailableValues(SILInstruction *StartingFrom,
                        llvm::SmallBitVector &RequiredElts,
                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
+  llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> VisitedBlocks;
+  llvm::SmallBitVector ConflictingValues(Result.size());
 
-  SILBasicBlock *InstBB = StartingFrom->getParent();
+  computeAvailableValuesFrom(StartingFrom, StartingFrom->getParent(),
+                             RequiredElts, Result, VisitedBlocks,
+                             ConflictingValues);
+  
+  // If we have any conflicting values, explicitly mask them out of the result,
+  // so we don't pick one arbitrary available value.
+  if (!ConflictingValues.none())
+    for (unsigned i = 0, e = Result.size(); i != e; ++i)
+      if (ConflictingValues[i])
+        Result[i] = { SILValue(), 0U };
+  
+  return;
+}
+
+void ElementPromotion::
+computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
+                           SILBasicBlock *BB,
+                       llvm::SmallBitVector &RequiredElts,
+                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+   llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
+                           llvm::SmallBitVector &ConflictingValues) {
+  assert(!RequiredElts.none() && "Scanning with a goal of finding nothing?");
 
   // If there is a potential modification in the current block, scan the block
   // to see if the store or escape is before or after the load.  If it is
   // before, check to see if it produces the value we are looking for.
-  if (PerBlockInfo[InstBB].HasNonLoadUse) {
-    for (SILBasicBlock::iterator BBI = StartingFrom; BBI != InstBB->begin();) {
+  if (PerBlockInfo[BB].HasNonLoadUse) {
+    for (SILBasicBlock::iterator BBI = StartingFrom; BBI != BB->begin();) {
       SILInstruction *TheInst = std::prev(BBI);
-
+      
       // If this instruction is unrelated to the element, ignore it.
       if (!NonLoadUses.count(TheInst)) {
         --BBI;
         continue;
       }
-
+      
       // Given an interesting instruction, incorporate it into the set of
       // results, and filter down the list of demanded subelements that we still
       // need.
-      updateAvailableValues(TheInst, RequiredElts, Result);
-
+      updateAvailableValues(TheInst, RequiredElts, Result, ConflictingValues);
+      
       // If this satisfied all of the demanded values, we're done.
       if (RequiredElts.none())
         return;
-
+      
       // Otherwise, keep scanning the block.  If the instruction we were looking
       // at just got exploded, don't skip the next instruction.
       if (&*std::prev(BBI) == TheInst)
         --BBI;
     }
   }
-
-
+  
+  
   // Otherwise, we need to scan up the CFG looking for available values.
-  // TODO: Implement this, for now we just return failure as though there is
-  // nothing available.
-  return;
+  for (auto PI = BB->pred_begin(), E = BB->pred_end(); PI != E; ++PI) {
+    SILBasicBlock *PredBB = *PI;
+   
+    // If the predecessor block has already been visited (potentially due to a
+    // cycle in the CFG), don't revisit it.  We can do this safely because we
+    // are optimistically assuming that all incoming elements in a cycle will be
+    // the same.  If we ever detect a conflicting element, we record it and do
+    // not look at the result.
+    auto Entry = VisitedBlocks.insert({PredBB, RequiredElts});
+    if (!Entry.second) {
+      // If we are revisiting a block and asking for different required elements
+      // then anything that isn't agreeing is in conflict.
+      const auto &PrevRequired = Entry.first->second;
+      if (PrevRequired != RequiredElts) {
+        ConflictingValues |= (PrevRequired ^ RequiredElts);
+      
+        RequiredElts &= ~ConflictingValues;
+        if (RequiredElts.none())
+          return;
+      }
+      continue;
+    }
+    
+    // Make sure to pass in the same set of required elements for each pred.
+    llvm::SmallBitVector Elts = RequiredElts;
+    computeAvailableValuesFrom(PredBB->end(), PredBB, Elts, Result,
+                               VisitedBlocks, ConflictingValues);
+    
+    // If we have any conflicting values, don't bother searching for them.
+    RequiredElts &= ~ConflictingValues;
+    if (RequiredElts.none())
+      return;
+  }
 }
+
 
 static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
                        ArrayRef<std::pair<SILValue, unsigned>> &Values) {
@@ -1098,7 +1168,7 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
 
   SmallVector<std::pair<SILValue, unsigned>, 8> AvailableValues;
   AvailableValues.resize(NumMemorySubElements);
-
+ 
   // Find out if we have any available values.  If no bits are demanded, we
   // trivially succeed. This can happen when there is a load of an empty struct.
   if (NumLoadSubElements != 0) {

@@ -160,7 +160,6 @@ bb0(%0 : $Int64):
   return %23 : $(Int64, Int64)
 }
 
-struct XYStruct { var x, y : Int }
 
 
 // CHECK-LABEL: sil @copy_addr1
@@ -486,7 +485,93 @@ bb0:
   dealloc_stack %1#0 : $*@local_storage Bool // CHECK-NEXT: dealloc_stack
   %12 = tuple ()
   return %12 : $()
-  
+}
 
+// CHECK-LABEL: sil @cross_block_load_promotion
+sil @cross_block_load_promotion : $@thin (a: Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1#1 : $*Int64
+  %11 = integer_literal $Builtin.Int1, 1          // user: %3
+  cond_br %11, bb1, bb2
+
+bb1:                                              // Preds: bb3
+  br bb5
+
+bb2:                                              // Preds: bb0
+  br bb5
+
+bb5:                                              // Preds: bb4
+  %15 = load %1#1 : $*Int64                       // user: %18
+  dealloc_stack %1#0 : $*@local_storage Int64
+  return %15 : $Int64
+
+// CHECK: return %0 : $Int64
+}
+
+struct XYStruct { var x, y : Int }
+sil @init_xy_struct : $@thin () -> XYStruct
+
+
+// CHECK-LABEL: sil @cross_block_load_promotion_struct
+sil @cross_block_load_promotion_struct : $@thin (a: Int64, b : Int64) -> Int64 {
+bb0(%0 : $Int64, %2 : $Int64):
+  %1 = alloc_stack $XYStruct
+  
+  %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
+  %9 = apply %7() : $@thin () -> XYStruct
+  store %9 to %1#1 : $*XYStruct
+
+  %11 = struct_element_addr %1#1 : $*XYStruct, #y
+  store %0 to %11 : $*Int64
+
+  %12 = integer_literal $Builtin.Int1, 1          // user: %3
+  cond_br %12, bb1, bb2
+
+bb1:                                              // Preds: bb3
+  %13 = struct_element_addr %1#1 : $*XYStruct, #x
+  store %2 to %13 : $*Int64
+  br bb5
+
+bb2:                                              // Preds: bb0
+  br bb5
+
+bb5:                                              // Preds: bb4
+  %15 = load %11 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage XYStruct
+  return %15 : $Int64
+
+// CHECK: return %0 : $Int64
+}
+
+// CHECK-LABEL: sil @cross_block_load_promotion_struct2
+sil @cross_block_load_promotion_struct2 : $@thin (a: Int64, b : Int64) -> Int64 {
+bb0(%0 : $Int64, %2 : $Int64):
+  %1 = alloc_stack $XYStruct
+  
+  %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
+  %9 = apply %7() : $@thin () -> XYStruct
+  store %9 to %1#1 : $*XYStruct
+
+  %11 = struct_element_addr %1#1 : $*XYStruct, #x
+  store %0 to %11 : $*Int64
+
+  %12 = integer_literal $Builtin.Int1, 1          // user: %3
+  cond_br %12, bb1, bb2
+
+bb1:                                              // Preds: bb3
+  %13 = struct_element_addr %1#1 : $*XYStruct, #x
+  store %0 to %13 : $*Int64
+  br bb5
+
+bb2:                                              // Preds: bb0
+  br bb5
+
+bb5:                                              // Preds: bb4
+  %15 = load %11 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage XYStruct
+  return %15 : $Int64
+
+// CHECK: return %0 : $Int64
 }
 
