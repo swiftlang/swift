@@ -28,6 +28,7 @@
 
 using namespace swift;
 
+STATISTIC(NumCombined, "Number of instructions combined.");
 STATISTIC(NumDeadInst, "Num dead insts eliminated.");
 
 //===----------------------------------------------------------------------===//
@@ -323,6 +324,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
 
     if (SILInstruction *Result = visit(I)) {
+      ++NumCombined;
       // Should we replace the old instruction with a new one?
       if (Result != I) {
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
