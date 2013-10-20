@@ -2,11 +2,33 @@
 ----------
 
 * Missing return statement from a non-Void function is diagnosed as an error.
+
 * Vector<T> has been replaced with Array<T>. This is a complete rewrite to use
   value-semantics and copy-on-write behavior. The former means that you never
   need to defensively copy again (or remember to attribute a property as "copy")
   and the latter yields better performance than defensive copying. Dictionary<T>
   is next.
+
+* 'switch' can now pattern-match into structs and classes, using the syntax
+  'case Type(property1: pattern1, property2: pattern2, ...):'.
+  
+    struct Point { var x, y: Double }
+    struct Size { var w, h: Double }
+    struct Rect { var origin: Point; var size: Size }
+
+    var square = Rect(Point(0, 0), Size(10, 10))
+
+    switch square {
+    case Rect(size: Size(w: var w, h: var h)) where w == h:
+      println("square")
+    case Rect(size: Size(w: var w, h: var h)) where w > h:
+      println("long rectangle")
+    case Rect(size: Size(w: var w, h: var h)) where w < h:
+      println("tall rectangle")
+    }
+  
+  Currently only stored properties ("ivars" in ObjC terminology) are
+  supported by the implementation.
 
 2013-10-16
 ----------
