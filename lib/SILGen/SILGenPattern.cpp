@@ -10,21 +10,89 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "switch-silgen"
 #include "SILGen.h"
 #include "Scope.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "RValue.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormattedStream.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
+
+/// Shallow-dump a pattern node one level deep for debug purposes.
+static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
+  if (!p) {
+    // We use null to represent a synthetic wildcard.
+    os << '_';
+    return;
+  }
+  p = p->getSemanticsProvidingPattern();
+  switch (p->getKind()) {
+  case PatternKind::Any:
+    os << '_';
+    return;
+  case PatternKind::Expr:
+    os << "<expr>";
+    return;
+  case PatternKind::Named:
+    os << "var " << cast<NamedPattern>(p)->getBoundName();
+    return;
+  case PatternKind::Tuple: {
+    unsigned numFields = cast<TuplePattern>(p)->getNumFields();
+    if (numFields == 0)
+      os << "()";
+    else if (numFields == 1)
+      os << "(_)";
+    else {
+      os << '(';
+      for (unsigned i = 0; i < numFields - 1; ++i)
+        os << ',';
+      os << ')';
+    }
+    return;
+  }
+  case PatternKind::Isa:
+    os << "is ";
+    cast<IsaPattern>(p)->getType()->print(os);
+    break;
+  case PatternKind::NominalType: {
+    auto np = cast<NominalTypePattern>(p);
+    np->getType()->print(os);
+    os << '(';
+    interleave(np->getElements(),
+               [&](const NominalTypePattern::Element &elt) {
+                 os << elt.getProperty()->getName() << ":";
+               },
+               [&]{ os << ", "; });
+    os << ')';
+    return;
+  }
+  case PatternKind::EnumElement: {
+    auto eep = cast<EnumElementPattern>(p);
+    os << '.' << eep->getName();
+    return;
+  }
+  case PatternKind::Paren:
+  case PatternKind::Typed:
+  case PatternKind::Var:
+    llvm_unreachable("not semantic");
+  }
+}
+
+static void dumpDepth(unsigned depth, llvm::raw_ostream &os) {
+  for (unsigned d = 0; d < depth; ++d)
+    os << "| ";
+}
 
 /// True if a pattern is a wildcard, meaning it matches any value. '_' and
 /// variable patterns are wildcards. We also consider ExprPatterns to be
@@ -1236,6 +1304,45 @@ public:
     }
     return true;
   }
+  
+  void print(llvm::raw_ostream &os, unsigned depth = 0) const {
+    // Tabulate the strings for each column, column-major.
+    std::vector<std::vector<std::string>> patternStrings;
+    std::vector<unsigned> columnSizes;
+    patternStrings.resize(columns());
+    columnSizes.resize(columns());
+    
+    llvm::formatted_raw_ostream fos(os);
+    
+    for (unsigned r = 0, rend = rows(); r < rend; ++r) {
+      auto row = (*this)[r];
+      for (unsigned c = 0, cend = columns(); c < cend; ++c) {
+        patternStrings[c].push_back("");
+        llvm::raw_string_ostream ss(patternStrings[c].back());
+        dumpPattern(row[c], ss);
+        ss.flush();
+
+        columnSizes[c] = std::max(columnSizes[c],
+                                  (unsigned)patternStrings[c].back().size());
+      }
+    }
+
+    for (unsigned r = 0, rend = rows(); r < rend; ++r) {
+      dumpDepth(depth, fos);
+      fos << "[ ";
+      for (unsigned c = 0, cend = columns(); c < cend; ++c) {
+        unsigned start = fos.getColumn();
+        fos << patternStrings[c][r];
+        fos.PadToColumn(start + columnSizes[c] + 1);
+      }
+      fos << "]\n";
+    }
+    fos.flush();
+  }
+  
+  void dump() const {
+    return print(llvm::errs());
+  }
 };
 
 } // end anonymous namespace
@@ -1273,8 +1380,11 @@ static void emitDecisionTree(SILGenFunction &gen,
                              SwitchStmt *stmt,
                              ClauseMatrix &&clauses,
                              CaseMap &caseMap,
-                             SILBasicBlock *contBB) {
+                             SILBasicBlock *contBB,
+                             unsigned depth) {
 recur:
+  DEBUG(clauses.print(llvm::dbgs(), depth));
+  
   // If there are no rows, then we fail. This will be a dataflow error if we
   // can reach here.
   if (clauses.rows() == 0) {
@@ -1343,6 +1453,8 @@ recur:
 
   // If we have no specializations, recur into the default matrix immediately.
   if (specializers.empty()) {
+    DEBUG(dumpDepth(depth, llvm::dbgs());
+          llvm::dbgs() << "Reducing to default row " << skipRows << '\n');
     clauses.reduceToDefault(gen, skipRows);
     goto recur;
   }
@@ -1376,9 +1488,14 @@ recur:
                                               bodyOccurrences,
                                               gen.Cleanups.getCleanupsDepth(),
                                               innerContBB);
-
+      DEBUG(dumpDepth(depth, llvm::dbgs());
+            llvm::dbgs() << "Specializing on ";
+            dumpPattern(specializers[i].pattern, llvm::dbgs());
+            llvm::dbgs() << " row " << specializers[i].row << '\n');
+      
       // Emit the submatrix into the true branch of the specialization.
-      emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB);
+      emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB,
+                       depth + 1);
       assert(!gen.B.hasValidInsertionPoint()
              && "recursive emitDecisionTree did not terminate all its BBs");
       
@@ -1408,6 +1525,8 @@ recur:
   assert(!gen.B.hasValidInsertionPoint() && "specialization did not close bb");
   
   gen.B.emitBlock(defaultBB, stmt);
+  DEBUG(dumpDepth(depth, llvm::dbgs());
+        llvm::dbgs() << "Reducing to default row " << skipRows << '\n');
   clauses.reduceToDefault(gen, skipRows);
   goto recur;
 }
@@ -1426,6 +1545,9 @@ public:
 };
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
+  DEBUG(llvm::dbgs() << "emitting switch stmt\n";
+        S->print(llvm::dbgs());
+        llvm::dbgs() << '\n');
   Scope OuterSwitchScope(Cleanups, CleanupLocation(S));
   
   // Emit the subject value. Dispatching will consume it.
@@ -1470,7 +1592,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     SwitchStack.push_back(&context);
 
     // Emit the decision tree.
-    emitDecisionTree(*this, S, std::move(clauses), caseMap, contBB);
+    emitDecisionTree(*this, S, std::move(clauses), caseMap, contBB, 0);
     assert(!B.hasValidInsertionPoint() &&
            "emitDecisionTree did not terminate all its BBs");
     
