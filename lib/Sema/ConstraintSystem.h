@@ -701,6 +701,20 @@ public:
                    PolymorphicFunctionType *polyFn,
                    Type openedType) const;
 
+  /// \brief Generate a specialized instance of a polymorphic expression.
+  ///
+  /// \param expr        The polymorphic expression.
+  /// \param genericFn   The unopened generic type of the expression.
+  /// \param dc          The declaration context that owns the generic type
+  /// \param openedType  The opened specialized type to instantiate.
+  ///
+  /// \returns A SpecializeExpr containing the expression specialized to the
+  /// opened type.
+  Expr *specialize(Expr *expr,
+                   GenericFunctionType *genericFn,
+                   DeclContext *dc,
+                   Type openedType) const;
+
   /// Compute the set of substitutions required to map the given polymorphic
   /// function type to the provided "opened" type.
   ///

@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
@@ -71,6 +72,98 @@ Expr *Solution::specialize(Expr *expr,
                                             substitutions, conformances,
                                             /*OnlyInnermostParams=*/true);
   return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
+}
+
+Expr *Solution::specialize(Expr *expr,
+                           GenericFunctionType *genericFn,
+                           DeclContext *dc,
+                           Type openedType) const {
+  auto &tc = getConstraintSystem().getTypeChecker();
+  auto &ctx = tc.Context;
+
+  // Gather the substitutions from archetypes to concrete types, found
+  // by identifying all of the type variables in the original type
+  // FIXME: It's unfortunate that we're using archetypes here, but we don't
+  // have another way to map from type variables back to dependent types (yet);
+  TypeSubstitutionMap substitutions;
+  auto type
+    = tc.transformType(openedType,
+                     [&](Type type) -> Type {
+                       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+                         auto archetype = tv->getImpl().getArchetype();
+                         auto simplified = getFixedType(tv);
+                         substitutions[archetype] = simplified;
+
+                         return SubstitutedType::get(archetype, simplified,
+                                                     tc.Context);
+                       }
+                       
+                       return type;
+                     });
+
+  auto currentModule = getConstraintSystem().DC->getParentModule();
+  SmallVector<Substitution, 4> substitutionsVec;
+  SmallVector<ProtocolConformance *, 4> currentConformances;
+
+  for (const auto &req : genericFn->getRequirements()) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      // If this is a protocol conformance requirement, get the conformance
+      // and record it.
+      if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
+        assert(ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+                   ->castTo<ArchetypeType>()
+                == substitutionsVec.back().Archetype && "Archetype out-of-sync");
+        ProtocolConformance *conformance = nullptr;
+        bool conforms = tc.conformsToProtocol(
+                          substitutionsVec.back().Replacement,
+                          protoType->getDecl(),
+                          getConstraintSystem().DC,
+                          &conformance);
+        assert(conforms && "Constraint system missed a conformance?");
+        (void)conforms;
+
+        assert(conformance ||
+               substitutionsVec.back().Replacement->is<ArchetypeType>() ||
+               substitutionsVec.back().Replacement->isExistentialType());
+        currentConformances.push_back(conformance);
+        break;
+      }
+      break;
+
+    case RequirementKind::SameType:
+      // Same-type requirements aren't recorded in substitutions.
+      break;
+
+    case RequirementKind::ValueWitnessMarker:
+      // Flush the current conformances.
+      if (!substitutionsVec.empty()) {
+        substitutionsVec.back().Conformance
+          = ctx.AllocateCopy(currentConformances);
+        currentConformances.clear();
+      }
+
+      // Each value witness marker starts a new substitution.
+      substitutionsVec.push_back(Substitution());
+      substitutionsVec.back().Archetype
+        = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+            ->castTo<ArchetypeType>();
+      substitutionsVec.back().Replacement =
+        tc.substType(currentModule, substitutionsVec.back().Archetype,
+                     substitutions);
+      break;
+    }
+  }
+
+  // Flush the final conformances.
+  if (!substitutionsVec.empty()) {
+    substitutionsVec.back().Conformance = ctx.AllocateCopy(currentConformances);
+    currentConformances.clear();
+  }
+
+  // Build the specialize expression.
+  return new (tc.Context) SpecializeExpr(expr, type,
+                                         ctx.AllocateCopy(substitutionsVec));
 }
 
 Type Solution::computeSubstitutions(
@@ -1123,6 +1216,15 @@ namespace {
       if (!fromType->hasTypeVariable())
         return expr;
 
+      // If this is a declaration with generic function type, specialize it.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(expr->getDecl())) {
+        if (auto interfaceTy = func->getInterfaceType()) {
+          return solution.specialize(expr,
+                                     interfaceTy->getAs<GenericFunctionType>(),
+                                     func, fromType);
+        }
+      }
+
       // Check whether this is a polymorphic function type, which needs to
       // be specialized.
       if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
@@ -1221,6 +1323,15 @@ namespace {
       auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
       auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
                                               expr->isImplicit(), type);
+
+      // If this is a declaration with generic function type, specialize it.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (auto interfaceTy = func->getInterfaceType()) {
+          return solution.specialize(result,
+                                     interfaceTy->getAs<GenericFunctionType>(),
+                                     func, selected.second);
+        }
+      }
 
       // For a polymorphic function type, we have to specialize our reference.
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
