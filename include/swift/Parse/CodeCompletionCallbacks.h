@@ -118,6 +118,9 @@ public:
   /// \brief Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(Expr *E) = 0;
 
+  /// \brief Complete an expression that starts with a dot.
+  virtual void completeDotPrefixExpr() = 0;
+
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
   virtual void completePostfixExprBeginning() = 0;

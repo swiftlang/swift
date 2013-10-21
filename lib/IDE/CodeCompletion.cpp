@@ -449,6 +449,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   enum class CompletionKind {
     None,
     DotExpr,
+    DotPrefixExpr,
     PostfixExprBeginning,
     PostfixExpr,
     SuperExpr,
@@ -550,6 +551,7 @@ public:
 
   void completeExpr() override;
   void completeDotExpr(Expr *E) override;
+  void completeDotPrefixExpr() override;
   void completePostfixExprBeginning() override;
   void completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
@@ -1004,7 +1006,7 @@ public:
       HasTypeContext ? SemanticContextKind::ExpressionSpecific
                      : getSemanticContext(EED, Reason));
     Builder.setAssociatedDecl(EED);
-    if (needDot() || HasTypeContext)
+    if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
@@ -1315,6 +1317,7 @@ public:
   void getEnumElementCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
         Kind, LookupKind::EnumElement);
+    NeedLeadingDot = !HaveDot;
 
     const DeclContext *FunctionDC = CurrDeclContext;
     const AbstractFunctionDecl *CurrentFunction = nullptr;
@@ -1410,6 +1413,15 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 
   Kind = CompletionKind::DotExpr;
   ParsedExpr = E;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeDotPrefixExpr() {
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
+    return;
+
+  Kind = CompletionKind::DotPrefixExpr;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -1521,6 +1533,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(ExprType);
+    break;
+  }
+
+  case CompletionKind::DotPrefixExpr: {
+    Lookup.setHaveDot();
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getEnumElementCompletions(Loc);
     break;
   }
 

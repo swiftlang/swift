@@ -765,6 +765,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   default:
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
+
+    if (CodeCompletion && Tok.is(tok::period) &&
+        peekToken().is(tok::code_complete))
+      CodeCompletion->completeDotPrefixExpr();
+
     return nullptr;
   }
   
