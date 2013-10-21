@@ -1305,7 +1305,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   assert(Name[0] == '$' && "Not a dollarident");
   bool AllNumeric = true;
   for (unsigned i = 1, e = Name.size(); i != e; ++i)
-    AllNumeric &= isdigit(Name[i]);
+    AllNumeric &= bool(isdigit(Name[i]));
   
   if (Name.size() == 1 || !AllNumeric) {
     diagnose(Loc.getAdvancedLoc(1), diag::expected_dollar_numeric);
