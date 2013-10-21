@@ -182,6 +182,8 @@ LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   result->filter([&](ValueDecl *decl) -> bool {
     return known.insert(getDynamicResultSignature(decl, selectors)).second;
   });
+
+  return *result;
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
