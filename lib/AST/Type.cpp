@@ -1433,7 +1433,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       return type;
 
     // If we have a substitution for this type, use it.
-    auto known = substitutions.find(substOrig);
+    auto key = substOrig->getCanonicalType()->castTo<SubstitutableType>();
+    auto known = substitutions.find(key);
     if (known != substitutions.end() && known->second)
       return SubstitutedType::get(substOrig, known->second,
                                   module->getASTContext());
@@ -1471,6 +1472,12 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     // look in the witness table.
     if (auto archetype = substOrig->getAs<ArchetypeType>()) {
       if (auto assocType = archetype->getAssocType()) {
+        // If the parent is dependent, create a dependent member type.
+        if (substParent->isDependentType()) {
+          return DependentMemberType::get(substParent, assocType,
+                                          substParent->getASTContext());
+        }
+
         auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
         // FIXME: Introduce substituted type node here?
         auto conformance = module->lookupConformance(substParent, proto,
@@ -1554,7 +1561,11 @@ Type TypeBase::getTypeOfMember(Module *module, ValueDecl *member,
       auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
+        // FIXME: Shouldn't need both archetype and generic parameter mappings.
         substitutions[params[i].getAsTypeParam()->getArchetype()] = args[i];
+        substitutions[params[i].getAsTypeParam()->getDeclaredType()
+                        ->getCanonicalType()->getAs<GenericTypeParamType>()]
+          = args[i];
       }
 
       // Continue looking into the parent.

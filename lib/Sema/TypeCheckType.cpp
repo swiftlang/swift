@@ -76,7 +76,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         case DeclContextKind::NominalTypeDecl:
           // If this is our nominal type, return its type within its context.
           if (cast<NominalTypeDecl>(dc) == nominal)
-            return nominal->getDeclaredTypeInContext();
+            return resolver->resolveTypeOfContext(nominal);
           continue;
             
         case DeclContextKind::ExtensionDecl:
@@ -84,7 +84,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
           // within the context of its extension.
           if (cast<ExtensionDecl>(dc)->getExtendedType()->getAnyNominal()
                 == nominal)
-            return dc->getDeclaredTypeInContext();
+            return resolver->resolveTypeOfContext(dc);
           continue;
 
         case DeclContextKind::AbstractClosureExpr:
@@ -141,7 +141,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   // Walk up through the type scopes to find the context where the type
   // declaration was found. When we find it, substitute the appropriate base
   // type.
-  Type ownerType = ownerDC->getDeclaredTypeInContext();
+  Type ownerType = resolver->resolveTypeOfContext(ownerDC);
   auto ownerNominal = ownerType->getAnyNominal();
   assert(ownerNominal && "Owner must be a nominal type");
   for (; !fromDC->isModuleContext(); fromDC = fromDC->getParent()) {
@@ -150,7 +150,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       continue;
 
     // Search the type of this context and its supertypes.
-    for (auto fromType = fromDC->getDeclaredTypeInContext();
+    for (auto fromType = resolver->resolveTypeOfContext(fromDC);
          fromType;
          fromType = getSuperClassOf(fromType)) {
       // If the nominal type declaration of the context type we're looking at

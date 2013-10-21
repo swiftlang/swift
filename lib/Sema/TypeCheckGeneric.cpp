@@ -34,6 +34,14 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   return DependentMemberType::get(baseTy, name, baseTy->getASTContext());
 }
 
+Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->getInterfaceType();
+
+  auto ext = dyn_cast<ExtensionDecl>(dc);
+  return ext->getExtendedType()->getAnyNominal()->getInterfaceType();
+}
+
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
                                        GenericTypeParamType *gp) {
   auto gpDecl = gp->getDecl();
@@ -45,7 +53,6 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   return archetype;
 }
 
-
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   Type baseTy,
                                   DeclContext *DC,
@@ -53,6 +60,11 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   Identifier name,
                                   SourceLoc nameLoc) {
   llvm_unreachable("Dependent type after archetype substitution");
+}
+
+
+Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getDeclaredTypeInContext();
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -77,6 +89,11 @@ Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               SourceLoc nameLoc) {
   // We don't have enough information to find the associated type.
   return DependentMemberType::get(baseTy, name, TC.Context);
+}
+
+Type
+PartialGenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getDeclaredTypeInContext();
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
@@ -140,6 +157,14 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
     .highlight(baseRange);
   return ErrorType::get(TC.Context);
+}
+
+Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->getInterfaceType();
+
+  auto ext = dyn_cast<ExtensionDecl>(dc);
+  return ext->getExtendedType()->getAnyNominal()->getInterfaceType();
 }
 
 /// Create a fresh archetype builder.

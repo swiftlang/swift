@@ -57,6 +57,14 @@ public:
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc) = 0;
+
+  /// Retrieve the type when referring to the given context.
+  ///
+  /// \param dc A context in which type checking occurs, which must be a type
+  /// context (i.e., nominal type or extension thereof).
+  ///
+  /// \returns the type of context.
+  virtual Type resolveTypeOfContext(DeclContext *dc) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -71,6 +79,8 @@ class DependentGenericTypeResolver : public GenericTypeResolver {
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -86,6 +96,9 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
+
 };
 
 /// Generic type resolver that maps any generic type parameter type that
@@ -110,6 +123,8 @@ public:
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -134,6 +149,8 @@ public:
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 };
 
 } // end namespace swift
