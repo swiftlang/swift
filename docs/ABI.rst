@@ -282,9 +282,7 @@ Struct Metadata
 In addition to the `common metadata layout`_ fields, struct metadata records
 contain the following fields:
 
-- The **nominal type descriptor** is a pointer at **offset 1**.
-
-  TODO: The nominal type descriptor is currently always null.
+- The `nominal type descriptor`_ is referenced at **offset 1**.
 
 - A reference to the **parent** metadata record is stored at **offset 2**. For
   structs that are members of an enclosing nominal type, this is a reference
@@ -306,13 +304,11 @@ Enum Metadata
 In addition to the `common metadata layout`_ fields, enum metadata records
 contain the following fields:
 
-- The **nominal type descriptor** is a pointer at **offset 1**.
+- The `nominal type descriptor`_ is referenced at **offset 1**.
 
-  TODO: The nominal type descriptor is currently always null.
-
-- The **parent** metadata record is stored at **offset 2**. For enums that
-  are members of an enclosing nominal type, this is a reference to the enclosing
-  type's metadata. For top-level enums, this is null.
+- A reference to the **parent** metadata record is stored at **offset 2**. For
+  enums that are members of an enclosing nominal type, this is a reference to
+  the enclosing type's metadata. For top-level enums, this is null.
 
   TODO: The parent pointer is currently always null.
 
@@ -390,10 +386,12 @@ classes.
   compatible rodata record for the class. This pointer value includes a tag.
   The **low bit is always set to 1** for Swift classes and always set to 0 for
   Objective-C classes.
-- The **instance size** is stored at **offset 5**. This is the total allocation
+- The `nominal type descriptor`_ for the most-derived class type is referenced
+  at **offset 5**.
+- The **instance size** is stored at **offset 6**. This is the total allocation
   size for an instance of the class, including the size of its
   `heap object header`_.
-- The **instance alignment** is stored at **offset 6**.
+- The **instance alignment** is stored at **offset 7**.
 - For each Swift class in the class's inheritance hierarchy, in order starting
   from the root class and working down to the most derived class, the following
   fields are present:
@@ -445,6 +443,54 @@ parameter vector contains witness tables for those protocols, as if laid out::
     FungibleWitnessTable *U_Fungible;
     AnsibleWitnessTable *U_Ansible;
   };
+
+Nominal Type Descriptor
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The metadata records for class, struct, and enum types contain a pointer to a
+**nominal type descriptor**, which contains basic information about the nominal
+type such as its name, members, and metadata layout. For a generic type, one
+nominal type descriptor is shared for all instantiations of the type. The
+layout is as follows:
+
+- The **kind** of type is stored at **offset 0**, which is as follows:
+
+  * **0** for a class,
+  * **1** for a struct, or
+  * **2** for an enum.
+
+- The mangled **name** is referenced as a null-terminated C string at
+  **offset 1**. This name includes no bound generic parameters.
+- The following three fields depend on the kind of nominal type.
+
+  * For a struct or class:
+
+    + The **number of fields** is stored at **offset 2**. This is the length
+      of the field offset vector in the metadata record, if any.
+    + The **offset to the field offset vector** is stored at **offset 3**.
+      This is the offset in pointer-sized words of the field offset vector for
+      the type in the metadata record. If no field offset vector is stored
+      in the metadata record, this is zero.
+    + The **field names** are referenced as a doubly-null-terminated list of
+      C strings at **offset 4**. The order of names corresponds to the order
+      of fields in the field offset vector.
+
+  * For an enum:
+
+    + TODO: Offsets 2-4 are always zero.
+
+- The **generic parameter descriptor** begins at **offset 5**. This describes
+  the layout of the generic parameter vector in the metadata record:
+
+  * The **offset of the generic parameter vector** is stored at **offset 5**.
+    This is the offset in pointer-sized words of the generic parameter vector
+    inside the metadata record. If the type is not generic, this is zero.
+  * The **number of type parameters** is stored at **offset 6**.
+  * For each type parameter **n**, the following fields are stored:
+
+    + The **number of witnesses** for the type parameter is stored at
+      **offset 7+n**. This is the number of witness table pointers that are
+      stored for the type parameter in the generic parameter vector.
 
 Heap Objects
 ------------
