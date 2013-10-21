@@ -1172,6 +1172,10 @@ public:
   void checkConvertCCInst(ConvertCCInst *CCI) {
     requireObjectType(AnyFunctionType, CCI->getOperand(), "convert_cc operand");
     requireObjectType(AnyFunctionType, CCI, "convert_cc result");
+    
+    // Thunks over static function refs can be thin.
+    bool isFunctionRef = isa<FunctionRefInst>(CCI->getOperand());
+        
     if (auto opFTy = dyn_cast<FunctionType>(
                                  CCI->getOperand().getType().getSwiftType())) {
       auto resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
@@ -1182,9 +1186,9 @@ public:
               opFTy->isBlock() == resFTy->isBlock(),
               "convert_cc operand and result type must differ only "
               " in calling convention");
-      // FIXME: Non-virtual CC thunks can be thin, as can ABI-compatible thunks.
-      require(!resFTy->isThin(),
-              "convert_cc result must be thick");
+      // Non-virtual CC thunks can be thin, but virtual ones must be thick.
+      require(isFunctionRef || !resFTy->isThin(),
+              "convert_cc result must be static or thick");
       require(opFTy->isThin(),
               "convert_cc operand must be thin");
     } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
@@ -1196,9 +1200,8 @@ public:
               opPTy->getResult()->isEqual(resPTy->getResult()),
               "convert_cc operand and result type must differ only "
               " in calling convention");
-      // FIXME: Non-virtual CC thunks can be thin, as can ABI-compatible thunks.
-      require(!resPTy->isThin(),
-              "convert_cc result must be thick");
+      require(isFunctionRef || !resPTy->isThin(),
+              "convert_cc result must be static or thick");
       require(opPTy->isThin(),
               "convert_cc operand must be thin");
     } else {

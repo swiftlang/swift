@@ -231,8 +231,7 @@ RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
   return B.createTuple(loc,
-                       getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())),
-                       {});
+               getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())), {});
 }
 
 SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
@@ -266,8 +265,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
     // Reference the next uncurrying level of the function.
     SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
                                  constant.uncurryLevel + 1);
-    // If the function is fully uncurried and natively ObjC, reference its ObjC
-    // entry point.
+    // If the function is fully uncurried and natively foreign, reference its
+    // foreign entry point.
     if (!next.isCurried && fd->hasClangNode())
       next = next.asForeign();
     
@@ -368,8 +367,12 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
         uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
       ++uncurryLevel;
   }
-
-  ManagedValue result = emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
+  
+  // Reference the decl at its natural foreign-ness.
+  bool isForeign = decl->hasClangNode();
+  auto constant = SILDeclRef(decl, uncurryLevel, isForeign);
+  constant.dump();
+  ManagedValue result = emitFunctionRef(loc, constant);
 
   // If the declaration reference is specialized, create the partial
   // application.
