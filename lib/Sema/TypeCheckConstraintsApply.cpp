@@ -1232,11 +1232,8 @@ namespace {
         }
       }
 
-      // Check whether this is a polymorphic function type, which needs to
-      // be specialized.
-      if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
-        return solution.specialize(expr, polyFn, fromType);
-      }
+      // We're using generic function types now.
+      assert(!expr->getType()->is<PolymorphicFunctionType>());
 
       simplifyExprType(expr);
 
@@ -1350,10 +1347,8 @@ namespace {
         }
       }
 
-      // For a polymorphic function type, we have to specialize our reference.
-      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
-        return solution.specialize(result, polyFn, selected.second);
-      }
+      // We're using generic function types now.
+      assert(!result->getType()->is<PolymorphicFunctionType>());
 
       return result;
     }
