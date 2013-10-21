@@ -1077,7 +1077,8 @@ public:
   /// Retrieve the "interface" type of this value, which is the type used when
   /// the declaration as viewed from an outside. For a generic function,
   /// this will have generic function type using generic parameters rather than
-  /// archetypes, while a generic class's interface type will
+  /// archetypes, while a generic nominal type's interface type will be the
+  /// generic type specialized with its generic parameters.
   ///
   /// FIXME: Eventually, this will simply become the type of the value, and
   /// we will substitute in the appropriate archetypes within a particular

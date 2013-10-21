@@ -859,6 +859,18 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (baseObjTy->is<ModuleType>())
     return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
 
+  // Open up a generic method via its generic function type.
+  if (!isa<ProtocolDecl>(value->getDeclContext()) && !isDynamicResult &&
+      !isTypeReference) {
+    if (auto func = dyn_cast<FuncDecl>(value)) {
+      if (auto interfaceTy = func->getInterfaceType()) {
+        if (interfaceTy->is<GenericFunctionType>()) {
+          return getTypeOfMethodReference(baseTy, func);
+        }
+      }
+    }
+  }
+
   // The types that have been opened up and replaced with type variables.
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
 
@@ -969,6 +981,47 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
   return adjustLValueForReference(type, value->getAttrs().isAssignment(),
                                   TC.Context);
+}
+
+Type ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
+  // Open the type of the generic function.
+  auto openedType = openType(func->getInterfaceType(), func);
+
+  // Figure out the instance type used for the base.
+  TypeVariableType *baseTypeVar = nullptr;
+  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
+                     ->getRValueType();
+  bool isInstance = true;
+  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
+    baseObjTy = baseMeta->getInstanceType();
+    isInstance = false;
+  }
+
+  auto openedFnType = openedType->castTo<FunctionType>();
+
+  // Determine the 'self' object type.
+  auto selfObjTy = openedFnType->getInput()->getRValueType();
+  if (auto selfTupleTy = selfObjTy->getAs<TupleType>()) {
+    assert(selfTupleTy->getNumElements() == 1 &&
+           !selfTupleTy->getFields()[0].isVararg() && "bogus 'self' tuple");
+    selfObjTy = selfTupleTy->getElementType(0)->getRValueType();
+  }
+
+  if (auto metaSelfTy = selfObjTy->getAs<MetaTypeType>())
+    selfObjTy = metaSelfTy->getInstanceType();
+
+  // The base object type must be a subtype of the self object type.
+  addConstraint(ConstraintKind::Subtype, baseObjTy, selfObjTy);
+
+  // Compute the type of the reference.
+  Type type = openedType;
+
+  // For a static method, or an instance method referenced through an instance,
+  // we've consumed the curried 'self' already.
+  if (func->isStatic() || isInstance)
+    type = openedFnType->getResult();
+
+  return type;
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,

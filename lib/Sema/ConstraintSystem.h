@@ -1315,6 +1315,13 @@ public:
                                 bool isTypeReference,
                                 bool isDynamicResult);
 
+  /// \brief Retrieve the type of a reference to the given generic function
+  /// declaration as a member with a base of the given type.
+  ///
+  /// This routine "opens up" the generic type by replacing each instance of a
+  /// generic parameter or a member thereof with a fresh type variable.
+  Type getTypeOfMethodReference(Type baseTy, FuncDecl *func);
+
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
