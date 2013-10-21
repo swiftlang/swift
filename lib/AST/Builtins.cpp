@@ -125,16 +125,12 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
 /// Build a builtin function declaration.
 static FuncDecl *
 getBuiltinFunction(ASTContext &Context, Identifier Id,
-                   ArrayRef<TupleTypeElt> ArgTypes, Type ResType,
-                   GenericParamList *GenericParams = nullptr,
+                   ArrayRef<TupleTypeElt> ArgTypes,
+                   Type ResType,
                    FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
   Type ArgType = TupleType::get(ArgTypes, Context);
   Type FnType;
-  if (GenericParams)
-    FnType = PolymorphicFunctionType::get(ArgType, ResType, GenericParams,
-                                          Info, Context);
-  else
-    FnType = FunctionType::get(ArgType, ResType, Info, Context);
+  FnType = FunctionType::get(ArgType, ResType, Info, Context);
 
   SmallVector<TuplePatternElt, 4> ArgPatternElts;
   for (auto &ArgTupleElt : ArgTypes) {
@@ -151,6 +147,53 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
                           /*GenericParams=*/nullptr, FnType, ArgPattern,
                           ArgPattern, TypeLoc::withoutLoc(ResType),
                           Context.TheBuiltinModule);
+}
+
+/// Build a builtin function declaration.
+static FuncDecl *
+getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
+                          ArrayRef<TupleTypeElt> ArgParamTypes,
+                          ArrayRef<TupleTypeElt> ArgBodyTypes,
+                          Type ResType,
+                          Type ResBodyType,
+                          GenericParamList *GenericParams,
+                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+  assert(GenericParams && "Missing generic parameters");
+  Type ArgParamType = TupleType::get(ArgParamTypes, Context);
+  Type ArgBodyType = TupleType::get(ArgBodyTypes, Context);
+
+  // Compute the function type.
+  Type FnType = PolymorphicFunctionType::get(ArgBodyType, ResBodyType,
+                                             GenericParams, Info, Context);
+
+  // Compute the interface type.
+  SmallVector<GenericTypeParamType *, 2> GenericParamTypes;
+  for (auto gp : *GenericParams) {
+    GenericParamTypes.push_back(gp.getAsTypeParam()->getDeclaredType()
+                                  ->castTo<GenericTypeParamType>());
+  }
+
+  Type InterfaceType = GenericFunctionType::get(GenericParamTypes, { },
+                                                ArgParamType, ResType,
+                                                Info, Context);
+
+  SmallVector<TuplePatternElt, 4> ArgPatternElts;
+  for (auto &ArgTupleElt : ArgBodyTypes) {
+    ArgPatternElts.push_back(TuplePatternElt(
+                               new (Context) TypedPattern(
+                                  new (Context) AnyPattern(SourceLoc()),
+                                  TypeLoc::withoutLoc(ArgTupleElt.getType()))));
+  }
+
+  Pattern *ArgPattern = TuplePattern::createSimple(
+                          Context, SourceLoc(), ArgPatternElts, SourceLoc());
+
+  auto func = FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id,
+                               SourceLoc(), GenericParams, FnType, ArgPattern,
+                               ArgPattern, TypeLoc::withoutLoc(ResBodyType),
+                               Context.TheBuiltinModule);
+  func->setInterfaceType(InterfaceType);
+  return func;
 }
 
 /// Build a getelementptr operation declaration.
@@ -314,7 +357,13 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, ArgElts, Output);
 }
 
-static std::tuple<Type, GenericParamList*>
+/// Create a generic parameter list with a single generic parameter.
+///
+/// \returns a tuple (interface type, body type, parameter list) that contains
+/// the interface type for the generic parameter (i.e.,
+/// a GenericTypeParamType*), the body type for the generic parameter (i.e.,
+/// an ArchetypeType*), and the generic parameter list.
+static std::tuple<Type, Type, GenericParamList*>
 getGenericParam(ASTContext &Context) {
   Identifier GenericName = Context.getIdentifier("T");
   ArchetypeType *Archetype
@@ -331,38 +380,49 @@ getGenericParam(ASTContext &Context) {
                                             SourceLoc());
   ParamList->setAllArchetypes(
     Context.AllocateCopy(ArrayRef<ArchetypeType *>(&Archetype, 1)));
-  return std::make_tuple(Archetype, ParamList);
+  return std::make_tuple(GenericTyDecl->getDeclaredType(), Archetype,
+                         ParamList);
 }
 
 static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
   Type ResultTy = GenericTy;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  Type BodyResultTy = ArchetypeTy;
+  return getBuiltinGenericFunction(Context, Id, ArgElts, ArgElts,
+                                   ResultTy, BodyResultTy, ParamList);
 }
 
 static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = { GenericTy, Context.TheRawPointerType };
+  TupleTypeElt ArgParamElts[] = { GenericTy, Context.TheRawPointerType };
+  TupleTypeElt ArgBodyElts[] = { ArchetypeTy, Context.TheRawPointerType };
   Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
 }
 
 static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = { MetaTypeType::get(GenericTy, Context),
-                             Context.TheRawPointerType };
+  TupleTypeElt ArgParamElts[] = { MetaTypeType::get(GenericTy, Context),
+                                  Context.TheRawPointerType };
+  TupleTypeElt ArgBodyElts[] = { MetaTypeType::get(ArchetypeTy, Context),
+                                 Context.TheRawPointerType };
   Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
 }
 
 static Type getPointerSizeType(ASTContext &Context) {
@@ -373,12 +433,15 @@ static Type getPointerSizeType(ASTContext &Context) {
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = { MetaTypeType::get(GenericTy, Context) };
+  TupleTypeElt ArgParamElts[] = { MetaTypeType::get(GenericTy, Context) };
+  TupleTypeElt ArgBodyElts[] = { MetaTypeType::get(ArchetypeTy, Context) };
   Type ResultTy = getPointerSizeType(Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
 }
 
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
@@ -417,8 +480,9 @@ static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
 static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
                                        BuiltinValueKind BV) {
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
   Type BuiltinTy;
   if (BV == BuiltinValueKind::BridgeToRawPointer ||
@@ -427,42 +491,57 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
   else
     BuiltinTy = Context.TheObjectPointerType;
 
-  Type Arg, ResultTy;
+  Type ArgParam, ArgBody, ResultTy, BodyResultTy;
   if (BV == BuiltinValueKind::CastToObjectPointer ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
-    Arg = GenericTy;
+    ArgParam = GenericTy;
+    ArgBody = ArchetypeTy;
     ResultTy = BuiltinTy;
+    BodyResultTy = BuiltinTy;
   } else {
-    Arg = BuiltinTy;
+    ArgParam = BuiltinTy;
+    ArgBody = BuiltinTy;
     ResultTy = GenericTy;
+    BodyResultTy = ArchetypeTy;
   }
 
-  TupleTypeElt ArgElts[] = { Arg };
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  TupleTypeElt ArgParamElts[] = { ArgParam };
+  TupleTypeElt ArgBodyElts[] = { ArgBody };
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, BodyResultTy, ParamList);
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> ([inout] T) -> RawPointer
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = {
+  TupleTypeElt ArgParamElts[] = {
     LValueType::get(GenericTy, LValueType::Qual::DefaultForType, Context)
   };
+  TupleTypeElt ArgBodyElts[] = {
+    LValueType::get(ArchetypeTy, LValueType::Qual::DefaultForType, Context)
+  };
   Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
 }
 
 static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
   // <T> T -> T.metatype
   Type GenericTy;
+  Type ArchetypeTy;
   GenericParamList *ParamList;
-  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = { GenericTy };
+  TupleTypeElt ArgParamElts[] = { GenericTy };
+  TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
   Type ResultTy = MetaTypeType::get(GenericTy, Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy, ParamList);
+  Type BodyResultTy = MetaTypeType::get(ArchetypeTy, Context);
+  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, BodyResultTy, ParamList);
 }
 
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
@@ -751,7 +830,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     FunctionType::ExtInfo Info;
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,
                                          Info))
-      return getBuiltinFunction(Context, Id, ArgElts, ResultTy, nullptr, Info);
+      return getBuiltinFunction(Context, Id, ArgElts, ResultTy, Info);
   }
   
   // If this starts with fence, we have special suffixes to handle.
