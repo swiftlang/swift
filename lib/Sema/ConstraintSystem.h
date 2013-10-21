@@ -731,6 +731,25 @@ public:
                             Type openedType,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
+  /// Compute the set of substitutions required to map the given generic
+  /// function type to the provided "opened" type.
+  ///
+  /// \param genericFn The generic function type.
+  ///
+  /// \param openedType The type to which this reference to the given
+  /// generic function type was opened.
+  ///
+  /// \param dc          The declaration context that owns the generic type
+  ///
+  /// \param substitutions Will be populated with the set of substitutions
+  /// to be applied to the generic function type.
+  ///
+  /// \returns The opened type after applying the computed substitutions.
+  Type computeSubstitutions(GenericFunctionType *genericFn,
+                            DeclContext *dc,
+                            Type openedType,
+                            SmallVectorImpl<Substitution> &substitutions) const;
+
   /// \brief Retrieve the fixed score of this solution, which considers
   /// the number of user-defined conversions.
   int getFixedScore() const;

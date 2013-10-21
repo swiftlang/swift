@@ -81,89 +81,13 @@ Expr *Solution::specialize(Expr *expr,
   auto &tc = getConstraintSystem().getTypeChecker();
   auto &ctx = tc.Context;
 
-  // Gather the substitutions from archetypes to concrete types, found
-  // by identifying all of the type variables in the original type
-  // FIXME: It's unfortunate that we're using archetypes here, but we don't
-  // have another way to map from type variables back to dependent types (yet);
-  TypeSubstitutionMap substitutions;
-  auto type
-    = tc.transformType(openedType,
-                     [&](Type type) -> Type {
-                       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-                         auto archetype = tv->getImpl().getArchetype();
-                         auto simplified = getFixedType(tv);
-                         substitutions[archetype] = simplified;
-
-                         return SubstitutedType::get(archetype, simplified,
-                                                     tc.Context);
-                       }
-                       
-                       return type;
-                     });
-
-  auto currentModule = getConstraintSystem().DC->getParentModule();
-  SmallVector<Substitution, 4> substitutionsVec;
-  SmallVector<ProtocolConformance *, 4> currentConformances;
-
-  for (const auto &req : genericFn->getRequirements()) {
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-      // If this is a protocol conformance requirement, get the conformance
-      // and record it.
-      if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-        assert(ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
-                   ->castTo<ArchetypeType>()
-                == substitutionsVec.back().Archetype && "Archetype out-of-sync");
-        ProtocolConformance *conformance = nullptr;
-        bool conforms = tc.conformsToProtocol(
-                          substitutionsVec.back().Replacement,
-                          protoType->getDecl(),
-                          getConstraintSystem().DC,
-                          &conformance);
-        assert(conforms && "Constraint system missed a conformance?");
-        (void)conforms;
-
-        assert(conformance ||
-               substitutionsVec.back().Replacement->is<ArchetypeType>() ||
-               substitutionsVec.back().Replacement->isExistentialType());
-        currentConformances.push_back(conformance);
-        break;
-      }
-      break;
-
-    case RequirementKind::SameType:
-      // Same-type requirements aren't recorded in substitutions.
-      break;
-
-    case RequirementKind::ValueWitnessMarker:
-      // Flush the current conformances.
-      if (!substitutionsVec.empty()) {
-        substitutionsVec.back().Conformance
-          = ctx.AllocateCopy(currentConformances);
-        currentConformances.clear();
-      }
-
-      // Each value witness marker starts a new substitution.
-      substitutionsVec.push_back(Substitution());
-      substitutionsVec.back().Archetype
-        = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
-            ->castTo<ArchetypeType>();
-      substitutionsVec.back().Replacement =
-        tc.substType(currentModule, substitutionsVec.back().Archetype,
-                     substitutions);
-      break;
-    }
-  }
-
-  // Flush the final conformances.
-  if (!substitutionsVec.empty()) {
-    substitutionsVec.back().Conformance = ctx.AllocateCopy(currentConformances);
-    currentConformances.clear();
-  }
+  // Compute the substitutions needed.
+  SmallVector<Substitution, 4> substitutions;
+  auto type = computeSubstitutions(genericFn, dc, openedType, substitutions);
 
   // Build the specialize expression.
   return new (tc.Context) SpecializeExpr(expr, type,
-                                         ctx.AllocateCopy(substitutionsVec));
+                                         ctx.AllocateCopy(substitutions));
 }
 
 Type Solution::computeSubstitutions(
@@ -202,6 +126,96 @@ Type Solution::computeSubstitutions(
                          typeSubstitutions, conformances,
                          /*OnlyInnermostParams=*/true,
                          substitutions);
+
+  return type;
+}
+
+Type Solution::computeSubstitutions(
+                 GenericFunctionType *genericFn,
+                 DeclContext *dc,
+                 Type openedType,
+                 SmallVectorImpl<Substitution> &substitutions) const {
+  auto &tc = getConstraintSystem().getTypeChecker();
+  auto &ctx = tc.Context;
+
+  // Gather the substitutions from archetypes to concrete types, found
+  // by identifying all of the type variables in the original type
+  // FIXME: It's unfortunate that we're using archetypes here, but we don't
+  // have another way to map from type variables back to dependent types (yet);
+  TypeSubstitutionMap typeSubstitutions;
+  auto type
+    = tc.transformType(openedType,
+                       [&](Type type) -> Type {
+       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+         auto archetype = tv->getImpl().getArchetype();
+         auto simplified = getFixedType(tv);
+         typeSubstitutions[archetype] = simplified;
+
+         return SubstitutedType::get(archetype, simplified,
+                                     tc.Context);
+       }
+
+       return type;
+     });
+
+  auto currentModule = getConstraintSystem().DC->getParentModule();
+  SmallVector<ProtocolConformance *, 4> currentConformances;
+
+  for (const auto &req : genericFn->getRequirements()) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      // If this is a protocol conformance requirement, get the conformance
+      // and record it.
+      if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
+        assert(ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+                 ->castTo<ArchetypeType>()
+               == substitutions.back().Archetype && "Archetype out-of-sync");
+        ProtocolConformance *conformance = nullptr;
+        bool conforms = tc.conformsToProtocol(
+                             substitutions.back().Replacement,
+                             protoType->getDecl(),
+                             getConstraintSystem().DC,
+                             &conformance);
+        assert(conforms && "Constraint system missed a conformance?");
+        (void)conforms;
+
+        assert(conformance ||
+               substitutions.back().Replacement->is<ArchetypeType>() ||
+               substitutions.back().Replacement->isExistentialType());
+        currentConformances.push_back(conformance);
+        break;
+      }
+      break;
+
+    case RequirementKind::SameType:
+      // Same-type requirements aren't recorded in substitutions.
+      break;
+
+    case RequirementKind::ValueWitnessMarker:
+      // Flush the current conformances.
+      if (!substitutions.empty()) {
+        substitutions.back().Conformance
+          = ctx.AllocateCopy(currentConformances);
+        currentConformances.clear();
+      }
+
+      // Each value witness marker starts a new substitution.
+      substitutions.push_back(Substitution());
+      substitutions.back().Archetype
+        = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+            ->castTo<ArchetypeType>();
+      substitutions.back().Replacement =
+      tc.substType(currentModule, substitutions.back().Archetype,
+                   typeSubstitutions);
+      break;
+    }
+  }
+  
+  // Flush the final conformances.
+  if (!substitutions.empty()) {
+    substitutions.back().Conformance = ctx.AllocateCopy(currentConformances);
+    currentConformances.clear();
+  }
 
   return type;
 }
