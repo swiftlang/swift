@@ -63,7 +63,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
   case PatternKind::Isa:
     os << "is ";
-    cast<IsaPattern>(p)->getType()->print(os);
+    cast<IsaPattern>(p)->getCastTypeLoc().getType()->print(os);
     break;
   case PatternKind::NominalType: {
     auto np = cast<NominalTypePattern>(p);
@@ -288,9 +288,6 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
   case PatternKind::Isa: {
     /// Emit all the 'is' checks.
-    ///
-    /// FIXME: We will at some point need to deal with heterogeneous pattern
-    /// node sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
     for (SpecializingPattern p : patterns) {
       auto *ip = cast<IsaPattern>(p.pattern);
       RegularLocation Loc(const_cast<IsaPattern*>(ip));
@@ -423,10 +420,10 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                            elt.getProperty(),
                            elt.getSubPattern()->getType()->getCanonicalType()));
     }
-      
-    // Release the aggregate.
-    auto &vTL = gen.getTypeLowering(v.getType());
-    vTL.emitDestroyRValue(gen.B, loc, v);
+    
+    // Carry the aggregate forward. It may be needed to match against other
+    // pattern kinds.
+    destructured.push_back(v);
     
     dispatches.emplace_back(gen.B.getInsertionBB(), std::move(destructured));
     gen.B.clearInsertionPoint();
@@ -552,31 +549,41 @@ static void destructurePattern(SILGenFunction &gen,
   }
       
   case PatternKind::NominalType: {
-    // TODO: Interaction of NominalType and Isa patterns is possible and needs
-    // consideration.
-    
-    auto *np = cast<NominalTypePattern>(p);
     auto *specializerNP = cast<NominalTypePattern>(specializer);
+
+    // If we're specializing another nominal type pattern, break out
+    // its subpatterns.
+    if (auto *np = dyn_cast<NominalTypePattern>(p)) {
+      assert(np->getType()->isEqual(specializerNP->getType()));
+      
+      // Extract the property subpatterns in specializer order. If a property
+      // isn't mentioned in the specializee, it's a wildcard.
+      size_t base = destructured.size();
+      // Extend the destructured vector with all wildcards.
+      // The +1 is for the full aggregate itself, which we don't need to
+      // match.
+      destructured.append(specializerNP->getElements().size() + 1, nullptr);
+      // Figure out the offsets for all the fields from the specializer.
+      llvm::DenseMap<VarDecl*, size_t> offsets;
+      size_t i = base;
+      for (auto &specElt : specializerNP->getElements()) {
+        offsets.insert({specElt.getProperty(), i});
+        ++i;
+      }
+      
+      // Drop in the subpatterns from the specializee.
+      for (auto &elt : np->getElements()) {
+        assert(offsets.count(elt.getProperty()));
+        destructured[offsets[elt.getProperty()]] = elt.getSubPattern();
+      }
     
-    // Extract the property subpatterns in specializer order. If a property
-    // isn't mentioned in the specializee, it's a wildcard.
-    size_t base = destructured.size();
-    // Extend the destructured vector with all wildcards.
+      return;
+    }
+    
+    // For any other kind of pattern, match it against the original aggregate,
+    // which is placed after all of the extracted properties of the specializer.
     destructured.append(specializerNP->getElements().size(), nullptr);
-    // Figure out the offsets for all the fields from the specializer.
-    llvm::DenseMap<VarDecl*, size_t> offsets;
-    size_t i = base;
-    for (auto &specElt : specializerNP->getElements()) {
-      offsets.insert({specElt.getProperty(), i});
-      ++i;
-    }
-    
-    // Drop in the subpatterns from the specializee.
-    for (auto &elt : np->getElements()) {
-      assert(offsets.count(elt.getProperty()));
-      destructured[offsets[elt.getProperty()]] = elt.getSubPattern();
-    }
-    
+    destructured.push_back(p);
     return;
   }
       
@@ -600,7 +607,7 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
   // A pattern always subsumes itself.
   if (sub == super) return true;
   
-  switch (sub->getKind()) {
+  switch (super->getKind()) {
   case PatternKind::Any:
   case PatternKind::Named:
   case PatternKind::Expr:
@@ -627,13 +634,12 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
   }
   
   case PatternKind::Isa: {
-    auto *isub = cast<IsaPattern>(sub);
-    
-    // FIXME: interaction with NominalTypePattern
-    assert(!isa<NominalTypePattern>(sub)
-           && "Isa/NominalType combination not implemented");
-
     auto *isup = cast<IsaPattern>(super);
+    auto *isub = dyn_cast<IsaPattern>(sub);
+    
+    // If the "sub" pattern isn't another cast, we can't subsume it.
+    if (!isub)
+      return false;
     
     Type subTy = isub->getCastTypeLoc().getType();
     Type supTy = isup->getCastTypeLoc().getType();
@@ -660,16 +666,10 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
   }
     
   case PatternKind::NominalType: {
-    // FIXME interaction with IsaPattern
-    auto *nsub = cast<NominalTypePattern>(sub);
-    auto *nsup = cast<NominalTypePattern>(super);
-    
-    assert(nsub->getType()->getCanonicalType()
-             == nsup->getType()->getCanonicalType() &&
+    // A NominalType pattern subsumes any other pattern matching the same type.
+    assert(sub->getType()->getCanonicalType()
+             == super->getType()->getCanonicalType() &&
            "nominal type patterns should match same type");
-    
-    (void)nsub;
-    (void)nsup;
     
     return true;
   }
@@ -687,14 +687,18 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
 /// but e.g. nominal type patterns can be combined to match all properties
 /// needed by the set of patterns.
 static const Pattern *combineAndFilterSubsumedPatterns(
-                                const Pattern *specializer,
                                 SmallVectorImpl<SpecializingPattern> &patterns,
                                 unsigned beginIndex, unsigned endIndex,
                                 ASTContext &C) {
   // For nominal type patterns, we want to combine all the following subsumed
   // nominal type patterns into one pattern with all of the necessary properties
   // to match all of the patterns together.
-  if (auto *specNP = dyn_cast<NominalTypePattern>(specializer)) {
+  auto begin = patterns.begin()+beginIndex, end = patterns.begin()+endIndex;
+  auto foundSpec = std::find_if(begin, end,
+      [](SpecializingPattern p) { return isa<NominalTypePattern>(p.pattern); });
+  
+  if (foundSpec != end) {
+    auto specNP = cast<NominalTypePattern>(foundSpec->pattern);
     llvm::MapVector<VarDecl *, NominalTypePattern::Element> neededProperties;
     for (auto &elt : specNP->getElements()) {
       neededProperties.insert({elt.getProperty(), elt});
@@ -702,15 +706,9 @@ static const Pattern *combineAndFilterSubsumedPatterns(
     // An existing pattern with all of the needed properties, if any.
     const NominalTypePattern *superPattern = specNP;
     
-    // NB: Removes elements from 'patterns' mid-loop.
-    for (unsigned i = beginIndex; i < endIndex; ++i) {
-      while (auto *subNP = dyn_cast<NominalTypePattern>(patterns[i].pattern)) {
-        // FIXME: Ensure synchronicity with isPatternSubsumed. These should be
-        // integrated.
-        assert(isPatternSubsumed(subNP, specializer));
-        patterns.erase(patterns.begin() + i);
-        --endIndex;
-        
+    for (auto &sub : make_range(foundSpec + 1,
+                                end)) {
+      if (auto *subNP = dyn_cast<NominalTypePattern>(sub.pattern)) {
         // Count whether this pattern matches all the needed properties.
         unsigned propCount = neededProperties.size();
         for (auto &elt : subNP->getElements()) {
@@ -727,14 +725,7 @@ static const Pattern *combineAndFilterSubsumedPatterns(
         // properties.
         if (!superPattern && propCount == 0)
           superPattern = subNP;
-        
-        if (i >= endIndex)
-          break;
       }
-      // FIXME: Ensure synchronicity with isPatternSubsumed. These should be
-      // integrated.
-      assert(i >= endIndex
-             || !isPatternSubsumed(patterns[i].pattern, specializer));
     }
     
     // If we didn't find an existing "super" pattern, we have to make one.
@@ -761,12 +752,16 @@ static const Pattern *combineAndFilterSubsumedPatterns(
       }
       return true;
     }() && "missing properties from subsuming nominal type pattern");
-    
+
+    // Subsume all of the patterns.
+    patterns.erase(begin+1, end);
     return superPattern;
   }
   
+  // Otherwise, specialize on the first pattern.
   // NB: Removes elements from 'patterns' mid-loop.
-  for (unsigned i = beginIndex; i < endIndex; ++i) {
+  const Pattern *specializer = patterns[beginIndex].pattern;
+  for (unsigned i = beginIndex+1; i < endIndex; ++i) {
     while (isPatternSubsumed(patterns[i].pattern, specializer)) {
       patterns.erase(patterns.begin() + i);
       --endIndex;
@@ -818,9 +813,9 @@ static bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   case PatternKind::Isa: {
     auto *ia = cast<IsaPattern>(a);
 
-    // FIXME: interaction with NominalTypePattern
-    assert(!isa<NominalTypePattern>(b)
-           && "Isa/NominalType combination not implemented");
+    // 'is' is never orthogonal to a nominal type pattern.
+    if (isa<NominalTypePattern>(b))
+      return false;
 
     auto *ib = cast<IsaPattern>(b);
     if (!ib)
@@ -884,15 +879,7 @@ static bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   }
       
   case PatternKind::NominalType: {
-    // Nominal types can only match other patterns of the same nominal type,
-    // to which they are never orthogonal (TODO: or IsaPatterns).
-    auto *na = cast<NominalTypePattern>(a);
-    auto *nb = cast<NominalTypePattern>(b);
-    
-    assert(na->getType()->isEqual(nb->getType()));
-    (void)na;
-    (void)nb;
-    
+    // Nominal types match all values of their type, so are never orthogonal.
     return false;
   }
       
@@ -1709,8 +1696,8 @@ recur:
   // previous ones.
   for (unsigned i = 0; i < specializers.size(); ++i) {
     specializers[i].pattern
-      = combineAndFilterSubsumedPatterns(specializers[i].pattern, specializers,
-                                         i+1, specializers.size(),
+      = combineAndFilterSubsumedPatterns(specializers,
+                                         i, specializers.size(),
                                          gen.getASTContext());
   }
 
