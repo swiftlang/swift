@@ -704,11 +704,18 @@ public:
   /// decl.
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
 
-  ManagedValue emitReferenceToDecl(SILLocation loc,
-                               ValueDecl *decl,
-                               Type declType = Type(),
-                               unsigned uncurryLevel
-                                 = SILDeclRef::ConstructAtNaturalUncurryLevel);
+  /// Emit a reference to the given declaration.
+  ///
+  /// \param loc The location of the reference.
+  /// \param declRef The reference, including any substitutions to be applied
+  /// \param refType The type of the reference (after substitutions)
+  /// \param uncurryLevel The uncurry level to use for function references.
+  ManagedValue emitReferenceToDecl(
+                 SILLocation loc,
+                 ConcreteDeclRef declRef,
+                 Type refType = Type(),
+                 unsigned uncurryLevel
+                   = SILDeclRef::ConstructAtNaturalUncurryLevel);
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,

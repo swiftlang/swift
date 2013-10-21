@@ -628,12 +628,18 @@ public:
 
     // Obtain a reference for a local closure.
     if (gen.LocalConstants.count(constant)) {
-      ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
+      ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDeclRef());
       setCallee(Callee::forIndirect(localFn, false, e));
 
     // Otherwise, stash the SILDeclRef.
     } else {
       setCallee(Callee::forDirect(gen, constant, e));
+    }
+
+    if (e->getDeclRef().isSpecialized()) {
+      callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+                               e->getType()->getCanonicalType(),
+                               callDepth);
     }
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {

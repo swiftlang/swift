@@ -1224,10 +1224,8 @@ namespace {
                                                       substitutions);
             expr->setDeclRef(ConcreteDeclRef(ctx, expr->getDecl(),
                                              substitutions));
-
-            return new (ctx) SpecializeExpr(
-                               expr, type,
-                               expr->getDeclRef().getSubstitutions());
+            expr->setType(type);
+            return expr;
           }
         }
       }
@@ -1323,11 +1321,6 @@ namespace {
                                         expr->isImplicit());
       }
 
-      // Normal path: build a declaration reference.
-      auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
-      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
-                                              expr->isImplicit(), type);
-
       // If this is a declaration with generic function type, build a
       // specialized reference to it.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1338,14 +1331,18 @@ namespace {
             auto type = solution.computeSubstitutions(genericFn, func,
                                                       selected.second,
                                                       substitutions);
-            result->setDeclRef(ConcreteDeclRef(cs.TC.Context, decl,
-                                               substitutions));
-            return new (ctx) SpecializeExpr(
-                               result, type,
-                               result->getDeclRef().getSubstitutions());
+            return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl,
+                                                         substitutions),
+                                         expr->getLoc(), expr->isImplicit(),
+                                         type);
           }
         }
       }
+
+      // Normal path: build a declaration reference.
+      auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
+      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
+                                              expr->isImplicit(), type);
 
       // We're using generic function types now.
       assert(!result->getType()->is<PolymorphicFunctionType>());

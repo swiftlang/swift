@@ -317,24 +317,29 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
-                                                 ValueDecl *decl,
-                                                 Type declType,
+                                                 ConcreteDeclRef declRef,
+                                                 Type refType,
                                                  unsigned uncurryLevel) {
-  if (!declType) declType = decl->getType();
+  ValueDecl *decl = declRef.getDecl();
+  if (!refType) refType = decl->getType();
   
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
+    assert(!declRef.isSpecialized() &&
+           "Cannot handle specialized type references");
     assert(decl->getType()->is<MetaTypeType>() &&
            "type declref does not have metatype type?!");
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for types");
-    return ManagedValue(B.createMetatype(loc, getLoweredType(declType)),
+    return ManagedValue(B.createMetatype(loc, getLoweredType(refType)),
                         ManagedValue::Unmanaged);
   }
   
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    assert(!declRef.isSpecialized() &&
+           "Cannot handle specialized variable references");
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for vars");
@@ -364,7 +369,21 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       ++uncurryLevel;
   }
 
-  return emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
+  ManagedValue result = emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
+
+  // If the declaration reference is specialized, create the partial
+  // application.
+  if (declRef.isSpecialized()) {
+    SILType specializedType = getLoweredLoadableType(refType);
+    SILType substType = getLoweredLoadableType(getThinFunctionType(refType));
+    SILValue spec = B.createPartialApply(loc, result.forward(*this),
+                                         substType,
+                                         declRef.getSubstitutions(),
+                                         { },
+                                         specializedType);
+    result = emitManagedRValueWithCleanup(spec);
+  }
+  return result;
 }
 
 RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
@@ -376,7 +395,8 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   if (E->getType()->is<LValueType>())
     return SGF.emitLValueAsRValue(E);
   return RValue(SGF,
-                SGF.emitReferenceToDecl(E, E->getDecl(), E->getType(), 0), E);
+                SGF.emitReferenceToDecl(E, E->getDeclRef(), E->getType(), 0),
+                E);
 }
 
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
