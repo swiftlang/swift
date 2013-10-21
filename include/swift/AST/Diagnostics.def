@@ -1421,6 +1421,8 @@ ERROR(enum_element_pattern_not_enum,sema_tcp,none,
       "enum case pattern cannot match values of the non-enum type %0", (Type))
 ERROR(enum_element_pattern_not_member_of_enum,sema_tcp,none,
       "enum case '%0' is not a member of type %1", (StringRef, Type))
+ERROR(nominal_type_pattern_not_nominal_type,sema_tcp,none,
+      "non-nominal type %0 cannot be used with property pattern syntax", (Type))
 ERROR(nominal_type_pattern_type_mismatch,sema_tcp,none,
       "type %0 of pattern does not match deduced type %1", (Type, Type))
 ERROR(nominal_type_pattern_property_not_found,sema_tcp,none,

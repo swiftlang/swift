@@ -842,10 +842,26 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     
     Type patTy = NP->getCastTypeLoc().getType();
 
+    // Check that the type is a nominal type.
+    NominalTypeDecl *nomTy = patTy->getAnyNominal();
+    if (!nomTy) {
+      diagnose(NP->getLoc(), diag::nominal_type_pattern_not_nominal_type,
+               patTy);
+      return nullptr;
+    }
+    
     // Check that the type matches the pattern type.
     // FIXME: We could insert an IsaPattern if a checked cast can do the
     // conversion.
-    if (!patTy->isEqual(type)) {
+    
+    // If a generic type name was given without arguments, allow a match to
+    if (patTy->is<UnboundGenericType>()) {
+      if (type->getNominalOrBoundGenericNominal() != nomTy) {
+        diagnose(NP->getLoc(), diag::nominal_type_pattern_type_mismatch,
+                 patTy, type);
+        return nullptr;
+      }
+    } else if (!patTy->isEqual(type)) {
       diagnose(NP->getLoc(), diag::nominal_type_pattern_type_mismatch,
                patTy, type);
       return nullptr;
@@ -861,7 +877,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
           continue;
         VarDecl *prop = nullptr;
         SmallVector<ValueDecl *, 4> members;
-        if (!dc->getParentModule()->lookupQualified(patTy,
+        if (!dc->getParentModule()->lookupQualified(type,
                                                     elt.getPropertyName(),
                                                     NL_QualifiedDefault,
                                                     this,
@@ -897,12 +913,15 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
       
       // Coerce the subpattern.
       auto sub = elt.getSubPattern();
-      if (coerceToType(sub, dc, elt.getProperty()->getType(),
+      Type propTy = type->getTypeOfMember(dc->getParentModule(),
+                                          elt.getProperty(),
+                                          this);
+      if (coerceToType(sub, dc, propTy,
                        false, resolver))
         return true;
       elt.setSubPattern(sub);
     }
-    NP->setType(patTy);
+    NP->setType(type);
     return false;
   }
   }
