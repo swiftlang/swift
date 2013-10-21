@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleLoadListener.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
@@ -219,6 +220,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
     StdlibModuleName(getIdentifier("swift")),
     AxleStdlibModuleName(getIdentifier("axle")),
+    TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this, AllocationArena::Permanent)
@@ -238,7 +240,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
     TheIEEE128Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
     ThePPC128Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::PPC128,*this)){
+                    BuiltinFloatType(BuiltinFloatType::PPC128,*this)) {
 }
 
 ASTContext::~ASTContext() {
@@ -1504,3 +1506,47 @@ ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
 void TypeLoc::setInvalidType(ASTContext &C) {
   TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
 }
+
+namespace {
+class raw_capturing_ostream : public raw_ostream {
+  std::string Message;
+  uint64_t Pos;
+  CapturingTypeCheckerDebugConsumer &Listener;
+
+public:
+  raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
+      : Listener(Listener) {}
+
+  ~raw_capturing_ostream() {
+    flush();
+  }
+
+  void write_impl(const char *Ptr, size_t Size) override {
+    Message.append(Ptr, Size);
+    Pos += Size;
+
+    // Check if we have at least one complete line.
+    size_t LastNewline = StringRef(Message).rfind('\n');
+    if (LastNewline == StringRef::npos)
+      return;
+    Listener.handleMessage(StringRef(Message.data(), LastNewline + 1));
+    Message.erase(0, LastNewline + 1);
+  }
+
+  uint64_t current_pos() const override {
+    return Pos;
+  }
+};
+} // unnamed namespace
+
+TypeCheckerDebugConsumer::~TypeCheckerDebugConsumer() { }
+
+CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
+    : Log(new raw_capturing_ostream(*this)) {
+  Log->SetUnbuffered();
+}
+
+CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
+  delete Log;
+}
+

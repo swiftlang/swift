@@ -82,7 +82,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "disjunction";
     if (Locator) {
       Out << " [[";
-      Locator->dump(sm);
+      Locator->dump(sm, Out);
       Out << "]]";
     }
     Out << ":";
@@ -189,7 +189,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   if (Locator) {
     Out << " [[";
-    Locator->dump(sm);
+    Locator->dump(sm, Out);
     Out << "]];";
   }
 }

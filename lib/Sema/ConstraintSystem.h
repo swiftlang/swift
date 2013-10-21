@@ -27,6 +27,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -442,7 +443,11 @@ public:
   }
 
   /// \brief Dump a debug representation of this failure.
-  void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+
+  void dump(SourceManager *SM, raw_ostream &OS) const;
 
 private:
   friend class ConstraintSystem;
@@ -743,8 +748,12 @@ public:
   /// \brief Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
-  /// \brief Dump this solution to standard error.
-  void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+
+  /// \brief Dump this solution.
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 /// \brief Describes the differences between several solutions to the same
@@ -1044,9 +1053,10 @@ private:
                                      std::forward<Args>(args)...);
 
       // Debug output.
-      if (TC.Context.LangOpts.DebugConstraintSolver) {
-        llvm::errs().indent(2);
-        failure->dump(&TC.Context.SourceMgr);
+      if (getASTContext().LangOpts.DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log.indent(2);
+        failure->dump(&TC.Context.SourceMgr, log);
       }
 
       unavoidableFailures.push_back(failure);
@@ -1066,9 +1076,10 @@ private:
     }
 
     // Debug output.
-    if (TC.Context.LangOpts.DebugConstraintSolver) {
-      llvm::errs().indent(solverState->depth * 2 + 2);
-      failure->dump(&TC.Context.SourceMgr);
+    if (getASTContext().LangOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2 + 2);
+      failure->dump(&TC.Context.SourceMgr, log);
     }
 
     return;
@@ -1587,7 +1598,10 @@ public:
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr);
 
-  void dump();
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  void dump(raw_ostream &out);
 };
 
 /// \brief Adjust lvalue types within the type of a reference to a declaration.

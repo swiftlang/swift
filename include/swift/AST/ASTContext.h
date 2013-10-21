@@ -31,6 +31,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include <functional>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -71,6 +72,7 @@ namespace swift {
   class ValueDecl;
   class DiagnosticEngine;
   class Substitution;
+  class TypeCheckerDebugConsumer;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -190,6 +192,9 @@ public:
   /// FIXME: HACK HACK HACK
   /// This state should be tracked somewhere else.
   unsigned LastCheckedExternalDefinition = 0;
+
+  /// A consumer of type checker debug output.
+  std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
 private:
   /// \brief The current generation number, which reflects the number of

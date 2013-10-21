@@ -23,6 +23,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2086,7 +2087,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
-    llvm::errs().indent(solverState? solverState->depth * 2 : 2)
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log.indent(solverState? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString() << " := "
       << refType->getString() << ")\n";
@@ -3811,8 +3813,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (preCheckExpression(expr, dc))
     return true;
 
-  llvm::raw_ostream &log = llvm::errs();
-
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
@@ -3830,10 +3830,11 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -3853,8 +3854,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Apply the solution to the expression.
@@ -3896,8 +3898,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
-    result->dump();
+    result->dump(log);
   }
 
   expr = result;
@@ -3924,12 +3927,12 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                      cs.getConstraintLocator(expr, { }));
   }
 
-  llvm::raw_ostream &log = llvm::errs();
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -3949,8 +3952,9 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Apply the solution to the expression.
@@ -3971,8 +3975,9 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
-    result->dump();
+    result->dump(log);
   }
 
   expr = result;
@@ -4020,11 +4025,11 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
                    patternType, initLocator);
 
   if (getLangOpts().DebugConstraintSolver) {
-    llvm::raw_ostream &log = llvm::errs();
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given variable binding---\n";
     init->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -4044,8 +4049,9 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
-    llvm::errs() << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Solution---\n";
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Apply the solution to the expression.
@@ -4077,8 +4083,9 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   }
 
   if (getLangOpts().DebugConstraintSolver) {
-    llvm::errs() << "---Type-checked expression---\n";
-    init->dump();
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Type-checked expression---\n";
+    init->dump(log);
   }
 
   binding->setPattern(pattern);
@@ -4146,8 +4153,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   if (preCheckExpression(expr, dc))
     return true;
 
-  llvm::raw_ostream &log = llvm::errs();
-
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
@@ -4178,10 +4183,11 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -4201,8 +4207,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Apply the solution to the expression.
@@ -4220,8 +4227,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
-    result->dump();
+    result->dump(log);
   }
 
   expr = result;
@@ -4264,8 +4272,6 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   if (preCheckExpression(expr, dc))
     return true;
 
-  llvm::raw_ostream &log = llvm::errs();
-
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
@@ -4286,10 +4292,11 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
                    cs.getConstraintLocator(expr, { }));
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -4309,8 +4316,9 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Apply the solution to the expression.
@@ -4328,8 +4336,9 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
-    result->dump();
+    result->dump(log);
   }
   
   expr = result;
@@ -4497,8 +4506,6 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
 }
 
 bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
-  llvm::raw_ostream &log = llvm::errs();
-
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
@@ -4509,10 +4516,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
                    cs.getConstraintLocator(expr, { }));
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump();
+    cs.dump(log);
   }
 
   // Attempt to solve the constraint system.
@@ -4532,8 +4540,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
   auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr);
+    solution.dump(&Context.SourceMgr, log);
   }
 
   // Perform the conversion.
@@ -4544,8 +4553,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   }
 
   if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
-    result->dump();
+    result->dump(log);
   }
 
   expr = result;
@@ -4559,7 +4569,10 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 #pragma mark Debugging
 
 void Solution::dump(SourceManager *sm) const {
-  llvm::raw_ostream &out = llvm::errs();
+  dump(sm, llvm::errs());
+}
+
+void Solution::dump(SourceManager *sm, raw_ostream &out) const {
   out << "Fixed score: " << getFixedScore() << "\n\n";
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
@@ -4575,7 +4588,7 @@ void Solution::dump(SourceManager *sm) const {
   for (auto ovl : overloadChoices) {
     out.indent(2);
     if (ovl.first)
-      ovl.first->dump(sm);
+      ovl.first->dump(sm, out);
     out << " with ";
 
     auto choice = ovl.second.first;
@@ -4612,8 +4625,10 @@ void Solution::dump(SourceManager *sm) const {
 }
 
 void ConstraintSystem::dump() {
-  llvm::raw_ostream &out = llvm::errs();
+  dump(llvm::errs());
+}
 
+void ConstraintSystem::dump(raw_ostream &out) {
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);

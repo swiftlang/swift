@@ -314,7 +314,10 @@ public:
 
   SourceLoc TrailingSemiLoc;
 
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  void dump(raw_ostream &OS) const;
   void dump(unsigned Indent) const;
 
   /// \brief Pretty-print the given declaration.

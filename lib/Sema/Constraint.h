@@ -308,7 +308,9 @@ public:
 
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));

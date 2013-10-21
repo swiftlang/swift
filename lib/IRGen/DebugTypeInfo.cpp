@@ -19,6 +19,7 @@
 #include "IRGen.h"
 #include "FixedTypeInfo.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
@@ -97,6 +98,8 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
 }
 
 void DebugTypeInfo::dump() const {
-  if (getDecl()) getDecl()->dump();
-  else getType()->dump();
+  if (getDecl())
+    getDecl()->dump(llvm::errs());
+  else
+    getType()->dump();
 }

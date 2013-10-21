@@ -84,8 +84,10 @@ public:
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }
-  
-  void dump() const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext

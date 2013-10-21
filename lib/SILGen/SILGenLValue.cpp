@@ -386,7 +386,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
 }
 
 LValue SILGenLValue::visitExpr(Expr *e) {
-  e->dump();
+  e->dump(llvm::errs());
   llvm_unreachable("unimplemented lvalue expr");
 }
 

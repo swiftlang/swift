@@ -312,14 +312,14 @@ namespace {
     void verifyCheckedAlways(ValueDecl *D) {
       if (D->hasType() && D->getType()->hasTypeVariable()) {
         Out << "a type variable escaped the type checker";
-        D->dump();
+        D->dump(Out);
         abort();
       }
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           Out << "can not override a decl in the same DeclContext";
-          D->dump();
-          Overridden->dump();
+          D->dump(Out);
+          Overridden->dump(Out);
           abort();
         }
       }
@@ -550,7 +550,7 @@ namespace {
           Out << "\nParameter type: ";
           FT->getInput()->print(Out);
           Out << "\n";
-          E->dump();
+          E->dump(Out);
           abort();
         }
       }
@@ -560,26 +560,26 @@ namespace {
       if (!E->getBase()->getType()->is<LValueType>() &&
           !E->getBase()->getType()->hasReferenceSemantics()) {
         Out << "Member reference base type is not an lvalue:\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
       
       if (!E->getType()->is<LValueType>()) {
         Out << "Member reference type is not an lvalue\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
       
       if (!E->getMember()) {
         Out << "Member reference is missing declaration\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
 
       LValueType *ResultLV = E->getType()->getAs<LValueType>();
       if (!ResultLV) {
         Out << "Member reference has non-lvalue type\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
 
@@ -600,14 +600,14 @@ namespace {
           !baseProtoTy->getDecl()->isSpecificProtocol(
              KnownProtocolKind::DynamicLookup)) {
         Out << "Dynamic member reference has non-DynamicLookup base\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
 
       // The member must be [objc].
       if (!E->getMember().getDecl()->isObjC()) {
         Out << "Dynamic member reference to non-[objc] member\n";
-        E->dump();
+        E->dump(Out);
         abort();
       }
     }
@@ -921,7 +921,7 @@ namespace {
       auto genericParams = dc->getGenericParamsOfContext();
       if (!genericParams) {
         Out << "Missing generic parameters\n";
-        decl->dump();
+        decl->dump(Out);
         abort();
       }
 
@@ -970,7 +970,7 @@ namespace {
           return;
 
         Out << "Generic requirements don't match all archetypes\n";
-        decl->dump();
+        decl->dump(Out);
 
         Out << "\nGeneric type: " << genericTy->getString() << "\n";
         Out << "Expected requirements: ";
@@ -1086,7 +1086,7 @@ namespace {
             AFD->getDeclContext()->getGenericParamsOfContext()))
           && !AFD->getInterfaceType()) {
         Out << "Missing interface type for generic function\n";
-        AFD->dump();
+        AFD->dump(Out);
         abort();
       }
 
@@ -1576,12 +1576,12 @@ namespace {
         return;
       if (D->isInvalid() && !D->getType()->is<ErrorType>()) {
         Out << "Invalid decl has non-error type!\n";
-        D->dump();
+        D->dump(Out);
         abort();
       }
       if (D->getType()->is<ErrorType>() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
-        D->dump();
+        D->dump(Out);
         abort();
       }
     }

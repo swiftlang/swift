@@ -553,7 +553,8 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
     for (auto binding : bindings) {
       auto type = binding.first;
       if (tc.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(depth * 2)
+        auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+        log.indent(depth * 2)
           << "(trying " << typeVar->getString()
           << " := " << type->getString() << "\n";
       }
@@ -576,7 +577,8 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(depth * 2) << ")\n";
+        auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+        log.indent(depth * 2) << ")\n";
       }
     }
 
@@ -696,7 +698,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     auto solution = finalize();
     if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "(found solution)\n";
     }
 
     solutions.push_back(std::move(solution));
@@ -778,7 +781,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       if (!anyNonConformanceConstraints) {
         auto solution = finalize();
         if (TC.getLangOpts().DebugConstraintSolver) {
-          llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
+          auto &log = getASTContext().TypeCheckerDebug->getStream();
+          log.indent(solverState->depth * 2) << "(found solution)\n";
         }
         
         solutions.push_back(std::move(solution));
@@ -821,10 +825,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     SolverScope scope(*this);
 
     if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(solverState->depth * 2)
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2)
         << "(assuming ";
-      constraint->print(llvm::errs(), &TC.Context.SourceMgr);
-      llvm::errs() << '\n';
+      constraint->print(log, &TC.Context.SourceMgr);
+      log << '\n';
     }
 
     // Simplify this term in the disjunction.
@@ -857,7 +862,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(solverState->depth * 2) << ")\n";
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << ")\n";
     }
   }
 

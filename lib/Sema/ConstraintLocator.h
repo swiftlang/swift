@@ -338,7 +338,11 @@ public:
   }
 
   /// \brief Produce a debugging dump of this locator.
-  void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+
+  void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
 
 private:
   /// \brief Initialize a constraint locator with an anchor and a path.

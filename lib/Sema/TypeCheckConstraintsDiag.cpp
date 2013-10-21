@@ -17,13 +17,15 @@
 using namespace swift;
 using namespace constraints;
 
-void Failure::dump(SourceManager *sm) {
+void Failure::dump(SourceManager *sm) const {
+  dump(sm, llvm::errs());
+}
 
-  llvm::raw_ostream &out = llvm::errs();
+void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   out << "(";
   if (locator) {
     out << "@";
-    locator->dump(sm);
+    locator->dump(sm, out);
     out << ": ";
   }
 
@@ -707,14 +709,14 @@ bool ConstraintSystem::diagnose() {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (solutions.size() > 1) {
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        llvm::raw_ostream &log = llvm::errs();
-        log << "---Ambiguity error: " 
+      if (getASTContext().LangOpts.DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log << "---Ambiguity error: "
             << solutions.size() << " solutions found---\n";
         int i = 0;
         for (auto &solution : solutions) {
           log << "---Ambiguous solution #" << i++ << "---\n";
-          solution.dump(&TC.Context.SourceMgr);
+          solution.dump(&TC.Context.SourceMgr, log);
           log << "\n";
         }
       }        

@@ -588,8 +588,12 @@ namespace {
 } // end anonymous namespace.
 
 void Decl::dump() const {
-  PrintDecl(llvm::errs(), 0).visit(const_cast<Decl *>(this));
-  llvm::errs() << '\n';
+  dump(llvm::errs());
+}
+
+void Decl::dump(raw_ostream &OS) const {
+  PrintDecl(OS, 0).visit(const_cast<Decl *>(this));
+  OS << '\n';
 }
 
 void Decl::dump(unsigned Indent) const {
@@ -1388,9 +1392,13 @@ public:
 } // end anonymous namespace.
 
 
+void Expr::dump(raw_ostream &OS) const {
+  print(OS);
+  OS << '\n';
+}
+
 void Expr::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
+  dump(llvm::errs());
 }
 
 void Expr::print(raw_ostream &OS, unsigned Indent) const {

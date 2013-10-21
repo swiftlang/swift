@@ -213,7 +213,9 @@ public:
   static Type mapTypeIntoContext(DeclContext *dc, Type type);
 
   /// \brief Dump all of the requirements, both specified and inferred.
-  void dump();
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(),
+      "only for use within the debugger");
 };
 
 class ArchetypeBuilder::PotentialArchetype {

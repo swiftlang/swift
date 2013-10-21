@@ -38,8 +38,10 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
-  llvm::raw_ostream &out = llvm::errs();
+  dump(sm, llvm::errs());
+}
 
+void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   if (anchor) {
     out << Expr::getKindName(anchor->getKind());
     if (sm) {

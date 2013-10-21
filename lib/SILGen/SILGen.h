@@ -933,7 +933,6 @@ public:
   //===--------------------------------------------------------------------===//
   
   void visitDecl(Decl *D) {
-    D->dump();
     llvm_unreachable("Not yet implemented");
   }
 
