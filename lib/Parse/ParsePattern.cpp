@@ -571,6 +571,7 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   SmallVector<TuplePatternElt, 8> elts;
   ParserStatus ListStatus = parseList(tok::r_paren, LPLoc, RPLoc,
                                       tok::comma, /*OptionalSep=*/false,
+                                      /*AllowSepAfterLast=*/false,
                                       diag::expected_rparen_tuple_pattern_list,
                                       [&] () -> ParserStatus {
     // Parse the pattern tuple element.

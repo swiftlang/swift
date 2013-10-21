@@ -553,6 +553,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   tok::comma, /*OptionalSep=*/false,
+                                  /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
     // If the tuple element starts with "ident :", then

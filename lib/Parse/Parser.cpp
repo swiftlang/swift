@@ -475,8 +475,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
-                  std::function<ParserStatus()> callback) {
+                  tok SeparatorK, bool OptionalSep, bool AllowSepAfterLast,
+                  Diag<> ErrorDiag, std::function<ParserStatus()> callback) {
   assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
 
   if (Tok.is(RightK)) {
@@ -503,8 +503,12 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       RightLoc = Tok.getLoc();
       return Status;
     }
-    if (consumeIf(SeparatorK))
-      continue;
+    if (consumeIf(SeparatorK)) {
+      if (AllowSepAfterLast && Tok.is(RightK))
+        break;
+      else
+        continue;
+    }
     if (!OptionalSep) {
       SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
@@ -534,18 +538,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   return Status;
-}
-
-bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                       tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
-                       std::function<bool()> callback) {
-  return parseList(RightK, LeftLoc, RightLoc, SeparatorK, OptionalSep,
-                   ErrorDiag, [&]() -> ParserStatus {
-    if (callback())
-      return makeParserError();
-    else
-      return makeParserSuccess();
-  }).isError();
 }
 
 /// diagnoseRedefinition - Diagnose a redefinition error, with a note

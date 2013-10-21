@@ -1457,9 +1457,10 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 
   ParserStatus Status = parseList(RightTok, LLoc, RLoc,
                                   tok::comma, /*OptionalSep=*/false,
+                                  /*AllowSepAfterLast=*/false,
                                   RightTok == tok::r_paren ?
-                                  diag::expected_rparen_expr_list :
-                                  diag::expected_rsquare_expr_list,
+                                      diag::expected_rparen_expr_list :
+                                      diag::expected_rsquare_expr_list,
                                   [&] () -> ParserStatus {
     Identifier FieldName;
     // Check to see if there is a field specifier
@@ -1575,7 +1576,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
 /// parsed, and are passed in as parameters.
 ///
 ///   expr-array:
-///     lsquare-starting expr (',' expr)* ']'
+///     '[' expr (',' expr)* ','? ']'
 ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                           Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
@@ -1593,6 +1594,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       tok::comma, /*OptionalSep=*/false,
+                      /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
                       [&] () -> ParserStatus {
     ParserResult<Expr> Element
@@ -1629,7 +1631,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 /// are passed in as parameters.
 ///
 ///   expr-dictionary:
-///     lsquare-starting expr ':' expr (',' expr ':' expr)* ']'
+///     '[' expr ':' expr (',' expr ':' expr)* ','? ']'
 ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                                Expr *FirstKey) {
   // Each subexpression is a (key, value) tuple. 
@@ -1669,6 +1671,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       tok::comma, /*OptionalSep=*/false,
+                      /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
                       [&] () -> ParserStatus {
     // Parse the next key.

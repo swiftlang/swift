@@ -966,16 +966,17 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args) {
     SourceLoc RParenLoc;
 
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
-                    tok::comma, false,
+                    tok::comma, /*OptionalSep=*/false,
+                    /*AllowSepAfterLast=*/false,
                     diag::sil_basicblock_arg_rparen,
-                    [&] () -> bool {
+                    [&]() -> ParserStatus {
                       SILValue Arg;
                       SourceLoc ArgLoc;
                       if (parseTypedValueRef(Arg, ArgLoc))
-                        return true;
+                        return makeParserError();
                       Args.push_back(Arg);
-                      return false;
-                    }))
+                      return makeParserSuccess();
+                    }).isError())
       return true;
   }
   return false;

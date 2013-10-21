@@ -876,7 +876,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
 
     ParserStatus BodyStatus =
         parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
-                  diag::expected_rbrace_extension, [&]()->ParserStatus{
+                  /*AllowSepAfterLast=*/false, diag::expected_rbrace_extension,
+                  [&]() -> ParserStatus {
       return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowStoredVar);
     });
     // Don't propagate the code completion bit from members: we can not help
@@ -1958,7 +1959,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                      Diag<> ErrorDiag, unsigned flags) {
   bool previousHadSemi = true;
   parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
-            ErrorDiag, [&] () -> ParserStatus {
+            /*AllowSepAfterLast=*/false, ErrorDiag, [&]() -> ParserStatus {
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
     if (!previousHadSemi && !Tok.isAtStartOfLine()) {
