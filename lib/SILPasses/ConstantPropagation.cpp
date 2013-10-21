@@ -1,4 +1,4 @@
-//===--- ConstantPropagation.cpp - Promote alloc_box to alloc_stack ------===//
+//===--- ConstantPropagation.cpp - Constant fold and diagnose overflows ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,18 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "constant-propagation"
-
-#include "swift/AST/Builtins.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
-#include "swift/AST/Type.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
-
 using namespace swift;
 
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
@@ -37,7 +32,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// \brief Fold arithmetic intrinsics with overflow.
 static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                                                       llvm::Intrinsic::ID ID,
-                                                      SILModule &M,
                                                       bool ReportOverflow) {
   OperandValueArrayRef Args = AI->getArguments();
   assert(Args.size() >= 2);
@@ -88,6 +82,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   }
 
   // Get the SIL subtypes of the returned tuple type.
+  SILModule &M = AI->getModule();
   SILType FuncResType = AI->getFunctionTypeInfo(M)->getResult().getSILType();
   TupleType *T = FuncResType.castTo<TupleType>();
   assert(T->getNumElements() == 2);
@@ -127,7 +122,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     }
 
     if (!OpType.isNull()) {
-      diagnose(M.getASTContext(),
+      diagnose(AI->getModule().getASTContext(),
                AI->getLoc().getSourceLoc(),
                diag::arithmetic_operation_overflow,
                LHSInt.toString(/*Radix*/ 10, Signed),
@@ -136,7 +131,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                OpType);
     } else {
       // If we cannot get the type info in an expected way, describe the type.
-      diagnose(M.getASTContext(),
+      diagnose(AI->getModule().getASTContext(),
                AI->getLoc().getSourceLoc(),
                diag::arithmetic_operation_overflow_generic_type,
                LHSInt.toString(/*Radix*/ 10, Signed),
@@ -152,18 +147,16 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
 }
 
 static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
-                                                   BuiltinValueKind ID,
-                                                   SILModule &M) {
+                                                   BuiltinValueKind ID) {
   OperandValueArrayRef Args = AI->getArguments();
   IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(AI,
-           getLLVMIntrinsicIDForBuiltinWithOverflow(ID), M,
+           getLLVMIntrinsicIDForBuiltinWithOverflow(ID),
            ShouldReportFlag && (ShouldReportFlag->getValue() == 1));
 }
 
 static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
-                                             llvm::Intrinsic::ID ID,
-                                             SILModule &M) {
+                                             llvm::Intrinsic::ID ID) {
   switch (ID) {
     default: break;
     case llvm::Intrinsic::sadd_with_overflow:
@@ -172,34 +165,34 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
     case llvm::Intrinsic::usub_with_overflow:
     case llvm::Intrinsic::smul_with_overflow:
     case llvm::Intrinsic::umul_with_overflow: {
-      return constantFoldBinaryWithOverflow(AI, ID, M, /*ReportOverflow*/false);
+      return constantFoldBinaryWithOverflow(AI, ID, /*ReportOverflow*/false);
     }
   }
   return nullptr;
 }
 
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
-                                           BuiltinFunctionRefInst *FR,
-                                           SILModule &M) {
+                                           BuiltinFunctionRefInst *FR) {
   const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
+  SILModule &M = AI->getModule();
 
   // If it's an llvm intrinsic, fold the intrinsic.
-  if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic) {
-    return constantFoldIntrinsic(AI, Intrinsic.ID, M);
-  }
+  if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic)
+    return constantFoldIntrinsic(AI, Intrinsic.ID);
 
   // Otherwise, it should be one of the builin functions.
   OperandValueArrayRef Args = AI->getArguments();
   const BuiltinInfo &Builtin = M.getBuiltinInfo(FR->getReferencedFunction());
 
   switch (Builtin.ID) {
+      // TODO: Should not indent the cases.
     default: break;
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
     case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return constantFoldOverflowBuiltin(AI, Builtin.ID, M);
+      return constantFoldOverflowBuiltin(AI, Builtin.ID);
 
     case BuiltinValueKind::Trunc:
     case BuiltinValueKind::ZExt:
@@ -216,16 +209,16 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       uint32_t DestBitWidth =
         DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
       switch (Builtin.ID) {
-        default : llvm_unreachable("Invalid case.");
-        case BuiltinValueKind::Trunc:
-          CastResV = V->getValue().trunc(DestBitWidth);
-          break;
-        case BuiltinValueKind::ZExt:
-          CastResV = V->getValue().zext(DestBitWidth);
-          break;
-        case BuiltinValueKind::SExt:
-          CastResV = V->getValue().sext(DestBitWidth);
-          break;
+      default : llvm_unreachable("Invalid case.");
+      case BuiltinValueKind::Trunc:
+        CastResV = V->getValue().trunc(DestBitWidth);
+        break;
+      case BuiltinValueKind::ZExt:
+        CastResV = V->getValue().zext(DestBitWidth);
+        break;
+      case BuiltinValueKind::SExt:
+        CastResV = V->getValue().sext(DestBitWidth);
+        break;
       }
 
       // Add the literal instruction to represnet the result of the cast.
@@ -266,7 +259,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       APInt ResVal;
       bool Overflowed = false;
       switch (Builtin.ID) {
-        // We do not cover all the cases below - only the ones taht are easily
+        // We do not cover all the cases below - only the ones that are easily
         // computable for APInt.
         default : return nullptr;
         case BuiltinValueKind::SDiv:
@@ -370,7 +363,6 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       if (!V)
         return nullptr;
       APInt SrcVal = V->getValue();
-
       Type DestTy = Builtin.Types[1];
 
       APFloat TruncVal(
@@ -401,63 +393,42 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
   return nullptr;
 }
 
-static SILInstruction *constantFoldInstruction(SILInstruction &I,
-                                               SILModule &M) {
+static SILValue constantFoldInstruction(SILInstruction &I) {
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
     // Constant fold calls to builtins.
     if (BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-      return constantFoldBuiltin(AI, FR, M);
+          dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+      return constantFoldBuiltin(AI, FR);
     }
-    return nullptr;
+    return SILValue();
   }
 
   // Constant fold extraction of a constant element.
   if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(&I)) {
-    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand().getDef())) {
-      unsigned FieldNo = TEI->getFieldNo();
-      ValueBase *Elem = TheTuple->getElements()[FieldNo].getDef();
-      if (SILInstruction *SILInstElem = dyn_cast<SILInstruction>(Elem)) {
-        return SILInstElem;
-      }
-    }
+    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand().getDef()))
+      return TheTuple->getElements()[TEI->getFieldNo()];
   }
 
-  // Constant fold extraction of a constant element.
+  // Constant fold extraction of a constant struct element.
   if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(&I)) {
-    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand().getDef())) {
-      // Find the Field number corresponding to the FieldDecl.
-      unsigned FieldNo = 0;
-      StructDecl *SD =
-        cast<StructDecl>(Struct->getType().getSwiftType()->getAnyNominal());
-
-      for (auto MD : SD->getStoredProperties()) {
-        if (MD == SEI->getField()) {
-          ValueBase *E = Struct->getElements()[FieldNo].getDef();
-          // If the element the struct_extract is extracting is const, fold it.
-          if (SILInstruction *SILInstElem = dyn_cast<SILInstruction>(E)) {
-            return SILInstElem;
-          }
-          break;
-        }
-        ++FieldNo;
-      }
-    }
+    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand().getDef()))
+      return Struct->getOperandForField(SEI->getField())->get();
   }
 
-  return nullptr;
+  return SILValue();
 }
 
-static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
+static bool CCPFunctionBody(SILFunction &F) {
   DEBUG(llvm::errs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
-  // Initialize the worklist to all of the instructions ready to process...
+  // Initialize the worklist to all of the instructions ready to process.
   llvm::SetVector<SILInstruction*> WorkList;
   for (auto &BB : F) {
-    for(auto &I : BB) {
-      WorkList.insert(&I);
+    for (auto &I : BB) {
+      if (!I.use_empty())
+        WorkList.insert(&I);
     }
   }
 
@@ -467,40 +438,45 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
     SILInstruction *I = *WorkList.begin();
     WorkList.remove(I);
 
-    if (!I->use_empty())
+    if (I->use_empty()) continue;
 
-      // Try to fold the instruction.
-      if (SILInstruction *C = constantFoldInstruction(*I, M)) {
-        // The users could be constant propagatable now.
-        for (auto UseI = I->use_begin(),
-                  UseE = I->use_end(); UseI != UseE; ++UseI) {
-          SILInstruction *User = cast<SILInstruction>(UseI.getUser());
-          WorkList.insert(User);
+    // Try to fold the instruction.
+    SILValue C = constantFoldInstruction(*I);
+    if (!C) continue;
+    
+    // The users could be constant propagatable now.
+    for (auto Use : I->getUses()) {
+      SILInstruction *User = cast<SILInstruction>(Use->getUser());
+      WorkList.insert(User);
 
-          // Some constant users may indirectly cause folding of their users.
-          if (isa<StructInst>(User) || isa<TupleInst>(User)) {
-            for (auto UseUseI = User->use_begin(),
-                 UseUseE = User->use_end(); UseUseI != UseUseE; ++UseUseI) {
-              WorkList.insert(cast<SILInstruction>(UseUseI.getUser()));
-
-            }
-          }
+      // TODO: This is handling folding of tupleelement/tuple and
+      // structelement/structs inline with constant folding.  This should
+      // probably handle them in the prepass, instead of handling them in the
+      // worklist loop.  They are conceptually very different operations and
+      // are technically not constant folding.
+      
+      // Some constant users may indirectly cause folding of their users.
+      if (isa<StructInst>(User) || isa<TupleInst>(User)) {
+        for (auto UseUseI = User->use_begin(),
+             UseUseE = User->use_end(); UseUseI != UseUseE; ++UseUseI) {
+          WorkList.insert(cast<SILInstruction>(UseUseI.getUser()));
         }
-
-        // We were able to fold, so all users should use the new folded value.
-        assert(I->getTypes().size() == 1 &&
-               "Currently, we only support single result instructions.");
-        SILValue(I).replaceAllUsesWith(C);
-
-        // Remove the unused instruction.
-        WorkList.remove(I);
-
-        // Eagerly DCE.
-        recursivelyDeleteTriviallyDeadInstructions(I);
-
-        Folded = true;
-        ++NumInstFolded;
       }
+    }
+
+    // We were able to fold, so all users should use the new folded value.
+    assert(I->getTypes().size() == 1 &&
+           "Currently, we only support single result instructions");
+    SILValue(I).replaceAllUsesWith(C);
+
+    // Remove the unused instruction.
+    WorkList.remove(I);
+
+    // Eagerly DCE.
+    recursivelyDeleteTriviallyDeadInstructions(I);
+
+    Folded = true;
+    ++NumInstFolded;
   }
 
   return false;
@@ -510,7 +486,6 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 void swift::performSILConstantPropagation(SILModule *M) {
-  for (auto &Fn : *M) {
-    CCPFunctionBody(Fn, *M);
-  }
+  for (auto &Fn : *M)
+    CCPFunctionBody(Fn);
 }
