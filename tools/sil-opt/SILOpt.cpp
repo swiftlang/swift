@@ -187,10 +187,6 @@ int main(int argc, char **argv) {
   }
   CI.getSILModule()->print(OS, EmitVerboseSIL);
 
-  // Print statistics.
-  if (PrintStats)
-    llvm::PrintStatistics(llvm::errs());
-
   bool HadError = CI.getASTContext().hadError();
 
   // If we're in -verify mode, we've buffered up all of the generated
