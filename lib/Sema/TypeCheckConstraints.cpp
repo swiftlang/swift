@@ -153,30 +153,35 @@ getDynamicResultSignature(ValueDecl *decl,
 
 LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   base = base->getCanonicalType();
+
+  // Check whether we've already performed this lookup.
+  auto knownMember = MemberLookups.find({base, name});
+  if (knownMember != MemberLookups.end())
+    return *knownMember->second;
+
+  // Lookup the member.
+  MemberLookups[{base, name}] = Nothing;
+  auto lookup = TC.lookupMember(base, name, DC);
   auto &result = MemberLookups[{base, name}];
-  if (!result) {
-    result = TC.lookupMember(base, name, DC);
+  result = std::move(lookup);
 
-    // If we aren't performing dynamic lookup, we're done.
-    auto instanceTy = base->getRValueType();
-    if (auto metaTy = instanceTy->getAs<MetaTypeType>())
-      instanceTy = metaTy->getInstanceType();
-    auto protoTy = instanceTy->getAs<ProtocolType>();
-    if (!*result ||
-        !protoTy ||
-        !protoTy->getDecl()->isSpecificProtocol(
-                               KnownProtocolKind::DynamicLookup))
-      return *result;
+  // If we aren't performing dynamic lookup, we're done.
+  auto instanceTy = base->getRValueType();
+  if (auto metaTy = instanceTy->getAs<MetaTypeType>())
+    instanceTy = metaTy->getInstanceType();
+  auto protoTy = instanceTy->getAs<ProtocolType>();
+  if (!*result ||
+      !protoTy ||
+      !protoTy->getDecl()->isSpecificProtocol(
+                             KnownProtocolKind::DynamicLookup))
+    return *result;
 
-    // We are performing dynamic lookup. Filter out redundant results early.
-    llvm::DenseSet<std::pair<unsigned, CanType>> known;
-    llvm::StringMap<unsigned> selectors;
-    result->filter([&](ValueDecl *decl) -> bool {
-      return known.insert(getDynamicResultSignature(decl, selectors)).second;
-    });
-  }
-
-  return *result;
+  // We are performing dynamic lookup. Filter out redundant results early.
+  llvm::DenseSet<std::pair<unsigned, CanType>> known;
+  llvm::StringMap<unsigned> selectors;
+  result->filter([&](ValueDecl *decl) -> bool {
+    return known.insert(getDynamicResultSignature(decl, selectors)).second;
+  });
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
