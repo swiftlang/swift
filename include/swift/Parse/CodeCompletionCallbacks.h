@@ -24,7 +24,6 @@ protected:
   Parser &P;
   ASTContext &Context;
   Parser::ParserPosition ExprBeginPosition;
-  SourceLoc SwitchCasePatternBeginLoc;
 
   /// The declaration parsed during delayed parsing that was caused by code
   /// completion.  This declaration contained the code completion token.
@@ -47,10 +46,6 @@ public:
 
   void setExprBeginning(Parser::ParserPosition PP) {
     ExprBeginPosition = PP;
-  }
-
-  void setSwitchCasePatternBeginning(SourceLoc Loc) {
-    SwitchCasePatternBeginLoc = Loc;
   }
 
   void setDelayedParsedDecl(Decl *D) {
@@ -94,32 +89,12 @@ public:
     }
   };
 
-  class InSwitchCasePatternRAII {
-    CodeCompletionCallbacks *Callbacks;
-
-  public:
-    InSwitchCasePatternRAII(CodeCompletionCallbacks *Callbacks,
-                            SourceLoc BeginLoc)
-        : Callbacks(Callbacks) {
-      if (Callbacks)
-        Callbacks->SwitchCasePatternBeginLoc = BeginLoc;
-    }
-
-    ~InSwitchCasePatternRAII() {
-      if (Callbacks)
-        Callbacks->SwitchCasePatternBeginLoc = SourceLoc();
-    }
-  };
-
   /// \brief Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
   virtual void completeExpr() = 0;
 
   /// \brief Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(Expr *E) = 0;
-
-  /// \brief Complete an expression that starts with a dot.
-  virtual void completeDotPrefixExpr() = 0;
 
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
@@ -144,6 +119,12 @@ public:
 
   /// \brief Complete a given type-identifier when there is no trailing dot.
   virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) = 0;
+
+  /// \brief Complete at the beginning of a case stmt pattern.
+  virtual void completeCaseStmtBeginning() = 0;
+
+  /// \brief Complete a case stmt pattern that starts with a dot.
+  virtual void completeCaseStmtDotPrefix() = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

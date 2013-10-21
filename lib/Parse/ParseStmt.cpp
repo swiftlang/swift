@@ -971,8 +971,20 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
       // Parse comma-separated patterns.
       SmallVector<Pattern *, 2> patterns;
       do {
-        CodeCompletionCallbacks::InSwitchCasePatternRAII InSwitchCasePatternRAII(
-            CodeCompletion, Tok.getLoc());
+        if (CodeCompletion) {
+          if (Tok.is(tok::code_complete)) {
+            CodeCompletion->completeCaseStmtBeginning();
+            consumeToken();
+            continue;
+          }
+          if (Tok.is(tok::period) && peekToken().is(tok::code_complete)) {
+            consumeToken();
+            CodeCompletion->completeCaseStmtDotPrefix();
+            consumeToken();
+            continue;
+          }
+        }
+
         ParserResult<Pattern> pattern = parseMatchingPattern();
         Status |= pattern;
         if (pattern.isNonNull()) {

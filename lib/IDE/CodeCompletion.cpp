@@ -449,7 +449,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   enum class CompletionKind {
     None,
     DotExpr,
-    DotPrefixExpr,
     PostfixExprBeginning,
     PostfixExpr,
     SuperExpr,
@@ -457,6 +456,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     TypeSimpleBeginning,
     TypeIdentifierWithDot,
     TypeIdentifierWithoutDot,
+    CaseStmtBeginning,
+    CaseStmtDotPrefix,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -551,7 +552,6 @@ public:
 
   void completeExpr() override;
   void completeDotExpr(Expr *E) override;
-  void completeDotPrefixExpr() override;
   void completePostfixExprBeginning() override;
   void completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
@@ -560,6 +560,9 @@ public:
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
+
+  void completeCaseStmtBeginning() override;
+  void completeCaseStmtDotPrefix() override;
 
   void doneParsing() override;
 
@@ -1314,7 +1317,7 @@ public:
     CompletionContext.includeUnqualifiedClangResults();
   }
 
-  void getEnumElementCompletions(SourceLoc Loc) {
+  void getTypeContextEnumElementCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
         Kind, LookupKind::EnumElement);
     NeedLeadingDot = !HaveDot;
@@ -1416,15 +1419,6 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDotPrefixExpr() {
-  // Don't produce any results in an enum element.
-  if (InEnumElementRawValue)
-    return;
-
-  Kind = CompletionKind::DotPrefixExpr;
-  CurDeclContext = P.CurDeclContext;
-}
-
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
 
@@ -1494,6 +1488,20 @@ void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeCaseStmtBeginning() {
+  assert(!InEnumElementRawValue);
+
+  Kind = CompletionKind::CaseStmtBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
+  assert(!InEnumElementRawValue);
+
+  Kind = CompletionKind::CaseStmtDotPrefix;
+  CurDeclContext = P.CurDeclContext;
+}
+
 static bool isDynamicLookup(Type T) {
   if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
     return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::DynamicLookup);
@@ -1536,19 +1544,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::DotPrefixExpr: {
-    Lookup.setHaveDot();
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getEnumElementCompletions(Loc);
-    break;
-  }
-
   case CompletionKind::PostfixExprBeginning: {
     if (CStyleForLoopIterationVariable)
       Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getValueCompletionsInDeclContext(Loc);
-    Lookup.getEnumElementCompletions(Loc);
     break;
   }
 
@@ -1587,6 +1587,20 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::TypeIdentifierWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
+    break;
+  }
+
+  case CompletionKind::CaseStmtBeginning: {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getValueCompletionsInDeclContext(Loc);
+    Lookup.getTypeContextEnumElementCompletions(Loc);
+    break;
+  }
+
+  case CompletionKind::CaseStmtDotPrefix: {
+    Lookup.setHaveDot();
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getTypeContextEnumElementCompletions(Loc);
     break;
   }
   }
