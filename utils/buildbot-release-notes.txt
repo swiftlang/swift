@@ -1,11 +1,3 @@
-2013-10-30
-----------
-
-* Array and dictionary literals allow an optional trailing comma:
-
-    var a = [ 1, 2, ]
-    var d = [ "a": 1, "b": 2, ]
-
 2013-10-23
 ----------
 
@@ -37,6 +29,11 @@
   
   Currently only stored properties ("ivars" in ObjC terminology) are
   supported by the implementation.
+
+* Array and dictionary literals allow an optional trailing comma:
+
+    var a = [ 1, 2, ]
+    var d = [ "a": 1, "b": 2, ]
 
 2013-10-16
 ----------
