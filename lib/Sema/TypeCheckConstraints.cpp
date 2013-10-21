@@ -747,10 +747,8 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
   Type valueType = TC.getUnopenedTypeOfReference(value);
 
   // If the declaration has an interface type, use it.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (auto interfaceTy = func->getInterfaceType()) {
-      valueType = interfaceTy;
-    }
+  if (auto interfaceTy = value->getInterfaceType()) {
+    valueType = interfaceTy;
   }
 
   // Up and adjust the type of the reference.

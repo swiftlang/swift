@@ -365,6 +365,16 @@ void ValueDecl::overwriteType(Type T) {
     setInvalid();
 }
 
+Type ValueDecl::getInterfaceType() const {
+  if (InterfaceTy)
+    return InterfaceTy;
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
+    return nominal->computeInterfaceType();
+
+  return Type();
+}
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
@@ -477,7 +487,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
   return DeclaredTyInContext;
 }
 
-Type NominalTypeDecl::getInterfaceType() {
+Type NominalTypeDecl::computeInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
 
@@ -488,7 +498,7 @@ Type NominalTypeDecl::getInterfaceType() {
 
   Type type;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    type = ProtocolType::get(proto, getASTContext());
+    type = ProtocolType::get(const_cast<ProtocolDecl *>(proto),getASTContext());
   } else if (auto params = getGenericParams()) {
     // If we have a generic type, bind the type to the archetypes
     // in the type's definition.
@@ -496,9 +506,11 @@ Type NominalTypeDecl::getInterfaceType() {
     for (auto param : *params)
       genericArgs.push_back(param.getAsTypeParam()->getDeclaredType());
 
-    type = BoundGenericType::get(this, parentType, genericArgs);
+    type = BoundGenericType::get(const_cast<NominalTypeDecl *>(this),
+                                 parentType, genericArgs);
   } else {
-    type = NominalType::get(this, parentType, getASTContext());
+    type = NominalType::get(const_cast<NominalTypeDecl *>(this), parentType,
+                            getASTContext());
   }
 
   InterfaceTy = type;

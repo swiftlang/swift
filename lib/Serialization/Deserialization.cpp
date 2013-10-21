@@ -749,10 +749,8 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
 
 /// Retrieve the interface type for the given declaration.
 static Type getValueInterfaceType(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (auto interfaceTy = func->getInterfaceType())
-      return interfaceTy;
-  }
+  if (auto interfaceTy = value->getInterfaceType())
+    return interfaceTy;
 
   return value->getType();
 }

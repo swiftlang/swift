@@ -1044,6 +1044,9 @@ protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc)
     : Decl(K, DC), Name(name), NameLoc(NameLoc) { }
 
+  /// The interface type, mutable because some subclasses compute this lazily.
+  mutable Type InterfaceTy;
+
 public:
   /// \brief Return true if this is a definition of a decl, not a forward
   /// declaration (e.g. of a function) that is implemented outside of the
@@ -1067,6 +1070,22 @@ public:
 
   /// Overwrite the type of this declaration.
   void overwriteType(Type T);
+
+  /// Retrieve the "interface" type of this value, which is the type used when
+  /// the declaration as viewed from an outside. For a generic function,
+  /// this will have generic function type using generic parameters rather than
+  /// archetypes, while a generic class's interface type will
+  ///
+  /// FIXME: Eventually, this will simply become the type of the value, and
+  /// we will substitute in the appropriate archetypes within a particular
+  /// context.
+  Type getInterfaceType() const;
+
+  /// Set the interface type for the given value.
+  void setInterfaceType(Type type) {
+    assert(InterfaceTy.isNull() && "Already have an interface type");
+    InterfaceTy = type;
+  }
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
@@ -1550,8 +1569,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   friend class MemberLookupTable;
   friend class ExtensionDecl;
 
-  Type InterfaceTy;
-
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -1620,7 +1637,7 @@ public:
   ///
   /// For a generic type, or a member thereof, this is the a specialization
   /// of the type using its own generic parameters.
-  Type getInterfaceType();
+  Type computeInterfaceType() const;
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
@@ -2065,8 +2082,6 @@ protected:
 
   CaptureInfo Captures;
 
-  Type InterfaceTy;
-
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
                        SourceLoc NameLoc,
                        VarDecl *ImplicitSelfDecl,
@@ -2147,19 +2162,6 @@ public:
 
   void setHasSelectorStyleSignature() {
     AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
-  }
-
-  /// Retrieve the "interface" type of the function, which is the type of
-  /// the declaration as viewed from an outside. For a polymorphic function,
-  /// this will have generic function type using generic parameters rather than
-  /// archetypes.
-  ///
-  /// FIXME: Eventually, this will simply become the type of the function.
-  Type getInterfaceType() const { return InterfaceTy; }
-
-  void setInterfaceType(Type type) {
-    assert(InterfaceTy.isNull() && "Already have an interface type");
-    InterfaceTy = type;
   }
 
   /// Determine the default argument kind and type for the given argument index

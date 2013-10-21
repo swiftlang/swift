@@ -883,12 +883,10 @@ void Serializer::writeCrossReference(const Decl *D) {
       // Otherwise, use the value's type for disambiguation.
       Type ty;
       if (!isa<TypeDecl>(value)) {
-        // If this function has an interface type, use its canonicalized form.
-        if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-          ty = func->getInterfaceType();
-          if (ty)
-            ty = ty->getCanonicalType();
-        }
+        // If this value has an interface type, use its canonicalized form.
+        ty = value->getInterfaceType();
+        if (ty)
+          ty = ty->getCanonicalType();
 
         if (!ty)
           ty = value->getType();
