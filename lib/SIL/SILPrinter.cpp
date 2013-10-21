@@ -485,6 +485,8 @@ public:
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box " << ABI->getElementType();
+    if (VarDecl *vd = ABI->getDecl())
+      OS << "  // var " << vd->getName();
   }
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
