@@ -149,11 +149,20 @@ Location getDeserializedLoc(Decl* D)  {
   return L;
 }
 
+Location getLoc(SourceManager &SM, SourceLoc Loc) {
+  Location L = {};
+  unsigned BufferID = SM.findBufferContainingLoc(Loc);
+  L.Filename = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc, BufferID);
+  return L;
+}
+
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
 Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
   Location L = {};
-  if (S == nullptr) return L;
+  if (S == nullptr)
+    return L;
 
   SourceLoc Loc = End ? S->getEndLoc() : S->getStartLoc();
   if (Loc.isInvalid())
@@ -162,25 +171,8 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
     // the module.
     return getDeserializedLoc(S);
 
-  unsigned BufferID = SM.findBufferContainingLoc(Loc);
-  L.Filename = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
-  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc, BufferID);
-  return L;
-}
 
-/// getLoc - extract the start location from a SILLocation.
-static Location getASTLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
-  if (!OptLoc)
-    return {};
-
-  SILLocation Loc = OptLoc.getValue();
-  if (Expr* E = Loc.getAsASTNode<Expr>()) return getLoc(SM, E);
-  if (Decl* D = Loc.getAsASTNode<Decl>()) return getLoc(SM, D);
-  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getLoc(SM, S);
-  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getLoc(SM, P);
-
-  Location None = {};
-  return None;
+  return getLoc(SM, Loc);
 }
 
 /// getLocForLinetable - extract the start location from a SILLocation.
@@ -624,7 +616,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
   // Create the imported module.
   StringRef Name = BumpAllocatedString(Printed);
-  Location L = getASTLocation(SM, D);
+  Location L = getLoc(SM, D, false);
   auto Import = DBuilder.createImportedModule(TheCU,
                                               llvm::DINameSpace(Namespace),
                                               L.Line, Name);
@@ -885,7 +877,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
                                                    Optional<SILLocation> Loc) {
-  Location L = getASTLocation(SM, Loc);
+  Location L = getLocation(SM, Loc).Loc;
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 
   // FIXME: Can there be nested types?
