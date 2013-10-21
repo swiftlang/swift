@@ -727,8 +727,6 @@ bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine diags(Ctx.SourceMgr);
 
-  Ctx.LangOpts.DebugConstraintSolver = true;
-
   TypeChecker TC(Ctx, diags);
   TC.typeCheckExpression(parsedExpr, DC, Type(), /*discardedExpr=*/true,
                          /*allowFreeTypeVariables=*/true);
