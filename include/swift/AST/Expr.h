@@ -414,28 +414,37 @@ class DeclRefExpr : public Expr {
   /// This is used when the reference is specialized, e.g "GenCls<Int>", to
   /// hold information about the generic arguments.
   struct SpecializeInfo {
-    ValueDecl *D = nullptr;
+    ConcreteDeclRef D;
     MutableArrayRef<TypeRepr*> GenericArgs;
   };
 
   /// \brief The declaration pointer or SpecializeInfo pointer if it was
   /// explicitly specialized with <...>.
-  llvm::PointerUnion<ValueDecl *, SpecializeInfo *> DAndSpecialized;
+  llvm::PointerUnion<ConcreteDeclRef, SpecializeInfo *> DOrSpecialized;
   SourceLoc Loc;
 
   SpecializeInfo *getSpecInfo() const {
-    return DAndSpecialized.dyn_cast<SpecializeInfo*>();
+    return DOrSpecialized.dyn_cast<SpecializeInfo*>();
   }
 
 public:
-  DeclRefExpr(ValueDecl *D, SourceLoc Loc, bool Implicit, Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), DAndSpecialized(D), Loc(Loc) {}
+  DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit, Type Ty = Type())
+    : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {}
 
+  /// Retrieve the declaration to which this expression refers.
   ValueDecl *getDecl() const {
+    return getDeclRef().getDecl();
+  }
+
+  /// Retrieve the concrete declaration reference.
+  ConcreteDeclRef getDeclRef() const {
     if (auto Spec = getSpecInfo())
       return Spec->D;
-    return DAndSpecialized.get<ValueDecl*>();
+    return DOrSpecialized.get<ConcreteDeclRef>();
   }
+
+  /// Set the declaration.
+  void setDeclRef(ConcreteDeclRef ref);
 
   void setSpecialized();
 

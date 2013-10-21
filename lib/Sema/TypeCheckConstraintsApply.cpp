@@ -74,22 +74,6 @@ Expr *Solution::specialize(Expr *expr,
   return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
 }
 
-Expr *Solution::specialize(Expr *expr,
-                           GenericFunctionType *genericFn,
-                           DeclContext *dc,
-                           Type openedType) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-  auto &ctx = tc.Context;
-
-  // Compute the substitutions needed.
-  SmallVector<Substitution, 4> substitutions;
-  auto type = computeSubstitutions(genericFn, dc, openedType, substitutions);
-
-  // Build the specialize expression.
-  return new (tc.Context) SpecializeExpr(expr, type,
-                                         ctx.AllocateCopy(substitutions));
-}
-
 Type Solution::computeSubstitutions(
                  PolymorphicFunctionType *polyFn,
                  Type openedType,
@@ -1233,9 +1217,18 @@ namespace {
       // If this is a declaration with generic function type, specialize it.
       if (auto func = dyn_cast<AbstractFunctionDecl>(expr->getDecl())) {
         if (auto interfaceTy = func->getInterfaceType()) {
-          return solution.specialize(expr,
-                                     interfaceTy->getAs<GenericFunctionType>(),
-                                     func, fromType);
+          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
+            auto &ctx = cs.TC.Context;
+            SmallVector<Substitution, 4> substitutions;
+            auto type = solution.computeSubstitutions(genericFn, func, fromType,
+                                                      substitutions);
+            expr->setDeclRef(ConcreteDeclRef(ctx, expr->getDecl(),
+                                             substitutions));
+
+            return new (ctx) SpecializeExpr(
+                               expr, type,
+                               expr->getDeclRef().getSubstitutions());
+          }
         }
       }
 
@@ -1338,12 +1331,22 @@ namespace {
       auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
                                               expr->isImplicit(), type);
 
-      // If this is a declaration with generic function type, specialize it.
+      // If this is a declaration with generic function type, build a
+      // specialized reference to it.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (auto interfaceTy = func->getInterfaceType()) {
-          return solution.specialize(result,
-                                     interfaceTy->getAs<GenericFunctionType>(),
-                                     func, selected.second);
+          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
+            auto &ctx = cs.TC.Context;
+            SmallVector<Substitution, 4> substitutions;
+            auto type = solution.computeSubstitutions(genericFn, func,
+                                                      selected.second,
+                                                      substitutions);
+            result->setDeclRef(ConcreteDeclRef(cs.TC.Context, decl,
+                                               substitutions));
+            return new (ctx) SpecializeExpr(
+                               result, type,
+                               result->getDeclRef().getSubstitutions());
+          }
         }
       }
 

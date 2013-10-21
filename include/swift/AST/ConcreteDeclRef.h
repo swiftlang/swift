@@ -68,6 +68,8 @@ class ConcreteDeclRef {
 
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
 
+  friend class llvm::PointerLikeTypeTraits<ConcreteDeclRef>;
+
 public:
   /// Create an empty declaration reference.
   ConcreteDeclRef() : Data() { }
@@ -75,7 +77,8 @@ public:
   /// Construct a reference to the given value.
   ConcreteDeclRef(ValueDecl *decl) : Data(decl) { }
 
-  /// Construct a reference to the given value, specialized
+  /// Construct a reference to the given value, specialized with the given
+  /// substitutions.
   ///
   /// \param ctx The ASTContext in which to allocate the specialized
   /// declaration reference.
@@ -121,5 +124,29 @@ public:
 
 } // end namespace swift
 
+namespace llvm {
+  template<> class PointerLikeTypeTraits<swift::ConcreteDeclRef> {
+    typedef llvm::PointerUnion<swift::ValueDecl *,
+                               swift::ConcreteDeclRef::SpecializedDeclRef *>
+      DataPointer;
+    typedef PointerLikeTypeTraits<DataPointer> DataTraits;
+
+  public:
+    static inline void *
+    getAsVoidPointer(swift::ConcreteDeclRef ref) {
+      return ref.Data.getOpaqueValue();
+    }
+
+    static inline swift::ConcreteDeclRef getFromVoidPointer(void *ptr) {
+      swift::ConcreteDeclRef ref;
+      ref.Data = DataPointer::getFromOpaqueValue(ptr);
+      return ref;
+    }
+
+    enum {
+      NumLowBitsAvailable = DataTraits::NumLowBitsAvailable
+    };
+  };
+} // end namespace llvm
 
 #endif
