@@ -1294,7 +1294,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                     (Superclass->getCanonicalType())), File);
     auto DITy = DBuilder.createStructType(Scope, Name, File, L.Line,
                                           SizeInBits, AlignInBits, Flags,
-                                          DerivedFrom, llvm::DIArray());
+                                          DerivedFrom, llvm::DIArray(),
+                                          DW_LANG_Swift);
+    // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Value *, 4> Protocols;
     for (auto ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = ProtocolDecl->getType()->getCanonicalType();
