@@ -3416,7 +3416,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
   llvm::DenseMap<ConstraintLocator *, SmallVector<OverloadChoice, 2>>
     overloadChoices;
   for (auto choice : solutions[0].overloadChoices) {
-    overloadChoices[choice.first].push_back(choice.second.first);
+    overloadChoices[choice.first].push_back(choice.second.choice);
   }
 
   // Find the type variables and overload locators common to all of the
@@ -3455,7 +3455,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
       }
 
       // Add this solution's overload choice to the results.
-      overloadChoice.second.push_back(known->second.first);
+      overloadChoice.second.push_back(known->second.choice);
     }
 
     // Remove those overload locators for which this solution did not have
@@ -4644,7 +4644,7 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
       ovl.first->dump(sm, out);
     out << " with ";
 
-    auto choice = ovl.second.first;
+    auto choice = ovl.second.choice;
     switch (choice.getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
@@ -4653,7 +4653,7 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
         out << choice.getBaseType()->getString() << ".";
         
       out << choice.getDecl()->getName().str() << ": "
-        << ovl.second.second->getString() << "\n";
+        << ovl.second.openedType->getString() << "\n";
       break;
 
     case OverloadChoiceKind::BaseType:

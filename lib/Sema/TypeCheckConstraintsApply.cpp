@@ -680,14 +680,13 @@ namespace {
   private:
     /// \brief Retrieve the overload choice associated with the given
     /// locator.
-    std::pair<OverloadChoice, Type>
-    getOverloadChoice(ConstraintLocator *locator) {
+    SelectedOverload getOverloadChoice(ConstraintLocator *locator) {
       return *getOverloadChoiceIfAvailable(locator);
     }
 
     /// \brief Retrieve the overload choice associated with the given
     /// locator.
-    Optional<std::pair<OverloadChoice, Type>>
+    Optional<SelectedOverload>
     getOverloadChoiceIfAvailable(ConstraintLocator *locator) {
       auto known = solution.overloadChoices.find(locator);
       if (known != solution.overloadChoices.end())
@@ -741,7 +740,7 @@ namespace {
                         cs.getConstraintLocator(
                           locator.withPathElement(
                             ConstraintLocator::SubscriptMember)));
-      auto choice = selected.first;
+      auto choice = selected.choice;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       auto &tc = cs.getTypeChecker();
@@ -750,7 +749,7 @@ namespace {
       // Figure out the index and result types.
       auto containerTy
         = subscript->getDeclContext()->getDeclaredTypeOfContext();
-      auto subscriptTy = simplifyType(selected.second);
+      auto subscriptTy = simplifyType(selected.openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
@@ -767,7 +766,7 @@ namespace {
       // Form the subscript expression.
 
       // Handle dynamic lookup.
-      if (selected.first.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
         // Materialize if we need to.
         base = coerceObjectArgumentToType(base, baseTy, locator);
         if (!base)
@@ -1268,7 +1267,7 @@ namespace {
                         cs.getConstraintLocator(
                           expr,
                           ConstraintLocator::ConstructorMember));
-      auto choice = selected.first;
+      auto choice = selected.choice;
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
       // Build a call to the initializer for the constructor.
@@ -1281,7 +1280,7 @@ namespace {
 
         // Add the type of 'self' back on to the opened type of the overload.
         // FIXME: Feels like a hack.
-        auto specializedType = selected.second;
+        auto specializedType = selected.openedType;
         auto selfType = specializedType->castTo<AnyFunctionType>()->getResult();
         if (!selfType->hasReferenceSemantics())
           selfType = LValueType::get(selfType,
@@ -1309,14 +1308,14 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto &context = cs.getASTContext();
       auto selected = getOverloadChoice(cs.getConstraintLocator(expr, { }));
-      auto choice = selected.first;
+      auto choice = selected.choice;
       auto decl = choice.getDecl();
 
       if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
         // If this a member of a protocol, build an appropriate operator
         // reference.
         return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
-                                        selected.second,
+                                        selected.openedType,
                                         cs.getConstraintLocator(expr, { }),
                                         expr->isImplicit());
       }
@@ -1329,7 +1328,7 @@ namespace {
             auto &ctx = cs.TC.Context;
             SmallVector<Substitution, 4> substitutions;
             auto type = solution.computeSubstitutions(genericFn, func,
-                                                      selected.second,
+                                                      selected.openedType,
                                                       substitutions);
             return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl,
                                                          substitutions),
@@ -1355,8 +1354,8 @@ namespace {
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                            selected.first.getDecl(), expr->getMemberLoc(),
-                            selected.second,
+                            selected.choice.getDecl(), expr->getMemberLoc(),
+                            selected.openedType,
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
     }
@@ -1399,8 +1398,8 @@ namespace {
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                            selected.first.getDecl(), expr->getNameLoc(),
-                            selected.second,
+                            selected.choice.getDecl(), expr->getNameLoc(),
+                            selected.openedType,
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
     }
@@ -1411,9 +1410,9 @@ namespace {
                                                 ConstraintLocator::Member));
 
       return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
-                                   selected.first.getDecl(),
+                                   selected.choice.getDecl(),
                                    expr->getNameLoc(),
-                                   selected.second,
+                                   selected.openedType,
                                    cs.getConstraintLocator(expr, { }));
     }
 
@@ -1431,7 +1430,7 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
                           expr, ConstraintLocator::UnresolvedMember));
-      auto member = selected.first.getDecl();
+      auto member = selected.choice.getDecl();
 
       // The base expression is simply the metatype of an enum type.
       auto base = new (tc.Context) MetatypeExpr(nullptr,
@@ -1440,7 +1439,7 @@ namespace {
 
       // Build the member reference.
       return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
-                            selected.second,
+                            selected.openedType,
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
     }
@@ -1460,11 +1459,11 @@ namespace {
                           expr,
                           ConstraintLocator::MemberRefBase));
 
-      switch (selected.first.getKind()) {
+      switch (selected.choice.getKind()) {
       case OverloadChoiceKind::Decl: {
         auto member = buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                              selected.first.getDecl(), expr->getNameLoc(),
-                              selected.second,
+                              selected.choice.getDecl(), expr->getNameLoc(),
+                              selected.openedType,
                               cs.getConstraintLocator(expr, { }),
                               expr->isImplicit());
         // If this is an application of a value type method, arrange for us to
@@ -1492,9 +1491,9 @@ namespace {
 
       case OverloadChoiceKind::DeclViaDynamic:
         return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
-                                     selected.first.getDecl(),
+                                     selected.choice.getDecl(),
                                      expr->getNameLoc(),
-                                     selected.second,
+                                     selected.openedType,
                                      cs.getConstraintLocator(expr, { }));
 
       case OverloadChoiceKind::TupleIndex: {
@@ -1510,7 +1509,7 @@ namespace {
         return new (cs.getASTContext()) TupleElementExpr(
                                           base,
                                           expr->getDotLoc(),
-                                          selected.first.getTupleIndex(),
+                                          selected.choice.getTupleIndex(),
                                           expr->getNameLoc(),
                                           simplifyType(expr->getType()));
       }
@@ -1752,7 +1751,7 @@ namespace {
       } else {
         // If the element type is default constructible, form a partial
         // application of it.
-        auto choice = getOverloadChoice(cs.getConstraintLocator(expr,
+        auto selected = getOverloadChoice(cs.getConstraintLocator(expr,
                                           ConstraintLocator::NewArrayElement));
         
         auto baseElementType = elementType;
@@ -1766,7 +1765,7 @@ namespace {
             break;
         }
         
-        Expr *ctor = tc.buildRefExpr(choice.first.getDecl(),
+        Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(),
                                SourceLoc(),
                                /*implicit*/ true);
         Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
@@ -2157,7 +2156,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
       locator = cs.getConstraintLocator(locator->getAnchor(), newPath);
       auto known = solution.overloadChoices.find(locator);
       if (known != solution.overloadChoices.end()) {
-        auto &choice = known->second.first;
+        auto &choice = known->second.choice;
         if (choice.getKind() == OverloadChoiceKind::Decl)
           return cast<AbstractFunctionDecl>(choice.getDecl());
       }
@@ -2185,7 +2184,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
                 return Nothing;
               }
 
-              return known->second.first;
+              return known->second.choice;
             })) {
     return cast<AbstractFunctionDecl>(resolved.getDecl());
   }
@@ -2610,9 +2609,9 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
     // FIXME: Location information is suspect throughout.
     // Form a reference to the conversion member.
     auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
-                                    selected.first.getDecl(),
+                                    selected.choice.getDecl(),
                                     expr->getEndLoc(),
-                                    selected.second,
+                                    selected.openedType,
                                     locator,
                                     /*Implicit=*/true);
 
@@ -2626,7 +2625,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
     // Call the conversion function with an empty tuple.
     ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
                                                  /*Implicit=*/true);
-    auto openedType = selected.second->castTo<FunctionType>()->getResult();
+    auto openedType = selected.openedType->castTo<FunctionType>()->getResult();
     expr = finishApply(apply, openedType,
                        ConstraintLocatorBuilder(
                          cs.getConstraintLocator(apply, { })));
@@ -2650,7 +2649,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
 
   // If we chose the identity constructor, coerce to the expected type
   // based on the application argument locator.
-  if (selected.first.getKind() == OverloadChoiceKind::IdentityFunction) {
+  if (selected.choice.getKind() == OverloadChoiceKind::IdentityFunction) {
     return coerceToType(expr, toType,
                         locator.withPathElement(
                           ConstraintLocator::ApplyArgument));
@@ -2665,9 +2664,9 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                       expr->getStartLoc(),
                                       MetaTypeType::get(toType,tc.Context));
   Expr *declRef = buildMemberRef(typeBase, expr->getStartLoc(),
-                                 selected.first.getDecl(),
+                                 selected.choice.getDecl(),
                                  expr->getStartLoc(),
-                                 selected.second,
+                                 selected.openedType,
                                  storedLocator,
                                  /*Implicit=*/true);
 
@@ -3179,20 +3178,20 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // it's because this was a coercion rather than a construction. Just perform
   // the appropriate conversion.
   if (!selected ||
-      selected->first.getKind() == OverloadChoiceKind::IdentityFunction) {
+      selected->choice.getKind() == OverloadChoiceKind::IdentityFunction) {
     // FIXME: Need an AST to represent this properly.
     return coerceToType(apply->getArg(), ty, locator);
   }
 
   // We have the constructor.
-  auto choice = selected->first;
+  auto choice = selected->choice;
   auto decl = choice.getDecl();
 
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   Expr *declRef = buildMemberRef(fn, /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
-                                 selected->second, locator,
+                                 selected->openedType, locator,
                                  /*Implicit=*/true);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
@@ -3631,7 +3630,7 @@ int Solution::getFixedScore() const {
 
   // Consider overload choices.
   for (auto overload : overloadChoices) {
-    auto choice = overload.second.first;
+    auto choice = overload.second.choice;
     if (choice.getKind() != OverloadChoiceKind::Decl)
       continue;
 

@@ -601,6 +601,19 @@ enum class SolutionCompareResult {
   Worse
 };
 
+/// An overload that has been selected in a particular solution.
+///
+/// A selected overload captures the specific overload choice (e.g., a
+/// particular declaration) as well as the type to which the reference to the
+/// declaration was opened, which may involve type variables.
+struct SelectedOverload {
+  /// The overload choice.
+  OverloadChoice choice;
+
+  /// The opened type produced by referring to this overload.
+  Type openedType;
+};
+
 /// \brief A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -645,8 +658,7 @@ public:
   llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
 
   /// \brief The set of overload choices along with their types.
-  llvm::SmallDenseMap<ConstraintLocator *,
-                      std::pair<OverloadChoice, Type>> overloadChoices;
+  llvm::SmallDenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
   /// The set of constraint restrictions used to arrive at this restriction,
   /// which informs constraint application.
