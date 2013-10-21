@@ -122,7 +122,7 @@ function build_stdlib()
   mkdir -p "$WORKSPACE/swift/build/stdlib/$OS-$ARCH"
   (cd "$WORKSPACE/swift/build/stdlib/$OS-$ARCH" &&
     "$CMAKE" -G "Unix Makefiles" \
-      -DCMAKE_TOOLCHAIN_FILE=$OS.cmake \
+      -DCMAKE_TOOLCHAIN_FILE=cmake/$OS.cmake \
       -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
       -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
