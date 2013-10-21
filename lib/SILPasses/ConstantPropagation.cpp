@@ -158,15 +158,14 @@ static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
 static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
                                              llvm::Intrinsic::ID ID) {
   switch (ID) {
-    default: break;
-    case llvm::Intrinsic::sadd_with_overflow:
-    case llvm::Intrinsic::uadd_with_overflow:
-    case llvm::Intrinsic::ssub_with_overflow:
-    case llvm::Intrinsic::usub_with_overflow:
-    case llvm::Intrinsic::smul_with_overflow:
-    case llvm::Intrinsic::umul_with_overflow: {
-      return constantFoldBinaryWithOverflow(AI, ID, /*ReportOverflow*/false);
-    }
+  default: break;
+  case llvm::Intrinsic::sadd_with_overflow:
+  case llvm::Intrinsic::uadd_with_overflow:
+  case llvm::Intrinsic::ssub_with_overflow:
+  case llvm::Intrinsic::usub_with_overflow:
+  case llvm::Intrinsic::smul_with_overflow:
+  case llvm::Intrinsic::umul_with_overflow:
+    return constantFoldBinaryWithOverflow(AI, ID, /*ReportOverflow*/false);
   }
   return nullptr;
 }
@@ -185,211 +184,210 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
   const BuiltinInfo &Builtin = M.getBuiltinInfo(FR->getReferencedFunction());
 
   switch (Builtin.ID) {
-      // TODO: Should not indent the cases.
-    default: break;
+  default: break;
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
-    case BuiltinValueKind::id:
+  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return constantFoldOverflowBuiltin(AI, Builtin.ID);
+    return constantFoldOverflowBuiltin(AI, Builtin.ID);
 
+  case BuiltinValueKind::Trunc:
+  case BuiltinValueKind::ZExt:
+  case BuiltinValueKind::SExt: {
+
+    // We can fold if the value being cast is a constant.
+    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+
+    // Get the cast result.
+    APInt CastResV;
+    Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
+    uint32_t DestBitWidth =
+      DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
+    switch (Builtin.ID) {
+    default : llvm_unreachable("Invalid case.");
     case BuiltinValueKind::Trunc:
+      CastResV = V->getValue().trunc(DestBitWidth);
+      break;
     case BuiltinValueKind::ZExt:
-    case BuiltinValueKind::SExt: {
-
-      // We can fold if the value being cast is a constant.
-      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
-      if (!V)
-        return nullptr;
-
-      // Get the cast result.
-      APInt CastResV;
-      Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
-      uint32_t DestBitWidth =
-        DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
-      switch (Builtin.ID) {
-      default : llvm_unreachable("Invalid case.");
-      case BuiltinValueKind::Trunc:
-        CastResV = V->getValue().trunc(DestBitWidth);
-        break;
-      case BuiltinValueKind::ZExt:
-        CastResV = V->getValue().zext(DestBitWidth);
-        break;
-      case BuiltinValueKind::SExt:
-        CastResV = V->getValue().sext(DestBitWidth);
-        break;
-      }
-
-      // Add the literal instruction to represnet the result of the cast.
-      SILBuilder B(AI);
-      return B.createIntegerLiteral(AI->getLoc(),
-                                    SILType::getPrimitiveType(CanType(DestTy),
-                                                      SILValueCategory::Object),
-                                    CastResV);
+      CastResV = V->getValue().zext(DestBitWidth);
+      break;
+    case BuiltinValueKind::SExt:
+      CastResV = V->getValue().sext(DestBitWidth);
+      break;
     }
 
-    // Fold constant division operations and report div by zero.
-    case BuiltinValueKind::SDiv:
-    case BuiltinValueKind::ExactSDiv:
-    case BuiltinValueKind::SRem:
-    case BuiltinValueKind::UDiv:
-    case BuiltinValueKind::ExactUDiv:
-    case BuiltinValueKind::URem: {
-      // Get the denominator.
-      IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
-      if (!Denom)
-        return nullptr;
-      APInt DenomVal = Denom->getValue();
-
-      // Reoprt an error if the denominator is zero.
-      if (DenomVal == 0) {
-        diagnose(M.getASTContext(),
-                 AI->getLoc().getSourceLoc(),
-                 diag::division_by_zero);
-        return nullptr;
-      }
-
-      // Get the numerator.
-      IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
-      if (!Num)
-        return nullptr;
-      APInt NumVal = Num->getValue();
-
-      APInt ResVal;
-      bool Overflowed = false;
-      switch (Builtin.ID) {
-        // We do not cover all the cases below - only the ones that are easily
-        // computable for APInt.
-        default : return nullptr;
-        case BuiltinValueKind::SDiv:
-          ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
-          break;
-        case BuiltinValueKind::SRem:
-          ResVal = NumVal.srem(DenomVal);
-          break;
-        case BuiltinValueKind::UDiv:
-          ResVal = NumVal.udiv(DenomVal);
-          break;
-        case BuiltinValueKind::URem:
-          ResVal = NumVal.urem(DenomVal);
-          break;
-      }
-
-      if (Overflowed) {
-        diagnose(M.getASTContext(),
-                 AI->getLoc().getSourceLoc(),
-                 diag::division_overflow,
-                 NumVal.toString(/*Radix*/ 10, /*Signed*/true),
-                 "/",
-                 DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
-        return nullptr;
-      }
-
-      // Add the literal instruction to represnet the result of the division.
-      SILBuilder B(AI);
-      Type DestTy = Builtin.Types[0];
-      return B.createIntegerLiteral(AI->getLoc(),
-               SILType::getPrimitiveType(CanType(DestTy),
-                                         SILValueCategory::Object),
-               ResVal);
-    }
-
-    // Deal with special builtins that are designed to check overflows on
-    // integer literals.
-    case BuiltinValueKind::STruncWithOverflow:
-    case BuiltinValueKind::UTruncWithOverflow: {
-      // Get the value. It should be a constant in most cases.
-      // Note, this will not always be a constant, for example, when analyzing
-      // _convertFromBuiltinIntegerLiteral function itself.
-      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
-      if (!V)
-        return nullptr;
-      APInt SrcVal = V->getValue();
-
-      // Get the signedness of the destination.
-      bool Signed = (Builtin.ID == BuiltinValueKind::STruncWithOverflow);
-
-      // Get the source and destination bit width.
-      assert(Builtin.Types.size() == 2);
-      uint32_t SrcBitWidth =
-        Builtin.Types[0]->castTo<BuiltinIntegerType>()->getBitWidth();
-      Type DestTy = Builtin.Types[1];
-      uint32_t DestBitWidth =
-        DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
-
-      // Compute the destination:
-      //   truncVal = trunc_IntFrom_IntTo(val)
-      //   strunc_IntFrom_IntTo(val) =
-      //     sext_IntFrom(truncVal) == val ? truncVal : overflow_error
-      //   utrunc_IntFrom_IntTo(val) =
-      //     zext_IntFrom(truncVal) == val ? truncVal : overflow_error
-      APInt TruncVal = SrcVal.trunc(DestBitWidth);
-      APInt T = Signed ? TruncVal.sext(SrcBitWidth):TruncVal.zext(SrcBitWidth);
-
-      SILLocation Loc = AI->getLoc();
-      const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
-
-      // Check for overflow.
-      if (SrcVal != T) {
-        // FIXME: This will prevent hard error in cases the error is comming
-        // from ObjC interoperability code. Currently, we treat NSUInteger as
-        // Int.
-        if (Loc.getSourceLoc().isInvalid()) {
-          diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                   diag::integer_literal_overflow_warn,
-                   CE ? CE->getType() : DestTy);
-          return nullptr;
-        }
-        diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_literal_overflow,
-                 CE ? CE->getType() : DestTy);
-        return nullptr;
-      }
-
-      // The call to the builtin should be replaced with the constant value.
-      SILBuilder B(AI);
-      return B.createIntegerLiteral(Loc,
-                                    SILType::getPrimitiveType(CanType(DestTy),
-                                                      SILValueCategory::Object),
-                                    TruncVal);
-    }
-
-    case BuiltinValueKind::IntToFPWithOverflow: {
-      // Get the value. It should be a constant in most cases.
-      // Note, this will not always be a constant, for example, when analyzing
-      // _convertFromBuiltinIntegerLiteral function itself.
-      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
-      if (!V)
-        return nullptr;
-      APInt SrcVal = V->getValue();
-      Type DestTy = Builtin.Types[1];
-
-      APFloat TruncVal(
-          DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics());
-      APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
-          SrcVal, /*isSigned=*/true, APFloat::rmNearestTiesToEven);
-
-      SILLocation Loc = AI->getLoc();
-      const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
-
-      // Check for overflow.
-      if (ConversionStatus & APFloat::opOverflow) {
-        diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_literal_overflow,
-                 CE ? CE->getType() : DestTy);
-        return nullptr;
-      }
-
-      // The call to the builtin should be replaced with the constant value.
-      SILBuilder B(AI);
-      return B.createFloatLiteral(Loc,
+    // Add the literal instruction to represnet the result of the cast.
+    SILBuilder B(AI);
+    return B.createIntegerLiteral(AI->getLoc(),
                                   SILType::getPrimitiveType(CanType(DestTy),
-                                                      SILValueCategory::Object),
-                                  TruncVal);
+                                                    SILValueCategory::Object),
+                                  CastResV);
+  }
 
+  // Fold constant division operations and report div by zero.
+  case BuiltinValueKind::SDiv:
+  case BuiltinValueKind::ExactSDiv:
+  case BuiltinValueKind::SRem:
+  case BuiltinValueKind::UDiv:
+  case BuiltinValueKind::ExactUDiv:
+  case BuiltinValueKind::URem: {
+    // Get the denominator.
+    IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
+    if (!Denom)
+      return nullptr;
+    APInt DenomVal = Denom->getValue();
+
+    // Reoprt an error if the denominator is zero.
+    if (DenomVal == 0) {
+      diagnose(M.getASTContext(),
+               AI->getLoc().getSourceLoc(),
+               diag::division_by_zero);
+      return nullptr;
     }
+
+    // Get the numerator.
+    IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!Num)
+      return nullptr;
+    APInt NumVal = Num->getValue();
+
+    APInt ResVal;
+    bool Overflowed = false;
+    switch (Builtin.ID) {
+    // We do not cover all the cases below - only the ones that are easily
+    // computable for APInt.
+    default : return nullptr;
+    case BuiltinValueKind::SDiv:
+      ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
+      break;
+    case BuiltinValueKind::SRem:
+      ResVal = NumVal.srem(DenomVal);
+      break;
+    case BuiltinValueKind::UDiv:
+      ResVal = NumVal.udiv(DenomVal);
+      break;
+    case BuiltinValueKind::URem:
+      ResVal = NumVal.urem(DenomVal);
+      break;
     }
+
+    if (Overflowed) {
+      diagnose(M.getASTContext(),
+               AI->getLoc().getSourceLoc(),
+               diag::division_overflow,
+               NumVal.toString(/*Radix*/ 10, /*Signed*/true),
+               "/",
+               DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+      return nullptr;
+    }
+
+    // Add the literal instruction to represnet the result of the division.
+    SILBuilder B(AI);
+    Type DestTy = Builtin.Types[0];
+    return B.createIntegerLiteral(AI->getLoc(),
+             SILType::getPrimitiveType(CanType(DestTy),
+                                       SILValueCategory::Object),
+             ResVal);
+  }
+
+  // Deal with special builtins that are designed to check overflows on
+  // integer literals.
+  case BuiltinValueKind::STruncWithOverflow:
+  case BuiltinValueKind::UTruncWithOverflow: {
+    // Get the value. It should be a constant in most cases.
+    // Note, this will not always be a constant, for example, when analyzing
+    // _convertFromBuiltinIntegerLiteral function itself.
+    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+    APInt SrcVal = V->getValue();
+
+    // Get the signedness of the destination.
+    bool Signed = (Builtin.ID == BuiltinValueKind::STruncWithOverflow);
+
+    // Get the source and destination bit width.
+    assert(Builtin.Types.size() == 2);
+    uint32_t SrcBitWidth =
+      Builtin.Types[0]->castTo<BuiltinIntegerType>()->getBitWidth();
+    Type DestTy = Builtin.Types[1];
+    uint32_t DestBitWidth =
+      DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
+
+    // Compute the destination:
+    //   truncVal = trunc_IntFrom_IntTo(val)
+    //   strunc_IntFrom_IntTo(val) =
+    //     sext_IntFrom(truncVal) == val ? truncVal : overflow_error
+    //   utrunc_IntFrom_IntTo(val) =
+    //     zext_IntFrom(truncVal) == val ? truncVal : overflow_error
+    APInt TruncVal = SrcVal.trunc(DestBitWidth);
+    APInt T = Signed ? TruncVal.sext(SrcBitWidth):TruncVal.zext(SrcBitWidth);
+
+    SILLocation Loc = AI->getLoc();
+    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+
+    // Check for overflow.
+    if (SrcVal != T) {
+      // FIXME: This will prevent hard error in cases the error is comming
+      // from ObjC interoperability code. Currently, we treat NSUInteger as
+      // Int.
+      if (Loc.getSourceLoc().isInvalid()) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow_warn,
+                 CE ? CE->getType() : DestTy);
+        return nullptr;
+      }
+      diagnose(M.getASTContext(), Loc.getSourceLoc(),
+               diag::integer_literal_overflow,
+               CE ? CE->getType() : DestTy);
+      return nullptr;
+    }
+
+    // The call to the builtin should be replaced with the constant value.
+    SILBuilder B(AI);
+    return B.createIntegerLiteral(Loc,
+                                  SILType::getPrimitiveType(CanType(DestTy),
+                                                    SILValueCategory::Object),
+                                  TruncVal);
+  }
+
+  case BuiltinValueKind::IntToFPWithOverflow: {
+    // Get the value. It should be a constant in most cases.
+    // Note, this will not always be a constant, for example, when analyzing
+    // _convertFromBuiltinIntegerLiteral function itself.
+    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+    APInt SrcVal = V->getValue();
+    Type DestTy = Builtin.Types[1];
+
+    APFloat TruncVal(
+        DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+    APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
+        SrcVal, /*isSigned=*/true, APFloat::rmNearestTiesToEven);
+
+    SILLocation Loc = AI->getLoc();
+    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+
+    // Check for overflow.
+    if (ConversionStatus & APFloat::opOverflow) {
+      diagnose(M.getASTContext(), Loc.getSourceLoc(),
+               diag::integer_literal_overflow,
+               CE ? CE->getType() : DestTy);
+      return nullptr;
+    }
+
+    // The call to the builtin should be replaced with the constant value.
+    SILBuilder B(AI);
+    return B.createFloatLiteral(Loc,
+                                SILType::getPrimitiveType(CanType(DestTy),
+                                                    SILValueCategory::Object),
+                                TruncVal);
+
+  }
+  }
   return nullptr;
 }
 
