@@ -1522,6 +1522,46 @@ public:
     return true;
   }
   
+  // Select the "necessary column", Maranget's term for the column most likely
+  // to give an optimal decision tree, and swap it into the zero column of the
+  // matrix.
+  void chooseNecessaryColumn(unsigned depth) {
+    // First of all, if we have zero or one columns, this is trivial.
+    if (columns() < 2)
+      return;
+    
+    // Use the "constructor prefix" heuristic from Maranget to pick the
+    // necessary column. The column with the most pattern nodes prior to a
+    // wildcard turns out to be a good and cheap-to-calculate heuristic for
+    // generating an optimal decision tree.
+    unsigned necessaryColumn = 0, longestConstructorPrefix = 0;
+    for (unsigned c = 0, cend = columns(); c < cend; ++c) {
+      unsigned constructorPrefix = 0;
+      for (unsigned r = 0, rend = rows(); r < rend; ++r) {
+        if (isWildcardPattern((*this)[r][c]))
+          break;
+        ++constructorPrefix;
+      }
+      
+      if (constructorPrefix > longestConstructorPrefix) {
+        longestConstructorPrefix = constructorPrefix;
+        necessaryColumn = c;
+      }
+    }
+    
+    DEBUG(dumpDepth(depth, llvm::dbgs());
+          llvm::dbgs() << "Choosing necessary column " << necessaryColumn
+                       << '\n');
+    
+    // Swap the necessary column into the head position.
+    if (necessaryColumn != 0) {
+      std::swap(getMutableOccurrences()[0],
+                getMutableOccurrences()[necessaryColumn]);
+      for (unsigned r = 0, rend = rows(); r < rend; ++r)
+        std::swap((*this)[r][0], (*this)[r][necessaryColumn]);
+    }
+  }
+  
   void print(llvm::raw_ostream &os, unsigned depth = 0) const {
     // Tabulate the strings for each column, column-major.
     std::vector<std::vector<std::string>> patternStrings;
@@ -1643,11 +1683,10 @@ recur:
   // one column.
   assert(clauses.rows() >= 1 && clauses.columns() >= 1 &&
          "empty clause matrices should have been handled above");
-  
+
   // Specialize on the next necessary column to continue testing the match.
-  // TODO: We should choose the necessary column using one or more of Maranget's
-  // heuristics and specialize on that column. For now we just do naive
-  // left-to-right specialization.
+  clauses.chooseNecessaryColumn(depth);
+  
   unsigned skipRows = r;
   
   // Collect the non-wildcard nodes from the column.
