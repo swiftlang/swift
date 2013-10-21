@@ -142,6 +142,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
                               LookupState LS, DeclVisibilityKind Reason,
                               LazyResolver *TypeResolver) {
   NominalTypeDecl *D = BaseType->getAnyNominal();
+  assert(D && "should have a nominal type");
 
   bool LookupFromChildDeclContext = false;
   const DeclContext *TempDC = CurrDC;
@@ -334,17 +335,15 @@ static void lookupVisibleMemberDeclsImpl(
   }
 
   do {
+    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
+    if (!CurNominal)
+      break;
+
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, Consumer, CurrDC, LS, Reason, TypeResolver);
 
     // If we have a class type, look into its superclass.
-    ClassDecl *CurClass = nullptr;
-    if (auto CT = BaseTy->getAs<ClassType>())
-      CurClass = CT->getDecl();
-    else if (auto BGT = BaseTy->getAs<BoundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(BGT->getDecl());
-    else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
+    ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
       BaseTy = CurClass->getSuperclass();
@@ -410,10 +409,6 @@ public:
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
-  // We can not refer to any declarations based on a tuple type.
-  if (BaseTy->is<TupleType>())
-    return;
-
   OverrideFilteringConsumer ConsumerWrapper;
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
