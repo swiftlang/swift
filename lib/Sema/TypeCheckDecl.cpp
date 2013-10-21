@@ -1493,13 +1493,16 @@ public:
     GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getArgParamPatterns();
-    bool isInstanceFunc = (bool)FD->computeSelfType(&outerGenericParams);
+    bool hasSelf = FD->getDeclContext()->isTypeContext();
+    if (hasSelf) {
+      outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
+    }
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
       Type argTy = patterns[e - i - 1]->getType();
 
       GenericParamList *params = nullptr;
-      if (e - i - 1 == isInstanceFunc && genericParams) {
+      if (e - i - 1 == hasSelf && genericParams) {
         params = genericParams;
       } else if (e - i - 1 == 0 && outerGenericParams) {
         params = outerGenericParams;
