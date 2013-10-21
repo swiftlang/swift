@@ -371,7 +371,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // Reference the decl at its natural foreign-ness.
   bool isForeign = decl->hasClangNode();
   auto constant = SILDeclRef(decl, uncurryLevel, isForeign);
-  constant.dump();
   ManagedValue result = emitFunctionRef(loc, constant);
 
   // If the declaration reference is specialized, create the partial

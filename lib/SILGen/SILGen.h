@@ -309,7 +309,7 @@ public:
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
-  std::vector<SwitchContext *> SwitchStack;
+  std::vector<SwitchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
 
