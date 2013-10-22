@@ -876,6 +876,14 @@ SILCloner<ImplClass>::visitDestroyAddrInst(DestroyAddrInst* Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitCondFailInst(CondFailInst* Inst) {
+  doPostProcess(Inst,
+    Builder.createCondFail(getOpLocation(Inst->getLoc()),
+                           getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst* Inst) {
   doPostProcess(Inst,
     Builder.createIndexAddr(getOpLocation(Inst->getLoc()),

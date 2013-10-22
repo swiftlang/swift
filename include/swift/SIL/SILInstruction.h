@@ -1790,6 +1790,20 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
+// Runtime failure
+//===----------------------------------------------------------------------===//
+
+/// Trigger a runtime failure if the given Int1 value is true.
+class CondFailInst : public UnaryInstructionBase<ValueKind::CondFailInst,
+                                                 SILInstruction,
+                                                 /*HAS_RESULT*/ false>
+{
+public:
+  CondFailInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
+};
+  
+//===----------------------------------------------------------------------===//
 // Pointer/address indexing instructions
 //===----------------------------------------------------------------------===//
 
@@ -1849,7 +1863,6 @@ public:
     return V->getKind() == ValueKind::IndexRawPointerInst;
   }
 };
-
 
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators

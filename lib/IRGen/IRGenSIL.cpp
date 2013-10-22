@@ -529,6 +529,8 @@ public:
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
+  void visitCondFailInst(CondFailInst *i);
+  
   void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitCoerceInst(CoerceInst *i);
   void visitUpcastInst(UpcastInst *i);
@@ -2555,6 +2557,12 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   Address base = getLoweredAddress(i->getOperand());
   TypeInfo const &addrTI = getTypeInfo(addrTy);
   addrTI.destroy(*this, base);
+}
+
+void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
+  Explosion e = getLoweredExplosion(i);
+  llvm::Value *cond = e.claimNext();
+  Builder.CreateCall(IGM.getConditionalFailureFn(), cond);
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {

@@ -909,6 +909,10 @@ public:
     OS << "destroy_addr " << getIDAndType(DI->getOperand());
   }
   
+  void visitCondFailInst(CondFailInst *FI) {
+    OS << "cond_fail " << getIDAndType(FI->getOperand());
+  }
+  
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     OS << "index_addr " << getIDAndType(IAI->getBase()) << ", "
        << getIDAndType(IAI->getIndex());

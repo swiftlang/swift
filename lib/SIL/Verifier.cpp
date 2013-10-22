@@ -1309,6 +1309,12 @@ public:
             "input types of convert_function operand and result do not match");
   }
   
+  void checkCondFailInst(CondFailInst *CFI) {
+    require(CFI->getOperand().getType()
+              == SILType::getBuiltinIntegerType(1, F.getASTContext()),
+            "cond_fail operand must be a Builtin.Int1");
+  }
+  
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     

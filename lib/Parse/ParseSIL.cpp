@@ -879,6 +879,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
     .Case("cond_br", ValueKind::CondBranchInst)
+    .Case("cond_fail", ValueKind::CondFailInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
     .Case("copy_value", ValueKind::CopyValueInst)
@@ -1272,6 +1273,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(DestroyValue)
   UNARY_INSTRUCTION(CopyValue)
   UNARY_INSTRUCTION(Load)
+  UNARY_INSTRUCTION(CondFail)
 #undef UNARY_INSTRUCTION
 #undef UNARY_INSTRUCTION_HELPER
 

@@ -1094,6 +1094,13 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
   return %17 : $()
 }
 
+sil @cond_fail_test : $(Builtin.Int1) -> () {
+entry(%x : $Builtin.Int1):
+  cond_fail %x : $Builtin.Int1
+  %t = tuple ()
+  return %t : $()
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis

@@ -691,6 +691,14 @@ public:
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) DestroyAddrInst(Loc, Operand));
   }
+  
+  //===--------------------------------------------------------------------===//
+  // Runtime failure
+  //===--------------------------------------------------------------------===//
+  
+  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) CondFailInst(Loc, Operand));
+  }
 
   //===--------------------------------------------------------------------===//
   // Array indexing instructions

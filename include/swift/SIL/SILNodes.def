@@ -170,6 +170,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     VALUE_RANGE(ConversionInst, CoerceInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
 
+  // Runtime failure
+  // FIXME: Special MemBehavior for runtime failure?
+  INST(CondFailInst, SILInstruction, MayHaveSideEffects)
+
   // Terminators
   ABSTRACT_VALUE(TermInst, SILInstruction)
     TERMINATOR(UnreachableInst, TermInst, None)
