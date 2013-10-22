@@ -2560,7 +2560,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
-  Explosion e = getLoweredExplosion(i);
+  Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
   Builder.CreateCall(IGM.getConditionalFailureFn(), cond);
 }
