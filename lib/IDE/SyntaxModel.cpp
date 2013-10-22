@@ -83,6 +83,7 @@ namespace {
 
 class ModelASTWalker : public ASTWalker {
   const SourceManager &SM;
+  std::vector<SyntaxStructureNode> SubStructureStack;
 #ifndef NDEBUG
   SourceLoc LastLoc;
 #endif
@@ -97,6 +98,7 @@ public:
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
   bool walkToDeclPre(Decl *D) override;
+  bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
@@ -111,6 +113,8 @@ private:
   bool passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Behavior);
   bool passNonTokenNode(const SyntaxNode &Node);
   bool passNode(const SyntaxNode &Node);
+  bool pushStructureNode(const SyntaxStructureNode &Node);
+  bool popStructureNode();
 };
 
 } // anonymous namespace
@@ -141,8 +145,32 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                             }))
         return false;
     }
+    else {
+      SourceRange SR = FD->getSourceRange();
+      pushStructureNode({SyntaxStructureKind::Func,
+                         CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange()});
+    }
+  }
+  else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
+      SourceRange SR = CD->getSourceRange();
+      pushStructureNode({SyntaxStructureKind::Class,
+                         CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange()});
   }
 
+  return true;
+}
+
+bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (!FD->isGetterOrSetter()) {
+      popStructureNode();
+    }
+  }
+  else if (isa<ClassDecl>(D)) {
+    popStructureNode();
+  }
   return true;
 }
 
@@ -200,5 +228,29 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
   Walker.walkToNodePre(Node);
   if (!Walker.walkToNodePost(Node))
     return false;
+  return true;
+}
+
+bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node) {
+  SubStructureStack.push_back(Node);
+
+  if (!passTokenNodesUntil(Node.Range.getStart(), ExcludeNodeAtLocation))
+    return false;
+  if (!Walker.walkToSubStructurePre(Node))
+    return false;
+
+  return true;
+}
+
+bool ModelASTWalker::popStructureNode() {
+  assert(!SubStructureStack.empty());
+  SyntaxStructureNode Node = SubStructureStack.back();
+  SubStructureStack.pop_back();
+
+  if (!passTokenNodesUntil(Node.Range.getEnd(), ExcludeNodeAtLocation))
+    return false;
+  if (!Walker.walkToSubStructurePost(Node))
+    return false;
+
   return true;
 }
