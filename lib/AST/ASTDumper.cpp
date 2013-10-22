@@ -52,9 +52,9 @@ namespace {
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
 
-    void printRec(Decl *D) { D->dump(Indent+2); }
-    void printRec(Expr *E) { E->print(OS, Indent+2); }
-    void printRec(Stmt *S) { S->print(OS, Indent+2); }
+    void printRec(Decl *D) { D->dump(OS, Indent + 2); }
+    void printRec(Expr *E) { E->print(OS, Indent + 2); }
+    void printRec(Stmt *S) { S->print(OS, Indent + 2); }
     void printRec(TypeRepr *T);
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
 
@@ -595,16 +595,11 @@ namespace {
 } // end anonymous namespace.
 
 void Decl::dump() const {
-  dump(llvm::errs());
+  dump(llvm::errs(), 0);
 }
 
-void Decl::dump(raw_ostream &OS) const {
-  PrintDecl(OS, 0).visit(const_cast<Decl *>(this));
-  OS << '\n';
-}
-
-void Decl::dump(unsigned Indent) const {
-  PrintDecl(llvm::errs(), Indent).visit(const_cast<Decl *>(this));
+void Decl::dump(raw_ostream &OS, unsigned Indent) const {
+  PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
 
@@ -725,8 +720,8 @@ public:
     Indent -= 2;
   }
 
-  void printRec(Decl *D) { D->dump(Indent+2); }
-  void printRec(Expr *E) { E->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
+  void printRec(Expr *E) { E->print(OS, Indent + 2); }
   void printRec(Pattern *P) { P->print(OS); }
 
   void visitBraceStmt(BraceStmt *S) {
@@ -891,8 +886,8 @@ public:
 
   /// FIXME: This should use ExprWalker to print children.
 
-  void printRec(Decl *D) { D->dump(Indent+2); }
-  void printRec(Stmt *S) { S->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
+  void printRec(Stmt *S) { S->print(OS, Indent + 2); }
   void printRec(Pattern *P) {
     PrintPattern(OS, Indent+2).visit(P);
   }
@@ -1429,9 +1424,9 @@ public:
       ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
   }
 
-  void printRec(Decl *D) { D->dump(Indent+2); }
-  void printRec(Expr *E) { E->print(OS, Indent+2); }
-  void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent+2).visit(T); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
+  void printRec(Expr *E) { E->print(OS, Indent + 2); }
+  void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent + 2).visit(T); }
 
   raw_ostream &printCommon(TypeRepr *T, const char *Name) {
     OS.indent(Indent) << '(';
