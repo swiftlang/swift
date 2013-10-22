@@ -957,7 +957,7 @@ public:
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=";
-    E->getDecl()->dumpRef(OS);
+    E->getDeclRef().dump(OS);
     OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
     for (auto TR : E->getGenericArgs()) {
