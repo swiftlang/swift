@@ -115,7 +115,7 @@ public:
 
   /// \brief Constructs a character range which starts and ends at the
   /// specified character locations.
-  CharSourceRange(SourceManager &SM, SourceLoc Start, SourceLoc End);
+  CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }

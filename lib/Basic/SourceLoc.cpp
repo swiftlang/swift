@@ -106,7 +106,7 @@ void SourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
 
-CharSourceRange::CharSourceRange(SourceManager &SM, SourceLoc Start,
+CharSourceRange::CharSourceRange(const SourceManager &SM, SourceLoc Start,
                                  SourceLoc End)
     : Start(Start) {
   assert(Start.isValid() == End.isValid() &&
