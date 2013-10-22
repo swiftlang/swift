@@ -191,6 +191,31 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
   std::uninitialized_copy(Path.begin(), Path.end(), getPathBuffer());
 }
 
+/// Associates the decls that are conforming, to the protocol decls.
+static void associateConformingValueDecls(ProtocolConformance *Conformance,
+                                          ASTContext &Ctx) {
+  if (!Conformance)
+    return;
+
+  for (auto Witness : Conformance->getWitnesses())
+    Ctx.recordConformingDecl(Witness.second.getDecl(), Witness.first);
+
+  for (auto InheritedConf: Conformance->getInheritedConformances())
+    associateConformingValueDecls(InheritedConf.second, Ctx);
+}
+
+static void associateConformingValueDecls(
+    ArrayRef<ProtocolConformance *> Conformances, ASTContext &Ctx) {
+  for (auto Conf: Conformances) {
+    associateConformingValueDecls(Conf, Ctx);
+  }
+}
+
+void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
+  Conformances = c;
+  associateConformingValueDecls(c, getASTContext());
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   if (Init) {
     SourceLoc EndLoc = Init->getSourceRange().End;
@@ -351,6 +376,13 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return false;
 }
 
+ArrayRef<ValueDecl *> ValueDecl::getConformances() {
+  if (!conformsToProtocolRequirement())
+    return ArrayRef<ValueDecl *>();
+
+  return getASTContext().getConformances(this);
+}
+
 void ValueDecl::setType(Type T) {
   assert(Ty.isNull() && "changing type of declaration");
   Ty = T;
@@ -391,6 +423,14 @@ bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     return enumDecl->hasRawType() && protocol == rawRepresentable;
   }
   return false;
+}
+
+void TypeDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
+  Conformances = c;
+  // A typealias should not affect the conformance bit of members of the
+  // original; mark conformances only if this is a nominal type decl.
+  if (isa<NominalTypeDecl>(this))
+    associateConformingValueDecls(c, getASTContext());
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,

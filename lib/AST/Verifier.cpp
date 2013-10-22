@@ -323,6 +323,13 @@ namespace {
           abort();
         }
       }
+      if (D->conformsToProtocolRequirement()) {
+        if (D->getConformances().empty()) {
+          Out << "conforms bit set but no conformances found\n";
+          D->dump();
+          abort();
+        }
+      }
     }
 
     void verifyChecked(ReturnStmt *S) {

@@ -633,6 +633,21 @@ void ASTContext::recordKnownProtocols(Module *Stdlib) {
 #include "swift/AST/KnownProtocols.def"
 }
 
+void ASTContext::recordConformingDecl(ValueDecl *ConformingD,
+                                      ValueDecl *ConformanceD) {
+  assert(ConformingD && ConformanceD);
+  auto &Vec = ConformingDeclMap[ConformingD];
+  // The vector should commonly have few elements.
+  if (std::find(Vec.begin(), Vec.end(), ConformanceD) == Vec.end()) {
+    Vec.push_back(ConformanceD);
+    ConformingD->setConformsToProtocolRequirement();
+  }
+}
+
+ArrayRef<ValueDecl *> ASTContext::getConformances(ValueDecl *D) {
+  return ConformingDeclMap[D];
+}
+
 Module *
 ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());

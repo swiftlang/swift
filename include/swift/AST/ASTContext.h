@@ -30,6 +30,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -195,6 +196,10 @@ public:
 
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
+
+  /// Associates a conforming decl to its protocol conformance decls.
+  llvm::DenseMap<ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
+     ConformingDeclMap;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -486,6 +491,12 @@ public:
 
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(Module *Stdlib);
+
+  /// Associates a conforming decl to its protocol requirement decl.
+  void recordConformingDecl(ValueDecl *ConformingD, ValueDecl *ConformanceD);
+
+  /// Returns the protocol requirement decls for a conforming decl.
+  ArrayRef<ValueDecl *> getConformances(ValueDecl *D);
 
 private:
   friend class Decl;

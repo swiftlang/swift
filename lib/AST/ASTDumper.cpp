@@ -353,6 +353,8 @@ namespace {
         OS << "<null type>";
       OS << '\'';
 
+      if (VD->conformsToProtocolRequirement())
+        OS << " conforms";
       if (auto Overridden = VD->getOverriddenDecl()) {
         OS << " override=";
         Overridden->dumpRef(OS);
@@ -533,8 +535,15 @@ namespace {
         }
       }
       
+      for (auto VD: FD->getConformances()) {
+        OS << '\n';
+        OS.indent(Indent+2) << "(conformance ";
+        VD->dumpRef(OS);
+        OS << ')';
+      }
+
       printAbstractFunctionDecl(FD);
-      
+
       OS << ')';
      }
 

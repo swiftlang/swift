@@ -111,8 +111,9 @@ class alignas(8) Decl {
   class ValueDeclBitfields {
     friend class ValueDecl;
     unsigned : NumDeclBits;
+    unsigned ConformsToProtocolRequrement : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits };
+  enum { NumValueDeclBits = NumDeclBits + 1 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class AbstractFunctionDeclBitfields {
@@ -902,10 +903,7 @@ public:
   ArrayRef<ProtocolConformance *> getConformances() const {
     return Conformances;
   }
-  
-  void setConformances(ArrayRef<ProtocolConformance *> c) {
-    Conformances = c;
-  }
+  void setConformances(ArrayRef<ProtocolConformance *> c);
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
@@ -1045,7 +1043,9 @@ class ValueDecl : public Decl {
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc)
-    : Decl(K, DC), Name(name), NameLoc(NameLoc) { }
+    : Decl(K, DC), Name(name), NameLoc(NameLoc) {
+    ValueDeclBits.ConformsToProtocolRequrement = false;
+  }
 
   /// The interface type, mutable because some subclasses compute this lazily.
   mutable Type InterfaceTy;
@@ -1128,6 +1128,17 @@ public:
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
 
+  /// Returns true if this decl conforms to a protocol requirement.
+  bool conformsToProtocolRequirement() const {
+    return ValueDeclBits.ConformsToProtocolRequrement;
+  }
+  void setConformsToProtocolRequirement(bool Value = true) {
+    ValueDeclBits.ConformsToProtocolRequrement = Value;
+  }
+
+  /// Returns the protocol requirements that this decl conforms to.
+  ArrayRef<ValueDecl *> getConformances();
+
   /// Dump a reference to the given declaration.
   void dumpRef(raw_ostream &os) const;
 
@@ -1201,10 +1212,7 @@ public:
   ArrayRef<ProtocolConformance *> getConformances() const {
     return Conformances;
   }
-  
-  void setConformances(ArrayRef<ProtocolConformance *> c) {
-    Conformances = c;
-  }
+  void setConformances(ArrayRef<ProtocolConformance *> c);
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
