@@ -326,7 +326,7 @@ namespace {
       if (D->conformsToProtocolRequirement()) {
         if (D->getConformances().empty()) {
           Out << "conforms bit set but no conformances found\n";
-          D->dump();
+          D->dump(Out);
           abort();
         }
       }
