@@ -1824,8 +1824,15 @@ namespace {
     void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
                                        ArrayRef<ProtocolDecl *> protocols,
-                                       SmallVectorImpl<Decl *> &members) {
+                                       SmallVectorImpl<Decl *> &members,
+                           SmallVectorImpl<ProtocolConformance *> &Conformances,
+                                       ASTContext &Ctx) {
       for (auto proto : protocols) {
+        WitnessMap Mapping;
+        TypeWitnessMap TypeWitnesses;
+        TypeSubstitutionMap TypeMapping;
+        InheritedConformanceMap InheritedMapping;
+
         for (auto member : proto->getMembers()) {
           if (auto func = dyn_cast<FuncDecl>(member)) {
             if (auto objcMethod = dyn_cast_or_null<clang::ObjCMethodDecl>(
@@ -1834,6 +1841,7 @@ namespace {
                                    objcMethod->isInstanceMethod())) {
                 if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
                   members.push_back(imported);
+                  Mapping[cast<ValueDecl>(member)] = cast<ValueDecl>(imported);
 
                   // Import any special methods based on this member.
                   if (auto special = importSpecialMethod(imported, dc)) {
@@ -1844,6 +1852,13 @@ namespace {
             }
           }
         }
+
+        Conformances.push_back(Ctx.getConformance(dc->getDeclaredTypeOfContext(),
+                                                  proto, dc->getParentModule(),
+                                                  std::move(Mapping),
+                                                  std::move(TypeWitnesses),
+                                                  std::move(InheritedMapping),
+                                                  ArrayRef<ValueDecl *>()));
       }
     }
 
@@ -1943,14 +1958,16 @@ namespace {
       // Import mirrored declarations for protocols to which this category
       // or extension conforms.
       // FIXME: This is a short-term hack.
+      SmallVector<ProtocolConformance *, 4> Conformances;
       importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members);
+                                    members, Conformances, Impl.SwiftContext);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
                          Impl.importSourceRange(clang::SourceRange(
                                                   decl->getLocation(),
                                                   decl->getLocEnd())));
+      result->setConformances(Impl.SwiftContext.AllocateCopy(Conformances));
 
       return result;
     }
@@ -2082,14 +2099,16 @@ namespace {
       // Import mirrored declarations for protocols to which this class
       // conforms.
       // FIXME: This is a short-term hack.
+      SmallVector<ProtocolConformance *, 4> Conformances;
       importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members);
+                                    members, Conformances, Impl.SwiftContext);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
                          Impl.importSourceRange(clang::SourceRange(
                                                   decl->getLocation(),
                                                   decl->getLocEnd())));
+      result->setConformances(Impl.SwiftContext.AllocateCopy(Conformances));
 
       // Pass the class to the type checker to create an implicit destructor.
       Impl.SwiftContext.addedExternalDecl(result);
