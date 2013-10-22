@@ -50,7 +50,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   APInt Res;
   bool Overflow;
   bool Signed = false;
-  std::string Operator = "+";
+  StringRef Operator = "+";
 
   switch (ID) {
   default: llvm_unreachable("Invalid case");
@@ -87,11 +87,11 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   TupleType *T = FuncResType.castTo<TupleType>();
   assert(T->getNumElements() == 2);
   SILType ResTy1 =
-  SILType::getPrimitiveType(CanType(T->getElementType(0)),
-                            SILValueCategory::Object);
+    SILType::getPrimitiveType(CanType(T->getElementType(0)),
+                              SILValueCategory::Object);
   SILType ResTy2 =
-  SILType::getPrimitiveType(CanType(T->getElementType(1)),
-                            SILValueCategory::Object);
+    SILType::getPrimitiveType(CanType(T->getElementType(1)),
+                              SILValueCategory::Object);
 
   // Construct the folded instruction - a tuple of two literals, the
   // result and overflow.
@@ -221,10 +221,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
     // Add the literal instruction to represnet the result of the cast.
     SILBuilder B(AI);
-    return B.createIntegerLiteral(AI->getLoc(),
-                                  SILType::getPrimitiveType(CanType(DestTy),
-                                                    SILValueCategory::Object),
-                                  CastResV);
+    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), CastResV);
   }
 
   // Fold constant division operations and report div by zero.
@@ -286,11 +283,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
     // Add the literal instruction to represnet the result of the division.
     SILBuilder B(AI);
-    Type DestTy = Builtin.Types[0];
-    return B.createIntegerLiteral(AI->getLoc(),
-             SILType::getPrimitiveType(CanType(DestTy),
-                                       SILValueCategory::Object),
-             ResVal);
+    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
   }
 
   // Deal with special builtins that are designed to check overflows on
@@ -323,7 +316,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
     //   utrunc_IntFrom_IntTo(val) =
     //     zext_IntFrom(truncVal) == val ? truncVal : overflow_error
     APInt TruncVal = SrcVal.trunc(DestBitWidth);
-    APInt T = Signed ? TruncVal.sext(SrcBitWidth):TruncVal.zext(SrcBitWidth);
+    APInt T = Signed ? TruncVal.sext(SrcBitWidth) : TruncVal.zext(SrcBitWidth);
 
     SILLocation Loc = AI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
@@ -347,10 +340,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
     // The call to the builtin should be replaced with the constant value.
     SILBuilder B(AI);
-    return B.createIntegerLiteral(Loc,
-                                  SILType::getPrimitiveType(CanType(DestTy),
-                                                    SILValueCategory::Object),
-                                  TruncVal);
+    return B.createIntegerLiteral(Loc, AI->getType(), TruncVal);
   }
 
   case BuiltinValueKind::IntToFPWithOverflow: {
@@ -381,11 +371,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
     // The call to the builtin should be replaced with the constant value.
     SILBuilder B(AI);
-    return B.createFloatLiteral(Loc,
-                                SILType::getPrimitiveType(CanType(DestTy),
-                                                    SILValueCategory::Object),
-                                TruncVal);
-
+    return B.createFloatLiteral(Loc, AI->getType(), TruncVal);
   }
   }
   return nullptr;
