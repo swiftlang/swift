@@ -357,8 +357,9 @@ public:
   
   // Get the type of the callee with the applied substitutions.
   SILType getSubstCalleeType() const { return SubstCalleeType; }
-  SILFunctionType *getFunctionTypeInfo(SILModule &M) const {
-    return getSubstCalleeType().getFunctionTypeInfo(M);
+  
+  SILFunctionType *getFunctionTypeInfo() const {
+    return getSubstCalleeType().getFunctionTypeInfo(getModule());
   }
   
   /// True if this application has generic substitutions.
@@ -384,17 +385,17 @@ public:
 
   bool isTransparent() const { return Transparent; }
 
-  bool hasIndirectReturn(SILModule &M) const {
-    return getFunctionTypeInfo(M)->hasIndirectResult();
+  bool hasIndirectReturn() const {
+    return getFunctionTypeInfo()->hasIndirectResult();
   }
 
-  SILValue getIndirectReturn(SILModule &M) const {
-    assert(hasIndirectReturn(M) && "apply inst does not have indirect return!");
+  SILValue getIndirectReturn() const {
+    assert(hasIndirectReturn() && "apply inst does not have indirect return!");
     return getArguments().front();
   }
 
-  OperandValueArrayRef getArgumentsWithoutIndirectReturn(SILModule &M) const {
-    if (hasIndirectReturn(M))
+  OperandValueArrayRef getArgumentsWithoutIndirectReturn() const {
+    if (hasIndirectReturn())
       return getArguments().slice(1);
     return getArguments();
   }
@@ -450,8 +451,8 @@ public:
 
   // Get the type of the callee with the applied substitutions.
   SILType getSubstCalleeType() const { return SubstCalleeType; }
-  SILFunctionType *getFunctionTypeInfo(SILModule &M) const {
-    return getSubstCalleeType().getFunctionTypeInfo(M);
+  SILFunctionType *getFunctionTypeInfo() const {
+    return getSubstCalleeType().getFunctionTypeInfo(getModule());
   }
 
   /// True if this application has generic substitutions.

@@ -1321,8 +1321,8 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   auto argValues = i->getArguments();
   
   Address indirectResult;
-  if (i->hasIndirectReturn(*IGF.IGM.SILMod)) {
-    indirectResult =IGF.getLoweredAddress(i->getIndirectReturn(*IGF.IGM.SILMod));
+  if (i->hasIndirectReturn()) {
+    indirectResult = IGF.getLoweredAddress(i->getIndirectReturn());
     argValues = argValues.slice(0, argValues.size() - 1);
   }
   
@@ -1363,11 +1363,10 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Explosion llArgs(emission.getCurExplosionLevel());
   
   // Save off the indirect return argument, if any.
-  OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn(*IGM.SILMod);
+  OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn();
   SILValue indirectReturn;
-  if (i->hasIndirectReturn(*IGM.SILMod)) {
-    indirectReturn = i->getIndirectReturn(*IGM.SILMod);
-  }
+  if (i->hasIndirectReturn())
+    indirectReturn = i->getIndirectReturn();
   
   // ObjC message sends need special handling for the 'self' argument, which in
   // SIL gets curried to the end of the argument list but in IR is passed as the

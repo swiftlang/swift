@@ -13,10 +13,10 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
@@ -154,12 +154,12 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through [inout] arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
-      if (apply->getFunctionTypeInfo(User->getModule())
+      if (apply->getFunctionTypeInfo()
             ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
-      if (partialApply->getFunctionTypeInfo(User->getModule())
+      if (partialApply->getFunctionTypeInfo()
             ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
       

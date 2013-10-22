@@ -82,8 +82,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   }
 
   // Get the SIL subtypes of the returned tuple type.
-  SILModule &M = AI->getModule();
-  SILType FuncResType = AI->getFunctionTypeInfo(M)->getResult().getSILType();
+  SILType FuncResType = AI->getFunctionTypeInfo()->getResult().getSILType();
   TupleType *T = FuncResType.castTo<TupleType>();
   assert(T->getNumElements() == 2);
   SILType ResTy1 =

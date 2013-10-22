@@ -404,7 +404,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // An apply is ok if the argument is used as an @inout parameter or an
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
-    if (AI->getFunctionTypeInfo(AI->getModule())
+    if (AI->getFunctionTypeInfo()
           ->getParameters()[O->getOperandNumber()-1].isIndirect()) {
       Mutations.push_back(AI);
       return true;
