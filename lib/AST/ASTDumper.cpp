@@ -218,16 +218,6 @@ namespace {
 
       if (ShowColors)
         OS << llvm::sys::Process::ResetColor();
-
-      if (auto value = dyn_cast<ValueDecl>(D)) {
-        if (!value->getName().empty()) {
-          OS << " \"" << value->getName().str() << "\"";
-        }
-        if (auto Overridden = value->getOverriddenDecl()) {
-          OS << " override=";
-          Overridden->dumpRef(OS);
-        }
-      }
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
@@ -307,7 +297,7 @@ namespace {
 
     void printDeclName(ValueDecl *D) {
       if (D->getName().get())
-        OS << '\'' << D->getName() << '\'';
+        OS << '\"' << D->getName() << '\"';
       else
         OS << "'anonname=" << (const void*)D << '\'';
     }
@@ -342,8 +332,11 @@ namespace {
       OS << ")";
     }
 
-    void printCommon(ValueDecl *VD, const char *Name) {
+    void printCommon(ValueDecl *VD, const char *Name,
+                     llvm::Optional<llvm::raw_ostream::Colors> Color =
+                      llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((Decl*)VD, Name);
+
       OS << ' ';
       printDeclName(VD);
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
@@ -359,6 +352,11 @@ namespace {
       else
         OS << "<null type>";
       OS << '\'';
+
+      if (auto Overridden = VD->getOverriddenDecl()) {
+        OS << " override=";
+        Overridden->dumpRef(OS);
+      }
     }
 
     void visitTranslationUnit(const TranslationUnit *TU) {
