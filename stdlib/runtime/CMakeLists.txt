@@ -17,6 +17,7 @@ add_swift_library(swift_runtime INSTALL
   Stubs.cpp
   SwiftObject.mm
   Enum.cpp
+  Failure.cpp
   BlockShims.mm)
 
 add_swift_optimization_flags(swift_runtime)
