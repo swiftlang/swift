@@ -445,7 +445,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && (isnumber(c) || c == '$'))
+  if (c < 0x80 && (isdigit(c) || c == '$'))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
