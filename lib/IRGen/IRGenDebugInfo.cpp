@@ -840,16 +840,6 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   if (Artificial)
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
-  // There are variables without storage, such as "struct { func foo() {} }".
-  if (isa<llvm::UndefValue>(Storage)) {
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    DBuilder.createStaticVariable(Scope, Name,
-                                  Name, Unit, Line,
-                                  DTy, true,
-                                  llvm::ConstantInt::get(Int64Ty, 0));
-    return;
-  }
-
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
 
@@ -858,18 +848,28 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;
     Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
-    Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name.str(),
+    Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name,
                                                 Unit, Line, DTy, Addr, ArgNo);
   } else {
-    Descriptor = DBuilder.createLocalVariable(Tag, Scope, Name.str(),
+    Descriptor = DBuilder.createLocalVariable(Tag, Scope, Name,
                                               Unit, Line, DTy,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
 
-  // Insert an llvm.dbg.declare into the current block.
-  llvm::Instruction *Call =
-    DBuilder.insertDeclare(Storage, Descriptor, Builder.GetInsertBlock());
-  Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
+  llvm::Instruction *Call;
+  if (isa<llvm::UndefValue>(Storage)) {
+    // There are variables without storage, such as "struct { func foo() {} }".
+    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
+    Call = DBuilder.insertDbgValueIntrinsic(llvm::ConstantInt::get(Int64Ty, 0),
+                                            0, Descriptor,
+                                            Builder.GetInsertBlock());
+  } else {
+    // Insert an llvm.dbg.declare into the current block.
+    Call = DBuilder.insertDeclare(Storage, Descriptor,
+                                  Builder.GetInsertBlock());
+
+  }
+Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
