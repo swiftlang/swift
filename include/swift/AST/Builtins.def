@@ -158,28 +158,32 @@ BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 /// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
 BUILTIN_SIL_OPERATION(CastToObjectPointer, "castToObjectPointer", Special)
 
-/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T.
+/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T
 BUILTIN_SIL_OPERATION(CastFromObjectPointer, "castFromObjectPointer", Special)
 
-/// BridgeToRawPointer has type (T) -> Builtin.RawPointer.
+/// BridgeToRawPointer has type (T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 
-/// BridgeFromRawPointer (Builtin.RawPointer) -> T.
+/// BridgeFromRawPointer (Builtin.RawPointer) -> T
 /// SILGen requires that T is a single retainable pointer.
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
-/// addressof ([inout] T) -> Builtin.RawPointer.
+/// addressof ([inout] T) -> Builtin.RawPointer
 /// Returns a RawPointer pointing to an lvalue. The returned pointer is only
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
-/// typeof(T) -> T.metatype.
+/// typeof(T) -> T.metatype
 /// Returns the runtime type of a value.
 BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
 
 /// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
+
+/// condfail(Int1) -> ()
+/// Triggers a runtime failure if the condition is true.
+BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
 
 #undef BUILTIN_SIL_OPERATION
 

@@ -1448,6 +1448,18 @@ namespace {
                                                    args[1].getUnmanagedValue());
     return ManagedValue(offsetPtr, ManagedValue::Unmanaged);
   }
+  
+  /// Specialized emitter for Builtin.condfail.
+  static ManagedValue emitBuiltinCondFail(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          ArrayRef<Substitution> substitutions,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+    assert(args.size() == 1 && "condfail should be given one argument");
+    
+    gen.B.createCondFail(loc, args[0].getUnmanagedValue());
+    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+  }
 
   Callee::SpecializedEmitter
   Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function,

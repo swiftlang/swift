@@ -544,6 +544,14 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
                                    ResultTy, BodyResultTy, ParamList);
 }
 
+static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+  // Int1 -> ()
+  auto CondTy = BuiltinIntegerType::get(1, C);
+  auto VoidTy = TupleType::getEmpty(C);
+  TupleTypeElt CondElt(CondTy);
+  return getBuiltinFunction(C, Id, CondElt, VoidTy);
+}
+
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
                                              Type FirstTy, Type SecondTy) {
   // (Vector<N, T>, Int32) -> T
@@ -1013,6 +1021,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TypeOf:
     if (!Types.empty()) return nullptr;
     return getTypeOfOperation(Context, Id);
+      
+  case BuiltinValueKind::CondFail:
+    return getCondFailOperation(Context, Id);
 
   case BuiltinValueKind::ExtractElement:
     if (Types.size() != 2) return nullptr;
