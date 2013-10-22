@@ -2756,6 +2756,21 @@ unconditional_checked_cast
 Performs a checked conversion, causing a runtime failure if the conversion
 fails.
 
+Runtime Failures
+~~~~~~~~~~~~~~~~
+
+cond_fail
+`````````
+::
+
+  sil-instruction ::= 'cond_fail' sil-operand
+
+  cond_fail %0 : $Builtin.Int1
+  // %0 must be of type $Builtin.Int1
+
+This instruction produces a `runtime failure`_ if the operand is one.
+Execution proceeds normally if the operand is zero.
+
 Terminators
 ~~~~~~~~~~~
 
