@@ -1369,9 +1369,9 @@ private:
     {
       // Vec<type, length>
       CodeCompletionResultBuilder Builder(
-                                    CompletionContext,
-                                    CodeCompletionResult::ResultKind::Pattern,
-                                    SemanticContextKind::None);
+          CompletionContext,
+          CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::OtherModule);
       Builder.addTextChunk("Vec");
       Builder.addLeftAngle();
       Builder.addGenericParameter("type");
@@ -1387,9 +1387,9 @@ private:
     {
       // Matrix<type, rows, columns>
       CodeCompletionResultBuilder Builder(
-                                    CompletionContext,
-                                    CodeCompletionResult::ResultKind::Pattern,
-                                    SemanticContextKind::None);
+          CompletionContext,
+          CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::OtherModule);
       Builder.addTextChunk("Matrix");
       Builder.addLeftAngle();
       Builder.addGenericParameter("type");
