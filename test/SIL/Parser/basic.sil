@@ -1094,11 +1094,13 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
   return %17 : $()
 }
 
-sil @cond_fail_test : $(Builtin.Int1) -> () {
-entry(%x : $Builtin.Int1):
-  cond_fail %x : $Builtin.Int1
-  %t = tuple ()
-  return %t : $()
+// CHECK: sil @cond_fail_test : $Builtin.Int1 -> () {
+sil @cond_fail_test : $Builtin.Int1 -> () {
+entry(%0 : $Builtin.Int1):
+  // CHECK: cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1
+  %1 = tuple ()
+  return %1 : $()
 }
 
 // CHECK-LABEL: sil_vtable Foo {

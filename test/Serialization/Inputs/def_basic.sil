@@ -973,6 +973,16 @@ bb0(%0 : $Val):
 func serialize_all() {
 }
 
+// CHECK: sil deserialized @cond_fail_test : $@thin Builtin.Int1 -> () {
+sil @cond_fail_test : $@thin Builtin.Int1 -> () {
+entry(%0 : $Builtin.Int1):
+  // CHECK: cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1
+  %1 = tuple ()
+  return %1 : $()
+}
+
+
 sil @_T9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
   %2 = function_ref @test1 : $@thin () -> ()
@@ -1027,6 +1037,7 @@ bb0:
   %113 = function_ref @test_dynamic_lookup_br : $@thin (obj: DynamicLookup) -> ()
   %115 = function_ref @test_mark_fn_escape : $@thin () -> ()
   %117 = function_ref @test_copy_destroy_value : $@thin (v: Val) -> (Val)
+  %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
   %119 = tuple ()
   return %119 : $()
