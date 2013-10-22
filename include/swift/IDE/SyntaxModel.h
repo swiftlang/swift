@@ -1,4 +1,4 @@
-//===- SyntaxColoring.h - Routines for syntax coloring --------------------===//
+//===- SyntaxModel.h - Routines for IDE syntax model  ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_SYNTAX_COLORING_H
-#define SWIFT_IDE_SYNTAX_COLORING_H
+#ifndef SWIFT_IDE_SYNTAX_MODEL_H
+#define SWIFT_IDE_SYNTAX_MODEL_H
 
 #include "swift/Basic/SourceLoc.h"
 
@@ -42,11 +42,11 @@ struct SyntaxNode {
     : Kind(Kind), Range(Range) { }
 };
 
-class SyntaxColorWalker {
+class SyntaxModelWalker {
   virtual void anchor();
 
 public:
-  virtual ~SyntaxColorWalker() {}
+  virtual ~SyntaxModelWalker() {}
 
   /// \brief Called when first visiting a syntax node, before walking into its
   /// children.  If it returns false, the subtree is skipped.
@@ -58,21 +58,21 @@ public:
   virtual bool walkToNodePost(SyntaxNode Node) { return true; }
 };
 
-class SyntaxColoringContext {
+class SyntaxModelContext {
   struct Implementation;
   Implementation &Impl;
   TranslationUnit &TU;
 
 public:
-  SyntaxColoringContext(SourceManager &SM, unsigned BufferID,
+  SyntaxModelContext(SourceManager &SM, unsigned BufferID,
                         TranslationUnit &TU);
-  ~SyntaxColoringContext();
+  ~SyntaxModelContext();
 
-  bool walk(SyntaxColorWalker &Walker);
+  bool walk(SyntaxModelWalker &Walker);
 };
 
 } // namespace ide
 } // namespace swift
 
-#endif // SWIFT_IDE_SYNTAX_COLORING_H
+#endif // SWIFT_IDE_SYNTAX_MODEL_H
 

@@ -1,4 +1,4 @@
-//===- SyntaxColoring.cpp - Routines for syntax coloring ------------------===//
+//===- SyntaxModel.cpp - Routines for IDE syntax model --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/SyntaxColoring.h"
+#include "swift/IDE/SyntaxModel.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -26,13 +26,13 @@
 using namespace swift;
 using namespace ide;
 
-void SyntaxColorWalker::anchor() {}
+void SyntaxModelWalker::anchor() {}
 
-struct SyntaxColoringContext::Implementation {
+struct SyntaxModelContext::Implementation {
   std::vector<SyntaxNode> TokenNodes;
 };
 
-SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
+SyntaxModelContext::SyntaxModelContext(SourceManager &SM,
                                              unsigned BufferID,
                                              TranslationUnit &TU)
   : Impl(*new Implementation()),
@@ -75,24 +75,24 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
   Impl.TokenNodes = std::move(Nodes);
 }
 
-SyntaxColoringContext::~SyntaxColoringContext() {
+SyntaxModelContext::~SyntaxModelContext() {
   delete &Impl;
 }
 
 namespace {
 
-class ColorASTWalker : public ASTWalker {
+class ModelASTWalker : public ASTWalker {
   const SourceManager &SM;
 #ifndef NDEBUG
   SourceLoc LastLoc;
 #endif
 
 public:
-  SyntaxColorWalker &SCWalker;
+  SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
 
-  ColorASTWalker(const SourceManager &SM, SyntaxColorWalker &SCWalker)
-      : SM(SM), SCWalker(SCWalker) { }
+  ModelASTWalker(const SourceManager &SM, SyntaxModelWalker &Walker)
+      : SM(SM), Walker(Walker) { }
 
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
@@ -115,13 +115,13 @@ private:
 
 } // anonymous namespace
 
-bool SyntaxColoringContext::walk(SyntaxColorWalker &Walker) {
-  ColorASTWalker ASTWalk(TU.Ctx.SourceMgr, Walker);
+bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
+  ModelASTWalker ASTWalk(TU.Ctx.SourceMgr, Walker);
   ASTWalk.visitTranslationUnit(TU, Impl.TokenNodes);
   return true;
 }
 
-void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
+void ModelASTWalker::visitTranslationUnit(TranslationUnit &TU,
                                           ArrayRef<SyntaxNode> Tokens) {
   TokenNodes = Tokens;
   TU.walk(*this);
@@ -131,7 +131,7 @@ void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
     passNode(TokNode);
 }
 
-bool ColorASTWalker::walkToDeclPre(Decl *D) {
+bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
     if (FD->isGetterOrSetter()) {
       // Pass get / set context sensitive keyword token.
@@ -146,7 +146,7 @@ bool ColorASTWalker::walkToDeclPre(Decl *D) {
   return true;
 }
 
-bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
+bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
     for (auto &comp : IdT->Components) {
       if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
@@ -159,7 +159,7 @@ bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
   return true;
 }
 
-bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc,
+bool ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
                                          PassNodesBehavior Behavior) {
   assert(Loc.isValid());
   unsigned I = 0;
@@ -184,7 +184,7 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc,
   return true;
 }
 
-bool ColorASTWalker::passNonTokenNode(const SyntaxNode &Node) {
+bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
   if (!passTokenNodesUntil(Node.Range.getStart(), DisplaceNodeAtLocation))
     return false;
   if (!passNode(Node))
@@ -192,13 +192,13 @@ bool ColorASTWalker::passNonTokenNode(const SyntaxNode &Node) {
   return true;
 }
 
-bool ColorASTWalker::passNode(const SyntaxNode &Node) {
+bool ModelASTWalker::passNode(const SyntaxNode &Node) {
 #ifndef NDEBUG
   assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
   LastLoc = Node.Range.getStart();
 #endif
-  SCWalker.walkToNodePre(Node);
-  if (!SCWalker.walkToNodePost(Node))
+  Walker.walkToNodePre(Node);
+  if (!Walker.walkToNodePost(Node))
     return false;
   return true;
 }
