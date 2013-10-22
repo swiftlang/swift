@@ -224,7 +224,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
     dc = dc->getParent();
   }
   
-  if (constant.isCurried)
+  if (constant.isCurried || constant.isForeignThunk())
     return SILLinkage::Thunk;
   
   if(isa<ClangModule>(dc) &&
@@ -361,6 +361,14 @@ void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
   SILGenFunction(*this, *f)
     .emitCurryThunk(fd, entryPoint, nextEntryPoint);
   postEmitFunction(entryPoint, f);
+}
+
+void SILGenModule::emitForeignThunk(SILDeclRef thunk) {
+  assert(!thunk.isForeign && "native-to-foreign thunk not implemented");
+  SILFunction *f = preEmitFunction(thunk, thunk.getDecl(), thunk.getDecl());
+  SILGenFunction(*this, *f)
+    .emitForeignThunk(thunk);
+  postEmitFunction(thunk, f);
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {

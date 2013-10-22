@@ -245,32 +245,39 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   }
   
   // If the constant is a curry thunk we haven't emitted yet, emit it.
-  if (constant.isCurried && !SGM.hasFunction(constant)) {
-    // Non-functions can't be referenced uncurried.
-    FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
-    
-    // Getters and setters can't be referenced uncurried.
-    assert(!fd->isGetterOrSetter());
-    
-    // FIXME: Thunks for instance methods of generics.
-    assert(!(fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
-           && "currying generic method not yet supported");
+  if (constant.isCurried) {
+    if (!SGM.hasFunction(constant)) {
+      // Non-functions can't be referenced uncurried.
+      FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
+      
+      // Getters and setters can't be referenced uncurried.
+      assert(!fd->isGetterOrSetter());
+      
+      // FIXME: Thunks for instance methods of generics.
+      assert(!(fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
+             && "currying generic method not yet supported");
 
-    // FIXME: Curry thunks for generic methods don't work right yet, so skip
-    // emitting thunks for them
-    assert(!(fd->getType()->is<AnyFunctionType>() &&
-             fd->getType()->castTo<AnyFunctionType>()->getResult()
-               ->is<PolymorphicFunctionType>()));
-    
-    // Reference the next uncurrying level of the function.
-    SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
-                                 constant.uncurryLevel + 1);
-    // If the function is fully uncurried and natively foreign, reference its
-    // foreign entry point.
-    if (!next.isCurried && fd->hasClangNode())
-      next = next.asForeign();
-    
-    SGM.emitCurryThunk(constant, next, fd);
+      // FIXME: Curry thunks for generic methods don't work right yet, so skip
+      // emitting thunks for them
+      assert(!(fd->getType()->is<AnyFunctionType>() &&
+               fd->getType()->castTo<AnyFunctionType>()->getResult()
+                 ->is<PolymorphicFunctionType>()));
+      
+      // Reference the next uncurrying level of the function.
+      SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
+                                   constant.uncurryLevel + 1);
+      // If the function is fully uncurried and natively foreign, reference its
+      // foreign entry point.
+      if (!next.isCurried && fd->hasClangNode())
+        next = next.asForeign();
+      
+      SGM.emitCurryThunk(constant, next, fd);
+    }
+  }
+  // Otherwise, if this is a foreign thunk we haven't emitted yet, emit it.
+  else if (constant.isForeignThunk()) {
+    if (!SGM.hasFunction(constant))
+      SGM.emitForeignThunk(constant);
   }
   
   return B.createFunctionRef(loc, SGM.getFunction(constant));
@@ -368,10 +375,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       ++uncurryLevel;
   }
   
-  // Reference the decl at its natural foreign-ness.
-  bool isForeign = decl->hasClangNode();
-  auto constant = SILDeclRef(decl, uncurryLevel, isForeign);
-  ManagedValue result = emitFunctionRef(loc, constant);
+  ManagedValue result = emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
 
   // If the declaration reference is specialized, create the partial
   // application.
@@ -2307,6 +2311,46 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   if (resultTy != closureTy)
     toClosure = B.createConvertFunction(fd, toClosure, resultTy);
   B.createReturn(fd, toClosure);
+}
+
+void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
+  // FIXME: native-to-foreign thunk
+  assert(!thunk.isForeign && "native to foreign thunk not implemented");
+  
+  // Wrap the function in its original form.
+
+  auto fd = cast<FuncDecl>(thunk.getDecl());
+  
+  // Forward the arguments.
+  // FIXME: For native-to-foreign thunks, use emitObjCThunkArguments to retain
+  // inputs according to the foreign convention.
+  auto forwardedPatterns = fd->getBodyParamPatterns();
+  SmallVector<SILValue, 8> args;
+  ArgumentForwardVisitor forwarder(*this, args);
+  for (auto *paramPattern : reversed(forwardedPatterns))
+    forwarder.visit(paramPattern);
+  
+  SILValue result;
+  {
+    CleanupLocation cleanupLoc(fd);
+    Scope scope(Cleanups, fd);
+    
+    // Set up cleanups on all the arguments, which should be at +1 now.
+    SmallVector<ManagedValue, 8> managedArgs;
+    for (auto arg : args)
+      managedArgs.push_back(emitManagedRValueWithCleanup(arg));
+
+    // Call the original.
+    SILDeclRef original = thunk.asForeign(!thunk.isForeign);
+    auto rules = original.getSILFunctionType(SGM.M);
+    result = emitApply(fd, ManagedValue(emitGlobalFunctionRef(fd, original),
+                                        ManagedValue::Unmanaged),
+                       /*substitutions*/ {}, managedArgs,
+                       fd->getBodyResultType()->getCanonicalType(),
+                       rules).forward(*this);
+  }
+  // FIXME: use correct convention for native-to-foreign return
+  B.createReturn(fd, result);
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {

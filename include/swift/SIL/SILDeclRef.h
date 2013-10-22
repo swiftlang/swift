@@ -220,12 +220,16 @@ struct SILDeclRef {
                       defaultArgIndex);
   }
   
-  // Returns the foreign (or native) entry point corresponding to the same
-  // decl.
-  SILDeclRef asForeign(bool objc = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried, objc,
-                       defaultArgIndex);
+  /// Returns the foreign (or native) entry point corresponding to the same
+  /// decl.
+  SILDeclRef asForeign(bool foreign = true) const {
+    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried,
+                      foreign, defaultArgIndex);
   }
+  
+  /// True if the decl ref references a thunk from a natively foreign
+  /// declaration to Swift (or vice versa).
+  bool isForeignThunk() const;
   
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc,

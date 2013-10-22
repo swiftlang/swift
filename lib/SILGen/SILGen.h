@@ -149,11 +149,13 @@ public:
   void emitDefaultArgGenerators(SILDeclRef::Loc decl, 
                                 ArrayRef<Pattern*> patterns);
 
-  /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
-  /// function.
+  /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(SILDeclRef entryPoint,
                       SILDeclRef nextEntryPoint,
                       FuncDecl *fd);
+  
+  /// Emits a thunk from a foreign function to the native Swift conventions.
+  void emitForeignThunk(SILDeclRef thunk);
   
   template<typename T>
   SILFunction *preEmitFunction(SILDeclRef constant, T *astNode, SILLocation L);
@@ -508,7 +510,9 @@ public:
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);
-
+  /// Generates a thunk from a foreign function to the native Swift conventions.
+  void emitForeignThunk(SILDeclRef thunk);
+  
   // Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
 

@@ -47,8 +47,13 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
 
   // Almost everything below gets one of the common prefixes:
   //   mangled-name ::= '_T' global     // Native symbol
-  //   mangled-name ::= '_TTo' global   // ObjC interop
-  char const *introducer = c.isForeign ? "_TTo" : "_T";
+  //   mangled-name ::= '_TTo' global   // ObjC interop thunk
+  //   mangled-name ::= '_TTO' global   // Foreign function thunk
+  char const *introducer = "_T";
+  if (c.isForeign)
+    introducer = "_TTo";
+  else if (c.isForeignThunk())
+    introducer = "_TTO";
   
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
@@ -59,7 +64,10 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
       return;
     }
     // As a special case, functions can have external asm names.
-    if (!c.getDecl()->getAttrs().AsmName.empty()) {
+    // Use the asm name only for the original non-thunked, non-curried entry
+    // point.
+    if (!c.getDecl()->getAttrs().AsmName.empty()
+        && !c.isForeignThunk() && !c.isCurried) {
       buffer << c.getDecl()->getAttrs().AsmName;
       return;
     }
@@ -71,13 +79,15 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
     // As a special case, Clang functions and globals don't get mangled at all.
     // FIXME: When we can import C++, use Clang's mangler.
     if (auto clangDecl = c.getDecl()->getClangDecl()) {
-      if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
-        if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-          buffer << '\01' << asmLabel->getLabel();
-        } else {
-          buffer << namedClangDecl->getName();
+      if (!c.isForeignThunk() && !c.isCurried) {
+        if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+          if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+            buffer << '\01' << asmLabel->getLabel();
+          } else {
+            buffer << namedClangDecl->getName();
+          }
+          return;
         }
-        return;
       }
     }
 

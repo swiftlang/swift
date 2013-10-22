@@ -239,6 +239,16 @@ bool SILDeclRef::isTransparent() const {
   return false;
 }
 
+bool SILDeclRef::isForeignThunk() const {
+  // Non-decl entry points are never thunks.
+  if (!hasDecl())
+    return false;
+  // Otherwise, match whether we have a clang node with whether we're foreign.
+  if (isa<FuncDecl>(getDecl()) && getDecl()->hasClangNode())
+    return !isForeign;
+  return false;
+}
+
 SILType SILType::getObjectPointerType(const ASTContext &C) {
   return SILType(CanType(C.TheObjectPointerType), SILValueCategory::Object);
 }
