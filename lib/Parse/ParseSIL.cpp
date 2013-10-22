@@ -879,7 +879,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
     .Case("cond_br", ValueKind::CondBranchInst)
-    .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
     .Case("copy_value", ValueKind::CopyValueInst)
@@ -1297,7 +1296,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
   case ValueKind::UnownedToRefInst:
-  case ValueKind::ConvertCCInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ArchetypeRefToSuperInst:
@@ -1351,9 +1349,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UnownedToRefInst:
       ResultVal = B.createUnownedToRef(InstLoc, Val, Ty);
-      break;
-    case ValueKind::ConvertCCInst:
-      ResultVal = B.createConvertCC(InstLoc, Val, Ty);
       break;
     case ValueKind::ThinToThickFunctionInst:
       ResultVal = B.createThinToThickFunction(InstLoc, Val, Ty);

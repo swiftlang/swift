@@ -134,16 +134,6 @@ SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
   // Thicken thin functions.
   if (v.getType().is<AnyFunctionType>() &&
       v.getType().castTo<AnyFunctionType>()->isThin()) {
-    // Thunk functions to the standard "freestanding" calling convention.
-    if (v.getType().getAbstractCC() != AbstractCC::Freestanding) {
-      auto freestandingType =
-        Lowering::getThinFunctionType(v.getType().getSwiftType(),
-                                      AbstractCC::Freestanding);
-      SILType freestandingSILType =
-        F.getModule().Types.getLoweredLoadableType(freestandingType, 0);
-      v = createConvertCC(loc, v, freestandingSILType);
-    }
-
     Type thickTy = Lowering::getThickFunctionType(v.getType().getSwiftType(),
                                                   AbstractCC::Freestanding);
 

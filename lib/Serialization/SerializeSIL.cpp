@@ -671,7 +671,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
   case ValueKind::UnownedToRefInst:
-  case ValueKind::ConvertCCInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ArchetypeRefToSuperInst:
@@ -720,10 +719,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::UnownedToRefInst:
       operand = cast<UnownedToRefInst>(&SI)->getOperand();
       Ty = cast<UnownedToRefInst>(&SI)->getType();
-      break;
-    case ValueKind::ConvertCCInst:
-      operand = cast<ConvertCCInst>(&SI)->getOperand();
-      Ty = cast<ConvertCCInst>(&SI)->getType();
       break;
     case ValueKind::ThinToThickFunctionInst:
       operand = cast<ThinToThickFunctionInst>(&SI)->getOperand();

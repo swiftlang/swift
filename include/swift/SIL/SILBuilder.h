@@ -345,11 +345,6 @@ public:
                     RawPointerToRefInst(Loc, Op, Ty));
   }
 
-  ConvertCCInst *createConvertCC(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    ConvertCCInst(Loc, Op, Ty));
-  }
-
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
     return insert(new (F.getModule())

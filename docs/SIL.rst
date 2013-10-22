@@ -2652,22 +2652,6 @@ exceptions:
   type, but a non-``@noreturn`` function may not be converted to a
   ``@noreturn`` function.
 
-convert_cc
-``````````
-::
-
-  sil-instruction ::= 'convert_cc' sil-operand 'to' sil-type
-
-  %1 = convert_cc %0 : $@cc(X) T -> U to $@cc(Y) T -> U
-  // %0 must be of a function type
-  // The destination must be the same function type, differing only in
-  //   calling convention
-  // %1 will be of type $@cc(Y) T -> U
-
-Thunks the calling convention of a function. If the input operand is statically
-a ``function_ref`` instruction, the result can be ``@thin``; otherwise, the
-result must be thick.
-
 bridge_to_block
 ```````````````
 ::

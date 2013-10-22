@@ -1169,46 +1169,6 @@ public:
     }
   }
   
-  void checkConvertCCInst(ConvertCCInst *CCI) {
-    requireObjectType(AnyFunctionType, CCI->getOperand(), "convert_cc operand");
-    requireObjectType(AnyFunctionType, CCI, "convert_cc result");
-    
-    // Thunks over static function refs can be thin.
-    bool isFunctionRef = isa<FunctionRefInst>(CCI->getOperand());
-        
-    if (auto opFTy = dyn_cast<FunctionType>(
-                                 CCI->getOperand().getType().getSwiftType())) {
-      auto resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
-      require(resFTy &&
-              opFTy->getInput()->isEqual(resFTy->getInput()) &&
-              opFTy->getResult()->isEqual(resFTy->getResult()) &&
-              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-              opFTy->isBlock() == resFTy->isBlock(),
-              "convert_cc operand and result type must differ only "
-              " in calling convention");
-      // Non-virtual CC thunks can be thin, but virtual ones must be thick.
-      require(isFunctionRef || !resFTy->isThin(),
-              "convert_cc result must be static or thick");
-      require(opFTy->isThin(),
-              "convert_cc operand must be thin");
-    } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
-                                 CCI->getOperand().getType().getSwiftType())) {
-      auto resPTy = dyn_cast<PolymorphicFunctionType>(
-                                               CCI->getType().getSwiftType());
-      require(resPTy &&
-              opPTy->getInput()->isEqual(resPTy->getInput()) &&
-              opPTy->getResult()->isEqual(resPTy->getResult()),
-              "convert_cc operand and result type must differ only "
-              " in calling convention");
-      require(isFunctionRef || !resPTy->isThin(),
-              "convert_cc result must be static or thick");
-      require(opPTy->isThin(),
-              "convert_cc operand must be thin");
-    } else {
-      llvm_unreachable("invalid AnyFunctionType?!");
-    }    
-  }
-
   void checkRefToUnownedInst(RefToUnownedInst *I) {
     requireReferenceValue(I->getOperand(), "Operand of ref_to_unowned");
     auto operandType = I->getOperand().getType().getSwiftRValueType();

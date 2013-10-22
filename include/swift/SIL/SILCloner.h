@@ -471,15 +471,6 @@ SILCloner<ImplClass>::visitThinToThickFunctionInst(ThinToThickFunctionInst* Inst
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitConvertCCInst(ConvertCCInst* Inst) {
-  doPostProcess(Inst,
-    Builder.createConvertCC(getOpLocation(Inst->getLoc()),
-                            getOpValue(Inst->getOperand()),
-                            getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitBridgeToBlockInst(BridgeToBlockInst* Inst) {
   doPostProcess(Inst,
     Builder.createBridgeToBlock(getOpLocation(Inst->getLoc()),

@@ -690,9 +690,6 @@ public:
   void visitUnownedToRefInst(UnownedToRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unowned_to_ref");
   }
-  void visitConvertCCInst(ConvertCCInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "convert_cc");
-  }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"thin_to_thick_function");
   }

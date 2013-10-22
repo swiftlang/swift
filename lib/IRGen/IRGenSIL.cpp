@@ -541,7 +541,6 @@ public:
   void visitRefToUnownedInst(RefToUnownedInst *i);
   void visitUnownedToRefInst(UnownedToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
-  void visitConvertCCInst(ConvertCCInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
@@ -2187,10 +2186,6 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   to.add(from.claimNext());
   to.add(IGM.RefCountedNull);
   setLoweredExplosion(SILValue(i, 0), to);
-}
-
-void IRGenSILFunction::visitConvertCCInst(swift::ConvertCCInst *i) {
-  llvm_unreachable("not implemented");
 }
 
 void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
