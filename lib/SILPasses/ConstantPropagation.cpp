@@ -32,7 +32,8 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// \brief Fold arithmetic intrinsics with overflow.
 static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                                                       llvm::Intrinsic::ID ID,
-                                                      bool ReportOverflow) {
+                                                      bool ReportOverflow,
+                                                      bool &ResultsInError) {
   OperandValueArrayRef Args = AI->getArguments();
   assert(Args.size() >= 2);
 
@@ -128,6 +129,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                Operator,
                RHSInt.toString(/*Radix*/ 10, Signed),
                OpType);
+      ResultsInError = true;
     } else {
       // If we cannot get the type info in an expected way, describe the type.
       diagnose(AI->getModule().getASTContext(),
@@ -139,6 +141,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                Signed,
                LHSInt.getBitWidth());
 
+      ResultsInError = true;
     }
   }
 
@@ -146,16 +149,19 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
 }
 
 static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
-                                                   BuiltinValueKind ID) {
+                                                   BuiltinValueKind ID,
+                                                   bool &ResultsInError) {
   OperandValueArrayRef Args = AI->getArguments();
   IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(AI,
            getLLVMIntrinsicIDForBuiltinWithOverflow(ID),
-           ShouldReportFlag && (ShouldReportFlag->getValue() == 1));
+           ShouldReportFlag && (ShouldReportFlag->getValue() == 1),
+           ResultsInError);
 }
 
 static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
-                                             llvm::Intrinsic::ID ID) {
+                                             llvm::Intrinsic::ID ID,
+                                             bool &ResultsInError) {
   switch (ID) {
   default: break;
   case llvm::Intrinsic::sadd_with_overflow:
@@ -164,19 +170,22 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
   case llvm::Intrinsic::usub_with_overflow:
   case llvm::Intrinsic::smul_with_overflow:
   case llvm::Intrinsic::umul_with_overflow:
-    return constantFoldBinaryWithOverflow(AI, ID, /*ReportOverflow*/false);
+    return constantFoldBinaryWithOverflow(AI, ID,
+                                          /* ReportOverflow */ false,
+                                          ResultsInError);
   }
   return nullptr;
 }
 
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
-                                           BuiltinFunctionRefInst *FR) {
+                                           BuiltinFunctionRefInst *FR,
+                                           bool &ResultsInError) {
   const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
   SILModule &M = AI->getModule();
 
   // If it's an llvm intrinsic, fold the intrinsic.
   if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic)
-    return constantFoldIntrinsic(AI, Intrinsic.ID);
+    return constantFoldIntrinsic(AI, Intrinsic.ID, ResultsInError);
 
   // Otherwise, it should be one of the builin functions.
   OperandValueArrayRef Args = AI->getArguments();
@@ -189,7 +198,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return constantFoldOverflowBuiltin(AI, Builtin.ID);
+    return constantFoldOverflowBuiltin(AI, Builtin.ID, ResultsInError);
 
   case BuiltinValueKind::Trunc:
   case BuiltinValueKind::ZExt:
@@ -241,6 +250,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       diagnose(M.getASTContext(),
                AI->getLoc().getSourceLoc(),
                diag::division_by_zero);
+      ResultsInError = true;
       return nullptr;
     }
 
@@ -277,6 +287,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                NumVal.toString(/*Radix*/ 10, /*Signed*/true),
                "/",
                DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+      ResultsInError = true;
       return nullptr;
     }
 
@@ -329,11 +340,13 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_warn,
                  CE ? CE->getType() : DestTy);
+        ResultsInError = true;
         return nullptr;
       }
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::integer_literal_overflow,
                CE ? CE->getType() : DestTy);
+      ResultsInError = true;
       return nullptr;
     }
 
@@ -365,6 +378,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::integer_literal_overflow,
                CE ? CE->getType() : DestTy);
+      ResultsInError = true;
       return nullptr;
     }
 
@@ -376,13 +390,14 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
   return nullptr;
 }
 
-static SILValue constantFoldInstruction(SILInstruction &I) {
+static SILValue constantFoldInstruction(SILInstruction &I,
+                                        bool &ResultsInError) {
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
     // Constant fold calls to builtins.
     if (BuiltinFunctionRefInst *FR =
           dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-      return constantFoldBuiltin(AI, FR);
+      return constantFoldBuiltin(AI, FR, ResultsInError);
     }
     return SILValue();
   }
@@ -402,64 +417,82 @@ static SILValue constantFoldInstruction(SILInstruction &I) {
   return SILValue();
 }
 
+static bool isFoldable(SILInstruction *I) {
+  return isa<IntegerLiteralInst>(I);
+}
+
 static bool CCPFunctionBody(SILFunction &F) {
   DEBUG(llvm::errs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
-  // Initialize the worklist to all of the instructions ready to process.
-  llvm::SetVector<SILInstruction*> WorkList;
+  // The list of instructions whose evaluation resulted in errror or warning.
+  // This is used to avoid duplicate error reporting in case we reach the same
+  // instruction from different entry points in the WorkList.
+  llvm::DenseSet<SILInstruction*> ErrorSet;
+
+  // The worklist of the constants that could be folded into their users.
+  llvm::SetVector<ValueBase*> WorkList;
+  // Initialize the worklist to all of the constant instructions.
   for (auto &BB : F) {
     for (auto &I : BB) {
-      if (!I.use_empty())
+      if (isFoldable(&I) && !I.use_empty())
         WorkList.insert(&I);
     }
   }
 
-  // Try to fold instructions in the list one by one.
-  bool Folded = false;
   while (!WorkList.empty()) {
-    SILInstruction *I = *WorkList.begin();
+    ValueBase *I = *WorkList.begin();
     WorkList.remove(I);
 
-    if (I->use_empty()) continue;
-
-    // Try to fold the instruction.
-    SILValue C = constantFoldInstruction(*I);
-    if (!C) continue;
-    
-    // The users could be constant propagatable now.
+    // Go through all users of the constant and try to fold them.
+    llvm::DenseSet<SILInstruction*> FoldedUsers;
     for (auto Use : I->getUses()) {
       SILInstruction *User = cast<SILInstruction>(Use->getUser());
-      WorkList.insert(User);
+
+      // It is possible that we had processed this user already. Do not try
+      // to fold it again if we had previously produced an error while folding
+      // it.
+      // (It is not always possible to fold an instruction in case of error.)
+      if (ErrorSet.count(User))
+        continue;
 
       // TODO: This is handling folding of tupleelement/tuple and
       // structelement/structs inline with constant folding.  This should
       // probably handle them in the prepass, instead of handling them in the
       // worklist loop.  They are conceptually very different operations and
       // are technically not constant folding.
-      
+      //
       // Some constant users may indirectly cause folding of their users.
       if (isa<StructInst>(User) || isa<TupleInst>(User)) {
-        for (auto UseUseI = User->use_begin(),
-             UseUseE = User->use_end(); UseUseI != UseUseE; ++UseUseI) {
-          WorkList.insert(cast<SILInstruction>(UseUseI.getUser()));
-        }
+        WorkList.insert(User);
+        continue;
       }
+
+      // Try to fold the user.
+      bool ResultsInError = false;
+      SILValue C = constantFoldInstruction(*User, ResultsInError);
+      if (ResultsInError)
+        ErrorSet.insert(User);
+
+      if (!C) continue;
+
+      FoldedUsers.insert(User);
+      ++NumInstFolded;
+
+      // We were able to fold, so all users should use the new folded value.
+      assert(User->getTypes().size() == 1 &&
+             "Currently, we only support single result instructions");
+      SILValue(User).replaceAllUsesWith(C);
+
+      // The new constant could be further folded now, add it to the worklist.
+      WorkList.insert(C.getDef());
     }
 
-    // We were able to fold, so all users should use the new folded value.
-    assert(I->getTypes().size() == 1 &&
-           "Currently, we only support single result instructions");
-    SILValue(I).replaceAllUsesWith(C);
+    // Eagerly DCE. We do this after visiting all users to ensure we don't
+    // invalidate the uses iterator.
+    for (auto U : FoldedUsers)
+      recursivelyDeleteTriviallyDeadInstructions(U);
 
-    // Remove the unused instruction.
-    WorkList.remove(I);
-
-    // Eagerly DCE.
-    recursivelyDeleteTriviallyDeadInstructions(I);
-
-    Folded = true;
-    ++NumInstFolded;
   }
 
   return false;
