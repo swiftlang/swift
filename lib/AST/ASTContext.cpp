@@ -277,14 +277,16 @@ void ASTContext::lookupInSwiftModule(
                    StringRef name,
                    SmallVectorImpl<ValueDecl *> &results) const {
   // Find the "swift" module.
-  auto module = LoadedModules.find(StdlibModuleName.str());
-  if (module == LoadedModules.end())
+  std::pair<Identifier, SourceLoc> ModulePath[] = {
+    { StdlibModuleName, SourceLoc() }
+  };
+  Module *M = getLoadedModule(ModulePath);
+  if (!M)
     return;
 
   // Find all of the declarations with this name in the Swift module.
   auto identifier = getIdentifier(name);
-  module->second->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
-                              results);
+  M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
 }
 
 /// Find the generic implementation declaration for the named syntactic-sugar
@@ -648,20 +650,29 @@ ArrayRef<ValueDecl *> ASTContext::getConformances(ValueDecl *D) {
   return ConformingDeclMap[D];
 }
 
-Module *
-ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
-  assert(!modulePath.empty());
-  auto moduleID = modulePath[0];
+Module *ASTContext::getLoadedModule(
+    ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const {
+  assert(!ModulePath.empty());
 
   // TODO: Swift submodules.
-  if (modulePath.size() == 1) {
-    if (Module *M = LoadedModules.lookup(moduleID.first.str()))
+  if (ModulePath.size() == 1) {
+    if (Module *M = LoadedModules.lookup(ModulePath[0].first.str()))
       return M;
   }
+  return nullptr;
+}
 
+Module *
+ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
+  assert(!ModulePath.empty());
+
+  if (auto *M = getLoadedModule(ModulePath))
+    return M;
+
+  auto moduleID = ModulePath[0];
   for (auto importer : Impl.ModuleLoaders) {
-    if (Module *M = importer->loadModule(moduleID.second, modulePath)) {
-      if (modulePath.size() == 1 && modulePath[0].first == StdlibModuleName)
+    if (Module *M = importer->loadModule(moduleID.second, ModulePath)) {
+      if (ModulePath.size() == 1 && ModulePath[0].first == StdlibModuleName)
         recordKnownProtocols(M);
       return M;
     }

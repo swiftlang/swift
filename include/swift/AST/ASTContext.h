@@ -410,13 +410,18 @@ public:
   /// If there is no Clang module loader, returns a null smart pointer.
   llvm::IntrusiveRefCntPtr<ModuleLoader> getClangModuleLoader() const;
 
+  /// \returns a module with a given name that was already loaded.  If the
+  /// module was not loaded, returns nullptr.
+  Module *getLoadedModule(
+      ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
+
   /// \brief Attempts to load a module into this ASTContext.
   ///
   /// If a module by this name has already been loaded, the existing module will
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath);
+  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
 
   /// \brief Add a new module loading listener to this AST context.
   void addModuleLoadListener(ModuleLoadListener &Listener);
