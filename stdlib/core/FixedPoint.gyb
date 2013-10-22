@@ -205,9 +205,7 @@ func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   var tmp = ${Self}.${method}(lhs, rhs)
-  if tmp.1 {
-    Builtin.int_trap()
-  }
+  Builtin.condfail(tmp.1._getBuiltinLogicValue())
   return tmp.0
 }
 @ end
