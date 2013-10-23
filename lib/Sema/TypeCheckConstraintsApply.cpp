@@ -380,6 +380,68 @@ namespace {
       auto containerTy
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
+      // Handle references to generic functions that aren't archetype or
+      // existential members.
+      if (openedFullType && isa<FuncDecl>(member) &&
+          member->getInterfaceType() &&
+          member->getInterfaceType()->is<GenericFunctionType>() &&
+          !(isa<ProtocolDecl>(member->getDeclContext()) &&
+            (baseTy->is<ArchetypeType>() || baseTy->isExistentialType()))) {
+        auto func = cast<FuncDecl>(member);
+
+        // Build a reference to the generic member.
+        SmallVector<Substitution, 4> substitutions;
+        Type substTy = solution.computeSubstitutions(
+                         func->getInterfaceType()
+                           ->castTo<GenericFunctionType>(),
+                         func,
+                         openedFullType,
+                         substitutions);
+
+        auto &ctx = solution.getConstraintSystem().getASTContext();
+        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
+                                                          substitutions),
+                                          memberLoc, Implicit);
+        ref->setType(substTy);
+
+        // If we're refering to the member of a module, we're done.
+        if (baseTy->is<ModuleType>()) {
+          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+        }
+
+        // Otherwise, convert the base.
+        auto openedBaseType = openedFullType->castTo<FunctionType>()
+                                ->getInput()->getRValueInstanceType();
+        containerTy = solution.simplifyType(tc, openedBaseType);
+        if (baseIsInstance) {
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = coerceObjectArgumentToType(
+                   base, containerTy,
+                   locator.withPathElement(ConstraintLocator::MemberRefBase));
+        } else {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base, MetaTypeType::get(containerTy, context),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+          base = tc.coerceToRValue(base);
+        }
+        assert(base && "Unable to convert base?");
+
+        ApplyExpr *apply;
+        if (isa<ConstructorDecl>(member)) {
+          // FIXME: Provide type annotation.
+          apply = new (context) ConstructorRefCallExpr(ref, base);
+        } else if (!baseIsInstance && member->isInstanceMember()) {
+          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+        } else {
+          assert((!baseIsInstance || member->isInstanceMember()) &&
+                 "can't call a static method on an instance");
+          apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        }
+        return finishApply(apply, openedType, nullptr);
+      }
+
       // Member references into an archetype or existential type that resolves
       // to a protocol requirement.
       if (containerTy && containerTy->is<ProtocolType>() &&
@@ -438,65 +500,6 @@ namespace {
         // Otherwise, just simplify the type of this reference directly.
         result->setType(simplifyType(openedType));
         return result;
-      }
-
-      // Handle references to generic functions.
-      if (openedFullType && isa<FuncDecl>(member) &&
-          member->getInterfaceType() &&
-          member->getInterfaceType()->is<GenericFunctionType>()) {
-        auto func = cast<FuncDecl>(member);
-
-        // Build a reference to the generic member.
-        SmallVector<Substitution, 4> substitutions;
-        Type substTy = solution.computeSubstitutions(
-                         func->getInterfaceType()
-                           ->castTo<GenericFunctionType>(),
-                         func,
-                         openedFullType,
-                         substitutions);
-
-        auto &ctx = solution.getConstraintSystem().getASTContext();
-        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
-                                                          substitutions),
-                                          memberLoc, Implicit);
-        ref->setType(substTy);
-
-        // If we're refering to the member of a module, we're done.
-        if (baseTy->is<ModuleType>()) {
-          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-        }
-
-        // Otherwise, convert the base.
-        auto openedBaseType = openedFullType->castTo<FunctionType>()
-                                ->getInput()->getRValueInstanceType();
-        containerTy = solution.simplifyType(tc, openedBaseType);
-        if (baseIsInstance) {
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
-          base = coerceObjectArgumentToType(
-                   base, containerTy,
-                   locator.withPathElement(ConstraintLocator::MemberRefBase));
-        } else {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(containerTy, context),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
-          base = tc.coerceToRValue(base);
-        }
-        assert(base && "Unable to convert base?");
-
-        ApplyExpr *apply;
-        if (isa<ConstructorDecl>(member)) {
-          // FIXME: Provide type annotation.
-          apply = new (context) ConstructorRefCallExpr(ref, base);
-        } else if (!baseIsInstance && member->isInstanceMember()) {
-          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-        } else {
-          assert((!baseIsInstance || member->isInstanceMember()) &&
-                 "can't call a static method on an instance");
-          apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
-        }
-        return finishApply(apply, openedType, nullptr);
       }
 
       // Reference to a member of a generic type.
