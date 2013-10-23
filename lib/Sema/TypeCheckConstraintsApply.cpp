@@ -358,6 +358,42 @@ namespace {
                                   ConstraintLocatorBuilder locator);
 
   public:
+    /// \brief Build a reference to the given declaration.
+    Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
+                       ConstraintLocatorBuilder locator,
+                       bool specialized, bool implicit) {
+      // Determine the declaration selected for this overloaded reference.
+      auto &ctx = cs.getASTContext();
+
+      if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+        // If this a member of a protocol, build an appropriate operator
+        // reference.
+        return buildProtocolOperatorRef(proto, decl, loc,
+                                        openedType,
+                                        cs.getConstraintLocator(locator),
+                                        implicit);
+      }
+
+      // If this is a declaration with generic function type, build a
+      // specialized reference to it.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (auto interfaceTy = func->getInterfaceType()) {
+          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
+            SmallVector<Substitution, 4> substitutions;
+            auto type = solution.computeSubstitutions(genericFn, func,
+                                                      openedType,
+                                                      substitutions);
+            return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl,
+                                                         substitutions),
+                                         loc, implicit, type);
+          }
+        }
+      }
+
+      auto type = simplifyType(openedType);
+      return new (ctx) DeclRefExpr(decl, loc, implicit, type);
+    }
+
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
@@ -1259,64 +1295,13 @@ namespace {
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
-      auto fromType = expr->getType();
-
-      if (auto proto
-            = dyn_cast<ProtocolDecl>(expr->getDecl()->getDeclContext())) {
-        // If this a member of a protocol, build an appropriate operator
-        // reference.
-        return buildProtocolOperatorRef(proto,
-                                        expr->getDecl(), expr->getLoc(),
-                                        fromType,
-                                        cs.getConstraintLocator(expr, { }),
-                                        expr->isImplicit());
-      }
-
-      // Set the type of this expression to the actual type of the reference.
-      expr->setType(getTypeOfDeclReference(expr->getDecl(),
-                                           expr->isSpecialized()));
-
-      // If there is no type variable in the original expression type, we're
-      // done.
-      if (!fromType->hasTypeVariable())
-        return expr;
-
-      // If this is a declaration with generic function type, specialize it.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(expr->getDecl())) {
-        if (auto interfaceTy = func->getInterfaceType()) {
-          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
-            auto &ctx = cs.TC.Context;
-            SmallVector<Substitution, 4> substitutions;
-            auto type = solution.computeSubstitutions(genericFn, func, fromType,
-                                                      substitutions);
-            expr->setDeclRef(ConcreteDeclRef(ctx, expr->getDecl(),
-                                             substitutions));
-            expr->setType(type);
-            return expr;
-          }
-        }
-      }
-
-      // We're using generic function types now.
-      assert(!expr->getType()->is<PolymorphicFunctionType>());
-
-      simplifyExprType(expr);
-
-      // Check whether this is a generic type.
-      if (auto meta = expr->getType()->getAs<MetaTypeType>()) {
-        if (meta->getInstanceType()->is<UnboundGenericType>()) {
-          // If so, type the declref as the bound generic type.
-          // FIXME: Is this right?
-          auto simplifiedType = simplifyType(fromType);
-          expr->setType(simplifiedType);
-          return expr;
-        }
-      }
-
-      // No polymorphic function; this a reference to a declaration with a
-      // deduced type, such as $0.
-      simplifyExprType(expr);
-      return expr;
+      // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
+      // new one?
+      return buildDeclRef(expr->getDecl(), expr->getLoc(),
+                          expr->getType(),
+                          cs.getConstraintLocator(expr, { }),
+                          expr->isSpecialized(),
+                          expr->isImplicit());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -1374,48 +1359,13 @@ namespace {
 
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
-      auto &context = cs.getASTContext();
-      auto selected = getOverloadChoice(cs.getConstraintLocator(expr, { }));
+      auto locator = cs.getConstraintLocator(expr, { });
+      auto selected = getOverloadChoice(locator);
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-        // If this a member of a protocol, build an appropriate operator
-        // reference.
-        return buildProtocolOperatorRef(proto,
-                                        decl, expr->getLoc(),
-                                        selected.openedType,
-                                        cs.getConstraintLocator(expr, { }),
-                                        expr->isImplicit());
-      }
-
-      // If this is a declaration with generic function type, build a
-      // specialized reference to it.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (auto interfaceTy = func->getInterfaceType()) {
-          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
-            auto &ctx = cs.TC.Context;
-            SmallVector<Substitution, 4> substitutions;
-            auto type = solution.computeSubstitutions(genericFn, func,
-                                                      selected.openedType,
-                                                      substitutions);
-            return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl,
-                                                         substitutions),
-                                         expr->getLoc(), expr->isImplicit(),
-                                         type);
-          }
-        }
-      }
-
-      // Normal path: build a declaration reference.
-      auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
-      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
-                                              expr->isImplicit(), type);
-
-      // We're using generic function types now.
-      assert(!result->getType()->is<PolymorphicFunctionType>());
-
-      return result;
+      return buildDeclRef(decl, expr->getLoc(), selected.openedType,
+                          locator, expr->isSpecialized(), expr->isImplicit());
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
@@ -2068,8 +2018,12 @@ namespace {
         return nullptr;
       return result;
     }
-    
+
     Expr *visitAssignExpr(AssignExpr *expr) {
+      llvm_unreachable("Handled by ExprWalker");
+    }
+
+    Expr *visitAssignExpr(AssignExpr *expr, ConstraintLocator *srcLocator) {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       //
@@ -2078,13 +2032,10 @@ namespace {
       if (!destTy)
         return nullptr;
 
-      auto assignLocator = cs.getConstraintLocator(expr->getSrc(),
-                                               ConstraintLocator::AssignSource);
-
       // Convert the source to the simplified destination type.
       Expr *src = solution.coerceToType(expr->getSrc(),
                                         destTy,
-                                        assignLocator);
+                                        srcLocator);
       if (!src)
         return nullptr;
       
@@ -3441,13 +3392,18 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
           return { false, nullptr };
         
         --LeftSideOfAssignment;
-        
+
+        auto &cs = Rewriter.getConstraintSystem();
+        auto srcLocator = cs.getConstraintLocator(
+                            assign->getSrc(),
+                            ConstraintLocator::AssignSource);
+
         if (auto src = assign->getSrc()->walk(*this))
           assign->setSrc(src);
         else
           return { false, nullptr };
         
-        expr = Rewriter.visitAssignExpr(assign);
+        expr = Rewriter.visitAssignExpr(assign, srcLocator);
         return { false, expr };
       }
       
