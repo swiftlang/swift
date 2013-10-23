@@ -376,6 +376,17 @@ namespace {
       return checkLValue(Dest->getType(), "LHS of assignment");
     }
 
+    void verifyChecked(DeclRefExpr *E) {
+      if (E->getType()->is<PolymorphicFunctionType>() &&
+          !isa<TypeDecl>(E->getDecl()) &&
+          !E->getDecl()->getDeclContext()->isTypeContext()) {
+        Out << "non-type declaration reference with polymorphic type "
+          << E->getType().getString() << "\n";
+        E->dump(Out);
+        abort();
+      }
+    }
+
     void verifyChecked(AssignExpr *S) {
       Type lhsTy = checkAssignDest(S->getDest());
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");

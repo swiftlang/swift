@@ -440,60 +440,67 @@ namespace {
         return result;
       }
 
-      // Reference to a member of a generic type.
-      if (containerTy && containerTy->isUnspecializedGeneric()) {
-        if (openedFullType && isa<FuncDecl>(member) &&
-            member->getInterfaceType()->is<GenericFunctionType>()) {
-          auto func = cast<FuncDecl>(member);
+      // Handle references to generic functions.
+      if (openedFullType && isa<FuncDecl>(member) &&
+          member->getInterfaceType() &&
+          member->getInterfaceType()->is<GenericFunctionType>()) {
+        auto func = cast<FuncDecl>(member);
 
-          // Convert the base.
-          auto openedBaseType = openedFullType->castTo<FunctionType>()
-                                  ->getInput()->getRValueInstanceType();
-          containerTy = solution.simplifyType(tc, openedBaseType);
-          if (baseIsInstance) {
-            // Convert the base to the appropriate container type, turning it
-            // into an lvalue if required.
-            base = coerceObjectArgumentToType(
-                     base, containerTy,
-                     locator.withPathElement(ConstraintLocator::MemberRefBase));
-          } else {
-            // Convert the base to an rvalue of the appropriate metatype.
-            base = coerceToType(base, MetaTypeType::get(containerTy, context),
-                                locator.withPathElement(
-                                  ConstraintLocator::MemberRefBase));
-            base = tc.coerceToRValue(base);
-          }
-          assert(base && "Unable to convert base?");
+        // Build a reference to the generic member.
+        SmallVector<Substitution, 4> substitutions;
+        Type substTy = solution.computeSubstitutions(
+                         func->getInterfaceType()
+                           ->castTo<GenericFunctionType>(),
+                         func,
+                         openedFullType,
+                         substitutions);
 
-          // Reference to the generic member.
-          SmallVector<Substitution, 4> substitutions;
-          Type substTy = solution.computeSubstitutions(
-                           func->getInterfaceType()->castTo<GenericFunctionType>(),
-                           func,
-                           openedFullType,
-                           substitutions);
+        auto &ctx = solution.getConstraintSystem().getASTContext();
+        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
+                                                          substitutions),
+                                          memberLoc, Implicit);
+        ref->setType(substTy);
 
-          auto &ctx = solution.getConstraintSystem().getASTContext();
-          Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
-                                                            substitutions),
-                                            memberLoc, Implicit);
-          ref->setType(substTy);
-
-          ApplyExpr *apply;
-          if (isa<ConstructorDecl>(member)) {
-            // FIXME: Provide type annotation.
-            apply = new (context) ConstructorRefCallExpr(ref, base);
-          } else if (!baseIsInstance && member->isInstanceMember()) {
-            return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-          } else {
-            assert((!baseIsInstance || member->isInstanceMember()) &&
-                   "can't call a static method on an instance");
-            apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
-          }
-          return finishApply(apply, openedType, nullptr);
+        // If we're refering to the member of a module, we're done.
+        if (baseTy->is<ModuleType>()) {
+          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
         }
 
+        // Otherwise, convert the base.
+        auto openedBaseType = openedFullType->castTo<FunctionType>()
+                                ->getInput()->getRValueInstanceType();
+        containerTy = solution.simplifyType(tc, openedBaseType);
+        if (baseIsInstance) {
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = coerceObjectArgumentToType(
+                   base, containerTy,
+                   locator.withPathElement(ConstraintLocator::MemberRefBase));
+        } else {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base, MetaTypeType::get(containerTy, context),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+          base = tc.coerceToRValue(base);
+        }
+        assert(base && "Unable to convert base?");
 
+        ApplyExpr *apply;
+        if (isa<ConstructorDecl>(member)) {
+          // FIXME: Provide type annotation.
+          apply = new (context) ConstructorRefCallExpr(ref, base);
+        } else if (!baseIsInstance && member->isInstanceMember()) {
+          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+        } else {
+          assert((!baseIsInstance || member->isInstanceMember()) &&
+                 "can't call a static method on an instance");
+          apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        }
+        return finishApply(apply, openedType, nullptr);
+      }
+
+      // Reference to a member of a generic type.
+      if (containerTy && containerTy->isUnspecializedGeneric()) {
         // Figure out the substitutions required to convert to the base.
         GenericParamList *genericParams = nullptr;
         TypeSubstitutionMap substitutions;

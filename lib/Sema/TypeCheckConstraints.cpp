@@ -857,10 +857,11 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->is<ModuleType>())
-    return { baseObjTy,
-             getTypeOfReference(value, isTypeReference,
-                                /*isSpecialized=*/false) };
+  if (baseObjTy->is<ModuleType>()) {
+    auto openedType = getTypeOfReference(value, isTypeReference,
+                                         /*isSpecialized=*/false);
+    return { openedType, openedType };
+  }
 
   // Open up a generic method via its generic function type.
   if (!isa<ProtocolDecl>(value->getDeclContext()) && !isDynamicResult &&
@@ -982,7 +983,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
     type = type->castTo<AnyFunctionType>()->getResult();
   }
-  return { ownerTy,
+
+
+  return { Type(),
            adjustLValueForReference(type, value->getAttrs().isAssignment(),
                                     TC.Context) };
 }
