@@ -1295,13 +1295,27 @@ namespace {
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
+      auto locator = cs.getConstraintLocator(expr, { });
+
+      // If this is an anonymous closure argument, there's no overload
+      // associated with it.
+      if (auto var = dyn_cast<VarDecl>(expr->getDecl())) {
+        if (var->isAnonClosureParam()) {
+          return buildDeclRef(expr->getDecl(), expr->getLoc(), expr->getType(),
+                              locator, expr->isSpecialized(),
+                              expr->isImplicit());
+        }
+      }
+
+      // Find the overload choice used for this declaration reference.
+      auto selected = getOverloadChoice(locator);
+      auto choice = selected.choice;
+      auto decl = choice.getDecl();
+
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(expr->getDecl(), expr->getLoc(),
-                          expr->getType(),
-                          cs.getConstraintLocator(expr, { }),
-                          expr->isSpecialized(),
-                          expr->isImplicit());
+      return buildDeclRef(decl, expr->getLoc(), selected.openedType,
+                          locator, expr->isSpecialized(), expr->isImplicit());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {

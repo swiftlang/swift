@@ -200,31 +200,35 @@ namespace {
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If we're referring to an invalid declaration, don't type-check.
+      //
+      // FIXME: If the decl is in error, we get no information from this.
+      // We may, alternatively, want to use a type variable in that case,
+      // and possibly infer the type of the variable that way.
       if (E->getDecl()->isInvalid())
         return nullptr;
+
+      auto locator = CS.getConstraintLocator(E, { });
 
       // If this is an anonymous closure argument, take it's type and turn it
       // into an implicit lvalue type. This accounts for the fact that the
       // closure argument type itself might be inferred to an lvalue type.
       if (auto var = dyn_cast<VarDecl>(E->getDecl())) {
         if (var->isAnonClosureParam()) {
-          auto tv = CS.createTypeVariable(CS.getConstraintLocator(E, { }),
-                                          /*options=*/0);
+          auto tv = CS.createTypeVariable(locator, /*options=*/0);
           CS.addConstraint(ConstraintKind::Equal, tv, E->getDecl()->getType());
           return LValueType::get(tv, LValueType::Qual::DefaultForVar,
                                  CS.getASTContext());
         }
       }
 
-      // FIXME: If the decl is in error, we get no information from this.
-      // We may, alternatively, want to use a type variable in that case,
-      // and possibly infer the type of the variable that way.
-      return adjustLValueForReference(
-               CS.getTypeOfReference(E->getDecl(),
-                                     /*isTypeReference=*/false,
-                                     E->isSpecialized()),
-               E->getDecl()->getAttrs().isAssignment(),
-               CS.getASTContext());
+      // Create an overload choice referencing this declaration and immediately
+      // resolve it. This records the overload for use later.
+      auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+      CS.resolveOverload(locator, tv,
+                         OverloadChoice(Type(), E->getDecl(),
+                                        E->isSpecialized()));
+
+      return tv;
     }
 
     Type visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
