@@ -413,7 +413,7 @@ llvm::Value *HeapArrayInfo::getAllocationSize(IRGenFunction &IGF,
     // Scale the length by the element stride.
     llvm::APInt elementStride(sizeWidth,
                               fixedElementTI.getFixedStride().getValue());
-    assert(elementStride);
+    assert(elementStride.getBoolValue());
     auto scaledLength = lenval.umul_ov(elementStride, overflow);
     if (overflow) return getSizeMax(IGF);
 
