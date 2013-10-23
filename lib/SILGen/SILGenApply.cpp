@@ -472,7 +472,7 @@ public:
                                                  specializedUncurriedType);
     }
     
-    return {mv, ownershipRules, transparent};
+    return std::make_tuple(mv, ownershipRules, transparent);
   }
   
   ArrayRef<Substitution> getSubstitutions() const {

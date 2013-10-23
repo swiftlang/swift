@@ -1440,9 +1440,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     case AbstractCC::Method:
       break;
     }
-    return {lv.getStaticFunction().getFunction(),
-            nullptr,
-            v.getType()};
+    return std::make_tuple(lv.getStaticFunction().getFunction(),
+                           nullptr, v.getType());
   case LoweredValue::Kind::Explosion:
   case LoweredValue::Kind::MetatypeValue:
   case LoweredValue::Kind::BuiltinValue: {
@@ -1451,8 +1450,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     llvm::Value *context = nullptr;
     if (!v.getType().castTo<AnyFunctionType>()->isThin())
       context = ex.claimNext();
-    
-    return {fn, context, v.getType()};
+
+    return std::make_tuple(fn, context, v.getType());
   }
   }
 }

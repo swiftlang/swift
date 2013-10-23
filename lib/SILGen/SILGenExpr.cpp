@@ -1030,7 +1030,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                       ->substGenericArgs(SGM.SwiftModule, allSubs));
   }
   
-  return {ManagedValue(methodValue, ManagedValue::Unmanaged),methodTy,allSubs};
+  return std::make_tuple(ManagedValue(methodValue, ManagedValue::Unmanaged),
+                         methodTy, allSubs);
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,

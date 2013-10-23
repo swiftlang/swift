@@ -110,7 +110,7 @@ public:
     auto size = emitLoadOfSize(IGF, wtable);
     auto align = emitLoadOfAlignmentMask(IGF, wtable);
     auto stride = emitLoadOfStride(IGF, wtable);
-    return { size, align, stride };
+    return std::make_tuple(size, align, stride);
   }
 
   llvm::Value *getSize(IRGenFunction &IGF) const override {

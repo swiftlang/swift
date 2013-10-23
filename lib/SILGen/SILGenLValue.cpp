@@ -598,8 +598,8 @@ emitSpecializedFunctionRef(SILGenFunction &gen,
   // Make the substitution.  This is valid by the known constraints
   // on these generic intrinsics.
   auto sub = getSimpleSubstitution(polyFnType, typeArg);
-  
-  return {fnVal, substType, sub};
+
+  return std::make_tuple(fnVal, substType, sub);
 }
 
 static CanType getOptionalValueType(SILType optType) {

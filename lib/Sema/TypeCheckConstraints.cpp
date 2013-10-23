@@ -2870,8 +2870,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         assert(solverState && "Can't record restriction without solver state");
         if (constraint.getKind() == ConstraintKind::Conversion) {
           solverState->constraintRestrictions.push_back(
-            { constraint.getFirstType(), constraint.getSecondType(),
-              *restriction });
+              std::make_tuple(constraint.getFirstType(),
+                              constraint.getSecondType(), *restriction));
         }
         break;
       }

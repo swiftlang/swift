@@ -113,9 +113,9 @@ FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF) const {
 }
 std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
 FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const {
-  return {FixedTypeInfo::getSize(IGF),
-          FixedTypeInfo::getAlignmentMask(IGF),
-          FixedTypeInfo::getStride(IGF)};
+  return std::make_tuple(FixedTypeInfo::getSize(IGF),
+                         FixedTypeInfo::getAlignmentMask(IGF),
+                         FixedTypeInfo::getStride(IGF));
 }
 
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {
@@ -541,25 +541,27 @@ const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
 /// alignment.
 static std::tuple<llvm::Type *, Size, Alignment>
 convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
+  using RetTy = std::tuple<llvm::Type *, Size, Alignment>;
   llvm::LLVMContext &ctx = IGM.getLLVMContext();
   TypeBase *ty = canTy.getPointer();
   switch (ty->getKind()) {
   case TypeKind::BuiltinRawPointer:
-    return { IGM.Int8PtrTy, IGM.getPointerSize(), IGM.getPointerAlignment() };
+    return RetTy{ IGM.Int8PtrTy, IGM.getPointerSize(),
+                  IGM.getPointerAlignment() };
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
     case BuiltinFloatType::IEEE16:
-      return { llvm::Type::getHalfTy(ctx), Size(2), Alignment(2) };
+      return RetTy{ llvm::Type::getHalfTy(ctx), Size(2), Alignment(2) };
     case BuiltinFloatType::IEEE32:
-      return { llvm::Type::getFloatTy(ctx), Size(4), Alignment(4) };
+      return RetTy{ llvm::Type::getFloatTy(ctx), Size(4), Alignment(4) };
     case BuiltinFloatType::IEEE64:
-      return { llvm::Type::getDoubleTy(ctx), Size(8), Alignment(8) };
+      return RetTy{ llvm::Type::getDoubleTy(ctx), Size(8), Alignment(8) };
     case BuiltinFloatType::IEEE80:
-      return { llvm::Type::getX86_FP80Ty(ctx), Size(16), Alignment(16) };
+      return RetTy{ llvm::Type::getX86_FP80Ty(ctx), Size(16), Alignment(16) };
     case BuiltinFloatType::IEEE128:
-      return { llvm::Type::getFP128Ty(ctx), Size(16), Alignment(16) };
+      return RetTy{ llvm::Type::getFP128Ty(ctx), Size(16), Alignment(16) };
     case BuiltinFloatType::PPC128:
-      return { llvm::Type::getPPC_FP128Ty(ctx),Size(16), Alignment(16) };
+      return RetTy{ llvm::Type::getPPC_FP128Ty(ctx),Size(16), Alignment(16) };
     }
     llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
@@ -569,7 +571,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     if (!llvm::isPowerOf2_32(ByteSize))
       ByteSize = llvm::NextPowerOf2(ByteSize);
 
-    return { llvm::IntegerType::get(ctx, BitWidth), Size(ByteSize),
+    return RetTy{ llvm::IntegerType::get(ctx, BitWidth), Size(ByteSize),
              Alignment(ByteSize) };
   }
   case TypeKind::BuiltinVector: {
@@ -586,7 +588,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     if (!llvm::isPowerOf2_32(bitSize))
       bitSize = llvm::NextPowerOf2(bitSize);
 
-    return { llvmVecTy, Size(bitSize / 8), align };
+    return RetTy{ llvmVecTy, Size(bitSize / 8), align };
   }
   default:
     llvm_unreachable("Not a primitive builtin type");

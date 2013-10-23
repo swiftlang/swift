@@ -583,7 +583,8 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
         }
 
         if (visitedProtocols.insert(testProto))
-          stack.push_back({testProto, currentNominal, currentOwner});
+          stack.push_back(
+              std::make_tuple(testProto, currentNominal, currentOwner));
       }
 
       return false;
@@ -592,7 +593,7 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
   resolver->resolveDeclSignature(nominal);
 
   // Walk the stack of types to find a conformance.
-  stack.push_back({nominal, nominal, nominal});
+  stack.push_back(std::make_tuple(nominal, nominal, nominal));
   while (!stack.empty()) {
     NominalTypeDecl *current;
     NominalTypeDecl *currentNominal;
@@ -604,7 +605,7 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
     if (auto classDecl = dyn_cast<ClassDecl>(current)) {
       if (auto superclassTy = classDecl->getSuperclass()) {
         auto nominal = superclassTy->getAnyNominal();
-        stack.push_back({nominal, nominal, nominal});
+        stack.push_back(std::make_tuple(nominal, nominal, nominal));
       }
     }
 
@@ -625,7 +626,7 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
   // If we didn't find the protocol, we don't conform. Cache the negative result
   // and return.
   if (!owningNominal) {
-    return { nullptr, nullptr, nullptr };
+    return std::make_tuple(nullptr, nullptr, nullptr);
   }
 
   // If we don't have a nominal conformance, but we do have a resolver, try
@@ -639,10 +640,11 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
 
   // If we have a nominal conformance, we're done.
   if (nominalConformance) {
-    return { owningNominal, declaresConformance, nominalConformance };
+    return std::make_tuple(owningNominal, declaresConformance,
+                           nominalConformance);
   }
 
-  return { nullptr, nullptr, nullptr };
+  return std::make_tuple(nullptr, nullptr, nullptr);
 }
 
 LookupConformanceResult Module::lookupConformance(Type type,
