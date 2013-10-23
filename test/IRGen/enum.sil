@@ -970,6 +970,84 @@ entry(%r : $*DynamicSinglePayload<T>):
   return %v : $()
 }
 
+// -- Ensure instantiations of single-payload types with empty payloads work.
+//    Bug discovered by Greg Parker.
+
+
+// CHECK: define void @dynamic_single_payload_empty_payload_switch(i2) {
+// CHECK:   switch i2 {{%.*}}, label {{.*}} [
+// CHECK:     i2 0, label {{.*}}
+// CHECK:     i2 1, label {{.*}}
+// CHECK:     i2 -2, label {{.*}}
+// CHECK:     i2 -1, label {{.*}}
+// CHECK:   ]
+sil @dynamic_single_payload_empty_payload_switch : $DynamicSinglePayload<()> -> () {
+entry(%x : $DynamicSinglePayload<()>):
+  switch_enum %x : $DynamicSinglePayload<()>, case #DynamicSinglePayload.x!enumelt.1: x_case, case #DynamicSinglePayload.y!enumelt: y_case, case #DynamicSinglePayload.z!enumelt: z_case, default default_case
+
+x_case(%a : $()):
+  br end(%a : $())
+
+y_case:
+  %b = tuple ()
+  br end(%b : $())
+
+z_case:
+  %c = tuple ()
+  br end(%c : $())
+
+default_case:
+  %d = tuple ()
+  br end(%d : $())
+
+end(%z : $()):
+  return %z : $()
+}
+
+// CHECK: define i2 @dynamic_single_payload_empty_payload_load(%O4enum20DynamicSinglePayload.2*) {
+// CHECK: entry:
+// CHECK:   %1 = bitcast %O4enum20DynamicSinglePayload.2* %0 to i2*
+// CHECK:   %2 = load i2* %1, align 1
+// CHECK:   ret i2 %2
+// CHECK: }
+sil @dynamic_single_payload_empty_payload_load : $(@inout DynamicSinglePayload<()>) -> DynamicSinglePayload<()> {
+entry(%p : $*DynamicSinglePayload<()>):
+  %x = load %p : $*DynamicSinglePayload<()>
+  return %x : $DynamicSinglePayload<()>
+}
+
+// CHECK: define void @dynamic_single_payload_empty_payload_store(%O4enum20DynamicSinglePayload.2*, i2) {
+// CHECK: entry:
+// CHECK:   %2 = bitcast %O4enum20DynamicSinglePayload.2* %0 to i2*
+// CHECK:   store i2 %1, i2* %2, align 1
+// CHECK:   ret void
+// CHECK: }
+sil @dynamic_single_payload_empty_payload_store : $(@inout DynamicSinglePayload<()>, DynamicSinglePayload<()>) -> () {
+entry(%p : $*DynamicSinglePayload<()>, %x : $DynamicSinglePayload<()>):
+  store %x to %p : $*DynamicSinglePayload<()>
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK: define i2 @dynamic_single_payload_empty_payload_inject_payload() {
+// CHECK: entry:
+// CHECK:   ret i2 0
+// CHECK: }
+sil @dynamic_single_payload_empty_payload_inject_payload : $() -> DynamicSinglePayload<()> {
+  %v = tuple ()
+  %u = enum $DynamicSinglePayload<()>, #DynamicSinglePayload.x!enumelt, %v : $()
+  return %u : $DynamicSinglePayload<()>
+}
+
+// CHECK: define i2 @dynamic_single_payload_empty_payload_inject_no_payload() {
+// CHECK: entry:
+// CHECK:   ret i2 1
+// CHECK: }
+sil @dynamic_single_payload_empty_payload_inject_no_payload : $() -> DynamicSinglePayload<()> {
+  %u = enum $DynamicSinglePayload<()>, #DynamicSinglePayload.y!enumelt
+  return %u : $DynamicSinglePayload<()>
+}
+
 enum MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
   case y(Builtin.Int32)
