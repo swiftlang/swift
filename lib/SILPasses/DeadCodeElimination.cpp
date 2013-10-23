@@ -34,6 +34,13 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
+/// Information about a folded conditional branch instruction: it's location
+/// and whether the condition evaluated to true or false.
+struct BranchFoldInfo {
+  SILLocation Loc;
+  bool CondIsAlwaysTrue;
+};
+
 /// \class UnreachableUserCodeReportingState Contains extra state we need to
 /// communicate from condition branch folding stage to the unreachable blocks
 /// removal stage of the path.
@@ -45,15 +52,26 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// it possible.
 class UnreachableUserCodeReportingState {
 public:
-  /// The set of blocks that became unreachbale due to conditional branch
-  /// folding, etc.
-  /// Make this a set vector since several blocks may lead to the same error
+  /// \brief The set of top-level blocks that became immediately unreachbale due
+  /// to conditional branch folding, etc.
+  ///
+  /// This is a SetVector since several blocks may lead to the same error
   /// report and we iterate through these when producing the diagnostic.
+  // TODO: this could be a vector.
   llvm::SetVector<const SILBasicBlock*> UnreachableBlocks;
 
-  /// The set of blocks in which we reported unreachable code errors.
+  /// \brief The set of blocks in which we reported unreachable code errors.
   /// These are used to ensure that we don't issue duplicate reports.
+  ///
+  /// Note, this set is different from the UnreachableBlocks as these are the
+  /// blocks that do contain user code and they might not be immediate sucessors
+  /// of a folded branch.
   llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
+
+  /// A map from the UnreachableBlocks to the folded conditional branchs
+  /// that caused each of them to be unreachable. This extra info is used to
+  /// enhance the diagnostics.
+  llvm::DenseMap<const SILBasicBlock*, BranchFoldInfo> FoldInfoMap;
 };
 
 
@@ -216,6 +234,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Determine which of the successors is unreachable and create a new
       // terminator that only branches to the reachable sucessor.
       SILBasicBlock *UnreachableBlock = nullptr;
+      bool CondIsAlwaysTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
         B.createBranch(Loc,
                        CBI->getFalseBB(), CBI->getFalseArgs());
@@ -226,6 +245,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         B.createBranch(Loc,
                        CBI->getTrueBB(), CBI->getTrueArgs());
         UnreachableBlock = CBI->getFalseBB();
+        CondIsAlwaysTrue = true;
       }
       eraseAndCleanup(TI);
 
@@ -233,8 +253,16 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // contains user code (only if we are not within an inlined function or a
       // template instantiation).
       // FIXME: Do not report if we are within a template instatiation.
-      if (Loc.is<RegularLocation>() && State)
+      if (Loc.is<RegularLocation>() && State &&
+          !State->UnreachableBlocks.count(UnreachableBlock)) {
+        // If this is the first time we see this unreachable block, store it
+        // along with the folded branch info.
         State->UnreachableBlocks.insert(UnreachableBlock);
+        State->FoldInfoMap.insert(
+          std::pair<const SILBasicBlock*,
+                    BranchFoldInfo>(UnreachableBlock,
+                                    BranchFoldInfo{Loc, CondIsAlwaysTrue}));
+      }
 
       return true;
     }
@@ -375,7 +403,8 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
 static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
                                      SILModule &M,
                                      const SILBasicBlockSet &Reachable,
-                                     UnreachableUserCodeReportingState *State) {
+                                     UnreachableUserCodeReportingState *State,
+                                     const SILBasicBlock *TopLevelB = nullptr) {
   assert(State);
   for (auto I = B.begin(), E = B.end(); I != E; ++I) {
     SILLocation Loc = I->getLoc();
@@ -397,6 +426,13 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         !State->BlocksWithErrors.count(&B)) {
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::unreachable_code);
+
+      // Emit the note on the branch responsible for the unreachable code.
+      auto BrInfo = State->FoldInfoMap.find(TopLevelB);
+      if (BrInfo != State->FoldInfoMap.end()) {
+        diagnose(M.getASTContext(), BrInfo->second.Loc.getSourceLoc(),
+          diag::unreachable_code_branch, BrInfo->second.CondIsAlwaysTrue);
+      }
       State->BlocksWithErrors.insert(&B);
       return true;
     }
@@ -414,7 +450,8 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
 
     // If all of the predecessors of this sucessor are unreachable, check if
     // it contains user code.
-    if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable, State))
+    if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable,
+                                                      State, TopLevelB))
       return true;
   }
   
@@ -449,7 +486,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   if (State) {
     for (auto BI = State->UnreachableBlocks.begin(),
               BE = State->UnreachableBlocks.end(); BI != BE; ++BI) {
-      diagnoseUnreachableBlock(**BI, M, Reachable, State);
+      diagnoseUnreachableBlock(**BI, M, Reachable, State, *BI);
     }
   }
 
