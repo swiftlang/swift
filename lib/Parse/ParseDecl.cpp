@@ -110,8 +110,6 @@ bool Parser::parseTopLevel() {
 ///   attribute:
 ///     'asmname' '=' identifier
 ///     'infix' '=' numeric_constant
-///     'infix_left' '=' numeric_constant
-///     'infix_right' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'
 ///     'weak'
