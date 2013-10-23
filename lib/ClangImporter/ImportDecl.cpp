@@ -2013,7 +2013,7 @@ namespace {
       result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
       result->setIsObjC(true);
 
-      // Add the implicit 'Self' associated type.
+      // Create the archetype for the implicit 'Self'.
       auto selfId = Impl.SwiftContext.getIdentifier("Self");
       auto selfDecl = result->getSelf();
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
@@ -2021,6 +2021,16 @@ namespace {
                                                  Type(result->getDeclaredType()),
                                                  Type());
       selfDecl->setArchetype(selfArchetype);
+
+      // Set the generic parameters and requirements.
+      auto genericParam = selfDecl->getDeclaredType()
+                            ->castTo<GenericTypeParamType>();
+      Requirement genericRequirements[2] = {
+        Requirement(RequirementKind::ValueWitnessMarker, genericParam, Type()),
+        Requirement(RequirementKind::Conformance, genericParam,
+                    result->getDeclaredType())
+      };
+      result->setGenericSignature(genericParam, genericRequirements);
                          
       // Import each of the members.
       SmallVector<Decl *, 4> members;
