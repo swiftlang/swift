@@ -28,4 +28,4 @@ add_swift_library(swiftIRGen
   SwiftTargetInfo.cpp
   SwiftTargetMachine.cpp
   StructLayout.cpp
-  DEPENDS swiftAST)
+  DEPENDS LLVMMC LLVMSupport LLVMCore swiftAST)

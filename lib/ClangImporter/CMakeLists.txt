@@ -15,9 +15,9 @@ add_swift_library(swiftClangImporter
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.
 target_link_libraries(swiftClangImporter
-  clangDriver
   clangFrontendTool
   clangFrontend
+  clangDriver
   clangSerialization
   clangParse
   clangSema
@@ -25,11 +25,12 @@ target_link_libraries(swiftClangImporter
   clangEdit
   clangRewriteCore
   clangRewriteFrontend
-  clangLex
   clangAST
+  clangLex
   clangBasic
   LLVMBitReader
   LLVMMC
   LLVMMCParser
   LLVMOption
-  LLVMTransformUtils)
+  LLVMTransformUtils
+  LLVMSupport)

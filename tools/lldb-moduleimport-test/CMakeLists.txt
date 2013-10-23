@@ -1,7 +1,7 @@
 add_swift_executable(lldb-moduleimport-test
   lldb-moduleimport-test.cpp
-  DEPENDS swiftParse swiftSema swiftClangImporter swiftAST swiftASTSectionImporter swiftSerialization swiftFrontend
-  COMPONENT_DEPENDS support ${LLVM_TARGETS_TO_BUILD})
+  DEPENDS swiftASTSectionImporter swiftFrontend swiftClangImporter
+  COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
 target_link_libraries(swift)
 
