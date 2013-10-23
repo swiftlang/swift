@@ -167,13 +167,15 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
                                              GenericParams, Info, Context);
 
   // Compute the interface type.
-  SmallVector<GenericTypeParamType *, 2> GenericParamTypes;
+  SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
   for (auto gp : *GenericParams) {
     GenericParamTypes.push_back(gp.getAsTypeParam()->getDeclaredType()
                                   ->castTo<GenericTypeParamType>());
   }
 
-  Type InterfaceType = GenericFunctionType::get(GenericParamTypes, { },
+  Requirement Marker(RequirementKind::ValueWitnessMarker,
+                     GenericParamTypes[0], Type());
+  Type InterfaceType = GenericFunctionType::get(GenericParamTypes, Marker,
                                                 ArgParamType, ResType,
                                                 Info, Context);
 
