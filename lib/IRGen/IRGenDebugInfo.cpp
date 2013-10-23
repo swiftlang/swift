@@ -741,6 +741,14 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   StringRef Name,
                                                   SILInstruction *I,
                                                   IndirectionKind Indirection) {
+  auto IntrinsicKind = Declare;
+  // There are variables without storage, such as "struct { func foo() {} }".
+  if (isa<llvm::UndefValue>(Storage)) {
+    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
+    Storage = llvm::ConstantInt::get(Int64Ty, 0);
+    IntrinsicKind = Value;
+  }
+
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
@@ -756,15 +764,13 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                      I->getFunction(), Src, Indirection))
         return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
-      // Generic type metadata?
+      // Is this a hidden generic type metadata argument?
       if (auto Call = dyn_cast<llvm::CallInst>(Storage))
         if (Call->getNumArgOperands() == 2) {
           auto TName = BumpAllocatedString(("$swift.type."+Name).str());
           emitVariableDeclaration(B, Call->getArgOperand(1), getSwiftType(),
                                   TName, llvm::dwarf::DW_TAG_auto_variable,
-                                  0, DirectValue, ArtificialValue);
-
-
+                                  0, DirectValue, ArtificialValue, Value);
         }
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
                                      CopyAddr->getSrc(), Indirection))
@@ -773,7 +779,8 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
   }
 
   emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, 0, Indirection);
+                          llvm::dwarf::DW_TAG_auto_variable, 0, Indirection,
+                          RealValue, IntrinsicKind);
 }
 
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
@@ -815,7 +822,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned Tag,
                                              unsigned ArgNo,
                                              IndirectionKind Indirection,
-                                             ArtificialKind Artificial) {
+                                             ArtificialKind Artificial,
+                                             IntrinsicKind DbgValue) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
   llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
   // If this is an argument, attach it to the current function scope.
@@ -856,20 +864,12 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
 
-  llvm::Instruction *Call;
-  if (isa<llvm::UndefValue>(Storage)) {
-    // There are variables without storage, such as "struct { func foo() {} }".
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    Call = DBuilder.insertDbgValueIntrinsic(llvm::ConstantInt::get(Int64Ty, 0),
-                                            0, Descriptor,
-                                            Builder.GetInsertBlock());
-  } else {
-    // Insert an llvm.dbg.declare into the current block.
-    Call = DBuilder.insertDeclare(Storage, Descriptor,
-                                  Builder.GetInsertBlock());
-
-  }
-Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
+  // Insert a debug intrinsic into the current block.
+  auto Call = DbgValue
+    ? DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor,
+                                       Builder.GetInsertBlock())
+    : DBuilder.insertDeclare(Storage, Descriptor, Builder.GetInsertBlock());
+  Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
