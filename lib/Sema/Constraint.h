@@ -63,6 +63,14 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief The first type can act as the Self type of the second type (which
+  /// is a protocol).
+  ///
+  /// This constraint is slightly looser than a conforms-to constraint, because
+  /// an existential can be used as the Self of any protocol within the
+  /// existential, even if it doesn't conform to that protocol (e.g., due to
+  /// the use of associated types).
+  SelfObjectOfProtocol,
   /// \brief Both types are function types with the same input and output types.
   /// Note, we do not require the function type attributes to match.
   ApplicableFunction,
@@ -235,6 +243,7 @@ public:
     case ConstraintKind::Conversion:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::BindOverload:
       return ConstraintClassification::Relational;

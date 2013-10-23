@@ -1544,8 +1544,13 @@ private:
   /// \param type The type being testing.
   /// \param protocol The protocol to which the type should conform.
   /// \param locator Locator describing where this constraint occurred.
+  ///
+  /// \param allowNonConformingExistential Allow an existential type that
+  /// contains the protocol but does not conform to it (i.e., due to associated
+  /// types).
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
-                                            ConstraintLocatorBuilder locator);
+                                            ConstraintLocatorBuilder locator,
+                                            bool allowNonConformingExistential);
 
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);

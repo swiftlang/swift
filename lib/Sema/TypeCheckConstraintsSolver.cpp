@@ -207,7 +207,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     switch (constraint->getClassification()) {
     case ConstraintClassification::Relational:
       // Store conformance constraints separately.
-      if (constraint->getKind() == ConstraintKind::ConformsTo) {
+      if (constraint->getKind() == ConstraintKind::ConformsTo ||
+          constraint->getKind() == ConstraintKind::SelfObjectOfProtocol) {
         if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
           // Record this constraint on the type variable.
           getTVC(firstTV).ConformsToConstraints.push_back(constraint);
@@ -777,7 +778,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     if (allowFreeTypeVariables && hasFreeTypeVariables()) {
       bool anyNonConformanceConstraints = false;
       for (auto constraint : Constraints) {
-        if (constraint->getKind() == ConstraintKind::ConformsTo)
+        if (constraint->getKind() == ConstraintKind::ConformsTo ||
+            constraint->getKind() == ConstraintKind::SelfObjectOfProtocol)
           continue;
 
         if (constraint->getKind() == ConstraintKind::TypeMember)

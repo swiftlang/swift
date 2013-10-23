@@ -262,6 +262,16 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   }
 }
 
+/// Check whether this is the depth 0, index 0 generic parameter, which is
+/// used for the 'Self' type of a protocol.
+static bool isProtocolSelfType(Type type) {
+  auto gp = type->getAs<GenericTypeParamType>();
+  if (!gp)
+    return false;
+
+  return gp->getDepth() == 0 && gp->getIndex() == 0;
+}
+
 Type ConstraintSystem::openType(
        Type startingType,
        ArrayRef<ArchetypeType *> archetypes,
@@ -430,10 +440,15 @@ Type ConstraintSystem::openType(
         case RequirementKind::Conformance: {
           auto subjectTy = TC.transformType(req.getFirstType(),
                                             replaceArchetypes);
-          if (auto proto = req.getSecondType()->getAs<ProtocolType>())
-            addConstraint(ConstraintKind::ConformsTo, subjectTy,
-                          proto);
-          else
+          if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
+            if (isa<ProtocolDecl>(dc->getParent()) &&
+                isProtocolSelfType(req.getFirstType()))
+              addConstraint(ConstraintKind::SelfObjectOfProtocol, subjectTy,
+                            proto);
+            else
+              addConstraint(ConstraintKind::ConformsTo, subjectTy,
+                            proto);
+          } else
             addConstraint(ConstraintKind::Subtype, subjectTy,
                           req.getSecondType());
           break;
@@ -834,6 +849,29 @@ Type ConstraintSystem::openTypeOfContext(
   return openType(result, openArchetypes, replacements, dc);
 }
 
+/// Add the constraint on the type used for the 'Self' type for a member
+/// reference.
+///
+/// \param cs The constraint system.
+///
+/// \param objectTy The type of the object that we're using to access the
+/// member.
+///
+/// \param selfTy The instance type of the context in which the member is
+/// declared.
+static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy){
+  // When referencing a protocol member, we need the object type to be usable
+  // as the Self type of the protocol, which covers anything that conforms to
+  // the protocol as well as existentials that include that protocol.
+  if (selfTy->is<ProtocolType>()) {
+    cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, objectTy, selfTy);
+    return;
+  }
+
+  // Otherwise, use a subtype constraint to account for class inheritance.
+  cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy);
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
@@ -873,14 +911,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                    nullptr);
 
   if (!isDynamicResult) {
-    // The base type must be convertible to the owner type. For most cases,
-    // subtyping suffices. However, the owner might be a protocol and the base a
-    // type that implements that protocol, if which case we need to model this
-    // with a conversion constraint.
-    if (ownerTy->is<ProtocolType>())
-      addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
-    else
-      addConstraint(ConstraintKind::Subtype, baseObjTy, ownerTy);
+    addSelfConstraint(*this, baseObjTy, ownerTy);
   }
 
   // Determine the type of the member.
@@ -1000,8 +1031,8 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   // Determine the 'self' object type.
   auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
 
-  // The base object type must be a subtype of the self object type.
-  addConstraint(ConstraintKind::Subtype, baseObjTy, selfObjTy);
+  // Add the constraint on the 'self' object.
+  addSelfConstraint(*this, baseObjTy, selfObjTy);
 
   // Compute the type of the reference.
   Type type = openedType;
@@ -1434,7 +1465,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   (void)existential;
 
   for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, locator)) {
+    switch (simplifyConformsToConstraint(type1, proto, locator, false)) {
       case SolutionKind::Solved:
         break;
 
@@ -1723,8 +1754,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeKind::Enum:
     case TypeKind::Struct:
-    case TypeKind::Class:
-    case TypeKind::Protocol: {
+    case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
@@ -1732,6 +1762,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       break;
     }
+
+    case TypeKind::Protocol:
+      // Nothing to do here; try existential and user-defined conversions below.
+      break;
 
     case TypeKind::MetaType: {
       auto meta1 = cast<MetaTypeType>(desugar1);
@@ -2280,7 +2314,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  ProtocolDecl *protocol,
-                                 ConstraintLocatorBuilder locator) {
+                                 ConstraintLocatorBuilder locator,
+                                 bool allowNonConformingExistential) {
   // Dig out the fixed type to which this type refers.
   while (true) {
     TypeVariableType *typeVar;
@@ -2300,9 +2335,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     break;
   }
 
-  // Check whether this type conforms to the protocol.
-  if (TC.conformsToProtocol(type, protocol, DC))
-    return SolutionKind::Solved;
+  // If existential types don't need to conform (i.e., they only need to
+  // contain the protocol), check that separately.
+  if (allowNonConformingExistential && type->isExistentialType()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    bool isExistential = type->isExistentialType(protocols);
+    assert(isExistential && "Not existential?");
+    (void)isExistential;
+
+    for (auto ap : protocols) {
+      // If this isn't the protocol we're looking for, continue looking.
+      if (ap == protocol || ap->inheritsFrom(protocol))
+        return SolutionKind::Solved;
+    }
+  } else {
+    // Check whether this type conforms to the protocol.
+    if (TC.conformsToProtocol(type, protocol, DC))
+      return SolutionKind::Solved;
+  }
 
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
@@ -2751,6 +2801,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Construction constraints don't involve type matches");
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
   case ConstraintKind::ValueMember:
@@ -2895,9 +2946,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           constraint.getLocator());
 
   case ConstraintKind::ConformsTo:
-    return simplifyConformsToConstraint(constraint.getFirstType(),
-                                        constraint.getProtocol(),
-                                        constraint.getLocator());
+  case ConstraintKind::SelfObjectOfProtocol:
+    return simplifyConformsToConstraint(
+             constraint.getFirstType(),
+             constraint.getProtocol(),
+             constraint.getLocator(),
+             constraint.getKind() == ConstraintKind::SelfObjectOfProtocol);
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:

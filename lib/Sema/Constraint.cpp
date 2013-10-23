@@ -36,6 +36,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Conversion:
   case ConstraintKind::Construction:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
     assert(Member.empty() && "Relational constraint cannot have a member");
     break;
   case ConstraintKind::ApplicableFunction:
@@ -68,7 +69,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 }
 
 ProtocolDecl *Constraint::getProtocol() const {
-  assert(Kind==ConstraintKind::ConformsTo && "Not a conformance constraint");
+  assert((Kind == ConstraintKind::ConformsTo ||
+          Kind == ConstraintKind::SelfObjectOfProtocol)
+          && "Not a conformance constraint");
   return Types.Second->castTo<ProtocolType>()->getDecl();
 }
 
@@ -114,6 +117,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Conversion: Out << " <c "; break;
   case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
+  case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
   case ConstraintKind::BindOverload: {
     // FIXME: Better output here.
