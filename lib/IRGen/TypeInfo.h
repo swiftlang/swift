@@ -51,6 +51,18 @@ namespace irgen {
   class RValue;
   class RValueSchema;
 
+/// Ways in which an object can fit into a fixed-size buffer.
+enum class FixedPacking {
+  /// It fits at offset zero.
+  OffsetZero,
+  
+  /// It doesn't fit and needs to be side-allocated.
+  Allocate,
+  
+  /// It needs to be checked dynamically.
+  Dynamic
+};
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -261,6 +273,9 @@ public:
   virtual void initializeMetadata(IRGenFunction &IGF,
                                            llvm::Value *metadata,
                                            llvm::Value *vwtable) const = 0;
+  
+  /// Compute the packing of values of this type into a fixed-size buffer.
+  FixedPacking getFixedPacking(IRGenModule &IGM) const;
 };
 
 } // end namespace irgen

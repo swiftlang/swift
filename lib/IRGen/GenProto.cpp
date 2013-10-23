@@ -1153,18 +1153,6 @@ namespace {
     }
   };
   
-  /// Ways in which an object can fit into a fixed-size buffer.
-  enum class FixedPacking {
-    /// It fits at offset zero.
-    OffsetZero,
-
-    /// It doesn't fit and needs to be side-allocated.
-    Allocate,
-
-    /// It needs to be checked dynamically.
-    Dynamic
-  };
-
   /// A type implementation for a class archetype, that is, an archetype
   /// bounded by a class protocol constraint. These archetypes can be
   /// represented by a refcounted pointer instead of an opaque value buffer.
@@ -1257,40 +1245,6 @@ public:
     return Table;
   }
 };
-
-static FixedPacking computePacking(IRGenModule &IGM,
-                                   const TypeInfo &concreteTI) {
-  auto fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI);
-
-  // If the type is fixed, we have to do something dynamic.
-  // FIXME: some types are provably too big (or aligned) to be
-  // allocated inline.
-  if (!fixedTI)
-    return FixedPacking::Dynamic;
-
-  Size bufferSize = getFixedBufferSize(IGM);
-  Size requiredSize = fixedTI->getFixedSize();
-
-  // Flat out, if we need more space than the buffer provides,
-  // we always have to allocate.
-  // FIXME: there might be some interesting cases where this
-  // is suboptimal for enums.
-  if (requiredSize > bufferSize)
-    return FixedPacking::Allocate;
-
-  Alignment bufferAlign = getFixedBufferAlignment(IGM);
-  Alignment requiredAlign = fixedTI->getFixedAlignment();
-
-  // If the buffer alignment is good enough for the type, great.
-  if (bufferAlign >= requiredAlign)
-    return FixedPacking::OffsetZero;
-
-  // TODO: consider using a slower mode that dynamically checks
-  // whether the buffer size is small enough.
-
-  // Otherwise we're stuck and have to separately allocate.
-  return FixedPacking::Allocate;
-}
 
 static bool isNeverAllocated(FixedPacking packing) {
   switch (packing) {
@@ -2911,7 +2865,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
   }
   
   auto &concreteTI = IGM.getTypeInfo(concreteType);
-  FixedPacking packing = computePacking(IGM, concreteTI);
+  FixedPacking packing = concreteTI.getFixedPacking(IGM);
   
   addValueWitnesses(IGM, packing, abstractType,
                     concreteType, concreteTI, witnesses);
@@ -4057,7 +4011,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
     packing = (FixedPacking) -1;
     needValueWitnessToAllocate = true;
   } else {
-    packing = computePacking(IGF.IGM, srcTI);
+    packing = srcTI.getFixedPacking(IGF.IGM);
     needValueWitnessToAllocate = false;
   }
   

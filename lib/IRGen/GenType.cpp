@@ -28,6 +28,7 @@
 #include "IRGenModule.h"
 #include "Address.h"
 #include "Explosion.h"
+#include "GenOpaque.h"
 #include "Linking.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
@@ -40,6 +41,39 @@ using namespace irgen;
 
 bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
+}
+
+FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
+  auto fixedTI = dyn_cast<FixedTypeInfo>(this);
+  
+  // If the type is fixed, we have to do something dynamic.
+  // FIXME: some types are provably too big (or aligned) to be
+  // allocated inline.
+  if (!fixedTI)
+    return FixedPacking::Dynamic;
+  
+  Size bufferSize = getFixedBufferSize(IGM);
+  Size requiredSize = fixedTI->getFixedSize();
+  
+  // Flat out, if we need more space than the buffer provides,
+  // we always have to allocate.
+  // FIXME: there might be some interesting cases where this
+  // is suboptimal for enums.
+  if (requiredSize > bufferSize)
+    return FixedPacking::Allocate;
+  
+  Alignment bufferAlign = getFixedBufferAlignment(IGM);
+  Alignment requiredAlign = fixedTI->getFixedAlignment();
+  
+  // If the buffer alignment is good enough for the type, great.
+  if (bufferAlign >= requiredAlign)
+    return FixedPacking::OffsetZero;
+  
+  // TODO: consider using a slower mode that dynamically checks
+  // whether the buffer size is small enough.
+  
+  // Otherwise we're stuck and have to separately allocate.
+  return FixedPacking::Allocate;
 }
 
 ExplosionSchema TypeInfo::getSchema(ExplosionKind kind) const {
