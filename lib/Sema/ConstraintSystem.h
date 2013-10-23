@@ -1313,9 +1313,12 @@ public:
   /// as a type.
   ///
   /// \param isSpecialized Whether this declaration is immediately specialized.
-  Type getTypeOfReference(ValueDecl *decl,
-                          bool isTypeReference,
-                          bool isSpecialized);
+  ///
+  /// \returns a pair containing the full opened type (if applicable) and
+  /// opened type of a reference to declaration.
+  std::pair<Type, Type> getTypeOfReference(ValueDecl *decl,
+                                           bool isTypeReference,
+                                           bool isSpecialized);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.

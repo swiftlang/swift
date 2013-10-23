@@ -365,13 +365,21 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
 
-      if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-        // If this a member of a protocol, build an appropriate operator
-        // reference.
-        return buildProtocolOperatorRef(proto, decl, loc,
-                                        openedType,
-                                        cs.getConstraintLocator(locator),
-                                        implicit);
+      // If this is a member of a nominal type, build a reference to the
+      // member with an implied base type.
+      if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
+        assert(isa<FuncDecl>(decl) && "Can only refer to functions here");
+        assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
+        auto openedFnType = openedType->castTo<FunctionType>();
+        auto baseTy = simplifyType(openedFnType->getInput())
+                        ->getRValueInstanceType();
+
+        Expr * base = new (ctx) MetatypeExpr(nullptr, loc,
+                                             MetaTypeType::get(baseTy, ctx));
+
+        return buildMemberRef(base, openedType, SourceLoc(), decl,
+                              loc, openedFnType->getResult(),
+                              locator, implicit);
       }
 
       // If this is a declaration with generic function type, build a
@@ -954,43 +962,6 @@ namespace {
       return subscriptExpr;
     }
 
-    /// \brief Build a reference to an operator within a protocol.
-    Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
-                                   SourceLoc nameLoc, Type openedType,
-                                   ConstraintLocatorBuilder locator,
-                                   bool Implicit) {
-      assert(isa<FuncDecl>(value) && "Only functions allowed");
-      assert(cast<FuncDecl>(value)->isOperator() && "Only operators allowed");
-
-      // Figure out the base type, which we do by finding the type variable
-      // in the open type that corresponds to the 'Self' archetype, which
-      // we opened.
-      // FIXME: This is both inefficient and suspicious. We should probably
-      // find a place to cache the type variable, rather than searching for it
-      // again.
-      Type baseTy;
-      auto selfArchetype = proto->getSelf()->getArchetype();
-      cs.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
-        if (auto typeVar = dyn_cast<TypeVariableType>(type.getPointer())) {
-          if (typeVar->getImpl().getArchetype() == selfArchetype) {
-            baseTy = solution.getFixedType(typeVar);
-            return nullptr;
-          }
-        }
-
-        return type;
-      });
-      assert(baseTy && "Unable to find base type for protocol operator ref");
-      // FIXME: Check whether baseTy is an archetype?
-
-      auto &ctx = cs.getASTContext();
-      auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
-                                         MetaTypeType::get(baseTy, ctx));
-      return buildMemberRef(base, /*FIXME:*/Type(),
-                            SourceLoc(), value, nameLoc, openedType,
-                            locator, Implicit);
-    }
-
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution)
       : cs(cs), dc(cs.DC), solution(solution) { }
@@ -1314,7 +1285,7 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(decl, expr->getLoc(), selected.openedType,
+      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit());
     }
 
@@ -1378,7 +1349,7 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      return buildDeclRef(decl, expr->getLoc(), selected.openedType,
+      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit());
     }
 

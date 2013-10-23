@@ -702,34 +702,25 @@ static LValueType::Qual settableQualForDecl(Type baseType,
   return LValueType::Qual::NonSettable;
 }
 
-Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                          bool isTypeReference,
-                                          bool isSpecialized) {
-  if (auto proto = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
-    // Unqualified lookup can find operator names within protocols.
+std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                                           bool isTypeReference,
+                                                           bool isSpecialized) {
+  if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
+    // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
-    // Skip the 'self' metatype parameter. It's not used for deduction.
-    auto type = func->getType()->castTo<AnyFunctionType>()->getResult();
+    auto openedType = openType(func->getInterfaceType(), func);
+    auto openedFnType = openedType->castTo<FunctionType>();
 
-    // Find the archetype for 'Self'. We'll be opening it.
-    auto selfArchetype = proto->getSelf()->getArchetype();
-    llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    type = adjustLValueForReference(openType(type, { &selfArchetype, 1 },
-                                             replacements,
-                                             value->getInnermostDeclContext()),
-                                    func->getAttrs().isAssignment(),
-                                    TC.Context);
-
-    // The type variable to which 'Self' was opened must be bound to an
-    // archetype.
-    // FIXME: We may eventually want to loosen this constraint, to allow us
+    // The 'Self' type must be bound to an archetype.
+    // FIXME: We eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
     // a class conforms (if there's a default implementation).
-    addArchetypeConstraint(replacements[selfArchetype->getCanonicalType()]);
-    
-    return type;
+    addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType());
+
+    // The reference implicitly binds 'self'.
+    return { openedType, openedFnType->getResult() };
   }
 
   // If we have a type declaration, resolve it within the current context.
@@ -738,17 +729,18 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = getTypeChecker().resolveTypeInContext(typeDecl, DC,
                                                       isSpecialized);
     if (!type)
-      return nullptr;
+      return { nullptr, nullptr };
 
     // Open the type.
     type = openType(type, value->getInnermostDeclContext());
 
     // If it's a type reference, we're done.
     if (isTypeReference)
-      return type;
+      return { type, type };
 
     // If it's a value reference, refer to the metatype.
-    return MetaTypeType::get(type, getASTContext());
+    type = MetaTypeType::get(type, getASTContext());
+    return { type, type };
   }
 
   // Determine the type of the value, opening up that type if necessary.
@@ -765,7 +757,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                          value->getInnermostDeclContext()),
                                        value->getAttrs().isAssignment(),
                                        TC.Context);
-  return valueType;
+  return { valueType, valueType };
 }
 
 /// \brief Retrieve the substituted type when replacing an archetype
@@ -858,9 +850,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    auto openedType = getTypeOfReference(value, isTypeReference,
-                                         /*isSpecialized=*/false);
-    return { openedType, openedType };
+    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
   }
 
   // Open up a generic method via its generic function type.
@@ -2069,9 +2059,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
                                    isTypeReference, isDynamicResult);
     else
-      refType = getTypeOfReference(choice.getDecl(),
-                                   isTypeReference,
-                                   choice.isSpecialized());
+      std::tie(openedFullType, refType)
+        = getTypeOfReference(choice.getDecl(),
+                             isTypeReference,
+                             choice.isSpecialized());
 
     if (isDynamicResult) {
       // For a non-subscript declaration found via dynamic lookup,
