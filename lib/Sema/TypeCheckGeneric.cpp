@@ -743,12 +743,9 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // Substitute in our own 'self' parameter.
       assert(selfTy && "Missing self type?");
 
+      argTy = selfTy;
       if (initFuncTy) {
-        argTy = selfTy;
         initArgTy = computeSelfType(func, /*isInitializing=*/true);
-      } else {
-        TupleTypeElt elt(selfTy, Context.getIdentifier("self"));
-        argTy = TupleType::get(elt, Context);
       }
     } else {
       argTy = patterns[e - i - 1]->getType();

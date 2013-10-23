@@ -610,6 +610,10 @@ struct SelectedOverload {
   /// The overload choice.
   OverloadChoice choice;
 
+  /// The opened type of the base of the reference to this overload, if
+  /// we're referencing a member.
+  Type openedFullType;
+
   /// The opened type produced by referring to this overload.
   Type openedType;
 };
@@ -817,6 +821,9 @@ struct ResolvedOverloadSetListItem {
 
   /// The locator for this choice.
   ConstraintLocator *Locator;
+
+  /// The type of the fully-opened base, if any.
+  Type OpenedFullType;
 
   /// The type of the referenced choice.
   Type ImpliedType;
@@ -1322,16 +1329,22 @@ public:
   ///
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
-  Type getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
-                                bool isTypeReference,
-                                bool isDynamicResult);
+  ///
+  /// \returns a pair containing the full opened type (if applicable) and
+  /// opened type of a reference to this member.
+  std::pair<Type, Type> getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
+                                                 bool isTypeReference,
+                                                 bool isDynamicResult);
 
   /// \brief Retrieve the type of a reference to the given generic function
   /// declaration as a member with a base of the given type.
   ///
   /// This routine "opens up" the generic type by replacing each instance of a
   /// generic parameter or a member thereof with a fresh type variable.
-  Type getTypeOfMethodReference(Type baseTy, FuncDecl *func);
+  ///
+  /// \returns a pair containing the full opened type (if applicable) and
+  /// opened type of a reference to this method.
+  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, FuncDecl *func);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.

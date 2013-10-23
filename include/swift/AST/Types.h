@@ -321,7 +321,11 @@ public:
   /// getRValueType - For an lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
-  
+
+  /// Retrieves the rvalue instance type, looking through single-element
+  /// tuples, lvalue types, and metatypes.
+  Type getRValueInstanceType();
+
   /// isSettableLValue - Returns true if the type is a settable lvalue, or
   /// false if the type is an rvalue or non-settable lvalue.
   bool isSettableLValue();

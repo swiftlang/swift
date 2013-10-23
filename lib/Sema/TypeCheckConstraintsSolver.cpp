@@ -76,7 +76,7 @@ Solution ConstraintSystem::finalize() {
   for (auto resolved = resolvedOverloadSets;
        resolved; resolved = resolved->Previous) {
     solution.overloadChoices[resolved->Locator]
-      = { resolved->Choice, resolved->ImpliedType };
+      = { resolved->Choice, resolved->OpenedFullType, resolved->ImpliedType };
   }
 
   // For each of the constraint restrictions, record it with simplified,

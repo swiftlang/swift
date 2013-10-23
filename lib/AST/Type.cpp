@@ -420,6 +420,21 @@ Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
+/// Retrieve the object type for a 'self' parameter, digging into one-element
+/// tuples, lvalue types, and metatypes.
+Type TypeBase::getRValueInstanceType() {
+  auto type = getRValueType();
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == 1 &&
+        !tupleTy->getFields()[0].isVararg())
+      type = tupleTy->getElementType(0)->getRValueType();
+  }
+  if (auto metaTy = type->getAs<MetaTypeType>())
+    type = metaTy->getInstanceType();
+
+  return type;
+}
+
 /// \brief Collect the protocols in the existential type T into the given
 /// vector.
 static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {

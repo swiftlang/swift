@@ -359,9 +359,10 @@ namespace {
 
   public:
     /// \brief Build a new member reference with the given base and member.
-    Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
-                         SourceLoc memberLoc, Type openedType,
-                         ConstraintLocatorBuilder locator, bool Implicit) {
+    Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
+                         ValueDecl *member, SourceLoc memberLoc,
+                         Type openedType, ConstraintLocatorBuilder locator,
+                         bool Implicit) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -441,6 +442,58 @@ namespace {
 
       // Reference to a member of a generic type.
       if (containerTy && containerTy->isUnspecializedGeneric()) {
+        if (openedFullType && isa<FuncDecl>(member) &&
+            member->getInterfaceType()->is<GenericFunctionType>()) {
+          auto func = cast<FuncDecl>(member);
+
+          // Convert the base.
+          auto openedBaseType = openedFullType->castTo<FunctionType>()
+                                  ->getInput()->getRValueInstanceType();
+          containerTy = solution.simplifyType(tc, openedBaseType);
+          if (baseIsInstance) {
+            // Convert the base to the appropriate container type, turning it
+            // into an lvalue if required.
+            base = coerceObjectArgumentToType(
+                     base, containerTy,
+                     locator.withPathElement(ConstraintLocator::MemberRefBase));
+          } else {
+            // Convert the base to an rvalue of the appropriate metatype.
+            base = coerceToType(base, MetaTypeType::get(containerTy, context),
+                                locator.withPathElement(
+                                  ConstraintLocator::MemberRefBase));
+            base = tc.coerceToRValue(base);
+          }
+          assert(base && "Unable to convert base?");
+
+          // Reference to the generic member.
+          SmallVector<Substitution, 4> substitutions;
+          Type substTy = solution.computeSubstitutions(
+                           func->getInterfaceType()->castTo<GenericFunctionType>(),
+                           func,
+                           openedFullType,
+                           substitutions);
+
+          auto &ctx = solution.getConstraintSystem().getASTContext();
+          Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
+                                                            substitutions),
+                                            memberLoc, Implicit);
+          ref->setType(substTy);
+
+          ApplyExpr *apply;
+          if (isa<ConstructorDecl>(member)) {
+            // FIXME: Provide type annotation.
+            apply = new (context) ConstructorRefCallExpr(ref, base);
+          } else if (!baseIsInstance && member->isInstanceMember()) {
+            return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+          } else {
+            assert((!baseIsInstance || member->isInstanceMember()) &&
+                   "can't call a static method on an instance");
+            apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+          }
+          return finishApply(apply, openedType, nullptr);
+        }
+
+
         // Figure out the substitutions required to convert to the base.
         GenericParamList *genericParams = nullptr;
         TypeSubstitutionMap substitutions;
@@ -887,7 +940,8 @@ namespace {
       auto &ctx = cs.getASTContext();
       auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
                                          MetaTypeType::get(baseTy, ctx));
-      return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType,
+      return buildMemberRef(base, /*FIXME:*/Type(),
+                            SourceLoc(), value, nameLoc, openedType,
                             locator, Implicit);
     }
 
@@ -1117,7 +1171,9 @@ namespace {
                                         nullptr, expr->getStartLoc(),
                                         MetaTypeType::get(type, tc.Context));
       // FIXME: The openedType is wrong for generic string types.
-      Expr *memberRef = buildMemberRef(typeRef, expr->getStartLoc(), member,
+      Expr *memberRef = buildMemberRef(typeRef,
+                                       /*FIXME*/Type(),
+                                       expr->getStartLoc(), member,
                                        expr->getStartLoc(),
                                        tc.getUnopenedTypeOfReference(member),
                                        cs.getConstraintLocator(expr, { }),
@@ -1198,7 +1254,8 @@ namespace {
             = dyn_cast<ProtocolDecl>(expr->getDecl()->getDeclContext())) {
         // If this a member of a protocol, build an appropriate operator
         // reference.
-        return buildProtocolOperatorRef(proto, expr->getDecl(), expr->getLoc(),
+        return buildProtocolOperatorRef(proto,
+                                        expr->getDecl(), expr->getLoc(),
                                         fromType,
                                         cs.getConstraintLocator(expr, { }),
                                         expr->isImplicit());
@@ -1314,7 +1371,8 @@ namespace {
       if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
         // If this a member of a protocol, build an appropriate operator
         // reference.
-        return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
+        return buildProtocolOperatorRef(proto,
+                                        decl, expr->getLoc(),
                                         selected.openedType,
                                         cs.getConstraintLocator(expr, { }),
                                         expr->isImplicit());
@@ -1353,7 +1411,9 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+      return buildMemberRef(expr->getBase(),
+                            selected.openedFullType,
+                            expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr, { }),
@@ -1382,9 +1442,14 @@ namespace {
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                            expr->getMember().getDecl(),
-                            expr->getNameLoc(), expr->getType(),
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
+      return buildMemberRef(expr->getBase(),
+                            selected.openedFullType,
+                            expr->getDotLoc(),
+                            selected.choice.getDecl(), expr->getNameLoc(),
+                            selected.openedType,
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
     }
@@ -1397,7 +1462,9 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+      return buildMemberRef(expr->getBase(),
+                            selected.openedFullType,
+                            expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr, { }),
@@ -1438,7 +1505,9 @@ namespace {
                                                 enumMetaTy);
 
       // Build the member reference.
-      return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
+      return buildMemberRef(base,
+                            selected.openedFullType,
+                            expr->getDotLoc(), member, expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
@@ -1461,11 +1530,14 @@ namespace {
 
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::Decl: {
-        auto member = buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                              selected.choice.getDecl(), expr->getNameLoc(),
-                              selected.openedType,
-                              cs.getConstraintLocator(expr, { }),
-                              expr->isImplicit());
+        auto member = buildMemberRef(expr->getBase(),
+                                     selected.openedFullType,
+                                     expr->getDotLoc(),
+                                     selected.choice.getDecl(),
+                                     expr->getNameLoc(),
+                                     selected.openedType,
+                                     cs.getConstraintLocator(expr, { }),
+                                     expr->isImplicit());
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
@@ -2608,7 +2680,9 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
 
     // FIXME: Location information is suspect throughout.
     // Form a reference to the conversion member.
-    auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
+    auto memberRef = buildMemberRef(expr,
+                                    selected.openedFullType,
+                                    expr->getStartLoc(),
                                     selected.choice.getDecl(),
                                     expr->getEndLoc(),
                                     selected.openedType,
@@ -2663,7 +2737,9 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                       nullptr,
                                       expr->getStartLoc(),
                                       MetaTypeType::get(toType,tc.Context));
-  Expr *declRef = buildMemberRef(typeBase, expr->getStartLoc(),
+  Expr *declRef = buildMemberRef(typeBase,
+                                 selected.openedFullType,
+                                 expr->getStartLoc(),
                                  selected.choice.getDecl(),
                                  expr->getStartLoc(),
                                  selected.openedType,
@@ -3189,7 +3265,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
-  Expr *declRef = buildMemberRef(fn, /*DotLoc=*/SourceLoc(),
+  Expr *declRef = buildMemberRef(fn,
+                                 selected->openedType->castTo<FunctionType>()
+                                    ->getResult(),
+                                 /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
                                  selected->openedType, locator,
                                  /*Implicit=*/true);
@@ -3423,10 +3502,11 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     return nullptr;
 
   // Form a reference to the witness itself.
-  auto openedType = cs.getTypeOfMemberReference(base->getType(),
-                                                witness,
-                                                /*isTypeReference=*/false,
-                                                /*isDynamicResult=*/false);
+  Type openedFullType, openedType;
+  std::tie(openedFullType, openedType)
+    = cs.getTypeOfMemberReference(base->getType(), witness,
+                                  /*isTypeReference=*/false,
+                                  /*isDynamicResult=*/false);
   auto locator = cs.getConstraintLocator(base, { });
 
   // Form the call argument.
@@ -3462,7 +3542,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   Solution &solution = solutions.front();
   ExprRewriter rewriter(cs, solution);
 
-  auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
+  auto memberRef = rewriter.buildMemberRef(base, openedFullType,
+                                           base->getStartLoc(),
                                            witness, base->getEndLoc(),
                                            openedType, locator,
                                            /*Implicit=*/true);
@@ -3519,7 +3600,9 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     // prevents this, but it feels hacky.
     auto openedType
       = witness->getType()->castTo<AnyFunctionType>()->getResult();
-    auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
+    auto memberRef = rewriter.buildMemberRef(expr,
+                                             /*FIXME:*/Type(),
+                                             expr->getStartLoc(),
                                              witness, expr->getEndLoc(),
                                              openedType, locator,
                                              /*Implicit=*/true);
@@ -3559,7 +3642,9 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   // Form a reference to the builtin method.
   auto openedType
     = builtinMethod->getType()->castTo<AnyFunctionType>()->getResult();
-  auto memberRef = rewriter.buildMemberRef(expr, /*DotLoc=*/SourceLoc(),
+  auto memberRef = rewriter.buildMemberRef(expr,
+                                           /*FIXME*/Type(),
+                                           /*DotLoc=*/SourceLoc(),
                                            builtinMethod, expr->getLoc(),
                                            openedType, locator,
                                            /*Implicit=*/true);

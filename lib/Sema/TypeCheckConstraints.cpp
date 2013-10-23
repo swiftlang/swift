@@ -842,9 +842,10 @@ Type ConstraintSystem::openTypeOfContext(
   return openType(result, openArchetypes, replacements, dc);
 }
 
-Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
-                                                bool isTypeReference,
-                                                bool isDynamicResult) {
+std::pair<Type, Type>
+ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
+                                           bool isTypeReference,
+                                           bool isDynamicResult) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
   Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
@@ -857,7 +858,9 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>())
-    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
+    return { baseObjTy,
+             getTypeOfReference(value, isTypeReference,
+                                /*isSpecialized=*/false) };
 
   // Open up a generic method via its generic function type.
   if (!isa<ProtocolDecl>(value->getDeclContext()) && !isDynamicResult &&
@@ -979,11 +982,13 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
     type = type->castTo<AnyFunctionType>()->getResult();
   }
-  return adjustLValueForReference(type, value->getAttrs().isAssignment(),
-                                  TC.Context);
+  return { ownerTy,
+           adjustLValueForReference(type, value->getAttrs().isAssignment(),
+                                    TC.Context) };
 }
 
-Type ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
+std::pair<Type, Type>
+ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   // Open the type of the generic function.
   auto openedType = openType(func->getInterfaceType(), func);
 
@@ -1000,15 +1005,7 @@ Type ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   auto openedFnType = openedType->castTo<FunctionType>();
 
   // Determine the 'self' object type.
-  auto selfObjTy = openedFnType->getInput()->getRValueType();
-  if (auto selfTupleTy = selfObjTy->getAs<TupleType>()) {
-    assert(selfTupleTy->getNumElements() == 1 &&
-           !selfTupleTy->getFields()[0].isVararg() && "bogus 'self' tuple");
-    selfObjTy = selfTupleTy->getElementType(0)->getRValueType();
-  }
-
-  if (auto metaSelfTy = selfObjTy->getAs<MetaTypeType>())
-    selfObjTy = metaSelfTy->getInstanceType();
+  auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
 
   // The base object type must be a subtype of the self object type.
   addConstraint(ConstraintKind::Subtype, baseObjTy, selfObjTy);
@@ -1021,7 +1018,7 @@ Type ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   if (func->isStatic() || isInstance)
     type = openedFnType->getResult();
 
-  return type;
+  return { openedType, type };
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
@@ -2055,6 +2052,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        OverloadChoice choice){
   // Determie the type to which we'll bind the overload set's type.
   Type refType;
+  Type openedFullType;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
@@ -2064,10 +2062,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
     if (choice.getBaseType())
-      refType = getTypeOfMemberReference(choice.getBaseType(),
-                                         choice.getDecl(),
-                                         isTypeReference,
-                                         isDynamicResult);
+      std::tie(openedFullType, refType)
+        = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
+                                   isTypeReference, isDynamicResult);
     else
       refType = getTypeOfReference(choice.getDecl(),
                                    isTypeReference,
@@ -2138,6 +2135,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               boundType,
                                               choice,
                                               locator,
+                                              openedFullType,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();

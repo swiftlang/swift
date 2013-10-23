@@ -612,10 +612,18 @@ public:
         
         setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
                                          constant, e));
-        
+
         // setSelfParam bumps the callDepth, but we aren't really past the
         // 'self' call depth in this case.
         --callDepth;
+
+        // If there are substitutions, add them.
+        if (e->getDeclRef().isSpecialized()) {
+          callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+                                   e->getType()->getCanonicalType(),
+                                   callDepth);
+        }
+
         return;
       }
     }
@@ -636,6 +644,7 @@ public:
       setCallee(Callee::forDirect(gen, constant, e));
     }
 
+    // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized()) {
       callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
                                e->getType()->getCanonicalType(),
