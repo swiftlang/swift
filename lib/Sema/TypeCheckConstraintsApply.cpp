@@ -1171,20 +1171,21 @@ namespace {
       auto name = tc.Context.getIdentifier("convertFromStringInterpolation");
       auto member = findNamedWitness(tc, dc, type, interpolationProto, name,
                                      diag::interpolation_broken_proto);
+      if (!member)
+        return nullptr;
 
       // Build a reference to the convertFromStringInterpolation member.
-      // FIXME: Dubious source location information.
       auto typeRef = new (tc.Context) MetatypeExpr(
                                         nullptr, expr->getStartLoc(),
                                         MetaTypeType::get(type, tc.Context));
-      // FIXME: The openedType is wrong for generic string types.
-      Expr *memberRef = buildMemberRef(typeRef,
-                                       /*FIXME*/Type(),
-                                       expr->getStartLoc(), member,
-                                       expr->getStartLoc(),
-                                       tc.getUnopenedTypeOfReference(member),
-                                       cs.getConstraintLocator(expr, { }),
-                                       /*Implicit=*/true);
+      Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
+                                                       expr->getStartLoc(),
+                                                       member,
+                                                       expr->getStartLoc(),
+                                                       /*Implicit=*/true);
+      bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
+      assert(!failed && "Could not reference string interpolation witness");
+      (void)failed;
 
       // Create a tuple containing all of the coerced segments.
       SmallVector<Expr *, 4> segments;
@@ -3273,8 +3274,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   Expr *declRef = buildMemberRef(fn,
-                                 selected->openedType->castTo<FunctionType>()
-                                    ->getResult(),
+                                 selected->openedFullType,
                                  /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
                                  selected->openedType, locator,
@@ -3592,6 +3592,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // FIXME: Cache name.
   auto &tc = cs.getTypeChecker();
+  auto &ctx = tc.Context;
   auto type = expr->getType();
 
   // Look for the builtin name. If we don't have it, we need to call the
@@ -3602,28 +3603,25 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     auto witness = findNamedWitness(tc, cs.DC, type->getRValueType(), protocol,
                                     generalName, brokenProtocolDiag);
 
-    // Form a reference to the general name.
-    // FIXME: openedType won't capture generics. The protocol definition
-    // prevents this, but it feels hacky.
-    auto openedType
-      = witness->getType()->castTo<AnyFunctionType>()->getResult();
-    auto memberRef = rewriter.buildMemberRef(expr,
-                                             /*FIXME:*/Type(),
-                                             expr->getStartLoc(),
-                                             witness, expr->getEndLoc(),
-                                             openedType, locator,
-                                             /*Implicit=*/true);
+    // Form a reference to this member.
+    Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
+                                              witness, expr->getEndLoc(),
+                                              /*Implicit=*/true);
+    bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
+    assert(!failed && "Could not reference witness?");
+    (void)failed;
 
     // Call the witness.
-    Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                           { }, nullptr,
-                                           expr->getEndLoc(),
-                                           /*hasTrailingClosure=*/false,
-                                           /*Implicit=*/true,
-                                           TupleType::getEmpty(tc.Context));
-    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg,
-                                                 /*Implicit=*/true);
-    expr = rewriter.finishApply(apply, openedType, locator);
+    Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(),
+                                    { }, nullptr,
+                                    expr->getEndLoc(),
+                                    /*hasTrailingClosure=*/false,
+                                    /*Implicit=*/true,
+                                    TupleType::getEmpty(ctx));
+    expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
+    failed = tc.typeCheckExpressionShallow(expr, cs.DC);
+    assert(!failed && "Could not call witness?");
+    (void)failed;
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
@@ -3647,25 +3645,25 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   }
 
   // Form a reference to the builtin method.
-  auto openedType
-    = builtinMethod->getType()->castTo<AnyFunctionType>()->getResult();
-  auto memberRef = rewriter.buildMemberRef(expr,
-                                           /*FIXME*/Type(),
-                                           /*DotLoc=*/SourceLoc(),
-                                           builtinMethod, expr->getLoc(),
-                                           openedType, locator,
-                                           /*Implicit=*/true);
+  Expr *memberRef = new (ctx) MemberRefExpr(expr, SourceLoc(),
+                                            builtinMethod, expr->getLoc(),
+                                            /*Implicit=*/true);
+  bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
+  assert(!failed && "Could not reference witness?");
+  (void)failed;
 
   // Call the builtin method.
-  Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                         { }, nullptr,
-                                         expr->getEndLoc(),
-                                         /*hasTrailingClosure=*/false,
-                                         /*Implicit=*/true,
-                                         TupleType::getEmpty(tc.Context));
-  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg,
-                                               /*Implicit=*/true);
-  return rewriter.finishApply(apply, openedType, locator);
+  Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(),
+                                  { }, nullptr,
+                                  expr->getEndLoc(),
+                                  /*hasTrailingClosure=*/false,
+                                  /*Implicit=*/true,
+                                  TupleType::getEmpty(ctx));
+  expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
+  failed = tc.typeCheckExpressionShallow(expr, cs.DC);
+  assert(!failed && "Could not call witness?");
+  (void)failed;
+  return expr;
 }
 
 Expr *

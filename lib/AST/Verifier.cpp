@@ -378,9 +378,9 @@ namespace {
 
     void verifyChecked(DeclRefExpr *E) {
       if (E->getType()->is<PolymorphicFunctionType>() &&
-          !isa<TypeDecl>(E->getDecl()) &&
-          !E->getDecl()->getDeclContext()->isTypeContext()) {
-        Out << "non-type declaration reference with polymorphic type "
+          isa<FuncDecl>(E->getDecl()) &&
+          !isa<ProtocolDecl>(E->getDecl()->getDeclContext())) {
+        Out << "func reference with polymorphic type "
           << E->getType().getString() << "\n";
         E->dump(Out);
         abort();
