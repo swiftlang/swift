@@ -48,7 +48,7 @@ class Requirement {
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
-  : FirstTypeAndKind(first, kind), SecondType(second) { }
+    : FirstTypeAndKind(first, kind), SecondType(second) { }
 
   /// \brief Determine the kind of requirement.
   RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
