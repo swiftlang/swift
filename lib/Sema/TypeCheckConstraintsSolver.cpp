@@ -58,6 +58,15 @@ Solution ConstraintSystem::finalize() {
   // Create the solution.
   Solution solution(*this);
 
+  // For any of the type variables that has no associated fixed type, assign a
+  // fresh generic type parameters.
+  // FIXME: We could gather the requirements on these as well.
+  unsigned index = 0;
+  for (auto tv : TypeVariables) {
+    if (!getFixedType(tv))
+      assignFixedType(tv, GenericTypeParamType::get(0, index++, TC.Context));
+  }
+
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
     solution.typeBindings[tv] = simplifyType(tv);

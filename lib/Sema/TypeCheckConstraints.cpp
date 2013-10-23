@@ -2935,8 +2935,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
-Type Solution::simplifyType(TypeChecker &tc, Type type,
-                            bool removeAllTypeVariables) const {
+Type Solution::simplifyType(TypeChecker &tc, Type type) const {
   return tc.transformType(type,
            [&](Type type) -> Type {
              if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
@@ -2944,14 +2943,6 @@ Type Solution::simplifyType(TypeChecker &tc, Type type,
                assert(known != typeBindings.end());
                type = known->second;
              }
-             if (removeAllTypeVariables) {
-               if (isa<TypeVariableType>(type.getPointer())) {
-                 type = GenericTypeParamType::get(
-                     0, 0, constraintSystem->TC.Context);
-               }
-             }
-             assert(!removeAllTypeVariables ||
-                    !dyn_cast<TypeVariableType>(type.getPointer()));
 
              return type;
            });
