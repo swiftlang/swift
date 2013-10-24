@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift %s -module-cache-path=%t/clang-module-cache -emit-silgen | FileCheck %s
+// RUN: %swift %s -module-cache-path=%t/clang-module-cache -sdk=%sdk -emit-silgen | FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
