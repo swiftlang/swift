@@ -751,7 +751,8 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   // witnesses successfully.)
   if (!decl->getGenericParams() ||
       (!isa<ClassDecl>(decl) && // fast path obvious case
-       IGM.classifyTypeSize(type, ResilienceScope::Local)
+       IGM.classifyTypeSize(decl->getDeclaredTypeInContext()->getCanonicalType(),
+                            ResilienceScope::Local)
          != ObjectSize::Fixed)) {
     switch (decl->getKind()) {
 #define NOMINAL_TYPE_DECL(ID, PARENT)
@@ -1007,12 +1008,11 @@ namespace {
       if (IGM.isResilient(D, Scope))
         return ObjectSize::Dependent;
 
-      // TODO: apply substitutions to decide whether the struct
-      // members are actually dependently-sized with the given
-      // arguments.
       ObjectSize result = ObjectSize::Fixed;
       for (auto field : D->getStoredProperties()) {
-        result = std::max(result, visit(field->getType()->getCanonicalType()));
+        auto fieldType = type->getTypeOfMember(D->getModuleContext(),
+                                           field, nullptr)->getCanonicalType();
+        result = std::max(result, visit(fieldType));
       }
       return result;
     }
@@ -1037,14 +1037,13 @@ namespace {
       if (IGM.isResilient(D, Scope))
         return ObjectSize::Dependent;
 
-      // TODO: apply substitutions to decide whether the enum data
-      // members are actually dependently-sized with the given
-      // arguments.
       ObjectSize result = ObjectSize::Fixed;
       for (auto elt : D->getAllElements()) {
         if (!elt->hasArgumentType()) continue;
-        result = std::max(result,
-                          visit(elt->getArgumentType()->getCanonicalType()));
+        auto eltType = type->getTypeOfMember(D->getModuleContext(),
+                                   elt, nullptr,
+                                   elt->getArgumentType())->getCanonicalType();
+        result = std::max(result, visit(eltType));
       }
       return result;
     }
