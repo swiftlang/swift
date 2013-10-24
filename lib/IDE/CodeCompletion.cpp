@@ -315,13 +315,13 @@ namespace ide {
 struct CodeCompletionCacheImpl {
   /// \brief Cache key.
   struct Key {
-    std::string Filename;
+    std::string ModuleFilename;
     std::string ModuleName;
     std::vector<std::string> AccessPath;
     bool ResultsHaveLeadingDot;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
-      return LHS.Filename == RHS.Filename &&
+      return LHS.ModuleFilename == RHS.ModuleFilename &&
              LHS.ModuleName == RHS.ModuleName &&
              LHS.AccessPath == RHS.AccessPath &&
              LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot;
@@ -329,6 +329,7 @@ struct CodeCompletionCacheImpl {
   };
 
   struct Value : public ThreadSafeRefCountedBase<Value> {
+    llvm::sys::TimeValue ModuleModificationTime;
     CodeCompletionResultSink Sink;
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
@@ -359,7 +360,7 @@ struct DenseMapInfo<swift::ide::CodeCompletionCacheImpl::Key> {
   }
   static unsigned getHashValue(const KeyTy &Val) {
     size_t H = 0;
-    H ^= std::hash<std::string>()(Val.Filename);
+    H ^= std::hash<std::string>()(Val.ModuleFilename);
     H ^= std::hash<std::string>()(Val.ModuleName);
     for (auto Piece : Val.AccessPath)
       H ^= std::hash<std::string>()(Piece);
@@ -390,8 +391,20 @@ void CodeCompletionCacheImpl::getResults(
   // FIXME(thread-safety): lock the whole AST context.  We might load a module.
   llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
   if (!V.hasValue()) {
+    // No cached results found.  Fill the cache.
     FillCacheCallback(*this, K);
     V = TheCache.get(K);
+  } else {
+    llvm::sys::fs::file_status ModuleStatus;
+    bool IsError = llvm::sys::fs::status(K.ModuleFilename, ModuleStatus);
+    if (IsError ||
+        V.getValue()->ModuleModificationTime !=
+            ModuleStatus.getLastModificationTime()) {
+      // Cache is stale.  Update the cache.
+      TheCache.remove(K);
+      FillCacheCallback(*this, K);
+      V = TheCache.get(K);
+    }
   }
   assert(V.hasValue());
   auto &SourceSink = V.getValue()->Sink;
@@ -440,6 +453,18 @@ CodeCompletionCacheImpl::getResultSinkFor(const Key &K) {
 }
 
 void CodeCompletionCacheImpl::storeResults(const Key &K, ValueRefCntPtr V) {
+  {
+    assert(!K.ModuleFilename.empty());
+
+    llvm::sys::fs::file_status ModuleStatus;
+    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus)) {
+      V->ModuleModificationTime = llvm::sys::TimeValue::now();
+    } else {
+      V->ModuleModificationTime = ModuleStatus.getLastModificationTime();
+    }
+  }
+
+  // Remove the cache entry and add it back to refresh the cost value.
   TheCache.remove(K);
   TheCache.set(K, V);
 }
@@ -1753,8 +1778,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       };
 
       // FIXME: actually check imports.
-      // FIXME: fill in filename.
-      CodeCompletionCacheImpl::Key K{"", Request.TheModule->Name.str().str(),
+      StringRef ModuleFilename = Request.TheModule->getModuleFilename();
+      assert(!ModuleFilename.empty() && "should have a filename");
+      CodeCompletionCacheImpl::Key K{ModuleFilename,
+                                     Request.TheModule->Name.str(),
                                      {}, Request.NeedLeadingDot};
       CompletionContext.Cache.Impl->getResults(
           K, CompletionContext.getResultSink(), Request.OnlyTypes,
@@ -1783,8 +1810,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         for (auto Piece : Imported.first) {
           AccessPath.push_back(Piece.first.str());
         }
-        // FIXME: fill in filename.
-        CodeCompletionCacheImpl::Key K{"", Imported.second->Name.str().str(),
+        Module *TheModule = Imported.second;
+        StringRef ModuleFilename = TheModule->getModuleFilename();
+        assert(!ModuleFilename.empty() && "should have a filename");
+        CodeCompletionCacheImpl::Key K{ModuleFilename,
+                                       TheModule->Name.str(),
                                        AccessPath, false};
         CompletionContext.Cache.Impl->getResults(
             K, CompletionContext.getResultSink(), Request.OnlyTypes,
