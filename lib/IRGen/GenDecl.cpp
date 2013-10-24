@@ -625,7 +625,15 @@ bool LinkEntity::isThunk() const {
 
   if (isDeclKind(getKind())) {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);
-    return isa<ClangModule>(D->getDeclContext()->getParentModule()) &&
+    if (!isa<ClangModule>(D->getDeclContext()->getParentModule()))
+      return false;
+    
+    // Nominal type descriptors for Clang-imported types are always given
+    // "thunk" linkage.
+    if (getKind() == Kind::NominalTypeDescriptor)
+      return true;
+    
+    return
       (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
        (isa<VarDecl>(D) && cast<VarDecl>(D)->isComputed()));
   } else { // isTypeKind(getKind())
