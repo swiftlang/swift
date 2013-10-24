@@ -1040,7 +1040,7 @@ public:
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
     printCommon(E, "archetype_member_ref_expr")
       << " decl=";
-    E->getDecl()->dumpRef(OS);
+    E->getDeclRef().dump(OS);
     OS << '\n';
     printRec(E->getBase());
     OS << ')';

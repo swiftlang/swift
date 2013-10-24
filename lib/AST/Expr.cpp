@@ -184,7 +184,7 @@ ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     DotLoc(DotLoc), NameLoc(NameLoc) { }
 
 ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                               ValueDecl *Value,
+                                               ConcreteDeclRef Value,
                                                SourceLoc NameLoc)
   : Expr(ExprKind::ArchetypeMemberRef, /*Implicit=*/false),
     Base(Base), Value(Value),
@@ -199,7 +199,7 @@ ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
 }
 
 bool ArchetypeMemberRefExpr::isBaseIgnored() const {
-  if (isa<TypeDecl>(Value))
+  if (isa<TypeDecl>(Value.getDecl()))
     return true;
 
   return false;

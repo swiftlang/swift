@@ -709,12 +709,54 @@ public:
     assert(fd && "archetype properties not yet supported");
 
     // Method calls through ObjC protocols require ObjC dispatch.
-    bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
-    
+    auto proto = cast<ProtocolDecl>(fd->getDeclContext());
+    bool isObjC = proto->isObjC();
+
+    // The declaration is always specialized (due to Self); ignore the
+    // substitutions related to Self.
+    ArrayRef<Substitution> subs = e->getDeclRef().getSubstitutions();
+    {
+      unsigned innerIdx = 0, n = subs.size();
+      for (; innerIdx != n; ++innerIdx) {
+        auto archetype = subs[innerIdx].Archetype;
+        while (archetype->getParent())
+          archetype = archetype->getParent();
+        if (!archetype->getSelfProtocol()) {
+          break;
+        }
+      }
+
+      subs = subs.slice(innerIdx);
+    }
+
+    // Figure out the result type of this expression. If we had any
+    // substitutions not related to 'Self', we'll need to produce a
+    // PolymorphicFunctionType to mollify callee handling.
+    // FIXME: This is a temporary hack that will go away when callee handling
+    // no longer depends on PolymorphicFunctionType at all.
+    Type resultTy = e->getType();
+    if (!subs.empty()) {
+      if (e->getDeclRef().isSpecialized()) {
+        TypeSubstitutionMap substitutions;
+        substitutions[proto->getSelf()->getArchetype()]
+          = e->getDeclRef().getSubstitutions()[0].Replacement;
+
+        resultTy = e->getDeclRef().getDecl()->getType()
+                     ->castTo<PolymorphicFunctionType>()->getResult()
+                     .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
+      }
+    }
     setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
                                    SILDeclRef(fd).asForeign(isObjC),
-                                   e->getType(), e));
+                                   resultTy, e));
+
+    // If there are substitutions, add them now.
+    if (!subs.empty()) {
+      callee->addSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
+                               callDepth);
+    }
   }
+
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     visit(e->getSubExpr());
   }

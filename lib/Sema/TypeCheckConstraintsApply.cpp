@@ -424,13 +424,12 @@ namespace {
       auto containerTy
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
-      // Handle references to generic functions that aren't archetype or
-      // existential members.
+      // Handle references to generic functions that aren't existential members.
       if (openedFullType && isa<FuncDecl>(member) &&
           member->getInterfaceType() &&
           member->getInterfaceType()->is<GenericFunctionType>() &&
           !(isa<ProtocolDecl>(member->getDeclContext()) &&
-            (baseTy->is<ArchetypeType>() || baseTy->isExistentialType()))) {
+            baseTy->isExistentialType())) {
         auto func = cast<FuncDecl>(member);
 
         // Build a reference to the generic member.
@@ -443,34 +442,59 @@ namespace {
                          substitutions);
 
         auto &ctx = solution.getConstraintSystem().getASTContext();
-        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
-                                                          substitutions),
-                                          memberLoc, Implicit);
-        ref->setType(substTy);
 
         // If we're refering to the member of a module, we're done.
         if (baseTy->is<ModuleType>()) {
+          Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
+                                                            substitutions),
+                                            memberLoc, Implicit);
+          ref->setType(substTy);
+
           return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
         }
 
+        bool isArchetypeRef = isa<ProtocolDecl>(member->getDeclContext()) &&
+                              baseTy->is<ArchetypeType>();
+
         // Otherwise, convert the base.
-        auto openedBaseType = openedFullType->castTo<FunctionType>()
-                                ->getInput()->getRValueInstanceType();
+        auto openedFullFnType = openedFullType->castTo<FunctionType>();
+        auto openedBaseType = openedFullFnType->getInput()
+                                ->getRValueInstanceType();
         containerTy = solution.simplifyType(tc, openedBaseType);
         if (baseIsInstance) {
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
           base = coerceObjectArgumentToType(
-                   base, containerTy,
+                   base, isArchetypeRef? baseTy : containerTy,
                    locator.withPathElement(ConstraintLocator::MemberRefBase));
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(containerTy, context),
+          base = coerceToType(base,
+                              MetaTypeType::get(isArchetypeRef? baseTy
+                                                              : containerTy,
+                                                context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
           base = tc.coerceToRValue(base);
         }
         assert(base && "Unable to convert base?");
+
+        // Handle archetype reference.
+        if (isArchetypeRef) {
+          Expr *ref = new (ctx) ArchetypeMemberRefExpr(
+                                  base, dotLoc,
+                                  ConcreteDeclRef(ctx, member, substitutions),
+                                  memberLoc);
+          ref->setImplicit(Implicit);
+          ref->setType(simplifyType(openedFullFnType->getResult()));
+          return ref;
+        }
+
+        // Handle all other function references.
+        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
+                                                          substitutions),
+                                          memberLoc, Implicit);
+        ref->setType(substTy);
 
         ApplyExpr *apply;
         if (isa<ConstructorDecl>(member)) {
