@@ -1014,6 +1014,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
+    case DeclContextKind::SourceFile:
+      printDeclContext(DC->getParent());
+      return;
+
     case DeclContextKind::AbstractClosureExpr:
       // FIXME: print closures somehow.
       return;

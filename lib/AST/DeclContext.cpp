@@ -13,6 +13,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
@@ -35,6 +36,7 @@ ASTContext &DeclContext::getASTContext() {
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
+  case DeclContextKind::SourceFile:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
@@ -53,6 +55,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
   case DeclContextKind::Module:
+  case DeclContextKind::SourceFile:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
@@ -69,6 +72,7 @@ Type DeclContext::getDeclaredTypeInContext() {
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
     case DeclContextKind::Module:
+    case DeclContextKind::SourceFile:
     case DeclContextKind::TopLevelCodeDecl:
       return nullptr;
 
@@ -128,6 +132,7 @@ bool DeclContext::isGenericContext() const {
   for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
     switch (dc->getContextKind()) {
     case DeclContextKind::Module:
+    case DeclContextKind::SourceFile:
       return false;
 
     case DeclContextKind::AbstractClosureExpr:
@@ -168,6 +173,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     }
     return false;
   }
+  case DeclContextKind::SourceFile:
+    return cast<SourceFile>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->walk(Walker);
   case DeclContextKind::NominalTypeDecl:
@@ -184,6 +191,14 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
 void DeclContext::dumpContext() const {
   printContext(llvm::outs());
 }
+
+template <typename DCType>
+static unsigned getLineNumber(DCType *DC) {
+  SourceLoc loc = DC->getLoc();
+  const ASTContext &ctx = static_cast<const DeclContext *>(DC)->getASTContext();
+  return ctx.SourceMgr.getLineAndColumn(loc).first;
+}
+
 unsigned DeclContext::printContext(raw_ostream &OS) const {
   unsigned Depth = 0;
   if (auto *P = getParent())
@@ -192,6 +207,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   const char *Kind;
   switch (getContextKind()) {
   case DeclContextKind::Module:           Kind = "Module"; break;
+  case DeclContextKind::SourceFile:       Kind = "SourceFile"; break;
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
@@ -204,15 +220,31 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   }
   OS.indent(Depth*2) << "0x" << (void*)this << " " << Kind;
 
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    OS << " decl=" << NTD->getName();
-
-  if (auto *CE = dyn_cast<AbstractClosureExpr>(this)) {
-    OS << ": " << CE->getType().getString();
-  }
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
-    OS << " AbstractFunctionDecl=" << AFD->getName()
-       << ": " << AFD->getType().getString();
+  switch (getContextKind()) {
+  case DeclContextKind::Module:
+    OS << " name=" << cast<Module>(this)->Name;
+    break;
+  case DeclContextKind::SourceFile:
+    // FIXME: print which source file.
+    break;
+  case DeclContextKind::AbstractClosureExpr:
+    OS << " line=" << getLineNumber(cast<AbstractClosureExpr>(this));
+    OS << " : " << cast<AbstractClosureExpr>(this)->getType();
+    break;
+  case DeclContextKind::NominalTypeDecl:
+    OS << " name=" << cast<NominalTypeDecl>(this)->getName();
+    break;
+  case DeclContextKind::ExtensionDecl:
+    OS << " line=" << getLineNumber(cast<ExtensionDecl>(this));
+    OS << " base=" << cast<ExtensionDecl>(this)->getExtendedType();
+    break;
+  case DeclContextKind::TopLevelCodeDecl:
+    OS << " line=" << getLineNumber(cast<TopLevelCodeDecl>(this));
+    break;
+  case DeclContextKind::AbstractFunctionDecl:
+    OS << " name=" << cast<AbstractFunctionDecl>(this)->getName();
+    OS << " : " << cast<AbstractClosureExpr>(this)->getType();
+    break;
   }
 
   OS << "\n";

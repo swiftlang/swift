@@ -1105,7 +1105,8 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 
 SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
                        Optional<unsigned> ImportID, bool hasBuiltinModuleAccess)
-  : ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {
+  : DeclContext(DeclContextKind::SourceFile, &tu),
+    ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 

@@ -210,6 +210,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
+  case DeclContextKind::SourceFile:
+    mangleDeclContext(ctx->getParent());
+    return;
+
   case DeclContextKind::NominalTypeDecl:
     mangleNominalType(cast<NominalTypeDecl>(ctx), ExplosionKind::Minimal);
     return;

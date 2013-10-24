@@ -121,6 +121,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       Buffer << BM->Name << ".";
     return;
 
+  case DeclContextKind::SourceFile:
+    // Ignore the SourceFile; just print the module.
+    return;
+
   case DeclContextKind::AbstractClosureExpr:
     // FIXME
     Buffer << "<anonymous function>";

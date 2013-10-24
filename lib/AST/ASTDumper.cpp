@@ -623,6 +623,11 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     printName(os, cast<Module>(dc)->Name);
     break;
 
+  case DeclContextKind::SourceFile:
+    // FIXME: print the file's basename?
+    os << "source file";
+    break;
+
   case DeclContextKind::AbstractClosureExpr: {
     auto *ACE = cast<AbstractClosureExpr>(dc);
     if (isa<ClosureExpr>(ACE))

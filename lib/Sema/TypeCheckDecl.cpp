@@ -2020,6 +2020,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     DeclContext *DC = typeParam->getDeclContext();
     switch (DC->getContextKind()) {
     case DeclContextKind::Module:
+    case DeclContextKind::SourceFile:
     case DeclContextKind::TopLevelCodeDecl:
       llvm_unreachable("cannot have type params");
 

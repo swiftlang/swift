@@ -340,7 +340,7 @@ public:
 /// the REPL). Since it contains raw source, it must be parsed and name-bound
 /// before being used for anything; a full type-check is also necessary for
 /// IR generation.
-class SourceFile {
+class SourceFile : public DeclContext {
   friend class Module;
 
 public:
@@ -362,6 +362,7 @@ private:
 
 public:
   /// The translation unit that this file is a part of.
+  // FIXME: Redundant with the decl context parent, but definitely convenient.
   TranslationUnit &TU;
 
   /// The list of top-level declarations in the source file.
@@ -461,6 +462,10 @@ public:
   /// \param os The stream to which the contents will be printed.
   /// \param options Options controlling the printing process.
   void print(raw_ostream &os, const PrintOptions &options);
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::SourceFile;
+  }
 
 private:
   // Make placement new and vanilla new/delete illegal for SourceFiles.

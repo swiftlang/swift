@@ -345,6 +345,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
           while (!dc->isModuleContext()) {
             switch (dc->getContextKind()) {
             case DeclContextKind::Module:
+            case DeclContextKind::SourceFile:
             case DeclContextKind::TopLevelCodeDecl:
               llvm_unreachable("Not in a module context!");
               break;

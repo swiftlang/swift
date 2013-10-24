@@ -94,10 +94,12 @@ namespace llvm {
 static const Decl *getDeclForContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
-      // Use a null decl to represent the translation unit.
+    // Use a null decl to represent the translation unit.
     if (isa<TranslationUnit>(DC))
-      return nullptr; // FIXME: multiple TUs within a module?
+      return nullptr;
     llvm_unreachable("builtins & serialized modules should be handled");
+  case DeclContextKind::SourceFile:
+    return getDeclForContext(DC->getParent());
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
     llvm_unreachable("shouldn't serialize decls from anonymous closures");

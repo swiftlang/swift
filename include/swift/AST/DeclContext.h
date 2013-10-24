@@ -53,6 +53,7 @@ namespace swift {
 // allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
   Module,
+  SourceFile,
   AbstractClosureExpr,
   NominalTypeDecl,
   ExtensionDecl,
