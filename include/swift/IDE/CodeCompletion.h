@@ -15,6 +15,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
@@ -24,7 +25,6 @@
 
 namespace swift {
 class CodeCompletionCallbacksFactory;
-class Decl;
 class ClangModule;
 
 namespace ide {
@@ -289,9 +289,9 @@ public:
 
 private:
   unsigned Kind : 2;
+  unsigned AssociatedDeclKind : 8;
   unsigned SemanticContext : 3;
   CodeCompletionString *const CompletionString;
-  const Decl *AssociatedDecl;
 
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
@@ -305,23 +305,24 @@ private:
                        const Decl *AssociatedDecl)
       : CodeCompletionResult(ResultKind::Declaration, SemanticContext,
                              CompletionString) {
-    this->AssociatedDecl = AssociatedDecl;
     assert(AssociatedDecl && "should have a decl");
+    AssociatedDeclKind = unsigned(AssociatedDecl->getKind());
   }
 
 public:
-  ResultKind getKind() const { return ResultKind(Kind); }
+  ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
+
+  DeclKind getAssociatedDeclKind() const {
+    assert(getKind() == Declaration);
+    return static_cast<DeclKind>(AssociatedDeclKind);
+  }
 
   SemanticContextKind getSemanticContext() const {
-    return SemanticContextKind(SemanticContext);
+    return static_cast<SemanticContextKind>(SemanticContext);
   }
 
   const CodeCompletionString *getCompletionString() const {
     return CompletionString;
-  }
-
-  const Decl *getAssociatedDecl() const {
-    return AssociatedDecl;
   }
 
   /// Print a debug representation of the code completion result to \p OS.
@@ -329,39 +330,65 @@ public:
   void dump() const;
 };
 
-class CodeCompletionContext {
-public:
-  struct ClangCacheImpl;
+struct CodeCompletionResultSink {
+  llvm::BumpPtrAllocator &Allocator;
+  std::vector<CodeCompletionResult *> &Results;
 
-private:
-  friend class CodeCompletionResultBuilder;
-  llvm::BumpPtrAllocator Allocator;
+  CodeCompletionResultSink(llvm::BumpPtrAllocator &Allocator,
+                           std::vector<CodeCompletionResult *> &Results)
+      : Allocator(Allocator), Results(Results) {}
+};
+
+class CodeCompletionCache {
+  struct Implementation;
 
   /// \brief Per-module code completion result cache.
   ///
   /// These results persist between multiple code completion requests.
-  std::unique_ptr<ClangCacheImpl> ClangResultCache;
+  std::unique_ptr<Implementation> Impl;
+
+public:
+  CodeCompletionCache();
+  ~CodeCompletionCache();
+
+  /// \brief Cache key.
+  struct Key {
+    std::string Filename;
+    std::string ModuleName;
+    std::vector<std::string> AccessPath;
+    bool ResultsHaveLeadingDot;
+
+    friend bool operator==(const Key &LHS, const Key &RHS) {
+      return LHS.Filename == RHS.Filename &&
+             LHS.ModuleName == RHS.ModuleName &&
+             LHS.AccessPath == RHS.AccessPath &&
+             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot;
+    }
+  };
+
+  void getResults(
+      const Key &K, CodeCompletionResultSink Sink, bool OnlyTypes,
+      std::function<void(CodeCompletionCache &, Key)> FillCacheCallback);
+
+  CodeCompletionResultSink getResultSinkFor(const Key &K);
+};
+
+class CodeCompletionContext {
+  friend class CodeCompletionResultBuilder;
+  llvm::BumpPtrAllocator Allocator;
 
   /// \brief A set of current completion results, not yet delivered to the
   /// consumer.
   std::vector<CodeCompletionResult *> CurrentCompletionResults;
 
-  enum class ResultDestination {
-    CurrentSet,
-    ClangCache
-  };
-
-  /// \brief Determines where the newly added results will go.
-  ResultDestination CurrentDestination = ResultDestination::CurrentSet;
-
-  void addResult(CodeCompletionResult *R, bool HasLeadingDot);
-
 public:
-  CodeCompletionContext();
-  ~CodeCompletionContext();
+  CodeCompletionCache &Cache;
+
+  CodeCompletionContext(CodeCompletionCache &Cache)
+      : Cache(Cache) {}
 
   /// \brief Allocate a string owned by the code completion context.
-  StringRef copyString(StringRef String);
+  StringRef copyString(StringRef Str);
 
   /// \brief Return current code completion results.
   MutableArrayRef<CodeCompletionResult *> takeResults();
@@ -371,24 +398,9 @@ public:
   static void sortCompletionResults(
       MutableArrayRef<CodeCompletionResult *> Results);
 
-  /// \brief Clean the cache of Clang completion results.
-  void clearClangCache();
-
-  /// \brief Set a function to refill code compltetion cache.
-  ///
-  /// \param RefillCache function that when called should generate code
-  /// completion results for all Clang modules.
-  void setCacheClangResults(
-      std::function<void(bool NeedLeadingDot)> RefillCache);
-
-  /// \brief If called, the current set of completion results will include
-  /// unqualified Clang completion results without a leading dot.
-  void includeUnqualifiedClangResults();
-
-  /// \brief If called, the current set of completion results will include
-  /// Clang completion results from a specified module.
-  void includeQualifiedClangResults(const ClangModule *Module,
-                                    bool NeedLeadingDot);
+  CodeCompletionResultSink getResultSink() {
+    return CodeCompletionResultSink(Allocator, CurrentCompletionResults);
+  }
 };
 
 /// \brief An abstract base class for consumers of code completion results.
@@ -422,5 +434,42 @@ makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
 } // namespace ide
 } // namespace swift
 
+namespace llvm {
+template<>
+struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
+  static inline swift::ide::CodeCompletionCache::Key getEmptyKey() {
+    return swift::ide::CodeCompletionCache::Key{"", "", {}, false};
+  }
+  static inline swift::ide::CodeCompletionCache::Key getTombstoneKey() {
+    auto Result = getEmptyKey();
+    Result.Filename = "x";
+    return Result;
+  }
+  static unsigned
+  getHashValue(const swift::ide::CodeCompletionCache::Key &Val) {
+    size_t H = 0;
+    H ^= std::hash<std::string>()(Val.Filename);
+    H ^= std::hash<std::string>()(Val.ModuleName);
+    for (auto Piece : Val.AccessPath)
+      H ^= std::hash<std::string>()(Piece);
+    H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
+    return H;
+  }
+  static bool isEqual(const swift::ide::CodeCompletionCache::Key &LHS,
+                      const swift::ide::CodeCompletionCache::Key &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
+
+namespace std {
+template <> struct hash<swift::ide::CodeCompletionCache::Key> {
+  std::size_t
+  operator()(const swift::ide::CodeCompletionCache::Key &K) const {
+    return llvm::DenseMapInfo<
+        swift::ide::CodeCompletionCache::Key>::getHashValue(K);
+  }
+};
+} // namespace std
 #endif // SWIFT_IDE_CODE_COMPLETION_H
 

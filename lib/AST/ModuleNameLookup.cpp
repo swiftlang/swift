@@ -251,8 +251,6 @@ void namelookup::lookupInModule(Module *startModule,
   );
 }
 
-// FIXME: Should Module::lookupVisibleDecls be refactored to take a vector
-// directly?
 namespace {
 class VectorDeclConsumer : public VisibleDeclConsumer {
 public:
@@ -266,16 +264,17 @@ public:
 };
 }
 
-void namelookup::lookupVisibleDeclsInModule(Module *topLevel,
-                                            Module::AccessPathTy topAccessPath,
+void namelookup::lookupVisibleDeclsInModule(Module *M,
+                                            Module::AccessPathTy accessPath,
                                             SmallVectorImpl<ValueDecl *> &decls,
                                             NLKind lookupKind,
                                             ResolutionKind resolutionKind,
-                                            LazyResolver *typeResolver) {
+                                            LazyResolver *typeResolver,
+                                            bool topLevel) {
   ModuleLookupCache cache;
-  ::lookupInModule<NamedCanTypeSet>(topLevel, topAccessPath, decls,
+  ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
-                                    typeResolver, cache, /*topLevel=*/true,
+                                    typeResolver, cache, topLevel,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);

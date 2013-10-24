@@ -556,6 +556,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                const DeclContext *DC,
                                LazyResolver *TypeResolver,
+                               bool IncludeTopLevel,
                                SourceLoc Loc) {
   const Module &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
@@ -639,26 +640,31 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       FindLocalVal(SM, Loc, Consumer).checkTranslationUnit(TU);
     }
 
-    auto &cached = TU->getCachedVisibleDecls();
-    if (!cached.empty()) {
-      for (auto result : cached)
-        Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
-      return;
+    if (IncludeTopLevel) {
+      auto &cached = TU->getCachedVisibleDecls();
+      if (!cached.empty()) {
+        for (auto result : cached)
+          Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
+        return;
+      }
     }
   }
 
-  using namespace namelookup;
-  SmallVector<ValueDecl *, 0> moduleResults;
-  auto &mutableM = const_cast<Module&>(M);
-  lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
-                             NLKind::QualifiedLookup,
-                             ResolutionKind::Overloadable,
-                             TypeResolver);
-  for (auto result : moduleResults)
-    Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
+  if (IncludeTopLevel) {
+    using namespace namelookup;
+    SmallVector<ValueDecl *, 0> moduleResults;
+    auto &mutableM = const_cast<Module&>(M);
+    lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
+                               NLKind::QualifiedLookup,
+                               ResolutionKind::Overloadable,
+                               TypeResolver,
+                               /*topLevel=*/true);
+    for (auto result : moduleResults)
+      Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
-  if (auto TU = dyn_cast<TranslationUnit>(&M)) {
-    TU->cacheVisibleDecls(std::move(moduleResults));
+    if (auto TU = dyn_cast<TranslationUnit>(&M)) {
+      TU->cacheVisibleDecls(std::move(moduleResults));
+    }
   }
 }
 

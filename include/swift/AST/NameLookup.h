@@ -20,6 +20,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -289,6 +290,7 @@ void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         const DeclContext *DC,
                         LazyResolver *typeResolver,
+                        bool IncludeTopLevel,
                         SourceLoc Loc = SourceLoc());
 
 /// Finds decls visible as members of the given type and feeds them to the given
@@ -300,6 +302,30 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               LazyResolver *typeResolver);
 
+namespace namelookup {
+enum class ResolutionKind {
+  /// Lookup can match any number of decls, as long as they are all
+  /// overloadable.
+  ///
+  /// If non-overloadable decls are returned, this indicates ambiguous lookup.
+  Overloadable,
+
+  /// Lookup should match a single decl.
+  Exact,
+
+  /// Lookup should match a single decl that declares a type.
+  TypesOnly
+};
+
+/// Performs a qualified lookup into the given module and, if necessary, its
+/// reexports, observing proper shadowing rules.
+void lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
+                                SmallVectorImpl<ValueDecl *> &decls,
+                                NLKind lookupKind,
+                                ResolutionKind resolutionKind,
+                                LazyResolver *typeResolver,
+                                bool topLevel);
+} // end namespace namelookup
 } // end namespace swift
 
 #endif

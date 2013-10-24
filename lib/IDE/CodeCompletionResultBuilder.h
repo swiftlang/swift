@@ -24,7 +24,7 @@ class Decl;
 namespace ide {
 
 class CodeCompletionResultBuilder {
-  CodeCompletionContext &Context;
+  CodeCompletionResultSink Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
   const Decl *AssociatedDecl = nullptr;
@@ -55,10 +55,10 @@ class CodeCompletionResultBuilder {
   void finishResult();
 
 public:
-  CodeCompletionResultBuilder(CodeCompletionContext &Context,
+  CodeCompletionResultBuilder(CodeCompletionResultSink Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext)
-      : Context(Context), Kind(Kind), SemanticContext(SemanticContext) {
+      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext) {
   }
 
   ~CodeCompletionResultBuilder() {

@@ -14,25 +14,21 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
-#include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "clang/Basic/Module.h"
 #include "CodeCompletionResultBuilder.h"
 #include <algorithm>
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 using namespace swift;
 using namespace ide;
@@ -104,7 +100,7 @@ Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   auto &SM = AFD->getASTContext().SourceMgr;
   assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
   StmtFinder Finder(SM, Loc, Kind);
-  // FIXME: this is not thread-safe.
+  // FIXME(thread-safety): the walker is is mutating the AST.
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
@@ -211,13 +207,24 @@ void CodeCompletionResult::dump() const {
   print(llvm::errs());
 }
 
+static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
+                            StringRef Str) {
+  char *Mem = Allocator.Allocate<char>(Str.size());
+  std::copy(Str.begin(), Str.end(), Mem);
+  return StringRef(Mem, Str.size());
+}
+
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, Context.copyString(Text));
+  addChunkWithTextNoCopy(Kind, copyString(Sink.Allocator, Text));
+}
+
+StringRef CodeCompletionContext::copyString(StringRef Str) {
+  return ::copyString(Allocator, Str);
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
-  void *CCSMem = Context.Allocator
+  void *CCSMem = Sink.Allocator
       .Allocate(sizeof(CodeCompletionString) +
                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
                 llvm::alignOf<CodeCompletionString>());
@@ -225,131 +232,69 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   switch (Kind) {
   case CodeCompletionResult::ResultKind::Declaration:
-    return new (Context.Allocator) CodeCompletionResult(SemanticContext, CCS,
-                                                        AssociatedDecl);
+    return new (Sink.Allocator) CodeCompletionResult(SemanticContext, CCS,
+                                                     AssociatedDecl);
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (Context.Allocator) CodeCompletionResult(Kind, SemanticContext,
-                                                        CCS);
+    return new (Sink.Allocator) CodeCompletionResult(Kind, SemanticContext,
+                                                     CCS);
   }
 }
 
 void CodeCompletionResultBuilder::finishResult() {
-  Context.addResult(takeResult(), HasLeadingDot);
+  Sink.Results.push_back(takeResult());
 }
 
 namespace swift {
 namespace ide {
-struct CodeCompletionContext::ClangCacheImpl {
-  CodeCompletionContext &CompletionContext;
 
-  /// Per-module completion result cache for results with a leading dot.
-  llvm::DenseMap<const ClangModule *, std::vector<CodeCompletionResult *>>
-      CacheWithDot;
+struct CodeCompletionCache::Implementation {
+  llvm::BumpPtrAllocator Allocator;
 
-  /// Per-module completion result cache for results without a leading dot.
-  llvm::DenseMap<const ClangModule *, std::vector<CodeCompletionResult *>>
-      CacheWithoutDot;
-
-  /// A function that can generate results for the cache.
-  std::function<void(bool NeedLeadingDot)> RefillCache;
-
-  struct RequestedResultsTy {
-    const ClangModule *Module;
-    bool NeedLeadingDot;
-  };
-
-  /// Describes the results requested for current completion.
-  Optional<RequestedResultsTy> RequestedResults = Nothing;
-
-  ClangCacheImpl(CodeCompletionContext &CompletionContext)
-      : CompletionContext(CompletionContext) {}
-
-  void clear() {
-    CacheWithDot.clear();
-    CacheWithoutDot.clear();
-  }
-
-  void ensureCached() {
-  if (!RequestedResults)
-    return;
-
-    bool NeedDot = RequestedResults->NeedLeadingDot;
-    if ((NeedDot && CacheWithDot.empty()) ||
-        (!NeedDot && CacheWithoutDot.empty())) {
-      llvm::SaveAndRestore<ResultDestination> ChangeDestination(
-          CompletionContext.CurrentDestination, ResultDestination::ClangCache);
-
-      RefillCache(NeedDot);
-    }
-  }
-
-  void requestUnqualifiedResults() {
-    RequestedResults = RequestedResultsTy{nullptr, false};
-  }
-
-  void requestQualifiedResults(const ClangModule *Module,
-                               bool NeedLeadingDot) {
-    assert(Module && "should specify a non-null Module");
-    RequestedResults = RequestedResultsTy{Module, NeedLeadingDot};
-  }
-
-  void addResult(CodeCompletionResult *R, bool HasLeadingDot);
-  void takeResults();
+  std::unordered_map<
+      CodeCompletionCache::Key,
+      std::vector<CodeCompletionResult *>> TheCache;
 };
+
+void CodeCompletionCache::getResults(
+    const Key &K, CodeCompletionResultSink Sink, bool OnlyTypes,
+    std::function<void(CodeCompletionCache &, Key)> FillCacheCallback) {
+  // FIXME(thread-safety): lock the whole AST context.  We might load a module.
+  auto I = Impl->TheCache.find(K);
+  if (I == Impl->TheCache.end()) {
+    FillCacheCallback(*this, K);
+    I = Impl->TheCache.find(K);
+  }
+  assert(I != Impl->TheCache.end());
+  if (OnlyTypes) {
+    std::copy_if(I->second.begin(), I->second.end(),
+                 std::back_inserter(Sink.Results),
+                 [](CodeCompletionResult *R) -> bool {
+      if (R->getKind() != CodeCompletionResult::Declaration)
+        return false;
+      return R->getAssociatedDeclKind() >= DeclKind::First_TypeDecl &&
+             R->getAssociatedDeclKind() <= DeclKind::Last_TypeDecl;
+    });
+  } else {
+    Sink.Results.insert(Sink.Results.end(),
+                        I->second.begin(), I->second.end());
+  }
+}
+
+CodeCompletionResultSink CodeCompletionCache::getResultSinkFor(const Key &K) {
+  return CodeCompletionResultSink(Impl->Allocator, Impl->TheCache[K]);
+}
+
 } // namespace ide
 } // namespace swift
 
-void CodeCompletionContext::ClangCacheImpl::addResult(CodeCompletionResult *R,
-                                                      bool HasLeadingDot) {
-  const ClangModule *Module = nullptr;
-  if (auto *D = R->getAssociatedDecl())
-    Module = cast<ClangModule>(D->getModuleContext());
-  auto &Cache = HasLeadingDot ? CacheWithDot : CacheWithoutDot;
-  Cache[Module].push_back(R);
-}
+CodeCompletionCache::CodeCompletionCache()
+    : Impl(new Implementation()) {}
 
-void CodeCompletionContext::ClangCacheImpl::takeResults() {
-  if (!RequestedResults)
-    return;
-
-  ensureCached();
-
-  std::vector<CodeCompletionResult *> &Results =
-      CompletionContext.CurrentCompletionResults;
-  // Add Clang results from the cache.
-  auto *Module = RequestedResults->Module;
-  auto &Cache = RequestedResults->NeedLeadingDot ? CacheWithDot :
-                                                   CacheWithoutDot;
-  for (auto KV : Cache) {
-    // Include results from this module if:
-    // * no particular module was requested, or
-    // * this module was specifically requested, or
-    // * this module is re-exported from the requested module.
-    if (!Module || Module == KV.first ||
-        Module->getClangModule()->isModuleVisible(KV.first->getClangModule()))
-      for (auto R : KV.second)
-        Results.push_back(R);
-  }
-
-  RequestedResults = Nothing;
-}
-
-CodeCompletionContext::CodeCompletionContext()
-    : ClangResultCache(new ClangCacheImpl(*this)) {}
-
-CodeCompletionContext::~CodeCompletionContext() {}
-
-StringRef CodeCompletionContext::copyString(StringRef String) {
-  char *Mem = Allocator.Allocate<char>(String.size());
-  std::copy(String.begin(), String.end(), Mem);
-  return StringRef(Mem, String.size());
-}
+CodeCompletionCache::~CodeCompletionCache() {}
 
 MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
-  ClangResultCache->takeResults();
-
   // Copy pointers to the results.
   const size_t Count = CurrentCompletionResults.size();
   CodeCompletionResult **Results =
@@ -393,19 +338,6 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
 }
 } // unnamed namespace
 
-void CodeCompletionContext::addResult(CodeCompletionResult *R,
-                                      bool HasLeadingDot) {
-  switch (CurrentDestination) {
-  case ResultDestination::CurrentSet:
-    CurrentCompletionResults.push_back(R);
-    return;
-
-  case ResultDestination::ClangCache:
-    ClangResultCache->addResult(R, HasLeadingDot);
-    return;
-  }
-}
-
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
@@ -421,28 +353,8 @@ void CodeCompletionContext::sortCompletionResults(
   });
 }
 
-void CodeCompletionContext::clearClangCache() {
-  ClangResultCache->clear();
-}
-
-void CodeCompletionContext::setCacheClangResults(
-    std::function<void(bool NeedLeadingDot)> RefillCache) {
-  ClangResultCache->RefillCache = RefillCache;
-}
-
-void CodeCompletionContext::includeUnqualifiedClangResults() {
-  ClangResultCache->requestUnqualifiedResults();
-}
-
-void
-CodeCompletionContext::includeQualifiedClangResults(const ClangModule *Module,
-                                                    bool NeedLeadingDot) {
-  ClangResultCache->requestQualifiedResults(Module, NeedLeadingDot);
-}
-
 namespace {
-class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
-                                    public ModuleLoadListener {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
 
@@ -543,11 +455,6 @@ public:
                               CodeCompletionConsumer &Consumer)
       : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
         Consumer(Consumer) {
-    P.Context.addModuleLoadListener(*this);
-  }
-
-  ~CodeCompletionCallbacksImpl() {
-    P.Context.removeModuleLoadListener(*this);
   }
 
   void completeExpr() override;
@@ -567,9 +474,6 @@ public:
   void doneParsing() override;
 
   void deliverCompletionResults();
-
-  // Implement swift::ModuleLoadListener.
-  void loadedModule(ModuleLoader *Loader, Module *M) override;
 };
 } // end unnamed namespace
 
@@ -587,8 +491,8 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 
 namespace {
 /// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : swift::VisibleDeclConsumer {
-  CodeCompletionContext &CompletionContext;
+class CompletionLookup : public swift::VisibleDeclConsumer {
+  CodeCompletionResultSink Sink;
   ASTContext &Ctx;
   OwnedResolver TypeResolver;
   Identifier SelfIdent;
@@ -600,6 +504,7 @@ class CompletionLookup : swift::VisibleDeclConsumer {
     EnumElement,
     Type,
     TypeInDeclContext,
+    ImportFromModule,
   };
 
   LookupKind Kind;
@@ -625,20 +530,41 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   /// \brief Declarations that should get ExpressionSpecific semantic context.
   llvm::SmallSet<const Decl *, 4> ExpressionSpecificDecls;
 
-  bool needDot() const {
-    return NeedLeadingDot;
-  }
+public:
+  struct RequestedResultsTy {
+    const Module *TheModule;
+    bool OnlyTypes;
+    bool NeedLeadingDot;
+
+    static RequestedResultsTy fromModule(const Module *TheModule) {
+      return { TheModule, false, false };
+    }
+
+    RequestedResultsTy onlyTypes() const {
+      return { TheModule, true, NeedLeadingDot };
+    }
+
+    RequestedResultsTy needLeadingDot(bool NeedDot) const {
+      return { TheModule, OnlyTypes, NeedDot };
+    }
+
+    static RequestedResultsTy toplevelResults() {
+      return { nullptr, false, false };
+    }
+  };
+
+  Optional<RequestedResultsTy> RequestedCachedResults;
 
 public:
-  CompletionLookup(CodeCompletionContext &CompletionContext,
+  CompletionLookup(CodeCompletionResultSink Sink,
                    ASTContext &Ctx,
                    const DeclContext *CurrDeclContext)
-      : CompletionContext(CompletionContext), Ctx(Ctx),
+      : Sink(Sink), Ctx(Ctx),
         TypeResolver(createLazyResolver(Ctx)),
         SelfIdent(Ctx.getIdentifier("self")),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
-    if (CurrDeclContext->isLocalContext()) {
+    if (CurrDeclContext && CurrDeclContext->isLocalContext()) {
       const DeclContext *FunctionDC = CurrDeclContext;
       while (FunctionDC->isLocalContext()) {
         const DeclContext *Parent = FunctionDC->getParent();
@@ -654,16 +580,14 @@ public:
         }
       }
     }
-
-    CompletionContext.setCacheClangResults([&](bool NeedLeadingDot) {
-      llvm::SaveAndRestore<bool> S(this->NeedLeadingDot, NeedLeadingDot);
-      if (auto Importer = Ctx.getClangModuleLoader())
-        static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
-    });
   }
 
   void setHaveDot() {
     HaveDot = true;
+  }
+
+  bool needDot() const {
+    return NeedLeadingDot;
   }
 
   void setIsSuperRefExpr() {
@@ -701,7 +625,8 @@ public:
       return SemanticContextKind::OutsideNominal;
 
     case DeclVisibilityKind::VisibleAtTopLevel:
-      if (D->getModuleContext() == CurrDeclContext->getParentModule())
+      if (CurrDeclContext &&
+          D->getModuleContext() == CurrDeclContext->getParentModule())
         return SemanticContextKind::CurrentModule;
       else
         return SemanticContextKind::OtherModule;
@@ -735,7 +660,7 @@ public:
     // FIXME: static variables.
 
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(VD, Reason));
     Builder.setAssociatedDecl(VD);
@@ -813,7 +738,7 @@ public:
 
   void addFunctionCall(const AnyFunctionType *AFT) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific);
     Builder.addLeftParen();
@@ -856,13 +781,16 @@ public:
     case LookupKind::TypeInDeclContext:
       llvm_unreachable("can not have a method call while doing a "
                        "type completion");
+    case LookupKind::ImportFromModule:
+      IsImlicitlyCurriedInstanceMethod = false;
+      break;
     }
 
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(FD, Reason));
     Builder.setAssociatedDecl(FD);
@@ -901,7 +829,7 @@ public:
   void addConstructorCall(const ConstructorDecl *CD,
                           DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(CD, Reason));
     Builder.setAssociatedDecl(CD);
@@ -922,7 +850,7 @@ public:
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
     assert(!HaveDot && "can not add a subscript after a dot");
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(SD, Reason));
     Builder.setAssociatedDecl(SD);
@@ -943,7 +871,7 @@ public:
   void addNominalTypeRef(const NominalTypeDecl *NTD,
                          DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(NTD, Reason));
     Builder.setAssociatedDecl(NTD);
@@ -956,7 +884,7 @@ public:
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(TAD, Reason));
     Builder.setAssociatedDecl(TAD);
@@ -975,9 +903,9 @@ public:
   void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
                               DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
-      CompletionContext,
-      CodeCompletionResult::ResultKind::Declaration,
-      getSemanticContext(GP, Reason));
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(GP, Reason));
     Builder.setAssociatedDecl(GP);
     if (needDot())
       Builder.addLeadingDot();
@@ -989,9 +917,9 @@ public:
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
                             DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
-      CompletionContext,
-      CodeCompletionResult::ResultKind::Declaration,
-      getSemanticContext(AT, Reason));
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(AT, Reason));
     Builder.setAssociatedDecl(AT);
     if (needDot())
       Builder.addLeadingDot();
@@ -1004,10 +932,10 @@ public:
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
     CodeCompletionResultBuilder Builder(
-      CompletionContext,
-      CodeCompletionResult::ResultKind::Declaration,
-      HasTypeContext ? SemanticContextKind::ExpressionSpecific
-                     : getSemanticContext(EED, Reason));
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        HasTypeContext ? SemanticContextKind::ExpressionSpecific
+                       : getSemanticContext(EED, Reason));
     Builder.setAssociatedDecl(EED);
     if (needDot())
       Builder.addLeadingDot();
@@ -1019,7 +947,7 @@ public:
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None);
     if (needDot())
@@ -1031,7 +959,7 @@ public:
 
   void addKeyword(StringRef Name, StringRef TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
-        CompletionContext,
+        Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None);
     if (needDot())
@@ -1122,6 +1050,7 @@ public:
       return;
 
     case LookupKind::ValueInDeclContext:
+    case LookupKind::ImportFromModule:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         addVarDeclRef(VD, Reason);
         return;
@@ -1200,7 +1129,7 @@ public:
     unsigned Index = 0;
     for (auto TupleElt : ExprType->getFields()) {
       CodeCompletionResultBuilder Builder(
-          CompletionContext,
+          Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::CurrentNominal);
       if (needDot())
@@ -1234,7 +1163,7 @@ public:
 
     {
       CodeCompletionResultBuilder Builder(
-          CompletionContext,
+          Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::ExpressionSpecific);
       Builder.addExclamationMark();
@@ -1242,7 +1171,7 @@ public:
     }
     {
       CodeCompletionResultBuilder Builder(
-          CompletionContext,
+          Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::ExpressionSpecific);
       Builder.addQuestionMark();
@@ -1266,8 +1195,11 @@ public:
       }
     }
     if (auto MT = ExprType->getAs<ModuleType>()) {
-      if (auto *M = dyn_cast<ClangModule>(MT->getModule())) {
-        CompletionContext.includeQualifiedClangResults(M, needDot());
+      Module *M = MT->getModule();
+      if (CurrDeclContext->getParentModule() != M) {
+        // Only use the cache if it is not the current module.
+        RequestedCachedResults = RequestedResultsTy::fromModule(M)
+                                                     .needLeadingDot(needDot());
         Done = true;
       }
     }
@@ -1302,7 +1234,9 @@ public:
 
   void getValueCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::ValueInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
+    NeedLeadingDot = false;
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/false, Loc);
 
     // FIXME: The pedantically correct way to find the type is to resolve the
     // swift.StringLiteralType type.
@@ -1314,7 +1248,7 @@ public:
     if (Ctx.LangOpts.Axle)
       addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/true);
 
-    CompletionContext.includeUnqualifiedClangResults();
+    RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -1358,10 +1292,53 @@ public:
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/false, Loc);
+
+    RequestedCachedResults =
+        RequestedResultsTy::toplevelResults().onlyTypes();
 
     if (Ctx.LangOpts.Axle)
       addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/false);
+  }
+
+  void getToplevelTUCompletions(bool OnlyTypes) {
+    Kind = OnlyTypes ? LookupKind::TypeInDeclContext
+                     : LookupKind::ValueInDeclContext;
+    NeedLeadingDot = false;
+    auto *TU = cast<TranslationUnit>(CurrDeclContext->getParentModule());
+    TU->lookupVisibleDecls({}, *this, NLKind::QualifiedLookup);
+  }
+
+  void getModuleImportCompletions(StringRef ModuleName,
+                                  const std::vector<std::string> &AccessPath,
+                                  bool ResultsHaveLeadingDot) {
+    Kind = LookupKind::ImportFromModule;
+    NeedLeadingDot = ResultsHaveLeadingDot;
+
+    auto ModulePath =
+        std::make_pair(Ctx.getIdentifier(ModuleName), SourceLoc());
+    Module *M = Ctx.getModule(llvm::makeArrayRef(ModulePath));
+    if (!M)
+      return;
+
+    llvm::SmallVector<std::pair<Identifier, SourceLoc>, 1> LookupAccessPath;
+    for (auto Piece : AccessPath) {
+      LookupAccessPath.push_back(
+          std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
+    }
+
+    using namespace swift::namelookup;
+    SmallVector<ValueDecl *, 1> Decls;
+    lookupVisibleDeclsInModule(M, LookupAccessPath, Decls,
+                               NLKind::QualifiedLookup,
+                               ResolutionKind::Overloadable,
+                               TypeResolver.get(),
+                               /*topLevel=*/false);
+
+    for (auto *VD : Decls) {
+      foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
+    }
   }
 
 private:
@@ -1369,7 +1346,7 @@ private:
     {
       // Vec<type, length>
       CodeCompletionResultBuilder Builder(
-          CompletionContext,
+          Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::OtherModule);
       Builder.addTextChunk("Vec");
@@ -1387,7 +1364,7 @@ private:
     {
       // Matrix<type, rows, columns>
       CodeCompletionResultBuilder Builder(
-          CompletionContext,
+          Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::OtherModule);
       Builder.addTextChunk("Matrix");
@@ -1528,7 +1505,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
-  CompletionLookup Lookup(CompletionContext, P.Context, CurDeclContext);
+  CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
+                          CurDeclContext);
 
   switch (Kind) {
   case CompletionKind::None:
@@ -1605,6 +1583,62 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   }
 
+  if (Lookup.RequestedCachedResults) {
+    auto &Request = Lookup.RequestedCachedResults.getValue();
+    if (Request.TheModule) {
+      // Create helpers for result caching.
+      auto &SwiftContext = P.Context;
+      auto FillCacheCallback =
+          [&SwiftContext](CodeCompletionCache &Cache,
+                          const CodeCompletionCache::Key &K) {
+        CompletionLookup Lookup(Cache.getResultSinkFor(K), SwiftContext,
+                                nullptr);
+        Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
+                                          K.ResultsHaveLeadingDot);
+      };
+
+      // FIXME: actually check imports.
+      // FIXME: fill in filename.
+      CodeCompletionCache::Key K{"", Request.TheModule->Name.str().str(),
+                                 {}, Request.NeedLeadingDot};
+      CompletionContext.Cache.getResults(
+          K, CompletionContext.getResultSink(), Request.OnlyTypes,
+          FillCacheCallback);
+    } else {
+      // Add results from current module.
+      Lookup.getToplevelTUCompletions(Request.OnlyTypes);
+
+      // Create helpers for result caching.
+      auto &SwiftContext = P.Context;
+      auto FillCacheCallback =
+          [&SwiftContext](CodeCompletionCache &Cache,
+                          const CodeCompletionCache::Key &K) {
+        CompletionLookup Lookup(Cache.getResultSinkFor(K), SwiftContext,
+                                nullptr);
+        Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
+                                          K.ResultsHaveLeadingDot);
+      };
+
+      // Add results for all imported modules.
+      SmallVector<Module::ImportedModule, 8> ImportedList;
+      auto *TU = cast<TranslationUnit>(CurDeclContext->getParentModule());
+      TU->getImportedModules(ImportedList, /*includePrivate=*/true);
+      for (auto Imported : ImportedList) {
+        std::vector<std::string> AccessPath;
+        for (auto Piece : Imported.first) {
+          AccessPath.push_back(Piece.first.str());
+        }
+        // FIXME: fill in filename.
+        CodeCompletionCache::Key K{"", Imported.second->Name.str().str(),
+                                   AccessPath, false};
+        CompletionContext.Cache.getResults(
+            K, CompletionContext.getResultSink(), Request.OnlyTypes,
+            FillCacheCallback);
+      }
+    }
+    Lookup.RequestedCachedResults.reset();
+  }
+
   deliverCompletionResults();
 }
 
@@ -1614,11 +1648,6 @@ void CodeCompletionCallbacksImpl::deliverCompletionResults() {
     Consumer.handleResults(Results);
     DeliveredResults = true;
   }
-}
-
-void CodeCompletionCallbacksImpl::loadedModule(ModuleLoader *Loader,
-                                               Module *M) {
-  CompletionContext.clearClangCache();
 }
 
 void PrintingCodeCompletionConsumer::handleResults(

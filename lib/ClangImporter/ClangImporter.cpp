@@ -506,7 +506,7 @@ class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
   ClangImporter &TheClangImporter;
   ClangImporter::Implementation &Impl;
   swift::VisibleDeclConsumer &NextConsumer;
-  const Module *ModuleFilter = nullptr;
+  const ClangModule *ModuleFilter = nullptr;
 
 public:
   ImportingVisibleDeclConsumer(ClangImporter &TheClangImporter,
@@ -515,7 +515,7 @@ public:
       : TheClangImporter(TheClangImporter), Impl(Impl),
         NextConsumer(NextConsumer) {}
 
-  void filterByModule(const Module *M) {
+  void filterByModule(const ClangModule *M) {
     ModuleFilter = M;
   }
 
@@ -534,9 +534,22 @@ public:
                                  Impl.SwiftContext.getIdentifier(ND->getName()),
                                  NLKind::UnqualifiedLookup,
                                  Results);
-    for (auto *VD : Results)
-      if (!ModuleFilter || VD->getModuleContext() == ModuleFilter)
+    for (auto *VD : Results) {
+      // Include results from this module if:
+      // * no particular module was requested, or
+      // * this module was specifically requested, or
+      // * this module is re-exported from the requested module.
+      bool ShouldReport = !ModuleFilter ||
+                          VD->getModuleContext() == ModuleFilter;
+      if (!ShouldReport) {
+        auto ThisDeclClangModule =
+            cast<ClangModule>(VD->getModuleContext())->getClangModule();
+        ShouldReport = ModuleFilter->getClangModule()->isModuleVisible(
+            ThisDeclClangModule);
+      }
+      if (ShouldReport)
         NextConsumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
+    }
   }
 };
 } // unnamed namespace
@@ -553,7 +566,7 @@ void ClangImporter::lookupVisibleDecls(const Module *M,
                                        NLKind LookupKind) {
   ImportingVisibleDeclConsumer ImportingConsumer(
       const_cast<ClangImporter &>(*this), Impl, Consumer);
-  ImportingConsumer.filterByModule(M);
+  ImportingConsumer.filterByModule(cast<ClangModule>(M));
   lookupVisibleDecls(ImportingConsumer);
 }
 

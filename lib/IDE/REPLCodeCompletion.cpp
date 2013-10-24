@@ -93,7 +93,8 @@ public:
 };
 } // namespace swift
 
-REPLCompletions::REPLCompletions() : State(CompletionState::Invalid) {
+REPLCompletions::REPLCompletions()
+    : State(CompletionState::Invalid), CompletionContext(CompletionCache) {
   // Create a CodeCompletionConsumer.
   Consumer.reset(new REPLCodeCompletionConsumer(*this));
 

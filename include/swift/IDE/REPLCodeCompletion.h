@@ -49,6 +49,7 @@ class REPLCompletions {
   friend class REPLCodeCompletionConsumer;
   CompletionState State;
 
+  ide::CodeCompletionCache CompletionCache;
   ide::CodeCompletionContext CompletionContext;
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer;
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory;

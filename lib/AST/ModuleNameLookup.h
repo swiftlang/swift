@@ -25,21 +25,6 @@
 namespace swift {
 namespace namelookup {
 
-/// Controls the behavior of lookupInModule().
-enum class ResolutionKind {
-  /// Lookup can match any number of decls, as long as they are all
-  /// overloadable.
-  ///
-  /// If non-overloadable decls are returned, this indicates ambiguous lookup.
-  Overloadable,
-
-  /// Lookup should match a single decl.
-  Exact,
-
-  /// Lookup should match a single decl that declares a type.
-  TypesOnly
-};
-
 /// Performs a lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 ///
@@ -57,14 +42,6 @@ void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     Identifier name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     LazyResolver *typeResolver, bool topLevel);
-
-/// Performs a qualified lookup into the given module and, if necessary, its
-/// reexports, observing proper shadowing rules.
-void lookupVisibleDeclsInModule(Module *module, Module::AccessPathTy accessPath,
-                                SmallVectorImpl<ValueDecl *> &decls,
-                                NLKind lookupKind,
-                                ResolutionKind resolutionKind,
-                                LazyResolver *typeResolver);
 
 } // end namespace namelookup
 } // end namespace swift
