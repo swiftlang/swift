@@ -27,7 +27,7 @@ namespace {
   enum ShouldHalt { Continue, Halt };
 
   class Verifier : public ASTWalker {
-    Module *M;
+    PointerUnion<Module *, SourceFile *> M;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
     const bool HadError;
@@ -43,7 +43,10 @@ namespace {
 
   public:
     Verifier(Module *M)
-        : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {}
+      : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {}
+    Verifier(SourceFile &SF)
+      : M(&SF), Ctx(SF.TU.Ctx), Out(llvm::errs()),
+        HadError(SF.TU.Ctx.hadError()) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
@@ -53,9 +56,8 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((HadError || !isa<TranslationUnit>(M) || \
-                cast<TranslationUnit>(M)->MainSourceFile->ASTStage < \
-                  SourceFile::TypeChecked) && \
+        assert((HadError || !M.is<SourceFile*>() || \
+                M.get<SourceFile*>()->ASTStage < SourceFile::TypeChecked) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -72,9 +74,8 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((HadError || !isa<TranslationUnit>(M) || \
-                cast<TranslationUnit>(M)->MainSourceFile->ASTStage < \
-                  SourceFile::TypeChecked) && \
+        assert((HadError || !M.is<SourceFile*>() || \
+                M.get<SourceFile*>()->ASTStage < SourceFile::TypeChecked) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -191,7 +192,8 @@ namespace {
     /// Helper template for dispatching post-visitation.
     template <class T> T dispatchVisitPost(T node) {
       // Verify source ranges if the AST node was parsed from source.
-      if (isa<TranslationUnit>(M))
+      SourceFile *SF = M.dyn_cast<SourceFile *>();
+      if (SF)
         checkSourceRanges(node);
 
       // Check that nodes marked invalid have the correct type.
@@ -199,10 +201,6 @@ namespace {
 
       // Always verify the node as a parsed node.
       verifyParsed(node);
-
-      SourceFile *SF = nullptr;
-      if (auto TU = dyn_cast<TranslationUnit>(M))
-        SF = TU->MainSourceFile;
 
       // If we've bound names already, verify as a bound node.
       if (!SF || SF->ASTStage >= SourceFile::NameBound)
@@ -1607,12 +1605,14 @@ namespace {
 }
 
 void swift::verify(SourceFile &SF) {
-  Verifier verifier(&SF.TU);
+  Verifier verifier(SF);
   SF.walk(verifier);
 }
 
 void swift::verify(Decl *D) {
-  Verifier V(D->getDeclContext()->getParentModule());
+  auto topScope = D->getDeclContext()->getModuleScopeContext();
+  Verifier V = topScope.is<Module*>() ? Verifier(topScope.get<Module*>())
+                                      : Verifier(*topScope.get<SourceFile*>());
   D->walk(V);
 }
 

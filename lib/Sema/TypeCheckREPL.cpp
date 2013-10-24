@@ -536,7 +536,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
   ClosureExpr *CE =
-      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &SF.TU);
+      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &SF);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   CE->setType(FuncTy);
@@ -576,7 +576,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
                                EndLoc);
-  SF.Decls.push_back(new (C) TopLevelCodeDecl(&SF.TU, BS));
+  SF.Decls.push_back(new (C) TopLevelCodeDecl(&SF, BS));
 }
 
 
@@ -609,7 +609,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(&SF.TU);
   VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(), name,
-                                          E->getType(), &SF.TU);
+                                          E->getType(), &SF);
   SF.Decls.push_back(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
@@ -617,7 +617,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
     = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
-                                           &SF.TU);
+                                           &SF);
   SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
@@ -668,7 +668,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(&SF.TU);
   VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(), name,
-                                          PBD->getPattern()->getType(), &SF.TU);
+                                          PBD->getPattern()->getType(), &SF);
   SF.Decls.push_back(vd);
 
   
@@ -677,13 +677,13 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
     = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
-                                           PBD->getInit(), &SF.TU);
+                                           PBD->getInit(), &SF);
 
   auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
                                    BraceStmt::ExprStmtOrDecl(metavarBinding),
                                    metavarBinding->getEndLoc());
 
-  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&SF.TU, MVBrace);
+  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&SF, MVBrace);
   SF.Decls.push_back(MVTLCD);
 
   

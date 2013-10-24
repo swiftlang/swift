@@ -127,6 +127,22 @@ Module *DeclContext::getParentModule() const {
   return const_cast<Module *>(cast<Module>(DC));
 }
 
+PointerUnion<Module *, SourceFile *>
+DeclContext::getModuleScopeContext() const {
+  const DeclContext *DC = this;
+  while (true) {
+    switch (DC->getContextKind()) {
+    case DeclContextKind::Module:
+      return const_cast<Module *>(cast<Module>(DC));
+    case DeclContextKind::SourceFile:
+      return const_cast<SourceFile *>(cast<SourceFile>(DC));
+    default:
+      break;
+    }
+    DC = DC->getParent();
+  }
+}
+
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
   for (const DeclContext *dc = this; ; dc = dc->getParent() ) {

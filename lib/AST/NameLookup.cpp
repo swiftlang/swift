@@ -210,8 +210,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       checkValueDecl(P.getDecl());
   }
 
-  void checkTranslationUnit(TranslationUnit *TU) {
-    for (Decl *D : TU->MainSourceFile->Decls) {
+  void checkSourceFile(const SourceFile &SF) {
+    for (Decl *D : SF.Decls) {
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
         visit(TLCD->getBody());
     }
@@ -306,7 +306,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
-  while (!DC->isModuleContext()) {
+  while (!DC->isModuleScopeContext()) {
     ValueDecl *BaseDecl = 0;
     ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
@@ -465,12 +465,12 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   }
 
   if (Loc.isValid()) {
-    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M)) {
+    if (auto SF = dyn_cast<SourceFile>(DC)) {
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
       FindLocalVal localVal(SM, Loc, Name);
-      localVal.checkTranslationUnit(TU);
+      localVal.checkSourceFile(*SF);
       if (localVal.MatchingValue) {
         Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
         return;

@@ -49,15 +49,15 @@ namespace {
 
 /// A visitor that does delayed parsing of function bodies.
 class ParseDelayedFunctionBodies : public ASTWalker {
-  TranslationUnit *TU;
+  SourceFile &SF;
   PersistentParserState &ParserState;
   CodeCompletionCallbacksFactory *CodeCompletionFactory;
 
 public:
-  ParseDelayedFunctionBodies(TranslationUnit *TU,
+  ParseDelayedFunctionBodies(SourceFile &SF,
                              PersistentParserState &ParserState,
                           CodeCompletionCallbacksFactory *CodeCompletionFactory)
-    : TU(TU), ParserState(ParserState),
+    : SF(SF), ParserState(ParserState),
       CodeCompletionFactory(CodeCompletionFactory) {}
 
   bool walkToDeclPre(Decl *D) override {
@@ -74,9 +74,9 @@ private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
-    unsigned BufferID =
-        TU->Ctx.SourceMgr.findBufferContainingLoc(AFD->getLoc());
-    Parser TheParser(BufferID, *TU->MainSourceFile, nullptr, &ParserState);
+    SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
+    unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
+    Parser TheParser(BufferID, SF, nullptr, &ParserState);
 
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
@@ -90,14 +90,15 @@ private:
   }
 };
 
-void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
+void parseDelayedDecl(SourceFile &SF, PersistentParserState &ParserState,
                       CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   if (!ParserState.hasDelayedDecl())
     return;
 
-  unsigned BufferID = TU->Ctx.SourceMgr
-      .findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, *TU->MainSourceFile, nullptr, &ParserState);
+  SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
+  unsigned BufferID =
+    SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
+  Parser TheParser(BufferID, SF, nullptr, &ParserState);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
@@ -140,14 +141,14 @@ bool swift::parseIntoTranslationUnit(SourceFile &SF,
 }
 
 void swift::performDelayedParsing(
-    TranslationUnit *TU, PersistentParserState &PersistentState,
+    SourceFile &SF, PersistentParserState &PersistentState,
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
-  ParseDelayedFunctionBodies Walker(TU, PersistentState,
+  ParseDelayedFunctionBodies Walker(SF, PersistentState,
                                     CodeCompletionFactory);
-  TU->walk(Walker);
+  SF.walk(Walker);
 
   if (CodeCompletionFactory)
-    parseDelayedDecl(TU, PersistentState, CodeCompletionFactory);
+    parseDelayedDecl(SF, PersistentState, CodeCompletionFactory);
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.

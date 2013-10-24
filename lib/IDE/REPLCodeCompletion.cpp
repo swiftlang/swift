@@ -138,7 +138,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     CurTUElem = SF.Decls.size();
   } while (!Done);
 
-  performDelayedParsing(&SF.TU, PersistentState, CompletionCallbacksFactory);
+  performDelayedParsing(SF, PersistentState, CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.

@@ -696,17 +696,17 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     // In SIL translation units *only*, permit @weak and @unowned to
     // apply directly to types.
     if (attrs.hasOwnership() && Ty->hasReferenceSemantics()) {
-      auto TU = dyn_cast<TranslationUnit>(DC->getParentModule());
-      if (TU && TU->MainSourceFile->Kind == SourceFile::SIL) {
-        Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
-        attrs.clearOwnership();
+      if (auto SF = DC->getParentSourceFile()) {
+        if (SF->Kind == SourceFile::SIL) {
+          Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
+          attrs.clearOwnership();
+        }
       }
     }
 
     // Diagnose @local_storage in nested positions.
     if (attrs.has(TAK_local_storage)) {
-      assert(cast<TranslationUnit>(DC->getParentModule())
-               ->MainSourceFile->Kind == SourceFile::SIL);
+      assert(DC->getParentSourceFile()->Kind == SourceFile::SIL);
       diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
       attrs.clearAttribute(TAK_local_storage);
     }

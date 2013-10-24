@@ -98,7 +98,7 @@ namespace swift {
   /// \brief Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
   void
-  performDelayedParsing(TranslationUnit *TU,
+  performDelayedParsing(SourceFile &SF,
                         PersistentParserState &PersistentState,
                         CodeCompletionCallbacksFactory *CodeCompletionFactory);
 

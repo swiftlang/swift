@@ -480,8 +480,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       checkValueDecl(P.getDecl(), Reason);
   }
 
-  void checkTranslationUnit(const TranslationUnit *TU) {
-    for (Decl *D : TU->MainSourceFile->Decls)
+  void checkSourceFile(const SourceFile &SF) {
+    for (Decl *D : SF.Decls)
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
         visit(TLCD->getBody());
   }
@@ -564,7 +564,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
-  while (!DC->isModuleContext()) {
+  while (!DC->isModuleScopeContext()) {
     const ValueDecl *BaseDecl = nullptr;
     const ValueDecl *MetaBaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
@@ -632,16 +632,16 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  if (auto TU = dyn_cast<TranslationUnit>(&M)) {
+  if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      FindLocalVal(SM, Loc, Consumer).checkTranslationUnit(TU);
+      FindLocalVal(SM, Loc, Consumer).checkSourceFile(*SF);
     }
 
     if (IncludeTopLevel) {
-      auto &cached = TU->MainSourceFile->getCachedVisibleDecls();
+      auto &cached = SF->getCachedVisibleDecls();
       if (!cached.empty()) {
         for (auto result : cached)
           Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
@@ -662,9 +662,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
-    if (auto TU = dyn_cast<TranslationUnit>(&M)) {
-      TU->MainSourceFile->cacheVisibleDecls(std::move(moduleResults));
-    }
+    if (auto SF = dyn_cast<SourceFile>(DC))
+      SF->cacheVisibleDecls(std::move(moduleResults));
   }
 }
 
