@@ -1247,11 +1247,17 @@ public:
   /// variables.
   ///
   /// \param type The type to open.
+  ///
   /// \param dc The declaration context in which the type occurs.
+  ///
+  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
+  /// protocol's 'Self' type.
+  ///
   /// \returns The opened type.
-  Type openType(Type type, DeclContext *dc = nullptr) {
+  Type openType(Type type, DeclContext *dc = nullptr,
+                bool skipProtocolSelfConstraint = false) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, { }, replacements, dc);
+    return openType(type, { }, replacements, dc, skipProtocolSelfConstraint);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -1267,11 +1273,15 @@ public:
   ///
   /// \param dc The declaration context in which the type occurs.
   ///
+  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
+  /// protocol's 'Self' type.
+  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(
          Type type, ArrayRef<ArchetypeType *> archetypes,
          llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-         DeclContext *dc = nullptr);
+         DeclContext *dc = nullptr,
+         bool skipProtocolSelfConstraint = false);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with

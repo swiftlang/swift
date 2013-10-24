@@ -276,7 +276,8 @@ Type ConstraintSystem::openType(
        Type startingType,
        ArrayRef<ArchetypeType *> archetypes,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-       DeclContext *dc) {
+       DeclContext *dc,
+       bool skipProtocolSelfConstraint) {
   class GetTypeVariable {
     ConstraintSystem &CS;
     llvm::DenseMap<CanType, TypeVariableType *> &Replacements;
@@ -441,13 +442,12 @@ Type ConstraintSystem::openType(
           auto subjectTy = TC.transformType(req.getFirstType(),
                                             replaceArchetypes);
           if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
-            if (isa<ProtocolDecl>(dc->getParent()) &&
-                isProtocolSelfType(req.getFirstType()))
-              addConstraint(ConstraintKind::SelfObjectOfProtocol, subjectTy,
-                            proto);
-            else
+            if (!skipProtocolSelfConstraint ||
+                !isa<ProtocolDecl>(dc->getParent()) ||
+                !isProtocolSelfType(req.getFirstType())) {
               addConstraint(ConstraintKind::ConformsTo, subjectTy,
                             proto);
+            }
           } else
             addConstraint(ConstraintKind::Subtype, subjectTy,
                           req.getSecondType());
@@ -892,8 +892,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Open up a generic method via its generic function type.
-  if (!isa<ProtocolDecl>(value->getDeclContext()) && !isDynamicResult &&
-      !isTypeReference) {
+  if (!isDynamicResult && !isTypeReference) {
     if (auto func = dyn_cast<FuncDecl>(value)) {
       if (auto interfaceTy = func->getInterfaceType()) {
         if (interfaceTy->is<GenericFunctionType>()) {
@@ -1014,7 +1013,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   // Open the type of the generic function.
-  auto openedType = openType(func->getInterfaceType(), func);
+  auto openedType = openType(func->getInterfaceType(), func, true);
 
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
@@ -2362,9 +2361,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 }
 
 /// \brief Determine whether the given protocol member's signature involves
-/// any associated types.
-///
-/// Used to
+/// any associated types or Self.
 static bool involvesAssociatedTypes(TypeChecker &tc, ValueDecl *decl) {
   Type type = decl->getType();
 
@@ -2374,14 +2371,14 @@ static bool involvesAssociatedTypes(TypeChecker &tc, ValueDecl *decl) {
   if (isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl))
     type = type->castTo<AnyFunctionType>()->getResult();
 
-  // FIXME: Lame way to perform a search.
-  return tc.transformType(type, [](Type type) -> Type {
+  // FIXME: Use interface type and look for dependent types.
+  return type.findIf([](Type type) {
     if (auto archetype = type->getAs<ArchetypeType>()) {
-      if (archetype->getParent())
-        return nullptr;
+      return archetype->getParent() || archetype->getSelfProtocol();
     }
-    return type;
-  }).isNull();
+
+    return false;
+  });
 }
 
 ConstraintSystem::SolutionKind
