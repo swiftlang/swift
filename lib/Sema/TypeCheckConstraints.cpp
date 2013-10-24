@@ -1013,7 +1013,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   // Open the type of the generic function.
-  auto openedType = openType(func->getInterfaceType(), func, true);
+  auto openedType = openType(func->getInterfaceType(), func,
+                             /*skipProtocolSelfConstraint=*/true);
 
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
@@ -1027,11 +1028,16 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
 
   auto openedFnType = openedType->castTo<FunctionType>();
 
-  // Determine the 'self' object type.
+  // Constraint the 'self' object type.
   auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
-
-  // Add the constraint on the 'self' object.
-  addSelfConstraint(*this, baseObjTy, selfObjTy);
+  if (isa<ProtocolDecl>(func->getDeclContext())) {
+    // For a protocol, substitute the base object directly. We don't need a
+    // conformance constraint because we wouldn't have found the declaration
+    // if it didn't conform.
+    addConstraint(ConstraintKind::Equal, baseObjTy, selfObjTy);
+  } else {
+    addSelfConstraint(*this, baseObjTy, selfObjTy);
+  }
 
   // Compute the type of the reference.
   Type type = openedType;
