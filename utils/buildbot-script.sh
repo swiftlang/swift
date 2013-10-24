@@ -23,9 +23,12 @@
 if [ "$1" = "-release" ]; then
   BUILD_TYPE=RelWithDebInfo
   PACKAGE=1
+  # Include a custom name to avoid picking up stale module files.
+  CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
 else
   BUILD_TYPE=Debug
   PACKAGE=
+  CUSTOM_VERSION_NAME=
 fi
 
 # Set these to the paths of the OS X SDK and toolchain.
@@ -96,6 +99,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DLLVM_TARGETS_TO_BUILD="X86" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
+      -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
       .. &&
     make -j8) || exit 1
 fi
