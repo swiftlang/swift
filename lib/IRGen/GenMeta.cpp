@@ -697,6 +697,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(
                       IGM.getAddrOfNominalTypeDescriptor(asImpl().getTarget(),
                                                          init->getType()));
+      var->setConstant(true);
       var->setInitializer(init);
       return var;
     }

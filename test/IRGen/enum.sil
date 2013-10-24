@@ -76,7 +76,7 @@ import Builtin
 //    The witness table pattern includes extra inhabitant witness
 //    implementations which are used if the instance has extra inhabitants.
 // CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private unnamed_addr constant [25 x i8] c"O4enum16DynamicSingleton\00"
-// CHECK: @_TMnO4enum16DynamicSingleton = global { {{.*}} i64 } {
+// CHECK: @_TMnO4enum16DynamicSingleton = constant { {{.*}} i64 } {
 // --       2 = enum
 // CHECK:   i64 2,
 // CHECK:   i8* getelementptr inbounds ([25 x i8]* [[DYNAMICSINGLETON_NAME]], i64 0, i64 0),

@@ -7,7 +7,7 @@ import Builtin
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private unnamed_addr constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private unnamed_addr constant [3 x i8] c"x\00\00"
-// CHECK: @_TMnV15generic_structs13SingleDynamic = global { {{.*}} i64 } {
+// CHECK: @_TMnV15generic_structs13SingleDynamic = constant { {{.*}} i64 } {
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name
@@ -43,7 +43,7 @@ import Builtin
 // -- Nominal type descriptor for generic struct with protocol requirements
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private unnamed_addr constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private unnamed_addr constant [5 x i8] c"x\00y\00\00"
-// CHECK: @_TMnV15generic_structs23DynamicWithRequirements = global { {{.*}} i64 } {
+// CHECK: @_TMnV15generic_structs23DynamicWithRequirements = constant { {{.*}} i64 } {
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name

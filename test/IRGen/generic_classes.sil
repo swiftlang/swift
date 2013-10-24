@@ -12,7 +12,7 @@ import gizmo
 // CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private unnamed_addr constant [32 x i8] c"C15generic_classes11RootGeneric\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private unnamed_addr constant [7 x i8] c"x\00y\00z\00\00"
-// CHECK: @_TMnC15generic_classes11RootGeneric = global { {{.*}} i64 } {
+// CHECK: @_TMnC15generic_classes11RootGeneric = constant { {{.*}} i64 } {
 // --       0 = class
 // CHECK:   i64 0,
 // --       name
@@ -49,7 +49,7 @@ import gizmo
 
 // -- fixed-layout nongeneric descriptor
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private unnamed_addr constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
-// CHECK: @_TMnC15generic_classes14RootNonGeneric = global { {{.*}} i64 } {
+// CHECK: @_TMnC15generic_classes14RootNonGeneric = constant { {{.*}} i64 } {
 // --       0 = class
 // CHECK:   i64 0,
 // --       name
