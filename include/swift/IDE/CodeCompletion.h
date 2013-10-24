@@ -276,6 +276,27 @@ enum class SemanticContextKind {
   OtherModule,
 };
 
+/// The declaration kind of a code completion result, if it is a declaration.
+enum class CodeCompletionDeclKind {
+  Class,
+  Struct,
+  Enum,
+  EnumElement,
+  Protocol,
+  TypeAlias,
+  Constructor,
+  Destructor,
+  Subscript,
+  StaticMethod,
+  InstanceMethod,
+  OperatorFunction,
+  FreeFunction,
+  StaticVar,
+  InstanceVar,
+  LocalVar,
+  GlobalVar
+};
+
 /// \brief A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
@@ -306,15 +327,15 @@ private:
       : CodeCompletionResult(ResultKind::Declaration, SemanticContext,
                              CompletionString) {
     assert(AssociatedDecl && "should have a decl");
-    AssociatedDeclKind = unsigned(AssociatedDecl->getKind());
+    AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
   }
 
 public:
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
 
-  DeclKind getAssociatedDeclKind() const {
+  CodeCompletionDeclKind getAssociatedDeclKind() const {
     assert(getKind() == Declaration);
-    return static_cast<DeclKind>(AssociatedDeclKind);
+    return static_cast<CodeCompletionDeclKind>(AssociatedDeclKind);
   }
 
   SemanticContextKind getSemanticContext() const {
@@ -328,6 +349,9 @@ public:
   /// Print a debug representation of the code completion result to \p OS.
   void print(raw_ostream &OS) const;
   void dump() const;
+
+private:
+  static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
 };
 
 struct CodeCompletionResultSink {

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -162,6 +163,67 @@ void CodeCompletionString::dump() const {
   print(llvm::errs());
 }
 
+namespace {
+
+// FIXME: const visitor.
+class CCDeclKindVisitor : public ASTVisitor<CCDeclKindVisitor,
+                              CodeCompletionDeclKind, CodeCompletionDeclKind,
+                              CodeCompletionDeclKind, CodeCompletionDeclKind > {
+public:
+  CodeCompletionDeclKind visitFuncDecl(const FuncDecl *D);
+  CodeCompletionDeclKind visitVarDecl(const VarDecl *D);
+  CodeCompletionDeclKind visitExtensionDecl(const ExtensionDecl *D) {
+    llvm_unreachable("extension decls should not show up in completion results");
+  }
+
+#define CCKIND_FOR(CLASS) \
+    CodeCompletionDeclKind visit##CLASS##Decl(const CLASS##Decl *) { \
+    return CodeCompletionDeclKind::CLASS; \
+  }
+  CCKIND_FOR(Class)
+  CCKIND_FOR(Struct)
+  CCKIND_FOR(Enum)
+  CCKIND_FOR(EnumElement)
+  CCKIND_FOR(Protocol)
+  CCKIND_FOR(TypeAlias)
+  CCKIND_FOR(Constructor)
+  CCKIND_FOR(Destructor)
+  CCKIND_FOR(Subscript)
+#undef CCKIND_FOR
+};
+
+} // anonymous namespace
+
+CodeCompletionDeclKind CCDeclKindVisitor::visitFuncDecl(const FuncDecl *D) {
+  const DeclContext *DC = D->getDeclContext();
+  if (isa<NominalTypeDecl>(DC) || isa<ExtensionDecl>(DC)) {
+    if (D->isStatic())
+      return CodeCompletionDeclKind::StaticMethod;
+    return CodeCompletionDeclKind::InstanceMethod;
+  }
+  if (D->isOperator())
+    return CodeCompletionDeclKind::OperatorFunction;
+  return CodeCompletionDeclKind::FreeFunction;
+}
+
+CodeCompletionDeclKind CCDeclKindVisitor::visitVarDecl(const VarDecl *D) {
+  const DeclContext *DC = D->getDeclContext();
+  if (isa<NominalTypeDecl>(DC)) {
+    // FIXME: Uncomment when static variables are implemented.
+    // if (D->isStatic())
+    //   return CodeCompletionDeclKind::StaticVar;
+    return CodeCompletionDeclKind::InstanceVar;
+  }
+  if (DC->isLocalContext())
+    return CodeCompletionDeclKind::LocalVar;
+  return CodeCompletionDeclKind::GlobalVar;
+}
+
+CodeCompletionDeclKind
+CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
+  return CCDeclKindVisitor().visit(const_cast<Decl*>(D));
+}
+
 void CodeCompletionResult::print(raw_ostream &OS) const {
   switch (getKind()) {
   case ResultKind::Declaration:
@@ -273,8 +335,27 @@ void CodeCompletionCache::getResults(
                  [](CodeCompletionResult *R) -> bool {
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
-      return R->getAssociatedDeclKind() >= DeclKind::First_TypeDecl &&
-             R->getAssociatedDeclKind() <= DeclKind::Last_TypeDecl;
+      switch(R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::Class:
+      case CodeCompletionDeclKind::Struct:
+      case CodeCompletionDeclKind::Enum:
+      case CodeCompletionDeclKind::Protocol:
+      case CodeCompletionDeclKind::TypeAlias:
+        return true;
+      case CodeCompletionDeclKind::EnumElement:
+      case CodeCompletionDeclKind::Constructor:
+      case CodeCompletionDeclKind::Destructor:
+      case CodeCompletionDeclKind::Subscript:
+      case CodeCompletionDeclKind::StaticMethod:
+      case CodeCompletionDeclKind::InstanceMethod:
+      case CodeCompletionDeclKind::OperatorFunction:
+      case CodeCompletionDeclKind::FreeFunction:
+      case CodeCompletionDeclKind::StaticVar:
+      case CodeCompletionDeclKind::InstanceVar:
+      case CodeCompletionDeclKind::LocalVar:
+      case CodeCompletionDeclKind::GlobalVar:
+        return false;
+      }
     });
   } else {
     Sink.Results.insert(Sink.Results.end(),
