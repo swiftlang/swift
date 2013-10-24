@@ -96,9 +96,10 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   // Construct the folded instruction - a tuple of two literals, the
   // result and overflow.
   SILBuilder B(AI);
+  SILLocation Loc = AI->getLoc();
   SILValue Result[] = {
-    B.createIntegerLiteral(AI->getLoc(), ResTy1, Res),
-    B.createIntegerLiteral(AI->getLoc(), ResTy2, Overflow)
+    B.createIntegerLiteral(Loc, ResTy1, Res),
+    B.createIntegerLiteral(Loc, ResTy2, Overflow)
   };
 
   // If we can statically determine that the operation overflows,
@@ -109,7 +110,6 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     // two arguments of the same type, use the type of the LHS argument.
     // This would detect '+'/'+=' and such.
     Type OpType;
-    SILLocation Loc = AI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     if (CE) {
       const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
@@ -123,7 +123,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
 
     if (!OpType.isNull()) {
       diagnose(AI->getModule().getASTContext(),
-               AI->getLoc().getSourceLoc(),
+               Loc.getSourceLoc(),
                diag::arithmetic_operation_overflow,
                LHSInt.toString(/*Radix*/ 10, Signed),
                Operator,
@@ -133,7 +133,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     } else {
       // If we cannot get the type info in an expected way, describe the type.
       diagnose(AI->getModule().getASTContext(),
-               AI->getLoc().getSourceLoc(),
+               Loc.getSourceLoc(),
                diag::arithmetic_operation_overflow_generic_type,
                LHSInt.toString(/*Radix*/ 10, Signed),
                Operator,
@@ -145,7 +145,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     }
   }
 
-  return B.createTuple(AI->getLoc(), FuncResType, Result);
+  return B.createTuple(Loc, FuncResType, Result);
 }
 
 static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
@@ -177,6 +177,39 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
   return nullptr;
 }
 
+static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
+                                                  BuiltinValueKind ID) {
+  OperandValueArrayRef Args = AI->getArguments();
+
+  // Fold for integer constant arguments.
+  IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+  IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+  if (LHS && RHS) {
+    APInt V1 = LHS->getValue();
+    APInt V2 = RHS->getValue();
+    APInt Res;
+    switch (ID) {
+    default: llvm_unreachable("Invalid integer compare kind");
+    case BuiltinValueKind::ICMP_EQ:  Res = V1 == V2; break;
+    case BuiltinValueKind::ICMP_NE:  Res = V1 != V2; break;
+    case BuiltinValueKind::ICMP_SLT: Res = V1.slt(V2); break;
+    case BuiltinValueKind::ICMP_SGT: Res = V1.sgt(V2); break;
+    case BuiltinValueKind::ICMP_SLE: Res = V1.sle(V2); break;
+    case BuiltinValueKind::ICMP_SGE: Res = V1.sge(V2); break;
+    case BuiltinValueKind::ICMP_ULT: Res = V1.ult(V2); break;
+    case BuiltinValueKind::ICMP_UGT: Res = V1.ugt(V2); break;
+    case BuiltinValueKind::ICMP_ULE: Res = V1.ule(V2); break;
+    case BuiltinValueKind::ICMP_UGE: Res = V1.uge(V2); break;
+    }
+    SILBuilder B(AI);
+    SILLocation Loc = AI->getLoc();
+    SILType ResType = AI->getFunctionTypeInfo()->getResult().getSILType();
+    return B.createIntegerLiteral(Loc, ResType, Res);
+  }
+
+  return nullptr;
+}
+
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                            BuiltinFunctionRefInst *FR,
                                            bool &ResultsInError) {
@@ -194,11 +227,19 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
   switch (Builtin.ID) {
   default: break;
 
+// Check and fold binary arithmetic with overflow.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return constantFoldOverflowBuiltin(AI, Builtin.ID, ResultsInError);
+
+// Fold comparison predicates.
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
+case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      return constantFoldCompareBuiltin(AI, Builtin.ID);
 
   case BuiltinValueKind::Trunc:
   case BuiltinValueKind::ZExt:

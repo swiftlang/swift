@@ -168,3 +168,29 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @testFoldingIntBinaryPredicates : $@thin () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int1, 1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %4 = apply %3(%1, %2) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 
+  %11 = integer_literal $Builtin.Int32, 21
+  %12 = integer_literal $Builtin.Int32, 12
+  %13 = builtin_function_ref #Builtin.cmp_ne_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %14 = apply %13(%11, %12) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
+  %15 = builtin_function_ref #Builtin.cmp_sgt_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %16 = apply %15(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
+  %17 = builtin_function_ref #Builtin.cmp_ult_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %18 = apply %17(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil @testFoldingIntBinaryPredicates
+// CHECK: bb
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
