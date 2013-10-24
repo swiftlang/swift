@@ -284,6 +284,7 @@ enum class CodeCompletionDeclKind {
   EnumElement,
   Protocol,
   TypeAlias,
+  GenericTypeParam,
   Constructor,
   Destructor,
   Subscript,

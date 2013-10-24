@@ -163,65 +163,65 @@ void CodeCompletionString::dump() const {
   print(llvm::errs());
 }
 
-namespace {
-
-// FIXME: const visitor.
-class CCDeclKindVisitor : public ASTVisitor<CCDeclKindVisitor,
-                              CodeCompletionDeclKind, CodeCompletionDeclKind,
-                              CodeCompletionDeclKind, CodeCompletionDeclKind> {
-public:
-  CodeCompletionDeclKind visitFuncDecl(const FuncDecl *D);
-  CodeCompletionDeclKind visitVarDecl(const VarDecl *D);
-  CodeCompletionDeclKind visitExtensionDecl(const ExtensionDecl *D) {
-    llvm_unreachable("extension decls should not show up in completion results");
-  }
-
-#define CCKIND_FOR(CLASS) \
-    CodeCompletionDeclKind visit##CLASS##Decl(const CLASS##Decl *) { \
-    return CodeCompletionDeclKind::CLASS; \
-  }
-  CCKIND_FOR(Class)
-  CCKIND_FOR(Struct)
-  CCKIND_FOR(Enum)
-  CCKIND_FOR(EnumElement)
-  CCKIND_FOR(Protocol)
-  CCKIND_FOR(TypeAlias)
-  CCKIND_FOR(Constructor)
-  CCKIND_FOR(Destructor)
-  CCKIND_FOR(Subscript)
-#undef CCKIND_FOR
-};
-
-} // anonymous namespace
-
-CodeCompletionDeclKind CCDeclKindVisitor::visitFuncDecl(const FuncDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (DC->isTypeContext()) {
-    if (D->isStatic())
-      return CodeCompletionDeclKind::StaticMethod;
-    return CodeCompletionDeclKind::InstanceMethod;
-  }
-  if (D->isOperator())
-    return CodeCompletionDeclKind::OperatorFunction;
-  return CodeCompletionDeclKind::FreeFunction;
-}
-
-CodeCompletionDeclKind CCDeclKindVisitor::visitVarDecl(const VarDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (DC->isTypeContext()) {
-    // FIXME: Uncomment when static variables are implemented.
-    // if (D->isStatic())
-    //   return CodeCompletionDeclKind::StaticVar;
-    return CodeCompletionDeclKind::InstanceVar;
-  }
-  if (DC->isLocalContext())
-    return CodeCompletionDeclKind::LocalVar;
-  return CodeCompletionDeclKind::GlobalVar;
-}
-
 CodeCompletionDeclKind
 CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
-  return CCDeclKindVisitor().visit(const_cast<Decl*>(D));
+  switch (D->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    llvm_unreachable("not expecting such a declaration result");
+
+  case DeclKind::TypeAlias:
+  case DeclKind::AssociatedType:
+    return CodeCompletionDeclKind::TypeAlias;
+  case DeclKind::GenericTypeParam:
+    return CodeCompletionDeclKind::GenericTypeParam;
+  case DeclKind::Enum:
+    return CodeCompletionDeclKind::Enum;
+  case DeclKind::Struct:
+    return CodeCompletionDeclKind::Struct;
+  case DeclKind::Class:
+    return CodeCompletionDeclKind::Class;
+  case DeclKind::Protocol:
+    return CodeCompletionDeclKind::Protocol;
+  case DeclKind::Var: {
+    auto DC = D->getDeclContext();
+    if (DC->isTypeContext()) {
+      // FIXME: Uncomment when static variables are implemented.
+      // if (D->isStatic())
+      //   return CodeCompletionDeclKind::StaticVar;
+      return CodeCompletionDeclKind::InstanceVar;
+    }
+    if (DC->isLocalContext())
+      return CodeCompletionDeclKind::LocalVar;
+    return CodeCompletionDeclKind::GlobalVar;
+  }
+  case DeclKind::Constructor:
+    return CodeCompletionDeclKind::Constructor;
+  case DeclKind::Destructor:
+    return CodeCompletionDeclKind::Destructor;
+  case DeclKind::Func: {
+    auto DC = D->getDeclContext();
+    auto FD = cast<FuncDecl>(D);
+    if (DC->isTypeContext()) {
+      if (FD->isStatic())
+        return CodeCompletionDeclKind::StaticMethod;
+      return CodeCompletionDeclKind::InstanceMethod;
+    }
+    if (FD->isOperator())
+      return CodeCompletionDeclKind::OperatorFunction;
+    return CodeCompletionDeclKind::FreeFunction;
+  }
+  case DeclKind::EnumElement:
+    return CodeCompletionDeclKind::EnumElement;
+  case DeclKind::Subscript:
+    return CodeCompletionDeclKind::Subscript;
+  }
 }
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
@@ -341,6 +341,7 @@ void CodeCompletionCache::getResults(
       case CodeCompletionDeclKind::Enum:
       case CodeCompletionDeclKind::Protocol:
       case CodeCompletionDeclKind::TypeAlias:
+      case CodeCompletionDeclKind::GenericTypeParam:
         return true;
       case CodeCompletionDeclKind::EnumElement:
       case CodeCompletionDeclKind::Constructor:
