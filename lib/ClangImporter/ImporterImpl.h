@@ -137,6 +137,10 @@ struct ClangImporter::Implementation {
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 
+  /// \brief The value of \c ImportCounter last time when imported modules were
+  /// verified.
+  unsigned VerifiedImportCounter = 0;
+
   /// \brief Clang compiler invocation.
   llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> Invocation;
 

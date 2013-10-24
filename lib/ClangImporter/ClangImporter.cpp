@@ -825,10 +825,14 @@ clang::TargetInfo &ClangImporter::getTargetInfo() const {
 }
 
 void ClangImporter::verifyAllModules() {
+  if (Impl.ImportCounter == Impl.VerifiedImportCounter)
+    return;
+
   for (auto &I : Impl.ImportedDecls) {
     if (Decl *D = I.second)
       verify(D);
   }
+  Impl.ImportCounter = Impl.VerifiedImportCounter;
 }
 
 //===----------------------------------------------------------------------===//
