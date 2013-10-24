@@ -320,15 +320,19 @@ private:
                        CodeCompletionString *CompletionString)
       : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
         CompletionString(CompletionString) {
+    assert(Kind != Declaration && "use the other constructor");
+    assert(CompletionString);
   }
 
   CodeCompletionResult(SemanticContextKind SemanticContext,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl)
-      : CodeCompletionResult(ResultKind::Declaration, SemanticContext,
-                             CompletionString) {
+      : Kind(ResultKind::Declaration),
+        SemanticContext(unsigned(SemanticContext)),
+        CompletionString(CompletionString) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
+    assert(CompletionString);
   }
 
 public:

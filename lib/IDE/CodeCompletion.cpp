@@ -223,6 +223,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
   }
+  llvm_unreachable("invalid DeclKind");
 }
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
