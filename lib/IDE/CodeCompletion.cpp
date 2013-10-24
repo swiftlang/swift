@@ -168,7 +168,7 @@ namespace {
 // FIXME: const visitor.
 class CCDeclKindVisitor : public ASTVisitor<CCDeclKindVisitor,
                               CodeCompletionDeclKind, CodeCompletionDeclKind,
-                              CodeCompletionDeclKind, CodeCompletionDeclKind > {
+                              CodeCompletionDeclKind, CodeCompletionDeclKind> {
 public:
   CodeCompletionDeclKind visitFuncDecl(const FuncDecl *D);
   CodeCompletionDeclKind visitVarDecl(const VarDecl *D);
@@ -196,7 +196,7 @@ public:
 
 CodeCompletionDeclKind CCDeclKindVisitor::visitFuncDecl(const FuncDecl *D) {
   const DeclContext *DC = D->getDeclContext();
-  if (isa<NominalTypeDecl>(DC) || isa<ExtensionDecl>(DC)) {
+  if (DC->isTypeContext()) {
     if (D->isStatic())
       return CodeCompletionDeclKind::StaticMethod;
     return CodeCompletionDeclKind::InstanceMethod;
@@ -208,7 +208,7 @@ CodeCompletionDeclKind CCDeclKindVisitor::visitFuncDecl(const FuncDecl *D) {
 
 CodeCompletionDeclKind CCDeclKindVisitor::visitVarDecl(const VarDecl *D) {
   const DeclContext *DC = D->getDeclContext();
-  if (isa<NominalTypeDecl>(DC)) {
+  if (DC->isTypeContext()) {
     // FIXME: Uncomment when static variables are implemented.
     // if (D->isStatic())
     //   return CodeCompletionDeclKind::StaticVar;
