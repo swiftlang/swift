@@ -33,8 +33,9 @@ struct CacheKeyHashInfo {
   static uintptr_t getHashValue(const T &Val) {
     return llvm::DenseMapInfo<T>::getHashValue(Val);
   }
-  static bool isEqual(const T &LHS, const T &RHS) {
-    return llvm::DenseMapInfo<T>::isEqual(LHS, RHS);
+  static bool isEqual(void *LHS, void *RHS) {
+    return llvm::DenseMapInfo<T>::isEqual(*static_cast<T*>(LHS),
+                                          *static_cast<T*>(RHS));
   }
 };
 
@@ -196,8 +197,7 @@ private:
     return KeyInfoT::getHashValue(*static_cast<KeyT*>(Key));
   }
   static bool keyIsEqual(void *Key1, void *Key2, void *UserData) {
-    return KeyInfoT::isEqual(*static_cast<KeyT*>(Key1),
-                             *static_cast<KeyT*>(Key2));
+    return KeyInfoT::isEqual(Key1, Key2);
   }
 
   static void keyDestroy(void *Key, void *UserData) {
