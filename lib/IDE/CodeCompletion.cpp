@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <functional>
 #include <string>
-#include <unordered_map>
 
 using namespace swift;
 using namespace ide;
