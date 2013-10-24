@@ -1776,6 +1776,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
         Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
                                           K.ResultsHaveLeadingDot);
+        Cache.storeResults(K, V);
       };
 
       // FIXME: actually check imports.
@@ -1800,6 +1801,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
         Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
                                           K.ResultsHaveLeadingDot);
+        Cache.storeResults(K, V);
       };
 
       // Add results for all imported modules.
