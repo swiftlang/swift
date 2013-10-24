@@ -63,7 +63,6 @@ namespace swift {
   class Identifier;
   class Module;
   class ModuleLoader;
-  class ModuleLoadListener;
   class NominalTypeDecl;
   class TupleTypeElt;
   class EnumElementDecl;
@@ -422,12 +421,6 @@ public:
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
   Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
-
-  /// \brief Add a new module loading listener to this AST context.
-  void addModuleLoadListener(ModuleLoadListener &Listener);
-
-  /// \brief Remove the given module loading listener from this AST context.
-  void removeModuleLoadListener(ModuleLoadListener &Listener);
 
   /// \brief Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of

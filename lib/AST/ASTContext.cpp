@@ -23,7 +23,6 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/AST/ModuleLoadListener.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
@@ -35,8 +34,6 @@
 using namespace swift;
 
 ASTMutationListener::~ASTMutationListener() { }
-
-ModuleLoadListener::~ModuleLoadListener() { }
 
 LazyResolver::~LazyResolver() { }
 
@@ -94,9 +91,6 @@ struct ASTContext::Implementation {
 
   /// \brief The set of AST mutation listeners.
   SmallVector<ASTMutationListener *, 4> MutationListeners;
-
-  /// \brief The set of 'module load' event listeners.
-  SmallVector<ModuleLoadListener *, 2> ModuleLoadListeners;
 
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
@@ -679,18 +673,6 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   }
 
   return nullptr;
-}
-
-void ASTContext::addModuleLoadListener(ModuleLoadListener &Listener) {
-  Impl.ModuleLoadListeners.push_back(&Listener);
-}
-
-void ASTContext::removeModuleLoadListener(ModuleLoadListener &Listener) {
-  auto Known = std::find(Impl.ModuleLoadListeners.rbegin(),
-                         Impl.ModuleLoadListeners.rend(),
-                         &Listener);
-  assert(Known != Impl.ModuleLoadListeners.rend() && "listener not registered");
-  Impl.ModuleLoadListeners.erase(Known.base() - 1);
 }
 
 ClangNode ASTContext::getClangNode(Decl *decl) {
