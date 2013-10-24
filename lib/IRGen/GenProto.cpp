@@ -2762,7 +2762,7 @@ namespace {
     llvm::Constant *getStaticMethodWitness(FuncDecl *impl,
                                            CanType ifaceType,
                                            ArrayRef<Substitution> witnessSubs) {
-      if (impl->getDeclContext()->isModuleContext()) {
+      if (impl->getDeclContext()->isModuleScopeContext()) {
         llvm::Constant *implPtr =
           IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 0),
                                 ExtraData::None);

@@ -1985,7 +1985,8 @@ public:
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   PrettyStackTraceDecl StackTrace("type-checking", D);
-  bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
+  bool isSecondPass =
+    !isFirstPass && D->getDeclContext()->isModuleScopeContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 

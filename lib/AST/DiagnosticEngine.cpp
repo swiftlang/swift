@@ -387,7 +387,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
 
           // Don't print bodies if we're looking at a top-level decl.
           PrintOptions options;
-          if (ActiveDiagnosticDecl->getDeclContext()->isModuleContext())
+          if (ActiveDiagnosticDecl->getDeclContext()->isModuleScopeContext())
             options = PrintOptions();
           else
             options = PrintOptions::printEverything();

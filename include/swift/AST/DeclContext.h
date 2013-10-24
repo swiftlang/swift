@@ -111,6 +111,13 @@ public:
     return getContextKind() == DeclContextKind::Module;
   }
 
+  /// \returns true if this is a context with module-wide scope, e.g. a module
+  /// or a source file.
+  bool isModuleScopeContext() const {
+    return getContextKind() == DeclContextKind::Module ||
+           getContextKind() == DeclContextKind::SourceFile;
+  }
+
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const {

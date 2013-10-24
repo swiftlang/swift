@@ -54,7 +54,7 @@ bool Parser::parseTopLevel() {
   if (Tok.is(tok::NUM_TOKENS))
     consumeToken();
 
-  CurDeclContext = &SF.TU;
+  CurDeclContext = &SF;
 
   skipExtraTopLevelRBraces(*this);
 
@@ -594,7 +594,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   }
 
   if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleContext()) {
+      !CurDeclContext->isModuleScopeContext()) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
@@ -1437,7 +1437,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   // If this is a var in the top-level of script/repl translation unit, then
   // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represent
   // executable code.
-  if (allowTopLevelCode() && isa<TranslationUnit>(CurDeclContext)) {
+  if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
     for (unsigned i = FirstDecl; i != Decls.size(); ++i) {
       auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
       if (PBD == 0) continue;

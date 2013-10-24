@@ -908,7 +908,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   // Build up the access path by walking through parent DeclContexts.
   const DeclContext *DC;
   const ExtensionDecl *extension = nullptr;
-  for (DC = D->getDeclContext(); !DC->isModuleContext(); DC = DC->getParent()) {
+  for (DC = D->getDeclContext(); !DC->isModuleScopeContext();
+       DC = DC->getParent()) {
     if ((extension = dyn_cast<ExtensionDecl>(DC)))
       DC = extension->getExtendedType()->getNominalOrBoundGenericNominal();
 
@@ -916,7 +917,7 @@ void Serializer::writeCrossReference(const Decl *D) {
     accessPath.push_back(addIdentifierRef(value->getName()));
   }
 
-  accessPath.push_back(addModuleRef(cast<Module>(DC)));
+  accessPath.push_back(addModuleRef(DC->getParentModule()));
   if (extension)
     accessPath.push_back(addModuleRef(extension->getModuleContext()));
 

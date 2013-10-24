@@ -767,8 +767,8 @@ void Mangler::mangleNominalType(NominalTypeDecl *decl,
 
 bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  Module *parent = dyn_cast<Module>(decl->getDeclContext());
-  if (!parent || !parent->isStdlibModule())
+  DeclContext *dc = decl->getDeclContext();
+  if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
     return false;
 
   // Standard substitutions shouldn't start with 's' (because that's
