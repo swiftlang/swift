@@ -318,7 +318,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
-  SF.TU.clearLookupCache();
+  SF.clearLookupCache();
 
   NameBinder Binder(SF);
 

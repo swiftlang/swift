@@ -46,7 +46,7 @@ namespace {
     unsigned Indent;
     bool ShowColors;
 
-    PrintPattern(raw_ostream &os, unsigned indent)
+    explicit PrintPattern(raw_ostream &os, unsigned indent = 0)
       : OS(os), Indent(indent), ShowColors(false) {
       if (&os == &llvm::errs() || &os == &llvm::outs())
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
@@ -168,10 +168,10 @@ namespace {
     unsigned Indent;
     bool ShowColors;
 
-    PrintDecl(raw_ostream &os, unsigned indent)
+    explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
       : OS(os), Indent(indent), ShowColors(false) {
       if (&os == &llvm::errs() || &os == &llvm::outs())
-    ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
     
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
@@ -361,9 +361,9 @@ namespace {
       }
     }
 
-    void visitTranslationUnit(const TranslationUnit *TU) {
-      OS.indent(Indent) << "(translation_unit";
-      for (Decl *D : TU->MainSourceFile->Decls) {
+    void visitSourceFile(const SourceFile &SF) {
+      OS.indent(Indent) << "(source_file";
+      for (Decl *D : SF.Decls) {
         if (D->isImplicit())
           continue;
 
@@ -683,17 +683,17 @@ void LLVM_ATTRIBUTE_USED ValueDecl::dumpRef() const {
   dumpRef(llvm::errs());
 }
 
-void TranslationUnit::dump() const {
+void SourceFile::dump() const {
   dump(llvm::errs());
 }
 
-void TranslationUnit::dump(llvm::raw_ostream &OS) const {
-  PrintDecl(OS, 0).visitTranslationUnit(this);
+void SourceFile::dump(llvm::raw_ostream &OS) const {
+  PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
 
 void Pattern::dump() const {
-  PrintPattern(llvm::errs(), 0).visit(const_cast<Pattern*>(this));
+  PrintPattern(llvm::errs()).visit(const_cast<Pattern*>(this));
   llvm::errs() << '\n';
 }
 

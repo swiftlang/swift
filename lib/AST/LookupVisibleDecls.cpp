@@ -641,7 +641,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
 
     if (IncludeTopLevel) {
-      auto &cached = TU->getCachedVisibleDecls();
+      auto &cached = TU->MainSourceFile->getCachedVisibleDecls();
       if (!cached.empty()) {
         for (auto result : cached)
           Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
@@ -663,7 +663,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
     if (auto TU = dyn_cast<TranslationUnit>(&M)) {
-      TU->cacheVisibleDecls(std::move(moduleResults));
+      TU->MainSourceFile->cacheVisibleDecls(std::move(moduleResults));
     }
   }
 }

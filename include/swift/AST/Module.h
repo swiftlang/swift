@@ -341,6 +341,15 @@ public:
 /// before being used for anything; a full type-check is also necessary for
 /// IR generation.
 class SourceFile {
+  friend class Module;
+
+public:
+  class LookupCache;
+
+private:
+  std::unique_ptr<LookupCache> Cache;
+  LookupCache &getCache() const;
+
   /// This is the list of modules that are imported by this module, with the
   /// second element of the pair declaring whether the module is reexported.
   ///
@@ -410,6 +419,7 @@ public:
   SourceFile(TranslationUnit &tu, SourceKind K,
              bool hasBuiltinModuleAccess = false)
     : SourceFile(tu, K, Nothing, hasBuiltinModuleAccess) {}
+  ~SourceFile();
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SIL);
@@ -418,6 +428,11 @@ public:
   void setImports(ArrayRef<std::pair<Module::ImportedModule, bool>> IM) {
     Imports = IM;
   }
+
+  void clearLookupCache();
+
+  void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+  const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   /// \brief The buffer ID for the file that was imported as this TU, or Nothing
   /// if this is not an imported TU.
@@ -432,6 +447,20 @@ public:
   /// \returns true if traversal was aborted, false if it completed
   /// successfully.
   bool walk(ASTWalker &walker);
+
+  void dump() const;
+  void dump(raw_ostream &os) const;
+
+  /// \brief Pretty-print the entire contents of this source file.
+  ///
+  /// \param os The stream to which the contents will be printed.
+  void print(raw_ostream &os);
+
+  /// \brief Pretty-print the contents of this source file.
+  ///
+  /// \param os The stream to which the contents will be printed.
+  /// \param options Options controlling the printing process.
+  void print(raw_ostream &os, const PrintOptions &options);
 
 private:
   // Make placement new and vanilla new/delete illegal for SourceFiles.
@@ -455,14 +484,6 @@ public:
 ///
 /// \sa SourceFile
 class TranslationUnit : public Module {
-  friend class Module;
-
-public:
-  class LookupCache;
-
-private:
-  LookupCache *Cache = nullptr;
-
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
@@ -474,11 +495,6 @@ public:
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(ModuleKind::TranslationUnit, Name, C) {
   }
-  
-  void clearLookupCache();
-
-  void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
-  const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
   void setExternalLookup(ExternalNameLookup *R) {
@@ -488,21 +504,6 @@ public:
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
-
-  void dump() const;
-  void dump(raw_ostream &os) const;
-    
-  /// \brief Pretty-print the entire contents of this translation unit.
-  ///
-  /// \param os The stream to which the contents will be printed.
-  void print(raw_ostream &os);
-
-  /// \brief Pretty-print the contents of this translation unit.
-  ///
-  /// \param os The stream to which the contents will be printed.
-  ///
-  /// \param options Options controlling the printing process.
-  void print(raw_ostream &os, const PrintOptions &options);
 
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::TranslationUnit;

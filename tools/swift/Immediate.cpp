@@ -1135,7 +1135,7 @@ public:
         } else if (L.peekNextToken().getText() == "dump_ir") {
           DumpModule.dump();
         } else if (L.peekNextToken().getText() == "dump_ast") {
-          REPLInputFile.TU.dump();
+          REPLInputFile.dump();
         } else if (L.peekNextToken().getText() == "dump_decl" ||
                    L.peekNextToken().getText() == "print_decl") {
           PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
