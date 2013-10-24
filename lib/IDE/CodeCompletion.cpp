@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
-#include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/Cache.h"
+#include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -282,7 +283,7 @@ void CodeCompletionResultBuilder::addChunkWithText(
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return ::copyString(Allocator, Str);
+  return ::copyString(CurrentResults.Allocator, Str);
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
@@ -311,27 +312,92 @@ void CodeCompletionResultBuilder::finishResult() {
 namespace swift {
 namespace ide {
 
-struct CodeCompletionCache::Implementation {
-  llvm::BumpPtrAllocator Allocator;
+struct CodeCompletionCacheImpl {
+  /// \brief Cache key.
+  struct Key {
+    std::string Filename;
+    std::string ModuleName;
+    std::vector<std::string> AccessPath;
+    bool ResultsHaveLeadingDot;
 
-  std::unordered_map<
-      CodeCompletionCache::Key,
-      std::vector<CodeCompletionResult *>> TheCache;
+    friend bool operator==(const Key &LHS, const Key &RHS) {
+      return LHS.Filename == RHS.Filename &&
+             LHS.ModuleName == RHS.ModuleName &&
+             LHS.AccessPath == RHS.AccessPath &&
+             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot;
+    }
+  };
+
+  struct Value : public ThreadSafeRefCountedBase<Value> {
+    CodeCompletionResultSink Sink;
+  };
+  using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
+
+  sys::Cache<Key, ValueRefCntPtr> TheCache{"swift.libIDE.CodeCompletionCache"};
+
+  void getResults(
+      const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
+      std::function<void(CodeCompletionCacheImpl &, Key)> FillCacheCallback);
+
+  ValueRefCntPtr getResultSinkFor(const Key &K);
+
+  void storeResults(const Key &K, ValueRefCntPtr V);
 };
 
-void CodeCompletionCache::getResults(
-    const Key &K, CodeCompletionResultSink Sink, bool OnlyTypes,
-    std::function<void(CodeCompletionCache &, Key)> FillCacheCallback) {
-  // FIXME(thread-safety): lock the whole AST context.  We might load a module.
-  auto I = Impl->TheCache.find(K);
-  if (I == Impl->TheCache.end()) {
-    FillCacheCallback(*this, K);
-    I = Impl->TheCache.find(K);
+} // namespace ide
+} // namespace swift
+
+namespace llvm {
+template<>
+struct DenseMapInfo<swift::ide::CodeCompletionCacheImpl::Key> {
+  using KeyTy = swift::ide::CodeCompletionCacheImpl::Key;
+  static inline KeyTy getEmptyKey() {
+    return KeyTy{"", "", {}, false};
   }
-  assert(I != Impl->TheCache.end());
+  static inline KeyTy getTombstoneKey() {
+    return KeyTy{"x", "", {}, false};
+  }
+  static unsigned getHashValue(const KeyTy &Val) {
+    size_t H = 0;
+    H ^= std::hash<std::string>()(Val.Filename);
+    H ^= std::hash<std::string>()(Val.ModuleName);
+    for (auto Piece : Val.AccessPath)
+      H ^= std::hash<std::string>()(Piece);
+    H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
+    return static_cast<unsigned>(H);
+  }
+  static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
+
+namespace swift {
+namespace sys {
+template<>
+struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
+  static size_t
+  getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
+    return V.Sink.Allocator.getTotalMemory();
+  };
+};
+} // namespace sys
+} // namespace swift
+
+void CodeCompletionCacheImpl::getResults(
+    const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
+    std::function<void(CodeCompletionCacheImpl &, Key)> FillCacheCallback) {
+  // FIXME(thread-safety): lock the whole AST context.  We might load a module.
+  llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
+  if (!V.hasValue()) {
+    FillCacheCallback(*this, K);
+    V = TheCache.get(K);
+  }
+  assert(V.hasValue());
+  auto &SourceSink = V.getValue()->Sink;
   if (OnlyTypes) {
-    std::copy_if(I->second.begin(), I->second.end(),
-                 std::back_inserter(Sink.Results),
+    std::copy_if(SourceSink.Results.begin(), SourceSink.Results.end(),
+                 std::back_inserter(TargetSink.Results),
                  [](CodeCompletionResult *R) -> bool {
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
@@ -359,31 +425,38 @@ void CodeCompletionCache::getResults(
       }
     });
   } else {
-    Sink.Results.insert(Sink.Results.end(),
-                        I->second.begin(), I->second.end());
+    TargetSink.Results.insert(TargetSink.Results.end(),
+                              SourceSink.Results.begin(),
+                              SourceSink.Results.end());
   }
 }
 
-CodeCompletionResultSink CodeCompletionCache::getResultSinkFor(const Key &K) {
-  return CodeCompletionResultSink(Impl->Allocator, Impl->TheCache[K]);
+CodeCompletionCacheImpl::ValueRefCntPtr
+CodeCompletionCacheImpl::getResultSinkFor(const Key &K) {
+  TheCache.remove(K);
+  auto V = ValueRefCntPtr(new Value);
+  TheCache.set(K, V);
+  return V;
 }
 
-} // namespace ide
-} // namespace swift
+void CodeCompletionCacheImpl::storeResults(const Key &K, ValueRefCntPtr V) {
+  TheCache.remove(K);
+  TheCache.set(K, V);
+}
 
 CodeCompletionCache::CodeCompletionCache()
-    : Impl(new Implementation()) {}
+    : Impl(new CodeCompletionCacheImpl()) {}
 
 CodeCompletionCache::~CodeCompletionCache() {}
 
 MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   // Copy pointers to the results.
-  const size_t Count = CurrentCompletionResults.size();
+  const size_t Count = CurrentResults.Results.size();
   CodeCompletionResult **Results =
-      Allocator.Allocate<CodeCompletionResult *>(Count);
-  std::copy(CurrentCompletionResults.begin(), CurrentCompletionResults.end(),
+      CurrentResults.Allocator.Allocate<CodeCompletionResult *>(Count);
+  std::copy(CurrentResults.Results.begin(), CurrentResults.Results.end(),
             Results);
-  CurrentCompletionResults.clear();
+  CurrentResults.Results.clear();
   return MutableArrayRef<CodeCompletionResult *>(Results, Count);
 }
 
@@ -574,7 +647,7 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 namespace {
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup : public swift::VisibleDeclConsumer {
-  CodeCompletionResultSink Sink;
+  CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
   OwnedResolver TypeResolver;
   Identifier SelfIdent;
@@ -638,7 +711,7 @@ public:
   Optional<RequestedResultsTy> RequestedCachedResults;
 
 public:
-  CompletionLookup(CodeCompletionResultSink Sink,
+  CompletionLookup(CodeCompletionResultSink &Sink,
                    ASTContext &Ctx,
                    const DeclContext *CurrDeclContext)
       : Sink(Sink), Ctx(Ctx),
@@ -1671,19 +1744,19 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // Create helpers for result caching.
       auto &SwiftContext = P.Context;
       auto FillCacheCallback =
-          [&SwiftContext](CodeCompletionCache &Cache,
-                          const CodeCompletionCache::Key &K) {
-        CompletionLookup Lookup(Cache.getResultSinkFor(K), SwiftContext,
-                                nullptr);
+          [&SwiftContext](CodeCompletionCacheImpl &Cache,
+                          const CodeCompletionCacheImpl::Key &K) {
+        auto V = Cache.getResultSinkFor(K);
+        CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
         Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
                                           K.ResultsHaveLeadingDot);
       };
 
       // FIXME: actually check imports.
       // FIXME: fill in filename.
-      CodeCompletionCache::Key K{"", Request.TheModule->Name.str().str(),
-                                 {}, Request.NeedLeadingDot};
-      CompletionContext.Cache.getResults(
+      CodeCompletionCacheImpl::Key K{"", Request.TheModule->Name.str().str(),
+                                     {}, Request.NeedLeadingDot};
+      CompletionContext.Cache.Impl->getResults(
           K, CompletionContext.getResultSink(), Request.OnlyTypes,
           FillCacheCallback);
     } else {
@@ -1693,10 +1766,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // Create helpers for result caching.
       auto &SwiftContext = P.Context;
       auto FillCacheCallback =
-          [&SwiftContext](CodeCompletionCache &Cache,
-                          const CodeCompletionCache::Key &K) {
-        CompletionLookup Lookup(Cache.getResultSinkFor(K), SwiftContext,
-                                nullptr);
+          [&SwiftContext](CodeCompletionCacheImpl &Cache,
+                          const CodeCompletionCacheImpl::Key &K) {
+        auto V = Cache.getResultSinkFor(K);
+        CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
         Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
                                           K.ResultsHaveLeadingDot);
       };
@@ -1711,9 +1784,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           AccessPath.push_back(Piece.first.str());
         }
         // FIXME: fill in filename.
-        CodeCompletionCache::Key K{"", Imported.second->Name.str().str(),
-                                   AccessPath, false};
-        CompletionContext.Cache.getResults(
+        CodeCompletionCacheImpl::Key K{"", Imported.second->Name.str().str(),
+                                       AccessPath, false};
+        CompletionContext.Cache.Impl->getResults(
             K, CompletionContext.getResultSink(), Request.OnlyTypes,
             FillCacheCallback);
       }
