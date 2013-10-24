@@ -868,8 +868,14 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy){
     return;
   }
 
-  // Otherwise, use a subtype constraint to account for class inheritance.
-  cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy);
+  // Otherwise, use a subtype constraint for classes to cope with inheritance.
+  if (selfTy->getClassOrBoundGenericClass()) {
+    cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy);
+    return;
+  }
+
+  // Otherwise, the types must be equivalent.
+  cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy);
 }
 
 std::pair<Type, Type>
