@@ -115,6 +115,9 @@ public:
   SourceLoc getDelayedDeclLoc() {
     return CodeCompletionDelayedDeclState->BodyPos.Loc;
   }
+  DeclContext *getDelayedDeclContext() {
+    return CodeCompletionDelayedDeclState->ParentContext;
+  }
   std::unique_ptr<DelayedDeclState> takeDelayedDeclState() {
     return std::move(CodeCompletionDelayedDeclState);
   }

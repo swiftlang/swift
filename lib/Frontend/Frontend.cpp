@@ -154,7 +154,7 @@ void swift::CompilerInstance::doIt() {
       performTypeChecking(*SingleInputFile);
 
     if (DelayedCB) {
-      performDelayedParsing(*SingleInputFile, PersistentState,
+      performDelayedParsing(TU, PersistentState,
                             Invocation.getCodeCompletionFactory());
     }
     return;
@@ -186,7 +186,7 @@ void swift::CompilerInstance::doIt() {
   } while (!Done);
 
   if (DelayedCB) {
-    performDelayedParsing(*SingleInputFile, PersistentState,
+    performDelayedParsing(TU, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
 }

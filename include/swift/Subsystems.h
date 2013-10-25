@@ -72,15 +72,16 @@ namespace swift {
 
   /// @}
 
-  /// \brief Parse a single buffer into the given translation unit.  If the
-  /// translation unit is the main module, stop parsing after the next
+  /// \brief Parse a single buffer into the given source file.
+  ///
+  /// If the source file is the main file, stop parsing after the next
   /// stmt-brace-item with side-effects.
   ///
   /// \param SF the file within the translation unit being parsed.
   ///
   /// \param BufferID the buffer to parse from.
   ///
-  /// \param Done set to \c true if end of the buffer was reached.
+  /// \param[out] Done set to \c true if end of the buffer was reached.
   ///
   /// \param SIL if non-null, we're parsing a SIL file.
   ///
@@ -89,18 +90,19 @@ namespace swift {
   ///
   /// \param DelayedParseCB if non-null enables delayed parsing for function
   /// bodies.
-  bool parseIntoTranslationUnit(SourceFile &SF, unsigned BufferID,
-                                bool *Done,
-                                SILParserState *SIL = nullptr,
-                              PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr);
+  ///
+  /// \return true if the parser found code with side effects.
+  bool
+  parseIntoTranslationUnit(SourceFile &SF, unsigned BufferID, bool *Done,
+                           SILParserState *SIL = nullptr,
+                           PersistentParserState *PersistentState = nullptr,
+                           DelayedParsingCallbacks *DelayedParseCB = nullptr);
 
   /// \brief Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
-  void
-  performDelayedParsing(SourceFile &SF,
-                        PersistentParserState &PersistentState,
-                        CodeCompletionCallbacksFactory *CodeCompletionFactory);
+  void performDelayedParsing(DeclContext *DC,
+                             PersistentParserState &PersistentState,
+                             CodeCompletionCallbacksFactory *Factory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(SourceManager &SM, unsigned BufferID,

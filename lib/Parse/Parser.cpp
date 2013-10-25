@@ -49,16 +49,13 @@ namespace {
 
 /// A visitor that does delayed parsing of function bodies.
 class ParseDelayedFunctionBodies : public ASTWalker {
-  SourceFile &SF;
   PersistentParserState &ParserState;
   CodeCompletionCallbacksFactory *CodeCompletionFactory;
 
 public:
-  ParseDelayedFunctionBodies(SourceFile &SF,
-                             PersistentParserState &ParserState,
-                          CodeCompletionCallbacksFactory *CodeCompletionFactory)
-    : SF(SF), ParserState(ParserState),
-      CodeCompletionFactory(CodeCompletionFactory) {}
+  ParseDelayedFunctionBodies(PersistentParserState &ParserState,
+                             CodeCompletionCallbacksFactory *Factory)
+    : ParserState(ParserState), CodeCompletionFactory(Factory) {}
 
   bool walkToDeclPre(Decl *D) override {
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -74,6 +71,7 @@ private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
+    SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
     SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState);
@@ -90,11 +88,12 @@ private:
   }
 };
 
-void parseDelayedDecl(SourceFile &SF, PersistentParserState &ParserState,
+void parseDelayedDecl(PersistentParserState &ParserState,
                       CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   if (!ParserState.hasDelayedDecl())
     return;
 
+  SourceFile &SF = *ParserState.getDelayedDeclContext()->getParentSourceFile();
   SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
@@ -141,14 +140,14 @@ bool swift::parseIntoTranslationUnit(SourceFile &SF,
 }
 
 void swift::performDelayedParsing(
-    SourceFile &SF, PersistentParserState &PersistentState,
+    DeclContext *DC, PersistentParserState &PersistentState,
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
-  ParseDelayedFunctionBodies Walker(SF, PersistentState,
+  ParseDelayedFunctionBodies Walker(PersistentState,
                                     CodeCompletionFactory);
-  SF.walk(Walker);
+  DC->walkContext(Walker);
 
   if (CodeCompletionFactory)
-    parseDelayedDecl(SF, PersistentState, CodeCompletionFactory);
+    parseDelayedDecl(PersistentState, CodeCompletionFactory);
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.

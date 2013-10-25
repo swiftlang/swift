@@ -131,7 +131,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   (void)done;
   
   if (SkipBodies)
-    performDelayedParsing(*importFile, persistentState, nullptr);
+    performDelayedParsing(importTU, persistentState, nullptr);
 
   // FIXME: Support recursive definitions in immediate modes by making type
   // checking even lazier.
