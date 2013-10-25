@@ -1509,6 +1509,9 @@ ERROR(non_exhaustive_switch,sil_analysis,none, "switch must be exhaustive", ())
 WARNING(unreachable_code,sil_analysis,none, "will never be executed", ())
 NOTE(unreachable_code_branch,sil_analysis,none,
      "condition always evaluates to %select{false|true}0", (bool))
+WARNING(switch_on_a_constant,sil_analysis,none, 
+        "switch condition evaluates to a constant", ())
+NOTE(unreachable_code_note,sil_analysis,none, "will never be executed", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,sil_analysis,none,

@@ -268,45 +268,88 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
     }
   }
 
-  // Constant fold switch union.
-  //   %1 = union $Bool, #Bool.false!unionelt
-  //   switch_union %1 : $Bool, case #Bool.true!unionelt: bb1,
+  // Constant fold switch enum.
+  //   %1 = enum $Bool, #Bool.false!unionelt
+  //   switch_enum %1 : $Bool, case #Bool.true!unionelt: bb1,
   //                            case #Bool.false!unionelt: bb2
   // =>
   //   br bb2
   if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
     if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand().getDef())) {
       const EnumElementDecl *TheEnumElem = TheEnum->getElement();
-      SILBasicBlock *TheSuccessorBlock = 0;
+      SILBasicBlock *TheSuccessorBlock = nullptr;
+      int ReachableBlockIdx = -1;
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
         const EnumElementDecl *EI;
         SILBasicBlock *BI;
         llvm::tie(EI, BI) = SUI->getCase(Idx);
-        if (EI == TheEnumElem)
+        if (EI == TheEnumElem) {
           TheSuccessorBlock = BI;
+          ReachableBlockIdx = Idx;
+          break;
+        }
       }
 
-      // FIXME: Should we produce a warning if there is no default?
       if (!TheSuccessorBlock)
-        if (SUI->hasDefault())
-          TheSuccessorBlock = SUI->getDefaultBB();
+        if (SUI->hasDefault()) {
+          SILBasicBlock *DB= SUI->getDefaultBB();
+          if (!isa<UnreachableInst>(DB->getTerminator())) {
+            TheSuccessorBlock = DB;
+            ReachableBlockIdx = SUI->getNumCases();
+          }
+        }
 
-      // Add the branch instruction with the block.
-      if (TheSuccessorBlock) {
-        SILBuilder B(&BB);
-        if (TheEnum->hasOperand())
-          B.createBranch(TI->getLoc(), TheSuccessorBlock,
-                         TheEnum->getOperand());
-        else
-          B.createBranch(TI->getLoc(), TheSuccessorBlock);
+      // Not fully covered switches will be diagnosed later. SILGen represnets
+      // them with a Default basic block with an unrechable instruction.
+      // We are going to produce an error on all unreachable instructions not
+      // eliminated by DCE.
+      if (!TheSuccessorBlock)
+        return false;
 
-        // TODO: Produce an unreachable code warning here if the basic blocks
-        // contains user code. Only if we are not within an inlined or generic
-        // function.
+      // Replace the switch with a branch to the TheSuccessorBlock.
+      SILBuilder B(&BB);
+      SILLocation Loc = TI->getLoc();
+      if (TheEnum->hasOperand())
+        B.createBranch(Loc, TheSuccessorBlock,
+                       TheEnum->getOperand());
+      else
+        B.createBranch(Loc, TheSuccessorBlock);
 
-        eraseAndCleanup(TI);
-        return true;
+      // Produce diagnostic info if we are not within an inlined function or
+      // template instantiation.
+      // FIXME: Do not report if we are within a template instatiation.
+      assert(ReachableBlockIdx >= 0);
+      if (Loc.is<RegularLocation>() && State) {
+        // Find the first unreachable block in the switch so that we could use
+        // it for better diagnostics.
+        SILBasicBlock *UnreachableBlock = nullptr;
+        if (SUI->getNumCases() > 1) {
+          // More than one case.
+          UnreachableBlock =
+            (ReachableBlockIdx == 0) ? SUI->getCase(1).second:
+                                       SUI->getCase(0).second;
+        } else {
+          if (SUI->getNumCases() == 1 && SUI->hasDefault()) {
+            // One case and a default.
+            UnreachableBlock =
+              (ReachableBlockIdx == 0) ? SUI->getDefaultBB():
+                                         SUI->getCase(0).second;
+          }
+        }
+
+        // Generate diagnostic info.
+        if (UnreachableBlock &&
+            !State->UnreachableBlocks.count(UnreachableBlock)) {
+          State->UnreachableBlocks.insert(UnreachableBlock);
+          State->FoldInfoMap.insert(
+            std::pair<const SILBasicBlock*,
+                      BranchFoldInfo>(UnreachableBlock,
+                                      BranchFoldInfo{Loc, true}));
+        }
       }
+
+      eraseAndCleanup(TI);
+      return true;
     }
   }
 
@@ -411,7 +454,10 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
 
     // Skip branch instructions. These could belong to the control flow
     // statement we are folding (ex: while loop).
-    if (isa<BranchInst>(I) && Loc.is<RegularLocation>())
+    // Also skip unreachable instructions, they are "expected" in unreachable
+    // blocks.
+    if ((isa<BranchInst>(I) || isa<UnreachableInst>(I)) &&
+        Loc.is<RegularLocation>())
       break;
 
     // If we've reached an implicit return, we have not found any user code and
@@ -424,19 +470,40 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
     // Check BlocksWithErrors to make sure we don't report an error twice.
     if ((Loc.is<RegularLocation>() || Loc.is<ReturnLocation>()) &&
         !State->BlocksWithErrors.count(&B)) {
+
+      // Emit the diagnostic.
+      auto BrInfoIter = State->FoldInfoMap.find(TopLevelB);
+      assert(BrInfoIter != State->FoldInfoMap.end());
+      auto BrInfo = BrInfoIter->second;
+
+      // If we are warning about a switch condition being a constant, the main
+      // emphasis should be on the condition (to ensure we have a single
+      // message per switch).
+      if (const SwitchStmt *SS = BrInfo.Loc.getAsASTNode<SwitchStmt>()) {
+        const Expr *SE = SS->getSubjectExpr();
+        diagnose(M.getASTContext(), SE->getLoc(), diag::switch_on_a_constant);
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::unreachable_code_note);
+        return true;
+      }
+
+      // Otherwise, emit the diagnostic on the unreachable block and emit the
+      // note on the branch responsible for the unreachable code.
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::unreachable_code);
+      diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
+        diag::unreachable_code_branch, BrInfo.CondIsAlwaysTrue);
 
-      // Emit the note on the branch responsible for the unreachable code.
-      auto BrInfo = State->FoldInfoMap.find(TopLevelB);
-      if (BrInfo != State->FoldInfoMap.end()) {
-        diagnose(M.getASTContext(), BrInfo->second.Loc.getSourceLoc(),
-          diag::unreachable_code_branch, BrInfo->second.CondIsAlwaysTrue);
-      }
+      // Record that we've reported this unreachable block to avoid duplicates
+      // in the future.
       State->BlocksWithErrors.insert(&B);
       return true;
     }
   }
+
+  // This block could be empty if it's terminator has been folded.
+  if (B.empty())
+    return false;
 
   // If we have not found user code in this block, inspect it's successors.
   // Check if at least one of the sucessors contains user code.
