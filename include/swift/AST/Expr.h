@@ -727,15 +727,16 @@ public:
 /// \endcode
 class ExistentialMemberRefExpr : public Expr {
   Expr *Base;
-  ValueDecl *Value;
+  ConcreteDeclRef Value;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   
 public:  
-  ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+  ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc, ConcreteDeclRef Value,
                            SourceLoc NameLoc);
   Expr *getBase() const { return Base; }
-  ValueDecl *getDecl() const { return Value; }
+  ValueDecl *getDecl() const { return Value.getDecl(); }
+  ConcreteDeclRef getDeclRef() const { return Value; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   

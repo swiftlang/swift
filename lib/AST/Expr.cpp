@@ -177,7 +177,7 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
     Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
 
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                                   ValueDecl *Value,
+                                                   ConcreteDeclRef Value,
                                                    SourceLoc NameLoc)
   : Expr(ExprKind::ExistentialMemberRef, /*Implicit=*/false),
     Base(Base), Value(Value),

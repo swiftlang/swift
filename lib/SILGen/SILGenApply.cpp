@@ -662,6 +662,23 @@ public:
     setSideEffect(e->getLHS());
     visit(e->getRHS());
   }
+
+  /// Skip over all of the 'Self'-related substitutions within the given set
+  /// of substitutions.
+  ArrayRef<Substitution> getNonSelfSubstitutions(ArrayRef<Substitution> subs) {
+    unsigned innerIdx = 0, n = subs.size();
+    for (; innerIdx != n; ++innerIdx) {
+      auto archetype = subs[innerIdx].Archetype;
+      while (archetype->getParent())
+        archetype = archetype->getParent();
+      if (!archetype->getSelfProtocol()) {
+        break;
+      }
+    }
+
+    return subs.slice(innerIdx);
+  }
+
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential =
       gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
@@ -695,12 +712,32 @@ public:
       setSelfParam(RValue(gen, existential, e), e);
     }
 
+    // The declaration is always specialized (due to Self); ignore the
+    // substitutions related to Self. Skip the substitutions involving Self.
+    ArrayRef<Substitution> subs = getNonSelfSubstitutions(
+                                    e->getDeclRef().getSubstitutions());
+
     // Method calls through ObjC protocols require ObjC dispatch.
     bool isObjC = proto->isObjC();
-    
+
+    // Compute the result type. If there are remaining substitutions, we
+    // need to dig up the original PolymorphicFunctionType.
+    // FIXME: Eliminate the use of PolymorphicFunctionType here.
+    auto resultTy = e->getType();
+    if (!subs.empty()) {
+      resultTy = e->getDecl()->getType()->castTo<PolymorphicFunctionType>()
+                   ->getResult();
+    }
+
     setCallee(Callee::forProtocol(gen, existential.getValue(),
                                   SILDeclRef(fd).asForeign(isObjC),
-                                  e->getType(), e));
+                                  resultTy, e));
+
+    // If there are substitutions, add them now.
+    if (!subs.empty()) {
+      callee->addSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
+                               callDepth);
+    }
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setSelfParam(gen.emitRValue(e->getBase()), e);
@@ -713,21 +750,9 @@ public:
     bool isObjC = proto->isObjC();
 
     // The declaration is always specialized (due to Self); ignore the
-    // substitutions related to Self.
-    ArrayRef<Substitution> subs = e->getDeclRef().getSubstitutions();
-    {
-      unsigned innerIdx = 0, n = subs.size();
-      for (; innerIdx != n; ++innerIdx) {
-        auto archetype = subs[innerIdx].Archetype;
-        while (archetype->getParent())
-          archetype = archetype->getParent();
-        if (!archetype->getSelfProtocol()) {
-          break;
-        }
-      }
-
-      subs = subs.slice(innerIdx);
-    }
+    // substitutions related to Self. Skip the substitutions involving Self.
+    ArrayRef<Substitution> subs = getNonSelfSubstitutions(
+                                    e->getDeclRef().getSubstitutions());
 
     // Figure out the result type of this expression. If we had any
     // substitutions not related to 'Self', we'll need to produce a
@@ -736,15 +761,13 @@ public:
     // no longer depends on PolymorphicFunctionType at all.
     Type resultTy = e->getType();
     if (!subs.empty()) {
-      if (e->getDeclRef().isSpecialized()) {
-        TypeSubstitutionMap substitutions;
-        substitutions[proto->getSelf()->getArchetype()]
-          = e->getDeclRef().getSubstitutions()[0].Replacement;
+      TypeSubstitutionMap substitutions;
+      substitutions[proto->getSelf()->getArchetype()]
+        = e->getDeclRef().getSubstitutions()[0].Replacement;
 
-        resultTy = e->getDeclRef().getDecl()->getType()
-                     ->castTo<PolymorphicFunctionType>()->getResult()
-                     .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
-      }
+      resultTy = e->getDecl()->getType()
+                   ->castTo<PolymorphicFunctionType>()->getResult()
+                   .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
     }
     setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
                                    SILDeclRef(fd).asForeign(isObjC),

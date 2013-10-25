@@ -160,7 +160,9 @@ Type Solution::computeSubstitutions(
                              protoType->getDecl(),
                              getConstraintSystem().DC,
                              &conformance);
-        assert(conforms && "Constraint system missed a conformance?");
+        assert((conforms ||
+                substitutions.back().Replacement->isExistentialType()) &&
+               "Constraint system missed a conformance?");
         (void)conforms;
 
         assert(conformance ||
@@ -424,12 +426,10 @@ namespace {
       auto containerTy
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
-      // Handle references to generic functions that aren't existential members.
+      // Handle references to generic functions.
       if (openedFullType && isa<FuncDecl>(member) &&
           member->getInterfaceType() &&
-          member->getInterfaceType()->is<GenericFunctionType>() &&
-          !(isa<ProtocolDecl>(member->getDeclContext()) &&
-            baseTy->isExistentialType())) {
+          member->getInterfaceType()->is<GenericFunctionType>()) {
         auto func = cast<FuncDecl>(member);
 
         // Build a reference to the generic member.
@@ -453,8 +453,9 @@ namespace {
           return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
         }
 
-        bool isArchetypeRef = isa<ProtocolDecl>(member->getDeclContext()) &&
-                              baseTy->is<ArchetypeType>();
+        bool isArchetypeOrExistentialRef
+              = isa<ProtocolDecl>(member->getDeclContext()) &&
+                (baseTy->is<ArchetypeType>() || baseTy->isExistentialType());
 
         // Otherwise, convert the base.
         auto openedFullFnType = openedFullType->castTo<FunctionType>();
@@ -465,13 +466,14 @@ namespace {
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
           base = coerceObjectArgumentToType(
-                   base, isArchetypeRef? baseTy : containerTy,
+                   base, isArchetypeOrExistentialRef? baseTy : containerTy,
                    locator.withPathElement(ConstraintLocator::MemberRefBase));
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base,
-                              MetaTypeType::get(isArchetypeRef? baseTy
-                                                              : containerTy,
+                              MetaTypeType::get(isArchetypeOrExistentialRef
+                                                  ? baseTy
+                                                  : containerTy,
                                                 context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
@@ -479,12 +481,21 @@ namespace {
         }
         assert(base && "Unable to convert base?");
 
-        // Handle archetype reference.
-        if (isArchetypeRef) {
-          Expr *ref = new (ctx) ArchetypeMemberRefExpr(
-                                  base, dotLoc,
-                                  ConcreteDeclRef(ctx, member, substitutions),
-                                  memberLoc);
+        // Handle archetype and existential references.
+        if (isArchetypeOrExistentialRef) {
+          Expr *ref;
+
+          if (baseTy->is<ArchetypeType>()) {
+            ref = new (ctx) ArchetypeMemberRefExpr(
+                              base, dotLoc,
+                              ConcreteDeclRef(ctx, member, substitutions),
+                              memberLoc);
+          } else {
+            ref = new (ctx) ExistentialMemberRefExpr(
+                               base, dotLoc,
+                               ConcreteDeclRef(ctx, member, substitutions),
+                               memberLoc);
+          }
           ref->setImplicit(Implicit);
           ref->setType(simplifyType(openedFullFnType->getResult()));
           return ref;
@@ -535,35 +546,6 @@ namespace {
                                                         member, memberLoc);
         if (base->isImplicit())
           result->setImplicit();
-
-        // If we have a function declaration, determine whether it is
-        // polymorphic. If so, we need to specialize the result.
-        if (isa<FuncDecl>(member)) {
-          if (auto funcTy = member->getType()->getAs<AnyFunctionType>()) {
-            auto resultTy = funcTy->getResult();
-            if (auto polyFn = resultTy->getAs<PolymorphicFunctionType>()) {
-              // Figure out the type of the expression we've built so
-              // far. For existentials, this is trivial (it's
-              // resultTy, but FIXME: this may change if we start
-              // introducing archetypes for existentials). For
-              // archetypes, we need to substitute 'self' through.
-              if (baseTy->is<ArchetypeType>()) {
-                auto protocol = containerTy->castTo<ProtocolType>()->getDecl();
-                auto selfArchetype = protocol->getSelf()->getArchetype();
-                TypeSubstitutionMap substitutions;
-                substitutions[selfArchetype] = baseTy;
-                resultTy = tc.substType(dc->getParentModule(), resultTy,
-                                        substitutions);
-                if (!resultTy)
-                  return nullptr;
-              }
-              result->setType(resultTy);
-
-              // Specialize the result.
-              return solution.specialize(result, polyFn, openedType);
-            }
-          }
-        }
 
         // Otherwise, just simplify the type of this reference directly.
         result->setType(simplifyType(openedType));
