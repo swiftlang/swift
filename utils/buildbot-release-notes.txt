@@ -1,7 +1,18 @@
 2013-10-30
 ----------
 
-* Type inference can now infer the generic arguments from context:
+* Type inference for variables has been improved, allowing any
+  variable to have its type inferred from its initializer, including
+  global and instance variables:
+
+    class MyClass {
+      var size = 0 // inferred to Int    
+    }
+
+    var name = "Swift"
+
+  Additionally, the arguments of a generic type can also be inferred
+  from the initializer:
 
     var dict : Dictionary = ["Hello" : 1, "World" : 2] // infers Dictionary<String, Int>
 

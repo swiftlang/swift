@@ -964,11 +964,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     return;
 
   // Check the pattern.
-  // With a local context, if we have an initializer, we can also have unknown
-  // types.
-  // FIXME: We could allow this anywhere.
-  bool allowUnknownTypes = binding->getDeclContext()->isLocalContext() &&
-                           binding->getInit();
+  // If we have an initializer, we can also have unknown types.
+  bool allowUnknownTypes = binding->getInit();
   if (tc.typeCheckPattern(binding->getPattern(),
                           binding->getDeclContext(),
                           allowUnknownTypes)) {
