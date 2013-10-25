@@ -123,11 +123,12 @@ void swift::CompilerInstance::doIt() {
   TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
-  auto *SingleInputFile =
-    new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
-  TU->addSourceFile(*SingleInputFile);
-  if (Kind == SourceFile::REPL)
+  if (Kind == SourceFile::REPL) {
+    auto *SingleInputFile =
+      new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+    TU->addSourceFile(*SingleInputFile);
     return;
+  }
 
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
   if (Invocation.isCodeCompletion()) {
@@ -140,18 +141,26 @@ void swift::CompilerInstance::doIt() {
   PersistentParserState PersistentState;
 
   if (Kind == SourceFile::Library) {
-    // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
+      auto *NextInput =
+        new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+      TU->addSourceFile(*NextInput);
+
       bool Done;
-      parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
-                               nullptr, &PersistentState, DelayedCB.get());
+      parseIntoTranslationUnit(*NextInput, BufferID, &Done, nullptr,
+                               &PersistentState, DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
+
+      performNameBinding(*NextInput);
     }
 
-    // Finally, if enabled, type check the whole thing in one go.
-    if (!Invocation.getParseOnly())
-      performTypeChecking(*SingleInputFile);
+    if (!Invocation.getParseOnly()) {
+      // Type-check each top-level input.
+      auto InputSourceFiles = TU->getSourceFiles().slice(0, BufferIDs.size());
+      for (auto SF : InputSourceFiles)
+        performTypeChecking(*SF);
+    }
 
     if (DelayedCB) {
       performDelayedParsing(TU, PersistentState,
@@ -169,6 +178,9 @@ void swift::CompilerInstance::doIt() {
     SourceMgr.setHashbangBufferID(BufferID);
 
   SILParserState SILContext(TheSILModule.get());
+  auto *SingleInputFile =
+    new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+  TU->addSourceFile(*SingleInputFile);
 
   unsigned CurTUElem = 0;
   bool Done;

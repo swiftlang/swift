@@ -309,7 +309,7 @@ namespace {
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
-  if (SF.Decls.empty()) {
+  if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
     SF.ASTStage = SourceFile::NameBound;
     return;
   }

@@ -598,7 +598,7 @@ static CanType getExtendedType(ExtensionDecl *ED) {
   // FIXME: we should require generic parameter clauses here
   if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
     auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
-    ED->getExtendedTypeLoc() = TypeLoc::withoutLoc(boundType);
+    ED->getExtendedTypeLoc().setType(boundType, true);
     ExtendedTy = boundType->getCanonicalType();
   }
   return ExtendedTy;
@@ -1705,7 +1705,7 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *ED) {
-    if (IsSecondPass)
+    if (IsSecondPass || ED->hasType())
       return;
 
     EnumDecl *UD = ED->getParentEnum();
