@@ -5,12 +5,12 @@ add_swift_library(swiftSIL
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILFunction.cpp
+  SILFunctionType.cpp
   SILInstruction.cpp
   SILLocation.cpp
   SILModule.cpp
   SILPrinter.cpp
   SILSuccessor.cpp
-  SILType.cpp
   SILVTable.cpp
   TypeLowering.cpp
   Verifier.cpp
