@@ -51,14 +51,16 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
     if (!currentDirectory.empty()) {
       inputFilename = currentDirectory;
       llvm::sys::path::append(inputFilename, moduleFilename.str());
-      llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename, buffer);
+      llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
+                                                         buffer);
       if (!err)
         return err;
     }
   }
 
   // Second, search in the current directory.
-  llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename, buffer);
+  llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename.str(),
+                                                     buffer);
   if (!err)
     return err;
 
@@ -66,7 +68,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
   for (auto Path : ctx.ImportSearchPaths) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
-    err = llvm::MemoryBuffer::getFile(inputFilename, buffer);
+    err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
     if (!err)
       return err;
   }
