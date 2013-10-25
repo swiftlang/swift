@@ -4099,10 +4099,6 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   if (preCheckExpression(init, dc))
     return true;
 
-  // Pre-check the pattern as well.
-  if (typeCheckPattern(pattern, dc, /*allowUnknownTypes*/ true))
-    return true;
-
   ConstraintSystem cs(*this, dc);
 
   // Collect constraints from the initializer.
@@ -4188,7 +4184,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   }
 
   binding->setPattern(pattern);
-  binding->setInit(init);
+  binding->setInit(init, /*checked=*/true);
   cleanup.disable();
   return false;
 }

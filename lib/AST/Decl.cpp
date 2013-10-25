@@ -217,8 +217,8 @@ void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
-  if (Init) {
-    SourceLoc EndLoc = Init->getSourceRange().End;
+  if (auto init = getInit()) {
+    SourceLoc EndLoc = init->getSourceRange().End;
     if (EndLoc.isValid())
       return { VarLoc, EndLoc };
   }

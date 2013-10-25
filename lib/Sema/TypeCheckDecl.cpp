@@ -956,6 +956,38 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
     func->overwriteType(Type());
 }
 
+/// Validate the given pattern binding declaration.
+static void validatePatternBindingDecl(TypeChecker &tc,
+                                       PatternBindingDecl *binding) {
+  // If the pattern already has a type, we're done.
+  if (binding->getPattern()->hasType())
+    return;
+
+  // Check the pattern.
+  // With a local context, if we have an initializer, we can also have unknown
+  // types.
+  // FIXME: We could allow this anywhere.
+  bool allowUnknownTypes = binding->getDeclContext()->isLocalContext() &&
+                           binding->getInit();
+  if (tc.typeCheckPattern(binding->getPattern(),
+                          binding->getDeclContext(),
+                          allowUnknownTypes)) {
+    setBoundVarsTypeError(binding->getPattern(), tc.Context);
+    binding->setInvalid();
+    return;
+  }
+
+  // If the pattern didn't get a type, it's because we ran into some
+  // unknown types along the way. We'll need to check the initializer.
+  if (!binding->getPattern()->hasType()) {
+    if (tc.typeCheckBinding(binding)) {
+      setBoundVarsTypeError(binding->getPattern(), tc.Context);
+      binding->setInvalid();
+      return;
+    }
+  }
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -1079,49 +1111,25 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (IsSecondPass) {
-      if (PBD->getInit() && PBD->getPattern()->hasType()) {
-        Expr *Init = PBD->getInit();
-        Type DestTy = PBD->getPattern()->getType();
-        if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy,
-                                   /*discardedExpr=*/false)) {
-          if (DestTy)
-            TC.diagnose(PBD, diag::while_converting_var_init,
-                        DestTy);
-        } else {
-          PBD->setInit(Init);
+    validatePatternBindingDecl(TC, PBD);
+    if (PBD->isInvalid())
+      return;
+
+    if (!IsFirstPass) {
+      if (PBD->getInit() && !PBD->wasInitChecked()) {
+        if (TC.typeCheckBinding(PBD)) {
+          PBD->setInvalid();
+          if (!PBD->getPattern()->hasType()) {
+            PBD->getPattern()->setType(ErrorType::get(TC.Context));
+            setBoundVarsTypeError(PBD->getPattern(), TC.Context);
+            return;
+          }
         }
       }
-      return;
     }
 
-    // If there is no initializer and we are not in a type context,
-    // create a default initializer.
-    if (!IsFirstPass && !PBD->getInit() &&
-        isa<TypedPattern>(PBD->getPattern()) &&
-        !PBD->getDeclContext()->isTypeContext()) {
-      // Type-check the pattern.
-      if (TC.typeCheckPattern(PBD->getPattern(),
-                              PBD->getDeclContext(),
-                              /*allowUnknownTypes*/false)) {
-        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
-        return;
-      }
-    } else if (!IsFirstPass && PBD->getInit()) {
-      if (TC.typeCheckBinding(PBD)) {
-        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
-        return;
-      }
-    } else {
-      if (TC.typeCheckPattern(PBD->getPattern(),
-                              PBD->getDeclContext(),
-                              /*allowUnknownTypes*/false)) {
-        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
-        return;
-      }
-    }
-
-    visitBoundVars(PBD->getPattern());
+    if (!IsSecondPass)
+      visitBoundVars(PBD->getPattern());
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -2160,8 +2168,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (D->hasType())
       return;
     if (PatternBindingDecl *PBD = cast<VarDecl>(D)->getParentPattern()) {
-      if (typeCheckPattern(PBD->getPattern(), PBD->getDeclContext(),
-                           /*allowUnknownTypes*/false)) {
+      validatePatternBindingDecl(*this, PBD);
+      if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
+        PBD->getPattern()->setType(ErrorType::get(Context));
         setBoundVarsTypeError(PBD->getPattern(), Context);
         return;
       }

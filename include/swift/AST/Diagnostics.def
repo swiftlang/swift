@@ -868,8 +868,6 @@ NOTE(type_declared_here,sema,none,
 NOTE(decl_declared_here,sema,none,
      "%0 declared here", (Identifier))
 
-NOTE(while_converting_var_init,sema,none,
-     "while converting 'var' initial value to declared type %0", (Type))
 NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_function_argument,sema,none,

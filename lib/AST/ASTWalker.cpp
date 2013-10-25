@@ -581,7 +581,7 @@ public:
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
         if (Expr *E2 = doIt(Init))
-          PBD->setInit(E2);
+          PBD->setInit(E2, PBD->wasInitChecked());
         else
           return true;
       }

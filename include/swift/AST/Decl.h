@@ -971,7 +971,9 @@ public:
 class PatternBindingDecl : public Decl {
   SourceLoc VarLoc; // Location of the 'var' keyword
   Pattern *Pat; // The pattern which this decl binds
-  Expr *Init; // Initializer for the variables
+
+  /// The initializer, and whether it's been type-checked already.
+  llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
 
   friend class Decl;
   
@@ -979,7 +981,7 @@ public:
   PatternBindingDecl(SourceLoc VarLoc, Pattern *Pat, Expr *E,
                      DeclContext *Parent)
     : Decl(DeclKind::PatternBinding, Parent), VarLoc(VarLoc), Pat(Pat),
-      Init(E) {
+      InitAndChecked(E, false) {
   }
 
   SourceLoc getStartLoc() const { return VarLoc; }
@@ -990,9 +992,12 @@ public:
   const Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *P) { Pat = P; }
 
-  bool hasInit() const { return Init; }
-  Expr *getInit() const { return Init; }
-  void setInit(Expr *E) { Init = E; }
+  bool hasInit() const { return InitAndChecked.getPointer(); }
+  Expr *getInit() const { return InitAndChecked.getPointer(); }
+  bool wasInitChecked() const { return InitAndChecked.getInt(); }
+  void setInit(Expr *expr, bool checked) {
+    InitAndChecked.setPointerAndInt(expr, checked);
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;

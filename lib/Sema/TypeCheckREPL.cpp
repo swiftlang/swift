@@ -690,7 +690,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Replace the initializer of PBD with a reference to our repl temporary.
   Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   E = TC->coerceToMaterializable(E);
-  PBD->setInit(E);
+  PBD->setInit(E, /*checked=*/true);
   SF.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
