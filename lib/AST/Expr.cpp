@@ -103,7 +103,7 @@ Expr *Expr::getValueProvidingExpr() {
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
-  // swift encodes octal differently than C
+  // swift encodes octal differently from C
   bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
   bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;

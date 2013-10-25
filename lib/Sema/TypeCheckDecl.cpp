@@ -55,7 +55,7 @@ struct RawValueKey {
   union {
     StringRef stringValue;
     uint32_t charValue;
-    uint64_t intValue;
+    int64_t intValue;
     double floatValue;
   };
   
@@ -63,14 +63,14 @@ struct RawValueKey {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
       kind = Kind::Int;
-      intValue = cast<IntegerLiteralExpr>(expr)->getValue().getZExtValue();
+      intValue = cast<IntegerLiteralExpr>(expr)->getValue().getSExtValue();
       return;
     case ExprKind::FloatLiteral: {
       double v = cast<FloatLiteralExpr>(expr)->getValue().convertToDouble();
       // If the value losslessly converts to int, key it as an int.
-      if (v <= (double)UINT64_MAX && round(v) == v) {
+      if (v <= (double)INT64_MAX && round(v) == v) {
         kind = Kind::Int;
-        intValue = (uint64_t)v;
+        intValue = (int64_t)v;
       } else {
         kind = Kind::Float;
         floatValue = v;
@@ -126,8 +126,8 @@ public:
       // Hash as bits. We want to treat distinct but IEEE-equal values as not
       // equal.
     case RawValueKey::Kind::Int:
-      return DenseMapInfo<uint64_t>::getHashValue(k.intValue);
-      return DenseMapInfo<uint64_t>::getHashValue(k.intValue);
+      return DenseMapInfo<int64_t>::getHashValue(k.intValue);
+      return DenseMapInfo<int64_t>::getHashValue(k.intValue);
     case RawValueKey::Kind::Char:
       return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
     case RawValueKey::Kind::String:
@@ -1203,11 +1203,19 @@ public:
     
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
       APInt nextVal = intLit->getValue() + 1;
+      bool negative = nextVal.slt(0);
+      if (negative)
+        nextVal = -nextVal;
+      
       llvm::SmallString<10> nextValStr;
       nextVal.toStringSigned(nextValStr);
-      return new (TC.Context)
+      auto expr = new (TC.Context)
         IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
                            SourceLoc(), /*Implicit=*/true);
+      if (negative)
+        expr->setNegative(SourceLoc());
+      
+      return expr;
     }
     
     TC.diagnose(forElt->getLoc(),
