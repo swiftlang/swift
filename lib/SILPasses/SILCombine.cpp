@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 //
 // A port of LLVM's InstCombine pass to SIL. Its main purpose is for performing
-// small combining operations/peepholes at the SIL level. It additionally DCEs
-// before in order to reduce compile time.
+// small combining operations/peepholes at the SIL level. It additionally
+// performs dead code elimination when it initially adds instructions to the
+// work queue in order to reduce compile time by not visiting trivially dead
+// instructions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -59,15 +61,15 @@ public:
     }
   }
 
-  /// Add the given ValueBase if it is an instruction to the worklist if it is a
-  /// SILInstruction.
+  /// If the given ValueBase is a SILInstruction add it to the worklist.
   void addValue(ValueBase *V) {
     if (SILInstruction *I = llvm::dyn_cast<SILInstruction>(V))
       add(I);
   }
 
-  /// Add the specified batch of stuff in reverse order.  which should only be
-  /// done when the worklist is empty and when the group has no duplicates.
+  /// Add the given list of instructions in reverse order to the worklist. This
+  /// routine assumes that the worklist is empty and the given list has no
+  /// duplicates.
   void addInitialGroup(SILInstruction *const *List, unsigned NumEntries) {
     assert(Worklist.empty() && "Worklist must be empty to add initial group");
     Worklist.reserve(NumEntries+16);
@@ -81,15 +83,13 @@ public:
     }
   }
 
-  // Remove I from the worklist if it exists.
+  // If I is in the worklist, remove it.
   void remove(SILInstruction *I) {
     auto It = WorklistMap.find(I);
     if (It == WorklistMap.end()) return; // Not in worklist.
 
     // Don't bother moving everything down, just null out the slot. We will
-    // check before we process any instruction if it is 0 allowing us to not
-    // have to shift all of the elements of our worklist down everytime an
-    // instruction is removed.
+    // check before we process any instruction if it is 0.
     Worklist[It->second] = 0;
 
     WorklistMap.erase(It);
@@ -102,8 +102,9 @@ public:
     return I;
   }
 
-  /// When an instruction is simplified, add all users of the instruction to the
-  /// work lists because they might get more simplified now.
+  /// When an instruction has been simplified, add all of its users to the
+  /// worklist since additional simplifications of its users may have been
+  /// exposed.
   void addUsersToWorklist(SILInstruction &I) {
     for (auto UI : I.getUses())
       add(llvm::cast<SILInstruction>(UI->getUser()));
@@ -127,9 +128,9 @@ public:
 
 namespace swift {
 
-/// This is a class which maintains the state of the combine and simplifies many
-/// operations such as removing/adding instructions and syncing that with the
-/// worklist.
+/// This is a class which maintains the state of the combiner and simplifies
+/// many operations such as removing/adding instructions and syncing them with
+/// the worklist.
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
 public:
@@ -139,7 +140,7 @@ public:
     bool MadeActualChange = false;
     Iteration = 0;
 
-    // Create a SILBuilder for F and initialize the TrackingList.
+    // Create a SILBuilder for F and initialize the tracking list.
     SILBuilder B(F);
     B.setTrackingList(&TrackingList);
     Builder = &B;
@@ -150,7 +151,7 @@ public:
       MadeActualChange = true;
     }
 
-    // Cleanup builder and return whether or not we made any changes.
+    // Cleanup the builder and return whether or not we made any changes.
     Builder = 0;
     return MadeActualChange;
   }
@@ -161,8 +162,8 @@ public:
     MadeChange = false;
   }
 
-  // Insert the instruction New before instruction Old in the program.  Add the
-  // new instruction to the worklist.
+  // Insert the instruction New before instruction Old in Old's parent BB. Add
+  // New to the worklist.
   SILInstruction *insertNewInstBefore(SILInstruction *New,
                                       SILInstruction &Old) {
     assert(New && New->getParent() == 0 &&
@@ -176,7 +177,7 @@ public:
   // This method is to be used when an instruction is found to be dead,
   // replacable with another preexisting expression. Here we add all uses of I
   // to the worklist, replace all uses of I with the new value, then return I,
-  // so that the inst combiner will know that I was modified.
+  // so that the combiner will know that I was modified.
   SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V) {
     Worklist.addUsersToWorklist(I);   // Add all modified instrs to worklist.
 
@@ -187,9 +188,12 @@ public:
     return &I;
   }
 
-  // When dealing with an instruction that has side effects or produces a void
-  // value, we can't rely on DCE to delete the instruction.  Instead, visit
-  // methods should return the value returned by this function.
+  // Some instructions can never be "trivially dead" due to side effects or
+  // producing a void value. In those cases, since we can not rely on
+  // SILCombines trivially dead instruction DCE in order to delete the
+  // instruction, visit methods should use this method to delete the given
+  // instruction and upon completion of their peephole return the value returned
+  // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I) {
     DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
@@ -204,7 +208,7 @@ public:
     Worklist.remove(&I);
     I.eraseFromParent();
     MadeChange = true;
-    return 0;  // Don't do anything with FI
+    return 0;  // Don't do anything with I
   }
 
   void addInitialGroup(SILInstruction *const *List, unsigned NumEntries) {
@@ -218,16 +222,17 @@ private:
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
 
-  /// All of the instructions that need to be simplified.
+  /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
-  /// Did we make a chanbge?
+  /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
-  /// What is the current iteration of the SILCombine we are on.
+  /// The current iteration of the SILCombine.
   unsigned Iteration;
   /// Builder used to insert instructions.
   SILBuilder *Builder;
-  /// A list that the builder puts newly created instructions into. Its contents
-  /// are added to the worklist after every iteration and then is cleared.
+  /// A list that the builder inserts newly created instructions into. Its
+  /// contents are added to the worklist after every iteration and then the list
+  /// is cleared.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
 };
 
@@ -242,11 +247,11 @@ private:
 ///
 /// This has a couple of tricks to make the code faster and more powerful.  In
 /// particular, we DCE instructions as we go, to avoid adding them to the
-/// worklist (this significantly speeds up instcombine on code where many
+/// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
-static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &IC) {
+static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
   llvm::SmallVector<SILBasicBlock*, 256> Worklist;
-  llvm::SmallVector<SILInstruction*, 128> InstrsForInstCombineWorklist;
+  llvm::SmallVector<SILInstruction*, 128> InstrsForSILCombineWorklist;
   llvm::SmallPtrSet<SILBasicBlock*, 64> Visited;
 
   Worklist.push_back(BB);
@@ -267,7 +272,7 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &IC) {
         continue;
       }
 
-      InstrsForInstCombineWorklist.push_back(Inst);
+      InstrsForSILCombineWorklist.push_back(Inst);
     }
 
     // Recursively visit successors.
@@ -275,13 +280,13 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &IC) {
       Worklist.push_back(*SI);
   } while (!Worklist.empty());
 
-  // Once we've found all of the instructions to add to SILCombine's worklist,
-  // add them in reverse order.  This way SILCombine will visit from the top of
-  // the function down.  This jives well with the way that it adds all uses of
+  // Once we've found all of the instructions to add to the worklist, add them
+  // in reverse order. This way SILCombine will visit from the top of the
+  // function down. This jives well with the way that it adds all uses of
   // instructions to the worklist after doing a transformation, thus avoiding
   // some N^2 behavior in pathological cases.
-  IC.addInitialGroup(&InstrsForInstCombineWorklist[0],
-                     InstrsForInstCombineWorklist.size());
+  SC.addInitialGroup(&InstrsForSILCombineWorklist[0],
+                     InstrsForSILCombineWorklist.size());
 }
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
@@ -360,9 +365,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       MadeChange = true;
     }
 
-    // Our tracking list which has been accumulating instructions created by the
-    // SILBuilder doing this iteration. Go through the tracking list and add
-    // them to the worklist and then clear the TrackingList in preparation for
+    // Our tracking list has been accumulating instructions created by the
+    // SILBuilder during this iteration. Go through the tracking list and add
+    // its contents to the worklist and then clear said list in preparation for
     // the next iteration.
     for (SILInstruction *I : TrackingList) {
       Worklist.add(I);
