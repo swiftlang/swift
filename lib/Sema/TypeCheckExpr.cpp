@@ -369,7 +369,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics()) return false;
+  if (Context.hasOptionalIntrinsics(this)) return false;
 
   diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
@@ -423,6 +423,7 @@ static Type lookupGlobalType(TypeChecker &TC, DeclContext *dc, StringRef name) {
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
+  TC.validateDecl(TD);
   return TD->getDeclaredType();
 }
 

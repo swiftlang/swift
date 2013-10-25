@@ -628,14 +628,16 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
   auto isNonNull = gen.B.createIsNonnull(loc, ref);
   gen.B.createCondBranch(loc, isNonNull, isNonNullBB, isNullBB);
 
+  ASTContext &ctx = gen.getASTContext();
+
   // If it's non-null, use _injectValueIntoOptional.
   gen.B.emitBlock(isNonNullBB);
+  FuncDecl *injectDecl = ctx.getInjectValueIntoOptionalDecl(nullptr);
   SILValue injectFn;
   SILType injectFnTy;
   Substitution injectSub;
   std::tie(injectFn, injectFnTy, injectSub) =
-    emitSpecializedFunctionRef(gen, loc, refType,
-                         gen.getASTContext().getInjectValueIntoOptionalDecl());
+    emitSpecializedFunctionRef(gen, loc, refType, injectDecl);
   
   SILValue injectedValue = gen.B.createApply(loc, injectFn, injectFnTy,
                                              optType, injectSub, ref);
@@ -643,9 +645,9 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
 
   // If it's null, use _injectValueIntoNothing.
   gen.B.emitBlock(isNullBB);
+  injectDecl = ctx.getInjectNothingIntoOptionalDecl(nullptr);
   std::tie(injectFn, injectFnTy, injectSub) =
-    emitSpecializedFunctionRef(gen, loc, refType,
-                       gen.getASTContext().getInjectNothingIntoOptionalDecl());
+    emitSpecializedFunctionRef(gen, loc, refType, injectDecl);
   SILValue injectedNothing =
     gen.B.createApply(loc, injectFn, injectFnTy, optType, injectSub, {});
   gen.B.createBranch(loc, contBB, injectedNothing);
@@ -698,7 +700,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   Substitution sub;
   std::tie(fn, fnTy, sub) =
     emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
-                               ctx.getDoesOptionalHaveValueDecl());
+                               ctx.getDoesOptionalHaveValueDecl(nullptr));
   auto i1Type = 
     SILType::getPrimitiveObjectType(CanType(BuiltinIntegerType::get(1, ctx)));
   auto isPresent = gen.B.createApply(loc, fn, fnTy, i1Type, sub, optAddr);
@@ -709,7 +711,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   gen.B.emitBlock(isPresentBB);
   std::tie(fn, fnTy, sub) =
     emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
-                               gen.getASTContext().getGetOptionalValueDecl());
+                               ctx.getGetOptionalValueDecl(nullptr));
   SILValue refValue = gen.B.createApply(loc, fn, fnTy, refType, sub, opt);
   gen.B.createBranch(loc, contBB, refValue);
 
@@ -736,7 +738,7 @@ ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
   SILType optType = optTL.getLoweredType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl();
+  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
@@ -761,7 +763,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   SILType optType = dest.getType().getObjectType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl();
+  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
@@ -782,7 +784,7 @@ ManagedValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
   SILType optType = optTL.getLoweredType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl();
+  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl(nullptr);
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
@@ -803,7 +805,7 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
   SILType optType = dest.getType().getObjectType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl();
+  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl(nullptr);
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
@@ -817,7 +819,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILType optType = addr.getType().getObjectType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getDoesOptionalHaveValueDecl();
+  FuncDecl *fn = getASTContext().getDoesOptionalHaveValueDecl(nullptr);
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
@@ -838,7 +840,7 @@ ManagedValue SILGenFunction::emitGetOptionalValue(SILLocation loc,
   SILType optType = value.getType().getObjectType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getGetOptionalValueDecl();
+  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, value, valueType, C);
@@ -851,7 +853,7 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
   SILType optType = src.getType().getObjectType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getGetOptionalValueDecl();
+  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   ManagedValue arg = src;

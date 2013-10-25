@@ -340,11 +340,17 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
 /// Find the implementation for the given "intrinsic" library function.
 static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
-                                      StringRef name) {
+                                      StringRef name,
+                                      LazyResolver *resolver) {
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInSwiftModule(name, results);
-  if (results.size() == 1)
-    return dyn_cast<FuncDecl>(results.front());
+  if (results.size() == 1) {
+    if (auto FD = dyn_cast<FuncDecl>(results.front())) {
+      if (resolver)
+        resolver->resolveDeclSignature(FD);
+      return FD;
+    }
+  }
   return nullptr;
 }
 
@@ -378,13 +384,13 @@ static bool isBuiltinInt1Type(CanType type) {
   return false;
 }
 
-FuncDecl *ASTContext::getGetBoolDecl() const {
+FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   if (Impl.GetBoolDecl)
     return Impl.GetBoolDecl;
 
   // Look for the function.
   CanType input, output;
-  auto decl = findLibraryIntrinsic(*this, "_getBool");
+  auto decl = findLibraryIntrinsic(*this, "_getBool", resolver);
   if (!decl || !isNonGenericIntrinsic(decl, input, output))
     return nullptr;
 
@@ -434,13 +440,14 @@ static bool isOptionalType(const ASTContext &ctx, CanType type,
   return false;
 }
 
-FuncDecl *ASTContext::getDoesOptionalHaveValueDecl() const {
+FuncDecl *
+ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver) const {
   if (Impl.DoesOptionalHaveValueDecl)
     return Impl.DoesOptionalHaveValueDecl;
 
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_doesOptionalHaveValue");
+  auto decl = findLibraryIntrinsic(*this, "_doesOptionalHaveValue", resolver);
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
@@ -457,13 +464,13 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueDecl() const {
   return decl;
 }
 
-FuncDecl *ASTContext::getGetOptionalValueDecl() const {
+FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver) const {
   if (Impl.GetOptionalValueDecl)
     return Impl.GetOptionalValueDecl;
 
   // Look for the function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_getOptionalValue");
+  auto decl = findLibraryIntrinsic(*this, "_getOptionalValue", resolver);
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
@@ -479,13 +486,15 @@ FuncDecl *ASTContext::getGetOptionalValueDecl() const {
   return decl;
 }
 
-FuncDecl *ASTContext::getInjectValueIntoOptionalDecl() const {
+FuncDecl *
+ASTContext::getInjectValueIntoOptionalDecl(LazyResolver *resolver) const {
   if (Impl.InjectValueIntoOptionalDecl)
     return Impl.InjectValueIntoOptionalDecl;
 
   // Look for the function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_injectValueIntoOptional");
+  auto decl = findLibraryIntrinsic(*this, "_injectValueIntoOptional",
+                                   resolver);
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
@@ -501,13 +510,15 @@ FuncDecl *ASTContext::getInjectValueIntoOptionalDecl() const {
   return decl;
 }
 
-FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl() const {
+FuncDecl *
+ASTContext::getInjectNothingIntoOptionalDecl(LazyResolver *resolver) const {
   if (Impl.InjectNothingIntoOptionalDecl)
     return Impl.InjectNothingIntoOptionalDecl;
 
   // Look for the function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_injectNothingIntoOptional");
+  auto decl = findLibraryIntrinsic(*this, "_injectNothingIntoOptional",
+                                   resolver);
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
@@ -524,11 +535,11 @@ FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl() const {
   return decl;
 }
 
-bool ASTContext::hasOptionalIntrinsics() const {
-  return getDoesOptionalHaveValueDecl() &&
-         getGetOptionalValueDecl() &&
-         getInjectValueIntoOptionalDecl() &&
-         getInjectNothingIntoOptionalDecl();
+bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
+  return getDoesOptionalHaveValueDecl(resolver) &&
+         getGetOptionalValueDecl(resolver) &&
+         getInjectValueIntoOptionalDecl(resolver) &&
+         getInjectNothingIntoOptionalDecl(resolver);
 }
 
 void ASTContext::addMutationListener(ASTMutationListener &listener) {

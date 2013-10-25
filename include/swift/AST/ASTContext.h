@@ -313,26 +313,26 @@ public:
   NominalTypeDecl *getOptionalDecl() const;
 
   /// Retrieve the declaration of swift._doesOptionalHaveValue.
-  FuncDecl *getDoesOptionalHaveValueDecl() const;
+  FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of swift._getOptionalValue.
-  FuncDecl *getGetOptionalValueDecl() const;
+  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of swift._injectValueIntoOptional.
-  FuncDecl *getInjectValueIntoOptionalDecl() const;
+  FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of swift._injectNothingIntoOptional.
-  FuncDecl *getInjectNothingIntoOptionalDecl() const;
+  FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver) const;
 
   /// Check whether the standary library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
   /// If this is true, the four methods above all promise to return
   /// non-null.
-  bool hasOptionalIntrinsics() const;
+  bool hasOptionalIntrinsics(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of swift._getBool.
-  FuncDecl *getGetBoolDecl() const;
+  FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 
   /// \brief Look for the declaration with the given name within the
   /// swift module.

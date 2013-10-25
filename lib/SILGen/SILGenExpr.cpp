@@ -896,12 +896,13 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   SGF.B.emitBlock(contBB);
   
   // Call the _getBool library intrinsic.
-  auto result = SGF.emitApplyOfLibraryIntrinsic(E,
-                                  SGF.SGM.M.getASTContext().getGetBoolDecl(),
-                                  {},
-                                  ManagedValue(isa, ManagedValue::Unmanaged),
-                                  E->getType()->getCanonicalType(),
-                                  C);
+  ASTContext &ctx = SGF.SGM.M.getASTContext();
+  auto result =
+    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+                                    ManagedValue(isa,
+                                                 ManagedValue::Unmanaged),
+                                    E->getType()->getCanonicalType(),
+                                    C);
   return (result ? RValue(SGF, result, E) : RValue());
 }
 

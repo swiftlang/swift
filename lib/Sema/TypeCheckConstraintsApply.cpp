@@ -1916,7 +1916,7 @@ namespace {
     
     Expr *visitIsaExpr(IsaExpr *expr) {
       // SIL-generation magically turns this into a Bool; make sure it can.
-      if (!cs.getASTContext().getGetBoolDecl()) {
+      if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
         cs.getTypeChecker().diagnose(expr->getLoc(),
                                      diag::bool_intrinsics_not_found);
         // Continue anyway.
