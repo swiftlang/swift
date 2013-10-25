@@ -319,12 +319,13 @@ enum class ResolutionKind {
 
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
-void lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
-                                SmallVectorImpl<ValueDecl *> &decls,
-                                NLKind lookupKind,
-                                ResolutionKind resolutionKind,
-                                LazyResolver *typeResolver,
-                                bool topLevel);
+void
+lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
+                           SmallVectorImpl<ValueDecl *> &decls,
+                           NLKind lookupKind,
+                           ResolutionKind resolutionKind,
+                           LazyResolver *typeResolver,
+                           ArrayRef<Module::ImportedModule> extraImports = {});
 } // end namespace namelookup
 } // end namespace swift
 

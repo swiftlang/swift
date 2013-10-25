@@ -1513,8 +1513,7 @@ public:
     lookupVisibleDeclsInModule(M, LookupAccessPath, Decls,
                                NLKind::QualifiedLookup,
                                ResolutionKind::Overloadable,
-                               TypeResolver.get(),
-                               /*topLevel=*/false);
+                               TypeResolver.get());
 
     for (auto *VD : Decls) {
       foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);

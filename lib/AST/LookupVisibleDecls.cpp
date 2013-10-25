@@ -632,6 +632,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
+  SmallVector<Module::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -647,6 +648,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
           Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
         return;
       }
+
+      for (auto importPair : SF->getImports())
+        if (!importPair.second)
+          extraImports.push_back(importPair.first);
     }
   }
 
@@ -657,8 +662,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
                                NLKind::QualifiedLookup,
                                ResolutionKind::Overloadable,
-                               TypeResolver,
-                               /*topLevel=*/true);
+                               TypeResolver, extraImports);
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 

@@ -1144,7 +1144,7 @@ public:
           L.lex(Tok);
           ASTContext &ctx = CI.getASTContext();
           UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
-                                   &REPLInputFile.TU, nullptr);
+                                   &REPLInputFile, nullptr);
           for (auto result : lookup.Results) {
             if (result.hasValueDecl()) {
               printOrDumpDecl(result.getValueDecl(), doPrint);
@@ -1250,7 +1250,7 @@ public:
         // We haven't run replApplicationMain() yet. Look for it.
         ASTContext &ctx = CI.getASTContext();
         UnqualifiedLookup lookup(ctx.getIdentifier("replApplicationMain"),
-                                 &REPLInputFile.TU, nullptr);
+                                 &REPLInputFile, nullptr);
         if (lookup.isSuccess()) {
           // Execute replApplicationMain().
           executeSwiftSource("replApplicationMain()\n", CmdLine);
@@ -1267,7 +1267,7 @@ public:
   void exitREPL() {
     /// Invoke replExit() if available.
     UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("replExit"),
-                             &REPLInputFile.TU, nullptr);
+                             &REPLInputFile, nullptr);
     if (lookup.isSuccess()) {
       executeSwiftSource("replExit()\n", CmdLine);
     }

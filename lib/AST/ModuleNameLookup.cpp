@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleNameLookup.h"
+#include "swift/AST/AST.h"
 #include "swift/AST/LazyResolver.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -147,7 +148,8 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            ResolutionKind resolutionKind, bool canReturnEarly,
                            LazyResolver *typeResolver,
-                           ModuleLookupCache &cache, bool topLevel,
+                           ModuleLookupCache &cache,
+                           ArrayRef<Module::ImportedModule> extraImports,
                            CallbackTy callback) {
   ModuleLookupCache::MapTy::iterator iter;
   bool isNew;
@@ -182,7 +184,8 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   if (!foundDecls || !canReturnEarly ||
       resolutionKind == ResolutionKind::Overloadable) {
     SmallVector<Module::ImportedModule, 8> reexports;
-    module->getImportedModules(reexports, topLevel);
+    module->getImportedModules(reexports, false);
+    reexports.append(extraImports.begin(), extraImports.end());
 
     // Prefer scoped imports (import func swift.max) to whole-module imports.
     SmallVector<ValueDecl *, 8> unscopedValues;
@@ -206,7 +209,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
       lookupInModule<OverloadSetTy>(next.second, combinedAccessPath,
                                     resultSet, resolutionKind, canReturnEarly,
-                                    typeResolver, cache, false, callback);
+                                    typeResolver, cache, {}, callback);
     }
 
     // Add the results from scoped imports.
@@ -239,11 +242,11 @@ void namelookup::lookupInModule(Module *startModule,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
                                 LazyResolver *typeResolver,
-                                bool topLevel) {
+                                ArrayRef<Module::ImportedModule> extraImports) {
   ModuleLookupCache cache;
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
-                               typeResolver, cache, topLevel,
+                               typeResolver, cache, extraImports,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       module->lookupValue(path, name, lookupKind, localDecls);
@@ -264,17 +267,18 @@ public:
 };
 }
 
-void namelookup::lookupVisibleDeclsInModule(Module *M,
-                                            Module::AccessPathTy accessPath,
-                                            SmallVectorImpl<ValueDecl *> &decls,
-                                            NLKind lookupKind,
-                                            ResolutionKind resolutionKind,
-                                            LazyResolver *typeResolver,
-                                            bool topLevel) {
+void namelookup::lookupVisibleDeclsInModule(
+    Module *M,
+    Module::AccessPathTy accessPath,
+    SmallVectorImpl<ValueDecl *> &decls,
+    NLKind lookupKind,
+    ResolutionKind resolutionKind,
+    LazyResolver *typeResolver,
+    ArrayRef<Module::ImportedModule> extraImports) {
   ModuleLookupCache cache;
   ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
-                                    typeResolver, cache, topLevel,
+                                    typeResolver, cache, extraImports,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);

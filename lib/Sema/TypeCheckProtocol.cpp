@@ -717,7 +717,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     SmallVector<ValueDecl *, 4> witnesses;
     if (Requirement->getName().isOperator()) {
       // Operator lookup is always global.
-      UnqualifiedLookup Lookup(Requirement->getName(), DC->getParentModule(),
+      UnqualifiedLookup Lookup(Requirement->getName(),
+                               DC->getModuleScopeContext(),
                                &TC);
 
       if (Lookup.isSuccess()) {

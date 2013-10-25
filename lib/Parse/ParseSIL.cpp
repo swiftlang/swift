@@ -587,7 +587,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
          "Unexpected stage during parsing!");
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
-  UnqualifiedLookup DeclLookup(Name, &P.SF.TU, nullptr);
+  UnqualifiedLookup DeclLookup(Name, &P.SF, nullptr);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {
     Module *Mod = DeclLookup.Results.back().getNamedModule();

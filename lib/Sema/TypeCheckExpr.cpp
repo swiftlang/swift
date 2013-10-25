@@ -418,7 +418,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
 
 static Type lookupGlobalType(TypeChecker &TC, DeclContext *dc, StringRef name) {
   UnqualifiedLookup lookup(TC.Context.getIdentifier(name),
-                           dc->getParentModule(),
+                           dc->getModuleScopeContext(),
                            nullptr);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)

@@ -48,6 +48,13 @@ namespace {
       : M(&SF), Ctx(SF.TU.Ctx), Out(llvm::errs()),
         HadError(SF.TU.Ctx.hadError()) {}
 
+    static Verifier forDecl(const Decl *D) {
+      DeclContext *topDC = D->getDeclContext()->getModuleScopeContext();
+      if (auto SF = dyn_cast<SourceFile>(topDC))
+        return Verifier(*SF);
+      return Verifier(cast<Module>(topDC));
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPreExpr(static_cast<ID##Expr*>(E))
@@ -1610,9 +1617,7 @@ void swift::verify(SourceFile &SF) {
 }
 
 void swift::verify(Decl *D) {
-  auto topScope = D->getDeclContext()->getModuleScopeContext();
-  Verifier V = topScope.is<Module*>() ? Verifier(topScope.get<Module*>())
-                                      : Verifier(*topScope.get<SourceFile*>());
+  Verifier V = Verifier::forDecl(D);
   D->walk(V);
 }
 

@@ -294,15 +294,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   typedef UnqualifiedLookupResult Result;
 
   Module &M = *DC->getParentModule();
-  const SourceManager &SM = DC->getASTContext().SourceMgr;
-  ExternalNameLookup *ExternalLookup = nullptr;
-
-  if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M))
-    ExternalLookup = TU->getExternalLookup();
+  const SourceManager &SM = M.getASTContext().SourceMgr;
 
   // Never perform local lookup for operators.
   if (Name.isOperator())
-    DC = &M;
+    DC = DC->getModuleScopeContext();
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
@@ -464,8 +460,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     DC = DC->getParent();
   }
 
-  if (Loc.isValid()) {
-    if (auto SF = dyn_cast<SourceFile>(DC)) {
+  SmallVector<Module::ImportedModule, 8> extraImports;
+  if (auto SF = dyn_cast<SourceFile>(DC)) {
+    if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
@@ -476,8 +473,17 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         return;
       }
     }
+
+    // Add private imports to the extra search list.
+    for (auto importPair : SF->getImports())
+      if (!importPair.second)
+        extraImports.push_back(importPair.first);
   }
     
+  ExternalNameLookup *ExternalLookup = nullptr;
+  if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M))
+    ExternalLookup = TU->getExternalLookup();
+
   if (ExternalLookup && ExternalLookup->lookupOverrides(Name, DC, Loc,
                                                         IsTypeLookup, Results))
     return;
@@ -487,7 +493,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   auto resolutionKind =
     IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, /*topLevel=*/true);
+                 resolutionKind, TypeResolver, extraImports);
 
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
@@ -712,7 +718,7 @@ bool Module::lookupQualified(Type type,
         return true;
       lookupInModule(import.second, import.first, name, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     typeResolver, /*topLevel=*/false);
+                     typeResolver);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();

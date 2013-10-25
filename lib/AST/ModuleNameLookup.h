@@ -13,14 +13,9 @@
 #ifndef SWIFT_AST_MODULENAMELOOKUP_H
 #define SWIFT_AST_MODULENAMELOOKUP_H
 
-#include "swift/Basic/SourceManager.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
-#include "swift/Basic/Fallthrough.h"
-#include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
+#include "swift/Basic/LLVM.h"
 
 namespace swift {
 namespace namelookup {
@@ -36,12 +31,12 @@ namespace namelookup {
 /// \param resolutionKind What sort of decl is expected.
 /// \param typeResolver The type resolver for decls that need to be
 ///        type-checked. This is needed for shadowing resolution.
-/// \param topLevel If \p module should be treated as a top-level source file,
-///        e.g. its private imports should be included in the search.
+/// \param extraImports Private imports to include in this search.
 void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     Identifier name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
-                    LazyResolver *typeResolver, bool topLevel);
+                    LazyResolver *typeResolver,
+                    ArrayRef<Module::ImportedModule> extraImports = {});
 
 } // end namespace namelookup
 } // end namespace swift

@@ -127,15 +127,20 @@ Module *DeclContext::getParentModule() const {
   return const_cast<Module *>(cast<Module>(DC));
 }
 
-PointerUnion<Module *, SourceFile *>
-DeclContext::getModuleScopeContext() const {
+SourceFile *DeclContext::getParentSourceFile() const {
+  const DeclContext *DC = this;
+  while (!DC->isModuleScopeContext())
+    DC = DC->getParent();
+  return const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
+}
+
+DeclContext *DeclContext::getModuleScopeContext() const {
   const DeclContext *DC = this;
   while (true) {
     switch (DC->getContextKind()) {
     case DeclContextKind::Module:
-      return const_cast<Module *>(cast<Module>(DC));
     case DeclContextKind::SourceFile:
-      return const_cast<SourceFile *>(cast<SourceFile>(DC));
+      return const_cast<DeclContext*>(DC);
     default:
       break;
     }

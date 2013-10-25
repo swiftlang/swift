@@ -176,13 +176,11 @@ public:
   /// Returns the module scope context that contains this context.
   ///
   /// This is either a Module or a SourceFile.
-  PointerUnion<Module *, SourceFile *> getModuleScopeContext() const;
+  DeclContext *getModuleScopeContext() const;
 
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
-  SourceFile *getParentSourceFile() const {
-    return getModuleScopeContext().dyn_cast<SourceFile*>();
-  }
+  SourceFile *getParentSourceFile() const;
 
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
