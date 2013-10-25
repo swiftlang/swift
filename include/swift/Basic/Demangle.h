@@ -58,6 +58,7 @@ public:
     Directness,
     GenericTypeMetadataPattern,
     ProtocolWitness,
+    NominalTypeDescriptor,
     Metaclass,
     TypeMetadata,
     ArrayType,

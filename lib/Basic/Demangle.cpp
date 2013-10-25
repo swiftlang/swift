@@ -473,6 +473,13 @@ private:
         appendNode(Node::Kind::Metaclass)->push_back_child(type);
         return true;
       }
+    if (Mangled.nextIf('n')) {
+        NodePointer type = demangleType();
+        if (!type)
+            return failure();
+        appendNode(Node::Kind::NominalTypeDescriptor)->push_back_child(type);
+        return true;
+    }
       Directness d = demangleDirectness();
       appendNode(Node::Kind::Directness, toString(d));
       NodePointer type = demangleType();
@@ -1987,6 +1994,9 @@ private:
           pointer = pointer->child_at(0); continue;
         case swift::Demangle::Node::Kind::TypeMetadata:
           Printer << "type metadata for ";
+          pointer = pointer->child_at(0); continue;
+        case swift::Demangle::Node::Kind::NominalTypeDescriptor:
+          Printer << "nominal type descriptor for ";
           pointer = pointer->child_at(0); continue;
         case swift::Demangle::Node::Kind::ValueWitnessKind:
           Printer << pointer->getText() << " value witness for ";
