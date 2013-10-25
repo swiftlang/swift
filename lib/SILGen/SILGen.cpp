@@ -583,10 +583,12 @@ std::unique_ptr<SILModule> SILModule::constructSIL(TranslationUnit *tu,
       sgm.visit(D);
   } else {
     assert(startElem == 0 && "no explicit source file");
-    // FIXME: Construct SIL for all source files, once there is more than one.
-    sf = tu->MainSourceFile;
-    for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
-      sgm.visit(D);
+    for (auto nextSF : tu->getSourceFiles()) {
+      if (nextSF->ASTStage != SourceFile::TypeChecked)
+        continue;
+      for (Decl *D : llvm::makeArrayRef(nextSF->Decls).slice(startElem))
+        sgm.visit(D);
+    }
   }
     
   // Emit external definitions used by this translation unit.

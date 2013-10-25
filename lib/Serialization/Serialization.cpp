@@ -390,13 +390,16 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  for (auto import : TU->MainSourceFile->getImports()) {
-    if (import.first.second == TU->Ctx.TheBuiltinModule)
-      continue;
+  for (auto SF : TU->getSourceFiles()) {
+    // FIXME: Do some uniquing.
+    for (auto import : SF->getImports()) {
+      if (import.first.second == TU->Ctx.TheBuiltinModule)
+        continue;
 
-    ImportPathBlob importPath;
-    flattenImportPath(import.first, importPath);
-    ImportedModule.emit(ScratchRecord, import.second, importPath);
+      ImportPathBlob importPath;
+      flattenImportPath(import.first, importPath);
+      ImportedModule.emit(ScratchRecord, import.second, importPath);
+    }
   }
 
   if (!moduleLinkName.empty()) {
@@ -2008,24 +2011,26 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU,
   writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
-  for (auto D : TU->MainSourceFile->Decls) {
-    if (isa<ImportDecl>(D))
-      continue;
-    else if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getName().empty())
+  for (auto SF : TU->getSourceFiles()) {
+    for (auto D : SF->Decls) {
+      if (isa<ImportDecl>(D))
         continue;
-      topLevelDecls[VD->getName()]
-        .push_back({ getKindForTable(D), addDeclRef(D) });
+      else if (auto VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->getName().empty())
+          continue;
+        topLevelDecls[VD->getName()]
+          .push_back({ getKindForTable(D), addDeclRef(D) });
 
-    } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-      Type extendedTy = ED->getExtendedType();
-      const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
-      extensionDecls[extendedNominal->getName()]
-        .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
+      } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        Type extendedTy = ED->getExtendedType();
+        const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
+        extensionDecls[extendedNominal->getName()]
+          .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
 
-    } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
-      operatorDecls[OD->getName()]
-        .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+      } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
+        operatorDecls[OD->getName()]
+          .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+      }
     }
   }
 

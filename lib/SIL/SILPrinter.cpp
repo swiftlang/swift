@@ -1152,8 +1152,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.VarInitializers = true;
     Options.SkipImplicit = true;
 
-    for (auto ID = TU->MainSourceFile->Decls.begin(),
-              ED = TU->MainSourceFile->Decls.end(); ID != ED; ++ID) {
+    // FIXME: What about the rest of the files in the TU?
+    for (auto ID = TU->getSourceFiles().front()->Decls.begin(),
+              ED = TU->getSourceFiles().front()->Decls.end(); ID != ED; ++ID) {
       const Decl *D = *ID;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&

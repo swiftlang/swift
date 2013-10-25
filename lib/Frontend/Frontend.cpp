@@ -125,7 +125,7 @@ void swift::CompilerInstance::doIt() {
 
   auto *SingleInputFile =
     new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
-  TU->MainSourceFile = SingleInputFile;
+  TU->addSourceFile(*SingleInputFile);
   if (Kind == SourceFile::REPL)
     return;
 

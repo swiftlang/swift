@@ -169,7 +169,10 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
     IGM.emitSourceFile(*SF, StartElem);
   } else {
     assert(StartElem == 0 && "no explicit source file provided");
-    IGM.emitSourceFile(*TU->MainSourceFile, 0);
+    for (auto *SF : TU->getSourceFiles()) {
+      if (SF->ASTStage == SourceFile::TypeChecked)
+        IGM.emitSourceFile(*SF, 0);
+    }
   }
   
   // Objective-C image information.

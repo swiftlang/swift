@@ -119,7 +119,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto *importFile = new (Ctx) SourceFile(*importTU, SourceFile::Library,
                                           bufferID);
-  importTU->MainSourceFile = importFile;
+  importTU->addSourceFile(*importFile);
 
   bool done;
   PersistentParserState persistentState;

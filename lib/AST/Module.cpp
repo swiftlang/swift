@@ -276,8 +276,10 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    const SourceFile &SF = *TU->MainSourceFile;
-    return SF.getCache().lookupValue(AccessPath, Name, LookupKind, Result);
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      SF->getCache().lookupValue(AccessPath, Name, LookupKind, Result);
+    return;
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
@@ -294,8 +296,10 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    const SourceFile &SF = *TU->MainSourceFile;
-    return SF.getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      SF->getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
+    return;
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
@@ -310,8 +314,10 @@ void Module::lookupClassMembers(AccessPathTy accessPath,
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    const SourceFile &SF = *TU->MainSourceFile;
-    return SF.getCache().lookupClassMembers(accessPath, consumer, SF);
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      SF->getCache().lookupClassMembers(accessPath, consumer, *SF);
+    return;
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
@@ -327,8 +333,10 @@ void Module::lookupClassMember(AccessPathTy accessPath,
   }
   
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    const SourceFile &SF = *TU->MainSourceFile;
-    return SF.getCache().lookupClassMember(accessPath, name, results, SF);
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      SF->getCache().lookupClassMember(accessPath, name, results, *SF);
+    return;
   }
   
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
@@ -341,8 +349,9 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    Results.append(TU->MainSourceFile->Decls.begin(),
-                   TU->MainSourceFile->Decls.end());
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      Results.append(SF->Decls.begin(), SF->Decls.end());
     return;
   }
 
@@ -807,8 +816,9 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
   }
   
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    results.append(TU->MainSourceFile->Decls.begin(),
-                   TU->MainSourceFile->Decls.end());
+    // FIXME: Access control.
+    for (const SourceFile *SF : TU->getSourceFiles())
+      results.append(SF->Decls.begin(), SF->Decls.end());
     return;
   }
   
@@ -830,11 +840,13 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
-Optional<OP_DECL *> lookupOperatorDeclForName(SourceFile &SF,
+Optional<OP_DECL *> lookupOperatorDeclForName(const SourceFile &SF,
     SourceLoc Loc,
     Identifier Name,
     IdentifierMap<OP_DECL *> SourceFile::*OP_MAP)
 {
+  assert(SF.ASTStage >= SourceFile::NameBound);
+
   // Look for an operator declaration in the current module.
   auto found = (SF.*OP_MAP).find(Name);
   if (found != (SF.*OP_MAP).end())
@@ -852,11 +864,15 @@ Optional<OP_DECL *> lookupOperatorDeclForName(SourceFile &SF,
     if (OP_DECL *op = *maybeOp)
       importedOperators.insert(op);
   }
+
+  // FIXME: By caching our lookup, we are implicitly re-exporting the operator,
+  // and in a non-predictable way. Yuck.
+  auto &mutableOpMap = const_cast<IdentifierMap<OP_DECL *> &>(SF.*OP_MAP);
   
   // Return early if we didn't find anything.
   if (importedOperators.empty()) {
     // Cache the mapping so we don't need to troll imports next time.
-    (SF.*OP_MAP)[Name] = nullptr;
+    mutableOpMap[Name] = nullptr;
     return nullptr;
   }
 
@@ -875,7 +891,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(SourceFile &SF,
     }
   }
   // Cache the mapping so we don't need to troll imports next time.
-  (SF.*OP_MAP)[Name] = first;
+  mutableOpMap[Name] = first;
   return first;
 }
 
@@ -891,7 +907,21 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   auto *TU = dyn_cast<TranslationUnit>(M);
   if (!TU)
     return nullptr;
-  return lookupOperatorDeclForName(*TU->MainSourceFile, Loc, Name, OP_MAP);
+
+  // FIXME: Access control.
+  OP_DECL *result = nullptr;
+  for (const SourceFile *SF : TU->getSourceFiles()) {
+    auto next = lookupOperatorDeclForName(*SF, Loc, Name, OP_MAP);
+    if (!next.hasValue())
+      return next;
+
+    // FIXME: Diagnose ambiguity.
+    if (*next && result)
+      return Nothing;
+    if (*next)
+      result = *next;
+  }
+  return result;
 }
 
 } // end anonymous namespace
@@ -925,9 +955,10 @@ Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     return;
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (auto importPair : TU->MainSourceFile->getImports())
-      if (includePrivate || importPair.second)
-        modules.push_back(importPair.first);
+    for (auto SF : TU->getSourceFiles())
+      for (auto importPair : SF->getImports())
+        if (includePrivate || importPair.second)
+          modules.push_back(importPair.first);
     return;
   }
 
@@ -969,8 +1000,10 @@ StringRef Module::getModuleFilename() const {
     return StringRef();
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    if (auto ID = TU->MainSourceFile->getImportBufferID())
-      return Ctx.SourceMgr->getMemoryBuffer(*ID)->getBufferIdentifier();
+    // FIXME: Figure out what the right intent is here.
+    if (TU->getSourceFiles().size() == 1)
+      if (auto ID = TU->getSourceFiles().front()->getImportBufferID())
+        return Ctx.SourceMgr->getMemoryBuffer(*ID)->getBufferIdentifier();
     return StringRef();
   }
 
@@ -1083,7 +1116,11 @@ SourceFile::getCachedVisibleDecls() const {
 }
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
-  return MainSourceFile->walk(Walker);
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
+  for (auto SF : getSourceFiles())
+    if (SF->walk(Walker))
+      return true;
+  return false;
 }
 
 static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {

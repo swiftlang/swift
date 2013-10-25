@@ -135,7 +135,7 @@ Module *TypeChecker::getStdlibModule() {
     // module.
     for (auto &entry : Context.LoadedModules) {
       if (auto TU = dyn_cast_or_null<TranslationUnit>(entry.getValue()))
-        if (!TU->MainSourceFile->getImportBufferID().hasValue())
+        if (!TU->getSourceFiles().front()->getImportBufferID().hasValue())
           StdlibModule = TU;
     }
     assert(StdlibModule && "no main module found");
@@ -481,14 +481,16 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
     if (!importTU)
       return;
     // FIXME: Respect the access path?
-    for (auto D : importTU->MainSourceFile->Decls) {
-      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        bindExtensionDecl(ED, TC);
-        if (mayConformToKnownProtocol(ED))
-          TC.validateDecl(ED->getExtendedType()->getAnyNominal());
-      } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-        if (mayConformToKnownProtocol(nominal))
-          TC.validateDecl(nominal);
+    for (auto SF : importTU->getSourceFiles()) {
+      for (auto D : SF->Decls) {
+        if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+          bindExtensionDecl(ED, TC);
+          if (mayConformToKnownProtocol(ED))
+            TC.validateDecl(ED->getExtendedType()->getAnyNominal());
+        } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+          if (mayConformToKnownProtocol(nominal))
+            TC.validateDecl(nominal);
+        }
       }
     }
   });

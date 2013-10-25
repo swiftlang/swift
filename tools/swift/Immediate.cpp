@@ -1025,7 +1025,7 @@ public:
   REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine)
-    : CI(CI), REPLInputFile(*CI.getTU()->MainSourceFile),
+    : CI(CI), REPLInputFile(CI.getTU()->getMainSourceFile(SourceFile::REPL)),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),

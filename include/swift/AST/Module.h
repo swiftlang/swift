@@ -27,6 +27,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace clang {
   class Module;
@@ -361,19 +362,8 @@ public:
   template <typename T>
   using IdentifierMap = llvm::DenseMap<Identifier, T>;
 
-  /// A map of operator names to InfixOperatorDecls.
-  /// Populated during name binding; the mapping will be incomplete until name
-  /// binding is complete.
   IdentifierMap<InfixOperatorDecl*> InfixOperators;
-
-  /// A map of operator names to PostfixOperatorDecls.
-  /// Populated during name binding; the mapping will be incomplete until name
-  /// binding is complete.
   IdentifierMap<PostfixOperatorDecl*> PostfixOperators;
-
-  /// A map of operator names to PrefixOperatorDecls.
-  /// Populated during name binding; the mapping will be incomplete until name
-  /// binding is complete.
   IdentifierMap<PrefixOperatorDecl*> PrefixOperators;
 
   enum SourceKind {
@@ -399,8 +389,10 @@ public:
   };
 
   /// Defines what phases of parsing and semantic analysis are complete for a
-  /// source file.  This should only be used for assertions and verification
-  /// purposes.
+  /// source file.
+  ///
+  /// Only files that have been fully processed (i.e. type-checked) will be
+  /// forwarded on to IRGen.
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> ImportID,
@@ -497,12 +489,34 @@ class TranslationUnit : public Module {
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
 
-public:
-  // FIXME: Make private or eliminate altogether.
-  SourceFile *MainSourceFile;
+  TinyPtrVector<SourceFile *> SourceFiles;
 
+public:
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(ModuleKind::TranslationUnit, Name, C) {
+  }
+
+  ArrayRef<SourceFile *> getSourceFiles() {
+    return SourceFiles;
+  }
+  ArrayRef<const SourceFile *> getSourceFiles() const {
+    return { SourceFiles.begin(), SourceFiles.size() };
+  }
+
+  void addSourceFile(SourceFile &newFile) {
+    // Require Main and REPL files to be the first file added.
+    assert(SourceFiles.empty() ||
+           newFile.Kind == SourceFile::Library ||
+           newFile.Kind == SourceFile::SIL);
+    SourceFiles.push_back(&newFile);
+  }
+
+  /// Convenience accessor for clients that know what kind of file they're
+  /// dealing with.
+  SourceFile &getMainSourceFile(SourceFile::SourceKind expectedKind) const {
+    assert(!SourceFiles.empty() && "No files added yet");
+    assert(SourceFiles.front()->Kind == expectedKind);
+    return *SourceFiles.front();
   }
 
   ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
