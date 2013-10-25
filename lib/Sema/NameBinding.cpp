@@ -261,16 +261,19 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
 
 template<typename OP_DECL>
 static void insertOperatorDecl(NameBinder &Binder,
-                               SourceFile::IdentifierMap<OP_DECL*> &Operators,
+                               SourceFile::OperatorMap<OP_DECL*> &Operators,
                                OP_DECL *OpDecl) {
   auto previousDecl = Operators.find(OpDecl->getName());
   if (previousDecl != Operators.end()) {
     Binder.diagnose(OpDecl->getLoc(), diag::operator_redeclared);
-    Binder.diagnose(previousDecl->second, diag::previous_operator_decl);
+    Binder.diagnose(previousDecl->second.getPointer(),
+                    diag::previous_operator_decl);
     return;
   }
-  
-  Operators[OpDecl->getName()] = OpDecl;
+
+  // FIXME: The second argument indicates whether the given operator is visible
+  // outside the current file.
+  Operators[OpDecl->getName()] = { OpDecl, true };
 }
 
 namespace {

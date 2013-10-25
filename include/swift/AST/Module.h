@@ -360,11 +360,11 @@ public:
   std::vector<Decl*> Decls;
 
   template <typename T>
-  using IdentifierMap = llvm::DenseMap<Identifier, T>;
+  using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
 
-  IdentifierMap<InfixOperatorDecl*> InfixOperators;
-  IdentifierMap<PostfixOperatorDecl*> PostfixOperators;
-  IdentifierMap<PrefixOperatorDecl*> PrefixOperators;
+  OperatorMap<InfixOperatorDecl*> InfixOperators;
+  OperatorMap<PostfixOperatorDecl*> PostfixOperators;
+  OperatorMap<PrefixOperatorDecl*> PrefixOperators;
 
   enum SourceKind {
     Library,  ///< A normal .swift file.

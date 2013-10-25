@@ -829,77 +829,85 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
 namespace {
 
 template <typename T>
-using IdentifierMap = SourceFile::IdentifierMap<T>;
+using OperatorMap = SourceFile::OperatorMap<T>;
 
 template<typename OP_DECL>
-Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
-    SourceLoc Loc,
-    Identifier Name,
-    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP);
+Optional<OP_DECL *>
+lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
+                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP);
 
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
-Optional<OP_DECL *> lookupOperatorDeclForName(const SourceFile &SF,
-    SourceLoc Loc,
-    Identifier Name,
-    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP)
+Optional<OP_DECL *>
+lookupOperatorDeclForName(const SourceFile &SF, SourceLoc Loc, Identifier Name,
+                          bool includePrivate,
+                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   assert(SF.ASTStage >= SourceFile::NameBound);
 
   // Look for an operator declaration in the current module.
   auto found = (SF.*OP_MAP).find(Name);
-  if (found != (SF.*OP_MAP).end())
-    return found->second;
+  if (found != (SF.*OP_MAP).end() && (includePrivate || found->second.getInt()))
+    return found->second.getPointer();
   
   // Look for imported operator decls.
-  
-  llvm::DenseSet<OP_DECL*> importedOperators;
+  // Record whether they come from re-exported modules.
+  // FIXME: We ought to prefer operators elsewhere in this TU before we check
+  // imports.
+  llvm::SmallDenseMap<OP_DECL*, bool, 16> importedOperators;
   for (auto &imported : SF.getImports()) {
+    if (!includePrivate && !imported.second)
+      continue;
+
     Optional<OP_DECL *> maybeOp
       = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
       return Nothing;
     
     if (OP_DECL *op = *maybeOp)
-      importedOperators.insert(op);
+      importedOperators[op] |= imported.second;
   }
 
-  // FIXME: By caching our lookup, we are implicitly re-exporting the operator,
-  // and in a non-predictable way. Yuck.
-  auto &mutableOpMap = const_cast<IdentifierMap<OP_DECL *> &>(SF.*OP_MAP);
+  typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
   
-  // Return early if we didn't find anything.
-  if (importedOperators.empty()) {
-    // Cache the mapping so we don't need to troll imports next time.
-    mutableOpMap[Name] = nullptr;
-    return nullptr;
+  if (!importedOperators.empty()) {
+    // Check for conflicts.
+    auto i = importedOperators.begin(), end = importedOperators.end();
+    auto start = i;
+    for (++i; i != end; ++i) {
+      if (i->first->conflictsWith(start->first)) {
+        if (Loc.isValid()) {
+          ASTContext &C = SF.TU.getASTContext();
+          C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
+          C.Diags.diagnose(start->first->getLoc(),
+                           diag::found_this_operator_decl);
+          C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
+        }
+        return Nothing;
+      }
+    }
+    result = { start->first, start->second };
   }
 
-  // Otherwise, check for conflicts.
-  auto i = importedOperators.begin(), end = importedOperators.end();
-  OP_DECL *first = *i;
-  for (++i; i != end; ++i) {
-    if ((*i)->conflictsWith(first)) {
-      if (Loc.isValid()) {
-        ASTContext &C = SF.TU.getASTContext();
-        C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
-        C.Diags.diagnose(first->getLoc(), diag::found_this_operator_decl);
-        C.Diags.diagnose((*i)->getLoc(), diag::found_this_operator_decl);
-      }
-      return Nothing;
-    }
+  if (includePrivate) {
+    // Cache the mapping so we don't need to troll imports next time.
+    // It's not safe to cache the non-private results because we didn't search
+    // private imports there, but in most non-private cases the result will
+    // be cached in the final lookup.
+    auto &mutableOpMap = const_cast<OperatorMap<OP_DECL *> &>(SF.*OP_MAP);
+    mutableOpMap[Name] = result;
   }
-  // Cache the mapping so we don't need to troll imports next time.
-  mutableOpMap[Name] = first;
-  return first;
+
+  if (includePrivate || result.getInt())
+    return result.getPointer();
+  return nullptr;
 }
 
 template<typename OP_DECL>
-Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
-    SourceLoc Loc,
-    Identifier Name,
-    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP)
+Optional<OP_DECL *>
+lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
+                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   if (auto loadedModule = dyn_cast<LoadedModule>(M))
     return loadedModule->lookupOperator<OP_DECL>(Name);
@@ -908,10 +916,9 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   if (!TU)
     return nullptr;
 
-  // FIXME: Access control.
   OP_DECL *result = nullptr;
   for (const SourceFile *SF : TU->getSourceFiles()) {
-    auto next = lookupOperatorDeclForName(*SF, Loc, Name, OP_MAP);
+    auto next = lookupOperatorDeclForName(*SF, Loc, Name, false, OP_MAP);
     if (!next.hasValue())
       return next;
 
@@ -935,7 +942,7 @@ Module::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
 } \
 Kind##OperatorDecl * \
 SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
-  auto result = lookupOperatorDeclForName(*this, loc, name, \
+  auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
   if (result.hasValue() && !result.getValue()) \
     result = lookupOperatorDeclForName(&TU, loc, name, \
