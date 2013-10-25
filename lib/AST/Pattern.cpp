@@ -77,11 +77,6 @@ inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
 
 void Pattern::setType(Type ty) {
-  assert(!hasType() || 
-         ty->is<ErrorType>() ||
-         ty->getWithoutDefaultArgs(ty->getASTContext())->isEqual(
-           Ty->getWithoutDefaultArgs(Ty->getASTContext())));
-
   Ty = ty;
 }
 

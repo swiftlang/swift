@@ -618,8 +618,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     Type Ty;
     auto AttrTyR = cast<AttributedTypeRepr>(TyR);
     
-    Ty = resolveType(AttrTyR->getTypeRepr(), DC,
-                     /*FIXME:allowUnboundGenerics=*/false,
+    Ty = resolveType(AttrTyR->getTypeRepr(), DC, allowUnboundGenerics,
                      resolver);
     if (Ty->is<ErrorType>())
       return Ty;
@@ -728,13 +727,11 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   case TypeReprKind::Function: {
     auto FnTyR = cast<FunctionTypeRepr>(TyR);
     Type inputTy = resolveType(FnTyR->getArgsTypeRepr(), DC,
-                               /*FIXME:allowUnboundGenerics=*/false,
-                               resolver);
+                               allowUnboundGenerics, resolver);
     if (inputTy->is<ErrorType>())
       return inputTy;
     Type outputTy = resolveType(FnTyR->getResultTypeRepr(), DC,
-                                /*FIXME:allowUnboundGenerics=*/false,
-                                resolver);
+                                allowUnboundGenerics, resolver);
     if (outputTy->is<ErrorType>())
       return outputTy;
     return FunctionType::get(inputTy, outputTy, Context);
@@ -743,8 +740,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   case TypeReprKind::Array: {
     // FIXME: diagnose non-materializability of element type!
     auto ArrTyR = cast<ArrayTypeRepr>(TyR);
-    Type baseTy = resolveType(ArrTyR->getBase(), DC,
-                              /*FIXME:allowUnboundGenerics=*/false,
+    Type baseTy = resolveType(ArrTyR->getBase(), DC, allowUnboundGenerics,
                               resolver);
     if (baseTy->is<ErrorType>())
       return baseTy;
@@ -767,8 +763,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   case TypeReprKind::Optional: {
     // FIXME: diagnose non-materializability of element type!
     auto optTyR = cast<OptionalTypeRepr>(TyR);
-    Type baseTy = resolveType(optTyR->getBase(), DC,
-                              /*FIXME:allowUnboundGenerics=*/false,
+    Type baseTy = resolveType(optTyR->getBase(), DC, allowUnboundGenerics,
                               resolver);
     if (baseTy->is<ErrorType>())
       return baseTy;
@@ -786,15 +781,12 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     for (auto tyR : TupTyR->getElements()) {
       if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
         Type ty = resolveType(namedTyR->getTypeRepr(), DC,
-                              /*FIXME:allowUnboundGenerics=*/false,
-                              resolver);
+                              allowUnboundGenerics, resolver);
         if (ty->is<ErrorType>())
           return ty;
         Elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
       } else {
-        Type ty = resolveType(tyR, DC,
-                              /*FIXME:allowUnboundGenerics=*/false,
-                              resolver);
+        Type ty = resolveType(tyR, DC, allowUnboundGenerics, resolver);
         if (ty->is<ErrorType>())
           return ty;
         Elements.push_back(TupleTypeElt(ty));
@@ -821,8 +813,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     auto ProtTyR = cast<ProtocolCompositionTypeRepr>(TyR);
     SmallVector<Type, 4> ProtocolTypes;
     for (auto tyR : ProtTyR->getProtocols()) {
-      Type ty = resolveType(tyR, DC, /*FIXME:allowUnboundGenerics=*/false,
-                            resolver);
+      Type ty = resolveType(tyR, DC, /*allowUnboundGenerics=*/false, resolver);
       if (ty->is<ErrorType>())
         return ty;
       if (!ty->isExistentialType()) {
@@ -849,8 +840,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
   case TypeReprKind::MetaType: {
     Type ty = resolveType(cast<MetaTypeTypeRepr>(TyR)->getBase(), DC,
-                          /*FIXME:allowUnboundGenerics=*/false,
-                          resolver);
+                          allowUnboundGenerics, resolver);
     if (ty->is<ErrorType>())
       return ty;
     return MetaTypeType::get(ty, Context);

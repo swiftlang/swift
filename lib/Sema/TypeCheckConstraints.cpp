@@ -4173,7 +4173,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   }
 
   // Apply the solution to the pattern as well.
-  if (coerceToType(pattern, dc, init->getType())) {
+  if (coerceToType(pattern, dc, init->getType(), /*allowOverride=*/true)) {
     return true;
   }
 

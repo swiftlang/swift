@@ -1,3 +1,11 @@
+2013-10-30
+----------
+
+* Type inference can now infer the generic arguments from context:
+
+    var dict : Dictionary = ["Hello" : 1, "World" : 2] // infers Dictionary<String, Int>
+
+
 2013-10-23
 ----------
 

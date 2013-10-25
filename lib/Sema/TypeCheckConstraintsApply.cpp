@@ -1980,7 +1980,7 @@ namespace {
         // Just perform the coercion directly, wrapping in an optional to
         // preserve the expected type of 'as'.
         auto coerced = coerceToType(expr->getSubExpr(), toType,
-                            cs.getConstraintLocator(expr, { }));
+                                    cs.getConstraintLocator(expr, { }));
         return new (cs.getASTContext())
           InjectIntoOptionalExpr(coerced,
                                  OptionalType::get(toType, cs.getASTContext()));
@@ -3337,7 +3337,8 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
         Pattern *params = closure->getParams();
-        if (tc.coerceToType(params, closure, fnType->getInput()))
+        if (tc.coerceToType(params, closure, fnType->getInput(),
+                            /*allowOverride=*/true))
           return { false, nullptr };
         closure->setParams(params);
 
