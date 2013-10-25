@@ -1529,14 +1529,10 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
-    auto &module = *FD->getModuleContext();
+    SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().isPrefix()) {
-        if (auto maybeOp = module.lookupPrefixOperator(FD->getName(),
-                                                       FD->getLoc()))
-          op = *maybeOp;
-        else
-          return;
+        op = SF.lookupPrefixOperator(FD->getName(), FD->getLoc());
       } else if (FD->getAttrs().isPostfix()) {
         // Postfix '!' is reserved.
         if (FD->getName().str().equals("!")) {
@@ -1544,16 +1540,10 @@ public:
           return;
         }
 
-        if (auto maybeOp = module.lookupPostfixOperator(FD->getName(),
-                                                        FD->getLoc()))
-          op = *maybeOp;
-        else
-          return;
+        op = SF.lookupPostfixOperator(FD->getName(),FD->getLoc());
       } else {
-        auto prefixOp = module.lookupPrefixOperator(FD->getName(),
-                                                    FD->getLoc());
-        auto postfixOp = module.lookupPostfixOperator(FD->getName(),
-                                                      FD->getLoc());
+        auto prefixOp = SF.lookupPrefixOperator(FD->getName(), FD->getLoc());
+        auto postfixOp = SF.lookupPostfixOperator(FD->getName(), FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
         // complain. We can't fix this situation.
@@ -1564,10 +1554,10 @@ public:
           if (prefixOp) {
             SourceLoc insertionLoc = FD->getLoc();
 
-            TC.diagnose(*prefixOp, diag::unary_operator_declaration_here,false)
-              .fixItInsert(insertionLoc, "[prefix] ");
-            TC.diagnose(*postfixOp, diag::unary_operator_declaration_here, true)
-              .fixItInsert(insertionLoc, "[postfix] ");
+            TC.diagnose(prefixOp, diag::unary_operator_declaration_here,false)
+              .fixItInsert(insertionLoc, "@prefix ");
+            TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+              .fixItInsert(insertionLoc, "@postfix ");
           } else {
             // FIXME: Introduce a Fix-It that adds the operator declaration?
           }
@@ -1585,11 +1575,11 @@ public:
         const char *insertionText;
         if (postfixOp) {
           insertionText = "@postfix ";
-          op = *postfixOp;
+          op = postfixOp;
           FD->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
         } else {
           insertionText = "@prefix ";
-          op = *prefixOp;
+          op = prefixOp;
           FD->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
         }
 
@@ -1601,19 +1591,18 @@ public:
                     static_cast<bool>(postfixOp));
       }
     } else if (FD->isBinaryOperator()) {
-      if (auto maybeOp = module.lookupInfixOperator(FD->getName(), FD->getLoc()))
-        op = *maybeOp;
-      else {
-        // FIXME: Add Fix-It introducing an operator declaration?
-        TC.diagnose(FD, diag::declared_operator_without_operator_decl);
-        return;
-      }
+      op = SF.lookupInfixOperator(FD->getName(), FD->getLoc());
     } else {
       TC.diagnose(FD, diag::invalid_arg_count_for_operator);
       return;
     }
 
-    assert(op && "Should have computed operator above");
+    if (!op) {
+      // FIXME: Add Fix-It introducing an operator declaration?
+      TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+      return;
+    }
+
     FD->setOperatorDecl(op);
   }
 

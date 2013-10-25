@@ -821,8 +821,64 @@ namespace {
 template <typename T>
 using IdentifierMap = SourceFile::IdentifierMap<T>;
 
+template<typename OP_DECL>
+Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
+    SourceLoc Loc,
+    Identifier Name,
+    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP);
+
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
+template<typename OP_DECL>
+Optional<OP_DECL *> lookupOperatorDeclForName(SourceFile &SF,
+    SourceLoc Loc,
+    Identifier Name,
+    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP)
+{
+  // Look for an operator declaration in the current module.
+  auto found = (SF.*OP_MAP).find(Name);
+  if (found != (SF.*OP_MAP).end())
+    return found->second;
+  
+  // Look for imported operator decls.
+  
+  llvm::DenseSet<OP_DECL*> importedOperators;
+  for (auto &imported : SF.getImports()) {
+    Optional<OP_DECL *> maybeOp
+      = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
+    if (!maybeOp)
+      return Nothing;
+    
+    if (OP_DECL *op = *maybeOp)
+      importedOperators.insert(op);
+  }
+  
+  // Return early if we didn't find anything.
+  if (importedOperators.empty()) {
+    // Cache the mapping so we don't need to troll imports next time.
+    (SF.*OP_MAP)[Name] = nullptr;
+    return nullptr;
+  }
+
+  // Otherwise, check for conflicts.
+  auto i = importedOperators.begin(), end = importedOperators.end();
+  OP_DECL *first = *i;
+  for (++i; i != end; ++i) {
+    if ((*i)->conflictsWith(first)) {
+      if (Loc.isValid()) {
+        ASTContext &C = SF.TU.getASTContext();
+        C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
+        C.Diags.diagnose(first->getLoc(), diag::found_this_operator_decl);
+        C.Diags.diagnose((*i)->getLoc(), diag::found_this_operator_decl);
+      }
+      return Nothing;
+    }
+  }
+  // Cache the mapping so we don't need to troll imports next time.
+  (SF.*OP_MAP)[Name] = first;
+  return first;
+}
+
 template<typename OP_DECL>
 Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     SourceLoc Loc,
@@ -834,76 +890,33 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
 
   auto *TU = dyn_cast<TranslationUnit>(M);
   if (!TU)
-    return Nothing;
-
-  // Look for an operator declaration in the current module.
-  auto found = (TU->MainSourceFile->*OP_MAP).find(Name);
-  if (found != (TU->MainSourceFile->*OP_MAP).end())
-    return found->second ? Optional<OP_DECL *>(found->second) : Nothing;
-  
-  // Look for imported operator decls.
-  
-  llvm::DenseSet<OP_DECL*> importedOperators;
-  for (auto &imported : TU->MainSourceFile->getImports()) {
-    Optional<OP_DECL *> maybeOp
-      = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
-    if (!maybeOp)
-      return Nothing;
-    
-    if (OP_DECL *op = *maybeOp)
-      importedOperators.insert(op);
-  }
-  
-  // If we found a single import, use it.
-  if (importedOperators.empty()) {
-    // Cache the mapping so we don't need to troll imports next time.
-    (TU->MainSourceFile->*OP_MAP)[Name] = nullptr;
-    return Nothing;
-  }
-  if (importedOperators.size() == 1) {
-    // Cache the mapping so we don't need to troll imports next time.
-    OP_DECL *result = *importedOperators.begin();
-    (TU->MainSourceFile->*OP_MAP)[Name] = result;
-    return result;
-  }
-  
-  // Otherwise, check for conflicts.
-  auto i = importedOperators.begin(), end = importedOperators.end();
-  OP_DECL *first = *i;
-  for (++i; i != end; ++i) {
-    if ((*i)->conflictsWith(first)) {
-      if (Loc.isValid()) {
-        ASTContext &C = M->getASTContext();
-        C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
-        C.Diags.diagnose(first->getLoc(), diag::found_this_operator_decl);
-        C.Diags.diagnose((*i)->getLoc(), diag::found_this_operator_decl);
-      }
-      return Nothing;
-    }
-  }
-  // Cache the mapping so we don't need to troll imports next time.
-  (TU->MainSourceFile->*OP_MAP)[Name] = first;
-  return first;
+    return nullptr;
+  return lookupOperatorDeclForName(*TU->MainSourceFile, Loc, Name, OP_MAP);
 }
+
 } // end anonymous namespace
 
-Optional<PrefixOperatorDecl *> Module::lookupPrefixOperator(Identifier name,
-                                                            SourceLoc diagLoc) {
-  return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &SourceFile::PrefixOperators);
+#define LOOKUP_OPERATOR(Kind) \
+Kind##OperatorDecl * \
+Module::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
+  auto result = lookupOperatorDeclForName(this, loc, name, \
+                                          &SourceFile::Kind##Operators); \
+  return result ? *result : nullptr; \
+} \
+Kind##OperatorDecl * \
+SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
+  auto result = lookupOperatorDeclForName(*this, loc, name, \
+                                          &SourceFile::Kind##Operators); \
+  if (result.hasValue() && !result.getValue()) \
+    result = lookupOperatorDeclForName(&TU, loc, name, \
+                                       &SourceFile::Kind##Operators); \
+  return result ? *result : nullptr; \
 }
 
-Optional<PostfixOperatorDecl *> Module::lookupPostfixOperator(Identifier name,
-                                                            SourceLoc diagLoc) {
-  return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &SourceFile::PostfixOperators);
-}
-
-Optional<InfixOperatorDecl *> Module::lookupInfixOperator(Identifier name,
-                                                          SourceLoc diagLoc) {
-  return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &SourceFile::InfixOperators);
-}
+LOOKUP_OPERATOR(Prefix)
+LOOKUP_OPERATOR(Infix)
+LOOKUP_OPERATOR(Postfix)
+#undef LOOKUP_OPERATOR
 
 void
 Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,

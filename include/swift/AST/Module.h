@@ -186,28 +186,18 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls);
 
-  /// Look up an InfixOperatorDecl for the given operator
-  /// name in this module (which must be NameBound) and return it, or return
-  /// null if there is no operator decl. Returns Nothing if there was an error
-  /// resolving the operator name (such as if there were conflicting importing
-  /// operator declarations).
-  Optional<InfixOperatorDecl *> lookupInfixOperator(Identifier name,
-                                              SourceLoc diagLoc = SourceLoc());
-  
-  /// Look up an PrefixOperatorDecl for the given operator
-  /// name in this module (which must be NameBound) and return it, or return
-  /// null if there is no operator decl. Returns Nothing if there was an error
-  /// resolving the operator name (such as if there were conflicting importing
-  /// operator declarations).
-  Optional<PrefixOperatorDecl *> lookupPrefixOperator(Identifier name,
-                                              SourceLoc diagLoc = SourceLoc());
-  /// Look up an PostfixOperatorDecl for the given operator
-  /// name in this module (which must be NameBound) and return it, or return
-  /// null if there is no operator decl. Returns Nothing if there was an error
-  /// resolving the operator name (such as if there were conflicting importing
-  /// operator declarations).
-  Optional<PostfixOperatorDecl *> lookupPostfixOperator(Identifier name,
-                                              SourceLoc diagLoc = SourceLoc());
+  /// @{
+
+  /// Look up the given operator in this module.
+  ///
+  /// If the operator is not found, or if there is an ambiguity, returns null.
+  InfixOperatorDecl *lookupInfixOperator(Identifier name,
+                                         SourceLoc diagLoc = {});
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name,
+                                           SourceLoc diagLoc = {});
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
+                                             SourceLoc diagLoc = {});
+  /// @}
 
   /// Finds all class members defined in this module.
   ///
@@ -434,6 +424,20 @@ public:
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
+
+  /// @{
+
+  /// Look up the given operator in this file.
+  ///
+  /// The file must be name-bound already. If the operator is not found, or if
+  /// there is an ambiguity, returns null.
+  InfixOperatorDecl *lookupInfixOperator(Identifier name,
+                                         SourceLoc diagLoc = {});
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name,
+                                           SourceLoc diagLoc = {});
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
+                                             SourceLoc diagLoc = {});
+  /// @}
 
   /// \brief The buffer ID for the file that was imported as this TU, or Nothing
   /// if this is not an imported TU.

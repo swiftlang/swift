@@ -1705,18 +1705,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
       switch (expectedTypeID) {
       case OperatorKind::Infix: {
-        auto op = M->lookupInfixOperator(opName);
-        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        declOrOffset = M->lookupInfixOperator(opName);
         break;
       }
       case OperatorKind::Prefix: {
-        auto op = M->lookupPrefixOperator(opName);
-        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        declOrOffset = M->lookupPrefixOperator(opName);
         break;
       }
       case OperatorKind::Postfix: {
-        auto op = M->lookupPostfixOperator(opName);
-        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        declOrOffset = M->lookupPostfixOperator(opName);
         break;
       }
       default:

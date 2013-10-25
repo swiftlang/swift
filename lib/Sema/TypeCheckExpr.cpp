@@ -143,40 +143,33 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     (void)ifExpr;
     return InfixData(100, Associativity::Right);
+
   } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
     return InfixData(90, Associativity::Right);
+
   } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
     return InfixData(95, Associativity::None);
+
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Module *mod = DC->getParentModule();
-    Optional<InfixOperatorDecl *> maybeOp
-      = mod->lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc());
-    if (maybeOp) {
-      if (auto *op = *maybeOp)
-        return op->getInfixData();
-      TC.diagnose(DRE->getLoc(), diag::unknown_binop);
-    }
+    SourceFile *SF = DC->getParentSourceFile();
+    Identifier name = DRE->getDecl()->getName();
+    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, E->getLoc()))
+      return op->getInfixData();
+
   } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Module *mod = DC->getParentModule();
+    SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
-    Optional<InfixOperatorDecl*> maybeOp
-      = mod->lookupInfixOperator(name, E->getLoc());
-    if (maybeOp) {
-      if (auto *op = *maybeOp)
-        return op->getInfixData();
-      TC.diagnose(OO->getLoc(), diag::unknown_binop);
-    }
-  // Otherwise, complain.
-  } else {
-    TC.diagnose(E->getLoc(), diag::unknown_binop);
+    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, E->getLoc()))
+      return op->getInfixData();
   }
   
+  TC.diagnose(E->getLoc(), diag::unknown_binop);
   // Recover with an infinite-precedence left-associative operator.
   return InfixData((unsigned char)~0U, Associativity::Left);
 }
