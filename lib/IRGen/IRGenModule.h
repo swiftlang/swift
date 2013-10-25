@@ -292,7 +292,7 @@ public:
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
-  void finalizeDebugInfo();
+  void finalize();
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -362,7 +362,7 @@ public:
 
 //--- Global context emission --------------------------------------------------
 public:
-  void emitGlobalTopLevel(SourceFile &SF, unsigned StartElem);
+  void emitGlobalTopLevel();
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);

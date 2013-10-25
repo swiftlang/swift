@@ -302,7 +302,8 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
-void IRGenModule::finalizeDebugInfo() {
+void IRGenModule::finalize() {
+  emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
 }

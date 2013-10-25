@@ -259,78 +259,13 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
-  /// Emit all the code from the SIL module and declarations.
-  emitGlobalTopLevel(SF, StartElem);
-  
+  // Emit types and other global decls.
+  for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
+    emitGlobalDecl(SF.Decls[i]);
+
+  // FIXME: All SourceFiles currently write the same top_level_code.
   llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
-  assert(topLevelCodeFn && "no top_level_code in SIL module?!");
-  
-  Type emptyTuple = TupleType::getEmpty(Context);
-  auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
-  Pattern *params[] = {
-    TuplePattern::create(Context, SourceLoc(),
-                         ArrayRef<TuplePatternElt>(), SourceLoc())
-  };
-  params[0]->setType(TupleType::getEmpty(Context));
 
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType =
-      getFunctionType(AbstractCC::Freestanding,
-                      unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
-                      attrs);
-  llvm::Function *initFn = nullptr;
-  if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
-    // Create a global initializer for library modules.
-    // FIXME: If there is more than one source file, the names will collide.
-    // FIXME: This is completely, utterly, wrong -- we don't want library
-    // initializers anyway.
-    initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    SF.TU.Name.str() + ".init", &Module);
-    initFn->setAttributes(attrs);
-    
-    // Insert a call to the top_level_code symbol from the SIL module.
-    IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
-    if (DebugInfo)
-      DebugInfo->emitArtificialFunction(initIGF, initFn);
-
-    initIGF.Builder.CreateCall(topLevelCodeFn);
-    initIGF.Builder.CreateRetVoid();
-  }
-  
-  SmallVector<llvm::Constant *, 2> allInits;
-  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
-    // We don't need global init to call main().
-  } else if (isTrivialGlobalInit(topLevelCodeFn)) {
-    // Not all translation units need a global initialization function.
-    initFn->eraseFromParent();
-    topLevelCodeFn->eraseFromParent();
-  } else {
-    // Build the initializer for the module.
-    llvm::Constant *initAndPriority[] = {
-      llvm::ConstantInt::get(Int32Ty, 1),
-      initFn
-    };
-    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
-                                                     initAndPriority));
-  }
-
-  if (!allInits.empty()) {
-    llvm::ArrayType *initListType =
-      llvm::ArrayType::get(allInits[0]->getType(), allInits.size());
-    llvm::Constant *globalInits =
-      llvm::ConstantArray::get(initListType, allInits);
-
-    // Add this as a global initializer.
-    (void) new llvm::GlobalVariable(Module,
-                                    globalInits->getType(),
-                                    /*is constant*/ false,
-                                    llvm::GlobalValue::AppendingLinkage,
-                                    globalInits,
-                                    "llvm.global_ctors");
-  }
-  
-  emitGlobalLists();
-  
   if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
     // Emit main().
     // FIXME: We should only emit this in non-JIT modes.
@@ -413,8 +348,76 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     }
     
     // Call the top-level code.
-    mainIGF.Builder.CreateCall(topLevelCodeFn);
+    if (topLevelCodeFn)
+      mainIGF.Builder.CreateCall(topLevelCodeFn);
     mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
+  }
+
+  if (!topLevelCodeFn)
+    return;
+
+  Type emptyTuple = TupleType::getEmpty(Context);
+  auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
+  Pattern *params[] = {
+    TuplePattern::create(Context, SourceLoc(),
+                         ArrayRef<TuplePatternElt>(), SourceLoc())
+  };
+  params[0]->setType(TupleType::getEmpty(Context));
+
+  llvm::AttributeSet attrs;
+  llvm::FunctionType *fnType =
+      getFunctionType(AbstractCC::Freestanding,
+                      unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
+                      attrs);
+  llvm::Function *initFn = nullptr;
+  if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
+    // Create a global initializer for library modules.
+    // FIXME: If there is more than one source file, the names will collide.
+    // FIXME: This is completely, utterly, wrong -- we don't want library
+    // initializers anyway.
+    initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
+                                    SF.TU.Name.str() + ".init", &Module);
+    initFn->setAttributes(attrs);
+    
+    // Insert a call to the top_level_code symbol from the SIL module.
+    IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
+    if (DebugInfo)
+      DebugInfo->emitArtificialFunction(initIGF, initFn);
+
+    initIGF.Builder.CreateCall(topLevelCodeFn);
+    initIGF.Builder.CreateRetVoid();
+  }
+  
+  SmallVector<llvm::Constant *, 2> allInits;
+  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
+    // We don't need global init to call main().
+  } else if (isTrivialGlobalInit(topLevelCodeFn)) {
+    // Not all translation units need a global initialization function.
+    initFn->eraseFromParent();
+    topLevelCodeFn->eraseFromParent();
+  } else {
+    // Build the initializer for the module.
+    llvm::Constant *initAndPriority[] = {
+      llvm::ConstantInt::get(Int32Ty, 1),
+      initFn
+    };
+    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
+                                                     initAndPriority));
+  }
+
+  if (!allInits.empty()) {
+    llvm::ArrayType *initListType =
+      llvm::ArrayType::get(allInits[0]->getType(), allInits.size());
+    llvm::Constant *globalInits =
+      llvm::ConstantArray::get(initListType, allInits);
+
+    // Add this as a global initializer.
+    (void) new llvm::GlobalVariable(Module,
+                                    globalInits->getType(),
+                                    /*is constant*/ false,
+                                    llvm::GlobalValue::AppendingLinkage,
+                                    globalInits,
+                                    "llvm.global_ctors");
   }
 }
 
@@ -490,7 +493,7 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage);
 }
 
-void IRGenModule::emitGlobalTopLevel(SourceFile &MainFile, unsigned StartElem) {
+void IRGenModule::emitGlobalTopLevel() {
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
     TypeInfo const &ti = getTypeInfo(global->getType());
@@ -500,11 +503,6 @@ void IRGenModule::emitGlobalTopLevel(SourceFile &MainFile, unsigned StartElem) {
   // Emit SIL functions.
   for (SILFunction &f : *SILMod) {
     emitSILFunction(&f);
-  }
-
-  // Emit types and other global decls.
-  for (unsigned i = StartElem, e = MainFile.Decls.size(); i != e; ++i) {
-    emitGlobalDecl(MainFile.Decls[i]);
   }
 
   // Emit the implicit import of the swift standard libary.

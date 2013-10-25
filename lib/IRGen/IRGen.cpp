@@ -165,6 +165,8 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Emit the translation unit.
   IRGenModule IGM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
+  IGM.emitGlobalTopLevel();
+
   if (SF) {
     IGM.emitSourceFile(*SF, StartElem);
   } else {
@@ -174,7 +176,9 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
         IGM.emitSourceFile(*SF, 0);
     }
   }
-  
+
+  IGM.finalize();
+
   // Objective-C image information.
   // Generate module-level named metadata to convey this information to the
   // linker and code-gen.
@@ -193,7 +197,6 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
   // FIXME: Simulator flag.
 
   emitModuleLinkOptions(*Module, TU, Opts.LinkLibraries);
-  IGM.finalizeDebugInfo();
 
   DEBUG(llvm::dbgs() << "module before passes:\n";
         IGM.Module.dump());
