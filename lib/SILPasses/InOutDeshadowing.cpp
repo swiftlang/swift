@@ -81,6 +81,46 @@ static bool hasTrivialElementType(AllocStackInst *Alloc) {
   return M.Types.getTypeLowering(Alloc->getElementType()).isTrivial();
 }
 
+namespace {
+struct CopyAddrParts {
+  bool isSourceOfCopyAddr;  // True if this is the source, false if this is dest
+  SILValue Src, Dest;
+  bool isTakeOfSrc, isInitializationOfDest;
+};
+}
+
+/// isCopyAddrOperation - Check to see if the specied use of an @inout argument
+/// is a copy_addr, or if it is part of a sequence of instructions that
+/// implements copy_addr semantics.  The later can occur when a copy_addr is
+/// exploded to expose the loaded intermediate value.
+static bool isCopyAddrOperation(Operand *UI, CopyAddrParts &Result) {
+  // We can't promote inout arguments used by basic blocks.
+  auto *ArgUser = dyn_cast<SILInstruction>(UI->getUser());
+  if (!ArgUser) {
+    DEBUG(llvm::errs() << "    inout variable used by basic block!\n");
+    return false;
+  }
+  
+  // If this is an explicit copy_addr, collect information and return.
+  if (auto CAI = dyn_cast<CopyAddrInst>(ArgUser)) {
+    Result.isSourceOfCopyAddr = UI->getOperandNumber() == 0;
+    Result.Src = CAI->getSrc();
+    Result.Dest = CAI->getDest();
+    Result.isTakeOfSrc = CAI->isTakeOfSrc();
+    Result.isInitializationOfDest = CAI->isInitializationOfDest();
+    return true;
+  }
+
+  
+  
+  // TODO: We should eventually support extraneous loads, which will occur
+  // in the future (e.g. when rdar://15170149 is implemented).
+  
+  
+  
+  DEBUG(llvm::errs() << "    unknown inout variable user: " << *ArgUser);
+  return false;
+}
 
 
 /// processInOutValue - Walk the use-def list of the inout argument to find uses
@@ -98,33 +138,24 @@ static bool processInOutValue(SILArgument *InOutArg) {
   bool FoundInit = false;
 
   for (auto UI : InOutArg->getUses()) {
-    // We can't promote inout arguments used by basic blocks.
-    auto *ArgUser = dyn_cast<SILInstruction>(UI->getUser());
-    if (!ArgUser) {
-      DEBUG(llvm::errs() << "    inout variable used by basic block!\n");
+    CopyAddrParts CAInfo;
+    if (!isCopyAddrOperation(UI, CAInfo))
       return false;
-    }
-
-    // TODO: We should eventually support extraneous loads, which will occur
-    // in the future (e.g. when rdar://15170149 is implemented).
-    auto CAI = dyn_cast<CopyAddrInst>(ArgUser);
-    if (!CAI) {
-      DEBUG(llvm::errs() << "    unknown inout variable user: " << *ArgUser);
-      return false;
-    }
-
-    if (UI->getOperandNumber() == 0) {
+    
+    auto ArgUser = UI->getUser();
+    
+    if (CAInfo.isSourceOfCopyAddr) {
       // This is a copy out of the argument into an alloc_stack.  We only
       // support a single copy out of the argument into the stack, and it must
       // be the initialization of that stack location.
-      auto *DestAlloc = dyn_cast<AllocStackInst>(CAI->getDest());
+      auto *DestAlloc = dyn_cast<AllocStackInst>(CAInfo.Dest);
       if (!DestAlloc) {
         DEBUG(llvm::errs() << "    copy to non-alloc-stack: " << *ArgUser);
-        DEBUG(llvm::errs() << "     dest is: " << *CAI->getDest());
+        DEBUG(llvm::errs() << "     dest is: " << *CAInfo.Dest);
         return false;
       }
 
-      if ((!CAI->isInitializationOfDest() || CAI->isTakeOfSrc()) &&
+      if ((!CAInfo.isInitializationOfDest || CAInfo.isTakeOfSrc) &&
           !hasTrivialElementType(DestAlloc)) {
         DEBUG(llvm::errs() << "    unknown copy from inout: " << *ArgUser);
         return false;
@@ -142,18 +173,17 @@ static bool processInOutValue(SILArgument *InOutArg) {
 
     // We allow multiple copies out of the shadow variable which can happen due
     // to multiple return paths.
-    assert(UI->getOperandNumber() == 1);
 
     // This should be a take from the source.
     // TODO: init/take flags don't matter for trivial types.
-    auto *SrcAlloc = dyn_cast<AllocStackInst>(CAI->getSrc());
+    auto *SrcAlloc = dyn_cast<AllocStackInst>(CAInfo.Src);
     if (!SrcAlloc) {
       DEBUG(llvm::errs() << "    copy back from non-alloc-stack: " << *ArgUser);
-      DEBUG(llvm::errs() << "      source is: " << *CAI->getSrc());
+      DEBUG(llvm::errs() << "      source is: " << *CAInfo.Src);
       return false;
     }
 
-    if ((CAI->isInitializationOfDest() || !CAI->isTakeOfSrc()) &&
+    if ((CAInfo.isInitializationOfDest || !CAInfo.isTakeOfSrc) &&
         !hasTrivialElementType(SrcAlloc)) {
       DEBUG(llvm::errs() << "    unknown copy back to inout: " << *ArgUser);
       return false;
