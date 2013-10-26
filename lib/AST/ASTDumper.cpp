@@ -351,6 +351,11 @@ namespace {
         VD->getType().print(OS);
       else
         OS << "<null type>";
+      if (VD->getInterfaceType()) {
+        OS << "' interface type='";
+        VD->getInterfaceType().print(OS);
+      }
+
       OS << '\'';
 
       if (VD->conformsToProtocolRequirement())
@@ -469,12 +474,6 @@ namespace {
       if (!D->getCaptureInfo().empty()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
-      }
-      if (D->getInterfaceType()) {
-        OS << "\n";
-        OS.indent(Indent + 2);
-        OS << "interface type=";
-        D->getInterfaceType().print(OS);
       }
     }
 
