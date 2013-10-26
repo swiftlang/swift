@@ -734,6 +734,9 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     }
     patterns = storedPatterns;
   }
+
+  bool isImplicitConstructor = isa<ConstructorDecl>(func) && 
+                               func->isImplicit();
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
     Type argTy;
     Type initArgTy;
@@ -749,6 +752,14 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       }
     } else {
       argTy = patterns[e - i - 1]->getType();
+
+      // For the implicit constructor, our argument type will be in
+      // terms of archetypes rather than dependent types. Replace the
+      // archetypes with their corresponding dependent types.
+      if (isImplicitConstructor) {
+        argTy = getInterfaceTypeFromInternalType(func, argTy); 
+      }
+
       if (initFuncTy)
         initArgTy = argTy;
     }
