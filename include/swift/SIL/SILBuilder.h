@@ -165,20 +165,24 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType) {
+    Loc.markAsPrologue();
     return insert(new (F.getModule()) AllocStackInst(Loc, elementType, F));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType) {
+    Loc.markAsPrologue();
     return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F));
   }
   
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
+    Loc.markAsPrologue();
     return insert(new (F.getModule())
                     AllocBoxInst(Loc, ElementType, F));
   }
 
   AllocArrayInst *createAllocArray(SILLocation Loc, SILType ElementType,
                                    SILValue NumElements) {
+    Loc.markAsPrologue();
     return insert(new (F.getModule())
                     AllocArrayInst(Loc, ElementType, NumElements, F));
   }

@@ -27,6 +27,8 @@ namespace llvm {
 }
 
 namespace swift {
+  class SILDebugScope;
+
   namespace irgen {
     class TypeInfo;
 
@@ -39,15 +41,20 @@ namespace swift {
       PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
       Size size;
       Alignment align;
+      SILDebugScope *DebugScope;
 
       DebugTypeInfo()
         : size(0), align(1) {
       }
+      // FIXME: retire the Type versions, they were useful for
+      // bootstrapping, but don't work for generics.
       DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes);
       DebugTypeInfo(Type Ty, Size size, Alignment align);
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
-      DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
-      DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align);
+      DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
+                    SILDebugScope *DS = nullptr);
+      DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align,
+                    SILDebugScope *DS = nullptr);
       inline TypeBase* getHash() const { return getType(); }
       inline TypeBase* getType() const {
         if (DeclOrType.isNull())
@@ -61,6 +68,7 @@ namespace swift {
       inline ValueDecl* getDecl() const {
         return DeclOrType.dyn_cast<ValueDecl*>();
       }
+      SILDebugScope *getDebugScope() const { return DebugScope; }
       inline bool isNull() const { return DeclOrType.isNull(); }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;

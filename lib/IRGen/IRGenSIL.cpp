@@ -452,7 +452,8 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
-  
+  void emitFunctionArgDebugInfo(SILBasicBlock *BB);
+
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
@@ -958,11 +959,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.AxleMeta->createFunctionMetadata(CurSILFn, CurFn);
 }
 
-void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
-  // Insert into the lowered basic block.
-  llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
-  Builder.SetInsertPoint(llBB);
-
+void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   if (IGM.DebugInfo && BB->pred_empty()) {
     // This is the prologue of a function.
     // Emit debug info for any captured and promoted [inout] variables.
@@ -980,21 +977,31 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           auto Name = Arg->getDecl()->getName().str();
           auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
           DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
-                            getTypeInfo(Arg->getType()));
+                            getTypeInfo(Arg->getType()),
+                            getDebugScope());
           IGM.DebugInfo->emitArgVariableDeclaration
             (Builder, AddrIR, DTI, Name, ArgNo, Indirection);
         }
       }
     }
   }
+}
+
+void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
+  // Insert into the lowered basic block.
+  llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
+  Builder.SetInsertPoint(llBB);
 
   // FIXME: emit a phi node to bind the bb arguments from all the predecessor
   // branches.
-  
+
+  bool InEntryBlock = BB->pred_empty();
+  bool ArgsEmitted = false;
+
   // Generate the body.
   for (auto &I : *BB) {
-    // Set the debug info location for I, if applicable.
     if (IGM.DebugInfo) {
+      // Set the debug info location for I, if applicable.
       if (auto DS = I.getDebugScope())
         IGM.DebugInfo->setCurrentLoc(Builder, DS, I.getLoc());
       else {
@@ -1005,6 +1012,28 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           // should be elided during IR generation anyway.
           assert(CurSILFn->isTransparent() && "function without a debug scope");
       }
+
+      if (InEntryBlock && !ArgsEmitted) {
+        if (!I.getLoc().isInPrologue()) {
+          if (I.getLoc().getSourceLoc().isValid()) {
+            // This is the first non-prologue instruction in the entry
+            // block.  The function prologue is where the stack frame is
+            // set up and storage for local variables and function
+            // arguments is initialized.  We need to emit the debug info
+            // for the function arguments after the function prologue,
+            // after the initialization.
+            emitFunctionArgDebugInfo(BB);
+            ArgsEmitted = true;
+          } else {
+            // There may be instructions without a valid location
+            // following the prologue. We need to associate them at
+            // least with the function scope or LLVM won't know were
+            // the prologue ends.
+            IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
+          }
+        }
+      }
+
     }
     visit(&I);
   }
@@ -2012,7 +2041,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (IGM.DebugInfo && Decl)
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
                                                 addr.getAddressPointer(),
-                                                DebugTypeInfo(Decl, type),
+                                                DebugTypeInfo(Decl, type,
+                                                              i->getDebugScope()),
                                                 Decl->getName().str(),
                                                 i, DirectValue);
 

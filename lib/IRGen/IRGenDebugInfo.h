@@ -125,9 +125,13 @@ public:
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                      Optional<SILLocation> Loc = Nothing);
 
-  /// Push the current debug location onto a stack.
+  /// Push the current debug location onto a stack and initialize the
+  /// IRBuilder to an empty location.
   void pushLoc() {
     LocationStack.push_back(std::make_pair(LastLoc, LastScope));
+    LastLoc = {};
+    LastScope = nullptr;
+    //Builder.SetCurrentDebugLocation(DebugLoc());
   }
 
   /// Restore the current debug location from the stack.
@@ -188,7 +192,8 @@ public:
                                   DebugTypeInfo Ty,
                                   StringRef Name,
                                   unsigned ArgNo,
-                                  IndirectionKind Indirection = DirectValue);
+                                  IndirectionKind Indirection = DirectValue,
+                                  IntrinsicKind = Declare);
 
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,

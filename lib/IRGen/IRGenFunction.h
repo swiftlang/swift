@@ -161,8 +161,12 @@ public:
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
+  /// Return the SILDebugScope for this function.
+  SILDebugScope* getDebugScope() const { return DbgScope; }
+
 private:
   llvm::Instruction *AllocaIP;
+  SILDebugScope* DbgScope;
 
 //--- Reference-counting methods -----------------------------------------------
 public:

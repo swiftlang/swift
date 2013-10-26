@@ -848,7 +848,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
                             ArrayRef<Substitution> substitutions) {
   assert(((out != nullptr) ^ indirectOut.isValid()) &&
          "cannot emit builtin to both explosion and memory");
-  
+
   // Decompose the function's name into a builtin name and type list.
   const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(fn);
 

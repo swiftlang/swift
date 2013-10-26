@@ -208,32 +208,19 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
   }
 
   if (Decl* D = Loc.getAsASTNode<Decl>()) {
-    if (auto VD = dyn_cast<VarDecl>(D)) {
-      // Normally, the code that allocates storage for function
-      // arguments would end up with a location pointing to the
-      // argument declaration, but this will just confuse users that
-      // single-step through the function. So until LLDB and Xcode
-      // actually display column info, we will set any VarDecl's
-      // location that is before the opening { of the function to the
-      // beginning of the function.
-      auto VarLoc = getLoc(SM, VD);
-      if (auto Fn = dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
-        auto FnLoc = getLoc(SM, Fn->getBody());
-        if (FnLoc.Line > 0 && FnLoc.Line > VarLoc.Line)
-          return {FnLoc, VarLoc};
-      }
-      return {VarLoc, VarLoc};
-    }
+    auto DLoc = getLoc(SM, D);
+    auto LinetableLoc = DLoc;
+    if (Loc.isInPrologue())
+      LinetableLoc = {};
 
     // FIXME: It may or may not be better to fix this in SILLocation.
     // If this is an implicit return, we want the end of the
     // AbstractFunctionDecl's body.
-    if (Loc.getKind() == SILLocation::ImplicitReturnKind ||
-        Loc.getKind() == SILLocation::CleanupKind)
-      return {getLoc(SM, D, true), getLoc(SM, D, false)};
+    else if (Loc.getKind() == SILLocation::ImplicitReturnKind ||
+             Loc.getKind() == SILLocation::CleanupKind)
+      LinetableLoc = getLoc(SM, D, true);
 
-    auto DLoc = getLoc(SM, D);
-    return {DLoc, DLoc};
+    return {LinetableLoc, DLoc};
   }
 
   llvm_unreachable("unexpected location type");
@@ -261,6 +248,8 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
   FullLocation L = getLocation(SM, Loc);
+  // In LLVM IR, the function prologue has neither location nor scope.
+  if (Loc && Loc->isInPrologue()) return;
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
@@ -499,7 +488,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                   DeclContext *DeclCtx) {
   StringRef Name;
   Location L = {};
-  Location PrologLoc = {};
+  Location PrologLoc = {}; // The source line used for the function prologue.
   if (DS) {
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
@@ -514,8 +503,6 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
                                           LinkageName, MainFile, MainFile, 0);
   auto Line = L.Line;
-  // This is the source line used for the function prologue.
-  unsigned ScopeLine = PrologLoc.Line;
 
   // We know that top_level_code always comes from MainFile.
   if (!L.Filename && LinkageName == "top_level_code") {
@@ -562,7 +549,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   llvm::DISubprogram SP =
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
                             DIFnTy, IsLocalToUnit, IsDefinition,
-                            ScopeLine,
+                            PrologLoc.Line,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = llvm::WeakVH(SP);
   Functions[LinkageName] = llvm::WeakVH(SP);
@@ -700,6 +687,7 @@ unsigned IRGenDebugInfo::getArgNo(SILFunction *Fn, SILArgument *Arg) {
       ++LastArg; ++LastArgNo;
     }
   }
+  LastFn = nullptr;
   DEBUG(llvm::dbgs() << "Failed to find argument number for ";
         Arg->dump(); llvm::dbgs() << "\nIn:"; Fn->dump());
   return 0;
@@ -713,9 +701,11 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
                                                 SILValue Value,
                                                 IndirectionKind Indirection) {
   if (auto SILArg = dyn_cast<SILArgument>(Value)) {
-    emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                               getArgNo(Fn, SILArg), Indirection);
-    return true;
+    if (unsigned ArgNo = getArgNo(Fn, SILArg)) {
+      emitArgVariableDeclaration(Builder, Storage, Ty, Name,
+                                 ArgNo, Indirection);
+      return true;
+    }
   }
   return false;
 }
@@ -788,10 +778,14 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
                                                 unsigned ArgNo,
-                                                IndirectionKind Indirection) {
+                                                IndirectionKind Indirection,
+                                                IntrinsicKind Intrinsic) {
+  assert(ArgNo > 0);
   emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirection,
-                          Name == "self" ? ArtificialValue : RealValue);
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo,
+                          Indirection,
+                          Name == "self" ? ArtificialValue : RealValue,
+                          Intrinsic);
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -824,14 +818,16 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              IndirectionKind Indirection,
                                              ArtificialKind Artificial,
                                              IntrinsicKind DbgValue) {
-  llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
-  llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
+  llvm::DIDescriptor Scope = getOrCreateScope(Ty.getDebugScope());
+  Location Loc = getLoc(SM, Ty.getDecl());
+
   // If this is an argument, attach it to the current function scope.
   if (ArgNo > 0) {
     while (Scope.isLexicalBlock())
       Scope = llvm::DILexicalBlock(Scope).getContext();
   }
 
+  assert(Scope.Verify() && Scope.isScope());
   if (!(Scope.Verify() && Scope.isScope()))
     return;
 
@@ -840,10 +836,11 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
 
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
+  assert(DTy);
   if (!DTy)
     return;
 
-  unsigned Line = LastLoc.Loc.Line;
+  unsigned Line = Loc.Line;
   unsigned Flags = 0;
   if (Artificial)
     Flags |= llvm::DIDescriptor::FlagArtificial;
@@ -869,7 +866,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     ? DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor,
                                        Builder.GetInsertBlock())
     : DBuilder.insertDeclare(Storage, Descriptor, Builder.GetInsertBlock());
-  Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
+  Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope));
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,

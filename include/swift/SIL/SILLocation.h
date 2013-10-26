@@ -105,7 +105,12 @@ protected:
          /// level (module) scope.
          ///
          /// FIXME: If Module becomes a Decl, this could be removed.
-         IsInTopLevel = 8 };
+         IsInTopLevel = 8,
+
+         /// \brief MArks this instruction as belonging to the
+         /// function prologue.
+         IsInPrologue = 9
+  };
 
   template <typename T>
   T *getNodeAs(ASTNodeTy Node) const {
@@ -190,6 +195,15 @@ public:
 
   /// \brief Check is this location is accositated with the top level/module.
   bool isInTopLevel() const { return KindData & (1 << IsInTopLevel); }
+
+  /// \brief Mark this location as being part of the function
+  /// prologue, which means that it deals with setting up the stack
+  /// frame. The first breakpoint location in a function is at the end
+  /// of the prologue.
+  void markAsPrologue() { KindData |= (1 << IsInPrologue); }
+
+  /// \brief Check is this location is accositated with the top level/module.
+  bool isInPrologue() const { return KindData & (1 << IsInPrologue); }
 
   bool hasASTLocation() const { return !ASTNode.isNull(); }
 

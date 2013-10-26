@@ -25,18 +25,20 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes)
-  : DeclOrType(Ty.getPointer()), size(SizeInBytes), align(AlignInBytes) {
+  : DeclOrType(Ty.getPointer()), size(SizeInBytes), align(AlignInBytes),
+    DebugScope(nullptr) {
   assert(align.getValue() != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align)
   : DeclOrType(Ty.getPointer()),
-    size(size), align(align) {
+    size(size), align(align),
+    DebugScope(nullptr) {
   assert(align.getValue() != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
-  : DeclOrType(Ty.getPointer()) {
+  : DeclOrType(Ty.getPointer()), DebugScope(nullptr) {
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     size = FixTy.getFixedSize();
@@ -48,8 +50,10 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
-  : DeclOrType(Decl) {
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
+                             SILDebugScope *DS)
+  : DeclOrType(Decl),
+    DebugScope(DS) {
   // Same as above.
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
@@ -62,10 +66,12 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align)
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
+                             SILDebugScope *DS)
   : DeclOrType(Decl),
     size(size),
-    align(align) {
+    align(align),
+    DebugScope(DS)  {
   assert(align.getValue() != 0);
 }
 

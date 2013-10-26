@@ -35,7 +35,8 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
-    ContextPtr(nullptr) {
+    ContextPtr(nullptr),
+    DbgScope(DbgScope) {
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
     // Functions, especially artificial thunks and closures, are often
@@ -43,7 +44,6 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
     // function. Be nice and preserve the current debug location until
     // after we're done with this function.
     IGM.DebugInfo->pushLoc();
-    IGM.DebugInfo->setCurrentLoc(Builder, DbgScope, DbgLoc);
   }
 
   emitPrologue();

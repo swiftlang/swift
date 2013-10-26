@@ -317,6 +317,7 @@ public:
     auto initVar = gen.emitLocalVariableWithCleanup(vd);
     
     // Initialize with the value from the inout.
+    loc.markAsPrologue();
     gen.B.createCopyAddr(loc, address, initVar->getAddress(),
                          IsNotTake, IsInitialization);
     initVar->finishInitialization(gen);
@@ -495,6 +496,7 @@ struct ArgumentInitVisitor :
   SILValue makeArgumentInto(Type ty, SILBasicBlock *parent,
                         SILLocation loc, Initialization *I) {
     assert(ty && "no type?!");
+    loc.markAsPrologue();
     SILValue arg = makeArgument(ty, parent, loc);
     storeArgumentInto(ty, arg, loc, I);
     return arg;
