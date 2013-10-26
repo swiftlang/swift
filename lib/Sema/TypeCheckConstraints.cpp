@@ -899,7 +899,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Open up a generic method via its generic function type.
   if (!isDynamicResult && !isTypeReference) {
-    if (auto func = dyn_cast<FuncDecl>(value)) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (auto interfaceTy = func->getInterfaceType()) {
         if (interfaceTy->is<GenericFunctionType>()) {
           return getTypeOfMethodReference(baseTy, func);
@@ -1017,7 +1017,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
+ConstraintSystem::getTypeOfMethodReference(Type baseTy, 
+                                           AbstractFunctionDecl *func) {
   // Open the type of the generic function.
   auto openedType = openType(func->getInterfaceType(), func,
                              /*skipProtocolSelfConstraint=*/true);
@@ -1048,9 +1049,12 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, FuncDecl *func) {
   // Compute the type of the reference.
   Type type = openedType;
 
-  // For a static method, or an instance method referenced through an instance,
-  // we've consumed the curried 'self' already.
-  if (func->isStatic() || isInstance)
+  // For a constructor, static method, or an instance method
+  // referenced through an instance, we've consumed the curried 'self'
+  // already.
+  if (isa<ConstructorDecl>(func) || 
+      (isa<FuncDecl>(func) && cast<FuncDecl>(func)->isStatic()) ||
+      isInstance)
     type = openedFnType->getResult();
 
   return { openedType, type };

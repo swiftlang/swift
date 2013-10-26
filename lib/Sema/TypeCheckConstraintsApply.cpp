@@ -427,10 +427,10 @@ namespace {
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
       // Handle references to generic functions.
-      if (openedFullType && isa<FuncDecl>(member) &&
+      if (openedFullType && isa<AbstractFunctionDecl>(member) &&
           member->getInterfaceType() &&
           member->getInterfaceType()->is<GenericFunctionType>()) {
-        auto func = cast<FuncDecl>(member);
+        auto func = cast<AbstractFunctionDecl>(member);
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
