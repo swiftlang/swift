@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "capture-promotion"
-#include "swift/Subsystems.h"
-#include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/Subsystems.h"
 using namespace swift;
 
 typedef llvm::SmallSet<unsigned, 4> IndicesSet;
@@ -25,15 +26,124 @@ typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
 STATISTIC(NumCapturesPromoted, "Number of captures promoted");
 
 namespace {
-class ReachabilityInfo {
-  llvm::DenseMap<SILBasicBlock*, unsigned> BlockMap;
-  std::vector<llvm::BitVector> BitVectors;
+/// \brief Transient reference to a block set within ReachabilityInfo.
+///
+/// This is a bitset that conveniently flattens into a matrix allowing bit-wise
+/// operations without masking.
+///
+/// TODO: If this sticks around, maybe we'll make a BitMatrix ADT.
+class ReachingBlockSet {
+public:
+  enum { BITWORD_SIZE = (unsigned)sizeof(uint64_t) * CHAR_BIT };
+
+  static size_t numBitWords(unsigned NumBlocks) {
+    return (NumBlocks + BITWORD_SIZE - 1) / BITWORD_SIZE;
+  }
+
+  /// \brief Transient reference to a reaching block matrix.
+  struct ReachingBlockMatrix {
+    uint64_t *Bits;
+    unsigned NumBitWords; // Words per row.
+
+    ReachingBlockMatrix(): Bits(0), NumBitWords(0) {}
+
+    bool empty() const { return !Bits; }
+  };
+
+  static ReachingBlockMatrix allocateMatrix(unsigned NumBlocks) {
+    ReachingBlockMatrix M;
+    M.NumBitWords = numBitWords(NumBlocks);
+    M.Bits = new uint64_t[NumBlocks * M.NumBitWords];
+    memset(M.Bits, 0, NumBlocks * M.NumBitWords * sizeof(uint64_t));
+    return M;
+  }
+  static void deallocateMatrix(ReachingBlockMatrix &M) {
+    delete [] M.Bits;
+    M.Bits = 0;
+    M.NumBitWords = 0;
+  }
+  static ReachingBlockSet allocateSet(unsigned NumBlocks) {
+    ReachingBlockSet S;
+    S.NumBitWords = numBitWords(NumBlocks);
+    S.Bits = new uint64_t[S.NumBitWords];
+    return S;
+  }
+  static void deallocateSet(ReachingBlockSet &S) {
+    delete [] S.Bits;
+    S.Bits = 0;
+    S.NumBitWords = 0;
+  }
+
+private:
+  uint64_t *Bits;
+  unsigned NumBitWords;
 
 public:
-  ReachabilityInfo(SILFunction *F);
+  ReachingBlockSet(): Bits(0), NumBitWords(0) {}
 
-  bool isReachable(SILBasicBlock *From, SILBasicBlock *To) const;
+  ReachingBlockSet(unsigned BlockID, ReachingBlockMatrix &M)
+    : Bits(&M.Bits[BlockID * M.NumBitWords]),
+      NumBitWords(M.NumBitWords) {}
+
+  bool test(unsigned ID) const {
+    assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
+    return Bits[ID / BITWORD_SIZE] & (1L << (ID % BITWORD_SIZE));
+  }
+
+  void set(unsigned ID) {
+    assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
+    Bits[ID / BITWORD_SIZE] |= 1L << (ID % BITWORD_SIZE);
+  }
+
+  ReachingBlockSet &operator|=(const ReachingBlockSet &RHS) {
+    for (size_t i = 0, e = NumBitWords; i != e; ++i)
+      Bits[i] |= RHS.Bits[i];
+    return *this;
+  }
+
+  void clear() {
+    memset(Bits, 0, NumBitWords * sizeof(uint64_t));
+  }
+
+  bool operator==(const ReachingBlockSet &RHS) const {
+    assert(NumBitWords == RHS.NumBitWords && "mismatched sets");
+    for (size_t i = 0, e = NumBitWords; i != e; ++i) {
+      if (Bits[i] != RHS.Bits[i])
+        return false;
+    }
+    return true;
+  }
+
+  bool operator!=(const ReachingBlockSet &RHS) const {
+    return !(*this == RHS);
+  }
+
+  const ReachingBlockSet &operator=(const ReachingBlockSet &RHS) {
+    assert(NumBitWords == RHS.NumBitWords && "mismatched sets");
+    for (size_t i = 0, e = NumBitWords; i != e; ++i)
+      Bits[i] = RHS.Bits[i];
+    return *this;
+  }
 };
+
+/// \brief Store the reachability matrix: ToBlock -> FromBlocks.
+class ReachabilityInfo {
+  SILFunction *F;
+  llvm::DenseMap<SILBasicBlock*, unsigned> BlockMap;
+  ReachingBlockSet::ReachingBlockMatrix Matrix;
+
+public:
+  ReachabilityInfo(SILFunction *f) : F(f) {}
+  ~ReachabilityInfo() { ReachingBlockSet::deallocateMatrix(Matrix); }
+
+  bool isComputed() const { return !Matrix.empty(); }
+
+  bool isReachable(SILBasicBlock *From, SILBasicBlock *To);
+
+private:
+  void compute();
+};
+
 } // end anonymous namespace.
 
 
@@ -66,74 +176,81 @@ private:
 };
 } // end anonymous namespace.
 
-/// \brief Initialize ReachabilityInfo so that it can answer queries about
+/// \brief Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
 /// block in the function.
-ReachabilityInfo::ReachabilityInfo(SILFunction *F) {
-  // FIXME: Is there a better datastructure for this?  Reachability being N^2
-  // in time or space doesn't seem right at all.  If the query is infrequent
-  // enough, this could just be calculated on demand.
-  
-  // FIXME: If not, this would be better stored as a single llvm::Bitvector that
-  // is indexed into with explicit i*N+j indexes.
-  
-  // FIXME: This would be better computed lazily.  There is no reason to compute
-  // this for functions that have no partial_applys in them.
+///
+/// FIXME: Computing global reachability requires initializing an N^2
+/// bitset. This could be avoided by computing reachability on-the-fly
+/// for each alloc_box by walking backward from mutations.
+void ReachabilityInfo::compute() {
+  assert(!isComputed() && "already computed");
+
   unsigned N = 0;
   for (auto &BB : *F)
     BlockMap.insert({ &BB, N++ });
-  BitVectors.resize(N);
-  for (auto &Bits : BitVectors)
-    Bits.resize(N, false);
+  Matrix = ReachingBlockSet::allocateMatrix(N);
+  ReachingBlockSet NewSet = ReachingBlockSet::allocateSet(N);
 
-  llvm::BitVector NewBits;
+  DEBUG(llvm::dbgs() << "Computing Reachability for " << F->getName()
+        << " with " << N << " blocks.\n");
+
+  // Iterate to a fix point, two times for a topological DAG.
   bool Changed;
   do {
     Changed = false;
-    NewBits.clear();
-    for (auto &BlockPair : BlockMap) {
-      llvm::BitVector &Bits = BitVectors[BlockPair.second];
+
+    // Visit all blocks in a predictable order, hopefully close to topological.
+    for (auto &BB : *F) {
+      ReachingBlockSet CurSet(BlockMap[&BB], Matrix);
       if (!Changed) {
         // If we have not detected a change yet, then calculate new
         // reachabilities into a new bit vector so we can determine if any
         // change has occured.
-        
-        // FIXME: Shadowing "NewBits" here is suboptimal.  It should get a new
-        // name or actually reuse the bitvector.  If it remains, the bitvector
-        // should be hoisted out of the loop and cleared, to avoid redundant
-        // memory allocation each time through the loop.
-        llvm::BitVector NewBits = Bits;
-        for (auto PI = BlockPair.first->pred_begin(),
-                  PE = BlockPair.first->pred_end(); PI != PE; ++PI) {
-          unsigned I = BlockMap[*PI];
-          NewBits |= BitVectors[I];
-          NewBits.set(I);
+        NewSet = CurSet;
+        for (auto PI = BB.pred_begin(), PE = BB.pred_end(); PI != PE; ++PI) {
+          unsigned PredID = BlockMap[*PI];
+          ReachingBlockSet PredSet(PredID, Matrix);
+          NewSet |= PredSet;
+          NewSet.set(PredID);
         }
-        if (Bits != NewBits) {
-          Bits.swap(NewBits);
+        if (NewSet != CurSet) {
+          CurSet = NewSet;
           Changed = true;
         }
       } else {
         // Otherwise, just update the existing reachabilities in-place.
-        for (auto PI = BlockPair.first->pred_begin(),
-                  PE = BlockPair.first->pred_end(); PI != PE; ++PI) {
-          unsigned I = BlockMap[*PI];
-          Bits |= BitVectors[I];
-          Bits.set(I);
+        for (auto PI = BB.pred_begin(), PE = BB.pred_end(); PI != PE; ++PI) {
+          unsigned PredID = BlockMap[*PI];
+          ReachingBlockSet PredSet(PredID, Matrix);
+          CurSet |= PredSet;
+          CurSet.set(PredID);
         }
       }
+      DEBUG(llvm::dbgs() << "  Block " << BlockMap[&BB] << " reached by ";
+            for (unsigned i = 0; i < N; ++i) {
+              if (CurSet.test(i))
+                llvm::dbgs() << i << " ";
+            }
+            llvm::dbgs() << "\n");
     }
   } while (Changed);
+
+  ReachingBlockSet::deallocateSet(NewSet);
 }
 
 /// \brief Return true if the To basic block is reachable from the From basic
 /// block. A block is considered reachable from itself only if its entry can be
 /// recursively reached from its own exit.
 bool
-ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) const {
+ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
+  if (!isComputed())
+    compute();
+
   auto FI = BlockMap.find(From), TI = BlockMap.find(To);
   assert(FI != BlockMap.end() && TI != BlockMap.end());
-  return BitVectors[TI->second].test(FI->second);
+  ReachingBlockSet FromSet(TI->second, Matrix);
+  return FromSet.test(FI->second);
 }
 
 ClosureCloner::ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices)
@@ -187,7 +304,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     FunctionType::get(TupleType::get(ClonedArgTys, M.getASTContext()),
                       OrigLoweredTy.getAs<AnyFunctionType>().getResult(),
                       M.getASTContext()));
-  
+
   // FIXME: This should insert the cloned function right before the existing
   // SILFunction for the closure, so that these naturally clump together and
   // so that testcases are easier to write.  This can be done by creating the
@@ -536,7 +653,7 @@ eraseRetainIfPresent(PartialApplyInst *PAI, SILValue BoxValue) {
       }
       continue;
     }
-    
+
     // FIXME: Can this be (I->getMemoryBehavior() == MayHaveSideEffects)?
     if (!isa<FunctionRefInst>(I) && !isa<LoadInst>(I) &&
         !isa<CopyValueInst>(I))
@@ -621,7 +738,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   if (auto *OrigCalleeInst = dyn_cast<SILInstruction>(OrigCallee.getDef()))
     if (OrigCalleeInst->use_empty()) {
       OrigCalleeInst->eraseFromParent();
-     
+
       // TODO: If this is the last use of the closure, and if it has internal
       // linkage, we should remove it from the SILModule now.
     }
@@ -661,7 +778,7 @@ void
 swift::performSILCapturePromotion(SILModule *M) {
   SmallVector<SILFunction*, 128> Worklist;
   for (auto &F : *M)
-    Worklist.push_back(&F);
+    runOnFunction(&F, Worklist);
   while (!Worklist.empty())
     runOnFunction(Worklist.pop_back_val(), Worklist);
 }
