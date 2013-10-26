@@ -363,11 +363,21 @@ public:
 
   /// Validate the signature of a generic type.
   ///
-
   /// \param nominal The generic type.
   ///
   /// \returns true if an error occurred, or false otherwise.
   bool validateGenericTypeSignature(NominalTypeDecl *nominal);
+
+  /// Given a type that was produced within the given generic declaration
+  /// context, produce the corresponding interface type.
+  ///
+  /// \param dc The declaration context in which the type was produced.
+  ///
+  /// \param type The type, which involves archetypes but not dependent types.
+  ///
+  /// \returns the type after mapping all archetypes to their corresponding
+  /// dependent types.
+  Type getInterfaceTypeFromInternalType(DeclContext *dc, Type type);
 
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl, DeclContext *DC = nullptr,

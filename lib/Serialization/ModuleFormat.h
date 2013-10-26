@@ -642,6 +642,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // iboutlet?
     TypeIDField,  // type
+    TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
     DeclIDField   // overridden decl

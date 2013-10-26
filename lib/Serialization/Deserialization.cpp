@@ -1053,12 +1053,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC, isIBOutlet;
-    TypeID typeID;
+    TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isIBOutlet, typeID,
+                                       isObjC, isIBOutlet, typeID, 
+                                       interfaceTypeID,
                                        getterID, setterID, overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
@@ -1069,6 +1070,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                  getType(typeID), DC);
 
     declOrOffset = var;
+
+    var->setInterfaceType(getType(interfaceTypeID));
 
     if (getterID || setterID) {
       var->setComputedAccessors(ctx, SourceLoc(),

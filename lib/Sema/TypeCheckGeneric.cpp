@@ -824,6 +824,22 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   return invalid;
 }
 
+Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
+  assert(dc->isGenericContext() && "Not a generic context?");
+
+  // Capture the archetype -> generic parameter type mapping.
+  TypeSubstitutionMap substitutions;
+  for (auto params = dc->getGenericParamsOfContext(); params;
+       params = params->getOuterParameters()) {
+    for (auto param : *params) {
+      substitutions[param.getAsTypeParam()->getArchetype()]
+        = param.getAsTypeParam()->getDeclaredType();
+    }
+  }
+
+  return substType(dc->getParentModule(), type, substitutions);
+}
+
 SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,

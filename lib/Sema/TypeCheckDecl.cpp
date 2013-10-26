@@ -544,35 +544,54 @@ static void checkCircularity(TypeChecker &tc, T *decl,
   }
 }
 
-static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
-  switch (pattern->getKind()) {
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(pattern)->getFields())
-      setBoundVarsTypeError(field.getPattern(), ctx);
-    return;
-  case PatternKind::Paren:
-    return setBoundVarsTypeError(cast<ParenPattern>(pattern)->getSubPattern(),
-                                 ctx);
-  case PatternKind::Typed:
-    return setBoundVarsTypeError(cast<TypedPattern>(pattern)->getSubPattern(),
-                                 ctx);
-  case PatternKind::NominalType:
-    for (auto &elt : cast<NominalTypePattern>(pattern)->getMutableElements())
-      setBoundVarsTypeError(elt.getSubPattern(), ctx);
-    return;
-  case PatternKind::Var:
-    return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern(),
-                                 ctx);
-  case PatternKind::EnumElement:
-    if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
-      setBoundVarsTypeError(subpattern, ctx);
-    return;
+namespace {
+  /// Apply the given function object to each bound variable within the pattern.
+  template<typename F>
+  void forEachBoundVar(Pattern *pattern, const F &f) {
+    switch (pattern->getKind()) {
+    case PatternKind::Tuple:
+      for (auto &field : cast<TuplePattern>(pattern)->getFields())
+        forEachBoundVar(field.getPattern(), f);
+      return;
+    case PatternKind::Paren:
+      return forEachBoundVar(cast<ParenPattern>(pattern)->getSubPattern(), f);
+    case PatternKind::Typed:
+      return forEachBoundVar(cast<TypedPattern>(pattern)->getSubPattern(), f);
+    case PatternKind::NominalType:
+      for (auto &elt : cast<NominalTypePattern>(pattern)->getMutableElements())
+        forEachBoundVar(elt.getSubPattern(), f);
+      return;
+    case PatternKind::Var:
+      return forEachBoundVar(cast<VarPattern>(pattern)->getSubPattern(), f);
+    case PatternKind::EnumElement:
+      if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
+        forEachBoundVar(subpattern, f);
+      return;
 
-  // Handle vars.
-  case PatternKind::Named: {
+      // Handle vars.
+    case PatternKind::Named: {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
+      VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
+      f(var);
+      return;
+    }
+
+      // Handle non-vars.
+    case PatternKind::Any:
+    case PatternKind::Isa:
+    case PatternKind::Expr:
+      return;
+    }
+    llvm_unreachable("bad pattern kind!");
+  }
+}
+
+/// Set each bound variable in the pattern to have an error type.
+static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
+  forEachBoundVar(pattern, [&](VarDecl *var ) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
     if (var->hasType()) {
       if (var->getType()->is<ErrorType>())
         var->setInvalid();
@@ -580,16 +599,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
       var->setType(ErrorType::get(ctx));
       var->setInvalid();
     }
-    return;
-  }
-
-  // Handle non-vars.
-  case PatternKind::Any:
-  case PatternKind::Isa:
-  case PatternKind::Expr:
-    return;
-  }
-  llvm_unreachable("bad pattern kind!");
+  });
 }
 
 static CanType getExtendedType(ExtensionDecl *ED) {
@@ -982,6 +992,16 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       binding->setInvalid();
       return;
     }
+  }
+
+  // If we're in a generic type context, provide interface types for all of
+  // the variables.
+  auto dc = binding->getDeclContext();
+  if (dc->isGenericContext() && dc->isTypeContext()) {
+    forEachBoundVar(binding->getPattern(), [&](VarDecl *var) {
+      var->setInterfaceType(
+        tc.getInterfaceTypeFromInternalType(dc, var->getType()));
+    });
   }
 }
 
@@ -1854,8 +1874,7 @@ public:
         CD->setInvalid();
       } else {
         ArchetypeBuilder builder =
-          createArchetypeBuilder(TC,
-                                                          CD->getModuleContext());
+          createArchetypeBuilder(TC, CD->getModuleContext());
         checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.

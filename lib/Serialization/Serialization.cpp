@@ -1243,6 +1243,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isObjC(),
                           var->getAttrs().isIBOutlet(),
                           addTypeRef(type),
+                          addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
                           addDeclRef(var->getOverriddenDecl()));
