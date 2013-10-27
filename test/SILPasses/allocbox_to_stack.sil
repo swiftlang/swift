@@ -80,9 +80,10 @@ bb1(%0 : $Int64):
 
   %9 = return %7 : $Int64
 
+// CHECK-NOT: alloc_box
 // CHECK: %1 = alloc_stack $TestStruct
-// CHECK: %2 = alloc_stack $(Int64, Int64)
-// CHECK: dealloc_stack %2
+// CHECK-NOT: alloc_box
+// CHECK-NOT: alloc_stack
 // CHECK: dealloc_stack %1
 // CHECK: return
 }
@@ -168,12 +169,11 @@ class Generic<T> {}
 
 // CHECK-LABEL: sil @dealloc_box
 sil @dealloc_box : $@thin <T> () -> () {
+bb0:  // CHECK-NEXT: bb0:
   %1 = alloc_box $Generic<T>
   dealloc_box $Generic<T>, %1#0 : $Builtin.ObjectPointer
-  // CHECK: %0 = alloc_stack $Generic<T>
-  // CHECK-NEXT: dealloc_stack %0
 
-  %0 = tuple ()
+  %0 = tuple ()    // CHECK-NEXT: tuple ()
   %6 = return %0 : $()
   // CHECK: return
 }
@@ -204,8 +204,9 @@ bb0:
   %10 = tuple ()
   return %10 : $()
   
-// CHECK: dealloc_stack %0#0 : $*@local_storage SomeUnion
-// CHECK-NEXT:  [[T0:%.*]] = tuple ()
+// CHECK-NOT: alloc_box
+// CHECK-NOT: alloc_stack
+// CHECK:  [[T0:%.*]] = tuple ()
 // CHECK-NEXT:  return [[T0]] : $()
 }
 
