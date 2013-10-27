@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
@@ -263,7 +264,7 @@ ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
     SubstCalleeType(SubstCalleeTy),
     Operands(this, Args, Callee)
 {
-  static_assert(std::is_trivially_copyable<Substitution>::value,
+  static_assert(IsTriviallyCopyable<Substitution>::value,
                 "assuming Substitution is trivially copyable");
   memcpy(getSubstitutionsStorage(), Subs.begin(),
          sizeof(Substitution) * Subs.size());
@@ -294,7 +295,7 @@ PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
     NumSubstitutions(Subs.size()),
     Operands(this, Args, Callee)
 {
-  static_assert(std::is_trivially_copyable<Substitution>::value,
+  static_assert(IsTriviallyCopyable<Substitution>::value,
                 "assuming Substitution is trivial");
   memcpy(getSubstitutionsStorage(), Subs.begin(),
          sizeof(Substitution) * Subs.size());

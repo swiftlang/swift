@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Initialization.h"
@@ -1017,7 +1018,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
       Substitution *allSubsBuf
         = F.getASTContext().Allocate<Substitution>(outerSubs.size()
                                                   + innerSubs.size());
-      static_assert(std::is_trivially_copyable<Substitution>::value,
+      static_assert(IsTriviallyCopyable<Substitution>::value,
                     "assuming Substitution is trivially copyable");
       std::memcpy(allSubsBuf,
                   outerSubs.data(), outerSubs.size() * sizeof(Substitution));

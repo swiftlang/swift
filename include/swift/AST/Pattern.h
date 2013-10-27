@@ -18,6 +18,7 @@
 #define SWIFT_PATTERN_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Expr.h"
@@ -449,7 +450,7 @@ private:
   {
     if (implicit.hasValue() ? *implicit : !CastTy.hasLocation())
       setImplicit();
-    static_assert(std::is_trivially_copyable<Element>::value,
+    static_assert(IsTriviallyCopyable<Element>::value,
                   "assuming Element is trivially copyable");
     memcpy(getElementStorage(), Elements.begin(),
            Elements.size() * sizeof(Element));
