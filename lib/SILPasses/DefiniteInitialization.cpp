@@ -1404,7 +1404,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   SmallVector<SILInstruction*, 4> UsesToScalarize;
   
   for (auto UI : Pointer.getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
 
     // Instructions that compute a subelement are handled by a helper.
     if (isa<TupleElementAddrInst>(User) || isa<StructElementAddrInst>(User)) {
@@ -1650,7 +1650,7 @@ static void processAllocBox(AllocBoxInst *ABI) {
 
   // Collect information about the retain count result as well.
   for (auto UI : SILValue(ABI, 0).getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
 
     // If this is a release, then remember it as such.
     if (isa<StrongReleaseInst>(User)) {
@@ -1679,7 +1679,7 @@ static void processAllocStack(AllocStackInst *ASI) {
   
   // Collect information about the retain count result as well.
   for (auto UI : SILValue(ASI, 0).getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
     
     // If this is a release or dealloc_stack, then remember it as such.
     if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User)) {

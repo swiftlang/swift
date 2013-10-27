@@ -43,7 +43,7 @@ static void promoteShadow(AllocStackInst *Alloc, SILArgument *InOutArg) {
   // it doesn't escape.  Eliminate the allocation.
   while (!Alloc->use_empty()) {
     auto Use = *Alloc->use_begin();
-    auto *User = cast<SILInstruction>(Use->getUser());
+    auto *User = Use->getUser();
 
     // If this is a use of the 0th result, not the address result, just zap the
     // instruction.  It is a dealloc_stack or something similar.

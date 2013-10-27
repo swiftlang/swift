@@ -488,7 +488,7 @@ static bool CCPFunctionBody(SILFunction &F) {
     // Go through all users of the constant and try to fold them.
     llvm::DenseSet<SILInstruction*> FoldedUsers;
     for (auto Use : I->getUses()) {
-      SILInstruction *User = cast<SILInstruction>(Use->getUser());
+      SILInstruction *User = Use->getUser();
 
       // It is possible that we had processed this user already. Do not try
       // to fold it again if we had previously produced an error while folding

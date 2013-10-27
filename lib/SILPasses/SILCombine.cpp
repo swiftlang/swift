@@ -107,7 +107,7 @@ public:
   /// exposed.
   void addUsersToWorklist(SILInstruction &I) {
     for (auto UI : I.getUses())
-      add(llvm::cast<SILInstruction>(UI->getUser()));
+      add(UI->getUser());
   }
 
   /// Check that the worklist is empty and nuke the backing store for the map if

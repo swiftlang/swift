@@ -119,7 +119,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
                               SmallVectorImpl<SILInstruction*> &Users,
                               SmallVectorImpl<SILInstruction*> &Releases) {
   for (auto UI : V->getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
     
     // These instructions do not cause the box's address to escape.
     if (isa<StrongRetainInst>(User) ||
@@ -245,7 +245,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // are gone, this only walks through uses of result #0 (the retain count
   // pointer).
   while (!ABI->use_empty()) {
-    auto *User = cast<SILInstruction>((*ABI->use_begin())->getUser());
+    auto *User = (*ABI->use_begin())->getUser();
     assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
            isa<DeallocBoxInst>(User));
     
@@ -266,7 +266,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
 /// discarded, but loads from the value require the memory to exist.
 static bool areAllocStackUsesSafeToRemove(SILValue V) {
   for (auto UI : V.getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
 
     // Stores to the pointer (either in store or copy_addr form) can be
     // discarded.
@@ -304,7 +304,7 @@ static bool areAllocStackUsesSafeToRemove(SILValue V) {
 
 static void eraseUsesOfInstruction(SILInstruction *Inst) {
   for (auto UI : Inst->getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
     
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
@@ -342,7 +342,7 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
   // Walk the use list to see if we have only safe-to-remove uses hanging off
   // of the allocation.  Check the local_storage piece first.
   for (auto UI : SILValue(ASI, 0).getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
+    auto *User = UI->getUser();
 
     if (isa<DeallocStackInst>(User))
       continue;

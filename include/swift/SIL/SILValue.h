@@ -28,6 +28,7 @@ namespace swift {
   class SILValue;
   class ValueBaseUseIterator;
   class ValueUseIterator;
+  class SILInstruction;
 
   enum class ValueKind {
 #define VALUE(Id, Parent) Id,
@@ -181,10 +182,10 @@ class Operand {
 
   /// The owner of this operand.
   /// FIXME: this could be space-compressed.
-  ValueBase *Owner;
+  SILInstruction *Owner;
 
-  Operand(ValueBase *owner) : Owner(owner) {}
-  Operand(ValueBase *owner, SILValue theValue)
+  Operand(SILInstruction *owner) : Owner(owner) {}
+  Operand(SILInstruction *owner, SILValue theValue)
       : TheValue(theValue), Owner(owner) {
     insertIntoCurrent();
   }
@@ -222,8 +223,8 @@ public:
   }
 
   /// Return the user that owns this use.
-  ValueBase *getUser() { return Owner; }
-  const ValueBase *getUser() const { return Owner; }
+  SILInstruction *getUser() { return Owner; }
+  const SILInstruction *getUser() const { return Owner; }
   
   /// getOperandNumber - Return which operand this is in the operand list of the
   /// using instruction.
@@ -302,7 +303,7 @@ public:
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
   Operand *operator*() const { return Cur; }
 
-  ValueBase *getUser() const {
+  SILInstruction *getUser() const {
     return Cur->getUser();
   }
 
@@ -360,7 +361,7 @@ public:
 
   Operand *operator*() const { return CurAndResultNumber.getPointer(); }
 
-  ValueBase *getUser() const {
+  SILInstruction *getUser() const {
     return CurAndResultNumber.getPointer()->getUser();
   }
                                                  
@@ -420,7 +421,7 @@ template <unsigned N> class FixedOperandList {
   FixedOperandList &operator=(const FixedOperandList &) = delete;
 
 public:
-  template <class... T> FixedOperandList(ValueBase *user, T&&...args)
+  template <class... T> FixedOperandList(SILInstruction *user, T&&...args)
       : Buffer{ { user, std::forward<T>(args) }... } {
     static_assert(sizeof...(args) == N, "wrong number of initializers");
   }
@@ -473,7 +474,7 @@ public:
   /// will placed after the fixed operands, not before them.  But
   /// the variadic arguments have to come last.
   template <class... T>
-  TailAllocatedOperandList(ValueBase *user,
+  TailAllocatedOperandList(SILInstruction *user,
                            ArrayRef<SILValue> dynamicArgs,
                            T&&... fixedArgs)
       : NumExtra(dynamicArgs.size()),
@@ -538,7 +539,7 @@ public:
     return sizeof(Operand) * (numExtra > 0 ? numExtra - 1 : 0);
   }
 
-  TailAllocatedOperandList(ValueBase *user, ArrayRef<SILValue> dynamicArgs)
+  TailAllocatedOperandList(SILInstruction *user, ArrayRef<SILValue> dynamicArgs)
       : NumExtra(dynamicArgs.size()) {
 
     Operand *dynamicSlot = Buffer;
