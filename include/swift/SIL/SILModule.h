@@ -169,6 +169,7 @@ public:
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
 
+  FunctionListType &getFunctionList() { return functions; }
   iterator begin() { return functions.begin(); }
   iterator end() { return functions.end(); }
   const_iterator begin() const { return functions.begin(); }

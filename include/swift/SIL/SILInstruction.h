@@ -529,6 +529,7 @@ public:
   /// \param Loc  The location of the reference.
   /// \param F    The function being referenced.
   FunctionRefInst(SILLocation Loc, SILFunction *F);
+  ~FunctionRefInst();
 
   /// Return the referenced function.
   SILFunction *getReferencedFunction() const { return Function; }

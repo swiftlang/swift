@@ -78,6 +78,11 @@ private:
 
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
+  
+  /// This is the number of function_ref instructions using this SILFunction.
+  friend class FunctionRefInst;
+  unsigned RefCount = 0;
+
 public:
 
   SILFunction(SILModule &Module, SILLinkage Linkage,
@@ -94,6 +99,10 @@ public:
   SILFunctionType *getFunctionTypeInfo() const {
     return LoweredType.getFunctionTypeInfo(getModule());
   }
+    
+  /// Return the number of function_ref instructions that refer to this
+  /// function.
+  unsigned getRefCount() const { return RefCount; }
   
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {

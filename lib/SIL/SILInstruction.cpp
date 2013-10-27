@@ -318,7 +318,14 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
   : SILInstruction(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
     Function(F) {
+      
+      F->RefCount++;
 }
+
+FunctionRefInst::~FunctionRefInst() {
+  Function->RefCount--;
+}
+
 
 const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
   return getModule().getIntrinsicInfo(Function);

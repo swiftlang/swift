@@ -266,7 +266,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
 
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
-  // generated when using auto closures
+  // generated when using auto closures.
   if (PartialApplyInst *PAI =
         dyn_cast<PartialApplyInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -317,8 +317,8 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet) {
-  // Avoid reprocessing functions needlessly
-  if (FullyInlinedSet.find(F) != FullyInlinedSet.end())
+  // Avoid reprocessing functions needlessly.
+  if (FullyInlinedSet.count(F))
     return true;
 
   // Prevent attempt to circularly inline.
@@ -417,4 +417,24 @@ void swift::performSILMandatoryInlining(SILModule *M) {
   for (auto &F : *M)
     runOnFunctionRecursively(&F, nullptr, FullyInlinedSet, SetFactory,
                               SetFactory.getEmptySet());
+  
+  // Now that we've inlined some functions, clean up.  If there are any
+  // transparent functions that are deserialized from another module that are
+  // now unused, just remove them from the module.
+  //
+  // We do this with a simple linear scan, because transparent functions that
+  // reference each other have already been flattened.
+  for (auto FI = M->begin(), E = M->end(); FI != E; ) {
+    SILFunction &F = *FI++;
+
+    if (F.getRefCount() != 0 || !F.isTransparent()) continue;
+    
+    // We discard functions that don't have external linkage, e.g. deserialized
+    // functions, internal functions, and thunks.  Being marked transparent
+    // controls this.
+    if (F.getLinkage() == SILLinkage::External) continue;
+    
+    // Okay, just erase the function from the module.
+    M->getFunctionList().erase(&F);
+  }
 }
