@@ -45,7 +45,13 @@ bool swift::appendToREPLTranslationUnit(SourceFile &SF,
 
 /// \brief Returns true if the diagnostic passes produced an error.
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
+  // If we parsed a .sil file that is already in canonical form, don't rerun
+  // the diagnostic passes.
+  if (Module.getStage() == SILStage::Canonical)
+    return false;
+  
   auto &Ctx = Module.getASTContext();
+ 
   performSILMandatoryInlining(&Module);
 
   performSILDefiniteInitialization(&Module);

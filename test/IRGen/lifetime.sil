@@ -20,9 +20,6 @@ bb0(%x : $*T):
   destroy_addr %x : $*T
   %0 = tuple ()
   return %0 : $()
-bb1:
-  copy_addr %y#1 to %y#1 : $*T
-  unreachable
 }
 // CHECK:    define void @generic_tuple([[OPAQUE]]*, [[TYPE]]* %T) {
 //   The fixed-size buffer.
