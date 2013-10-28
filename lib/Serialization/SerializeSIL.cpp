@@ -91,9 +91,11 @@ namespace {
     }
     ValueID addValueRef(const ValueBase *Val);
 
-    /// FuncTable maps function name to an ID.
+  public:
     using TableData = FuncTableInfo::data_type;
     using Table = llvm::DenseMap<FuncTableInfo::key_type, TableData>;
+  private:
+    /// FuncTable maps function name to an ID.
     Table FuncTable;
     std::vector<BitOffset> Funcs;
     /// The current function ID.
@@ -121,7 +123,7 @@ namespace {
     void writeSILFunction(const SILFunction &F);
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
-    void writeFuncTable();
+    void writeTables();
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
@@ -1053,31 +1055,37 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 }
 
-void SILSerializer::writeFuncTable() {
-  using clang::OnDiskChainedHashTableGenerator;
-
-  if (FuncTable.empty())
-    return;
-
-  SmallVector<uint64_t, 8> scratch;
+/// Depending on the RecordKind, we write either the SILFunction
+/// table or the table for SILVTable.
+static void writeTable(const sil_index_block::ListLayout &List,
+                       sil_index_block::RecordKind kind,
+                       const SILSerializer::Table &table) {
+  assert((kind == sil_index_block::SIL_FUNC_NAMES ||
+          kind == sil_index_block::SIL_VTABLE_NAMES) &&
+         "Only SIL function table and SIL vtable are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
-    OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
-    for (auto &entry : FuncTable)
+    clang::OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
+    for (auto &entry : table)
       generator.insert(entry.first, entry.second);
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
-    // Make sure that no bucket is at offset 0
+    // Make sure that no bucket is at offset 0.
     clang::io::Emit32(blobStream, 0);
     tableOffset = generator.Emit(blobStream);
   }
+  SmallVector<uint64_t, 8> scratch;
+  List.emit(scratch, kind, tableOffset, hashTableBlob);
+}
 
+void SILSerializer::writeTables() {
   sil_index_block::ListLayout List(Out);
   sil_index_block::OffsetLayout Offset(Out);
-  List.emit(ScratchRecord, sil_index_block::SIL_FUNC_NAMES, tableOffset,
-            hashTableBlob);
-  Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
+  if (!FuncTable.empty()) {
+    writeTable(List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
+  }
 }
 
 void SILSerializer::writeAllSILFunctions(const SILModule *M) {
@@ -1119,7 +1127,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
   }
   {
     BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
-    writeFuncTable();
+    writeTables();
   }
 }
 
