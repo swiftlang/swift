@@ -909,9 +909,160 @@ struct TupleTypeMetadata : public Metadata {
     return reinterpret_cast<const Element *>(this+1);
   }
 };
-
+  
 /// The standard metadata for the empty tuple type.
 extern "C" const FullMetadata<TupleTypeMetadata> _TMdT_;
+
+struct ProtocolDescriptor;
+  
+/// An array of protocol descriptors with a header and tail-allocated elements.
+struct ProtocolDescriptorList {
+  uintptr_t NumProtocols;
+  
+  const ProtocolDescriptor * const *getProtocols() const {
+    return reinterpret_cast<const ProtocolDescriptor * const *>(this + 1);
+  }
+
+protected:
+  constexpr ProtocolDescriptorList(uintptr_t NumProtocols)
+    : NumProtocols(NumProtocols) {}
+};
+  
+/// A literal class for creating constant protocol descriptors in the runtime.
+template<uintptr_t NUM_PROTOCOLS>
+struct LiteralProtocolDescriptorList : ProtocolDescriptorList {
+  const ProtocolDescriptorList *Protocols[NUM_PROTOCOLS];
+  
+  template<typename...DescriptorPointers>
+  constexpr LiteralProtocolDescriptorList(DescriptorPointers...elements)
+    : ProtocolDescriptorList(NUM_PROTOCOLS), Protocols{elements...}
+  {}
+};
+  
+/// Flag that indicates whether an existential type is class-constrained or not.
+enum class ProtocolClassConstraint : bool {
+  /// The protocol is class-constrained, so only class types can conform to it.
+  Class = false,
+  /// Any type can conform to the protocol.
+  Any = true,
+};
+  
+/// Flags for protocol descriptors.
+class ProtocolDescriptorFlags {
+  typedef uint32_t int_type;
+  enum : int_type {
+    IsSwift           = 1U <<  0U,
+    ClassConstraint   = 1U <<  1U,
+    NeedsWitnessTable = 1U <<  2U,
+    /// Reserved by the ObjC runtime.
+    _ObjC_FixedUp     = 1U << 31U,
+  };
+
+  int_type Data;
+  
+  constexpr ProtocolDescriptorFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr ProtocolDescriptorFlags() : Data(0) {}
+  constexpr ProtocolDescriptorFlags withSwift(bool s) const {
+    return ProtocolDescriptorFlags((Data & ~IsSwift) | (s ? IsSwift : 0));
+  }
+  constexpr ProtocolDescriptorFlags withClassConstraint(
+                                              ProtocolClassConstraint c) const {
+    return ProtocolDescriptorFlags((Data & ~ClassConstraint)
+                                     | (bool(c) ? ClassConstraint : 0));
+  }
+  constexpr ProtocolDescriptorFlags withNeedsWitnessTable(bool n) const {
+    return ProtocolDescriptorFlags((Data & ~NeedsWitnessTable)
+                                     | (n ? NeedsWitnessTable : 0));
+  }
+  
+  /// Was the protocol defined in Swift?
+  bool isSwift() const { return Data & IsSwift; }
+  /// Is the protocol class-constrained?
+  ProtocolClassConstraint getClassConstraint() const {
+    return ProtocolClassConstraint(bool(Data & ClassConstraint));
+  }
+  /// Does the protocol require a witness table for method dispatch?
+  bool needsWitnessTable() const { return Data & NeedsWitnessTable; }
+};
+  
+/// A protocol descriptor. This is not type metadata, but is referenced by
+/// existential type metadata records to describe a protocol constraint.
+/// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
+/// layout.
+struct ProtocolDescriptor {
+  /// Unused by the Swift runtime.
+  const void *_ObjC_Isa;
+  
+  /// The mangled name of the protocol.
+  const char *Name;
+  
+  /// The list of protocols this protocol refines.
+  const ProtocolDescriptorList *InheritedProtocols;
+  
+  /// Unused by the Swift runtime.
+  const void *_ObjC_InstanceMethods, *_ObjC_ClassMethods,
+             *_ObjC_OptionalInstanceMethods, *_ObjC_OptionalClassMethods,
+             *_ObjC_InstanceProperties;
+  
+  /// Size of the descriptor record.
+  uint32_t DescriptorSize;
+  
+  /// Additional flags.
+  ProtocolDescriptorFlags Flags;
+  
+  constexpr ProtocolDescriptor(const char *Name,
+                               const ProtocolDescriptorList *Inherited,
+                               ProtocolDescriptorFlags Flags)
+    : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
+      _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
+      _ObjC_OptionalInstanceMethods(nullptr),
+      _ObjC_OptionalClassMethods(nullptr),
+      _ObjC_InstanceProperties(nullptr),
+      DescriptorSize(sizeof(ProtocolDescriptor)),
+      Flags(Flags)
+  {}
+};
+  
+/// Flags in an existential type metadata record.
+class ExistentialTypeFlags {
+  typedef size_t int_type;
+  enum : int_type {
+    NumWitnessTablesMask  = 0x7FFFFFFFU,
+    ClassConstraintMask = 0x80000000U,
+  };
+  int_type Data;
+
+  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr ExistentialTypeFlags() : Data(0) {}
+  constexpr ExistentialTypeFlags withNumWitnessTables(unsigned numTables) const {
+    return ExistentialTypeFlags((Data & ~NumWitnessTablesMask) | numTables);
+  }
+  constexpr ExistentialTypeFlags
+  withClassConstraint(ProtocolClassConstraint c) const {
+    return ExistentialTypeFlags((Data & ~ClassConstraintMask)
+                                  | (bool(c) ? ClassConstraintMask : 0));
+  }
+  
+  unsigned getNumWitnessTables() const {
+    return Data & NumWitnessTablesMask;
+  }
+  
+  ProtocolClassConstraint getClassConstraint() const {
+    return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
+  }
+};
+
+/// The structure of existential type metadata.
+struct ExistentialTypeMetadata : public Metadata {
+  /// The number of witness tables and class-constrained-ness of the type.
+  ExistentialTypeFlags Flags;
+  /// The protocol constraints.
+  ProtocolDescriptorList NumProtocols;
+  
+  /// NB: Protocols has a tail-emplaced array; additional fields cannot follow.
+};
 
 /// \brief The header in front of a generic metadata template.
 ///
