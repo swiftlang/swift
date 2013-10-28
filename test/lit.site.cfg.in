@@ -24,7 +24,7 @@ except KeyError:
 # Let the main config do the real work.
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
 
-# Enable Dawrin SDK-dependent tests if we have an SDK.
+# Enable Darwin SDK-dependent tests if we have an SDK.
 # On Linux, assume that SDK path does not point to the Darwin SDK.
 if "@MODULES_SDK@" != "" and platform.system() != 'Linux':
   config.available_features.add("sdk")
