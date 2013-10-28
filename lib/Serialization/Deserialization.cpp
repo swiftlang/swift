@@ -993,7 +993,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // A polymorphic constructor type needs to refer to the constructor to get
     // its generic parameters.
     ctor->setType(getType(signatureID));
-    ctor->setInterfaceType(getType(interfaceID));
+    if (auto interfaceType = getType(interfaceID))
+      ctor->setInterfaceType(interfaceType);
 
     // Set the initializer type of the constructor.
     auto allocType = ctor->getType();
@@ -1071,7 +1072,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     declOrOffset = var;
 
-    var->setInterfaceType(getType(interfaceTypeID));
+    if (auto interfaceType = getType(interfaceTypeID))
+      var->setInterfaceType(interfaceType);
 
     if (getterID || setterID) {
       var->setComputedAccessors(ctx, SourceLoc(),
@@ -1100,7 +1102,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isObjC, isIBAction, isTransparent;
     unsigned numParamPatterns;
     TypeID signatureID;
-    TypeID interfaceID;
+    TypeID interfaceTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
@@ -1109,7 +1111,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
                                         numParamPatterns, signatureID,
-                                        interfaceID, associatedDeclID,
+                                        interfaceTypeID, associatedDeclID,
                                         overriddenID);
 
     auto DC = getDeclContext(contextID);
@@ -1133,7 +1135,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setType(signature);
 
     // Set the interface type.
-    fn->setInterfaceType(getType(interfaceID));
+    if (auto interfaceType = getType(interfaceTypeID))
+      fn->setInterfaceType(interfaceType);
 
     SmallVector<Pattern *, 16> patternBuf;
     while (Pattern *pattern = maybeReadPattern())
@@ -1446,12 +1449,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::ENUM_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID argTypeID, ctorTypeID;
+    TypeID argTypeID, ctorTypeID, interfaceTypeID;
     bool isImplicit;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID, contextID,
                                                 argTypeID, ctorTypeID,
-                                                isImplicit);
+                                                interfaceTypeID, isImplicit);
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1468,6 +1471,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     declOrOffset = elem;
 
     elem->setType(getType(ctorTypeID));
+    if (auto interfaceType = getType(interfaceTypeID))
+      elem->setInterfaceType(interfaceType);
     if (isImplicit)
       elem->setImplicit();
 

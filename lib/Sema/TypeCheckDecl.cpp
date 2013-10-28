@@ -1737,6 +1737,27 @@ public:
     }
   }
 
+  /// Compute the interface type of the given enum element.
+  void computeEnumElementInterfaceType(EnumElementDecl *elt) {
+    auto enumDecl = cast<EnumDecl>(elt->getDeclContext());
+    assert(enumDecl->isGenericContext() && "Not a generic enum");
+
+    // Build the generic function type.
+    auto funcTy = elt->getType()->castTo<AnyFunctionType>();
+    auto inputTy = TC.getInterfaceTypeFromInternalType(enumDecl,
+                                                       funcTy->getInput());
+    auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
+                                                        funcTy->getResult());
+    auto interfaceTy
+      = GenericFunctionType::get(enumDecl->getGenericParamTypes(),
+                                 enumDecl->getGenericRequirements(),
+                                 inputTy, resultTy, funcTy->getExtInfo(),
+                                 TC.Context);
+
+    // Record the interface type.
+    elt->setInterfaceType(interfaceTy);
+  }
+
   void visitEnumElementDecl(EnumElementDecl *ED) {
     if (IsSecondPass || ED->hasType())
       return;
@@ -1772,6 +1793,8 @@ public:
       else
         fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
       ED->setType(fnTy);
+      if (ED->getDeclContext()->isGenericContext())
+        computeEnumElementInterfaceType(ED);
       return;
     }
 
@@ -1783,6 +1806,9 @@ public:
       fnTy = FunctionType::get(MetaTypeType::get(ElemTy, TC.Context), fnTy,
                                TC.Context);
     ED->setType(fnTy);
+
+    if (ED->getDeclContext()->isGenericContext())
+      computeEnumElementInterfaceType(ED);
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {

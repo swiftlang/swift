@@ -1301,11 +1301,12 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addIdentifierRef(elem->getName()),
-                                   addDeclRef(DC),
-                                   addTypeRef(elem->getArgumentType()),
-                                   addTypeRef(elem->getType()),
-                                   elem->isImplicit());
+                                  addIdentifierRef(elem->getName()),
+                                  addDeclRef(DC),
+                                  addTypeRef(elem->getArgumentType()),
+                                  addTypeRef(elem->getType()),
+                                  addTypeRef(elem->getInterfaceType()),
+                                  elem->isImplicit());
     break;
   }
 
