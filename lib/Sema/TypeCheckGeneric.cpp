@@ -851,17 +851,6 @@ Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
   return substType(dc->getParentModule(), type, substitutions);
 }
 
-ArrayRef<Substitution>
-TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
-                                 const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances,
-                                 bool OnlyInnermostParams) {
-  SmallVector<Substitution, 4> Results;
-  encodeSubstitutions(GenericParams, Substitutions, Conformances,
-                      OnlyInnermostParams, Results);
-  return Context.AllocateCopy(Results);
-}
-
 void TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
                                       const TypeSubstitutionMap &Substitutions,
                                       const ConformanceMap &Conformances,

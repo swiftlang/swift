@@ -729,25 +729,6 @@ public:
                                  ValueDecl *decl1,
                                  ValueDecl *decl2);
 
-  /// \brief Encode the provided substitutions.
-  ///
-  /// \param GenericParams The generic parameters whose substitutions are
-  /// being encoded.
-  ///
-  /// \param Substitutions The set of substitutions.
-  ///
-  /// \param Conformances The set of protocol conformances.
-  ///
-  /// \param OnlyInnermostParams Whether we're specializing only the innermost
-  /// generic parameters (rather than all levels of generic parameters).
-  ///
-  /// \returns an ASTContext-allocate array of substitutions.
-  ArrayRef<Substitution>
-  encodeSubstitutions(const GenericParamList *GenericParams,
-                      const TypeSubstitutionMap &Substitutions,
-                      const ConformanceMap &Conformances,
-                      bool OnlyInnermostParams);
-
   /// \brief Encode the provided substitutions in the form.
   ///
   /// \param GenericParams The generic parameters whose substitutions are
