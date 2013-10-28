@@ -1803,15 +1803,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       };
 
       // Add results for all imported modules.
-      SmallVector<Module::ImportedModule, 8> ImportedList;
-      auto *TU = cast<TranslationUnit>(CurDeclContext->getParentModule());
-      TU->getImportedModules(ImportedList, /*includePrivate=*/true);
-      for (auto Imported : ImportedList) {
+      auto *SF = CurDeclContext->getParentSourceFile();
+      for (std::pair<Module::ImportedModule, bool> Imported :
+               SF->getImports()) {
         std::vector<std::string> AccessPath;
-        for (auto Piece : Imported.first) {
+        for (auto Piece : Imported.first.first) {
           AccessPath.push_back(Piece.first.str());
         }
-        Module *TheModule = Imported.second;
+        Module *TheModule = Imported.first.second;
         StringRef ModuleFilename = TheModule->getModuleFilename();
         assert(!ModuleFilename.empty() && "should have a filename");
         CodeCompletionCacheImpl::Key K{ModuleFilename,
