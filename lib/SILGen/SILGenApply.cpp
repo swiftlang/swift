@@ -657,6 +657,11 @@ public:
     // or to delegate to a designated initializer.
     setCallee(Callee::forDirect(gen,
                 SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), e));
+
+    // If there are substitutions, add them.
+    if (e->getDeclRef().isSpecialized())
+      callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+                               e->getType()->getCanonicalType(), callDepth);
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -796,23 +801,32 @@ public:
       auto superValue = gen.B.createLoad(arg, super.getValue());
       super = gen.emitManagedRetain(arg, superValue);
     }
-    
-    // The callee for a super call has to be either a method or constructor.
-    Expr *fn = apply->getFn();
-    SILDeclRef constant;
-    SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(fn);
-    if (specialize)
-      fn = specialize->getSubExpr();
 
+    // Find the callee.
+    Expr *fn = apply->getFn();
+    ArrayRef<Substitution> substitutions;
+    if (SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(fn)) {
+      fn = specialize->getSubExpr();
+      substitutions = specialize->getSubstitutions();
+    }
+
+    // The callee for a super call has to be either a method or constructor.
+    SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
+
+      if (ctorRef->getDeclRef().isSpecialized())
+        substitutions = ctorRef->getDeclRef().getSubstitutions();
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       constant = SILDeclRef(declRef->getDecl(),
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
+
+      if (declRef->getDeclRef().isSpecialized())
+        substitutions = declRef->getDeclRef().getSubstitutions();
     } else
       llvm_unreachable("invalid super callee");
 
@@ -835,8 +849,10 @@ public:
       setCallee(Callee::forDirect(gen, constant, fn));
     }
 
-    if (specialize)
-      callee->addSubstitutions(gen, specialize, callDepth-1);
+    // If there are any substitutions for the callee, apply them now.
+    if (!substitutions.empty())
+      callee->addSubstitutions(gen, fn, substitutions,
+                               fn->getType()->getCanonicalType(), callDepth-1);
   }
   
   Callee getCallee() {

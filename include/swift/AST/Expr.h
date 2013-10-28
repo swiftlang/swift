@@ -504,20 +504,18 @@ public:
 /// entry point, called the 'initializing constructor', from the 'allocating
 /// constructor' entry point referenced by a 'new' expression.
 class OtherConstructorDeclRefExpr : public Expr {
-  ConstructorDecl *Ctor;
+  ConcreteDeclRef Ctor;
   SourceLoc Loc;
   
 public:
-  OtherConstructorDeclRefExpr(ConstructorDecl /*nullable*/ *Ctor, SourceLoc Loc,
-                              Type Ty = {})
+  OtherConstructorDeclRefExpr(ConcreteDeclRef Ctor, SourceLoc Loc, Type Ty = {})
     : Expr(ExprKind::OtherConstructorDeclRef, /*Implicit=*/true, Ty),
       Ctor(Ctor), Loc(Loc)
   {}
   
-  ConstructorDecl *getDecl() const {
-    return Ctor;
-  }
-  
+  ConstructorDecl *getDecl() const;
+  ConcreteDeclRef getDeclRef() const { return Ctor; }
+
   SourceLoc getConstructorLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   

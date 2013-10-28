@@ -169,6 +169,9 @@ void DeclRefExpr::setGenericArgs(ArrayRef<TypeRepr*> GenericArgs) {
   getSpecInfo()->GenericArgs = D->getASTContext().AllocateCopy(GenericArgs);
 }
 
+ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
+  return cast_or_null<ConstructorDecl>(Ctor.getDecl());
+}
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, SourceLoc nameLoc,

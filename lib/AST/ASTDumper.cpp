@@ -974,7 +974,10 @@ public:
     printCommon(E, "super_ref_expr") << ')';
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
-    printCommon(E, "other_constructor_ref_expr") << ')';
+    printCommon(E, "other_constructor_ref_expr")
+      << " decl=";
+    E->getDeclRef().dump(OS);
+    OS << ')';
   }
   void visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
     printCommon(E, "unresolved_constructor") << '\n';

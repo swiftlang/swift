@@ -945,6 +945,52 @@ namespace {
       return subscriptExpr;
     }
 
+    /// \brief Build a new reference to another constructor.
+    Expr *buildOtherConstructorRef(Type openedFullType,
+                                   ConstructorDecl *ctor, SourceLoc loc,
+                                   bool implicit) {
+      auto &tc = cs.getTypeChecker();
+      auto &ctx = tc.Context;
+
+      // Compute the concrete reference.
+      ConcreteDeclRef ref;
+      Type resultTy;
+      if (ctor->getInterfaceType() &&
+          ctor->getInterfaceType()->is<GenericFunctionType>()) {
+        // Compute the reference to the generic constructor.
+        SmallVector<Substitution, 4> substitutions;
+        resultTy = solution.computeSubstitutions(
+                     ctor->getInterfaceType()->castTo<GenericFunctionType>(),
+                     ctor,
+                     openedFullType,
+                     substitutions);
+
+        ref = ConcreteDeclRef(ctx, ctor, substitutions);
+
+        // The constructor was opened with the allocating type, not the
+        // initializer type. Map the former into the latter.
+        auto resultFnTy = resultTy->castTo<FunctionType>();
+        auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
+        if (!selfTy->hasReferenceSemantics())
+          selfTy = LValueType::get(selfTy,
+                                   LValueType::Qual::DefaultForMemberAccess,
+                                   ctx);
+
+        resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
+                                     resultFnTy->getExtInfo(), ctx);
+      } else {
+        ref = ConcreteDeclRef(ctor);
+        resultTy = ctor->getInitializerType();
+      }
+
+      // Build the constructor reference.
+      Expr *refExpr = new (ctx) OtherConstructorDeclRefExpr(ref, loc,
+                                                            resultTy);
+      if (implicit)
+        refExpr->setImplicit();
+      return refExpr;
+    }
+
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution)
       : cs(cs), dc(cs.DC), solution(solution) { }
@@ -1292,26 +1338,9 @@ namespace {
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
       // Build a call to the initializer for the constructor.
-      Expr *ctorRef
-        = new (cs.getASTContext()) OtherConstructorDeclRefExpr(ctor,
-                                     expr->getConstructorLoc(),
-                                     ctor->getInitializerType());
-      if (auto polyFn = ctorRef->getType()->getAs<PolymorphicFunctionType>()) {
-        auto &ctx = cs.getASTContext();
-
-        // Add the type of 'self' back on to the opened type of the overload.
-        // FIXME: Feels like a hack.
-        auto specializedType = selected.openedType;
-        auto selfType = specializedType->castTo<AnyFunctionType>()->getResult();
-        if (!selfType->hasReferenceSemantics())
-          selfType = LValueType::get(selfType,
-                                     LValueType::Qual::DefaultForMemberAccess,
-                                     ctx);
-        specializedType = FunctionType::get(selfType, specializedType, ctx);
-
-        ctorRef = solution.specialize(ctorRef, polyFn, specializedType);
-      }
-
+      Expr *ctorRef = buildOtherConstructorRef(selected.openedFullType,
+                                               ctor, expr->getConstructorLoc(),
+                                               expr->isImplicit());
       auto *call
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
