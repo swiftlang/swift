@@ -52,7 +52,8 @@ namespace swift {
     SILBasicBlock *getBBForDefinition(SILFunction *Fn, unsigned ID);
 
     /// Read a SIL function.
-    SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc);
+    SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
+                                 Identifier name);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);

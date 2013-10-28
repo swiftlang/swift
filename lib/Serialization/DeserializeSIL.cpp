@@ -209,7 +209,27 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
                                    Category);
 }
 
-SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
+/// Helper function to find the SILFunction given name and type.
+static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
+                                        SILModule &SILMod) {
+  // Check to see if we have a function by this name already.
+  if (SILFunction *FnRef = SILMod.lookup(Name.str()))
+    // FIXME: check for matching types.
+    return FnRef;
+
+  // If we didn't find a function, create a new one.
+  SourceLoc Loc;
+  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
+                                     Name.str(), Ty, SILFileLocation(Loc));
+  return Fn;
+}
+
+/// Deserialize a SILFunction if it is not already deserialized. The input
+/// SILFunction can either be an empty declaration or null. If it is an empty
+/// declaration, we fill in the contents. If the input SILFunction is
+/// null, we create a SILFunction.
+SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
+                                              Identifier FuncName) {
   LastValueID = 0;
   if (FID == 0)
     return nullptr;
@@ -244,10 +264,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   auto Ty = MF->getType(FuncTyID);
 
   // Verify that the types match up.
-  if (InFunc->getLoweredType() != getSILType(Ty, SILValueCategory::Object)) {
+  if (InFunc &&
+      InFunc->getLoweredType() != getSILType(Ty, SILValueCategory::Object)) {
     DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
     return nullptr;
   }
+  if (!InFunc)
+    // Find a declaration from SILModule or create a SILFunction.
+    InFunc = getFuncForReference(FuncName,
+                                 getSILType(Ty, SILValueCategory::Object),
+                                 SILMod);
+  assert(InFunc->empty() &&
+         "SILFunction to be deserialized starts being empty.");
+
   auto Fn = InFunc;
   // FIXME: what should we set the linkage to?
   Fn->setLinkage(SILLinkage::Deserialized);
@@ -318,21 +347,6 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     setLocalValue(Arg, ++LastValueID);
   }
   return CurrentBB;
-}
-
-/// Helper function to find the SILFunction given name and type.
-static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
-                                        SILModule &SILMod) {
-  // Check to see if we have a function by this name already.
-  if (SILFunction *FnRef = SILMod.lookup(Name.str()))
-    // FIXME: check for matching types.
-    return FnRef;
-
-  // If we didn't find a function, create a new one.
-  SourceLoc Loc;
-  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty, SILFileLocation(Loc));
-  return Fn;
 }
 
 static CheckedCastKind getCheckedCastKind(unsigned Attr) {
@@ -1136,7 +1150,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, InFunc);
+  auto Func = readSILFunction(*iter, InFunc, name);
   if (Func)
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
