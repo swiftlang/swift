@@ -3196,24 +3196,8 @@ static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
     // their replacements.
     otherType = tc.substType(dc->getParentModule(), otherType, substitutions);
 
-    // If we have a polymorphic function type for which all of the generic
-    // parameters have been replaced, make it monomorphic.
-    // FIXME: Arguably, this should be part of substType
-    if (auto polyFn = otherType->getAs<PolymorphicFunctionType>()) {
-      bool allReplaced = true;
-      for (auto gp : polyFn->getGenericParameters()) {
-        auto archetype = gp.getAsTypeParam()->getArchetype();
-        if (!substitutions.count(archetype)) {
-          allReplaced = false;
-          break;
-        }
-      }
-
-      if (allReplaced) {
-        otherType = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
-                                      tc.Context);
-      }
-    }
+    assert(!otherType->is<PolymorphicFunctionType>() &&
+           "Polymorphic function type slipped through");
   }
 }
 
