@@ -675,6 +675,9 @@ void ElementPromotion::doIt() {
       /// TODO: We could make this more powerful to directly support these
       /// cases, at least when the value doesn't escape.
       ///
+      /// When this gets fixed, the code in the ~ElementUseCollector() method
+      /// can be removed.
+      ///
       if (DI != DI_Yes) {
         // This is a release of an uninitialized value.  Emit a diagnostic.
         diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
@@ -1338,6 +1341,19 @@ namespace {
       : Uses(Uses) {
     }
 
+    ~ElementUseCollector() {
+      // As a final cleanup, move all ValueKind::Release uses to the end of the
+      // list.  This ensures that more specific diagnostics about use-before
+      // init are emitted before any release-specific diagnostics.
+      for (auto &U : Uses) {
+        std::partition(U.begin(), U.end(),
+                       [&](std::pair<SILInstruction*, UseKind> &V) {
+                         return V.second != UseKind::Release;
+                       });
+      }
+    }
+
+
     /// This is the main entry point for the use walker.
     void collectUses(SILValue Pointer, unsigned BaseElt);
     
@@ -1561,6 +1577,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)) {
       Uses[BaseElt].push_back({User, UseKind::Load});
       // TODO: Is it safe to ignore all uses of the project_existential?
+      continue;
+    }
+
+    // We model destroy_addr as a release of the entire value.
+    if (isa<DestroyAddrInst>(User)) {
+      for (auto &UseArray : Uses)
+        UseArray.push_back({ User, UseKind::Release });
       continue;
     }
 
@@ -1887,5 +1910,3 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
     lowerRawSILOperations(Fn);
   }
 }
-
-

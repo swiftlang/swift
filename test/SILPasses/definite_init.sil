@@ -572,3 +572,20 @@ bb5:                                              // Preds: bb4
 // CHECK: return %0 : $Int64
 }
 
+
+
+sil @destroy_addr : $@cc(method) @thin ((), SomeClass) -> SomeClass {
+bb0(%0 : $SomeClass):
+  %1 = alloc_stack $SomeClass
+  %2 = tuple ()
+  store %0 to %1#1 : $*SomeClass
+  %7 = load %1#1 : $*SomeClass
+  strong_retain %7 : $SomeClass
+  strong_release %7 : $SomeClass
+  %12 = load %1#1 : $*SomeClass                   // users: %16, %13
+  strong_retain %12 : $SomeClass                  // id: %13
+  destroy_addr %1#1 : $*SomeClass                 // id: %14
+  dealloc_stack %1#0 : $*@local_storage SomeClass // id: %15
+  return %12 : $SomeClass                         // id: %16
+}
+
