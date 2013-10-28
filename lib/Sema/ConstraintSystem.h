@@ -709,34 +709,6 @@ public:
   /// type).
   Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
 
-  /// \brief Generate a specialized instance of a polymorphic expression.
-  ///
-  /// \param expr        The polymorphic expression.
-  /// \param polyFn      The unopened polymorphic type of the expression.
-  /// \param openedType  The opened specialized type to instantiate.
-  ///
-  /// \returns A SpecializeExpr containing the expression specialized to the
-  /// opened type.
-  Expr *specialize(Expr *expr,
-                   PolymorphicFunctionType *polyFn,
-                   Type openedType) const;
-
-  /// Compute the set of substitutions required to map the given polymorphic
-  /// function type to the provided "opened" type.
-  ///
-  /// \param polyFn The polymorphic function type.
-  ///
-  /// \param openedType The type to which this reference to the given
-  /// polymorphic function type was opened.
-  ///
-  /// \param substitutions Will be populated with the set of substitutions
-  /// to be applied to the polymorphic function type.
-  ///
-  /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(PolymorphicFunctionType *polyFn,
-                            Type openedType,
-                            SmallVectorImpl<Substitution> &substitutions) const;
-
   /// Compute the set of substitutions required to map the given generic
   /// function type to the provided "opened" type.
   ///

@@ -35,85 +35,6 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
   return knownBinding->second;
 }
 
-Expr *Solution::specialize(Expr *expr,
-                           PolymorphicFunctionType *polyFn,
-                           Type openedType) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-  
-  // Gather the substitutions from archetypes to concrete types, found
-  // by identifying all of the type variables in the original type
-  TypeSubstitutionMap substitutions;
-  auto type
-    = tc.transformType(openedType,
-        [&](Type type) -> Type {
-          if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-            auto archetype = tv->getImpl().getArchetype();
-            auto simplified = getFixedType(tv);
-            substitutions[archetype] = simplified;
-             
-            return SubstitutedType::get(archetype, simplified,
-                                        tc.Context);
-          }
-          
-          return type;
-        });
-  
-  // Check that the substitutions we've produced actually work.
-  // FIXME: We'd like the type checker to ensure that this always
-  // succeeds.
-  ConformanceMap conformances;
-  if (tc.checkSubstitutions(substitutions, conformances,
-                            getConstraintSystem().DC, expr->getLoc(),
-                            &substitutions))
-    return nullptr;
-  
-  // Build the specialization expression.
-  auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
-                                            substitutions, conformances,
-                                            /*OnlyInnermostParams=*/true);
-  return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
-}
-
-Type Solution::computeSubstitutions(
-                 PolymorphicFunctionType *polyFn,
-                 Type openedType,
-                 SmallVectorImpl<Substitution> &substitutions) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-
-  // Gather the substitutions from archetypes to concrete types, found
-  // by identifying all of the type variables in the original type
-  TypeSubstitutionMap typeSubstitutions;
-  auto type
-    = tc.transformType(openedType,
-                       [&](Type type) -> Type {
-        if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-          auto archetype = tv->getImpl().getArchetype();
-          auto simplified = getFixedType(tv);
-          typeSubstitutions[archetype] = simplified;
-
-          return SubstitutedType::get(archetype, simplified, tc.Context);
-        }
-
-        return type;
-      });
-
-  // Check that the substitutions we've produced actually work.
-  // FIXME: We'd like the type checker to ensure that this always
-  // succeeds.
-  ConformanceMap conformances;
-  if (tc.checkSubstitutions(typeSubstitutions, conformances,
-                            getConstraintSystem().DC, SourceLoc(),
-                            &typeSubstitutions))
-    return Type();
-
-  tc.encodeSubstitutions(&polyFn->getGenericParams(),
-                         typeSubstitutions, conformances,
-                         /*OnlyInnermostParams=*/true,
-                         substitutions);
-
-  return type;
-}
-
 Type Solution::computeSubstitutions(
                  GenericFunctionType *genericFn,
                  DeclContext *dc,
@@ -649,12 +570,9 @@ namespace {
       }
 
       // Build a reference where the base is ignored.
-      Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
-        return solution.specialize(result, polyFn, openedType);
-      }
-
-      return result;
+      assert(!ref->getType()->is<PolymorphicFunctionType>() &&
+             "Polymorphic function type slipped through");
+      return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
     }
     
     /// \brief Build a new dynamic member reference with the given base and
@@ -666,20 +584,12 @@ namespace {
 
       // If we're specializing a polymorphic function, compute the set of
       // substitutions and form the member reference.
-      Optional<ConcreteDeclRef> memberRef;
+      Optional<ConcreteDeclRef> memberRef(member);
       if (auto func = dyn_cast<FuncDecl>(member)) {
         auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
-        if (auto polyFn = resultTy->getAs<PolymorphicFunctionType>()) {
-          llvm::SmallVector<Substitution, 4> substitutions;
-          solution.computeSubstitutions(polyFn, openedType, substitutions);
-          memberRef = ConcreteDeclRef(context, member, substitutions);
-        }
+        assert(!resultTy->is<PolymorphicFunctionType>() &&
+               "Polymorphic function type slipped through");
       }
-
-      // If we didn't have a specialized member reference, it's a normal
-      // reference.
-      if (!memberRef)
-        memberRef = member;
 
       // The base must always be an rvalue.
       base = cs.getTypeChecker().coerceToRValue(base);
@@ -3182,10 +3092,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setType(fnType->getResult());
     apply->setIsSuper(isSuper);
 
-    if (auto polyFn = apply->getType()->getAs<PolymorphicFunctionType>()) {
-      return solution.specialize(apply, polyFn, openedType);
-    }
-
+    assert(!apply->getType()->is<PolymorphicFunctionType>() &&
+           "Polymorphic function type slipped through");
     return tc.substituteInputSugarTypeForResult(apply);
   }
 
