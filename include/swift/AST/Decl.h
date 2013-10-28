@@ -1126,7 +1126,7 @@ public:
   bool isObjC() const { return AttrsAndIsObjC.getInt(); }
   
   void setIsObjC(bool value) {
-    AttrsAndIsObjC = {AttrsAndIsObjC.getPointer(), value};
+    AttrsAndIsObjC.setInt(value);
   }
   
   /// Returns true if this decl can be found by id-style dynamic lookup.
