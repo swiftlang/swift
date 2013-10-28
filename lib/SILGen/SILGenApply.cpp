@@ -99,7 +99,7 @@ private:
       CanType origType;
     } genericMethod;
   };
-  std::vector<Substitution> substitutions;
+  ArrayRef<Substitution> substitutions;
   // There is an initialization order dependency between genericMethod and
   // specializedType.
   CanType specializedType;
@@ -282,9 +282,9 @@ public:
     // FIXME: Generic local functions can add type parameters to arbitrary
     // depth.
     assert(callDepth < 2 && "specialization below 'self' or argument depth?!");
-    substitutions.insert(substitutions.end(),
-                         newSubs.begin(),
-                         newSubs.end());
+    assert(substitutions.empty() && "Already have substitutions?");
+    substitutions = newSubs;
+    
     // Save the type of the specializations at the right depth in the type.
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
@@ -593,8 +593,8 @@ public:
         callSites.pop_back();
         setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
         SILDeclRef constant(fd,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             gen.SGM.requiresObjCDispatch(fd));
+                            SILDeclRef::ConstructAtNaturalUncurryLevel,
+                            gen.SGM.requiresObjCDispatch(fd));
         
         setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
                                          constant, e));
