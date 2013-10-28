@@ -7,31 +7,29 @@ import swift
 // CHECK-LABEL: sil @simple_reg_promotion
 sil @simple_reg_promotion : $@thin (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_box $Int64                   // CHECK: alloc_box
+  %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = alloc_box $Int64                   // CHECK: alloc_box
+  %3 = alloc_box $Int64
   %4 = load %1#1 : $*Int64
-  store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
+  store %4 to %3#1 : $*Int64
   %6 = load %3#1 : $*Int64
-  strong_release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
+  strong_release %3#0 : $Builtin.ObjectPointer
   strong_release %1#0 : $Builtin.ObjectPointer
   return %6 : $Int64
 
-  // CHECK: return %0 : $Int64
+  // CHECK-NEXT: return %0 : $Int64
 }
 
 
 // CHECK-LABEL: sil @tuple_reg_promotion
 sil @tuple_reg_promotion : $@thin (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_box $(Int64, Int64)                   // CHECK: alloc_box
+  %1 = alloc_box $(Int64, Int64)
   
   %a = tuple_element_addr %1#1 : $*(Int64, Int64), 0
   %b = tuple_element_addr %1#1 : $*(Int64, Int64), 1
   store %0 to %a : $*Int64
-  // CHECK: store %0 to
   store %0 to %b : $*Int64
-  // CHECK-NEXT: store %0 to 
 
   %c = load %1#1 : $*(Int64, Int64)
   %d = tuple_extract %c : $(Int64, Int64), 0
@@ -42,10 +40,10 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 
   // Verify that promotion has promoted the tuple load away, and we know that
   // %0 is being returned through scalar instructions in SSA form.
-  // CHECK: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int64, {{.*}} : $Int64)
-  // CHECK: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int64, Int64), 0
+  // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int64, {{.*}} : $Int64)
+  // CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int64, Int64), 0
 
-  // CHECK: return [[TUPLE_ELT]] : $Int64
+  // CHECK-NEXT: return [[TUPLE_ELT]] : $Int64
 }
 
 
@@ -237,12 +235,12 @@ bb0(%0 : $Int64):
 
   // These assigns are a mix of init + store forms, but because Int is trivial,
   // they all turn into stores.
-  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
-  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
-  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
+  assign %0 to %1#1 : $*Int64
+  assign %0 to %1#1 : $*Int64
+  assign %0 to %1#1 : $*Int64
 
   %2 = load %1#1 : $*Int64
-  strong_release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: strong_release %1#0
+  strong_release %1#0 : $Builtin.ObjectPointer
 
   // Verify that the load got forwarded from an assign.
   return %2 : $Int64                        // CHECK: return %0 : $Int64
@@ -262,16 +260,14 @@ bb0:
   // CHECK: [[C1:%[0-9]+]] = apply
 
   assign %4 to %c#1 : $*SomeClass
-  // CHECK-NEXT: store [[C1]]
 
   %8 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c#1 : $*SomeClass
-  // CHECK-NEXT: store [[C2]]
-  // CHECK-NEXT: release [[C1]]
 
   strong_release %c#0 : $Builtin.ObjectPointer
+  // CHECK-NEXT: strong_release [[C1]]
 
   %11 = tuple ()
   return %11 : $()
@@ -308,7 +304,11 @@ bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %c = alloc_box $@sil_weak SomeClass
+  %c = alloc_box $@sil_weak SomeClass  // expected-note {{variable defined here}}
+  
+  // Invalid load to keep the alloc_box around so we can check init semantics.
+  load %c#1 : $*@sil_weak SomeClass    // expected-error {{used before being initialized}}
+
   %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
@@ -344,7 +344,7 @@ bb0:
   // second becomes an assignment.
 
   %c = alloc_box $@sil_unowned SomeClass
-  // CHECK: [[BOX:%[0-9]+]] = alloc_box
+
   %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
@@ -358,7 +358,6 @@ bb0:
   strong_release %4 : $SomeClass
   // CHECK-NEXT: [[C1u:%[0-9]+]] = ref_to_unowned [[C1]]
   // CHECK-NEXT: unowned_retain [[C1u]]
-  // CHECK-NEXT: store [[C1u]] to [[BOX]]#1
   // CHECK-NEXT: strong_release [[C1]]
 
   %8 = apply %f(%3) : $@thin ((), SomeClass.metatype) -> SomeClass
@@ -368,9 +367,8 @@ bb0:
   unowned_retain %9 : $@sil_unowned SomeClass
   assign %9 to %c#1 : $*@sil_unowned SomeClass
   strong_release %8 : $SomeClass
-  // CHECK-NEXT: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
+  // CHECK: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
   // CHECK-NEXT: unowned_retain [[C2u]]
-  // CHECK-NEXT: store [[C2u]] to [[BOX]]#1
   // CHECK-NEXT: unowned_release [[C1u]]
   // CHECK-NEXT: strong_release [[C2]]
 
@@ -441,7 +439,7 @@ bb0(%0 : $Int64):
   %18 = struct $Int64 (%5 : $Builtin.Int64)
   %22 = alloc_stack $Int64
 
-  // CHECK: store
+  // CHECK-NOT: alloc_stack
   // CHECK: [[SE:%[0-9]+]] = struct_extract
 
   store %18 to %22#1 : $*Int64
@@ -454,37 +452,36 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: sil @copy_addr_to_load
 sil @copy_addr_to_load : $@thin (i : Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64     // CHECK: alloc_stack
-  store %0 to %1#1 : $*Int64  // CHECK: store
-  %2 = alloc_stack $Int64     // CHECK: alloc_stack
+bb0(%0 : $Int64):               // CHECK: bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1#1 : $*Int64
+  %2 = alloc_stack $Int64
   
-  // CHECK-NEXT: store
   copy_addr %1#1 to [initialization] %2#1 : $*Int64
 
   %3 = load %2#1 : $*Int64
 
-  dealloc_stack %2#0 : $*@local_storage Int64  // CHECK-NEXT: dealloc_stack
-  dealloc_stack %1#0 : $*@local_storage Int64  // CHECK-NEXT: dealloc_stack
-  // CHECK: return %0
+  dealloc_stack %2#0 : $*@local_storage Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  // CHECK-NEXT: return %0
   return %3 : $Int64
 }
 
 // rdar://15170149
 // CHECK-LABEL: sil @store_to_copyaddr
-sil @store_to_copyaddr : $() -> () {
+sil @store_to_copyaddr : $() -> Bool {
 bb0:
   %0 = enum $Bool, #Bool.true!enumelt  // CHECK: %0 = enum $Bool
-  %1 = alloc_stack $Bool               // CHECK-NEXT: alloc_stack
-  store %0 to %1#1 : $*Bool            // CHECK-NEXT: store
-  %3 = alloc_stack $Bool               // CHECK-NEXT: alloc_stack
-  copy_addr %1#1 to [initialization] %3#1 : $*Bool  // CHECK-NEXT: store
+  %1 = alloc_stack $Bool
+  store %0 to %1#1 : $*Bool
+  %3 = alloc_stack $Bool
+  copy_addr %1#1 to [initialization] %3#1 : $*Bool
   %5 = load %3#1 : $*Bool
-  copy_addr %3#1 to %1#1 : $*Bool      // CHECK-NEXT: store
-  dealloc_stack %3#0 : $*@local_storage Bool // CHECK-NEXT: dealloc_stack
-  dealloc_stack %1#0 : $*@local_storage Bool // CHECK-NEXT: dealloc_stack
-  %12 = tuple ()
-  return %12 : $()
+  copy_addr %3#1 to %1#1 : $*Bool
+  %12 = load %1#1 : $*Bool
+  dealloc_stack %3#0 : $*@local_storage Bool
+  dealloc_stack %1#0 : $*@local_storage Bool
+  return %12 : $Bool                              // CHECK-NEXT: return %0
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion
@@ -492,17 +489,17 @@ sil @cross_block_load_promotion : $@thin (a: Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64
   store %0 to %1#1 : $*Int64
-  %11 = integer_literal $Builtin.Int1, 1          // user: %3
+  %11 = integer_literal $Builtin.Int1, 1
   cond_br %11, bb1, bb2
 
-bb1:                                              // Preds: bb3
+bb1:
   br bb5
 
-bb2:                                              // Preds: bb0
+bb2:
   br bb5
 
-bb5:                                              // Preds: bb4
-  %15 = load %1#1 : $*Int64                       // user: %18
+bb5:
+  %15 = load %1#1 : $*Int64
   dealloc_stack %1#0 : $*@local_storage Int64
   return %15 : $Int64
 

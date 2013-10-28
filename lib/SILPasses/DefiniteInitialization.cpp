@@ -15,7 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/Basic/Fixnum.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -25,6 +25,7 @@ using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
+STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
@@ -488,7 +489,7 @@ namespace {
     void handleStoreUse(std::pair<SILInstruction*, UseKind> &InstInfo,
                         DIKind Kind);
 
-    void promoteLoad(SILInstruction *Inst);
+    bool promoteLoad(SILInstruction *Inst);
 
     bool isLiveOut(SILBasicBlock *BB);
 
@@ -690,7 +691,8 @@ void ElementPromotion::doIt() {
     auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
     if (Use.first && Use.second == UseKind::Load)
-      promoteLoad(Use.first);
+      if (promoteLoad(Use.first))
+        Uses[i].first = nullptr;  // remove entry if load got deleted.
   }
 }
 
@@ -1136,7 +1138,9 @@ AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
 /// analysis.  We know that accesses to this element only access this element,
 /// cross element accesses have been scalarized.
 ///
-void ElementPromotion::promoteLoad(SILInstruction *Inst) {
+/// This returns true if the load has been removed from the program.
+///
+bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
@@ -1144,19 +1148,18 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // diagnostics pass this like one.
 
   // We only handle load and copy_addr right now.
-  if (!isa<LoadInst>(Inst) && !isa<CopyAddrInst>(Inst)) return;
+  if (auto CAI = dyn_cast<CopyAddrInst>(Inst)) {
+    // If this is a CopyAddr, verify that the element type is loadable.  If not,
+    // we can't explode to a load.
+    if (!CAI->getSrc().getType().isLoadable(Inst->getModule()))
+      return false;
+  } else if (!isa<LoadInst>(Inst))
+    return false;
 
-  
-  // If this is a CopyAddr, verify that the element type is loadable.  If not,
-  // we can't explode to a load.
-  if (isa<CopyAddrInst>(Inst) &&
-      !Inst->getOperand(0).getType().isLoadable(Inst->getModule()))
-    return;
-  
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
   if (hasEscapedAt(Inst))
-    return;
+    return false;
 
   CanType LoadTy = Inst->getOperand(0).getType().getSwiftRValueType();
 
@@ -1187,7 +1190,7 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
       }
   
     if (!AnyAvailable)
-      return;
+      return false;
   }
   
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
@@ -1195,7 +1198,10 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // see the load and propagate the available values into it.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
     explodeCopyAddr(CAI);
-    return;
+
+    // This is removing the copy_addr, but explodeCopyAddr takes care of
+    // removing the instruction from Uses for us, so we return false.
+    return false;
   }
   
   // Aggregate together all of the subelements into something that has the same
@@ -1215,6 +1221,7 @@ void ElementPromotion::promoteLoad(SILInstruction *Inst) {
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
   RemoveDeadAddressingInstructions(Addr);
+  return true;
 }
 
 
@@ -1310,9 +1317,8 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
 
 
 
-
 //===----------------------------------------------------------------------===//
-//                          Top Level Driver
+//                          ElementUseCollector
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -1638,6 +1644,77 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                           Top Level Driver
+//===----------------------------------------------------------------------===//
+
+static void eraseUsesOfInstruction(SILInstruction *Inst) {
+  for (auto UI : Inst->getUses()) {
+    auto *User = UI->getUser();
+
+    // If the instruction itself has any uses, recursively zap them so that
+    // nothing uses this instruction.
+    eraseUsesOfInstruction(User);
+
+    // Walk through the operand list and delete any random instructions that
+    // will become trivially dead when this instruction is removed.
+
+    for (auto &Op : User->getAllOperands()) {
+      if (auto *OpI = dyn_cast<SILInstruction>(Op.get().getDef())) {
+        // Don't recursively delete the pointer we're getting in.
+        if (OpI != Inst) {
+          Op.drop();
+          recursivelyDeleteTriviallyDeadInstructions(OpI);
+        }
+      }
+    }
+
+    User->eraseFromParent();
+  }
+}
+
+/// removeDeadAllocation - If the allocation is an autogenerated allocation that
+/// is only stored to (after load promotion) then remove it completely.
+static void removeDeadAllocation(SILInstruction *Alloc,
+                                 SmallVectorImpl<ElementUses> &Uses) {
+  // We only look at and try to remove allocations that don't correspond to
+  // var decls (or locations from the SIL parser, so we can test this), unless
+  // the var decl was auto-generated.
+  if (Alloc->getLoc().getAsASTNode<VarDecl>() &&
+      !Alloc->getLoc().isAutoGenerated() &&
+      !Alloc->getLoc().is<MandatoryInlinedLocation>())
+    return;
+
+
+  // Check the uses list to see if there are any non-store uses left over after
+  // load promotion and other things DI does.
+  for (auto &EU : Uses)
+    for (auto &U : EU) {
+      // Ignore removed instructions.
+      if (U.first == nullptr) continue;
+
+      switch (U.second) {
+      case UseKind::Store:
+      case UseKind::PartialStore:
+      case UseKind::Release:
+        break;    // These don't prevent removal.
+
+      case UseKind::Load:
+      case UseKind::InOutUse:
+      case UseKind::Escape:
+        DEBUG(llvm::errs() << "*** Failed to remove autogenerated alloc: "
+              "kept alive by: " << *U.first);
+        return;   // These do prevent removal.
+      }
+    }
+
+  DEBUG(llvm::errs() << "*** Removing autogenerated alloc_stack: " << *Alloc);
+
+  // If it is safe to remove, do it.  Recursively remove all instructions
+  // hanging off the allocation instruction, then return success.  Let the
+  // caller remove the allocation itself to avoid iterator invalidation.
+  eraseUsesOfInstruction(Alloc);
+}
 
 static void processAllocBox(AllocBoxInst *ABI) {
   DEBUG(llvm::errs() << "*** Definite Init looking at: " << *ABI << "\n");
@@ -1666,6 +1743,8 @@ static void processAllocBox(AllocBoxInst *ABI) {
   unsigned EltNo = 0;
   for (auto &Elt : Uses)
     ElementPromotion(ABI, EltNo++, Elt).doIt();
+
+  removeDeadAllocation(ABI, Uses);
 }
 
 static void processAllocStack(AllocStackInst *ASI) {
@@ -1695,6 +1774,8 @@ static void processAllocStack(AllocStackInst *ASI) {
   unsigned EltNo = 0;
   for (auto &Elt : Uses)
     ElementPromotion(ASI, EltNo++, Elt).doIt();
+
+  removeDeadAllocation(ASI, Uses);
 }
 
 static void processMarkUninitialized(MarkUninitializedInst *MUI) {
@@ -1730,13 +1811,24 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
         
         // Carefully move iterator to avoid invalidation problems.
         ++I;
-        if (ABI->use_empty())
+        if (ABI->use_empty()) {
           ABI->eraseFromParent();
+          ++NumAllocRemoved;
+        }
         continue;
       }
 
-      if (auto *ASI = dyn_cast<AllocStackInst>(I))
+      if (auto *ASI = dyn_cast<AllocStackInst>(I)) {
         processAllocStack(ASI);
+
+        // Carefully move iterator to avoid invalidation problems.
+        ++I;
+        if (ASI->use_empty()) {
+          ASI->eraseFromParent();
+          ++NumAllocRemoved;
+        }
+        continue;
+      }
 
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(I))
         processMarkUninitialized(MUI);
