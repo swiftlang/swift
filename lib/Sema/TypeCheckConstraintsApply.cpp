@@ -591,33 +591,7 @@ namespace {
 
         if (isa<FuncDecl>(member) || isa<EnumElementDecl>(member) ||
             isa<ConstructorDecl>(member)) {
-          // We're binding a reference to an instance method of a generic
-          // type, which we build as a reference to the underlying declaration
-          // specialized based on the deducing the arguments of the generic
-          // type.
-
-          // Reference to the generic member.
-          Expr *ref = tc.buildCheckedRefExpr(member, memberLoc, Implicit);
-
-          // Specialize the member with the types deduced from the object
-          // argument. This eliminates the genericity that comes from being
-          // an instance method of a generic class.
-          Expr *specializedRef
-            = tc.buildSpecializeExpr(ref, substTy, substitutions, conformances);
-
-          ApplyExpr *apply;
-          if (isa<ConstructorDecl>(member)) {
-            // FIXME: Provide type annotation.
-            apply = new (context) ConstructorRefCallExpr(specializedRef, base);
-          } else if (!baseIsInstance && member->isInstanceMember()) {
-            return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
-                                                          specializedRef);
-          } else {
-            assert((!baseIsInstance || member->isInstanceMember()) &&
-                   "can't call a static method on an instance");
-            apply = new (context) DotSyntaxCallExpr(specializedRef, dotLoc, base);
-          }
-          return finishApply(apply, openedType, nullptr);
+          llvm_unreachable("Function-like entities handled above");
         }
 
         // Build a reference to a generic member.

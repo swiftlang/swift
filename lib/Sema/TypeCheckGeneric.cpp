@@ -851,18 +851,6 @@ Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
   return substType(dc->getParentModule(), type, substitutions);
 }
 
-SpecializeExpr *
-TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
-                                 const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances) {
-  auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
-  return new (Context) SpecializeExpr(Sub, Ty,
-                         encodeSubstitutions(&polyFn->getGenericParams(),
-                                             Substitutions,
-                                             Conformances,
-                                             /*OnlyInnermostParams=*/false));
-}
-
 ArrayRef<Substitution>
 TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
                                  const TypeSubstitutionMap &Substitutions,

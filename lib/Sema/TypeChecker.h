@@ -769,22 +769,6 @@ public:
                            bool OnlyInnermostParams,
                            SmallVectorImpl<Substitution> &Results);
 
-  /// \brief Build a new SpecializeExpr wrapping the given subexpression.
-  ///
-  /// \param Sub The subexpression to wrap, which must have polymorphic
-  /// function type.
-  ///
-  /// \param Ty The type of the resulting SpecializeExpr.
-  ///
-  /// \param Substitutions The set of substitutions from each of the archetypes
-  /// to the replacement type.
-  ///
-  /// \param Conformances The set of protocol-conformance structures for each
-  /// of the substitutions.
-  SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
-                                      const TypeSubstitutionMap &Substitutions,
-                                      const ConformanceMap &Conformances);
-
   /// \brief Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc, bool Implicit);
 
