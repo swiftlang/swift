@@ -272,7 +272,7 @@ public:
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
 
-  void addSubstitutions(SILGenFunction &gen,
+  void setSubstitutions(SILGenFunction &gen,
                         SILLocation loc,
                         ArrayRef<Substitution> newSubs,
                         CanType subType,
@@ -284,7 +284,7 @@ public:
     assert(callDepth < 2 && "specialization below 'self' or argument depth?!");
     assert(substitutions.empty() && "Already have substitutions?");
     substitutions = newSubs;
-    
+
     // Save the type of the specializations at the right depth in the type.
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
@@ -605,7 +605,7 @@ public:
 
         // If there are substitutions, add them.
         if (e->getDeclRef().isSpecialized()) {
-          callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+          callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
                                    e->getType()->getCanonicalType(),
                                    callDepth);
         }
@@ -632,7 +632,7 @@ public:
 
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized()) {
-      callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+      callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
                                e->getType()->getCanonicalType(),
                                callDepth);
     }
@@ -646,7 +646,7 @@ public:
 
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized())
-      callee->addSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
+      callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
                                e->getType()->getCanonicalType(), callDepth);
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
@@ -726,7 +726,7 @@ public:
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
-      callee->addSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
+      callee->setSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
                                callDepth);
     }
   }
@@ -766,7 +766,7 @@ public:
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
-      callee->addSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
+      callee->setSubstitutions(gen, e, subs, e->getType()->getCanonicalType(),
                                callDepth);
     }
   }
@@ -831,7 +831,7 @@ public:
 
     // If there are any substitutions for the callee, apply them now.
     if (!substitutions.empty())
-      callee->addSubstitutions(gen, fn, substitutions,
+      callee->setSubstitutions(gen, fn, substitutions,
                                fn->getType()->getCanonicalType(), callDepth-1);
   }
   
@@ -1701,7 +1701,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
     substAccessorType = getThinFunctionType(substAccessorType,
                                             gen.SGM.getConstantCC(constant));
 
-    callee.addSubstitutions(gen, loc, substitutions,
+    callee.setSubstitutions(gen, loc, substitutions,
                             substAccessorType->getCanonicalType(), 0);
   }
   return callee;
