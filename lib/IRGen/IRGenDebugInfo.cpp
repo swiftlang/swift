@@ -1278,9 +1278,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Location L = getLoc(SM, Archetype->getAssocType());
     auto Superclass = Archetype->getSuperclass();
     auto DerivedFrom = Superclass.isNull() ? llvm::DIType() :
-      getOrCreateType(DebugTypeInfo(Superclass,
-                                    Types.getCompleteTypeInfo
-                                    (Superclass->getCanonicalType())), File);
+      getOrCreateDesugaredType(Superclass, DbgTy, Scope);
     auto DITy = DBuilder.createStructType(Scope, Name, File, L.Line,
                                           SizeInBits, AlignInBits, Flags,
                                           DerivedFrom, llvm::DIArray(),
