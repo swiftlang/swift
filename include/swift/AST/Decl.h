@@ -2289,7 +2289,7 @@ class FuncDecl : public AbstractFunctionDecl {
   /// \sa getBodyResultType()
   Type BodyResultType;
 
-  llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
+  llvm::PointerIntPair<ValueDecl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
@@ -2438,27 +2438,27 @@ public:
   
   /// makeGetter - Note that this function is the getter for the given
   /// declaration, which may be either a variable or a subscript declaration.
-  void makeGetter(Decl *D) {
+  void makeGetter(ValueDecl *D) {
     GetOrSetDecl.setPointer(D);
     GetOrSetDecl.setInt(false);
   }
   
   /// makeSetter - Note that this function is the setter for the given
   /// declaration, which may be either a variable or a subscript declaration.
-  void makeSetter(Decl *D) {
+  void makeSetter(ValueDecl *D) {
     GetOrSetDecl.setPointer(D);
     GetOrSetDecl.setInt(true);
   }
   
   /// getGetterDecl - If this function is a getter, retrieve the declaration for
   /// which it is a getter. Otherwise, returns null.
-  Decl *getGetterDecl() const {
+  ValueDecl *getGetterDecl() const {
     return GetOrSetDecl.getInt()? nullptr : GetOrSetDecl.getPointer();
   }
 
   /// getSetterDecl - If this function is a setter, retrieve the declaration for
   /// which it is a setter. Otherwise, returns null.
-  Decl *getSetterDecl() const {
+  ValueDecl *getSetterDecl() const {
     return GetOrSetDecl.getInt()? GetOrSetDecl.getPointer() : nullptr;
   }
 
@@ -2468,7 +2468,7 @@ public:
 
   /// getGetterOrSetterDecl - Return the declaration for which this function
   /// is a getter or setter, if it is one.
-  Decl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
+  ValueDecl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).
