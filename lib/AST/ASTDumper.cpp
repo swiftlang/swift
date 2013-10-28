@@ -1163,12 +1163,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitSpecializeExpr(SpecializeExpr *E) {
-    printCommon(E, "specialize_expr") << '\n';
-    printSubstitutions(E->getSubstitutions());
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());

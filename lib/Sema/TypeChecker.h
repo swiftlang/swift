@@ -729,8 +729,7 @@ public:
                                  ValueDecl *decl1,
                                  ValueDecl *decl2);
 
-  /// \brief Encode the provided substitutions in the form used by
-  /// SpecializeExpr (and another other AST nodes that require specialization).
+  /// \brief Encode the provided substitutions.
   ///
   /// \param GenericParams The generic parameters whose substitutions are
   /// being encoded.
@@ -749,8 +748,7 @@ public:
                       const ConformanceMap &Conformances,
                       bool OnlyInnermostParams);
 
-  /// \brief Encode the provided substitutions in the form used by
-  /// SpecializeExpr (and another other AST nodes that require specialization).
+  /// \brief Encode the provided substitutions in the form.
   ///
   /// \param GenericParams The generic parameters whose substitutions are
   /// being encoded.

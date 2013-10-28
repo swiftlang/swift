@@ -1668,43 +1668,6 @@ public:
   }
 };
 
-/// SpecializeExpr - Specializes a reference to a generic entity by binding
-/// each of its type parameters to a specific type.
-///
-/// In a type-checked AST, every reference to a generic entity will be bound
-/// (at some point) by a SpecializeExpr. The type of a SpecializeExpr is the
-/// type of the entity with all of the type parameters substituted.
-///
-/// An example:
-/// \code
-/// func identity<T>(x : T) -> T { return x }
-///
-/// var i : Int = identity(17) // 'identity' is specialized to (x : Int) -> Int
-/// \endcode
-class SpecializeExpr : public ImplicitConversionExpr {
-public:
-  typedef swift::Substitution Substitution;
-
-private:
-  ArrayRef<Substitution> Substitutions;
-
-public:
-  SpecializeExpr(Expr *SubExpr, Type Ty, ArrayRef<Substitution> Substitutions)
-    : ImplicitConversionExpr(ExprKind::Specialize, SubExpr, Ty),
-      Substitutions(Substitutions) { }
-
-  /// \brief Retrieve the set of substitutions applied to specialize the
-  /// subexpression.
-  ///
-  /// Each substitution contains the archetype being substitued, the type it is
-  /// being replaced with, and the protocol conformance relationships.
-  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Specialize;
-  }
-};
-  
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr : public Expr {

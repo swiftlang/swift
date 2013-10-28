@@ -662,42 +662,6 @@ namespace {
       }
     }
 
-    void verifyChecked(SpecializeExpr *E) {
-      if (!E->getType()->is<FunctionType>()) {
-        Out << "SpecializeExpr must have FunctionType result\n";
-        abort();
-      }
-
-      Type SubType = E->getSubExpr()->getType()->getRValueType();
-      if (!SubType->is<PolymorphicFunctionType>()) {
-        Out << "Non-polymorphic expression specialized\n";
-        abort();
-      }
-
-      // Verify that the protocol conformances line up with the archetypes.
-      // FIXME: It's not clear how many levels we're substituting here.
-      for (auto &Subst : E->getSubstitutions()) {
-        auto Archetype = Subst.Archetype;
-        if (Subst.Conformance.size() != Archetype->getConformsTo().size()) {
-          Out << "Wrong number of protocol conformances for archetype\n";
-          abort();
-        }
-
-        for (unsigned I = 0, N = Subst.Conformance.size(); I != N; ++I) {
-          const auto &Conformance = Subst.Conformance[I];
-          if (!Conformance || Conformance->getWitnesses().empty())
-            continue;
-
-          if (Conformance->getWitnesses().begin()->first->getDeclContext()
-                != Archetype->getConformsTo()[I]) {
-            Out << "Protocol conformance doesn't match up with archetype "
-                   "requirement\n";
-            abort();
-          }
-        }
-      }
-    }
-
     void verifyChecked(TupleShuffleExpr *E) {
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();

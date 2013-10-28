@@ -58,8 +58,6 @@ private:
   ValueDecl *extractDecl(Expr *Fn) const {
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
-    if (SpecializeExpr *SpecE = dyn_cast<SpecializeExpr>(Fn))
-      return extractDecl(SpecE->getSubExpr());
     return nullptr;
   }
 };

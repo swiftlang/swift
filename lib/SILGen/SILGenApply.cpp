@@ -285,7 +285,7 @@ public:
     substitutions.insert(substitutions.end(),
                          newSubs.begin(),
                          newSubs.end());
-    // Save the type of the SpecializeExpr at the right depth in the type.
+    // Save the type of the specializations at the right depth in the type.
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
     AbstractCC cc = cast<AnyFunctionType>(specializedType)->getAbstractCC();
@@ -309,13 +309,6 @@ public:
     specializeLoc = loc;
   }
   
-  void addSubstitutions(SILGenFunction &gen,
-                        SpecializeExpr *e,
-                        unsigned callDepth) {
-    addSubstitutions(gen, e, e->getSubstitutions(),
-                     e->getType()->getCanonicalType(), callDepth);
-  }
-
   unsigned getNaturalUncurryLevel() const {
     switch (kind) {
     case Kind::IndirectValue:
@@ -586,13 +579,6 @@ public:
     ++callDepth;
   }
   
-  /// Add specializations to the curry.
-  void visitSpecializeExpr(SpecializeExpr *e) {
-    visit(e->getSubExpr());
-    assert(callee && "did not find callee below SpecializeExpr?!");
-    callee->addSubstitutions(gen, e, callDepth);
-  }
-  
   //
   // Known callees.
   //
@@ -802,15 +788,9 @@ public:
       super = gen.emitManagedRetain(arg, superValue);
     }
 
-    // Find the callee.
+    // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
     ArrayRef<Substitution> substitutions;
-    if (SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(fn)) {
-      fn = specialize->getSubExpr();
-      substitutions = specialize->getSubstitutions();
-    }
-
-    // The callee for a super call has to be either a method or constructor.
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,

@@ -173,7 +173,6 @@ namespace {
     RValue visitParenExpr(ParenExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
-    RValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
@@ -965,24 +964,6 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
     result.addElement(visit(elt));
   }
   return result;
-}
-
-RValue RValueEmitter::visitSpecializeExpr(SpecializeExpr *E,
-                                          SGFContext C) {
-  SILValue unspecialized
-    = visit(E->getSubExpr()).getUnmanagedSingleValue(SGF, E->getSubExpr());
-  SILType specializedType
-    = SGF.getLoweredLoadableType(E->getType());
-  SILType substType
-    = SGF.getLoweredLoadableType(getThinFunctionType(E->getType()));
-  
-  // Partially apply to no arguments to create a thunk.
-  SILValue spec = SGF.B.createPartialApply(E, unspecialized,
-                                           substType,
-                                           E->getSubstitutions(),
-                                           {},
-                                           specializedType);
-  return RValue(SGF, SGF.emitManagedRValueWithCleanup(spec), E);
 }
 
 RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
