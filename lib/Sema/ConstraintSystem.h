@@ -1349,16 +1349,15 @@ public:
                                                  bool isTypeReference,
                                                  bool isDynamicResult);
 
-  /// \brief Retrieve the type of a reference to the given generic function
-  /// declaration as a member with a base of the given type.
+  /// \brief Retrieve the type of a reference to the given declaration of
+  /// generic function type as a member with a base of the given type.
   ///
   /// This routine "opens up" the generic type by replacing each instance of a
   /// generic parameter or a member thereof with a fresh type variable.
   ///
   /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to this method.
-  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, 
-                                                 AbstractFunctionDecl *func);
+  /// opened type of a reference to this member.
+  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, ValueDecl *value);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.

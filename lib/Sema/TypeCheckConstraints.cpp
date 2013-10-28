@@ -897,13 +897,11 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
   }
 
-  // Open up a generic method via its generic function type.
+  // Open up a generic member via its generic function type.
   if (!isDynamicResult && !isTypeReference) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (auto interfaceTy = func->getInterfaceType()) {
-        if (interfaceTy->is<GenericFunctionType>()) {
-          return getTypeOfMethodReference(baseTy, func);
-        }
+    if (auto interfaceTy = value->getInterfaceType()) {
+      if (interfaceTy->is<GenericFunctionType>()) {
+        return getTypeOfMethodReference(baseTy, value);
       }
     }
   }
@@ -1017,10 +1015,14 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfMethodReference(Type baseTy, 
-                                           AbstractFunctionDecl *func) {
+ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
+  // Figure out the declaration context to use when opening this type.
+  DeclContext *dc = value->getDeclContext();
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    dc = func;
+
   // Open the type of the generic function.
-  auto openedType = openType(func->getInterfaceType(), func,
+  auto openedType = openType(value->getInterfaceType(), dc,
                              /*skipProtocolSelfConstraint=*/true);
 
   // Figure out the instance type used for the base.
@@ -1037,7 +1039,7 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy,
 
   // Constraint the 'self' object type.
   auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
-  if (isa<ProtocolDecl>(func->getDeclContext())) {
+  if (isa<ProtocolDecl>(value->getDeclContext())) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
@@ -1049,11 +1051,11 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy,
   // Compute the type of the reference.
   Type type = openedType;
 
-  // For a constructor, static method, or an instance method
+  // For a constructor, enum element, static method, or an instance method
   // referenced through an instance, we've consumed the curried 'self'
   // already.
-  if (isa<ConstructorDecl>(func) || 
-      (isa<FuncDecl>(func) && cast<FuncDecl>(func)->isStatic()) ||
+  if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
+      (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
       isInstance)
     type = openedFnType->getResult();
 

@@ -427,17 +427,20 @@ namespace {
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
       // Handle references to generic functions.
-      if (openedFullType && isa<AbstractFunctionDecl>(member) &&
-          member->getInterfaceType() &&
+      if (openedFullType && member->getInterfaceType() &&
           member->getInterfaceType()->is<GenericFunctionType>()) {
-        auto func = cast<AbstractFunctionDecl>(member);
+        // Figure out the declaration context where we'll get the generic
+        // parameters.
+        auto dc = member->getDeclContext();
+        if (auto func = dyn_cast<AbstractFunctionDecl>(member))
+          dc = func;
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
         Type substTy = solution.computeSubstitutions(
-                         func->getInterfaceType()
+                         member->getInterfaceType()
                            ->castTo<GenericFunctionType>(),
-                         func,
+                         dc,
                          openedFullType,
                          substitutions);
 
