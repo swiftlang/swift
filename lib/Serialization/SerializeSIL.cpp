@@ -101,6 +101,12 @@ namespace {
     /// The current function ID.
     DeclID FuncID;
 
+    /// Maps class name to a VTable ID.
+    Table VTableList;
+    /// Holds the list of VTables.
+    std::vector<BitOffset> VTableOffset;
+    DeclID VTableID;
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
@@ -123,6 +129,7 @@ namespace {
     void writeSILFunction(const SILFunction &F);
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
+    void writeVTable(const SILVTable &vt);
     void writeTables();
 
   public:
@@ -135,7 +142,8 @@ namespace {
 
 SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                              llvm::BitstreamWriter &Out) :
-                            S(S), Ctx(Ctx), Out(Out), FuncID(1) {
+                            S(S), Ctx(Ctx), Out(Out), FuncID(1),
+                            VTableID(1) {
 }
 
 /// We enumerate all values to update ValueIDs in a separate pass
@@ -1086,6 +1094,30 @@ void SILSerializer::writeTables() {
     writeTable(List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
     Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
   }
+
+  if (!VTableList.empty()) {
+    writeTable(List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_VTABLE_OFFSETS,
+                VTableOffset);
+  }
+}
+
+void SILSerializer::writeVTable(const SILVTable &vt) {
+  VTableList[vt.getClass()->getName()] = VTableID++;
+  VTableOffset.push_back(Out.GetCurrentBitNo());
+  VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
+                           S.addDeclRef(vt.getClass()));
+
+  for (auto &entry : vt.getEntries()) {
+    SmallVector<ValueID, 4> ListOfValues;
+    handleSILDeclRef(S, entry.first, ListOfValues);
+    // Each entry is a pair of SILDeclRef and SILFunction.
+    VTableEntryLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[VTableEntryLayout::Code],
+        // SILFunction name
+        S.addIdentifierRef(Ctx.getIdentifier(entry.second->getName())),
+        ListOfValues);
+  }
 }
 
 void SILSerializer::writeAllSILFunctions(const SILModule *M) {
@@ -1123,6 +1155,15 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
       if ((EnableSerializeAll || F.isTransparent())
           && !F.empty())
         writeSILFunction(F);
+    }
+
+    // Go through all SILVTables in M, and if it is fragile, write out the
+    // VTable.
+    for (const SILVTable &vt : M->getVTables()) {
+      const ClassDecl *cd = vt.getClass();
+      if (EnableSerializeAll ||
+          cd->getAttrs().getResilienceKind() == Resilience::Fragile)
+        writeVTable(vt);
     }
   }
   {

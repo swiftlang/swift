@@ -96,4 +96,7 @@ void swift::performSILLinking(SILModule *M) {
       }
     }
   }
+
+  if (EnableLinkAll)
+    SILLoader->getAllVTables();
 }

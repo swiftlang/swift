@@ -102,6 +102,26 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
           kind == sil_index_block::SIL_FUNC_OFFSETS) &&
          "Expect a SIL_FUNC_OFFSETS record.");
   Funcs.assign(scratch.begin(), scratch.end());
+
+  // Read SIL_VTABLE_NAMES record and update VTableList.
+  next = cursor.advance();
+  if (next.Kind == llvm::BitstreamEntry::EndBlock)
+    return;
+  scratch.clear();
+  kind = cursor.readRecord(next.ID, scratch, &blobData);
+  assert((next.Kind == llvm::BitstreamEntry::Record &&
+          kind == sil_index_block::SIL_VTABLE_NAMES) &&
+         "Expect a SIL_VTABLE_NAMES record.");
+  VTableList = readFuncTable(scratch, blobData);
+
+  // Read SIL_VTABLE_OFFSETS record and initialize VTables.
+  next = cursor.advance();
+  scratch.clear();
+  kind = cursor.readRecord(next.ID, scratch, &blobData);
+  assert((next.Kind == llvm::BitstreamEntry::Record &&
+          kind == sil_index_block::SIL_VTABLE_OFFSETS) &&
+         "Expect a SIL_VTABLE_OFFSETS record.");
+  VTables.assign(scratch.begin(), scratch.end());
 }
 
 std::unique_ptr<SILDeserializer::SerializedFuncTable>
@@ -303,7 +323,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
-  while (kind != SIL_FUNCTION) {
+  // SIL_VTABLE record also means the end of this SILFunction.
+  while (kind != SIL_FUNCTION && kind != SIL_VTABLE) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(Fn, scratch);
@@ -1155,6 +1176,102 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
   return Func;
+}
+
+SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
+  if (!FuncTable)
+    return nullptr;
+  auto iter = FuncTable->find(name);
+  if (iter == FuncTable->end())
+    return nullptr;
+
+  auto Func = readSILFunction(*iter, nullptr, name);
+  if (Func)
+    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+          Func->dump());
+  return Func;
+}
+
+SILVTable *SILDeserializer::readVTable(DeclID VId) {
+  if (VId == 0)
+    return nullptr;
+  assert(VId <= VTables.size() && "invalid VTable ID");
+  auto &vTableOrOffset = VTables[VId-1];
+
+  if (vTableOrOffset.isComplete())
+    return vTableOrOffset;
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(vTableOrOffset);
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in readVTable.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_VTABLE && "expect a sil vtable");
+  (void)kind;
+
+  DeclID ClassID;
+  VTableLayout::readRecord(scratch, ClassID);
+  if (ClassID == 0) {
+    DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
+    return nullptr;
+  }
+
+  ClassDecl *theClass = cast<ClassDecl>(MF->getDecl(ClassID));
+  // Fetch the next record.
+  scratch.clear();
+  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+    // This vtable has no contents.
+    return nullptr;
+  kind = SILCursor.readRecord(entry.ID, scratch);
+
+  std::vector<SILVTable::Pair> vtableEntries;
+  // Another SIL_VTABLE record means the end of this VTable.
+  while (kind != SIL_VTABLE) {
+    assert(kind == SIL_VTABLE_ENTRY &&
+           "Content of Vtable should be in SIL_VTABLE_ENTRY.");
+    ArrayRef<uint64_t> ListOfValues;
+    DeclID NameID;
+    VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
+    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
+    if (Func)
+      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, 0), Func);
+
+    // Fetch the next record.
+    scratch.clear();
+    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      // EndBlock means the end of this VTable.
+      return SILVTable::create(SILMod, theClass, vtableEntries);
+    kind = SILCursor.readRecord(entry.ID, scratch);
+  }
+  return SILVTable::create(SILMod, theClass, vtableEntries);
+}
+
+SILVTable *SILDeserializer::lookupVTable(Identifier Name) {
+  if (!VTableList)
+    return nullptr;
+  auto iter = VTableList->find(Name);
+  if (iter == VTableList->end())
+    return nullptr;
+
+  auto VT = readVTable(*iter);
+  return VT;
+}
+
+/// Deserialize all VTables inside the module and add them to SILMod.
+void SILDeserializer::getAllVTables() {
+  if (!VTableList)
+    return;
+
+  for (unsigned I = 0, E = VTables.size(); I < E; I++)
+    readVTable(I+1);
 }
 
 SILDeserializer::~SILDeserializer() = default;

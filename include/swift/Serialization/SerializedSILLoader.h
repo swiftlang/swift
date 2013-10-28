@@ -18,6 +18,7 @@ class ASTContext;
 class SILDeserializer;
 class SILFunction;
 class SILModule;
+class SILVTable;
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -33,6 +34,9 @@ public:
     return new SerializedSILLoader(ctx, SILMod);
   }
   SILFunction *lookupSILFunction(SILFunction *Callee);
+  SILVTable *lookupVTable(Identifier Name);
+  /// Deserialize all VTables in all SILModules.
+  void getAllVTables();
 
   ~SerializedSILLoader();
 

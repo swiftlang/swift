@@ -37,6 +37,10 @@ namespace swift {
     std::unique_ptr<SerializedFuncTable> FuncTable;
 
     std::vector<ModuleFile::Serialized<SILFunction*>> Funcs;
+
+    std::unique_ptr<SerializedFuncTable> VTableList;
+    std::vector<ModuleFile::Serialized<SILVTable*>> VTables;
+
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
     llvm::DenseMap<uint32_t, std::vector<SILValue>> ForwardMRVLocalValues;
@@ -73,8 +77,14 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id, unsigned ResultNum,
                            SILType Type);
 
+    SILFunction *lookupSILFunction(Identifier Name);
+    SILVTable *readVTable(serialization::DeclID);
+
 public:
     SILFunction *lookupSILFunction(SILFunction *InFunc);
+    SILVTable *lookupVTable(Identifier Name);
+    /// Deserialize all VTables inside the module and add them to SILMod.
+    void getAllVTables();
     SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx);
 
     // Out of line to avoid instantiation OnDiskChainedHashTable here.

@@ -37,3 +37,17 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   }
   return nullptr;
 }
+
+SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
+  for (auto &Des : LoadedSILSections) {
+    if (auto VT = Des->lookupVTable(Name))
+      return VT;
+  }
+  return nullptr;
+}
+
+/// Deserialize all VTables in all SILModules.
+void SerializedSILLoader::getAllVTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllVTables();
+}
