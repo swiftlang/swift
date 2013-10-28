@@ -125,6 +125,13 @@ public:
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                      Optional<SILLocation> Loc = Nothing);
 
+  void clearLoc(IRBuilder &Builder) {
+    LastLoc = {};
+    LastScope = nullptr;
+    Builder.SetCurrentDebugLocation(llvm::DebugLoc());
+  }
+
+
   /// Push the current debug location onto a stack and initialize the
   /// IRBuilder to an empty location.
   void pushLoc() {

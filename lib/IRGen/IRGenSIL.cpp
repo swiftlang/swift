@@ -688,6 +688,10 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     }
   }
 
+  // Since we return to the entry of the function, reset the location.
+  if (IGF.IGM.DebugInfo)
+    IGF.IGM.DebugInfo->clearLoc(IGF.Builder);
+
   return phis;
 }
 
