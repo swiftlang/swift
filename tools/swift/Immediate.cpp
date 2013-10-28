@@ -1065,14 +1065,14 @@ public:
     Options.UseJIT = true;
     Options.DebugInfo = false;
 
-    // Force swift.swift to be parsed/type-checked immediately.  This forces
-    // any errors to appear upfront, and helps eliminate some nasty lag after
-    // the first statement is typed into the REPL.
-    static const char importstmt[] = "import swift\n";
+    // Force standard library to be loaded immediately.  This forces any errors
+    // to appear upfront, and helps eliminate some nasty lag after the first
+    // statement is typed into the REPL.
+    static const char WarmUpStmt[] = "Void()\n";
 
     swift::appendToREPLTranslationUnit(
         REPLInputFile, RC,
-        llvm::MemoryBuffer::getMemBufferCopy(importstmt,
+        llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                              "<REPL Initialization>"));
     if (CI.getASTContext().hadError())
       return;
