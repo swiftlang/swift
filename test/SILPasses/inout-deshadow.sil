@@ -80,3 +80,83 @@ bb0(%0 : $*NontrivialStruct):
   // CHECK-NEXT: return
   return %9 : $()
 }
+
+
+//===----------------------------------------------------------------------===//
+// Tests for exploded copy_addrs of trivial types
+//===----------------------------------------------------------------------===//
+
+//func exploded_trivial_type_dead(a : @inout Int) {
+//}
+
+// CHECK-LABEL: sil @exploded_trivial_type_dead
+// CHECK-NOT: alloc_stack
+sil @exploded_trivial_type_dead : $@thin (a: @inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = alloc_stack $Int64
+  %2 = load %0 : $*Int64
+  store %2 to %1#1 : $*Int64
+  store %2 to %0 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  %6 = tuple ()
+  return %6 : $()
+}
+
+//func exploded_trivial_type_returned(a : @inout Int) -> Int {
+//  return a
+//}
+
+// CHECK-LABEL: sil @exploded_trivial_type_returned
+// CHECK-NOT: alloc_stack
+sil @exploded_trivial_type_returned : $@thin (a: @inout Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  %1 = alloc_stack $Int64
+  %2 = load %0 : $*Int64
+  store %2 to %1#1 : $*Int64
+  store %2 to %0 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  return %2 : $Int64
+}
+
+//func exploded_trivial_type_stored(a : @inout Int) {
+//  a = 12
+//}
+
+// CHECK-LABEL: sil @exploded_trivial_type_stored
+// CHECK-NOT: alloc_stack
+sil @exploded_trivial_type_stored : $@thin (a: @inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = alloc_stack $Int64
+  copy_addr %0 to [initialization] %1#1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 12
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to %1#1 : $*Int64
+  store %4 to %0 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  %8 = tuple ()
+  return %8 : $()
+}
+
+//func exploded_trivial_type_stored_returned(a : @inout Int) -> Int {
+//  a = 12
+//  return a
+//}
+
+// CHECK-LABEL: sil @exploded_trivial_type_stored_returned
+// CHECK-NOT: alloc_stack
+sil @exploded_trivial_type_stored_returned : $@thin (a: @inout Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  %1 = alloc_stack $Int64
+  copy_addr %0 to [initialization] %1#1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 12
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to %1#1 : $*Int64
+  store %4 to %0 : $*Int64
+  dealloc_stack %1#0 : $*@local_storage Int64
+  return %4 : $Int64
+}
+
+
+
+
+
