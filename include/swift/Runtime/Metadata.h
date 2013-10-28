@@ -918,11 +918,25 @@ struct ProtocolDescriptor;
 /// An array of protocol descriptors with a header and tail-allocated elements.
 struct ProtocolDescriptorList {
   uintptr_t NumProtocols;
+
+  const ProtocolDescriptor **getProtocols() {
+    return reinterpret_cast<const ProtocolDescriptor **>(this + 1);
+  }
   
   const ProtocolDescriptor * const *getProtocols() const {
     return reinterpret_cast<const ProtocolDescriptor * const *>(this + 1);
   }
+  
+  const ProtocolDescriptor *operator[](size_t i) const {
+    return getProtocols()[i];
+  }
+  
+  const ProtocolDescriptor *&operator[](size_t i) {
+    return getProtocols()[i];
+  }
 
+  constexpr ProtocolDescriptorList() : NumProtocols(0) {}
+  
 protected:
   constexpr ProtocolDescriptorList(uintptr_t NumProtocols)
     : NumProtocols(NumProtocols) {}
@@ -1059,9 +1073,13 @@ struct ExistentialTypeMetadata : public Metadata {
   /// The number of witness tables and class-constrained-ness of the type.
   ExistentialTypeFlags Flags;
   /// The protocol constraints.
-  ProtocolDescriptorList NumProtocols;
+  ProtocolDescriptorList Protocols;
   
   /// NB: Protocols has a tail-emplaced array; additional fields cannot follow.
+  
+  constexpr ExistentialTypeMetadata()
+    : Metadata{MetadataKind::Existential},
+      Flags(ExistentialTypeFlags()), Protocols() {}
 };
 
 /// \brief The header in front of a generic metadata template.
@@ -1198,6 +1216,12 @@ extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
 
+/// \brief Fetch a uniqued metadata for an existential type. The array
+/// referenced by \c protocols will be sorted in-place.
+extern "C" const ExistentialTypeMetadata *
+swift_getExistentialMetadata(size_t numProtocols,
+                             const ProtocolDescriptor **protocols);
+  
 /// \brief Checked dynamic cast to a class type.
 ///
 /// \param object The object to cast.

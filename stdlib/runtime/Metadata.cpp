@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
+#include "swift/Basic/Range.h"
 #include "swift/Runtime/Alloc.h"
 #include "swift/Runtime/Metadata.h"
 #include <algorithm>
@@ -1077,4 +1078,86 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   metadata->InstanceType = instanceMetadata;
 
   return MetatypeTypes.add(entry)->getData();
+}
+
+/*** Existential types ********************************************************/
+
+namespace {
+  class ExistentialCacheEntry : public CacheEntry<ExistentialCacheEntry> {
+  public:
+    FullMetadata<ExistentialTypeMetadata> Metadata;
+
+    ExistentialCacheEntry(size_t numArguments) {
+      Metadata.Protocols.NumProtocols = numArguments;
+    }
+
+    FullMetadata<ExistentialTypeMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<ExistentialTypeMetadata> *getData() const {
+      return &Metadata;
+    }
+
+    /// Does this cache entry match the given set of arguments?
+    bool matches(const void * const *arguments, size_t numArguments) const {
+      // Same number of elements.
+      if (numArguments != Metadata.Protocols.NumProtocols)
+        return false;
+
+      // Arguments match up element-wise.
+      // The arguments must be sorted prior to searching the cache!
+      for (size_t i = 0; i != numArguments; ++i) {
+        if (arguments[i] != Metadata.Protocols[i])
+          return false;
+      }
+
+      return true;
+    }
+  };
+}
+
+/// The uniquing structure for existential type metadata.
+static MetadataCache<ExistentialCacheEntry> ExistentialTypes;
+
+/// \brief Fetch a uniqued metadata for an existential type. The array
+/// referenced by \c protocols will be sorted in-place.
+const ExistentialTypeMetadata *
+swift::swift_getExistentialMetadata(size_t numProtocols,
+                                  const ProtocolDescriptor **protocols) {
+  // Sort the protocol set.
+  std::sort(protocols, protocols + numProtocols);
+  
+  // Calculate the class constraint and number of witness tables for the
+  // protocol set.
+  unsigned numWitnessTables = 0;
+  ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
+  for (auto p : make_range(protocols, protocols + numProtocols)) {
+    if (p->Flags.needsWitnessTable()) {
+      printf("%s\n", p->Name);
+      ++numWitnessTables;
+    }
+    if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
+      classConstraint = ProtocolClassConstraint::Class;
+  }
+  
+  auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
+  
+  if (auto entry = ExistentialTypes.find(protocolArgs, numProtocols)) {
+    return entry->getData();
+  }
+  
+  auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
+                             sizeof(const ProtocolDescriptor *) * numProtocols);
+  auto metadata = entry->getData();
+  metadata->setKind(MetadataKind::Existential);
+  // TODO
+  metadata->ValueWitnesses = nullptr;
+  metadata->Flags = ExistentialTypeFlags()
+    .withNumWitnessTables(numWitnessTables)
+    .withClassConstraint(classConstraint);
+  metadata->Protocols.NumProtocols = numProtocols;
+  for (size_t i = 0; i < numProtocols; ++i)
+    metadata->Protocols[i] = protocols[i];
+  
+  return ExistentialTypes.add(entry)->getData();
 }
