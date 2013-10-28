@@ -349,6 +349,18 @@ static CheckedCastKind getCheckedCastKind(unsigned Attr) {
   }
 }
 
+/// Construct a SILDeclRef from ListOfValues.
+static SILDeclRef getSILDeclRef(ModuleFile *MF,
+                                ArrayRef<uint64_t> ListOfValues,
+                                unsigned StartIdx) {
+  assert(ListOfValues.size() >= StartIdx+4 &&
+         "Expect 4 numbers for SILDeclRef");
+  SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[StartIdx])),
+                  (SILDeclRef::Kind)ListOfValues[StartIdx+1],
+                  ListOfValues[StartIdx+2], ListOfValues[StartIdx+3] > 0);
+  return DRef;
+}
+
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                           unsigned RecordKind,
                           SmallVectorImpl<uint64_t> &scratch) {
@@ -1040,9 +1052,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // and an operand.
     assert(ListOfValues.size() >= 7 &&
            "Expect at least 7 numbers for MethodInst");
-    SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[1])),
-                    (SILDeclRef::Kind)ListOfValues[2],
-                    ListOfValues[3], ListOfValues[4] > 0);
+    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, 1);
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     SILType operandTy = getSILType(MF->getType(ListOfValues[5]),
                                    (SILValueCategory)ListOfValues[6]);
@@ -1081,9 +1091,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // a BasicBlock ID for no method. Use SILOneTypeValuesLayout.
     assert(ListOfValues.size() == 8 &&
            "Expect 8 numbers for DynamicMethodBranchInst");
-    SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[2])),
-                    (SILDeclRef::Kind)ListOfValues[3],
-                    ListOfValues[4], ListOfValues[5] > 0);
+    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, 2);
     ResultVal = Builder.createDynamicMethodBranch(Loc,
                     getLocalValue(ListOfValues[0], ListOfValues[1],
                                   getSILType(MF->getType(TyID),
