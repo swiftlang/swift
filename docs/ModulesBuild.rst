@@ -2,6 +2,9 @@
 .. default-role:: term
 .. title:: Modules Build Model
 
+.. Import substitutions for Unicode arrows.
+.. include:: <isoamsa.txt>
+
 
 This document describes the process used to build a module from multiple Swift
 source files.
@@ -74,16 +77,21 @@ Interpreted Mode
 The Swift compiler also supports being used as an interpreter through use of
 the ``-i`` flag. In this mode, the single input file is parsed in
 :ref:`executable mode <executable-mode>`. As with compilation, files can be
-explicitly imported within the source using ``import``, or made implicitly
-visible through the use of a :ref:`module source list <module-source-list>`.
-However, in interpreter mode *all imported source files* are processed for code
-generation, since there's no chance to link separate object files later.
+explicitly imported within the source using ``import``. However, in interpreter
+mode *all imported source files* are processed for code generation, since
+there's no chance to link separate object files later.
 
 Swift source files support the Unix convention of a `shebang`__ line at the
 top of the file; this line will be recognized and skipped in the compiler's
 interpreter mode.
 
 __ http://goto.apple.com/?http://en.wikipedia.org/wiki/Shebang_(Unix)
+
+.. admonition:: TODO
+
+  Is there a way to have "several files in the same module" for interpreted
+  scripts? The -module-source-list option no longer makes sense to expose to
+  users.
 
 
 Build Details
@@ -171,29 +179,122 @@ falling back to the source file.
   tool means that the system linker can still be used to link Swift object
   files into a binary.
 
-Once all source files have been compiled, the final binary must be linked.
-In addition to the normal linking of object files that happens in C or
-Objective-C, Swift needs to merge the serialized ASTs from all the source files, so that the binary itself can be used as an imported module.
+Once all source files have been compiled, the final binary must be linked. In
+addition to the normal linking of object files that happens in C or
+Objective-C, Swift needs to merge the serialized ASTs from all the source
+files, so that the binary itself can be used as an imported module.
 
 .. admonition:: TODO
 
   The tool for this AST linking hasn't been written yet.
 
 
-Objective-C Interoperability
-============================
+Objective-C Interoperation
+==========================
+
+It is possible to build a mixed Swift/Objective-C target, though there are some
+stricter requirements on the Objective-C header files to make sure they are
+Swift-compatible. 
+
+0. Ensure that every Objective-C header imported by Swift is modular, i.e. it
+can be compiled to a Clang pcm file.
+
+1. Parse all Swift sources. Resolve all imports to external modules.
+
+.. note::
+
+  The syntax for importing a local header file has not been decided. It could
+  be as simple as ``import NameOfHeader``, or more like ``@header import
+  NameOfHeader``, or even ``import "NameOfHeader.h"``.
+
+2. Attempt to build a module for each Clang header, skipping any function
+bodies. If a header imports the Swift world, a new AST source is added to the
+Clang subcomponent of Swift. When a Swift type or value is used from the Clang
+header, Swift will validate that declaration on demand (just as it does for
+type-checking in pure Swift code), and vend a stripped-down version of the
+declaration to Clang.
+
+.. note::
+
+  "imports the Swift world" is deliberately vague; most likely this will
+  semantically import the entire Swift half of the current target, rather than
+  just specific source files. The likely interface for this is ``@import
+  NameOfTarget`` in the header file.
+
+The exact nature of the "stripped-down" declaration depends on the kind:
+
+- **Structs:** Everything must be validated; Clang must know the layout of a
+  struct in order to use it in most cases.
+  
+- **Enumerations:** Enumerations bridged to Objective-C will likely require a
+  fixed representation type, which will probably have to be from a set of known
+  types. Enumerator values can be used in constant expressions, but can be
+  resolved individually on demand.
+
+- **Protocols:** Since protocol adoption isn't checked until a class's
+  ``@implementation`` block, it's actually possible to omit a protocol's
+  contents for this mode. Inherited protocols do need to be type-checked,
+  because they provide information needed for testing proper covariance.
+
+- **Classes:** Like protocols, none of a class's members *need* to be exposed
+  at this point. However, we need to be careful about Clang's notion of
+  "overriding"; while it is not common for Objective-C programmers to redeclare
+  overridden methods in a class's ``@interface`` block, it isn't forbidden
+  either.
+
+- **Functions:** If the Clang module builder skips function bodies, there is no
+  reason to import Swift function declarations into the Clang context.
+
+- **Globals:** Almost the same as functions, but perhaps we would want to allow
+  certain globals to be used in constant expressions. C++11 ``decltype`` may
+  also count as an interesting case in the future where it would be good to
+  know the type.
+
+For all types, if the declaration cannot be properly validated, a forward
+declaration may still be good enough to parse the Clang header.
+
+.. admonition:: TODO
+
+  If not, however, there should be an error message that's better than simply
+  "use of incomplete type" that references the cross-language import problem.
+
+There is one additional wrinkle here; consider this dependency graph:
+
+  A.swift |srarr| B.h |srarr| C.swift |srarr| D.h
+
+In compiling the module for B.h, some types may be needed from C.swift.
+However, these types may in turn depend on D.h. This implies that in the middle
+of building a module for B.h, we may have to turn around and build a module for
+D.h as well. We can detect this by seeing that the name comes from C.swift,
+that the declaration cannot be resolved on its own, and that C.swift has an
+unresolved import of a Clang header D.h.
+
+3. Now that the Swift module is complete, each Objective-C source file can be
+compiled properly. This time, importing the Swift module will provide the full
+interface of the module, not just the "stripped-down" minimal declarations
+described above. In addition, other *headers* in the same project must be
+imported as modules, so that they do not provide conflicting declarations if included both directly and indirectly via the single Swift module.
+
+.. admonition:: TODO
+
+  An interesting idea: To avoid putting Swift into Clang proper, we'll need
+  some kind of plugin interface for loading a Swift module into a Clang AST.
+  The lowest-level interface here would simply request Clang ASTs for names,
+  which is mostly how the "stripped-down external AST source" will work
+  (described above). However, a more stable interface would simply emit header
+  files for a Swift module, which Clang could then import itself. This could
+  also remove the requirement that all headers in the target must be modular,
+  only the ones imported into Swift.
+  
+  (credit to Argyrios and Dmitri)
+
+4. Link the interfaces. For a framework, both the Swift interface and the
+Objective-C interface should be available for both Swift and Objective-C
+clients.
 
 .. admonition:: FIXME
 
-  Write this section. Across module boundaries is the easy case: they just look
-  like any other modules. (Though, note: how does this work for user 
-  frameworks?) So, how to:
-  
-  - load Objective-C from Swift? (do we need an explicit module map? do we get
-    implicit visibility? who knows?)
-  - load Swift from Objective-C? (what do you @import? if that depends on Clang
-    modules, how to get the same decls? if it depends on other sources in the
-    same target, how to get the same decls?)
-  - deal with mutual dependencies? (supposedly, everything imported from Clang
-    has been fully type-checked. Clang won't even have a way to type-check
-    things from Swift, but Swift doesn't have forward declarations.)
+  What does this entail? The Swift module will probably have links to the
+  Objective-C half of the framework, which will look like any other dependent
+  import. The Objective-C side will need to expose the Swift interface, though.
+  At worst, we can always auto-generate a header file.
