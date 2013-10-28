@@ -90,7 +90,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   StringRef blobData;
   unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
   assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == SIL_FUNC_NAMES) &&
+          kind == sil_index_block::SIL_FUNC_NAMES) &&
          "Expect a SIL_FUNC_NAMES record.");
   FuncTable = readFuncTable(scratch, blobData);
 
@@ -99,7 +99,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   scratch.clear();
   kind = cursor.readRecord(next.ID, scratch, &blobData);
   assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == SIL_FUNC_OFFSETS) &&
+          kind == sil_index_block::SIL_FUNC_OFFSETS) &&
          "Expect a SIL_FUNC_OFFSETS record.");
   Funcs.assign(scratch.begin(), scratch.end());
 }
@@ -107,7 +107,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
 std::unique_ptr<SILDeserializer::SerializedFuncTable>
 SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   uint32_t tableOffset;
-  FuncListLayout::readRecord(fields, tableOffset);
+  sil_index_block::ListLayout::readRecord(fields, tableOffset);
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   using OwnedTable = std::unique_ptr<SerializedFuncTable>;

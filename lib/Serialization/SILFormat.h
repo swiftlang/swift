@@ -30,6 +30,31 @@ using SILInstOpCodeField = BCFixed<8>;
 using SILTypeCategoryField = BCFixed<2>;
 using SILValueResultField = BCFixed<8>;
 
+/// The record types within the "sil-index" block.
+///
+/// \sa SIL_INDEX_BLOCK_ID
+namespace sil_index_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
+  enum RecordKind {
+    SIL_FUNC_NAMES = 1,
+    SIL_FUNC_OFFSETS,
+    SIL_VTABLE_NAMES,
+    SIL_VTABLE_OFFSETS
+  };
+
+  using ListLayout = BCGenericRecordLayout<
+    BCFixed<3>,  // record ID
+    BCVBR<16>,  // table offset within the blob
+    BCBlob      // map from identifier strings to IDs.
+  >;
+
+  using OffsetLayout = BCGenericRecordLayout<
+    BCFixed<3>,  // record ID
+    BCArray<BitOffsetField>
+  >;
+}
+
 /// The record types within the "sil" block.
 ///
 /// \sa SIL_BLOCK_ID
@@ -47,8 +72,8 @@ namespace sil_block {
     SIL_TWO_OPERANDS,
     SIL_INST_APPLY,
     SIL_INST_NO_OPERAND,
-    SIL_FUNC_NAMES,
-    SIL_FUNC_OFFSETS
+    SIL_VTABLE,
+    SIL_VTABLE_ENTRY
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -56,15 +81,15 @@ namespace sil_block {
     SILInstOpCodeField
   >;
 
-  using FuncListLayout = BCRecordLayout<
-    SIL_FUNC_NAMES,
-    BCVBR<16>,  // table offset within the blob
-    BCBlob      // map from identifier strings to func IDs.
+  using VTableLayout = BCRecordLayout<
+    SIL_VTABLE,
+    DeclIDField   // Class Decl
   >;
 
-  using FuncOffsetLayout = BCRecordLayout<
-    SIL_FUNC_OFFSETS,
-    BCArray<BitOffsetField>
+  using VTableEntryLayout = BCRecordLayout<
+    SIL_VTABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef
   >;
 
   using SILFunctionLayout = BCRecordLayout<

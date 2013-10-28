@@ -1073,12 +1073,11 @@ void SILSerializer::writeFuncTable() {
     tableOffset = generator.Emit(blobStream);
   }
 
-  unsigned abbrCode = SILAbbrCodes[FuncListLayout::Code];
-  FuncListLayout::emitRecord(Out, ScratchRecord, abbrCode, tableOffset,
-                             hashTableBlob);
-
-  abbrCode = SILAbbrCodes[FuncOffsetLayout::Code];
-  FuncOffsetLayout::emitRecord(Out, ScratchRecord, abbrCode, Funcs);
+  sil_index_block::ListLayout List(Out);
+  sil_index_block::OffsetLayout Offset(Out);
+  List.emit(ScratchRecord, sil_index_block::SIL_FUNC_NAMES, tableOffset,
+            hashTableBlob);
+  Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
 }
 
 void SILSerializer::writeAllSILFunctions(const SILModule *M) {
@@ -1096,6 +1095,9 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<SILTwoOperandsLayout>();
     registerSILAbbr<SILInstApplyLayout>();
     registerSILAbbr<SILInstNoOperandLayout>();
+
+    registerSILAbbr<VTableLayout>();
+    registerSILAbbr<VTableEntryLayout>();
 
     // Register the abbreviation codes so these layouts can exist in both
     // decl blocks and sil blocks.
@@ -1117,8 +1119,6 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
   }
   {
     BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
-    registerSILAbbr<FuncListLayout>();
-    registerSILAbbr<FuncOffsetLayout>();
     writeFuncTable();
   }
 }
