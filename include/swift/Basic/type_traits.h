@@ -24,6 +24,9 @@ namespace swift {
 
 /// Same as \c std::is_trivially_copyable, which we can not use directly
 /// because it is not implemented yet in all C++11 standard libraries.
+///
+/// Unlike \c llvm::isPodLike, this trait should produce a precise result and
+/// is not intended to be specialized.
 template<typename T>
 struct IsTriviallyCopyable {
 #if _LIBCPP_VERSION
