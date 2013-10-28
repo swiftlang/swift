@@ -1323,6 +1323,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
+                                addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(subscript->getGetter()),
                                 addDeclRef(subscript->getSetter()),
                                 addDeclRef(subscript->getOverriddenDecl()));

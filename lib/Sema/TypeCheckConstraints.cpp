@@ -1037,7 +1037,7 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
 
   auto openedFnType = openedType->castTo<FunctionType>();
 
-  // Constraint the 'self' object type.
+  // Constrain the 'self' object type.
   auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
   if (isa<ProtocolDecl>(value->getDeclContext())) {
     // For a protocol, substitute the base object directly. We don't need a

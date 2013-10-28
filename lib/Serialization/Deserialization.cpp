@@ -1482,12 +1482,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::SUBSCRIPT_DECL: {
     DeclID contextID;
     bool isImplicit, isObjC;
-    TypeID declTypeID, elemTypeID;
+    TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
                                              isObjC, declTypeID, elemTypeID,
+                                             interfaceTypeID,
                                              getterID, setterID,
                                              overriddenID);
 
@@ -1509,6 +1510,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     declOrOffset = subscript;
 
     subscript->setType(getType(declTypeID));
+    if (auto interfaceType = getType(interfaceTypeID))
+      subscript->setInterfaceType(interfaceType);
     if (isImplicit)
       subscript->setImplicit();
     subscript->setIsObjC(isObjC);

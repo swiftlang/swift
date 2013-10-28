@@ -711,6 +711,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
+    TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
     DeclIDField  // overridden decl

@@ -1156,10 +1156,9 @@ public:
     assert(SD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent subscripts outside of types!");
 
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(),
-                                     SD->getDeclContext());
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(),
-                                     SD->getDeclContext(),
+    auto dc = SD->getDeclContext();
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc,
                                      /*allowUnknownTypes*/false);
 
     if (isInvalid) {
@@ -1168,12 +1167,21 @@ public:
     } else {
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
                                     SD->getElementType(), TC.Context));
+
+      // If we're in a generic context, set the interface type.
+      if (dc->isGenericContext()) {
+        auto indicesTy = TC.getInterfaceTypeFromInternalType(
+                           dc, SD->getIndices()->getType());
+        auto elementTy = TC.getInterfaceTypeFromInternalType(
+                           dc, SD->getElementType());
+        SD->setInterfaceType(FunctionType::get(indicesTy, elementTy,
+                                               TC.Context));
+      }
     }
 
     // A subscript is ObjC-compatible if it's explicitly [objc], or a
     // member of an ObjC-compatible class or property.
-    DeclContext *dc = SD->getDeclContext();
-    if (dc && dc->getDeclaredTypeInContext()) {
+    if (dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
