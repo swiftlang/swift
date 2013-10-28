@@ -485,7 +485,8 @@ namespace {
     };
     DIKind checkDefinitelyInit(SILInstruction *Inst);
 
-    void handleStoreUse(SILInstruction *Inst, DIKind Kind, bool isPartialStore);
+    void handleStoreUse(std::pair<SILInstruction*, UseKind> &InstInfo,
+                        DIKind Kind);
 
     void promoteLoad(SILInstruction *Inst);
 
@@ -635,10 +636,8 @@ void ElementPromotion::doIt() {
     
     switch (Uses[i].second) {
     case UseKind::Store:
-      handleStoreUse(Inst, DI, false);
-      break;
     case UseKind::PartialStore:
-      handleStoreUse(Inst, DI, true);
+      handleStoreUse(Uses[i], DI);
       break;
 
     case UseKind::Load:
@@ -695,12 +694,13 @@ void ElementPromotion::doIt() {
   }
 }
 
-void ElementPromotion::handleStoreUse(SILInstruction *Inst,
-                                      DIKind DI, bool isPartialStore) {
+void ElementPromotion::
+handleStoreUse(std::pair<SILInstruction*, UseKind> &InstInfo, DIKind DI) {
+  SILInstruction *Inst = InstInfo.first;
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
-  if (isPartialStore && DI != DI_Yes) {
+  if (InstInfo.second == UseKind::PartialStore && DI != DI_Yes) {
     diagnoseInitError(Inst, diag::struct_not_fully_initialized);
     return;
   }
@@ -730,6 +730,9 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+    // Remove this instruction from our data structures, since we will be
+    // removing it.
+    InstInfo.first = nullptr;
     NonLoadUses.erase(Inst);
 
     SmallVector<SILInstruction*, 8> InsertedInsts;
