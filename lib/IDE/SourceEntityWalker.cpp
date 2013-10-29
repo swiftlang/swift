@@ -147,8 +147,16 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(DRE->getDecl(), E->getLoc()))
       return { false, nullptr };
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
+    // Visit in source order.
+    if (!MRE->getBase()->walk(*this))
+      return { false, nullptr };
     if (!passReference(MRE->getMember().getDecl(), E->getLoc()))
       return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
 
   } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
     if (SE->hasDecl())
