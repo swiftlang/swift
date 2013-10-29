@@ -159,7 +159,7 @@ namespace swift {
 
   /// \brief Combine instructions to form fewer, simple instructions via a
   /// simple worklist driven algorithm.
-  bool performSILCombine(SILModule *M);
+  void performSILCombine(SILModule *M);
 
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.

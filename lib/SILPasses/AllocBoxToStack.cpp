@@ -166,7 +166,8 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     }
 
     // Otherwise, this looks like it escapes.
-    DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
+    DEBUG(llvm::errs() << "*** Failed to promote alloc_box in @"
+          << ABI->getFunction()->getName() << ": " << *ABI
           << "    Due to user: " << *User << "\n");
     
     return true;
@@ -212,11 +213,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     return false;
   }
 
-  DEBUG({
-    llvm::errs() << "*** Promoting alloc_box to stack: " << *ABI;
-    for (auto UI : ABI->getUses())
-      llvm::errs() << "    User: " << *UI->getUser();
-  });
+  DEBUG(llvm::errs() << "*** Promoting alloc_box to stack: " << *ABI);
   
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.

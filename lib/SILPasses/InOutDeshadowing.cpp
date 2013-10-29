@@ -110,6 +110,13 @@ static bool processInOutValue(SILArgument *InOutArg) {
       return true;
     }
 
+  // If we fail, dump out some internal state.
+  DEBUG({
+    llvm::errs() << "*** Failed to deshadow.  Uses:\n";
+    for (auto UI : InOutArg->getUses())
+      llvm::errs() << "    " << *UI->getUser();
+  });
+  
   return false;
 }
 

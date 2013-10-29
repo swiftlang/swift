@@ -27,11 +27,10 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Subsystems.h"
-
 using namespace swift;
 
-STATISTIC(NumCombined, "Number of instructions combined.");
-STATISTIC(NumDeadInst, "Num dead insts eliminated.");
+STATISTIC(NumCombined, "Number of instructions combined");
+STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
 //===----------------------------------------------------------------------===//
 //                             SILCombineWorklist
@@ -136,8 +135,7 @@ class SILCombiner :
 public:
   SILCombiner() : Worklist(), MadeChange(false), Iteration(0), Builder(0) { }
 
-  bool runOnFunction(SILFunction &F) {
-    bool MadeActualChange = false;
+  void runOnFunction(SILFunction &F) {
     Iteration = 0;
 
     // Create a SILBuilder for F and initialize the tracking list.
@@ -148,12 +146,10 @@ public:
     // Perform iterations until we do not make any changes.
     while (doOneIteration(F, Iteration)) {
       Iteration++;
-      MadeActualChange = true;
     }
 
     // Cleanup the builder and return whether or not we made any changes.
     Builder = 0;
-    return MadeActualChange;
   }
 
   void clear() {
@@ -383,22 +379,18 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-bool swift::performSILCombine(SILModule *M) {
-  bool MadeChange = false;
+void swift::performSILCombine(SILModule *M) {
   SILCombiner Combiner;
 
   // Process each function in M.
   for (SILFunction &F : *M) {
     // If F is just a declaration without any basic blocks, skip it.
-    if (!F.size())
+    if (F.empty())
       continue;
 
     // Clear the combiner just in case.
     Combiner.clear();
     // Record if we made any changes.
-    MadeChange |= Combiner.runOnFunction(F);
+    Combiner.runOnFunction(F);
   }
-
-  // Return true if we made any changes.
-  return MadeChange;
 }
