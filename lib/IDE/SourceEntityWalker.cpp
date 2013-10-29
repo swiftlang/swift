@@ -134,6 +134,9 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
 
+  if (!SEWalker.walkToExprPre(E))
+    return { false, E };
+
   if (ConstructorRefCallExpr *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
@@ -157,6 +160,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
 
     // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
     return { false, E };
   }
 
@@ -184,7 +189,10 @@ Expr *SemaAnnotator::walkToExprPost(Expr *E) {
     CtorRefs.pop_back();
   }
 
-  return E;
+  bool Continue = SEWalker.walkToExprPost(E);
+  if (!Continue)
+    Cancelled = true;
+  return Continue ? E : nullptr;
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {

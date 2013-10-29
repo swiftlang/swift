@@ -25,6 +25,7 @@ namespace swift {
   class ValueDecl;
   class TypeDecl;
   class Stmt;
+  class Expr;
 
 namespace ide {
 
@@ -64,6 +65,14 @@ public:
   /// This method is called after visiting the children of a statement. If it
   /// returns false, the remaining traversal is terminated and returns failure.
   virtual bool walkToStmtPost(Stmt *S) { return true; }
+
+  /// This method is called when first visiting an expression, before walking
+  /// into its children.  If it returns false, the subtree is skipped.
+  virtual bool walkToExprPre(Expr *E) { return true; }
+
+  /// This method is called after visiting the children of an expression. If it
+  /// returns false, the remaining traversal is terminated and returns failure.
+  virtual bool walkToExprPost(Expr *E) { return true; }
 
   /// This method is called when a ValueDecl is referenced in source. If it
   /// returns false, the remaining traversal is terminated and returns failure.
