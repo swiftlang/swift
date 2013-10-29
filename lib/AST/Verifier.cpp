@@ -1115,6 +1115,7 @@ namespace {
           checkGenericRequirements(AFD, AFD, genericTy);
         }
       }
+      return verifyChecked(cast<ValueDecl>(AFD));
     }
 
     void verifyChecked(DestructorDecl *DD) {
