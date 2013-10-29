@@ -58,6 +58,11 @@ protected:
     : TypeOrTypeList(Ty), Kind(Kind) {}
   
 public:
+  ~ValueBase() {
+    assert(use_empty() && "Cannot destroy a value that still has uses!");
+  }
+
+
   ValueKind getKind() const { return Kind; }
 
   ArrayRef<SILType> getTypes() const;
