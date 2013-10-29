@@ -946,7 +946,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // Open up a generic member via its generic function type.
   if (!isDynamicResult && !isTypeReference) {
     if (auto interfaceTy = value->getInterfaceType()) {
-      if (interfaceTy->is<GenericFunctionType>()) {
+      if (interfaceTy->is<GenericFunctionType>() ||
+          (isa<SubscriptDecl>(value) &&
+           value->getDeclContext()->isGenericContext())) {
         return getTypeOfMethodReference(baseTy, value);
       }
     }
@@ -1067,9 +1069,36 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
     dc = func;
 
-  // Open the type of the generic function.
-  auto openedType = openType(value->getInterfaceType(), dc,
-                             /*skipProtocolSelfConstraint=*/true);
+  // Open the type of the generic function or member of a generic type.
+  Type openedType;
+  if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
+    openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true);
+  } else {
+    // Open up the generic parameter list for the container.
+    auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
+    llvm::DenseMap<CanType, TypeVariableType *> replacements;
+    auto genericParams = nominal->getGenericParamTypes();
+    openGeneric(dc, genericParams, nominal->getGenericRequirements(),
+                /*skipProtocolSelfConstraint=*/true,
+                replacements);
+
+    // Open up the type of the member.
+    openedType = openType(value->getInterfaceType(), { }, replacements);
+
+    // Determine the object type of 'self'.
+    Type selfTy;
+    if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+      // Retrieve the type variable for 'Self'.
+      selfTy = replacements[protocol->getSelf()->getDeclaredType()
+                              ->getCanonicalType()];
+    } else {
+      // Open the nominal type.
+      selfTy = openType(nominal->getInterfaceType(), { }, replacements);
+    }
+
+    // Prepend the type variable for 'self' to the type.
+    openedType = FunctionType::get(selfTy, openedType, TC.Context);
+  }
 
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
@@ -1081,10 +1110,9 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
     isInstance = false;
   }
 
-  auto openedFnType = openedType->castTo<FunctionType>();
-
   // Constrain the 'self' object type.
-  auto selfObjTy = openedFnType->getInput()->getRValueInstanceType();
+  auto openedFnType = openedType->castTo<FunctionType>();
+  Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();
   if (isa<ProtocolDecl>(value->getDeclContext())) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
@@ -1095,15 +1123,27 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
   }
 
   // Compute the type of the reference.
-  Type type = openedType;
-
-  // For a constructor, enum element, static method, or an instance method
-  // referenced through an instance, we've consumed the curried 'self'
-  // already.
-  if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
-      (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
-      isInstance)
+  Type type;
+  if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+    // For a subscript, turn the element type into an lvalue.
+    auto fnType = openedFnType->getResult()->castTo<FunctionType>();
+    type = FunctionType::get(
+             fnType->getInput(),
+             LValueType::get(fnType->getResult(),
+                             LValueType::Qual::DefaultForMemberAccess|
+                             settableQualForDecl(baseTy, subscript),
+                             TC.Context),
+             TC.Context);
+  } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
+             (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
+             isInstance) {
+    // For a constructor, enum element, static method, or an instance method
+    // referenced through an instance, we've consumed the curried 'self'
+    // already.
     type = openedFnType->getResult();
+  } else {
+    type = openedType;
+  }
 
   return { openedType, type };
 }
