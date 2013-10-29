@@ -86,7 +86,7 @@ private:
   void *TypeListUniquing;
 
   /// The context that uniques the types used by this
-  /// SILFunction.
+  /// SILModule.
   ASTContext &TheASTContext;
   
   /// The list of SILFunctions in the module.
