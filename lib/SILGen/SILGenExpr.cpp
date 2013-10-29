@@ -1628,7 +1628,7 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
 
   // Return () if no return value was given.
   if (!returnValue)
-    returnValue = emitEmptyTuple(TopLevel);
+    returnValue = emitEmptyTuple(CleanupLocation::getCleanupLocation(TopLevel));
 
   B.createReturn(returnLoc, returnValue)->setDebugScope(F.getDebugScope());
 }

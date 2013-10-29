@@ -230,7 +230,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     SILBuilder B2(LastRelease);
 
     if (!lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
-      B2.emitDestroyAddr(ABI->getLoc(), ASI->getAddressResult());
+      B2.emitDestroyAddr(CleanupLocation::getCleanupLocation(ABI->getLoc()),
+                         ASI->getAddressResult());
 
     // Reset the insertion point in case the destroy address expanded to
     // multiple blocks.

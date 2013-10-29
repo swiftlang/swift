@@ -159,6 +159,8 @@ CleanupLocation CleanupLocation::getCleanupLocation(SILLocation L) {
     return CleanupLocation(D);
   if (L.isNull())
     return CleanupLocation();
+  if (L.getAs<SILFileLocation>())
+    return CleanupLocation();
   llvm_unreachable("Cannot construct Cleanup loc from the "
                    "given location.");
 }
