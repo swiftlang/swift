@@ -34,7 +34,8 @@ enum class PassKind {
   MandatoryInlining,
   CapturePromotion,
   SILCleanup,
-  SILCombine
+  SILCombine,
+  SimplifyCFG,
 };
 
 static llvm::cl::opt<std::string>
@@ -77,6 +78,9 @@ Passes(llvm::cl::desc("Passes:"),
                                    "sil-combine",
                                    "Perform small peepholes/combine operations/"
                                    "dead code elimination."),
+                        clEnumValN(PassKind::SimplifyCFG,
+                                   "simplify-cfg",
+                                   "Clean up the CFG of SIL functions"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -171,6 +175,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::SILCombine:
       performSILCombine(CI.getSILModule());
+      break;
+    case PassKind::SimplifyCFG:
+      performSimplifyCFG(CI.getSILModule());
       break;
     }
 

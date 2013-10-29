@@ -11,5 +11,6 @@ add_swift_library(swiftSILPasses
   DefiniteInitialization.cpp
   SILCleanup.cpp
   SILCombine.cpp
+  SimplifyCFG.cpp
   DEPENDS swiftSILPassesUtils)
 

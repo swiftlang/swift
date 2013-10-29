@@ -1,0 +1,46 @@
+// RUN: %sil-opt %s -simplify-cfg | FileCheck %s
+
+import Builtin
+import swift
+
+sil_stage canonical
+
+// CHECK: @test_dead_block
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   unreachable
+// CHECK-NEXT: }
+sil @test_dead_block : $() -> () {
+bb0:
+  unreachable
+
+bb1:
+  unreachable
+}
+
+
+
+// CHECK: @test_empty_block
+sil @test_empty_block : $@thin (v: Builtin.Int1) -> Int64 {
+bb0(%0 : $Builtin.Int1):
+  %1 = alloc_stack $Builtin.Int1
+  store %0 to %1#1 : $*Builtin.Int1
+  cond_br %0, bb1, bb3
+
+bb1:
+  %4 = integer_literal $Builtin.Int64, 1
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  br bb2(%5 : $Int64)
+
+bb2(%7 : $Int64):
+  br bb4
+
+bb3:
+  %9 = integer_literal $Builtin.Int64, 2
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  br bb2(%10 : $Int64)
+
+bb4:
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int1
+  return %7 : $Int64
+}
+
