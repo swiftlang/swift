@@ -34,10 +34,20 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
+enum class UnreachableKind {
+  FoldedBranch,
+  FoldedSwitchEnum,
+  NoreturnCall,
+};
+
 /// Information about a folded conditional branch instruction: it's location
 /// and whether the condition evaluated to true or false.
-struct BranchFoldInfo {
+struct UnreachableInfo {
+  UnreachableKind Kind;
+  /// \brief The location of the instruction that caused the unreachability.
   SILLocation Loc;
+  /// \brief If this is the FoldedBranch kind, specifies if the condition is
+  /// always true.
   bool CondIsAlwaysTrue;
 };
 
@@ -57,7 +67,6 @@ public:
   ///
   /// This is a SetVector since several blocks may lead to the same error
   /// report and we iterate through these when producing the diagnostic.
-  // TODO: this could be a vector.
   llvm::SetVector<const SILBasicBlock*> UnreachableBlocks;
 
   /// \brief The set of blocks in which we reported unreachable code errors.
@@ -71,7 +80,7 @@ public:
   /// A map from the UnreachableBlocks to the folded conditional branchs
   /// that caused each of them to be unreachable. This extra info is used to
   /// enhance the diagnostics.
-  llvm::DenseMap<const SILBasicBlock*, BranchFoldInfo> FoldInfoMap;
+  llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
 
@@ -234,7 +243,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Determine which of the successors is unreachable and create a new
       // terminator that only branches to the reachable sucessor.
       SILBasicBlock *UnreachableBlock = nullptr;
-      bool CondIsAlwaysTrue = false;
+      bool CondIsTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
         B.createBranch(Loc,
                        CBI->getFalseBB(), CBI->getFalseArgs());
@@ -245,7 +254,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         B.createBranch(Loc,
                        CBI->getTrueBB(), CBI->getTrueArgs());
         UnreachableBlock = CBI->getFalseBB();
-        CondIsAlwaysTrue = true;
+        CondIsTrue = true;
       }
       eraseAndCleanup(TI);
 
@@ -258,10 +267,10 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         // If this is the first time we see this unreachable block, store it
         // along with the folded branch info.
         State->UnreachableBlocks.insert(UnreachableBlock);
-        State->FoldInfoMap.insert(
-          std::pair<const SILBasicBlock*,
-                    BranchFoldInfo>(UnreachableBlock,
-                                    BranchFoldInfo{Loc, CondIsAlwaysTrue}));
+        State->MetaMap.insert(
+          std::pair<const SILBasicBlock*, UnreachableInfo>(
+            UnreachableBlock,
+            UnreachableInfo{UnreachableKind::FoldedBranch, Loc, CondIsTrue}));
       }
 
       return true;
@@ -341,10 +350,10 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         if (UnreachableBlock &&
             !State->UnreachableBlocks.count(UnreachableBlock)) {
           State->UnreachableBlocks.insert(UnreachableBlock);
-          State->FoldInfoMap.insert(
-            std::pair<const SILBasicBlock*,
-                      BranchFoldInfo>(UnreachableBlock,
-                                      BranchFoldInfo{Loc, true}));
+          State->MetaMap.insert(
+            std::pair<const SILBasicBlock*, UnreachableInfo>(
+              UnreachableBlock,
+              UnreachableInfo{UnreachableKind::FoldedSwitchEnum, Loc, true}));
         }
       }
 
@@ -381,6 +390,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         eraseAndCleanup(TI);
         return true;
       }
+      
+      // TODO: Warn on unreachable user code here as well.
     }
   }
 
@@ -469,11 +480,11 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
         // If this is the first time we see this unreachable block, store it
         // along with the noreturn call info.
         State->UnreachableBlocks.insert(UnreachableBlock);
-        State->FoldInfoMap.insert(
-          std::pair<const SILBasicBlock*,
-                    BranchFoldInfo>(UnreachableBlock,
-                                    BranchFoldInfo{NoReturnCall->getLoc(),
-                                    true}));
+        State->MetaMap.insert(
+          std::pair<const SILBasicBlock*, UnreachableInfo>(
+            UnreachableBlock,
+            UnreachableInfo{UnreachableKind::NoreturnCall,
+                            NoReturnCall->getLoc(), true }));
       }
     }
   }
@@ -514,33 +525,43 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         !State->BlocksWithErrors.count(&B)) {
 
       // Emit the diagnostic.
-      auto BrInfoIter = State->FoldInfoMap.find(TopLevelB);
-      assert(BrInfoIter != State->FoldInfoMap.end());
+      auto BrInfoIter = State->MetaMap.find(TopLevelB);
+      assert(BrInfoIter != State->MetaMap.end());
       auto BrInfo = BrInfoIter->second;
 
-      // If we are warning about a switch condition being a constant, the main
-      // emphasis should be on the condition (to ensure we have a single
-      // message per switch).
-      if (const SwitchStmt *SS = BrInfo.Loc.getAsASTNode<SwitchStmt>()) {
+      switch (BrInfo.Kind) {
+      case (UnreachableKind::FoldedBranch): {
+        // Emit the diagnostic on the unreachable block and emit the
+        // note on the branch responsible for the unreachable code.
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::unreachable_code);
+        diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
+                 diag::unreachable_code_branch, BrInfo.CondIsAlwaysTrue);
+        break;
+      }
+
+      case (UnreachableKind::FoldedSwitchEnum): {
+        // If we are warning about a switch condition being a constant, the main
+        // emphasis should be on the condition (to ensure we have a single
+        // message per switch).
+        const SwitchStmt *SS = BrInfo.Loc.getAsASTNode<SwitchStmt>();
+        assert(SS);
         const Expr *SE = SS->getSubjectExpr();
         diagnose(M.getASTContext(), SE->getLoc(), diag::switch_on_a_constant);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::unreachable_code_note);
+        break;
+      }
 
-      // Specialcase when we are warning about unreachable code after a call
-      // to a noreturn function.
-      } else if (BrInfo.Loc.isASTNode<ApplyExpr>()) {
+      case (UnreachableKind::NoreturnCall): {
+        // Specialcase when we are warning about unreachable code after a call
+        // to a noreturn function.
+        assert(BrInfo.Loc.isASTNode<ApplyExpr>());
         diagnose(M.getASTContext(), Loc.getSourceLoc(), diag::unreachable_code);
         diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
                  diag::call_to_noreturn_note);
-
-      // Otherwise, emit the diagnostic on the unreachable block and emit the
-      // note on the branch responsible for the unreachable code.
-      } else {
-        diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::unreachable_code);
-        diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
-          diag::unreachable_code_branch, BrInfo.CondIsAlwaysTrue);
+        break;
+      }
       }
 
       // Record that we've reported this unreachable block to avoid duplicates
