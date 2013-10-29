@@ -387,13 +387,36 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   return false;
 }
 
-static bool isCallToNoReturn(const ApplyInst *AI, SILBasicBlock &BB) {
-  return AI->getCallee().getType().castTo<AnyFunctionType>()->isNoReturn();
+/// \brief Check if this instruction corresponds to user-written code.
+static bool isUserCode(const SILInstruction *I) {
+  SILLocation Loc = I->getLoc();
+  // Branch instructions are not user code. These could belong to the control
+  // flow statement we are folding (ex: while loop).
+  // Also, unreachable instructions are not user code, they are "expected" in
+  // unreachable blocks.
+  if ((isa<BranchInst>(I) || isa<UnreachableInst>(I)) &&
+      Loc.is<RegularLocation>())
+    return false;
+  // If the instruction corresponds to user-written return or some other
+  // statement, we know it corresponds to user code.
+  if (Loc.is<RegularLocation>() || Loc.is<ReturnLocation>())
+    return true;
+  return false;
 }
 
-static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
+static const ApplyInst *getAsCallToNoReturn(const SILInstruction *I,
+                                            SILBasicBlock &BB) {
+  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
+    if (AI->getCallee().getType().castTo<AnyFunctionType>()->isNoReturn())
+      return AI;
+  return nullptr;
+}
+
+static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
+                                     UnreachableUserCodeReportingState *State) {
   auto I = BB.begin(), E = BB.end();
-  bool FoundNoReturnCall = false;
+  bool DiagnosedUnreachableCode = false;
+  const ApplyInst *NoReturnCall = nullptr;
 
   // Collection of all instructions that should be deleted.
   llvm::DenseSet<SILInstruction*> ToBeDeleted;
@@ -406,26 +429,55 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
     ++I;
 
     // Remove all instructions following the noreturn call.
-    if (FoundNoReturnCall) {
+    if (NoReturnCall) {
 
       // We will need to delete the instruction later on.
       ToBeDeleted.insert(CurrentInst);
+
+      // Diagnose the unreachable code within the same block as the call to
+      // noreturn.
+      if (isUserCode(CurrentInst) && !DiagnosedUnreachableCode) {
+        if (NoReturnCall->getLoc().is<RegularLocation>()) {
+          diagnose(BB.getModule().getASTContext(),
+                   CurrentInst->getLoc().getSourceLoc(),
+                   diag::unreachable_code);
+          diagnose(BB.getModule().getASTContext(),
+                   NoReturnCall->getLoc().getSourceLoc(),
+                   diag::call_to_noreturn_note);
+          DiagnosedUnreachableCode = true;
+        }
+      }
 
       NumInstructionsRemoved++;
       continue;
     }
 
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(CurrentInst)) {
-      if (isCallToNoReturn(AI, BB)) {
-        FoundNoReturnCall = true;
-        // FIXME: Diagnose unreachable code if the call is followed by anything
-        // but implicit return.
+    // Check if this instruction is the first call to noreturn in this block.
+    if (!NoReturnCall)
+      NoReturnCall = getAsCallToNoReturn(CurrentInst, BB);
+  }
+
+  if (!NoReturnCall)
+    return false;
+
+  // Record the diagnostic info.
+  if (!DiagnosedUnreachableCode &&
+      NoReturnCall->getLoc().is<RegularLocation>() && State){
+    for (auto SI = BB.succ_begin(), SE = BB.succ_end(); SI != SE; ++SI) {
+      SILBasicBlock *UnreachableBlock = *SI;
+      if (!State->UnreachableBlocks.count(UnreachableBlock)) {
+        // If this is the first time we see this unreachable block, store it
+        // along with the noreturn call info.
+        State->UnreachableBlocks.insert(UnreachableBlock);
+        State->FoldInfoMap.insert(
+          std::pair<const SILBasicBlock*,
+                    BranchFoldInfo>(UnreachableBlock,
+                                    BranchFoldInfo{NoReturnCall->getLoc(),
+                                    true}));
       }
     }
   }
 
-  if (!FoundNoReturnCall)
-    return false;
 
   eraseAndCleanup(ToBeDeleted);
 
@@ -451,24 +503,14 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
   assert(State);
   for (auto I = B.begin(), E = B.end(); I != E; ++I) {
     SILLocation Loc = I->getLoc();
-
-    // Skip branch instructions. These could belong to the control flow
-    // statement we are folding (ex: while loop).
-    // Also skip unreachable instructions, they are "expected" in unreachable
-    // blocks.
-    if ((isa<BranchInst>(I) || isa<UnreachableInst>(I)) &&
-        Loc.is<RegularLocation>())
-      break;
-
     // If we've reached an implicit return, we have not found any user code and
     // can stop searching for it.
     if (Loc.is<ImplicitReturnLocation>())
       return false;
 
-    // If the instruction corresponds to user-written return or some other
-    // statement, we know it corresponds to user code.
-    // Check BlocksWithErrors to make sure we don't report an error twice.
-    if ((Loc.is<RegularLocation>() || Loc.is<ReturnLocation>()) &&
+    // Check if the instruction corresponds to user-written code, also make
+    // sure we don't report an error twice for the same instruction.
+    if (isUserCode(I) &&
         !State->BlocksWithErrors.count(&B)) {
 
       // Emit the diagnostic.
@@ -484,15 +526,22 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         diagnose(M.getASTContext(), SE->getLoc(), diag::switch_on_a_constant);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::unreachable_code_note);
-        return true;
-      }
+
+      // Specialcase when we are warning about unreachable code after a call
+      // to a noreturn function.
+      } else if (BrInfo.Loc.isASTNode<ApplyExpr>()) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(), diag::unreachable_code);
+        diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
+                 diag::call_to_noreturn_note);
 
       // Otherwise, emit the diagnostic on the unreachable block and emit the
       // note on the branch responsible for the unreachable code.
-      diagnose(M.getASTContext(), Loc.getSourceLoc(),
-               diag::unreachable_code);
-      diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
-        diag::unreachable_code_branch, BrInfo.CondIsAlwaysTrue);
+      } else {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::unreachable_code);
+        diagnose(M.getASTContext(), BrInfo.Loc.getSourceLoc(),
+          diag::unreachable_code_branch, BrInfo.CondIsAlwaysTrue);
+      }
 
       // Record that we've reported this unreachable block to avoid duplicates
       // in the future.
@@ -605,7 +654,7 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
 
       // Remove instructions from the basic block after a call to a noreturn
       // function.
-      if (simplifyBlocksWithCallsToNoReturn(BB))
+      if (simplifyBlocksWithCallsToNoReturn(BB, &State))
         continue;
     }
 
@@ -623,7 +672,7 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
       }
       // Remove instructions from the basic block after a call to a noreturn
       // function.
-      if (simplifyBlocksWithCallsToNoReturn(BB))
+      if (simplifyBlocksWithCallsToNoReturn(BB, &State))
         continue;
     }
 
