@@ -1177,10 +1177,8 @@ struct OpaqueExistentialValueWitnesses {
   }
   
   static void destroy(Container *value, const Metadata *self) {
-    value->metadata->getValueWitnesses()
-      ->destroyBuffer(value->getValueBuffer(self), value->metadata);
-    value->metadata->getValueWitnesses()
-      ->deallocateBuffer(value->getValueBuffer(self), value->metadata);
+    value->metadata->vw_destroyBuffer(value->getValueBuffer(self));
+    value->metadata->vw_deallocateBuffer(value->getValueBuffer(self));
   }
   
   static Container *initializeBufferWithCopy(ValueBuffer *dest,
@@ -1196,10 +1194,9 @@ struct OpaqueExistentialValueWitnesses {
     dest->metadata = src->metadata;
     for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
       dest->getWitness(i) = src->getWitness(i);
-    src->metadata->getValueWitnesses()
-      ->initializeBufferWithCopyOfBuffer(dest->getValueBuffer(self),
-                                         src->getValueBuffer(self),
-                                         src->metadata);
+    src->metadata->vw_initializeBufferWithCopyOfBuffer(
+                                         dest->getValueBuffer(self),
+                                         src->getValueBuffer(self));
     return dest;
   }
   
@@ -1213,13 +1210,12 @@ struct OpaqueExistentialValueWitnesses {
     // Do the metadata records match?
     if (dest->metadata == src->metadata) {
       // If so, project down to the buffers and do direct assignment.
-      auto destValue = dest->metadata->getValueWitnesses()
-        ->projectBuffer(dest->getValueBuffer(self), dest->metadata);
-      auto srcValue = src->metadata->getValueWitnesses()
-        ->projectBuffer(src->getValueBuffer(self), src->metadata);
+      auto destValue = dest->metadata->vw_projectBuffer(
+                                                    dest->getValueBuffer(self));
+      auto srcValue = src->metadata->vw_projectBuffer(
+                                                    src->getValueBuffer(self));
       
-      dest->metadata->getValueWitnesses()->assignWithCopy(destValue, srcValue,
-                                                          dest->metadata);
+      dest->metadata->vw_assignWithCopy(destValue, srcValue);
       return dest;
     }
     
@@ -1248,12 +1244,10 @@ struct OpaqueExistentialValueWitnesses {
     dest->metadata = src->metadata;
     for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
       dest->getWitness(i) = src->getWitness(i);
-    auto srcValue = src->metadata->getValueWitnesses()
-      ->projectBuffer(src->getValueBuffer(self), src->metadata);
+    auto srcValue = src->metadata->vw_projectBuffer(src->getValueBuffer(self));
     
-    src->metadata->getValueWitnesses()
-      ->initializeBufferWithTake(dest->getValueBuffer(self), srcValue,
-                                 src->metadata);
+    src->metadata->vw_initializeBufferWithTake(dest->getValueBuffer(self),
+                                               srcValue);
     return dest;
   }
   
@@ -1273,9 +1267,8 @@ struct OpaqueExistentialValueWitnesses {
   }
   
   static const Metadata *typeOf(Container *obj, const Metadata *self) {
-    auto value = obj->metadata->getValueWitnesses()
-      ->projectBuffer(obj->getValueBuffer(self), obj->metadata);
-    return obj->metadata->getValueWitnesses()->typeOf(value, obj->metadata);
+    auto value = obj->metadata->vw_projectBuffer(obj->getValueBuffer(self));
+    return obj->metadata->vw_typeOf(value);
   }
   
   static const ValueWitnessTable ValueWitnessTable;

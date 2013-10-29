@@ -19,6 +19,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
+#include <utility>
 #include "swift/ABI/MetadataValues.h"
 
 namespace swift {
@@ -557,6 +559,17 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
   return asFullMetadata(const_cast<T*>(metadata));
 }
 
+// std::result_of is busted in Xcode 5. This is a simplified reimplementation
+// that isn't SFINAE-safe.
+namespace {
+  template<typename T> struct _ResultOf;
+  
+  template<typename R, typename...A>
+  struct _ResultOf<R(A...)> {
+    using type = R;
+  };
+}
+  
 /// The common structure of all type metadata.
 struct Metadata {
   constexpr Metadata() : Kind(MetadataKind::Class) {}
@@ -595,7 +608,18 @@ public:
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
   }
-
+  
+  // Define forwarders for value witnesses. These invoke this metadata's value
+  // witness table with itself as the 'self' parameter.
+  #define FORWARD_WITNESS(WITNESS)                                         \
+    template<typename...A>                                                 \
+    _ResultOf<value_witness_types::WITNESS>::type                          \
+    vw_##WITNESS(A &&...args) const {                                      \
+      return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
+    }
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(FORWARD_WITNESS)
+  #undef FORWARD_WITNESS
+  
 protected:
   friend struct OpaqueMetadata;
   
