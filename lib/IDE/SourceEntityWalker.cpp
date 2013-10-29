@@ -150,6 +150,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(MRE->getMember().getDecl(), E->getLoc()))
       return { false, nullptr };
 
+  } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
+    if (SE->hasDecl())
+      if (!passReference(SE->getDecl().getDecl(), E->getLoc()))
+        return { false, nullptr };
+
   } else if (BinaryExpr *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
