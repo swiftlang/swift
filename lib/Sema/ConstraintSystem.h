@@ -709,10 +709,15 @@ public:
   /// type).
   Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
 
-  /// Compute the set of substitutions required to map the given generic
-  /// function type to the provided "opened" type.
+  /// Compute the set of substitutions required to map the given type
+  /// to the provided "opened" type.
   ///
-  /// \param genericFn The generic function type.
+  /// Either the generic type (\c origType) must either be a
+  /// \c GenericFunctionType, in which case it's generic requirements will be
+  /// used to compute the required substitutions, or \c dc must be a generic
+  /// context, in which case it's generic requirements will be used.
+  ///
+  /// \param origType The generic type.
   ///
   /// \param openedType The type to which this reference to the given
   /// generic function type was opened.
@@ -723,7 +728,7 @@ public:
   /// to be applied to the generic function type.
   ///
   /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(GenericFunctionType *genericFn,
+  Type computeSubstitutions(Type origType,
                             DeclContext *dc,
                             Type openedType,
                             SmallVectorImpl<Substitution> &substitutions) const;

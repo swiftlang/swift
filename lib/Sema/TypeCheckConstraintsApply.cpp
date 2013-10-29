@@ -36,7 +36,7 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
 }
 
 Type Solution::computeSubstitutions(
-                 GenericFunctionType *genericFn,
+                 Type origType,
                  DeclContext *dc,
                  Type openedType,
                  SmallVectorImpl<Substitution> &substitutions) const {
@@ -48,25 +48,32 @@ Type Solution::computeSubstitutions(
   // FIXME: It's unfortunate that we're using archetypes here, but we don't
   // have another way to map from type variables back to dependent types (yet);
   TypeSubstitutionMap typeSubstitutions;
-  auto type
-    = tc.transformType(openedType,
-                       [&](Type type) -> Type {
-       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-         auto archetype = tv->getImpl().getArchetype();
-         auto simplified = getFixedType(tv);
-         typeSubstitutions[archetype] = simplified;
+  auto type = tc.transformType(openedType,
+                               [&](Type type) -> Type {
+                if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+                  auto archetype = tv->getImpl().getArchetype();
+                  auto simplified = getFixedType(tv);
+                  typeSubstitutions[archetype] = simplified;
 
-         return SubstitutedType::get(archetype, simplified,
-                                     tc.Context);
-       }
+                  return SubstitutedType::get(archetype, simplified,
+                                              tc.Context);
+                }
 
-       return type;
-     });
+                return type;
+              });
 
   auto currentModule = getConstraintSystem().DC->getParentModule();
   SmallVector<ProtocolConformance *, 4> currentConformances;
 
-  for (const auto &req : genericFn->getRequirements()) {
+  ArrayRef<Requirement> requirements;
+  if (auto genericFn = origType->getAs<GenericFunctionType>()) {
+    requirements = genericFn->getRequirements();
+  } else {
+    requirements = dc->getDeclaredTypeOfContext()->getAnyNominal()
+                     ->getGenericRequirements();
+  }
+
+  for (const auto &req : requirements) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
       // If this is a protocol conformance requirement, get the conformance
@@ -359,8 +366,7 @@ namespace {
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
         Type substTy = solution.computeSubstitutions(
-                         member->getInterfaceType()
-                           ->castTo<GenericFunctionType>(),
+                         member->getInterfaceType(),
                          dc,
                          openedFullType,
                          substitutions);
@@ -800,31 +806,32 @@ namespace {
                                  tc.Context);
 
       // Handle subscripting of generics.
-      if (containerTy->isUnspecializedGeneric()) {
-        // Compute the substitutions we need to apply for the generic subscript,
-        // along with the base type of the subscript.
-        GenericParamList *genericParams = nullptr;
-        TypeSubstitutionMap substitutions;
-        ConformanceMap conformances;
-        containerTy = subscript->getDeclContext()->getDeclaredTypeInContext();
-        substForBaseConversion(tc, dc, subscript, baseTy, containerTy,
-                               index->getStartLoc(), substitutions,
-                               conformances, genericParams);
+      if (subscript->getDeclContext()->isGenericContext()) {
+        auto dc = subscript->getDeclContext();
 
-        // Coerce the base to the (substituted) container type.
+        // Compute the substitutions used to reference the subscript.
+        SmallVector<Substitution, 4> substitutions;
+        solution.computeSubstitutions(subscript->getInterfaceType(),
+                                      dc,
+                                      selected.openedFullType,
+                                      substitutions);
+
+        // Convert the base.
+        auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
+        auto openedBaseType = openedFullFnType->getInput()
+                                ->getRValueInstanceType();
+        containerTy = solution.simplifyType(tc, openedBaseType);
         base = coerceObjectArgumentToType(base, containerTy, locator);
+                 locator.withPathElement(ConstraintLocator::MemberRefBase);
         if (!base)
           return nullptr;
 
         // Form the generic subscript expression.
-        SmallVector<Substitution, 4> substitutionsVec;
-        tc.encodeSubstitutions(genericParams, substitutions, conformances,
-                               false, substitutionsVec);
         auto subscriptExpr
           = new (tc.Context) SubscriptExpr(base, index,
                                            ConcreteDeclRef(tc.Context,
                                                            subscript,
-                                                           substitutionsVec));
+                                                           substitutions));
         subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }
@@ -870,7 +877,7 @@ namespace {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
-                     ctor->getInterfaceType()->castTo<GenericFunctionType>(),
+                     ctor->getInterfaceType(),
                      ctor,
                      openedFullType,
                      substitutions);
