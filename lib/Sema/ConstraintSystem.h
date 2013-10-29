@@ -1267,6 +1267,14 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openBindingType(Type type, DeclContext *dc = nullptr);
 
+  /// Open the generic parameter list and its requirements, creating
+  /// type variables for each of the type parameters.
+  void openGeneric(DeclContext *dc,
+                   ArrayRef<GenericTypeParamType *> params,
+                   ArrayRef<Requirement> requirements,
+                   bool skipProtocolSelfConstraint,
+                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+
   /// \brief "Open" the type of a declaration context, which must be a type or
   /// extension.
   ///
