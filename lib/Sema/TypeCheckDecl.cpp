@@ -2710,10 +2710,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  auto isInClassContext = [](Decl *vd) {
-    return bool(vd->getDeclContext()->getDeclaredTypeOfContext()
-                  ->getClassOrBoundGenericClass());
-  };
+   auto isInClassContext = [](Decl *vd) {
+    Type ContextTy = vd->getDeclContext()->getDeclaredTypeOfContext();
+     if (!ContextTy)
+       return false;
+     return bool(ContextTy->getClassOrBoundGenericClass());
+   };
 
   if (Attrs.isObjC()) {
     // Only classes, class protocols, instance properties, methods,
