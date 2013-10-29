@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <new>
 #include <string.h>
+#include <unordered_map>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -1119,6 +1120,350 @@ namespace {
 /// The uniquing structure for existential type metadata.
 static MetadataCache<ExistentialCacheEntry> ExistentialTypes;
 
+namespace {
+
+/// Template parameter for the below templates that instantiates for a variable
+/// number of witnesses.
+static const unsigned VariableValueWitnesses = ~0U;
+  
+/// Prefab value witnesses for existential containers without a class constraint
+/// and a fixed number of protocol witness table slots.
+template<unsigned NUM_WITNESS_TABLES>
+struct OpaqueExistentialValueWitnesses {
+  /// The ABI layout of an opaque existential container.
+  struct Container; /* {
+    // Specializations have the following members:
+                     
+    // Metadata pointer.
+    const Metadata *metadata;
+    // Get a reference to the nth witness table.
+    const void *&getWitness(unsigned i);
+    const void *getWitness(unsigned i) const;
+                     
+    // Get a reference to the fixed-sized buffer for the value.
+    ValueBuffer &getValueBuffer(const Metadata *self);
+    const ValueBuffer &getValueBuffer(const Metadata *self) const;
+                     
+    // The size of the container.
+    static unsigned size(const Metadata *self);
+    // The alignment of the container.
+    static unsigned alignment(const Metadata *self);
+    // The stride of the container.
+    static unsigned stride(const Metadata *self);
+  }; */
+  
+  static void destroyBuffer(ValueBuffer *buffer, const Metadata *self) {
+    auto value = projectBuffer(buffer, self);
+    destroy(value, self);
+  }
+  
+  static Container *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                     ValueBuffer *src,
+                                                     const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self),
+         srcValue  = projectBuffer (src,  self);
+    initializeWithCopy(destValue, srcValue, self);
+    return destValue;
+  }
+
+  static Container *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
+    /// Opaque existentials never fit in a fixed-size buffer. They contain one
+    /// as part of themselves.
+    return *reinterpret_cast<Container**>(buffer);
+  }
+
+  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
+    swift_slowRawDealloc(projectBuffer(buffer, self), Container::size(self));
+  }
+  
+  static void destroy(Container *value, const Metadata *self) {
+    value->metadata->getValueWitnesses()
+      ->destroyBuffer(value->getValueBuffer(self), value->metadata);
+    value->metadata->getValueWitnesses()
+      ->deallocateBuffer(value->getValueBuffer(self), value->metadata);
+  }
+  
+  static Container *initializeBufferWithCopy(ValueBuffer *dest,
+                                             Container *src,
+                                             const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self);
+    return initializeWithCopy(destValue, src, self);
+  }
+  
+  static Container *initializeWithCopy(Container *dest,
+                                       Container *src,
+                                       const Metadata *self) {
+    dest->metadata = src->metadata;
+    for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    src->metadata->getValueWitnesses()
+      ->initializeBufferWithCopyOfBuffer(dest->getValueBuffer(self),
+                                         src->getValueBuffer(self),
+                                         src->metadata);
+    return dest;
+  }
+  
+  static Container *assignWithCopy(Container *dest,
+                                   Container *src,
+                                   const Metadata *self) {
+    // If doing a self-assignment, we're done.
+    if (dest == src)
+      return dest;
+    
+    // Do the metadata records match?
+    if (dest->metadata == src->metadata) {
+      // If so, project down to the buffers and do direct assignment.
+      auto destValue = dest->metadata->getValueWitnesses()
+        ->projectBuffer(dest->getValueBuffer(self), dest->metadata);
+      auto srcValue = src->metadata->getValueWitnesses()
+        ->projectBuffer(src->getValueBuffer(self), src->metadata);
+      
+      dest->metadata->getValueWitnesses()->assignWithCopy(destValue, srcValue,
+                                                          dest->metadata);
+      return dest;
+    }
+    
+    // Otherwise, destroy and copy-initialize.
+    // TODO: should we copy-initialize and then destroy?  That's
+    // possible if we copy aside, which is a small expense but
+    // always safe.  Otherwise the destroy (which can invoke user code)
+    // could see invalid memory at this address.  These are basically
+    // the madnesses that boost::variant has to go through, with the
+    // advantage of address-invariance.
+
+    destroy(dest, self);
+    return initializeWithCopy(dest, src, self);
+  }
+  
+  static Container *initializeBufferWithTake(ValueBuffer *dest,
+                                             Container *src,
+                                             const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self);
+    return initializeWithTake(destValue, src, self);
+  }
+  
+  static Container *initializeWithTake(Container *dest,
+                                       Container *src,
+                                       const Metadata *self) {
+    dest->metadata = src->metadata;
+    for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    auto srcValue = src->metadata->getValueWitnesses()
+      ->projectBuffer(src->getValueBuffer(self), src->metadata);
+    
+    src->metadata->getValueWitnesses()
+      ->initializeBufferWithTake(dest->getValueBuffer(self), srcValue,
+                                 src->metadata);
+    return dest;
+  }
+  
+  static Container *assignWithTake(Container *dest,
+                                   Container *src,
+                                   const Metadata *self) {
+    destroy(dest, self);
+    return initializeWithTake(dest, src, self);
+  }
+  
+  static Container *allocateBuffer(ValueBuffer *dest, const Metadata *self) {
+    Container **valuePtr = reinterpret_cast<Container**>(dest);
+    *valuePtr
+      = reinterpret_cast<Container*>(swift_slowAlloc(Container::size(self),
+                                                     SWIFT_RAWALLOC));
+    return *valuePtr;
+  }
+  
+  static const Metadata *typeOf(Container *obj, const Metadata *self) {
+    auto value = obj->metadata->getValueWitnesses()
+      ->projectBuffer(obj->getValueBuffer(self), obj->metadata);
+    return obj->metadata->getValueWitnesses()->typeOf(value, obj->metadata);
+  }
+  
+  static const ValueWitnessTable ValueWitnessTable;
+};
+
+/// Fixed-size existential container.
+template<unsigned NUM_VALUE_WITNESSES>
+struct OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::Container {
+  // Metadata pointer.
+  const Metadata *metadata;
+  // Protocol witness tables.
+  const void *_witnesses[NUM_VALUE_WITNESSES];
+  // Fixed-size buffer.
+  ValueBuffer valueBuffer;
+  
+  // Get a reference to the nth witness table.
+  const void *&getWitness(unsigned i) { return _witnesses[i]; }
+  const void *getWitness(unsigned i) const { return _witnesses[i]; }
+  
+  // Get a reference to the fixed-sized buffer for the value.
+  ValueBuffer *getValueBuffer(const Metadata *self) { return &valueBuffer; }
+  const ValueBuffer *getValueBuffer(const Metadata *self) const {
+    return &valueBuffer;
+  }
+  
+  // The size of the container.
+  static unsigned size(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned size() { return sizeof(Container); }
+  // The alignment of the container.
+  static unsigned alignment(const Metadata *self) { return alignof(Container); }
+  static constexpr unsigned alignment() { return alignof(Container); }
+  // The stride of the container.
+  static unsigned stride(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned stride() { return sizeof(Container); }
+};
+  
+/// Variable-sized existential container.
+template<>
+struct OpaqueExistentialValueWitnesses<VariableValueWitnesses>::Container {
+  // Metadata pointer.
+  const Metadata *metadata;
+
+  const void **_getWitnesses() {
+    return reinterpret_cast<const void**>(this + 1);
+  }
+  const void * const *_getWitnesses() const {
+    return reinterpret_cast<const void* const *>(this + 1);
+  }
+  
+  const void *&getWitness(unsigned i) { return _getWitnesses()[i]; }
+  const void * const &getWitness(unsigned i) const {
+    return _getWitnesses()[i];
+  }
+  
+  ValueBuffer *getValueBuffer(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return reinterpret_cast<ValueBuffer*>(
+                           &getWitness(existSelf->Flags.getNumWitnessTables()));
+  }
+  const ValueBuffer *getValueBuffer(const Metadata *self) const {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return reinterpret_cast<const ValueBuffer *>(
+                           &getWitness(existSelf->Flags.getNumWitnessTables()));
+  }
+
+  static unsigned size(unsigned numWitnessTables) {
+    return sizeof(const Metadata *) + sizeof(ValueBuffer)
+      + sizeof(const void *) * numWitnessTables;
+  }
+  static unsigned size(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return size(existSelf->Flags.getNumWitnessTables());
+  }
+  
+  static unsigned alignment(unsigned numWitnessTables) {
+    return alignof(void*);
+  }
+  static unsigned alignment(const Metadata *self) {
+    return alignof(void*);
+  }
+
+  static unsigned stride(unsigned numWitnessTables) {
+    return size(numWitnessTables);
+  }
+  static unsigned stride(const Metadata *self) {
+    return size(self);
+  }
+};
+  
+template<unsigned NUM_VALUE_WITNESSES>
+const ValueWitnessTable
+OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
+#define FIXED_OPAQUE_EXISTENTIAL_WITNESS(WITNESS) \
+  (value_witness_types::WITNESS*)WITNESS,
+  
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(FIXED_OPAQUE_EXISTENTIAL_WITNESS)
+#undef FIXED_OPAQUE_EXISTENTIAL_WITNESS
+  /*size*/ Container::size(),
+  /*flags*/ ValueWitnessFlags().withAlignment(Container::alignment())
+    .withPOD(false)
+    .withInlineStorage(false)
+    .withExtraInhabitants(false),
+  /*stride*/ Container::stride()
+};
+
+template<unsigned NUM_WITNESS_TABLES>
+struct ClassExistentialValueWitnesses {
+  /// The ABI layout of a class-constrained existential container.
+  struct Container {
+    const void *witnesses[NUM_WITNESS_TABLES];
+    HeapObject *value;
+  };
+};
+  
+} // end anonymous namespace
+
+static std::unordered_map<unsigned, const ValueWitnessTable*>
+  OpaqueExistentialValueWitnessTables;
+
+/// Instantiate a value witness table for an opaque existential container with
+/// the given number of witness table pointers.
+static const ValueWitnessTable *
+existential_instantiateOpaqueValueWitnesses(unsigned numWitnessTables) {
+  auto found = OpaqueExistentialValueWitnessTables.find(numWitnessTables);
+  if (found != OpaqueExistentialValueWitnessTables.end())
+    return found->second;
+  
+  using VarOpaqueValueWitnesses
+    = OpaqueExistentialValueWitnesses<VariableValueWitnesses>;
+  
+  auto *vwt = new ValueWitnessTable;
+#define STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS(WITNESS) \
+  vwt->WITNESS = (value_witness_types::WITNESS*)      \
+    VarOpaqueValueWitnesses::WITNESS;
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS)
+#undef STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS
+  
+  vwt->size = VarOpaqueValueWitnesses::Container::size(numWitnessTables);
+  vwt->flags = ValueWitnessFlags()
+    .withAlignment(VarOpaqueValueWitnesses::Container::alignment(numWitnessTables))
+    .withPOD(false)
+    .withInlineStorage(false)
+    .withExtraInhabitants(false);
+  vwt->stride = VarOpaqueValueWitnesses::Container::stride(numWitnessTables);
+
+  OpaqueExistentialValueWitnessTables.insert({numWitnessTables, vwt});
+  
+  return vwt;
+}
+
+/// Get the value witness table for an existential type, first trying to use a
+/// shared specialized table for common cases.
+static const ValueWitnessTable *
+existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
+                              unsigned numWitnessTables) {
+  // Pattern-match common cases.
+
+  switch (classConstraint) {
+  case ProtocolClassConstraint::Class:
+    // A class-constrained existential with no witness tables can use the
+    // Builtin.ObjCPointer witnesses.
+    if (numWitnessTables == 0)
+      return &_TWVBO;
+
+    return nullptr;
+    /* TODO
+    // Use statically-instantiated witnesses for the common case of a
+    // one-witness-table class existential.
+    if (numWitnessTables == 1)
+      return &ClassExistentialValueWitnesses<1>::ValueWitnessTable;
+    
+    // Otherwise, use dynamic value witnesses.
+    return existential_getClassValueWitnesses(numWitnessTables);
+     */
+
+  case ProtocolClassConstraint::Any:
+    // Use statically-instantiated witnesses for the common cases of zero- or
+    // one-witness-table opaque existentials.
+    if (numWitnessTables == 0)
+      return &OpaqueExistentialValueWitnesses<0>::ValueWitnessTable;
+    if (numWitnessTables == 1)
+      return &OpaqueExistentialValueWitnesses<1>::ValueWitnessTable;
+    
+    // Otherwise, use dynamic value witnesses.
+    return existential_instantiateOpaqueValueWitnesses(numWitnessTables);
+  }
+}
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
@@ -1150,8 +1495,8 @@ swift::swift_getExistentialMetadata(size_t numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
   auto metadata = entry->getData();
   metadata->setKind(MetadataKind::Existential);
-  // TODO
-  metadata->ValueWitnesses = nullptr;
+  metadata->ValueWitnesses = existential_getValueWitnesses(classConstraint,
+                                                           numWitnessTables);
   metadata->Flags = ExistentialTypeFlags()
     .withNumWitnessTables(numWitnessTables)
     .withClassConstraint(classConstraint);
