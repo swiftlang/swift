@@ -76,7 +76,15 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    NameLen = VD->getName().getLength();
+    if (auto FD = dyn_cast<FuncDecl>(D)) {
+      if (FD->isGetterOrSetter()) {
+        NameLen = 0;
+      } else {
+        NameLen = VD->getName().getLength();
+      }
+    } else {
+      NameLen = VD->getName().getLength();
+    }
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     if (TypeRepr *TR = ED->getExtendedTypeLoc().getTypeRepr()) {
@@ -220,12 +228,6 @@ bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
   if (D->isImplicit()) {
     ShouldVisitChildren = false;
     return true;
-  }
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isGetterOrSetter()) {
-      ShouldVisitChildren = true;
-      return true;
-    }
   }
   return false;
 }
