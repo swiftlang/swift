@@ -1280,7 +1280,7 @@ struct OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::Container {
   // Metadata pointer.
   const Metadata *metadata;
   // Protocol witness tables.
-  const void *_witnesses[NUM_VALUE_WITNESSES];
+  const void *_witnesses[NUM_VALUE_WITNESSES ? NUM_VALUE_WITNESSES : 1];
   // Fixed-size buffer.
   ValueBuffer valueBuffer;
   
