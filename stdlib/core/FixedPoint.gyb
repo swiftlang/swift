@@ -37,18 +37,18 @@ def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
 
-def all_ints():
+def allInts():
     for bits in allBits:
         for signed in False, True:
             yield bits,signed
 
-def int_name(bits, signed):
+def intName(bits, signed):
     return ('' if signed else 'U') + 'Int' + str(bits)
 }@
 
-@ for (bits, signed) in all_ints():
+@ for (bits, signed) in allInts():
 @   sign = 's' if signed else 'u'
-@   Self = int_name(bits, signed)
+@   Self = intName(bits, signed)
 @   ArrayBound = 'ArrayBound, ' if bits > 8 and bits < 128 else ''
 
 struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
@@ -174,18 +174,18 @@ extension ${Self} : SignedNumber {
 // construction from other integer types
 @@transparent
 extension ${Self} {
-@ for (src_bits, src_signed) in all_ints():
-@    That = int_name(src_bits, src_signed)
+@ for (srcBits, srcSigned) in allInts():
+@    That = intName(srcBits, srcSigned)
 @    if Self != That:
   init(v: ${That}) {
-@      if bits == src_bits:
+@      if bits == srcBits:
     value = v.value
 @      else:
     value = Builtin.${
-    ('trunc' if src_bits > bits
-    else 'sext' if src_signed
+    ('trunc' if srcBits > bits
+    else 'sext' if srcSigned
     else 'zext')
-    }_Int${src_bits}_Int${bits}(v.value)
+    }_Int${srcBits}_Int${bits}(v.value)
 @      end
   }
 @    end
@@ -246,7 +246,7 @@ func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 @ end
-@ end  # for bits in all_ints
+@ end  # for bits in allInts
 
 // FIXME: rdar://14897572
 // hack to make non-x86 architectures build at a reasonable speed
