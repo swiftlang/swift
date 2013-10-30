@@ -17,6 +17,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -119,6 +120,7 @@ namespace {
       SourceLoc NameLoc;
       unsigned ResultVal;
 
+      bool isUndef() const { return Name == "undef"; }
       bool isMRV() const { return ResultVal != ~0U; }
     };
 
@@ -356,6 +358,9 @@ bool SILParser::parseGlobalName(Identifier &Name) {
 /// and type.
 SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
                                   SILLocation Loc) {
+  if (Name.isUndef())
+    return SILUndef::get(Type, &SILMod);
+
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Name.Name];
 
@@ -790,9 +795,16 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
 ///
 ///     sil-value-name:
 ///       sil-local-name ('#' integer_literal)?
+///       'undef'
 ///
 bool SILParser::parseValueName(UnresolvedValueName &Result) {
   Result.Name = P.Tok.getText();
+
+  if (P.Tok.is(tok::kw_undef)) {
+    Result.NameLoc = P.consumeToken(tok::kw_undef);
+    Result.ResultVal = ~1U;
+    return false;
+  }
 
   // Parse the local-name.
   if (P.parseToken(tok::sil_local_name, Result.NameLoc,
@@ -1105,6 +1117,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   ValueBase *ResultVal;
   switch (Opcode) {
   case ValueKind::SILArgument:
+  case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
   case ValueKind::AllocBoxInst: {

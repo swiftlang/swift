@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
@@ -85,6 +86,9 @@ public:
   void visitBasicBlockArguments(SILBasicBlock *BB) {}
 
   ValueRetTy visitSILArgument(SILArgument *A) {
+    llvm_unreachable("should only be visiting instructions");
+  }
+  ValueRetTy visitSILUndef(SILUndef *U) {
     llvm_unreachable("should only be visiting instructions");
   }
 

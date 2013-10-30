@@ -45,6 +45,7 @@ KEYWORD(subscript)
 KEYWORD(typealias)
 KEYWORD(var)
 
+KEYWORD(undef)      // This is only enabled when parsing .sil files.
 KEYWORD(sil)        // This is only enabled when parsing .sil files.
 KEYWORD(sil_stage)  // This is only enabled when parsing .sil files.
 KEYWORD(sil_vtable) // This is only enabled when parsing .sil files.

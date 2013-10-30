@@ -15,6 +15,7 @@
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 
 // This is a template-only header; eventually it should move to llvm/Support.
 #include "clang/Basic/OnDiskHashTable.h"
@@ -149,7 +150,7 @@ SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
 /// We enumerate all values to update ValueIDs in a separate pass
 /// to correctly handle forward reference of a value.
 ValueID SILSerializer::addValueRef(const ValueBase *Val) {
-  if (!Val)
+  if (!Val || isa<SILUndef>(Val))
     return 0;
 
   ValueID &id = ValueIDs[Val];
@@ -232,6 +233,7 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
   case ValueKind::SILArgument:
+  case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
   case ValueKind::UnreachableInst: {

@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
 // This is a template-only header; eventually it should move to llvm/Support.
@@ -168,6 +169,9 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
 
 SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
                                         SILType Type) {
+  if (Id == 0)
+    return SILUndef::get(Type, &SILMod);
+
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Id];
   if (Entry) {
@@ -459,6 +463,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ValueBase *ResultVal;
   switch ((ValueKind)OpCode) {
   case ValueKind::SILArgument:
+  case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
 #define ONETYPE_INST(ID)                      \

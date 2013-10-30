@@ -56,6 +56,7 @@
 #endif
 
 VALUE(SILArgument, ValueBase)
+VALUE(SILUndef, ValueBase)
 
 // Please keep the order of instructions consistent with the order of their
 // descriptions in the SIL reference in docs/SIL.rst.

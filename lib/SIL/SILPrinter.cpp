@@ -37,7 +37,7 @@ using namespace Demangle;
 
 struct ID {
   enum ID_Kind {
-    SILBasicBlock, SSAValue
+    SILBasicBlock, SILUndef, SSAValue
   } Kind;
   unsigned Number;
   int ResultNumber;
@@ -69,6 +69,7 @@ public:
     if (!OS.has_colors())
       return;
     switch (K) {
+      DEF_COL(ID::SILUndef, RED)
       DEF_COL(ID::SILBasicBlock, GREEN)
       DEF_COL(ID::SSAValue, MAGENTA)
     }
@@ -90,6 +91,7 @@ public:
 static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   SILColor C(OS, i.Kind);
   switch (i.Kind) {
+  case ID::SILUndef: OS << "undef"; return OS;
   case ID::SILBasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
   }
@@ -477,7 +479,15 @@ public:
     OS << "argument of " << getID(A->getParent()) << " : ";
     A->getType().print(OS);
   }
-  
+
+  void visitSILUndef(SILUndef *A) {
+    // This should really only happen during debugging.
+    OS << "undef<";
+    A->getType().print(OS);
+    OS << ">";
+  }
+
+
   void visitAllocStackInst(AllocStackInst *AVI) {
     OS << "alloc_stack " << AVI->getElementType();
     if (VarDecl *vd = AVI->getDecl())
@@ -1018,6 +1028,9 @@ ID SILPrinter::getID(const SILBasicBlock *Block) {
 }
 
 ID SILPrinter::getID(SILValue V) {
+  if (isa<SILUndef>(V))
+    return { ID::SILUndef };
+
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
     const SILBasicBlock *ParentBB;

@@ -41,6 +41,7 @@ namespace swift {
   class SILFunction;
   class SILVTable;
   class SILTypeList;
+  class SILUndef;
   class SourceFile;
   class TranslationUnit;
 
@@ -78,6 +79,7 @@ private:
   friend class SILFunction;
   friend class SILType;
   friend class SILVTable;
+  friend class SILUndef;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
 
@@ -106,6 +108,9 @@ private:
 
   /// This is a cache of builtin Function declarations to numeric ID mappings.
   llvm::DenseMap<const FuncDecl*, BuiltinInfo> BuiltinIDCache;
+
+  /// This is the set of undef values we've created, for uniquing purposes.
+  llvm::DenseMap<SILType, SILUndef*> UndefValues;
 
   /// The stage of processing this module is at.
   SILStage Stage;

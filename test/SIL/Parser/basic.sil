@@ -1037,3 +1037,10 @@ sil_vtable Foo {
   #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
   #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
 }
+
+sil @undef_value : $() -> () {
+bb0:
+  store undef to undef : $*Builtin.Int1
+  unreachable
+}
+

@@ -341,11 +341,13 @@ Values and Operands
   sil-identifier ::= [A-Za-z_0-9]+
   sil-value-name ::= '%' sil-identifier
   sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-value ::= 'undef'
   sil-operand ::= sil-value ':' sil-type
 
 SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
-argument that produces the value.
+argument that produces the value.  SIL values may also refer to the keyword
+'undef', which is a value of undefined contents.
 In SIL, a single instruction may produce multiple values. Operands that refer
 to multiple-value instructions choose the value by following the ``%name`` with
 ``#`` and the index of the value. For example::

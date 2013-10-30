@@ -14,6 +14,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -27,6 +28,16 @@ void SILValue::replaceAllUsesWith(SILValue V) {
   while (!use_empty())
     (**use_begin()).set(V);
 }
+
+SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
+  // Unique these.
+  SILUndef *&Entry = M->UndefValues[Ty];
+  if (Entry == nullptr)
+    Entry = new (*M) SILUndef(Ty);
+  return Entry;
+}
+
+
 
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getArgParamPatterns().size() >= 1 && "no arguments for func?!");
@@ -270,24 +281,12 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
                                      const ASTContext &C) {
   Type ty;
   switch (Kind) {
-  case BuiltinFloatType::IEEE16:
-    ty = C.TheIEEE16Type;
-    break;
-  case BuiltinFloatType::IEEE32:
-    ty = C.TheIEEE32Type;
-    break;
-  case BuiltinFloatType::IEEE64:
-    ty = C.TheIEEE64Type;
-    break;
-  case BuiltinFloatType::IEEE80:
-    ty = C.TheIEEE80Type;
-    break;
-  case BuiltinFloatType::IEEE128:
-    ty = C.TheIEEE128Type;
-    break;
-  case BuiltinFloatType::PPC128:
-    ty = C.ThePPC128Type;
-    break;
+  case BuiltinFloatType::IEEE16:  ty = C.TheIEEE16Type; break;
+  case BuiltinFloatType::IEEE32:  ty = C.TheIEEE32Type; break;
+  case BuiltinFloatType::IEEE64:  ty = C.TheIEEE64Type; break;
+  case BuiltinFloatType::IEEE80:  ty = C.TheIEEE80Type; break;
+  case BuiltinFloatType::IEEE128: ty = C.TheIEEE128Type; break;
+  case BuiltinFloatType::PPC128:  ty = C.ThePPC128Type; break;
   }
   return getPrimitiveObjectType(CanType(ty));
 }

@@ -96,7 +96,7 @@ static bool eraseAndCleanup(const llvm::DenseSet<SILInstruction*> &ToBeDeleted){
   for (auto II = ToBeDeleted.begin(), EI = ToBeDeleted.end(); II != EI; ++II) {
 
     // Deleting instructions might make their operands dead, let's collect them.
-    SILInstruction* DI = *II;
+    SILInstruction *DI = *II;
     ArrayRef<Operand> Ops = DI->getAllOperands();
     for (auto OpI = Ops.begin(), OpE = Ops.end(); OpI != OpE; ++OpI) {
       SILInstruction *V = dyn_cast_or_null<SILInstruction>(OpI->get().getDef());
@@ -105,7 +105,7 @@ static bool eraseAndCleanup(const llvm::DenseSet<SILInstruction*> &ToBeDeleted){
         PossiblyDead.insert(V);
     }
 
-    // Drop references for all the instrcutions that will be deleted.
+    // Drop references for all the instructions that will be deleted.
     DI->dropAllReferences();
   }
 

@@ -182,6 +182,7 @@ SILInstructionMemoryBehavior SILInstruction::getMemoryBehavior() const {
   case ValueKind::CLASS: return SILInstructionMemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
   case ValueKind::SILArgument:
+  case ValueKind::SILUndef:
     llvm_unreachable("Non-instructions are unreachable.");
   }
   llvm_unreachable("We've just exhausted the switch.");
