@@ -226,43 +226,106 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
 }
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
+  llvm::SmallString<64> Prefix;
   switch (getKind()) {
   case ResultKind::Declaration:
-    OS << "Decl/";
+    Prefix.append("Decl");
+    switch (getAssociatedDeclKind()) {
+    case CodeCompletionDeclKind::Class:
+      Prefix.append("[Class]");
+      break;
+    case CodeCompletionDeclKind::Struct:
+      Prefix.append("[Struct]");
+      break;
+    case CodeCompletionDeclKind::Enum:
+      Prefix.append("[Enum]");
+      break;
+    case CodeCompletionDeclKind::EnumElement:
+      Prefix.append("[EnumElement]");
+      break;
+    case CodeCompletionDeclKind::Protocol:
+      Prefix.append("[Protocol]");
+      break;
+    case CodeCompletionDeclKind::TypeAlias:
+      Prefix.append("[TypeAlias]");
+      break;
+    case CodeCompletionDeclKind::GenericTypeParam:
+      Prefix.append("[GenericTypeParam]");
+      break;
+    case CodeCompletionDeclKind::Constructor:
+      Prefix.append("[Constructor]");
+      break;
+    case CodeCompletionDeclKind::Destructor:
+      Prefix.append("[Destructor]");
+      break;
+    case CodeCompletionDeclKind::Subscript:
+      Prefix.append("[Subscript]");
+      break;
+    case CodeCompletionDeclKind::StaticMethod:
+      Prefix.append("[StaticMethod]");
+      break;
+    case CodeCompletionDeclKind::InstanceMethod:
+      Prefix.append("[InstanceMethod]");
+      break;
+    case CodeCompletionDeclKind::OperatorFunction:
+      Prefix.append("[OperatorFunction]");
+      break;
+    case CodeCompletionDeclKind::FreeFunction:
+      Prefix.append("[FreeFunction]");
+      break;
+    case CodeCompletionDeclKind::StaticVar:
+      Prefix.append("[StaticVar]");
+      break;
+    case CodeCompletionDeclKind::InstanceVar:
+      Prefix.append("[InstanceVar]");
+      break;
+    case CodeCompletionDeclKind::LocalVar:
+      Prefix.append("[LocalVar]");
+      break;
+    case CodeCompletionDeclKind::GlobalVar:
+      Prefix.append("[GlobalVar]");
+      break;
+    }
     break;
   case ResultKind::Keyword:
-    OS << "Keyword/";
+    Prefix.append("Keyword");
     break;
   case ResultKind::Pattern:
-    OS << "Pattern/";
+    Prefix.append("Pattern");
     break;
   }
+  Prefix.append("/");
   switch (getSemanticContext()) {
   case SemanticContextKind::None:
-    OS << "None:         ";
+    Prefix.append("None");
     break;
   case SemanticContextKind::ExpressionSpecific:
-    OS << "ExprSpecific: ";
+    Prefix.append("ExprSpecific");
     break;
   case SemanticContextKind::Local:
-    OS << "Local:        ";
+    Prefix.append("Local");
     break;
   case SemanticContextKind::CurrentNominal:
-    OS << "CurrNominal:  ";
+    Prefix.append("CurrNominal");
     break;
   case SemanticContextKind::Super:
-    OS << "Super:        ";
+    Prefix.append("Super");
     break;
   case SemanticContextKind::OutsideNominal:
-    OS << "OutNominal:   ";
+    Prefix.append("OutNominal");
     break;
   case SemanticContextKind::CurrentModule:
-    OS << "CurrModule:   ";
+    Prefix.append("CurrModule");
     break;
   case SemanticContextKind::OtherModule:
-    OS << "OtherModule:  ";
+    Prefix.append("OtherModule");
     break;
   }
+  Prefix.append(": ");
+  while (Prefix.size() < 36) {
+    Prefix.append(" ");
+  }
+  OS << Prefix;
   CompletionString->print(OS);
 }
 

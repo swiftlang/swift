@@ -294,7 +294,7 @@ enum class CodeCompletionDeclKind {
   StaticVar,
   InstanceVar,
   LocalVar,
-  GlobalVar
+  GlobalVar,
 };
 
 /// \brief A single code completion result.
