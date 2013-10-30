@@ -44,10 +44,10 @@ ifneq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES := $(subst Assert.swift,AssertDebug.swift,$(SWIFT_SOURCES))
 endif
 
-# Remove Float80.swift on non-x86 architectures
+# Compile only 32-bit and 64-bit floating point on non-x86 architectures
 ifneq ($(ARCH),x86_64)
   ifneq ($(ARCH),x86)
-    SWIFT_SOURCES := $(filter-out Float80.swift,$(SWIFT_SOURCES))
+    SWIFT_SOURCES := $(subst FloatAll.swift,FloatDouble.swift,$(SWIFT_SOURCES))
   endif
 endif
 

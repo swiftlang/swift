@@ -26,10 +26,10 @@ if(SWIFT_ASSERTS)
   string(REPLACE ";Assert.swift" ";AssertDebug.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 endif()
 
-# Remove Float80.swift on non-x86 architectures
+# Compile only 32-bit and 64-bit floating point on non-x86 architectures
 if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL i386 AND
     NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-  string(REPLACE ";Float80.swift" "" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
+  string(REPLACE ";FloatAll.swift" ";FloatDouble.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 endif()
 
 # Strip comments and blank lines
