@@ -709,8 +709,7 @@ namespace {
 
       // Form a normal subscript.
       SubscriptExpr *subscriptExpr
-        = new (tc.Context) SubscriptExpr(base, index,
-                                         ConcreteDeclRef(subscript));
+        = new (tc.Context) SubscriptExpr(base, index, subscript);
       subscriptExpr->setType(resultTy);
       return subscriptExpr;
     }

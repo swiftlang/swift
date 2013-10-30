@@ -404,6 +404,19 @@ Type ValueDecl::getInterfaceType() const {
   if (auto nominal = dyn_cast<NominalTypeDecl>(this))
     return nominal->computeInterfaceType();
 
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
+    auto proto = cast<ProtocolDecl>(getDeclContext());
+    (void)proto->getType(); // make sure we've computed the type.
+    auto selfTy = proto->getGenericParamTypes()[0];
+    auto &ctx = getASTContext();
+    InterfaceTy = DependentMemberType::get(
+                    selfTy,
+                    const_cast<AssociatedTypeDecl *>(assocType),
+                    ctx);
+    InterfaceTy = MetaTypeType::get(InterfaceTy, ctx);
+    return InterfaceTy;
+  }
+
   return Type();
 }
 

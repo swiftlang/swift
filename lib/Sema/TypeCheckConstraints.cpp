@@ -983,51 +983,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     type = TC.getUnopenedTypeOfReference(value, baseTy);
   }
 
-  // If the declaration is a protocol member, we may have more substitutions to
-  // perform.
-  if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
-    // Turn the outer polymorphic function type into a monomorphic function
-    // type, because the caller always handles the Self parameter explicitly.
-    if (auto polyFn = type->getAs<PolymorphicFunctionType>()) {
-      type = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
-                               polyFn->getExtInfo(), TC.Context);
-    }
-
-    // For a member of an archetype, substitute the base type for the 'Self'
-    // type.
-    if (baseObjTy->is<ArchetypeType>()) {
-      auto selfArchetype = ownerProtoTy->getDecl()->getSelf()->getArchetype();
-
-      llvm::DenseMap<ArchetypeType *, Type> mappedTypes;
-      mappedTypes[selfArchetype] = baseObjTy;
-      type = TC.transformType(type,
-               [&](Type type) -> Type {
-                 if (auto archetype = type->getAs<ArchetypeType>()) {
-                   return getTypeForArchetype(*this, archetype, mappedTypes);
-                 }
-                 
-                 if (auto polyTy = type->getAs<PolymorphicFunctionType>()) {
-                   // Preserve generic method archetypes.
-                   for (auto archetype : polyTy->getAllArchetypes())
-                     mappedTypes[archetype] = archetype;
-                 }
-
-                 return type;
-               });
-    } else if (!baseObjTy->isExistentialType() &&
-               !baseObjTy->hasTypeVariable()) {
-      // When we have an associated type and the base type conforms to the
-      // given protocol, use the type witness directly.
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, ownerProtoTy->getDecl(), DC,
-                                &conformance)) {
-        // FIXME: Eventually, deal with default function/property definitions.
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
-          type = conformance->getTypeWitness(assocType).Replacement;
-        }
-      }
-    }
-  }
+  assert(!ownerTy->is<ProtocolType>() && "Protocol types handled above");
 
   type = openType(type, { }, replacements, value->getInnermostDeclContext());
 
@@ -1082,6 +1038,54 @@ std::pair<Type, Type>
 ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
                                            bool isDynamicResult) {
+  // Figure out the instance type used for the base.
+  TypeVariableType *baseTypeVar = nullptr;
+  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
+                     ->getRValueType();
+  bool isInstance = true;
+  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
+    baseObjTy = baseMeta->getInstanceType();
+    isInstance = false;
+  }
+
+  // Handle associated type lookup as a special case, horribly.
+  // FIXME: This is an awful hack.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
+    // Refer to a member of the archetype directly.
+    if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
+      Type memberTy = archetype->getNestedType(value->getName());
+      if (!isTypeReference)
+        memberTy = MetaTypeType::get(memberTy, TC.Context);
+
+      auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+      return { openedType, memberTy };
+    }
+
+    // If we have a nominal type that conforms to the protocol in which the
+    // associated type resides, use the witness.
+    if (!baseObjTy->isExistentialType() &&
+        !baseObjTy->hasTypeVariable() &&
+        baseObjTy->getAnyNominal()) {
+
+      auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
+      ProtocolConformance *conformance = nullptr;
+      if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance)) {
+        auto memberTy = conformance->getTypeWitness(assocType).Replacement;
+        if (!isTypeReference)
+          memberTy = MetaTypeType::get(memberTy, TC.Context);
+
+        auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+        return { openedType, memberTy };
+      }
+    }
+
+    // FIXME: Totally bogus fallthrough.
+    Type memberTy = isTypeReference? assocType->getDeclaredType()
+                                   : assocType->getType();
+    auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+    return { openedType, memberTy };
+  }
+
   // Figure out the declaration context to use when opening this type.
   DeclContext *dc = value->getDeclContext();
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
@@ -1127,16 +1131,6 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
     openedType = FunctionType::get(selfTy, openedType, TC.Context);
   }
 
-  // Figure out the instance type used for the base.
-  TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
-                     ->getRValueType();
-  bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
-    baseObjTy = baseMeta->getInstanceType();
-    isInstance = false;
-  }
-
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();
   Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();
@@ -1164,13 +1158,34 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
                                   settableQualForDecl(baseTy, subscript),
                                   TC.Context);
     type = FunctionType::get(fnType->getInput(), elementTy, TC.Context);
+  } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
+             isa<AssociatedTypeDecl>(value)) {
+    // When we have an associated type, the base type conforms to the
+    // given protocol, so use the type witness directly.
+    // FIXME: Diagnose existentials properly.
+    // FIXME: Eliminate the "hasTypeVariables()" hack here.
+    auto proto = cast<ProtocolDecl>(value->getDeclContext());
+    auto assocType = cast<AssociatedTypeDecl>(value);
+
+    type = openedFnType->getResult();
+    if (baseObjTy->is<ArchetypeType>()) {
+      // For an archetype, we substitute the base object for the base.
+      // FIXME: Feels like a total hack.
+    } else if (!baseObjTy->isExistentialType() &&
+        !baseObjTy->is<ArchetypeType>() &&
+        !baseObjTy->hasTypeVariable()) {
+      ProtocolConformance *conformance = nullptr;
+      if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance)) {
+        type = conformance->getTypeWitness(assocType).Replacement;
+      }
+    }
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
              (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
              isa<TypeDecl>(value) ||
              isInstance) {
     // For a constructor, enum element, static method, or an instance method
     // referenced through an instance, we've consumed the curried 'self'
-    // already.
+    // already. For a type, strip off the 'self' we artificially added.
     type = openedFnType->getResult();
   } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
     // For a dynamic result referring to an instance function through
