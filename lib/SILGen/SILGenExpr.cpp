@@ -2817,11 +2817,12 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E);
 
   // Emit the operand into the temporary.
-  RValue subResult;
+  SILValue subResult;
   if (optInit) {
     SGF.emitExprInto(E->getSubExpr(), optInit);
   } else {
-    subResult = SGF.emitRValue(E->getSubExpr(), SGFContext());
+    subResult = SGF.emitRValue(E->getSubExpr(), SGFContext())
+      .forwardAsSingleValue(SGF, E);
   }
 
   // We fell out of the normal result, which generated a T? as either
@@ -2837,8 +2838,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     assert(subResult);
     assert(!optTL.isAddressOnly());
     contBBArg = new (SGF.SGM.M) SILArgument(optTL.getLoweredType(), contBB);
-    SGF.B.createBranch(E, contBB,
-                       std::move(subResult).forwardAsSingleValue(SGF, E));
+    SGF.B.createBranch(E, contBB, subResult);
   } else {
     assert(!subResult);
     SGF.B.createBranch(E, contBB);
