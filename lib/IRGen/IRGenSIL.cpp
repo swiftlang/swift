@@ -327,6 +327,7 @@ class IRGenSILFunction :
 {
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
+  llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
   SILFunction *CurSILFn;
@@ -397,9 +398,45 @@ public:
     setLoweredValue(v, BuiltinValue{builtin});
   }
   
+  LoweredValue &getUndefLoweredValue(SILType t) {
+    auto found = LoweredUndefs.find(t);
+    if (found != LoweredUndefs.end())
+      return found->second;
+    
+    auto &ti = getTypeInfo(t);
+    switch (t.getCategory()) {
+    case SILValueCategory::Address:
+    case SILValueCategory::LocalStorage: {
+      Address undefAddr = ti.getAddressForPointer(
+                  llvm::UndefValue::get(ti.getStorageType()->getPointerTo()));
+      LoweredUndefs.insert({t, LoweredValue(undefAddr)});
+      break;
+    }
+
+    case SILValueCategory::Object: {
+      auto schema = ti.getSchema(ExplosionKind::Maximal);
+      Explosion e(ExplosionKind::Maximal);
+      for (auto &elt : schema) {
+        assert(!elt.isAggregate()
+               && "non-scalar element in loadable type schema?!");
+        e.add(llvm::UndefValue::get(elt.getScalarType()));
+      }
+      LoweredUndefs.insert({t, LoweredValue(e)});
+      break;
+    }
+    }
+    
+    found = LoweredUndefs.find(t);
+    assert(found != LoweredUndefs.end());
+    return found->second;
+  }
+  
   /// Get the LoweredValue corresponding to the given SIL value, which must
   /// have been lowered.
   LoweredValue &getLoweredValue(SILValue v) {
+    if (isa<SILUndef>(v))
+      return getUndefLoweredValue(v.getType());
+    
     auto foundValue = LoweredValues.find(v);
     assert(foundValue != LoweredValues.end() &&
            "no lowered explosion for sil value!");
