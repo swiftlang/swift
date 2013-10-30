@@ -321,13 +321,14 @@ namespace {
         baseTy = baseMeta->getInstanceType();
       }
 
-      // Figure out the type of the container in which the member actually
-      // resides.
-      auto containerTy
-        = member->getDeclContext()->getDeclaredTypeOfContext();
-
-      // Handle references that require substitutions.
+      // Produce a reference to the member, the type of the container it
+      // resides in, and the type produced by the reference itself.
+      Type containerTy;
+      ConcreteDeclRef memberRef;
+      Type refTy;
       if (openedFullType->hasTypeVariable()) {
+        // We require substitutions. Figure out what they are.
+
         // Figure out the declaration context where we'll get the generic
         // parameters.
         auto dc = member->getDeclContext();
@@ -336,181 +337,101 @@ namespace {
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
-        Type substTy = solution.computeSubstitutions(
-                         member->getInterfaceType(),
-                         dc,
-                         openedFullType,
-                         substitutions);
+        refTy = solution.computeSubstitutions(member->getInterfaceType(),
+                                              dc,
+                                              openedFullType,
+                                              substitutions);
 
-        auto &ctx = solution.getConstraintSystem().getASTContext();
+        memberRef = ConcreteDeclRef(context, member, substitutions);
 
-        // If we're refering to the member of a module, we're done.
-        if (baseTy->is<ModuleType>()) {
-          Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
-                                                            substitutions),
-                                            memberLoc, Implicit);
-          ref->setType(substTy);
-
-          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-        }
-
-        bool isArchetypeOrExistentialRef
-              = isa<ProtocolDecl>(member->getDeclContext()) &&
-                (baseTy->is<ArchetypeType>() || baseTy->isExistentialType());
-
-        // Otherwise, convert the base.
         auto openedFullFnType = openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput()
                                 ->getRValueInstanceType();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        if (baseIsInstance) {
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
-          base = coerceObjectArgumentToType(
-                   base, isArchetypeOrExistentialRef? baseTy : containerTy,
-                   locator.withPathElement(ConstraintLocator::MemberRefBase));
-        } else {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base,
-                              MetaTypeType::get(isArchetypeOrExistentialRef
-                                                  ? baseTy
-                                                  : containerTy,
-                                                context),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
-          base = tc.coerceToRValue(base);
-        }
-        assert(base && "Unable to convert base?");
-
-        // Handle archetype and existential references.
-        if (isArchetypeOrExistentialRef) {
-          Expr *ref;
-
-          if (baseTy->is<ArchetypeType>()) {
-            ref = new (ctx) ArchetypeMemberRefExpr(
-                              base, dotLoc,
-                              ConcreteDeclRef(ctx, member, substitutions),
-                              memberLoc);
-          } else {
-            ref = new (ctx) ExistentialMemberRefExpr(
-                               base, dotLoc,
-                               ConcreteDeclRef(ctx, member, substitutions),
-                               memberLoc);
-          }
-          ref->setImplicit(Implicit);
-          ref->setType(simplifyType(openedFullFnType->getResult()));
-          return ref;
-        }
-
-        // For types and variables, build member references.
-        if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
-          auto result
-            = new (context) MemberRefExpr(base, dotLoc,
-                                          ConcreteDeclRef(ctx, member,
-                                                          substitutions),
-                                          memberLoc, Implicit);
-
-          // Skip the synthesized 'self' input type of the opened type.
-          result->setType(substTy->castTo<FunctionType>()->getResult());
-          return result;
-        }
-
-        // Handle all other function references.
-        Expr *ref = new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, member,
-                                                          substitutions),
-                                          memberLoc, Implicit);
-        ref->setType(substTy);
-
-        ApplyExpr *apply;
-        if (isa<ConstructorDecl>(member)) {
-          // FIXME: Provide type annotation.
-          apply = new (context) ConstructorRefCallExpr(ref, base);
-        } else if (!baseIsInstance && member->isInstanceMember()) {
-          return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-        } else {
-          assert((!baseIsInstance || member->isInstanceMember()) &&
-                 "can't call a static method on an instance");
-          apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
-        }
-        return finishApply(apply, openedType, nullptr);
+      } else {
+        // No substitutions required; the declaration reference is simple.
+        containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
+        memberRef = member;
+        refTy = tc.getUnopenedTypeOfReference(member);
       }
 
-      // Member references into an archetype or existential type that resolves
-      // to a protocol requirement.
-      if (containerTy && containerTy->is<ProtocolType>() &&
-          (baseTy->is<ArchetypeType>() || baseTy->isExistentialType())) {
-        // Convert the base appropriately.
-        if (baseIsInstance) {
-          // Turn the object argument into an lvalue if required.
-          base = coerceObjectArgumentToType(
-                   base, baseTy,
-                   locator.withPathElement(ConstraintLocator::MemberRefBase));
+      // If we're referring to the member of a module, it's just a simple
+      // reference.
+      if (baseTy->is<ModuleType>()) {
+        Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
+        ref->setType(refTy);
+        return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+      }
+
+      // Otherwise, we're referring to a member of a type.
+
+      // Is it an archetype or existential member?
+      bool isArchetypeOrExistentialRef
+            = isa<ProtocolDecl>(member->getDeclContext()) &&
+              (baseTy->is<ArchetypeType>() || baseTy->isExistentialType());
+
+      if (baseIsInstance) {
+        // Convert the base to the appropriate container type, turning it
+        // into an lvalue if required.
+        base = coerceObjectArgumentToType(
+                 base, isArchetypeOrExistentialRef? baseTy : containerTy,
+                 locator.withPathElement(ConstraintLocator::MemberRefBase));
+      } else {
+        // Convert the base to an rvalue of the appropriate metatype.
+        base = coerceToType(base,
+                            MetaTypeType::get(isArchetypeOrExistentialRef
+                                                ? baseTy
+                                                : containerTy,
+                                              context),
+                            locator.withPathElement(
+                              ConstraintLocator::MemberRefBase));
+        base = tc.coerceToRValue(base);
+      }
+      assert(base && "Unable to convert base?");
+
+      // Handle archetype and existential references.
+      if (isArchetypeOrExistentialRef) {
+        Expr *ref;
+
+        if (baseTy->is<ArchetypeType>()) {
+          ref = new (context) ArchetypeMemberRefExpr(base, dotLoc, memberRef,
+                                                     memberLoc);
         } else {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = tc.coerceToRValue(base);
+          ref = new (context) ExistentialMemberRefExpr(base, dotLoc, memberRef,
+                                                       memberLoc);
         }
+        ref->setImplicit(Implicit);
+        ref->setType(simplifyType(openedType));
+        return ref;
+      }
 
-        // Build the member reference expression.
-        Expr *result;
-        if (baseTy->isExistentialType())
-          result = new (context) ExistentialMemberRefExpr(base, dotLoc,
-                                                          member, memberLoc);
-        else
-          result = new (context) ArchetypeMemberRefExpr(base, dotLoc,
-                                                        member, memberLoc);
-        if (base->isImplicit())
-          result->setImplicit();
+      // For types and variables, build member references.
+      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+        auto result
+          = new (context) MemberRefExpr(base, dotLoc, memberRef,
+                                        memberLoc, Implicit);
 
-        // Otherwise, just simplify the type of this reference directly.
+        // Skip the synthesized 'self' input type of the opened type.
         result->setType(simplifyType(openedType));
         return result;
       }
 
-      // Reference to a variable within a class.
-      if (auto var = dyn_cast<VarDecl>(member)) {
-        if (!baseTy->is<ModuleType>()) {
-          // Convert the base to the type of the 'self' parameter.
-          assert(baseIsInstance && "Can only access variables of an instance");
+      // Handle all other function references.
+      Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
+      ref->setType(refTy);
 
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
-          base = coerceObjectArgumentToType(base, containerTy, nullptr);
-
-          auto result
-            = new (context) MemberRefExpr(base, dotLoc, var, memberLoc,
-                                          Implicit);
-          result->setType(simplifyType(openedType));
-          return result;
-        }
-      }
-
-      // Handle references to non-variable struct/class/enum members, as
-      // well as module members.
-      Expr *ref = tc.buildCheckedRefExpr(member, memberLoc, Implicit);
-
-      // Refer to a member function that binds 'self':
-      if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
-          isa<EnumElementDecl>(member) || isa<ConstructorDecl>(member)) {
-        // Constructor calls.
-        if (isa<ConstructorDecl>(member)) {
-          return finishApply(new (context) ConstructorRefCallExpr(ref, base),
-                             openedType, nullptr);
-        }
-
-        // Non-static member function calls.
-        if (baseIsInstance == member->isInstanceMember()) {
-          return finishApply(new (context) DotSyntaxCallExpr(ref, dotLoc, base),
-                             openedType, nullptr);
-        }
-        
+      ApplyExpr *apply;
+      if (isa<ConstructorDecl>(member)) {
+        // FIXME: Provide type annotation.
+        apply = new (context) ConstructorRefCallExpr(ref, base);
+      } else if (!baseIsInstance && member->isInstanceMember()) {
+        return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+      } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
+        apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
       }
-
-      // Build a reference where the base is ignored.
-      assert(!ref->getType()->is<PolymorphicFunctionType>() &&
-             "Polymorphic function type slipped through");
-      return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+      return finishApply(apply, openedType, nullptr);
     }
     
     /// \brief Build a new dynamic member reference with the given base and
