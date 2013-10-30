@@ -1103,7 +1103,7 @@ public:
 
       validateAttributes(TC, VD);
 
-      // The var requires ObjC interop if it has an [objc] or [iboutlet]
+      // The var requires ObjC interop if it has an @objc or @iboutlet
       // attribute or if it's a member of an ObjC class.
       Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
       if (ContextTy) {
@@ -1179,7 +1179,7 @@ public:
       }
     }
 
-    // A subscript is ObjC-compatible if it's explicitly [objc], or a
+    // A subscript is ObjC-compatible if it's explicitly @objc, or a
     // member of an ObjC-compatible class or property.
     if (dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
@@ -1725,7 +1725,7 @@ public:
 
     validateAttributes(TC, FD);
 
-    // A method is ObjC-compatible if it's explicitly [objc], a member of an
+    // A method is ObjC-compatible if it's explicitly @objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
     Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
@@ -1739,7 +1739,7 @@ public:
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
         // The only additional condition we need to check is if the var decl
-        // had an [objc] or [iboutlet] property. We don't use prop->isObjC()
+        // had an @objc or @iboutlet property. We don't use prop->isObjC()
         // because the property accessors may be visited before the VarDecl and
         // prop->isObjC() may not yet be set by typechecking.
         ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
@@ -1984,7 +1984,7 @@ public:
       }
     }
 
-    // A method is ObjC-compatible if it's explicitly [objc], a member of an
+    // A method is ObjC-compatible if it's explicitly @objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
     DeclContext *dc = CD->getDeclContext();
     if (dc && dc->getDeclaredTypeInContext()) {
@@ -2139,7 +2139,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     validateAttributes(*this, D);
     checkInheritanceClause(D);
 
-    // Mark a class as [objc]. This must happen before checking its members.
+    // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
       ClassDecl *superclassDecl = nullptr;
       if (CD->hasSuperclass())
@@ -2191,7 +2191,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
 
-    // If the protocol is [objc], it may only refine other [objc] protocols.
+    // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().isObjC()) {
       bool isObjC = true;
