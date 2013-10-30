@@ -20,6 +20,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 using namespace swift;
@@ -109,6 +110,9 @@ int main(int argc, char **argv) {
   llvm::PrettyStackTraceProgram X(argc, argv);
   
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
+
+  // Call llvm_shutdown() on exit to print stats and free memory.
+  llvm::llvm_shutdown_obj Y;
 
   if (PrintStats)
     llvm::EnableStatistics();
