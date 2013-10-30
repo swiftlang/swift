@@ -1342,7 +1342,8 @@ public:
   ///
   /// \returns a pair containing the full opened type (if applicable) and
   /// opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, ValueDecl *value);
+  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, ValueDecl *value,
+                                                 bool isDynamicResult);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.

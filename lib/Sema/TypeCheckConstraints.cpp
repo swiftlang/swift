@@ -820,14 +820,15 @@ void ConstraintSystem::openGeneric(
                                         replaceDependentTypes);
       if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
         if (!skipProtocolSelfConstraint ||
-            !isa<ProtocolDecl>(dc->getParent()) ||
+            !(isa<ProtocolDecl>(dc) || isa<ProtocolDecl>(dc->getParent())) ||
             !isProtocolSelfType(req.getFirstType())) {
           addConstraint(ConstraintKind::ConformsTo, subjectTy,
                         proto);
         }
-      } else
+      } else {
         addConstraint(ConstraintKind::Subtype, subjectTy,
                       req.getSecondType());
+      }
       break;
     }
 
@@ -944,12 +945,12 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Open up a generic member via its generic function type.
-  if (!isDynamicResult && !isTypeReference) {
+  if (!isTypeReference) {
     if (auto interfaceTy = value->getInterfaceType()) {
       if (interfaceTy->is<GenericFunctionType>() ||
           (isa<SubscriptDecl>(value) &&
            value->getDeclContext()->isGenericContext())) {
-        return getTypeOfMethodReference(baseTy, value);
+        return getTypeOfMethodReference(baseTy, value, isDynamicResult);
       }
     }
   }
@@ -1063,7 +1064,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
+ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
+                                           bool isDynamicResult) {
   // Figure out the declaration context to use when opening this type.
   DeclContext *dc = value->getDeclContext();
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
@@ -1118,22 +1120,25 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
     addConstraint(ConstraintKind::Equal, baseObjTy, selfObjTy);
-  } else {
+  } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseObjTy, selfObjTy);
   }
 
   // Compute the type of the reference.
   Type type;
   if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // For a subscript, turn the element type into an lvalue.
+    // For a subscript, turn the element type into an optional or lvalue,
+    // depending on
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
-    type = FunctionType::get(
-             fnType->getInput(),
-             LValueType::get(fnType->getResult(),
-                             LValueType::Qual::DefaultForMemberAccess|
-                             settableQualForDecl(baseTy, subscript),
-                             TC.Context),
-             TC.Context);
+    auto elementTy = fnType->getResult();
+    if (isDynamicResult)
+      elementTy = OptionalType::get(elementTy, TC.Context);
+    else
+      elementTy = LValueType::get(elementTy,
+                                  LValueType::Qual::DefaultForMemberAccess|
+                                  settableQualForDecl(baseTy, subscript),
+                                  TC.Context);
+    type = FunctionType::get(fnType->getInput(), elementTy, TC.Context);
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
              (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
              isInstance) {
@@ -1141,6 +1146,16 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value) {
     // referenced through an instance, we've consumed the curried 'self'
     // already.
     type = openedFnType->getResult();
+  } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
+    // For a dynamic result referring to an instance function through
+    // an object of metatype type, replace the 'Self' parameter with
+    // a DynamicLookup member.
+    auto funcTy = type->castTo<AnyFunctionType>();
+    Type resultTy = funcTy->getResult();
+    Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::DynamicLookup)
+                     ->getDeclaredTypeOfContext();
+    type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo(),
+                             TC.Context);
   } else {
     type = openedType;
   }
