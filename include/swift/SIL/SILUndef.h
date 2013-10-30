@@ -26,6 +26,7 @@ class SILUndef : public ValueBase {
 public:
 
   static SILUndef *get(SILType Ty, SILModule *M);
+  static SILUndef *get(SILType Ty, SILModule &M) { return get(Ty, &M); }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }

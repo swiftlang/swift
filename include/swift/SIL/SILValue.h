@@ -72,9 +72,21 @@ public:
   bool hasValue() const { return !TypeOrTypeList.isNull(); }
 
   SILType getType(unsigned i) const {
-    SILType ty = getTypes()[i];
-    return ty;
+    if (TypeOrTypeList.is<SILType>()) {
+      assert(i == 0);
+      return TypeOrTypeList.get<SILType>();
+    }
+    return getTypes()[i];
   }
+  
+  unsigned getNumTypes() const {
+    if (TypeOrTypeList.isNull())
+      return 0;
+    if (TypeOrTypeList.is<SILType>())
+      return 1;
+    return getTypes().size();
+  }
+
 
   bool use_empty() const { return FirstUse == nullptr; }
   inline ValueBaseUseIterator use_begin();

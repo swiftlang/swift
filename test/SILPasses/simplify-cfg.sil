@@ -14,6 +14,11 @@ bb0:
   unreachable
 
 bb1:
+  %4 = integer_literal $Builtin.Int64, 1
+  br bb2
+
+bb2:
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
   unreachable
 }
 

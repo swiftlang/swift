@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -31,8 +32,19 @@ static void removeDeadBlock(SILBasicBlock *BB,
   for (auto &S : BB->getSuccs())
     Worklist.insert(S);
 
-  // FIXME: Need to removePredecessor to drop BBArgs for any branch to the succ.
-  
+  // Instructions in the dead block may be used by other dead blocks.  Replace
+  // any uses of them with undef values.
+  while (!BB->empty()) {
+    auto *Inst = &BB->getInstList().back();
+
+    // Replace any non-dead results with SILUndef values.
+    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i)
+      if (!SILValue(Inst, i).use_empty())
+        SILValue(Inst, i).replaceAllUsesWith(SILUndef::get(Inst->getType(i),
+                                                           BB->getModule()));
+    BB->getInstList().pop_back();
+  }
+
   BB->eraseFromParent();
   ++NumBlocksDeleted;
 }
