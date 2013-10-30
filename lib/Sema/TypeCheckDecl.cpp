@@ -1775,6 +1775,8 @@ public:
     if (IsSecondPass || ED->hasType())
       return;
 
+    validateAttributes(TC, ED);
+
     EnumDecl *UD = ED->getParentEnum();
     Type ElemTy = UD->getDeclaredTypeInContext();
 
