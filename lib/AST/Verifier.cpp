@@ -872,6 +872,14 @@ namespace {
       return verifyParsed(cast<AbstractFunctionDecl>(CD));
     }
 
+    void verifyParsed(ProtocolDecl *PD) {
+      if (PD->isObjC() && !PD->requiresClass()) {
+        Out << "@objc protocols should be class protocols as well";
+        abort();
+      }
+      return verifyParsed(cast<NominalTypeDecl>(PD));
+    }
+
     void verifyChecked(ConstructorDecl *CD) {
       auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&

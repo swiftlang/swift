@@ -147,14 +147,16 @@ class alignas(8) Decl {
     friend class TypeDecl;
     unsigned : NumValueDeclBits;
 
-
     /// Whether we have already checked the inheritance clause.
     ///
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
+
+    /// Whether we have already set the protocols to which this type conforms.
+    unsigned ProtocolsSet : 1;
   };
 
-  enum { NumTypeDeclBits = NumValueDeclBits + 1 };
+  enum { NumTypeDeclBits = NumValueDeclBits + 2 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
 
   enum { NumNominalTypeDeclBits = NumTypeDeclBits};
@@ -1172,6 +1174,11 @@ protected:
     ValueDecl(K, DC, name, NameLoc), Inherited(inherited)
   {
     TypeDeclBits.CheckedInheritanceClause = false;
+    TypeDeclBits.ProtocolsSet = false;
+  }
+
+  bool isProtocolsValid() const {
+    return TypeDeclBits.ProtocolsSet;
   }
 
 public:
@@ -1199,9 +1206,12 @@ public:
   ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&
+           "protocols already set");
+    TypeDeclBits.ProtocolsSet = true;
     Protocols = protocols;
   }
-  
+
   /// \brief True if the type can implicitly derive a conformance for the given
   /// protocol.
   ///
