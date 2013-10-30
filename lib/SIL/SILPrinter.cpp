@@ -1029,7 +1029,7 @@ ID SILPrinter::getID(const SILBasicBlock *Block) {
 
 ID SILPrinter::getID(SILValue V) {
   if (isa<SILUndef>(V))
-    return { ID::SILUndef };
+    return { ID::SILUndef, 0, 0 };
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
