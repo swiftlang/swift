@@ -25,7 +25,7 @@ using namespace swift;
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
 STATISTIC(NumInstructionsRemoved, "Number of unreachable instructions removed");
 
-typedef llvm::SmallPtrSet<SILBasicBlock*, 16> SILBasicBlockSet;
+typedef llvm::SmallPtrSet<const SILBasicBlock*, 16> SILBasicBlockSet;
 
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
@@ -67,19 +67,19 @@ public:
   ///
   /// This is a SetVector since several blocks may lead to the same error
   /// report and we iterate through these when producing the diagnostic.
-  llvm::SetVector<const SILBasicBlock*> UnreachableBlocks;
+  llvm::SetVector<const SILBasicBlock*> PossiblyUnreachableBlocks;
 
   /// \brief The set of blocks in which we reported unreachable code errors.
   /// These are used to ensure that we don't issue duplicate reports.
   ///
-  /// Note, this set is different from the UnreachableBlocks as these are the
-  /// blocks that do contain user code and they might not be immediate sucessors
-  /// of a folded branch.
+  /// Note, this set is different from the PossiblyUnreachableBlocks as these
+  /// are the blocks that do contain user code and they might not be immediate
+  /// sucessors of a folded branch.
   llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
 
-  /// A map from the UnreachableBlocks to the folded conditional branchs
-  /// that caused each of them to be unreachable. This extra info is used to
-  /// enhance the diagnostics.
+  /// A map from the PossiblyUnreachableBlocks to the folded conditional
+  /// branches that caused each of them to be unreachable. This extra info is
+  /// used to enhance the diagnostics.
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
@@ -263,10 +263,10 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // template instantiation).
       // FIXME: Do not report if we are within a template instatiation.
       if (Loc.is<RegularLocation>() && State &&
-          !State->UnreachableBlocks.count(UnreachableBlock)) {
+          !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
         // If this is the first time we see this unreachable block, store it
         // along with the folded branch info.
-        State->UnreachableBlocks.insert(UnreachableBlock);
+        State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
         State->MetaMap.insert(
           std::pair<const SILBasicBlock*, UnreachableInfo>(
             UnreachableBlock,
@@ -348,8 +348,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
         // Generate diagnostic info.
         if (UnreachableBlock &&
-            !State->UnreachableBlocks.count(UnreachableBlock)) {
-          State->UnreachableBlocks.insert(UnreachableBlock);
+            !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
+          State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
           State->MetaMap.insert(
             std::pair<const SILBasicBlock*, UnreachableInfo>(
               UnreachableBlock,
@@ -476,10 +476,10 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       NoReturnCall->getLoc().is<RegularLocation>() && State){
     for (auto SI = BB.succ_begin(), SE = BB.succ_end(); SI != SE; ++SI) {
       SILBasicBlock *UnreachableBlock = *SI;
-      if (!State->UnreachableBlocks.count(UnreachableBlock)) {
+      if (!State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
         // If this is the first time we see this unreachable block, store it
         // along with the noreturn call info.
-        State->UnreachableBlocks.insert(UnreachableBlock);
+        State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
         State->MetaMap.insert(
           std::pair<const SILBasicBlock*, UnreachableInfo>(
             UnreachableBlock,
@@ -621,9 +621,11 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
   // Diagnose user written unreachable code.
   if (State) {
-    for (auto BI = State->UnreachableBlocks.begin(),
-              BE = State->UnreachableBlocks.end(); BI != BE; ++BI) {
-      diagnoseUnreachableBlock(**BI, M, Reachable, State, *BI);
+    for (auto BI = State->PossiblyUnreachableBlocks.begin(),
+              BE = State->PossiblyUnreachableBlocks.end(); BI != BE; ++BI) {
+      const SILBasicBlock *BB = *BI;
+      if (!Reachable.count(BB))
+        diagnoseUnreachableBlock(**BI, M, Reachable, State, BB);
     }
   }
 
