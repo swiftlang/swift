@@ -1374,7 +1374,28 @@ swift_objectTypeof(OpaqueValue *obj, const Metadata *self);
 /// \returns The dynamic type metadata for the object.
 extern "C" const Metadata *
 swift_objcTypeof(OpaqueValue *obj, const Metadata *self);
-  
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with the
+/// same number of witness tables.
+extern "C" OpaqueValue *swift_assignExistentialWithCopy(OpaqueValue *dest,
+                                             const OpaqueValue *src,
+                                             const Metadata *type);
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with no
+/// witness tables.
+OpaqueValue *swift_assignExistentialWithCopy0(OpaqueValue *dest,
+                                              const OpaqueValue *src,
+                                              const Metadata *type);
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with one
+/// witness table.
+OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
+                                              const OpaqueValue *src,
+                                              const Metadata *type);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

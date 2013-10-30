@@ -1136,6 +1136,10 @@ struct OpaqueExistentialValueWitnesses {
                      
     // Metadata pointer.
     const Metadata *metadata;
+                     
+    // Get the number of witness tables.
+    static unsigned getNumWitnesses(const Metadata *self);
+
     // Get a reference to the nth witness table.
     const void *&getWitness(unsigned i);
     const void *getWitness(unsigned i) const;
@@ -1192,7 +1196,7 @@ struct OpaqueExistentialValueWitnesses {
                                        Container *src,
                                        const Metadata *self) {
     dest->metadata = src->metadata;
-    for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
       dest->getWitness(i) = src->getWitness(i);
     src->metadata->vw_initializeBufferWithCopyOfBuffer(
                                          dest->getValueBuffer(self),
@@ -1242,7 +1246,7 @@ struct OpaqueExistentialValueWitnesses {
                                        Container *src,
                                        const Metadata *self) {
     dest->metadata = src->metadata;
-    for (unsigned i = 0; i != NUM_WITNESS_TABLES; ++i)
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
       dest->getWitness(i) = src->getWitness(i);
     auto srcValue = src->metadata->vw_projectBuffer(src->getValueBuffer(self));
     
@@ -1284,6 +1288,10 @@ struct OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::Container {
   // Fixed-size buffer.
   ValueBuffer valueBuffer;
   
+  static unsigned getNumWitnesses(const Metadata *self) {
+    return NUM_VALUE_WITNESSES;
+  }
+  
   // Get a reference to the nth witness table.
   const void *&getWitness(unsigned i) { return _witnesses[i]; }
   const void *getWitness(unsigned i) const { return _witnesses[i]; }
@@ -1313,6 +1321,10 @@ struct OpaqueExistentialValueWitnesses<0>::Container {
   // Fixed-size buffer.
   ValueBuffer valueBuffer;
 
+  static unsigned getNumWitnesses(const Metadata *self) {
+    return 0;
+  }
+
   // Get a reference to the nth witness table. This shouldn't happen.
   const void *&getWitness(unsigned i) { abort(); }
   const void *getWitness(unsigned i) const { abort(); }
@@ -1339,6 +1351,11 @@ template<>
 struct OpaqueExistentialValueWitnesses<VariableValueWitnesses>::Container {
   // Metadata pointer.
   const Metadata *metadata;
+
+  static unsigned getNumWitnesses(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return existSelf->Flags.getNumWitnessTables();
+  }
 
   const void **_getWitnesses() {
     return reinterpret_cast<const void**>(this + 1);
@@ -1528,3 +1545,65 @@ swift::swift_getExistentialMetadata(size_t numProtocols,
   
   return ExistentialTypes.add(entry)->getData();
 }
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with no
+/// witness tables.
+OpaqueValue *swift::swift_assignExistentialWithCopy0(OpaqueValue *dest,
+                                                     const OpaqueValue *src,
+                                                     const Metadata *type) {
+  auto destVal =
+    reinterpret_cast<OpaqueExistentialValueWitnesses<0>::Container*>(dest);
+  auto srcCVal =
+    reinterpret_cast<const OpaqueExistentialValueWitnesses<0>::Container*>(src);
+  auto srcVal =
+    const_cast<OpaqueExistentialValueWitnesses<0>::Container*>(srcCVal);
+  
+  auto result =
+    OpaqueExistentialValueWitnesses<0>::assignWithCopy(destVal, srcVal, type);
+  
+  return reinterpret_cast<OpaqueValue*>(result);
+}
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with one
+/// witness table.
+OpaqueValue *swift::swift_assignExistentialWithCopy1(OpaqueValue *dest,
+                                                     const OpaqueValue *src,
+                                                     const Metadata *type) {
+  auto destVal =
+    reinterpret_cast<OpaqueExistentialValueWitnesses<1>::Container*>(dest);
+  auto srcCVal =
+    reinterpret_cast<const OpaqueExistentialValueWitnesses<1>::Container*>(src);
+  auto srcVal =
+    const_cast<OpaqueExistentialValueWitnesses<1>::Container*>(srcCVal);
+  
+  auto result =
+    OpaqueExistentialValueWitnesses<1>::assignWithCopy(destVal, srcVal, type);
+
+  return reinterpret_cast<OpaqueValue*>(result);
+}
+
+/// \brief Perform a copy-assignment from one existential container to another.
+/// Both containers must be of the same existential type representable with the
+/// same number of witness tables.
+OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
+                                                    const OpaqueValue *src,
+                                                    const Metadata *type) {
+  auto destVal =
+    reinterpret_cast<OpaqueExistentialValueWitnesses<VariableValueWitnesses>
+                     ::Container*>(dest);
+  auto srcCVal =
+    reinterpret_cast<const OpaqueExistentialValueWitnesses
+                           <VariableValueWitnesses>::Container*>(src);
+  auto srcVal =
+    const_cast<OpaqueExistentialValueWitnesses<VariableValueWitnesses>
+               ::Container*>(srcCVal);
+  
+  auto result =
+    OpaqueExistentialValueWitnesses<VariableValueWitnesses>
+      ::assignWithCopy(destVal, srcVal, type);
+
+  return reinterpret_cast<OpaqueValue*>(result);
+}
+
