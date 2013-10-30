@@ -1991,6 +1991,9 @@ public:
     return DestBB;
   }
 
+  unsigned getNumArgs() const { return Operands.size(); }
+  SILValue getArg(unsigned i) const { return Operands[i].get(); }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 

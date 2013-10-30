@@ -121,6 +121,10 @@ public:
   
   ArrayRef<SILArgument*> getBBArgs() const { return BBArgList; }
 
+  unsigned getNumBBArg() const { return BBArgList.size(); }
+  const SILArgument *getBBArg(unsigned i) const { return BBArgList[i]; }
+  SILArgument *getBBArg(unsigned i) { return BBArgList[i]; }
+
   /// \brief Remove all block arguments.
   void dropAllArgs() { BBArgList.clear(); }
 

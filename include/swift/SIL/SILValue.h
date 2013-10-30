@@ -536,6 +536,8 @@ public:
     return OperandValueArrayRef(getDynamicAsArray());
   }
 
+  unsigned size() const { return N+NumExtra; }
+
   /// Indexes into the full list of operands.
   Operand &operator[](unsigned i) { return asArray()[i]; }
   const Operand &operator[](unsigned i) const { return asArray()[i]; }
@@ -596,6 +598,8 @@ public:
   OperandValueArrayRef getDynamicValuesAsArray() const {
     return OperandValueArrayRef(getDynamicAsArray());
   }
+
+  unsigned size() const { return NumExtra; }
 
   /// Indexes into the full list of operands.
   Operand &operator[](unsigned i) { return asArray()[i]; }
