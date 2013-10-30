@@ -325,10 +325,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
-Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
+Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   validateDecl(value);
 
-  Type type = value->getType();
+  Type type;
+  if (wantInterfaceType)
+    type = value->getInterfaceType();
+  if (!type)
+    type = value->getType();
+
   if (!value->isReferencedAsLValue())
     return type;
 
@@ -375,7 +380,8 @@ bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
   return true;
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
+Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+                                             bool wantInterfaceType) {
   if (!value->hasType())
     typeCheckDecl(value, true);
   
@@ -387,8 +393,12 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
     if (!value->isSettableOnBase(baseType))
       quals |= LValueType::Qual::NonSettable;
 
-    return LValueType::get(getTypeOfRValue(value), quals, Context);
+    return LValueType::get(getTypeOfRValue(value, wantInterfaceType), quals,
+                           Context);
   }
+
+  if (wantInterfaceType && value->getInterfaceType())
+    return value->getInterfaceType();
 
   return value->getType();
 }

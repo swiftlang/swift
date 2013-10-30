@@ -546,12 +546,15 @@ public:
   /// Return the type-of-reference of the given value.  This does not
   /// open values of polymorphic function type.
   ///
-  /// \param baseType - if non-null, return the type of a member reference to
+  /// \param baseType if non-null, return the type of a member reference to
   ///   this value when the base has the given type
-  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType = Type());
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType = Type(),
+                                  bool wantInterfaceType = false);
 
   /// Return the non-lvalue type-of-reference of the given value.
-  Type getTypeOfRValue(ValueDecl *value);
+  Type getTypeOfRValue(ValueDecl *value, bool wantInterfaceType = false);
 
   /// \brief Retrieve the default type for the given protocol.
   ///

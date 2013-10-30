@@ -748,12 +748,8 @@ std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  Type valueType = TC.getUnopenedTypeOfReference(value);
-
-  // If the declaration has an interface type, use it.
-  if (auto interfaceTy = value->getInterfaceType()) {
-    valueType = interfaceTy;
-  }
+  Type valueType = TC.getUnopenedTypeOfReference(value, Type(),
+                                                 /*wantInterfaceType=*/true);
 
   // Up and adjust the type of the reference.
   valueType = adjustLValueForReference(openType(
@@ -948,8 +944,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (!isTypeReference) {
     if (auto interfaceTy = value->getInterfaceType()) {
       if (interfaceTy->is<GenericFunctionType>() ||
-          (isa<SubscriptDecl>(value) &&
-           value->getDeclContext()->isGenericContext())) {
+          (value->getDeclContext()->isGenericContext() &&
+           (isa<SubscriptDecl>(value) || isa<VarDecl>(value)))) {
         return getTypeOfMethodReference(baseTy, value, isDynamicResult);
       }
     }
@@ -1063,6 +1059,27 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                     TC.Context) };
 }
 
+/// Collect all of the generic parameters and requirements from the
+/// given context and its outer contexts.
+static void collectContextParamsAndRequirements(
+              DeclContext *dc, 
+              SmallVectorImpl<GenericTypeParamType *> &genericParams, 
+              SmallVectorImpl<Requirement> &genericRequirements) {
+  if (!dc->isTypeContext())
+    return;
+
+  // Recurse to outer context.
+  collectContextParamsAndRequirements(dc->getParent(), genericParams,
+                                      genericRequirements);
+
+  // Add our generic parameters and requirements.
+  auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
+  genericParams.append(nominal->getGenericParamTypes().begin(),
+                       nominal->getGenericParamTypes().end());
+  genericRequirements.append(nominal->getGenericRequirements().begin(),
+                             nominal->getGenericRequirements().end());
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
                                            bool isDynamicResult) {
@@ -1079,13 +1096,18 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
     // Open up the generic parameter list for the container.
     auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    auto genericParams = nominal->getGenericParamTypes();
-    openGeneric(dc, genericParams, nominal->getGenericRequirements(),
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    SmallVector<Requirement, 4> genericRequirements;
+    collectContextParamsAndRequirements(dc, genericParams, genericRequirements);
+    openGeneric(dc, genericParams, genericRequirements,
                 /*skipProtocolSelfConstraint=*/true,
                 replacements);
 
     // Open up the type of the member.
-    openedType = openType(value->getInterfaceType(), { }, replacements);
+    openedType = openType(
+                   TC.getUnopenedTypeOfReference(value, baseTy,
+                                                 /*wantInterfaceType=*/true),
+                   { }, replacements);
 
     // Determine the object type of 'self'.
     Type selfTy;

@@ -1206,7 +1206,8 @@ namespace {
         return MetaTypeType::get(type, cs.getASTContext());
       }
 
-      Type type = cs.TC.getUnopenedTypeOfReference(decl);
+      Type type = cs.TC.getUnopenedTypeOfReference(decl, Type(),
+                                                   /*wantInterfaceType=*/true);
       return adjustLValueForReference(type, decl->getAttrs().isAssignment(),
                                       cs.TC.Context);
     }
