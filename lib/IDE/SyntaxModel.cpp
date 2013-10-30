@@ -117,6 +117,25 @@ private:
   bool popStructureNode();
 };
 
+bool SyntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N,
+                                                    SyntaxStructureKind* Kind) {
+  SyntaxStructureKind Result;
+  if (isa<ClassDecl>(N))
+    Result = SyntaxStructureKind::Class;
+  else if (isa<StructDecl>(N))
+    Result = SyntaxStructureKind::Struct;
+  else if (isa<ProtocolDecl>(N))
+    Result = SyntaxStructureKind::Protocol;
+  else if (isa<EnumDecl>(N))
+    Result = SyntaxStructureKind::Enum;
+  else
+    return false;
+
+  if (Kind)
+    *Kind = Result;
+  return true;
+}
+
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
@@ -152,48 +171,35 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       const DeclContext *DC = FD->getDeclContext();
       if (DC->isTypeContext()) {
         if (FD->isStatic())
-          Kind = SyntaxStructureKind::FuncStatic;
+          Kind = SyntaxStructureKind::StaticFunction;
         else
-          Kind = SyntaxStructureKind::FuncInst;
+          Kind = SyntaxStructureKind::InstanceFunction;
       }
       else
-         Kind = SyntaxStructureKind::FuncFree;
+         Kind = SyntaxStructureKind::FreeFunction;
 
       pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                   FD->getName().getLength()))});
     }
   }
-  else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
-      SourceRange SR = CD->getSourceRange();
-      SourceLoc NL = CD->getNameLoc();
-      pushStructureNode({SyntaxStructureKind::Class,
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  CD->getName().getLength()))});
-  }
-  else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
-      SourceRange SR = SD->getSourceRange();
-      SourceLoc NL = SD->getNameLoc();
-      pushStructureNode({SyntaxStructureKind::Struct,
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  SD->getName().getLength()))});
-  }
-  else if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(D)) {
-      SourceRange SR = PD->getSourceRange();
-      SourceLoc NL = PD->getNameLoc();
-      pushStructureNode({SyntaxStructureKind::Protocol,
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  PD->getName().getLength()))});
+  else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      SyntaxStructureKind Kind;
+      if (SyntaxStructureKindFromNominalTypeDecl(NTD, &Kind)) {
+        SourceRange SR = NTD->getSourceRange();
+        SourceLoc NL = NTD->getNameLoc();
+        pushStructureNode({Kind,
+                           CharSourceRange(SM, SR.Start, SR.End),
+                           CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  NTD->getName().getLength()))});
+      }
   }
   else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
       SourceRange SR = VD->getSourceRange();
       SourceLoc NL = VD->getNameLoc();
-      pushStructureNode({SyntaxStructureKind::VarInst,
+      pushStructureNode({SyntaxStructureKind::InstanceVariable,
                          CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                   VD->getName().getLength()))});
@@ -214,8 +220,9 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
       popStructureNode();
     }
   }
-  else if (isa<ClassDecl>(D) || isa<StructDecl>(D) || isa<ProtocolDecl>(D)) {
-    popStructureNode();
+  else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (SyntaxStructureKindFromNominalTypeDecl(NTD, nullptr))
+      popStructureNode();
   }
   return true;
 }
