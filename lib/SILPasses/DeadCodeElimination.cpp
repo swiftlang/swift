@@ -9,8 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "dead-code-elimination"
 
+#define DEBUG_TYPE "dead-code-elimination"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -19,7 +19,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-
 using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
