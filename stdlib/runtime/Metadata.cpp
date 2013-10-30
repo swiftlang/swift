@@ -1305,6 +1305,35 @@ struct OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::Container {
   static constexpr unsigned stride() { return sizeof(Container); }
 };
   
+/// Fixed-size existential container with no witnesses.
+template<>
+struct OpaqueExistentialValueWitnesses<0>::Container {
+  // Metadata pointer.
+  const Metadata *metadata;
+  // Fixed-size buffer.
+  ValueBuffer valueBuffer;
+
+  // Get a reference to the nth witness table. This shouldn't happen.
+  const void *&getWitness(unsigned i) { abort(); }
+  const void *getWitness(unsigned i) const { abort(); }
+  
+  // Get a reference to the fixed-sized buffer for the value.
+  ValueBuffer *getValueBuffer(const Metadata *self) { return &valueBuffer; }
+  const ValueBuffer *getValueBuffer(const Metadata *self) const {
+    return &valueBuffer;
+  }
+  
+  // The size of the container.
+  static unsigned size(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned size() { return sizeof(Container); }
+  // The alignment of the container.
+  static unsigned alignment(const Metadata *self) { return alignof(Container); }
+  static constexpr unsigned alignment() { return alignof(Container); }
+  // The stride of the container.
+  static unsigned stride(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned stride() { return sizeof(Container); }
+};
+  
 /// Variable-sized existential container.
 template<>
 struct OpaqueExistentialValueWitnesses<VariableValueWitnesses>::Container {
