@@ -428,6 +428,13 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
+Type TypeDecl::getDeclaredInterfaceType() const {
+  if (auto interfaceTy = getInterfaceType())
+    return interfaceTy->castTo<MetaTypeType>()->getInstanceType();
+
+  return Type();
+}
+
 bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   // Enums with raw types can derive their RawRepresentable conformance.
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
@@ -547,7 +554,8 @@ Type NominalTypeDecl::computeInterfaceType() const {
   // Figure out the interface type of the parent.
   Type parentType;
   if (auto typeOfParentContext = getDeclContext()->getDeclaredTypeOfContext())
-    parentType = typeOfParentContext->getAnyNominal()->getInterfaceType();
+    parentType = typeOfParentContext->getAnyNominal()
+                   ->getDeclaredInterfaceType();
 
   Type type;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
@@ -566,7 +574,7 @@ Type NominalTypeDecl::computeInterfaceType() const {
                             getASTContext());
   }
 
-  InterfaceTy = type;
+  InterfaceTy = MetaTypeType::get(type, getASTContext());
   return InterfaceTy;
 
 }

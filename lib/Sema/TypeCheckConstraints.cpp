@@ -965,7 +965,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                 ->getCanonicalType()];
       } else {
         // Open the nominal type.
-        selfTy = openType(nominal->getInterfaceType(), { }, replacements);
+        selfTy = openType(nominal->getDeclaredInterfaceType(), { },
+                          replacements);
       }
     } else {
       selfTy = value->getDeclContext()->getDeclaredTypeOfContext();

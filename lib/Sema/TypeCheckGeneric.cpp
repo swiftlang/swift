@@ -36,10 +36,10 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal->getInterfaceType();
+    return nominal->getDeclaredInterfaceType();
 
   auto ext = dyn_cast<ExtensionDecl>(dc);
-  return ext->getExtendedType()->getAnyNominal()->getInterfaceType();
+  return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -161,10 +161,10 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal->getInterfaceType();
+    return nominal->getDeclaredInterfaceType();
 
   auto ext = dyn_cast<ExtensionDecl>(dc);
-  return ext->getExtendedType()->getAnyNominal()->getInterfaceType();
+  return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
 /// Create a fresh archetype builder.
@@ -645,7 +645,7 @@ static Type computeSelfType(AbstractFunctionDecl *func,
     selfTy = self->getDeclaredType();
   } else {
     // For any other nominal type, the self type is the interface type.
-    selfTy = containerTy->getAnyNominal()->getInterfaceType();
+    selfTy = containerTy->getAnyNominal()->getDeclaredInterfaceType();
   }
 
   // For a static function or constructor, 'self' has type T.metatype.
@@ -708,7 +708,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       funcTy = TupleType::getEmpty(Context);
     }
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
-    funcTy = ctor->getExtensionType()->getAnyNominal()->getInterfaceType();
+    funcTy = ctor->getExtensionType()->getAnyNominal()
+               ->getDeclaredInterfaceType();
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));

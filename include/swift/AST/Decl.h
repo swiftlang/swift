@@ -1184,6 +1184,8 @@ protected:
 public:
   Type getDeclaredType() const;
 
+  Type getDeclaredInterfaceType() const;
+
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
