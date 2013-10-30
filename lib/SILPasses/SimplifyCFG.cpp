@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "allocbox-to-stack"
+#define DEBUG_TYPE "sil-simplify-cfg"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
