@@ -69,6 +69,23 @@ namespace {
         DeclOffsets->push_back({decl, OS.tell()});
     }
 
+    void printImplicitObjCNote(Decl *D) {
+      if (Options.SkipImplicit)
+        return;
+
+      if (D->getAttrs().isObjC())
+        return;
+
+      auto *VD = dyn_cast<ValueDecl>(D);
+      if (!VD)
+        return;
+
+      if (!VD->isObjC())
+        return;
+
+      OS << "/* @objc(inferred) */ ";
+    }
+
     void printTypeLoc(const TypeLoc &TL) {
       // Print a TypeRepr if instructed to do so by options, or if the type
       // is null.
@@ -556,6 +573,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl->getAttrs());
+  printImplicitObjCNote(decl);
   OS << "var ";
   recordDeclLoc(decl);
   OS << decl->getName().str();
@@ -642,6 +660,7 @@ void PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isGetterOrSetter()) {
     // FIXME: Attributes
+    printImplicitObjCNote(decl);
     recordDeclLoc(decl);
     if (decl->getGetterDecl()) {
       OS << "get:";
@@ -669,6 +688,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printBraceStmtElements(decl->getBody());
   } else {
     printAttributes(decl->getAttrs());
+    printImplicitObjCNote(decl);
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
     OS << "func ";
