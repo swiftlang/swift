@@ -319,6 +319,11 @@ namespace {
       OS << ")";
     }
 
+    void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
+      printCommon(decl, "associated_type_decl");
+      OS << ")";
+    }
+
     void visitProtocolDecl(ProtocolDecl *PD) {
       printCommon(PD, "protocol");
       printInherited(PD->getInherited());
