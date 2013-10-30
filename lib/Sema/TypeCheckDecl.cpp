@@ -2060,9 +2060,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::TypeAlias: {
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
-    if (typeAlias->getUnderlyingTypeLoc().getTypeRepr())
-      validateType(typeAlias->getUnderlyingTypeLoc(),
-                   typeAlias->getDeclContext());
+    if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
+        !typeAlias->getUnderlyingTypeLoc().wasValidated())
+      typeCheckDecl(typeAlias, true);
+    
     break;
   }
 
