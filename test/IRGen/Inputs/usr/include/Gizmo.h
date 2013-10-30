@@ -62,3 +62,8 @@ NSString *NSStringFromRect(struct NSRect r);
 - (void)funge;
 - (void)foo;
 @end
+
+typedef NS_ENUM(NSInteger, NSRuncingOptions) {
+  NSRuncingMince,
+  NSRuncingQuince,
+};

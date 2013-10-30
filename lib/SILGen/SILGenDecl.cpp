@@ -1036,6 +1036,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(cast<ConstructorDecl>(d));
     break;
   }
+  case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol: {
@@ -1047,7 +1048,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
-  case DeclKind::Enum:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
   case DeclKind::AssociatedType:

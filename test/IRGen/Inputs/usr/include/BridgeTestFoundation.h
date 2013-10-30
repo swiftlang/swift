@@ -26,3 +26,5 @@
 NSString *bar(int);
 void setBar(NSString *s);
 
+#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+

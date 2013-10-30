@@ -513,6 +513,10 @@ namespace {
                                                        decl->getRBraceLoc())));
       }
       
+      // Add the struct decl to ExternalDefinitions so that IRGen can emit
+      // metadata for it.
+      // FIXME: There might be better ways to do this.
+      Impl.SwiftContext.addedExternalDecl(result);
       return result;
     }
 
