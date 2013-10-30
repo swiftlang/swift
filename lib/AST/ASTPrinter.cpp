@@ -684,7 +684,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printFunctionParameters(decl);
 
     auto &Context = decl->getASTContext();
-    Type ResultTy = decl->getResultType(Context);
+    Type ResultTy = decl->getResultType();
     if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
       OS << " -> ";
       ResultTy->print(OS);

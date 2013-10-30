@@ -995,7 +995,7 @@ public:
         Patterns[i]->print(OS);
         OS << " -> ";
       }
-      Type ResultType = FD->getResultType(Ctx);
+      Type ResultType = FD->getResultType();
       if (ResultType->isVoid())
         OS << "Void";
       else

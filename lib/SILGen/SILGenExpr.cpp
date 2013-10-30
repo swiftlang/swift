@@ -1491,7 +1491,7 @@ RValue RValueEmitter::visitAutoClosureExpr(AutoClosureExpr *e,
 }
 
 void SILGenFunction::emitFunction(FuncDecl *fd) {
-  Type resultTy = fd->getResultType(F.getASTContext());
+  Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(fd));
   visit(fd->getBody());

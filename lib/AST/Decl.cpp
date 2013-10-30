@@ -979,7 +979,7 @@ Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
                          getASTContext());
 }
 
-Type FuncDecl::getResultType(ASTContext &Ctx) const {
+Type FuncDecl::getResultType() const {
   Type resultTy = getType();
   if (!resultTy || resultTy->is<ErrorType>())
     return resultTy;
@@ -988,7 +988,7 @@ Type FuncDecl::getResultType(ASTContext &Ctx) const {
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)
-    resultTy = TupleType::getEmpty(Ctx);
+    resultTy = TupleType::getEmpty(getASTContext());
 
   return resultTy;
 }

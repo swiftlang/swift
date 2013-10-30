@@ -2399,7 +2399,7 @@ public:
   /// Retrieve the result type of this function.
   ///
   /// \sa getBodyResultType
-  Type getResultType(ASTContext &Ctx) const;
+  Type getResultType() const;
 
   /// Retrieve the result type of this function for use within the function
   /// definition.
