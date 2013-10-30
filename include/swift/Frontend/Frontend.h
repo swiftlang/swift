@@ -282,6 +282,10 @@ public:
     return TheSILModule.get();
   }
 
+  std::unique_ptr<SILModule> takeSILModule() {
+    return std::move(TheSILModule);
+  }
+
   bool hasSILModule() {
     return static_cast<bool>(TheSILModule);
   }
