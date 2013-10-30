@@ -1105,11 +1105,11 @@ public:
 
       // The var requires ObjC interop if it has an [objc] or [iboutlet]
       // attribute or if it's a member of an ObjC class.
-      DeclContext *dc = VD->getDeclContext();
-      if (dc && dc->getDeclaredTypeInContext()) {
-        ClassDecl *classContext = dc->getDeclaredTypeInContext()
-          ->getClassOrBoundGenericClass();
-        ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
+      Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+      if (ContextTy) {
+        ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+        ProtocolDecl *protocolContext =
+            dyn_cast<ProtocolDecl>(VD->getDeclContext());
         VD->setIsObjC(VD->getAttrs().isObjC()
                       || (classContext && classContext->isObjC())
                       || (protocolContext && protocolContext->isObjC()));
@@ -1727,11 +1727,11 @@ public:
 
     // A method is ObjC-compatible if it's explicitly [objc], a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
-    DeclContext *dc = FD->getDeclContext();
-    if (dc && dc->getDeclaredTypeInContext()) {
-      ClassDecl *classContext = dc->getDeclaredTypeInContext()
-        ->getClassOrBoundGenericClass();
-      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
+    Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+    if (ContextTy) {
+      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+      ProtocolDecl *protocolContext =
+          dyn_cast<ProtocolDecl>(VD->getDeclContext());
       bool isObjC = FD->getAttrs().isObjC()
         || (classContext && classContext->isObjC())
         || (protocolContext && protocolContext->isObjC());
