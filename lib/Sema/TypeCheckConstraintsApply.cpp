@@ -190,34 +190,6 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
   return cast<FuncDecl>(conformance->getWitness(requirement).getDecl());
 }
 
-/// \brief Perform the substitutions required to convert a given object type
-/// to the object type required to access a specific member, producing the
-/// archetype-to-replacement mappings and protocol conformance information
-/// as a result.
-///
-/// \param tc The type checker we're using to perform the substitution.
-/// \param dc The context in which we're performing the substitution.
-/// \param member The member we will be accessing after performing the
-/// conversion.
-/// \param objectTy The type of object in which we want to access the member,
-/// which will be a subtype of the member's context type.
-/// \param otherTypes A set of types that will also be substituted, and modified
-/// in place.
-/// \param loc The location of this substitution.
-/// \param substitutions Will be populated with the archetype-to-fixed type
-/// mappings needed for the conversion.
-/// \param conformances The protocol conformances required to perform the
-/// conversion.
-/// \param genericParams Will be set to the generic parameter list used for
-/// substitution.
-static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
-                                   ValueDecl *member, Type objectTy,
-                                   MutableArrayRef<Type> otherTypes,
-                                   SourceLoc loc,
-                                   TypeSubstitutionMap &substitutions,
-                                   ConformanceMap &conformances,
-                                   GenericParamList *&genericParams);
-
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -436,7 +408,7 @@ namespace {
         if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
           auto result
             = new (context) MemberRefExpr(base, dotLoc,
-                                          ConcreteDeclRef(context, member,
+                                          ConcreteDeclRef(ctx, member,
                                                           substitutions),
                                           memberLoc, Implicit);
 
@@ -493,58 +465,6 @@ namespace {
 
         // Otherwise, just simplify the type of this reference directly.
         result->setType(simplifyType(openedType));
-        return result;
-      }
-
-      // Reference to a member of a generic type.
-      if (containerTy && containerTy->isUnspecializedGeneric()) {
-        // Figure out the substitutions required to convert to the base.
-        GenericParamList *genericParams = nullptr;
-        TypeSubstitutionMap substitutions;
-        ConformanceMap conformances;
-        Type otherTypes[2] = {
-          tc.getUnopenedTypeOfReference(member),
-          member->getDeclContext()->getDeclaredTypeInContext()
-        };
-
-        substForBaseConversion(tc, dc, member, baseTy, otherTypes, memberLoc,
-                               substitutions, conformances, genericParams);
-        Type substTy = otherTypes[0];
-        containerTy = otherTypes[1];
-
-        // Convert the base appropriately.
-        // FIXME: We could be referring to a member of a superclass, so find
-        // that superclass and convert to it.
-        if (baseIsInstance) {
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
-          base = coerceObjectArgumentToType(
-                   base, containerTy,
-                   locator.withPathElement(ConstraintLocator::MemberRefBase));
-        } else {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(containerTy, context),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
-          base = tc.coerceToRValue(base);
-        }
-        assert(base && "Unable to convert base?");
-
-        if (isa<FuncDecl>(member) || isa<EnumElementDecl>(member) ||
-            isa<ConstructorDecl>(member)) {
-          llvm_unreachable("Function-like entities handled above");
-        }
-
-        // Build a reference to a generic member.
-        SmallVector<Substitution, 4> substitutionsVec;
-        tc.encodeSubstitutions(genericParams, substitutions, conformances,
-                               false, substitutionsVec);
-        auto result
-          = new (context) MemberRefExpr(base, dotLoc,
-                                        ConcreteDeclRef(context, member,
-                                                        substitutionsVec),
-                                        memberLoc, Implicit);
-        result->setType(substTy);
         return result;
       }
 
@@ -3171,56 +3091,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Tail-recurse to actually call the constructor.
   return finishApply(apply, openedType, locator);
-}
-
-static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
-                                   ValueDecl *member, Type objectTy,
-                                   MutableArrayRef<Type> otherTypes,
-                                   SourceLoc loc,
-                                   TypeSubstitutionMap &substitutions,
-                                   ConformanceMap &conformances,
-                                   GenericParamList *&genericParams) {
-  ConstraintSystem cs(tc, dc);
-
-  // The types that have been opened up and replaced with type variables.
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
-
-  // Open up the owning context of the member.
-  Type ownerTy = cs.openTypeOfContext(member->getDeclContext(), replacements,
-                                      &genericParams);
-
-  // The base type of the member access needs to be convertible to the
-  // opened type of the member's context.
-  cs.addConstraint(ConstraintKind::Conversion, objectTy, ownerTy);
-
-  // Solve the constraint system.
-  SmallVector<Solution, 1> solutions;
-  bool failed = cs.solve(solutions);
-  (void)failed;
-  assert(!failed && "Solution failed");
-  assert(solutions.size() == 1 && "Multiple solutions?");
-
-  // Fill in the set of substitutions.
-  auto &solution = solutions.front();
-  for (auto replacement : replacements) {
-    substitutions[replacement.first->castTo<ArchetypeType>()]
-      = solution.simplifyType(tc, replacement.second);
-  }
-
-  // Finalize the set of protocol conformances.
-  failed = tc.checkSubstitutions(substitutions, conformances, dc, loc,
-                                 &substitutions);
-  assert(!failed && "Substitutions cannot fail?");
-
-  // Substitute all of the 'other' types with the substitutions we computed.
-  for (auto &otherType : otherTypes) {
-    // Replace the already-opened archetypes in the requested "other" type with
-    // their replacements.
-    otherType = tc.substType(dc->getParentModule(), otherType, substitutions);
-
-    assert(!otherType->is<PolymorphicFunctionType>() &&
-           "Polymorphic function type slipped through");
-  }
 }
 
 /// \brief Apply a given solution to the expression, producing a fully

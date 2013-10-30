@@ -851,49 +851,6 @@ Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
   return substType(dc->getParentModule(), type, substitutions);
 }
 
-void TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
-                                      const TypeSubstitutionMap &Substitutions,
-                                      const ConformanceMap &Conformances,
-                                      bool OnlyInnermostParams,
-                                      SmallVectorImpl<Substitution> &Results) {
-  // Collect all of the archetypes.
-  SmallVector<ArchetypeType *, 2> allArchetypesList;
-  ArrayRef<ArchetypeType *> allArchetypes = GenericParams->getAllArchetypes();
-  if (GenericParams->getOuterParameters() && !OnlyInnermostParams) {
-    SmallVector<const GenericParamList *, 2> allGenericParams;
-    unsigned numArchetypes = 0;
-    for (; GenericParams; GenericParams = GenericParams->getOuterParameters()) {
-      allGenericParams.push_back(GenericParams);
-      numArchetypes += GenericParams->getAllArchetypes().size();
-    }
-    allArchetypesList.reserve(numArchetypes);
-    for (auto gp = allGenericParams.rbegin(), gpEnd = allGenericParams.rend();
-         gp != gpEnd; ++gp) {
-      allArchetypesList.append((*gp)->getAllArchetypes().begin(),
-                               (*gp)->getAllArchetypes().end());
-    }
-    allArchetypes = allArchetypesList;
-  }
-
-  Results.resize(allArchetypes.size());
-  unsigned index = 0;
-  for (auto archetype : allArchetypes) {
-    // Figure out the key into the maps we were given.
-    SubstitutableType *key = archetype;
-    assert(Substitutions.count(key) && "Missing substitution information");
-    assert(Conformances.count(key) && "Missing conformance information");
-
-    // Record this substitution.
-    Results[index].Archetype = archetype;
-    Results[index].Replacement
-      = Substitutions.find(key)->second;
-    Results[index].Conformance
-      = Context.AllocateCopy(Conformances.find(key)->second);
-
-    ++index;
-  }
-}
-
 bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
                                      ConformanceMap &Conformance,
                                      DeclContext *DC,

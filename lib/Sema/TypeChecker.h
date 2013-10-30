@@ -732,25 +732,6 @@ public:
                                  ValueDecl *decl1,
                                  ValueDecl *decl2);
 
-  /// \brief Encode the provided substitutions in the form.
-  ///
-  /// \param GenericParams The generic parameters whose substitutions are
-  /// being encoded.
-  ///
-  /// \param Substitutions The set of substitutions.
-  ///
-  /// \param Conformances The set of protocol conformances.
-  ///
-  /// \param OnlyInnermostParams Whether we're specializing only the innermost
-  /// generic parameters (rather than all levels of generic parameters).
-  ///
-  /// \param Results Will receive the resulting set of substitutions.
-  void encodeSubstitutions(const GenericParamList *GenericParams,
-                           const TypeSubstitutionMap &Substitutions,
-                           const ConformanceMap &Conformances,
-                           bool OnlyInnermostParams,
-                           SmallVectorImpl<Substitution> &Results);
-
   /// \brief Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc, bool Implicit);
 
