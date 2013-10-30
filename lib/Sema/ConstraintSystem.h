@@ -1280,22 +1280,6 @@ public:
                    bool skipProtocolSelfConstraint,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
-  /// \brief "Open" the type of a declaration context, which must be a type or
-  /// extension.
-  ///
-  /// \param dc The context to open.
-  ///
-  /// \param replacements Will receive the set of type variable replacements.
-  ///
-  /// \param genericParams If non-null, will receive the set of generic
-  /// parameters opened up by this routine.
-  ///
-  /// \returns The opened type of the base.
-  Type openTypeOfContext(
-         DeclContext *dc,
-         llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-         GenericParamList **genericParams);
-
   /// \brief Retrieve the type of a reference to the given value declaration.
   ///
   /// For references to polymorphic function types, this routine "opens up"
@@ -1318,9 +1302,9 @@ public:
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
-  /// For references to polymorphic function types, this routine "opens up"
-  /// the type by replacing each instance of an archetype with a fresh type
-  /// variable.
+  /// For references to generic function types or members of generic types,
+  /// this routine "opens up" the type by replacing each instance of a generic
+  /// parameter with a fresh type variable.
   ///
   /// \param isTypeReference Indicates that we want to refer to the declared
   /// type of the type declaration rather than referring to it as a value.
@@ -1328,21 +1312,9 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
-  /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to this member.
+  /// \returns a pair containing the full opened type (which includes the opened
+  /// base) and opened type of a reference to this member.
   std::pair<Type, Type> getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
-                                                 bool isTypeReference,
-                                                 bool isDynamicResult);
-
-  /// \brief Retrieve the type of a reference to the given declaration of
-  /// generic function type as a member with a base of the given type.
-  ///
-  /// This routine "opens up" the generic type by replacing each instance of a
-  /// generic parameter or a member thereof with a fresh type variable.
-  ///
-  /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMethodReference(Type baseTy, ValueDecl *value,
                                                  bool isTypeReference,
                                                  bool isDynamicResult);
 

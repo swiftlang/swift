@@ -760,31 +760,6 @@ std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-/// \brief Retrieve the substituted type when replacing an archetype
-/// in the type of a protocol member with an actual type.
-static Type
-getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
-                    llvm::DenseMap<ArchetypeType *, Type> &mappedTypes) {
-  // If we've already seen this archetype, return it.
-  auto known = mappedTypes.find(archetype);
-  if (known != mappedTypes.end())
-    return known->second;
-
-  // Get the type for the parent archetype.
-  Type parentTy = getTypeForArchetype(cs, archetype->getParent(),
-                                      mappedTypes);
-
-  // Look for this member type.
-  // FIXME: Ambiguity check.
-  auto &tc = cs.getTypeChecker();
-  LookupTypeResult lookup = tc.lookupMemberType(parentTy, archetype->getName(),
-                                                cs.DC);
-  assert(lookup.size() == 1 && "Couldn't find archetype for member lookup");
-  auto type = lookup.front().second;
-  mappedTypes[archetype] = type;
-  return type;
-}
-
 void ConstraintSystem::openGeneric(
        DeclContext *dc,
        ArrayRef<GenericTypeParamType *> params,
@@ -843,55 +818,6 @@ void ConstraintSystem::openGeneric(
   }
 }
 
-Type ConstraintSystem::openTypeOfContext(
-       DeclContext *dc,
-       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-       GenericParamList **genericParams) {
-  GenericParamList *dcGenericParams = nullptr;
-  Type result;
-  if (auto nominalOwner = dyn_cast<NominalTypeDecl>(dc)) {
-    result = nominalOwner->getDeclaredTypeInContext();
-    dcGenericParams = nominalOwner->getGenericParamsOfContext();
-  } else {
-    auto extensionOwner = cast<ExtensionDecl>(dc);
-    auto extendedTy = extensionOwner->getExtendedType();
-    if (auto nominal = extendedTy->getAs<NominalType>()) {
-      result = nominal->getDecl()->getDeclaredTypeInContext();
-      dcGenericParams = nominal->getDecl()->getGenericParamsOfContext();
-    } else if (auto bound = extendedTy->getAs<BoundGenericType>()) {
-      result = bound->getDecl()->getDeclaredTypeInContext();
-      dcGenericParams = bound->getDecl()->getGenericParamsOfContext();
-    } else
-      llvm_unreachable("unknown owner for type member");
-  }
-
-  // Save the generic parameters for the caller.
-  if (genericParams)
-    *genericParams = dcGenericParams;
-
-  // If the owner is not specialized, we're done.
-  if (!result->isSpecialized())
-    return result;
-
-  // Open up the types in the owner.
-  SmallVector<ArchetypeType *, 4> allOpenArcheTypes;
-  ArrayRef<ArchetypeType *> openArchetypes;
-  if (dcGenericParams) {
-    openArchetypes = dcGenericParams->getAllArchetypes();
-
-    // If we have multiple levels, open them now.
-    if (dcGenericParams->getOuterParameters()) {
-      for (auto gp = dcGenericParams; gp; gp = gp->getOuterParameters()) {
-        allOpenArcheTypes.append(gp->getAllArchetypes().begin(),
-                                 gp->getAllArchetypes().end());
-      }
-      openArchetypes = allOpenArcheTypes;
-    }
-  }
-
-  return openType(result, openArchetypes, replacements, dc);
-}
-
 /// Add the constraint on the type used for the 'Self' type for a member
 /// reference.
 ///
@@ -921,98 +847,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy){
   cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy);
 }
 
-std::pair<Type, Type>
-ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
-                                           bool isTypeReference,
-                                           bool isDynamicResult) {
-  // Figure out the instance type used for the base.
-  TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
-                     ->getRValueType();
-  bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
-    baseObjTy = baseMeta->getInstanceType();
-    isInstance = false;
-  }
-
-  // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
-  }
-
-  // Open up a generic member via its generic function type.
-  if (auto interfaceTy = value->getInterfaceType()) {
-    if (interfaceTy->is<GenericFunctionType>() ||
-        value->getDeclContext()->isGenericContext()) {
-      return getTypeOfMethodReference(baseTy, value, isTypeReference,
-                                      isDynamicResult);
-    }
-  }
-
-  // The types that have been opened up and replaced with type variables.
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
-
-  // Figure out the type of the owner.
-  Type ownerTy = openTypeOfContext(value->getDeclContext(), replacements,
-                                   nullptr);
-
-  if (!isDynamicResult) {
-    addSelfConstraint(*this, baseObjTy, ownerTy);
-  }
-
-  // Determine the type of the member.
-  Type type;
-  if (isTypeReference) {
-    type = cast<TypeDecl>(value)->getDeclaredType();
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // The type of a subscript operation is a function type mapping
-    // from the indices to the element type.
-    // If this is a dynamic lookup, the result type is optional;
-    // otherwise, it's an lvalue.
-    auto resultTy = subscript->getElementType();
-    if (isDynamicResult)
-      resultTy = OptionalType::get(resultTy, TC.Context);
-    else 
-      resultTy = LValueType::get(resultTy,
-                                 LValueType::Qual::DefaultForMemberAccess|
-                                 settableQualForDecl(baseTy, subscript),
-                                 TC.Context);
-    type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
-                             TC.Context);
-  } else {
-    type = TC.getUnopenedTypeOfReference(value, baseTy);
-  }
-
-  assert(!ownerTy->is<ProtocolType>() && "Protocol types handled above");
-
-  type = openType(type, { }, replacements, value->getInnermostDeclContext());
-
-  // Skip the 'self' argument if it's already been bound by the base.
-  if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->isStatic() || isInstance) {
-      type = type->castTo<AnyFunctionType>()->getResult();
-    } else if (isDynamicResult) {
-      // For a dynamic result referring to an instance function through
-      // an object of metatype type, replace the 'Self' parameter with
-      // a DynamicLookup member.
-      auto funcTy = type->castTo<AnyFunctionType>();
-      Type resultTy = funcTy->getResult();
-      Type inputTy = TC.getProtocol(SourceLoc(),
-                                    KnownProtocolKind::DynamicLookup)
-                       ->getDeclaredTypeOfContext();
-      type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo(),
-                               TC.Context);
-    }
-  } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
-    type = type->castTo<AnyFunctionType>()->getResult();
-  }
-
-
-  return { type,
-           adjustLValueForReference(type, value->getAttrs().isAssignment(),
-                                    TC.Context) };
-}
-
 /// Collect all of the generic parameters and requirements from the
 /// given context and its outer contexts.
 static void collectContextParamsAndRequirements(
@@ -1035,7 +869,7 @@ static void collectContextParamsAndRequirements(
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
+ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
                                            bool isDynamicResult) {
   // Figure out the instance type used for the base.
@@ -1046,6 +880,11 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
   if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
     isInstance = false;
+  }
+
+  // If the base is a module type, just use the type of the decl.
+  if (baseObjTy->is<ModuleType>()) {
+    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
   }
 
   // Handle associated type lookup as a special case, horribly.
@@ -1093,42 +932,53 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
-  if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
+  auto interfaceTy = value->getInterfaceType();
+  if (!interfaceTy)
+    interfaceTy = value->getType();
+  if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()){
     openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true);
   } else {
-    // Open up the generic parameter list for the container.
-    auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
-    llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    SmallVector<Requirement, 4> genericRequirements;
-    collectContextParamsAndRequirements(dc, genericParams, genericRequirements);
-    openGeneric(dc, genericParams, genericRequirements,
-                /*skipProtocolSelfConstraint=*/true,
-                replacements);
+    openedType = TC.getUnopenedTypeOfReference(value, baseTy,
+                                               /*wantInterfaceType=*/true);
 
-    // Open up the type of the member.
-    openedType = openType(
-                   TC.getUnopenedTypeOfReference(value, baseTy,
-                                                 /*wantInterfaceType=*/true),
-                   { }, replacements);
-
-    // Determine the object type of 'self'.
     Type selfTy;
-    if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-      // Retrieve the type variable for 'Self'.
-      selfTy = replacements[protocol->getSelf()->getDeclaredType()
-                              ->getCanonicalType()];
+    if (dc->isGenericContext()) {
+      // Open up the generic parameter list for the container.
+      auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
+      llvm::DenseMap<CanType, TypeVariableType *> replacements;
+      SmallVector<GenericTypeParamType *, 4> genericParams;
+      SmallVector<Requirement, 4> genericRequirements;
+      collectContextParamsAndRequirements(dc, genericParams, genericRequirements);
+      openGeneric(dc, genericParams, genericRequirements,
+                  /*skipProtocolSelfConstraint=*/true,
+                  replacements);
+
+      // Open up the type of the member.
+      openedType = openType(
+                     openedType,
+                     { }, replacements);
+
+      // Determine the object type of 'self'.
+      if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+        // Retrieve the type variable for 'Self'.
+        selfTy = replacements[protocol->getSelf()->getDeclaredType()
+                                ->getCanonicalType()];
+      } else {
+        // Open the nominal type.
+        selfTy = openType(nominal->getInterfaceType(), { }, replacements);
+      }
     } else {
-      // Open the nominal type.
-      selfTy = openType(nominal->getInterfaceType(), { }, replacements);
+      selfTy = value->getDeclContext()->getDeclaredTypeOfContext();
     }
 
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
       openedType = openedType->castTo<MetaTypeType>()->getInstanceType();
 
-    // Prepend the type variable for 'self' to the type.
-    openedType = FunctionType::get(selfTy, openedType, TC.Context);
+    // If we're not coming from something function-like, prepend the type
+    // for 'self' to the type.
+    if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value))
+      openedType = FunctionType::get(selfTy, openedType, TC.Context);
   }
 
   // Constrain the 'self' object type.
