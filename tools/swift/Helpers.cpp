@@ -70,11 +70,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   return Ctx.hadError();
 }
 
-bool swift::runSILOptimizationPasses(SILModule &Module) {
-  auto &Ctx = Module.getASTContext();
-
+void swift::runSILOptimizationPasses(SILModule &Module) {
   performSILCombine(&Module);
-
-  // If errors were produced during SIL optimization, return true.
-  return Ctx.hadError();
 }
