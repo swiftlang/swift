@@ -326,10 +326,8 @@ namespace {
       auto containerTy
         = member->getDeclContext()->getDeclaredTypeOfContext();
 
-      // Handle references to generic functions.
-      if (openedFullType && member->getInterfaceType() &&
-          (member->getInterfaceType()->is<GenericFunctionType>() ||
-           member->getDeclContext()->isGenericContext())) {
+      // Handle references that require substitutions.
+      if (openedFullType->hasTypeVariable()) {
         // Figure out the declaration context where we'll get the generic
         // parameters.
         auto dc = member->getDeclContext();

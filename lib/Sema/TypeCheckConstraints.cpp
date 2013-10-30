@@ -1052,7 +1052,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
 
-  return { Type(),
+  return { type,
            adjustLValueForReference(type, value->getAttrs().isAssignment(),
                                     TC.Context) };
 }
