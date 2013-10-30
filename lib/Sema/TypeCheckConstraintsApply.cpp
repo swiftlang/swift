@@ -356,7 +356,8 @@ namespace {
 
       // Handle references to generic functions.
       if (openedFullType && member->getInterfaceType() &&
-          member->getInterfaceType()->is<GenericFunctionType>()) {
+          (member->getInterfaceType()->is<GenericFunctionType>() ||
+           member->getDeclContext()->isGenericContext())) {
         // Figure out the declaration context where we'll get the generic
         // parameters.
         auto dc = member->getDeclContext();
@@ -429,6 +430,19 @@ namespace {
           ref->setImplicit(Implicit);
           ref->setType(simplifyType(openedFullFnType->getResult()));
           return ref;
+        }
+
+        // For types and variables, build member references.
+        if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+          auto result
+            = new (context) MemberRefExpr(base, dotLoc,
+                                          ConcreteDeclRef(context, member,
+                                                          substitutions),
+                                          memberLoc, Implicit);
+
+          // Skip the synthesized 'self' input type of the opened type.
+          result->setType(substTy->castTo<FunctionType>()->getResult());
+          return result;
         }
 
         // Handle all other function references.
