@@ -31,6 +31,7 @@ namespace {
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
     const bool HadError;
+    SmallVector<bool, 8> InImplicitBraceStmt;
 
     using FunctionLike = llvm::PointerUnion4<
         ConstructorDecl *, DestructorDecl *, FuncDecl *, ClosureExpr *>;
@@ -200,8 +201,13 @@ namespace {
     template <class T> T dispatchVisitPost(T node) {
       // Verify source ranges if the AST node was parsed from source.
       SourceFile *SF = M.dyn_cast<SourceFile *>();
-      if (SF)
-        checkSourceRanges(node);
+      if (SF) {
+        // If we are inside an implicit BraceStmt, don't verify source
+        // locations.  LLDB creates implicit BraceStmts which contain a mix of
+        // generated/user-written code.
+        if (InImplicitBraceStmt.empty() || !InImplicitBraceStmt.back())
+          checkSourceRanges(node);
+      }
 
       // Check that nodes marked invalid have the correct type.
       checkErrors(node);
@@ -312,6 +318,15 @@ namespace {
     void cleanup(FuncDecl *FD) {
       assert(Functions.back().get<FuncDecl *>() == FD);
       Functions.pop_back();
+    }
+
+    bool shouldVerify(BraceStmt *BS) {
+      InImplicitBraceStmt.push_back(BS->isImplicit());
+      return shouldVerify(cast<Stmt>(BS));
+    }
+
+    void cleanup(BraceStmt *BS) {
+      InImplicitBraceStmt.pop_back();
     }
 
     void verifyCheckedAlways(ValueDecl *D) {
