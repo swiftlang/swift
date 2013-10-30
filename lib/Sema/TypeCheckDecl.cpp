@@ -1202,6 +1202,11 @@ public:
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
+      } else if (TAD->getDeclContext()->isGenericContext() &&
+                 !TAD->getInterfaceType()) {
+        TAD->setInterfaceType(
+          TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
+                                              TAD->getType()));
       }
 
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))

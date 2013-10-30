@@ -789,11 +789,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::TYPE_ALIAS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID underlyingTypeID;
+    TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
-                                             underlyingTypeID, isImplicit);
+                                             underlyingTypeID, interfaceTypeID,
+                                             isImplicit);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
@@ -805,6 +806,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                          SourceLoc(), underlyingType,
                                          DC, { });
     declOrOffset = alias;
+
+    if (auto interfaceType = getType(interfaceTypeID))
+      alias->setInterfaceType(interfaceType);
 
     if (isImplicit)
       alias->setImplicit();

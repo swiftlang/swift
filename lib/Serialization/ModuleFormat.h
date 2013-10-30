@@ -550,6 +550,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // underlying type
+    TypeIDField, // interface type
     BCFixed<1>  // implicit flag
     // Trailed by the conformance info (if any).
   >;

@@ -1094,6 +1094,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addIdentifierRef(typeAlias->getName()),
                                 addDeclRef(DC),
                                 addTypeRef(underlying),
+                                addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit());
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
