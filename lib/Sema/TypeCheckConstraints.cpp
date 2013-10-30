@@ -941,13 +941,11 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Open up a generic member via its generic function type.
-  if (!isTypeReference) {
-    if (auto interfaceTy = value->getInterfaceType()) {
-      if (interfaceTy->is<GenericFunctionType>() ||
-          (value->getDeclContext()->isGenericContext() &&
-           (isa<SubscriptDecl>(value) || isa<VarDecl>(value)))) {
-        return getTypeOfMethodReference(baseTy, value, isDynamicResult);
-      }
+  if (auto interfaceTy = value->getInterfaceType()) {
+    if (interfaceTy->is<GenericFunctionType>() ||
+        value->getDeclContext()->isGenericContext()) {
+      return getTypeOfMethodReference(baseTy, value, isTypeReference,
+                                      isDynamicResult);
     }
   }
 
@@ -1082,6 +1080,7 @@ static void collectContextParamsAndRequirements(
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
+                                           bool isTypeReference,
                                            bool isDynamicResult) {
   // Figure out the declaration context to use when opening this type.
   DeclContext *dc = value->getDeclContext();
@@ -1119,6 +1118,10 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
       // Open the nominal type.
       selfTy = openType(nominal->getInterfaceType(), { }, replacements);
     }
+
+    // If we have a type reference, look through the metatype.
+    if (isTypeReference)
+      openedType = openedType->castTo<MetaTypeType>()->getInstanceType();
 
     // Prepend the type variable for 'self' to the type.
     openedType = FunctionType::get(selfTy, openedType, TC.Context);
@@ -1163,6 +1166,7 @@ ConstraintSystem::getTypeOfMethodReference(Type baseTy, ValueDecl *value,
     type = FunctionType::get(fnType->getInput(), elementTy, TC.Context);
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
              (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
+             isa<TypeDecl>(value) ||
              isInstance) {
     // For a constructor, enum element, static method, or an instance method
     // referenced through an instance, we've consumed the curried 'self'

@@ -397,8 +397,14 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                            Context);
   }
 
-  if (wantInterfaceType && value->getInterfaceType())
+  if (wantInterfaceType && value->getInterfaceType()) {
+    // FIXME: Work around broken AST for nominal types. The interface
+    // type should be the metatype, not the instance type.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(value))
+      return MetaTypeType::get(value->getInterfaceType(), Context);
+
     return value->getInterfaceType();
+  }
 
   return value->getType();
 }
