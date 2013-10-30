@@ -147,18 +147,58 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
     else {
       SourceRange SR = FD->getSourceRange();
-      pushStructureNode({SyntaxStructureKind::Func,
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange()});
+      SourceLoc NL = FD->getNameLoc();
+      SyntaxStructureKind Kind;
+      const DeclContext *DC = FD->getDeclContext();
+      if (DC->isTypeContext()) {
+        if (FD->isStatic())
+          Kind = SyntaxStructureKind::FuncStatic;
+        else
+          Kind = SyntaxStructureKind::FuncInst;
+      }
+      else
+         Kind = SyntaxStructureKind::FuncFree;
+
+      pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  FD->getName().getLength()))});
     }
   }
   else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
       SourceRange SR = CD->getSourceRange();
+      SourceLoc NL = CD->getNameLoc();
       pushStructureNode({SyntaxStructureKind::Class,
                          CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange()});
+                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  CD->getName().getLength()))});
   }
-
+  else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
+      SourceRange SR = SD->getSourceRange();
+      SourceLoc NL = SD->getNameLoc();
+      pushStructureNode({SyntaxStructureKind::Struct,
+                         CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  SD->getName().getLength()))});
+  }
+  else if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(D)) {
+      SourceRange SR = PD->getSourceRange();
+      SourceLoc NL = PD->getNameLoc();
+      pushStructureNode({SyntaxStructureKind::Protocol,
+                         CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  PD->getName().getLength()))});
+  }
+  else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+    const DeclContext *DC = VD->getDeclContext();
+    if (DC->isTypeContext()) {
+      SourceRange SR = VD->getSourceRange();
+      SourceLoc NL = VD->getNameLoc();
+      pushStructureNode({SyntaxStructureKind::VarInst,
+                         CharSourceRange(SM, SR.Start, SR.End),
+                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                  VD->getName().getLength()))});
+    }
+  }
   return true;
 }
 
@@ -168,7 +208,13 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
       popStructureNode();
     }
   }
-  else if (isa<ClassDecl>(D)) {
+  else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+    const DeclContext *DC = VD->getDeclContext();
+    if (DC->isTypeContext()) {
+      popStructureNode();
+    }
+  }
+  else if (isa<ClassDecl>(D) || isa<StructDecl>(D) || isa<ProtocolDecl>(D)) {
     popStructureNode();
   }
   return true;

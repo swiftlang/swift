@@ -44,7 +44,12 @@ struct SyntaxNode {
 
 enum class SyntaxStructureKind : uint8_t {
   Class,
-  Func,
+  Struct,
+  Protocol,
+  FuncFree,
+  FuncInst,
+  FuncStatic,
+  VarInst
 };
 
 struct SyntaxStructureNode {
