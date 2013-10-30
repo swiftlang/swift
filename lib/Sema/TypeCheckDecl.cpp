@@ -192,7 +192,7 @@ static void addImplicitConformances(
   }
 }
 
-/// Check that the func/var declaration attributes are ok.
+/// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *VD);
 
 /// Check the inheritance clause of a type declaration or extension thereof.
