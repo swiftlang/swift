@@ -2717,7 +2717,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   auto isInClassContext = [](Decl *vd) {
-   Type ContextTy = vd->getDeclContext()->getDeclaredTypeOfContext();
+   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
     if (!ContextTy)
       return false;
     return bool(ContextTy->getClassOrBoundGenericClass());
@@ -2727,15 +2727,13 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // Only classes, class protocols, instance properties, methods,
     // constructors, and subscripts can be ObjC.
     Optional<Diag<>> error;
-    if (auto *CD = dyn_cast<ClassDecl>(D)) {
-      if (CD->isGenericContext())
-        error = diag::invalid_objc_decl;
+    if (isa<ClassDecl>(D)) {
+      /* ok */
     } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
       if (isOperator)
         error = diag::invalid_objc_decl;
     } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
-      if (D->getDeclContext()->isGenericContext())
-        error = diag::invalid_objc_decl;
+      /* ok */
     } else if (isa<SubscriptDecl>(D) && isInClassContext(D) &&
                cast<SubscriptDecl>(D)->getObjCSubscriptKind() 
                  != ObjCSubscriptKind::None) {
