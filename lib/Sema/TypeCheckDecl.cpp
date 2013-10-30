@@ -1727,11 +1727,11 @@ public:
 
     // A method is ObjC-compatible if it's explicitly @objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
-    Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+    Type ContextTy = FD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
       ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(VD->getDeclContext());
+          dyn_cast<ProtocolDecl>(FD->getDeclContext());
       bool isObjC = FD->getAttrs().isObjC()
         || (classContext && classContext->isObjC())
         || (protocolContext && protocolContext->isObjC());
