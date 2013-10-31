@@ -45,3 +45,40 @@ bb4(%8 : $Int64):
   return %8 : $Int64
 }
 
+// func testThread(a : Bool) -> Int {
+//   if a { return 42 } else { return 17 } }
+//
+sil @testThread : $@thin (a: Bool) -> Int64 {
+bb0(%0 : $Bool):
+  // CHECK: switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+  switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb3 // id: %3
+
+bb1:                                              // Preds: bb0
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  br bb2(%4 : $Builtin.Int1)                      // id: %5
+
+bb2(%6 : $Builtin.Int1):                          // Preds: bb3 bb1
+  br bb4                                          // id: %7
+
+bb3:                                              // Preds: bb0
+  %8 = integer_literal $Builtin.Int1, 0           // user: %9
+  br bb2(%8 : $Builtin.Int1)                      // id: %9
+
+bb4:                                              // Preds: bb2
+  cond_br %6, bb5, bb6                            // id: %10
+
+bb5:                                              // Preds: bb4
+  %11 = metatype $Int64.metatype
+  %12 = integer_literal $Builtin.Int64, 42        // user: %13
+  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
+  br bb7(%13 : $Int64)                            // id: %14
+
+bb6:                                              // Preds: bb4
+  %15 = metatype $Int64.metatype
+  %16 = integer_literal $Builtin.Int64, 17        // user: %17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
+  br bb7(%17 : $Int64)                            // id: %18
+
+bb7(%19 : $Int64):                                // Preds: bb6 bb5
+  return %19 : $Int64                             // id: %21
+}

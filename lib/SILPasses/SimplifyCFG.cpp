@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/Statistic.h"
@@ -21,6 +22,7 @@ using namespace swift;
 
 STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged, "Number of blocks merged together");
+STATISTIC(NumJumpThreads, "Number of jumps threaded");
 
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
@@ -83,6 +85,8 @@ namespace {
     }
 
     void removeDeadBlock(SILBasicBlock *BB);
+    bool tryJumpThreading(BranchInst *BI);
+
     void simplifyBranchBlock(BranchInst *BI);
   };
 } // end anonymous namespace
@@ -110,11 +114,167 @@ void SimplifyCFG::removeDeadBlock(SILBasicBlock *BB) {
   ++NumBlocksDeleted;
 }
 
+/// Return true if there are any users of V outside the specified block.
+static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
+  for (auto UI : V.getUses())
+    if (UI->getUser()->getParent() != BB)
+      return true;
+  return false;
+}
+
+/// couldSimplifyUsers - Check to see if any simplifications are possible if
+/// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
+/// is possible, return false.
+static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
+  assert(!isa<IntegerLiteralInst>(Val) && !isa<FloatLiteralInst>(Val) &&
+         "Obvious constants shouldn't reach here");
+
+  // If the value being substituted is an enum, check to see if there are any
+  // switches on it.
+  if (isa<EnumInst>(Val)) {
+    for (auto UI : BBArg->getUses()) {
+      auto *User = UI->getUser();
+      if (isa<SwitchEnumInst>(User))
+        return true;
+    }
+    return false;
+  }
+
+
+  return false;
+}
+
+
+namespace {
+  class ThreadingCloner : public SILCloner<ThreadingCloner> {
+    friend class SILVisitor<ThreadingCloner>;
+    friend class SILCloner<ThreadingCloner>;
+
+    SILBasicBlock *FromBB, *DestBB;
+  public:
+
+    ThreadingCloner(BranchInst *BI)
+      : SILCloner(*BI->getFunction()),
+        FromBB(BI->getDestBB()), DestBB(BI->getParent()) {
+      // Populate the value map so that uses of the BBArgs in the DestBB are
+      // replaced with the branch's values.
+      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
+        ValueMap[FromBB->getBBArg(i)] = BI->getArg(i);
+    }
+
+    void process(SILInstruction *I) { visit(I); }
+
+    SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+
+    SILValue remapValue(SILValue Value) {
+      // If this is a use of an instruction in another block, then just use it.
+      if (auto SI = dyn_cast<SILInstruction>(Value)) {
+        if (SI->getParent() != FromBB) return Value;
+      } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
+        if (BBArg->getParent() != FromBB) return Value;
+      } else {
+        assert(isa<SILUndef>(Value) && "Unexpected Value kind");
+        return Value;
+      }
+
+      return SILCloner<ThreadingCloner>::remapValue(Value);
+    }
+
+
+    void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+      DestBB->getInstList().push_back(Cloned);
+      SILCloner<ThreadingCloner>::postProcess(Orig, Cloned);
+    }
+  };
+} // end anonymous namespace
+
+/// tryJumpThreading - Check to see if it looks profitable to duplicate the
+/// destination of an unconditional jump into the bottom of this block.
+bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
+  auto *DestBB = BI->getDestBB();
+
+  // If the destination block ends with a return, we don't want to duplicate it.
+  // We want to maintain the canonical form of a single return where possible.
+  if (isa<ReturnInst>(DestBB->getTerminator()))
+    return false;
+
+  // This code is intentionally simple, and cannot thread if the BBArgs of the
+  // destination are used outside the DestBB.
+  for (auto Arg : DestBB->getBBArgs())
+    if (isUsedOutsideOfBlock(Arg, DestBB))
+      return false;
+
+  // We don't have a great cost model at the SIL level, so we don't want to
+  // blissly duplicate tons of code with a goal of improved performance (we'll
+  // leave that to LLVM).  However, doing limited code duplication can lead to
+  // major second order simplifications.  Here we only do it if there are
+  // "constant" arguments to the branch or if we know how to fold something
+  // given the duplication.
+  bool WantToThread = false;
+  for (auto V : BI->getArgs()) {
+    if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+      WantToThread = true;
+      break;
+    }
+  }
+
+  if (!WantToThread) {
+    for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
+      if (couldSimplifyUsers(DestBB->getBBArg(i), BI->getArg(i))) {
+        WantToThread = true;
+        break;
+      }
+  }
+
+  // If we don't have anything that we can simplify, don't do it.
+  if (!WantToThread) return false;
+
+  // If it looks potentially interesting, decide whether we *can* do the
+  // operation and whether the block is small enough to be worth duplicating.
+  unsigned Cost = 0;
+
+  for (auto &Inst : DestBB->getInstList()) {
+    // This is a really trivial cost model, which is only intended as a starting
+    // point.
+    if (++Cost == 4) return false;
+
+    // If there is an instruction in the block that has used outside the block,
+    // duplicating it would require constructing SSA, which we're not prepared
+    // to do.
+    if (isUsedOutsideOfBlock(&Inst, DestBB)) return false;
+  }
+
+
+  // Okay, it looks like we want to do this and we can.  Duplicate the
+  // destination block into this one, rewriting uses of the BBArgs to use the
+  // branch arguments as we go.
+  ThreadingCloner Cloner(BI);
+
+  for (auto &I : *DestBB)
+    Cloner.process(&I);
+
+  // Once all the instructions are copied, we can nuke BI itself.  We also add
+  // this block back to the worklist now that the terminator (likely) can be
+  // simplified.
+  addToWorklist(BI->getParent());
+  BI->eraseFromParent();
+
+  // Make sure that DestBB is in the worklist, as well as its remaining
+  // predecessors, since they may not be able to be simplified.
+  addToWorklist(DestBB);
+  for (auto *P : DestBB->getPreds())
+    addToWorklist(P);
+
+
+  ++NumJumpThreads;
+  return true;
+}
+
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
-
 
   // If this block branches to a block with a single predecessor (us), then
   // merge the DestBB into this BB.
@@ -136,6 +296,16 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     ++NumBlocksMerged;
     return;
   }
+
+  // If this unconditional branch has BBArgs, check to see if duplicating the
+  // destination would allow it to be simplified.  This is a simple form of jump
+  // threading.
+  if (!BI->getArgs().empty() &&
+      tryJumpThreading(BI))
+    return;
+
+
+
 }
 
 
