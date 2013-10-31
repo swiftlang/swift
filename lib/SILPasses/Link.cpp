@@ -62,6 +62,15 @@ void swift::performSILLinking(SILModule *M) {
           // When EnableLinkAll is true, we always link the Callee.
           TryLinking = EnableLinkAll ? true : AI->isTransparent();
         }
+        else if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(I)) {
+          SILValue Callee = PAI->getCallee();
+          // Handles FunctionRefInst only.
+          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef()))
+            CalleeFunction = FRI->getReferencedFunction();
+            
+          // When EnableLinkAll is true, we always link the Callee.
+          TryLinking = EnableLinkAll ? true : CalleeFunction->isTransparent();
+        }
         else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
           // When EnableLinkAll is true, we link the function referenced by
           // FunctionRefInst.
@@ -72,6 +81,15 @@ void swift::performSILLinking(SILModule *M) {
 
         if (!CalleeFunction)
           continue;
+        
+        // The ExternalSource may wish to rewrite non-empty bodies.
+        if (ExternalSource) {
+          if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
+            Worklist.push_back(NewFn);
+            ++NumFuncLinked;
+            continue;
+          }
+        }
 
         if (CalleeFunction->empty()) {
           // Try to find the definition in a serialized module when callee is
@@ -81,13 +99,6 @@ void swift::performSILLinking(SILModule *M) {
               Worklist.push_back(NewFn);
               ++NumFuncLinked;
               continue;
-            }
-            if (ExternalSource) {
-              if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
-                Worklist.push_back(NewFn);
-                ++NumFuncLinked;
-                continue;
-              }
             }
           }
           // FIXME: Make sure the declaration has external linkage?
