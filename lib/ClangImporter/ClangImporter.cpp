@@ -542,8 +542,14 @@ public:
       bool ShouldReport = !ModuleFilter ||
                           VD->getModuleContext() == ModuleFilter;
       if (!ShouldReport) {
-        auto ThisDeclClangModule =
-            cast<ClangModule>(VD->getModuleContext())->getClangModule();
+        clang::Module *ThisDeclClangModule = nullptr;
+        if (auto *ClangDecl = VD->getClangDecl()) {
+          ThisDeclClangModule = ClangDecl->getOwningModule();
+        }
+        if (!ThisDeclClangModule) {
+          ThisDeclClangModule =
+              cast<ClangModule>(VD->getModuleContext())->getClangModule();
+        }
         ShouldReport = ModuleFilter->getClangModule()->isModuleVisible(
             ThisDeclClangModule);
       }
