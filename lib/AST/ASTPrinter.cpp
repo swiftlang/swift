@@ -552,6 +552,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl->getAttrs());
+  printImplicitObjCNote(decl);
   OS << "class ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
