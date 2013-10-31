@@ -506,17 +506,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       DerivingTypeDecl = NT;
   }
 
-  // Bind the implicit 'Self' type to the type T.
-  TypeMapping[Proto->getSelf()->getArchetype()] = T;
-
-
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
     if (TC.conformsToProtocol(T, InheritedProto, DC, &InheritedConformance,
                               ComplainLoc, ExplicitConformance)) {
       InheritedMapping[InheritedProto] = InheritedConformance;
-      TypeMapping[InheritedProto->getSelf()->getArchetype()] = T;
     } else {
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
@@ -541,7 +536,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   bool Complained = false;
   auto metaT = MetaTypeType::get(T, TC.Context);
-  
+
+  // Bind the implicit 'Self' type to the type T.
+  TypeMapping[Proto->getSelf()->getArchetype()] = T;
+
   // First, resolve any associated type members that have bindings. We'll
   // attempt to deduce any associated types that don't have explicit
   // definitions.
@@ -552,8 +550,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     
     TC.validateDecl(AssociatedType, true);
-
-    auto archetype = AssociatedType->getArchetype();
 
     auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName(), DC);
     bool didDerive = false;
@@ -602,8 +598,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         Viable.push_back(candidate);
     }
     
+    auto archetype = AssociatedType->getArchetype();
     if (Viable.size() == 1) {
-      auto archetype = AssociatedType->getArchetype();
       TypeMapping[archetype] = Viable.front().second;
       TypeWitnesses[AssociatedType]
         = getArchetypeSubstitution(TC, DC, archetype, Viable.front().second);
@@ -705,7 +701,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // Determine the type that the requirement is expected to have. If the
     // requirement is for a function, look past the 'self' parameter.
     Type reqType = Requirement->getType();
-    if (isa<FuncDecl>(Requirement))
+    if (isa<AbstractFunctionDecl>(Requirement))
       reqType = reqType->castTo<AnyFunctionType>()->getResult();
 
     // Substitute the type mappings we have into the requirement type.
