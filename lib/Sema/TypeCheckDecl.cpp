@@ -2039,6 +2039,10 @@ public:
     DD->setType(FnTy);
     DD->getImplicitSelfDecl()->setType(SelfTy);
 
+    // Destructors are always @objc, because their Objective-C entry point is
+    // -dealloc.
+    DD->setIsObjC(true);
+
     validateAttributes(TC, DD);
   }
 };
