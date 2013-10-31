@@ -201,6 +201,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     recordDeclLoc(named->getDecl());
+    printImplicitObjCNote(named->getDecl());
     OS << named->getBoundName();
     break;
   }
