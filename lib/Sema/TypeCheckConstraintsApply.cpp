@@ -446,6 +446,7 @@ namespace {
       Optional<ConcreteDeclRef> memberRef(member);
       if (auto func = dyn_cast<FuncDecl>(member)) {
         auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
+        (void)resultTy;
         assert(!resultTy->is<PolymorphicFunctionType>() &&
                "Polymorphic function type slipped through");
       }
