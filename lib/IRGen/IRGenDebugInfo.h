@@ -54,6 +54,7 @@ class AllocStackInst;
 namespace irgen {
 
 class Options;
+class IRGenFunction;
 
 typedef struct {
   unsigned Line, Col;
@@ -102,7 +103,7 @@ class IRGenDebugInfo {
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
   llvm::DIFile MainFile;
-  DebugTypeInfo *SwiftType; /// The cached debug type for swift.type.
+  TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
 
   FullLocation LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
@@ -209,6 +210,10 @@ public:
                                      DebugTypeInfo DebugType,
                                      Optional<SILLocation> Loc);
 
+  /// Emit debug metadata for type metadata (for generic types). So meta.
+  void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
+                        StringRef Name);
+
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
@@ -283,7 +288,7 @@ private:
                                   SILFunction *Fn,
                                   SILValue Value,
                                   IndirectionKind Indirection);
-  DebugTypeInfo &getSwiftType();
+  TypeAliasDecl *getMetadataType();
 };
 
 /// ArtificialLocation - An RAII object that temporarily switches to

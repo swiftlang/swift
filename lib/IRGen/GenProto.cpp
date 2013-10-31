@@ -1211,6 +1211,10 @@ static void setMetadataRef(IRGenFunction &IGF,
   IGF.setUnscopedLocalTypeData(CanType(archetype),
                                LocalTypeData::Metatype,
                                metadata);
+
+  // Emit debug info for the metadata.
+  if (IGF.IGM.DebugInfo)
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, metadata, metadata->getName());
 }
 
 static void setWitnessTable(IRGenFunction &IGF,

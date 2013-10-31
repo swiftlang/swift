@@ -468,10 +468,11 @@ public:
     return foundBB->second;
   }
 
-  /// Emit a shadow copy in an alloca, so the register allocator
-  /// doesn't elide the dbg.value intrinsic when register pressure is
-  /// high.
-  llvm::Value *emitShadowCopy(const Address &Source, StringRef Name) {
+  /// Emit a shadow copy of an Address in an alloca, so the register
+  /// allocator doesn't elide the dbg.value intrinsic when register
+  /// pressure is high.
+  llvm::Value *emitShadowCopy(const Address &Source,
+                              StringRef Name) {
     if (IGM.Opts.OptLevel == 0) {
       auto Alloca = createAlloca(Source->getType(),
                                  Source.getAlignment(),
@@ -483,6 +484,7 @@ public:
     } else
       return Source.getAddress();
   }
+
   
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering

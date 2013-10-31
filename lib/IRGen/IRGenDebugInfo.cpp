@@ -74,7 +74,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     DBuilder(M),
     Types(Types),
     LastFn(nullptr),
-    SwiftType(nullptr),
+    MetadataTypeDecl(nullptr),
     LastLoc({}),
     LastScope(nullptr)
 {
@@ -120,9 +120,6 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
 }
 
 void IRGenDebugInfo::finalize() {
-  if (SwiftType) delete SwiftType;
-  SwiftType = nullptr;
-
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
 
   // The default for a function is to be in the file-level scope.
@@ -710,19 +707,15 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
   return false;
 }
 
-DebugTypeInfo &IRGenDebugInfo::getSwiftType() {
-  if (!SwiftType) {
-    auto TyDecl = new (Context)
+TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
+  if (!MetadataTypeDecl)
+    MetadataTypeDecl = new (Context)
       TypeAliasDecl(SourceLoc(),
                     Context.getIdentifier("$swift.type"), SourceLoc(),
                     TypeLoc::withoutLoc(Context.TheRawPointerType),
                     Context.TheBuiltinModule,
                     MutableArrayRef<TypeLoc>());
-    SwiftType = new DebugTypeInfo(TyDecl,
-                                  (Size)TargetInfo.getPointerWidth(0),
-                                  (Alignment)TargetInfo.getPointerAlign(0));
-  }
-  return *SwiftType;
+  return MetadataTypeDecl;
 }
 
 void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
@@ -738,7 +731,6 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
     Storage = llvm::ConstantInt::get(Int64Ty, 0);
     IntrinsicKind = Value;
   }
-
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
@@ -754,14 +746,6 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                      I->getFunction(), Src, Indirection))
         return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
-      // Is this a hidden generic type metadata argument?
-      if (auto Call = dyn_cast<llvm::CallInst>(Storage))
-        if (Call->getNumArgOperands() == 2) {
-          auto TName = BumpAllocatedString(("$swift.type."+Name).str());
-          emitVariableDeclaration(B, Call->getArgOperand(1), getSwiftType(),
-                                  TName, llvm::dwarf::DW_TAG_auto_variable,
-                                  0, DirectValue, ArtificialValue, Value);
-        }
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
                                      CopyAddr->getSrc(), Indirection))
         return;
@@ -772,6 +756,22 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                           llvm::dwarf::DW_TAG_auto_variable, 0, Indirection,
                           RealValue, IntrinsicKind);
 }
+
+
+void IRGenDebugInfo::
+emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
+  auto TName = BumpAllocatedString(("$swift.type."+Name).str());
+  DebugTypeInfo DTI(getMetadataType(),
+                    (Size)TargetInfo.getPointerWidth(0),
+                    (Alignment)TargetInfo.getPointerAlign(0),
+                    IGF.getDebugScope());
+  emitVariableDeclaration(IGF.Builder, Metadata, DTI,
+                          TName, llvm::dwarf::DW_TAG_auto_variable,
+                          0, DirectValue, ArtificialValue,
+                          isa<llvm::AllocaInst>(Metadata) ? Declare :
+                          Value);
+}
+
 
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 llvm::Value *Storage,
@@ -853,6 +853,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;
     Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
+    //assert(Flags == 0 && "Complex variables cannot have flags");
     Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name,
                                                 Unit, Line, DTy, Addr, ArgNo);
   } else {
@@ -1292,7 +1293,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
     }
     DITy.setTypeArray(DBuilder.getOrCreateArray(Protocols));
-    return DITy;
+
+    // Emit a typedef with the user-defined generic name.
+    auto UserName = Archetype->getName().str();
+    return DBuilder.createTypedef(DITy, UserName, File, L.Line, File);
   }
 
   case TypeKind::MetaType: {
