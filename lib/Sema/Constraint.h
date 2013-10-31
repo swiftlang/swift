@@ -138,8 +138,10 @@ enum class ConversionRestrictionKind {
   LValueToRValue,
   /// Value to existential value conversion.
   Existential,
-  /// Value to optional conversion.
+  /// T -> U? value to optional conversion.
   ValueToOptional,
+  /// T? -> U? optional to optional conversion.
+  OptionalToOptional,
   /// User-defined conversions.
   User
 };

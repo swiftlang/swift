@@ -1382,17 +1382,17 @@ public:
     OS << ')';
   }
   void visitBindOptionalExpr(BindOptionalExpr *E) {
-    OS.indent(Indent) << "(bind_optional_expr\n";
+    printCommon(E, "bind_optional_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    OS.indent(Indent) << "(optional_evaluation_expr\n";
+    printCommon(E, "optional_evaluation_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitForceValueExpr(ForceValueExpr *E) {
-    OS.indent(Indent) << "(force_value_expr\n";
+    printCommon(E, "force_value_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

@@ -1941,12 +1941,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
+  // A value of type T? can be converted to type U? if T is convertible to U.
   {
     BoundGenericType *boundGenericType2;
     if (concrete && kind >= TypeMatchKind::Conversion &&
         (boundGenericType2 = type2->getAs<BoundGenericType>())) {
       if (boundGenericType2->getDecl() == TC.Context.getOptionalDecl()) {
         assert(boundGenericType2->getGenericArgs().size() == 1);
+        
+        BoundGenericType *boundGenericType1
+          = type1->getAs<BoundGenericType>();
+        if (boundGenericType1
+            && boundGenericType1->getDecl() == TC.Context.getOptionalDecl()) {
+          assert(boundGenericType1->getGenericArgs().size() == 1);
+          potentialConversions.push_back(
+                                 ConversionRestrictionKind::OptionalToOptional);
+        }
+        
         potentialConversions.push_back(
           ConversionRestrictionKind::ValueToOptional);
       }
@@ -2041,7 +2052,20 @@ commit_to_conversions:
                       type2->castTo<BoundGenericType>()->getGenericArgs()[0],
                       kind, subFlags, locator);
   }
-
+      
+  case ConversionRestrictionKind::OptionalToOptional: {
+    auto boundGenericType1 = type1->castTo<BoundGenericType>();
+    auto boundGenericType2 = type2->castTo<BoundGenericType>();
+    (void)boundGenericType1; (void)boundGenericType2;
+    assert(boundGenericType1->getDecl() == TC.Context.getOptionalDecl());
+    assert(boundGenericType1->getGenericArgs().size() == 1);
+    assert(boundGenericType2->getDecl() == TC.Context.getOptionalDecl());
+    assert(boundGenericType2->getGenericArgs().size() == 1);
+    return matchTypes(type1->castTo<BoundGenericType>()->getGenericArgs()[0],
+                      type2->castTo<BoundGenericType>()->getGenericArgs()[0],
+                      kind, subFlags, locator);
+  }
+      
   case ConversionRestrictionKind::User:
     return tryUserConversion(*this, type1, ConstraintKind::Subtype, type2,
                               locator);
@@ -2901,6 +2925,21 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                             constraint.getLocator());
         break;
 
+      case ConversionRestrictionKind::OptionalToOptional:
+        assert(constraint.getFirstType()->castTo<BoundGenericType>()->getDecl()
+                 == TC.Context.getOptionalDecl());
+        assert(constraint.getSecondType()->castTo<BoundGenericType>()->getDecl()
+                 == TC.Context.getOptionalDecl());
+        result = matchTypes(constraint.getFirstType()
+                              ->castTo<BoundGenericType>()
+                              ->getGenericArgs()[0],
+                            constraint.getSecondType()
+                              ->castTo<BoundGenericType>()
+                              ->getGenericArgs()[0],
+                            matchKind, TMF_GenerateConstraints,
+                            constraint.getLocator());
+        break;
+          
       case ConversionRestrictionKind::User:
         assert(constraint.getKind() == ConstraintKind::Conversion);
         result = tryUserConversion(*this, constraint.getFirstType(),

@@ -2584,6 +2584,29 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
     }
 
+    case ConversionRestrictionKind::OptionalToOptional: {
+      auto fromGenericType = fromType->castTo<BoundGenericType>();
+      auto toGenericType = toType->castTo<BoundGenericType>();
+      assert(fromGenericType->getDecl() == tc.Context.getOptionalDecl());
+      assert(toGenericType->getDecl() == tc.Context.getOptionalDecl());
+      tc.requireOptionalIntrinsics(expr->getLoc());
+
+      Type fromValueType = fromGenericType->getGenericArgs()[0];
+      Type toValueType = toGenericType->getGenericArgs()[0];
+      
+      expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
+                                               fromValueType);
+      expr->setImplicit(true);
+      expr = coerceToType(expr, toValueType, locator);
+      if (!expr) return nullptr;
+      
+      expr = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      
+      expr = new (tc.Context) OptionalEvaluationExpr(expr, toType);
+      expr->setImplicit(true);
+      return expr;
+    }
+
     case ConversionRestrictionKind::User:
       return coerceViaUserConversion(expr, toType, locator);
     }

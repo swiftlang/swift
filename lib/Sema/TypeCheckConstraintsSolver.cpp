@@ -832,6 +832,17 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
   for (auto constraint : disjunction->getNestedConstraints()) {
+    // These kinds of conversions should be avoided if we've already found a
+    // solution.
+    // FIXME: Generalize this!
+    if (anySolved) {
+      if (auto restriction = constraint->getRestriction()) {
+        if (*restriction == ConversionRestrictionKind::OptionalToOptional)
+          break;
+      }
+    }
+
+
     // Try to solve the system with this option in the disjunction.
     SolverScope scope(*this);
 

@@ -185,6 +185,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << " [value-to-optional]";
       break;
 
+    case ConversionRestrictionKind::OptionalToOptional:
+      Out << " [optional-to-optional]";
+      break;
+      
     case ConversionRestrictionKind::User:
       Out << " [user]";
       break;
