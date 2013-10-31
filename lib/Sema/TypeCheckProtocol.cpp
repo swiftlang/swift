@@ -822,14 +822,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             std::remove_if(unresolvedAssocTypes.begin(),
                            unresolvedAssocTypes.end(),
                            [&](AssociatedTypeDecl *assocType) {
-                             auto archetype = assocType->getArchetype();
-
-                             auto known = TypeMapping.find(archetype);
-                             if (known == TypeMapping.end())
+                             auto known = TypeWitnesses.find(assocType);
+                             if (known == TypeWitnesses.end())
                                return false;
 
-                             deducedAssocTypes.push_back({assocType,
-                                                          known->second});
+                             deducedAssocTypes.push_back(
+                               {assocType, known->second.Replacement});
                              return true;
                            }),
             unresolvedAssocTypes.end());
