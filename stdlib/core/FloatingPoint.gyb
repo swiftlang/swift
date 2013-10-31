@@ -13,7 +13,7 @@
 # Bit counts for all floating point types
 allFloatBits = [32, 64]
 
-if withExtendedPrecision != 0:
+if int(withExtendedPrecision) != 0:
     allFloatBits += [80]
 
 # Bit counts for all int types
