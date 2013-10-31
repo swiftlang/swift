@@ -199,7 +199,12 @@ static void **assignWithoutObjCRetain(void **dest, void **src,
 
 const Metadata *swift::swift_objcTypeof(OpaqueValue *src, const Metadata *self)
 {
-  auto object = *reinterpret_cast<void**>(src);
+  auto object = *reinterpret_cast<HeapObject**>(src);
+  return swift_unknownTypeOf(object);
+}
+
+const Metadata *swift::swift_unknownTypeOf(HeapObject *object)
+{
   auto theClass = object_getClass(object);
   auto classAsMetadata = reinterpret_cast<const ClassMetadata*>(theClass);
   if (classAsMetadata->isTypeMetadata()) return classAsMetadata;

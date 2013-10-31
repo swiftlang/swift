@@ -1126,8 +1126,8 @@ namespace {
 /// number of witnesses.
 static const unsigned VariableValueWitnesses = ~0U;
   
-/// Prefab value witnesses for existential containers without a class constraint
-/// and a fixed number of protocol witness table slots.
+/// Value witnesses for existential containers without a class constraint
+/// and an optional fixed number of protocol witness table slots.
 template<unsigned NUM_WITNESS_TABLES>
 struct OpaqueExistentialValueWitnesses {
   /// The ABI layout of an opaque existential container.
@@ -1166,8 +1166,7 @@ struct OpaqueExistentialValueWitnesses {
                                                      const Metadata *self) {
     auto destValue = allocateBuffer(dest, self),
          srcValue  = projectBuffer (src,  self);
-    initializeWithCopy(destValue, srcValue, self);
-    return destValue;
+    return initializeWithCopy(destValue, srcValue, self);
   }
 
   static Container *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
@@ -1420,17 +1419,6 @@ OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
   /*stride*/ Container::stride()
 };
 
-template<unsigned NUM_WITNESS_TABLES>
-struct ClassExistentialValueWitnesses {
-  /// The ABI layout of a class-constrained existential container.
-  struct Container {
-    const void *witnesses[NUM_WITNESS_TABLES];
-    HeapObject *value;
-  };
-};
-  
-} // end anonymous namespace
-
 static std::unordered_map<unsigned, const ValueWitnessTable*>
   OpaqueExistentialValueWitnessTables;
 
@@ -1465,6 +1453,317 @@ existential_instantiateOpaqueValueWitnesses(unsigned numWitnessTables) {
   return vwt;
 }
 
+/// Value witnesses for existential containers with a class constraint
+/// and an optional fixed number of protocol witness table slots.
+template<unsigned NUM_WITNESS_TABLES>
+struct ClassExistentialValueWitnesses {
+  /// The ABI layout of a class-constrained existential container.
+  struct Container; /* {
+    // Specializations have the following members:
+                     
+    // Get the number of witnesses.
+    static unsigned getNumWitnesses(const Metadata *self);
+                     
+    // Get a reference to the nth witness table.
+    const void *&getWitness(unsigned i);
+    const void *getWitness(unsigned i) const;
+                     
+    // Get a reference to the instance pointer value.
+    HeapObject *&getValue(const Metadata *self);
+    HeapObject *getValue(const Metadata *self) const;
+                     
+    // The size of the container.
+    static unsigned size(const Metadata *self);
+    // The alignment of the container.
+    static unsigned alignment(const Metadata *self);
+    // The stride of the container.
+    static unsigned stride(const Metadata *self);
+                     
+    // Whether the container fits inline in a fixed-size buffer.
+    static bool isInline(const Metadata *self);
+  }; */
+  
+  /// Whether the container fits in a fixed-size buffer without a side
+  /// allocation.
+  static void destroyBuffer(ValueBuffer *buffer, const Metadata *self) {
+    HeapObject *value = projectBuffer(buffer, self)->getValue(self);
+    swift_unknownRelease(value);
+  }
+  
+  static Container *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                     ValueBuffer *src,
+                                                     const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self),
+         srcValue  = projectBuffer (src,  self);
+    return initializeWithCopy(destValue, srcValue, self);
+  }
+  
+  static Container *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
+    if (Container::isInline(self)) {
+      return reinterpret_cast<Container*>(buffer);
+    } else {
+      return *reinterpret_cast<Container**>(buffer);
+    }
+  }
+  
+  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
+    if (!Container::isInline(self))
+      swift_slowRawDealloc(projectBuffer(buffer, self), Container::size(self));
+  }
+  
+  static void destroy(Container *value, const Metadata *self) {
+    swift_unknownRelease(value->getValue(self));
+  }
+  
+  static Container *initializeBufferWithCopy(ValueBuffer *dest,
+                                             Container *src,
+                                             const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self);
+    return initializeWithCopy(destValue, src, self);
+  }
+  
+  static Container *initializeWithCopy(Container *dest,
+                                       Container *src,
+                                       const Metadata *self) {
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    dest->getValue(self) = (HeapObject*)swift_unknownRetain(src->getValue(self));
+    return dest;
+  }
+  
+  static Container *assignWithCopy(Container *dest,
+                                   Container *src,
+                                   const Metadata *self) {
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    auto &destValue = dest->getValue(self), srcValue = src->getValue(self);
+    auto old = destValue;
+    swift_unknownRetain(srcValue);
+    destValue = srcValue;
+    swift_unknownRelease(old);
+    return dest;
+  }
+  
+  static Container *initializeBufferWithTake(ValueBuffer *dest, Container *src,
+                                              const Metadata *self) {
+    auto destValue = allocateBuffer(dest, self);
+    return initializeWithTake(destValue, src, self);
+  }
+  
+  static Container *initializeWithTake(Container *dest, Container *src,
+                                       const Metadata *self) {
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    dest->getValue(self) = src->getValue(self);
+    return dest;
+  }
+  
+  static Container *assignWithTake(Container *dest, Container *src,
+                                   const Metadata *self) {
+    for (unsigned i = 0, e = Container::getNumWitnesses(self); i < e; ++i)
+      dest->getWitness(i) = src->getWitness(i);
+    swift_unknownRelease(dest->getValue(self));
+    dest->getValue(self) = src->getValue(self);
+    return dest;
+  }
+  
+  static Container *allocateBuffer(ValueBuffer *dest, const Metadata *self) {
+    if (Container::isInline(self))
+      return reinterpret_cast<Container*>(dest);
+
+    Container **valuePtr = reinterpret_cast<Container**>(dest);
+    *valuePtr
+      = reinterpret_cast<Container*>(swift_slowAlloc(Container::size(self),
+                                                     SWIFT_RAWALLOC));
+    return *valuePtr;
+  }
+  
+  static const Metadata *typeOf(Container *obj, const Metadata *self) {
+    return swift_unknownTypeOf(obj->getValue(self));
+  }
+  
+  static const ValueWitnessTable ValueWitnessTable;
+};
+  
+/// Fixed-size class-constrained existential container.
+template<unsigned NUM_VALUE_WITNESSES>
+struct ClassExistentialValueWitnesses<NUM_VALUE_WITNESSES>::Container {
+  // Protocol witness tables.
+  const void *_witnesses[NUM_VALUE_WITNESSES];
+  // Instance pointer.
+  HeapObject *_value;
+  
+  static unsigned getNumWitnesses(const Metadata *self) {
+    return NUM_VALUE_WITNESSES;
+  }
+  
+  // Get a reference to the nth witness table.
+  const void *&getWitness(unsigned i) { return _witnesses[i]; }
+  const void *getWitness(unsigned i) const { return _witnesses[i]; }
+
+  // Get a reference to the instance pointer for the value.
+  HeapObject *&getValue(const Metadata *self) { return _value; }
+  HeapObject *getValue(const Metadata *self) const { return _value; }
+  
+  // The size of the container.
+  static unsigned size(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned size() { return sizeof(Container); }
+  // The alignment of the container.
+  static unsigned alignment(const Metadata *self) { return alignof(Container); }
+  static constexpr unsigned alignment() { return alignof(Container); }
+  // The stride of the container.
+  static unsigned stride(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned stride() { return sizeof(Container); }
+  
+  // Whether the container fits in a fixed-size buffer.
+  static bool isInline(const Metadata *self) { return isInline(); }
+  static constexpr bool isInline() {
+    return sizeof(Container) <= sizeof(ValueBuffer)
+      && alignof(Container) <= alignof(ValueBuffer);
+  }
+};
+  
+/// Fixed-size class-constrained existential container with no witnesses.
+template<>
+struct ClassExistentialValueWitnesses<0>::Container {
+  // Instance pointer.
+  HeapObject *_value;
+  
+  static unsigned getNumWitnesses(const Metadata *self) {
+    return 0;
+  }
+  
+  // Get a reference to the nth witness table.
+  const void *&getWitness(unsigned i) { abort(); }
+  const void *getWitness(unsigned i) const { abort(); }
+
+  // Get a reference to the instance pointer for the value.
+  HeapObject *&getValue(const Metadata *self) { return _value; }
+  HeapObject *getValue(const Metadata *self) const { return _value; }
+  
+  // The size of the container.
+  static unsigned size(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned size() { return sizeof(Container); }
+  // The alignment of the container.
+  static unsigned alignment(const Metadata *self) { return alignof(Container); }
+  static constexpr unsigned alignment() { return alignof(Container); }
+  // The stride of the container.
+  static unsigned stride(const Metadata *self) { return sizeof(Container); }
+  static constexpr unsigned stride() { return sizeof(Container); }
+  
+  // Whether the container fits in a fixed-size buffer.
+  static bool isInline(const Metadata *self) { return true; }
+  static constexpr bool isInline() { return true; }
+};
+  
+/// Variable-size class-constrained existential container.
+template<>
+struct ClassExistentialValueWitnesses<VariableValueWitnesses>::Container {
+  static unsigned getNumWitnesses(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return existSelf->Flags.getNumWitnessTables();
+  }
+  
+  // Get a reference to the nth witness table.
+  void *&getWitness(unsigned i) {
+    return reinterpret_cast<void**>(this)[i];
+  }
+  void * const &getWitness(unsigned i) const {
+    return reinterpret_cast<void* const*>(this)[i];
+  }
+  
+  // Get a reference to the instance pointer for the value.
+  HeapObject *&getValue(const Metadata *self) {
+    return *reinterpret_cast<HeapObject **>(&getWitness(getNumWitnesses(self)));
+  }
+  HeapObject *getValue(const Metadata *self) const {
+    return *reinterpret_cast<HeapObject * const*>
+              (&getWitness(getNumWitnesses(self)));
+  }
+  
+  static unsigned size(unsigned numWitnessTables) {
+    return sizeof(HeapObject*)
+      + sizeof(void *) * numWitnessTables;
+  }
+  static unsigned size(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return size(existSelf->Flags.getNumWitnessTables());
+  }
+  
+  static unsigned alignment(unsigned numWitnessTables) {
+    return alignof(void*);
+  }
+  static unsigned alignment(const Metadata *self) {
+    return alignof(void*);
+  }
+
+  static unsigned stride(unsigned numWitnessTables) {
+    return size(numWitnessTables);
+  }
+  static unsigned stride(const Metadata *self) {
+    return size(self);
+  }
+  
+  static bool isInline(unsigned numWitnessTables) {
+    return size(numWitnessTables) <= sizeof(ValueBuffer)
+      && alignment(numWitnessTables) <= alignof(ValueBuffer);
+  }
+  static bool isInline(const Metadata *self) {
+    auto existSelf = static_cast<const ExistentialTypeMetadata*>(self);
+    return isInline(existSelf->Flags.getNumWitnessTables());
+  }
+};
+  
+template<unsigned NUM_VALUE_WITNESSES>
+const ValueWitnessTable
+ClassExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
+#define FIXED_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
+  (value_witness_types::WITNESS*)WITNESS,
+  
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(FIXED_CLASS_EXISTENTIAL_WITNESS)
+#undef FIXED_CLASS_EXISTENTIAL_WITNESS
+  /*size*/ Container::size(),
+  /*flags*/ ValueWitnessFlags().withAlignment(Container::alignment())
+    .withPOD(false)
+    .withInlineStorage(Container::isInline())
+    .withExtraInhabitants(false),
+  /*stride*/ Container::stride()
+};
+  
+static std::unordered_map<unsigned, const ValueWitnessTable*>
+  ClassExistentialValueWitnessTables;
+
+/// Instantiate a value witness table for a class-constrained existential
+/// container with the given number of witness table pointers.
+static const ValueWitnessTable *
+existential_instantiateClassValueWitnesses(unsigned numWitnessTables) {
+  auto found = ClassExistentialValueWitnessTables.find(numWitnessTables);
+  if (found != ClassExistentialValueWitnessTables.end())
+    return found->second;
+  
+  using VarClassValueWitnesses
+    = ClassExistentialValueWitnesses<VariableValueWitnesses>;
+  
+  auto *vwt = new ValueWitnessTable;
+#define STORE_VAR_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
+  vwt->WITNESS = (value_witness_types::WITNESS*)      \
+    VarClassValueWitnesses::WITNESS;
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_CLASS_EXISTENTIAL_WITNESS)
+#undef STORE_VAR_CLASS_EXISTENTIAL_WITNESS
+  
+  vwt->size = VarClassValueWitnesses::Container::size(numWitnessTables);
+  vwt->flags = ValueWitnessFlags()
+    .withAlignment(VarClassValueWitnesses::Container::alignment(numWitnessTables))
+    .withPOD(false)
+    .withInlineStorage(false)
+    .withExtraInhabitants(false);
+  vwt->stride = VarClassValueWitnesses::Container::stride(numWitnessTables);
+
+  ClassExistentialValueWitnessTables.insert({numWitnessTables, vwt});
+  
+  return vwt;
+}
+
 /// Get the value witness table for an existential type, first trying to use a
 /// shared specialized table for common cases.
 static const ValueWitnessTable *
@@ -1474,21 +1773,18 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
 
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
-    // A class-constrained existential with no witness tables can use the
+    // A class-constrained existential with no witness tables can share the
     // Builtin.ObjCPointer witnesses.
     if (numWitnessTables == 0)
       return &_TWVBO;
 
-    return nullptr;
-    /* TODO
     // Use statically-instantiated witnesses for the common case of a
     // one-witness-table class existential.
     if (numWitnessTables == 1)
       return &ClassExistentialValueWitnesses<1>::ValueWitnessTable;
     
     // Otherwise, use dynamic value witnesses.
-    return existential_getClassValueWitnesses(numWitnessTables);
-     */
+    return existential_instantiateClassValueWitnesses(numWitnessTables);
 
   case ProtocolClassConstraint::Any:
     // Use statically-instantiated witnesses for the common cases of zero- or
@@ -1502,6 +1798,8 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
     return existential_instantiateOpaqueValueWitnesses(numWitnessTables);
   }
 }
+  
+} // end anonymous namespace
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.

@@ -1396,6 +1396,15 @@ OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
                                               const OpaqueValue *src,
                                               const Metadata *type);
 
+/// \brief Standard 'typeof' value witness for heap object references that may
+/// not be native Swift objects.
+///
+/// \param obj  The object reference.
+///
+/// \returns The dynamic type metadata for the object.
+extern "C"
+const Metadata *swift_unknownTypeOf(HeapObject *obj);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */
