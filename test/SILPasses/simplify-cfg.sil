@@ -5,7 +5,7 @@ import swift
 
 sil_stage canonical
 
-// CHECK: @test_dead_block
+// CHECK-LABEL: @test_dead_block
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
@@ -22,7 +22,7 @@ bb2:
   unreachable
 }
 
-// CHECK: @test_single_pred_block
+// CHECK-LABEL: @test_single_pred_block
 // CHECK: struct $Int64
 // CHECK-NEXT: return
 sil @test_single_pred_block : $@thin (v: Builtin.Int1) -> Int64 {
@@ -48,6 +48,7 @@ bb4(%8 : $Int64):
 // func testThread(a : Bool) -> Int {
 //   if a { return 42 } else { return 17 } }
 //
+/// CHECK-LABEL: sil @testThread
 sil @testThread : $@thin (a: Bool) -> Int64 {
 bb0(%0 : $Bool):
   // CHECK: switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
@@ -82,3 +83,18 @@ bb6:                                              // Preds: bb4
 bb7(%19 : $Int64):                                // Preds: bb6 bb5
   return %19 : $Int64                             // id: %21
 }
+
+/// CHECK-LABEL: sil @testCondBrFold
+/// CHECK-NEXT: bb0(
+/// CHECK-NEXT: return %1 : $Int64
+sil @testCondBrFold : $@thin (a: Int64, b: Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %8 = integer_literal $Builtin.Int1, 0
+  cond_br %8, bb1, bb2
+bb1:
+  unreachable
+bb2:
+  return %1 : $Int64
+}
+
+

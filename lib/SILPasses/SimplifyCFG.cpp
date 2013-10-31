@@ -20,9 +20,10 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
-STATISTIC(NumBlocksMerged, "Number of blocks merged together");
-STATISTIC(NumJumpThreads, "Number of jumps threaded");
+STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
+STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
+STATISTIC(NumJumpThreads,    "Number of jumps threaded");
+STATISTIC(NumConstantFolded, "Number of terminators constant folded");
 
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
@@ -88,6 +89,7 @@ namespace {
     bool tryJumpThreading(BranchInst *BI);
 
     void simplifyBranchBlock(BranchInst *BI);
+    void simplifyCondBrBlock(CondBranchInst *BI);
   };
 } // end anonymous namespace
 
@@ -303,10 +305,31 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   if (!BI->getArgs().empty() &&
       tryJumpThreading(BI))
     return;
+}
+
+/// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
+/// branch.
+void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
+
+  // If the condition is an integer literal, we can constant fold the branch.
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
+    bool isFalse = !IL->getValue();
+    auto *LiveBlock = isFalse ? BI->getFalseBB() : BI->getTrueBB();
+
+    SILBuilder(BI).createBranch(BI->getLoc(), LiveBlock);
+    addToWorklist(BI->getParent());
+    addToWorklist(BI->getTrueBB());
+    addToWorklist(BI->getFalseBB());
+    BI->eraseFromParent();
+    if (IL->use_empty()) IL->eraseFromParent();
+    ++NumConstantFolded;
+    return;
+  }
 
 
 
 }
+
 
 
 void SimplifyCFG::run() {
@@ -327,7 +350,7 @@ void SimplifyCFG::run() {
     if (auto *BI = dyn_cast<BranchInst>(TI))
       simplifyBranchBlock(BI);
     else if (auto *CBI = dyn_cast<CondBranchInst>(TI))
-      (void)CBI;
+      simplifyCondBrBlock(CBI);
     else if (auto *SII = dyn_cast<SwitchIntInst>(TI))
       (void)SII;
   }
