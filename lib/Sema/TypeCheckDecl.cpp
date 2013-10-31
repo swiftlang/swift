@@ -1988,11 +1988,11 @@ public:
 
     // A method is ObjC-compatible if it's explicitly @objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
-    DeclContext *dc = CD->getDeclContext();
-    if (dc && dc->getDeclaredTypeInContext()) {
-      ClassDecl *classContext = dc->getDeclaredTypeInContext()
-                                  ->getClassOrBoundGenericClass();
-      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
+    Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
+    if (ContextTy) {
+      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+      ProtocolDecl *protocolContext =
+          dyn_cast<ProtocolDecl>(CD->getDeclContext());
       bool isObjC = CD->getAttrs().isObjC()
         || (classContext && classContext->isObjC())
         || (protocolContext && protocolContext->isObjC());
