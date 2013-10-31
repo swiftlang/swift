@@ -3634,7 +3634,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  UnqualifiedLookup Lookup(Name, Context, &TC);
+  UnqualifiedLookup Lookup(Name, Context, &TC, UDRE->getLoc());
 
   if (!Lookup.isSuccess()) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);

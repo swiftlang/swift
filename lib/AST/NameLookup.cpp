@@ -280,8 +280,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (!IntersectsRange(S->getSourceRange()))
       return;
     for (auto Label : S->getCaseLabels()) {
-      for (auto P : Label->getPatterns())
-        checkPattern(P);
+      for (auto P : Label->getPatterns()) {
+        if (!IntersectsRange(P->getSourceRange()))
+          checkPattern(P);
+      }
     }
     visit(S->getBody());
   }
