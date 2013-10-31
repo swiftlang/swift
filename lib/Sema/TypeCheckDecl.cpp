@@ -1739,10 +1739,16 @@ public:
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
         // The only additional condition we need to check is if the var decl
-        // had an @objc or @iboutlet property. We don't use prop->isObjC()
-        // because the property accessors may be visited before the VarDecl and
-        // prop->isObjC() may not yet be set by typechecking.
+        // had an @objc or @iboutlet property.
+
         ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
+        // Validate the subscript or property because it might not be type
+        // checked yet.
+        if (isa<SubscriptDecl>(prop))
+          TC.validateDecl(prop);
+        else
+          visitPatternBindingDecl(cast<VarDecl>(prop)->getParentPattern());
+
         isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
       }
 
