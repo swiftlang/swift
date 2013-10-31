@@ -783,6 +783,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
+  printImplicitObjCNote(decl);
   OS << "init";
   if (decl->isGeneric()) {
     printGenericParams(decl->getGenericParams());
@@ -799,6 +800,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
+  printImplicitObjCNote(decl);
   OS << "destructor() ";
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
