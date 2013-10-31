@@ -11,7 +11,14 @@
 //===----------------------------------------------------------------------===//
 //
 // SILGen produces shadow variables for "inout" arguments to provide proper
-// semantics for when
+// semantics for when the inout argument is closed over.  However, this shadow
+// value is *only* needed when the argument is closed over (and when that
+// closure isn't inlined).  This pass looks for shadow allocations and removes
+// them.
+//
+// This is a guaranteed optimization pass, because adding additional references
+// can cause algorithmic performance changes, e.g. turning amortized constant
+// time string and array operations into linear time operations.
 //
 //===----------------------------------------------------------------------===//
 
