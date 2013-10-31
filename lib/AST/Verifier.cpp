@@ -1214,6 +1214,13 @@ namespace {
         }
       }
 
+      if (auto *VD = FD->getGetterOrSetterDecl()) {
+        if (!isa<VarDecl>(VD) && !isa<SubscriptDecl>(VD)) {
+          Out << "only variables and subscript can have getters and setters";
+          abort();
+        }
+      }
+
       return verifyParsed(cast<AbstractFunctionDecl>(FD));
     }
 
