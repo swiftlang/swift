@@ -331,7 +331,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   Type type;
   if (wantInterfaceType)
     type = value->getInterfaceType();
-  if (!type)
+  else
     type = value->getType();
 
   if (!value->isReferencedAsLValue())
@@ -397,7 +397,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                            Context);
   }
 
-  if (wantInterfaceType && value->getInterfaceType()) {
+  if (wantInterfaceType) {
     return value->getInterfaceType();
   }
 

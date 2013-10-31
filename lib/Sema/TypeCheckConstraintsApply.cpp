@@ -286,18 +286,17 @@ namespace {
 
       // If this is a declaration with generic function type, build a
       // specialized reference to it.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (auto interfaceTy = func->getInterfaceType()) {
-          if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()) {
-            SmallVector<Substitution, 4> substitutions;
-            auto type = solution.computeSubstitutions(genericFn, func,
-                                                      openedType,
-                                                      substitutions);
-            return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl,
-                                                         substitutions),
-                                         loc, implicit, type);
-          }
-        }
+      if (auto genericFn
+            = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
+        auto dc = decl->getDeclContext();
+        if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+          dc = func;
+
+        SmallVector<Substitution, 4> substitutions;
+        auto type = solution.computeSubstitutions(genericFn, dc, openedType,
+                                                  substitutions);
+        return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+                                     loc, implicit, type);
       }
 
       auto type = simplifyType(openedType);
@@ -725,8 +724,7 @@ namespace {
       // Compute the concrete reference.
       ConcreteDeclRef ref;
       Type resultTy;
-      if (ctor->getInterfaceType() &&
-          ctor->getInterfaceType()->is<GenericFunctionType>()) {
+      if (ctor->getInterfaceType()->is<GenericFunctionType>()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(

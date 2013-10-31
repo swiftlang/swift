@@ -747,14 +747,6 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   }
 }
 
-/// Retrieve the interface type for the given declaration.
-static Type getValueInterfaceType(ValueDecl *value) {
-  if (auto interfaceTy = value->getInterfaceType())
-    return interfaceTy;
-
-  return value->getType();
-}
-
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                           std::function<void(Decl*)> DidRecord) {
   if (DID == 0)
@@ -1020,23 +1012,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     // Set the initializer interface type of the constructor.
     allocType = ctor->getInterfaceType();
-    if (allocType) {
-      selfTy = allocType->castTo<AnyFunctionType>()->getInput()
-                 ->castTo<MetaTypeType>()->getInstanceType();
-      if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
-        ctor->setInitializerInterfaceType(
-                GenericFunctionType::get(polyFn->getGenericParams(),
-                                         polyFn->getRequirements(),
-                                         selfTy, polyFn->getResult(),
-                                         polyFn->getExtInfo(),
-                                         ctx));
-      } else {
-        auto fn = allocType->castTo<FunctionType>();
-        ctor->setInitializerInterfaceType(FunctionType::get(selfTy,
-                                                            fn->getResult(),
-                                                            fn->getExtInfo(),
-                                                            ctx));
-      }
+    selfTy = allocType->castTo<AnyFunctionType>()->getInput()
+               ->castTo<MetaTypeType>()->getInstanceType();
+    if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
+      ctor->setInitializerInterfaceType(
+              GenericFunctionType::get(polyFn->getGenericParams(),
+                                       polyFn->getRequirements(),
+                                       selfTy, polyFn->getResult(),
+                                       polyFn->getExtInfo(),
+                                       ctx));
+    } else {
+      auto fn = allocType->castTo<FunctionType>();
+      ctor->setInitializerInterfaceType(FunctionType::get(selfTy,
+                                                          fn->getResult(),
+                                                          fn->getExtInfo(),
+                                                          ctx));
     }
 
     if (isImplicit)
@@ -1664,7 +1654,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         if (!value->hasClangNode() && value->getModuleContext() != M)
           continue;
         if (expectedTy &&
-            getValueInterfaceType(value)->getCanonicalType() != expectedTy)
+            value->getInterfaceType()->getCanonicalType() != expectedTy)
           continue;
 
         if (!result || result == value) {

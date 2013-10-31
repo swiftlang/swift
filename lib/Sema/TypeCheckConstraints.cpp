@@ -932,10 +932,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
-  auto interfaceTy = value->getInterfaceType();
-  if (!interfaceTy)
-    interfaceTy = value->getType();
-  if (auto genericFn = interfaceTy->getAs<GenericFunctionType>()){
+  if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
     openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true);
   } else {
     openedType = TC.getUnopenedTypeOfReference(value, baseTy,

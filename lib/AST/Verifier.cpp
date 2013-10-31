@@ -1105,7 +1105,7 @@ namespace {
       if ((AFD->getGenericParams() ||
            (AFD->getDeclContext()->isTypeContext() &&
             AFD->getDeclContext()->getGenericParamsOfContext()))
-          && !AFD->getInterfaceType()) {
+          && !AFD->getInterfaceType()->is<GenericFunctionType>()) {
         Out << "Missing interface type for generic function\n";
         AFD->dump(Out);
         abort();
@@ -1114,30 +1114,30 @@ namespace {
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.
       // FIXME: This is a general property of the type system.
-      if (auto interfaceTy = AFD->getInterfaceType()) {
-        Type unresolvedDependentTy;
-        interfaceTy.findIf([&](Type type) -> bool {
-          if (auto dependent = type->getAs<DependentMemberType>()) {
-            if (dependent->getAssocType() == nullptr) {
-              unresolvedDependentTy = dependent;
-              return true;
-            }
+      auto interfaceTy = AFD->getInterfaceType();
+      Type unresolvedDependentTy;
+      interfaceTy.findIf([&](Type type) -> bool {
+        if (auto dependent = type->getAs<DependentMemberType>()) {
+          if (dependent->getAssocType() == nullptr) {
+            unresolvedDependentTy = dependent;
+            return true;
           }
-          return false;
-        });
-
-        if (unresolvedDependentTy) {
-          Out << "Unresolved dependent member type ";
-          unresolvedDependentTy->print(Out);
-          abort();
         }
+        return false;
+      });
 
-        // If the interface type is generic, make sure its requirements
-        // line up with the archetypes.
-        if (auto genericTy = interfaceTy->getAs<GenericFunctionType>()) {
-          checkGenericRequirements(AFD, AFD, genericTy);
-        }
+      if (unresolvedDependentTy) {
+        Out << "Unresolved dependent member type ";
+        unresolvedDependentTy->print(Out);
+        abort();
       }
+
+      // If the interface type is generic, make sure its requirements
+      // line up with the archetypes.
+      if (auto genericTy = interfaceTy->getAs<GenericFunctionType>()) {
+        checkGenericRequirements(AFD, AFD, genericTy);
+      }
+
       return verifyChecked(cast<ValueDecl>(AFD));
     }
 
@@ -1160,10 +1160,6 @@ namespace {
           return;
         }
         auto FuncTy = FD->getInterfaceType();
-        if (!FuncTy) {
-          // FIXME: not all functions have an interface type.
-          return;
-        }
         auto InTy = FuncTy->castTo<AnyFunctionType>()->getInput();
         if (auto TupleTy = InTy->getAs<TupleType>()) {
           if (TupleTy->getNumElements() != 1) {

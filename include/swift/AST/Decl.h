@@ -1081,7 +1081,7 @@ public:
   void overwriteType(Type T);
 
   /// Retrieve the "interface" type of this value, which is the type used when
-  /// the declaration as viewed from an outside. For a generic function,
+  /// the declaration is viewed from the outside. For a generic function,
   /// this will have generic function type using generic parameters rather than
   /// archetypes, while a generic nominal type's interface type will be the
   /// generic type specialized with its generic parameters.
@@ -1092,10 +1092,7 @@ public:
   Type getInterfaceType() const;
 
   /// Set the interface type for the given value.
-  void setInterfaceType(Type type) {
-    assert(InterfaceTy.isNull() && "Already have an interface type");
-    InterfaceTy = type;
-  }
+  void setInterfaceType(Type type) { InterfaceTy = type; }
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.

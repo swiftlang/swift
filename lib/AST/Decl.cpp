@@ -417,7 +417,11 @@ Type ValueDecl::getInterfaceType() const {
     return InterfaceTy;
   }
 
-  return Type();
+  if (!hasType())
+    return Type();
+
+  InterfaceTy = getType();
+  return InterfaceTy;
 }
 
 Type TypeDecl::getDeclaredType() const {
@@ -429,10 +433,7 @@ Type TypeDecl::getDeclaredType() const {
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
-  if (auto interfaceTy = getInterfaceType())
-    return interfaceTy->castTo<MetaTypeType>()->getInstanceType();
-
-  return Type();
+  return getInterfaceType()->castTo<MetaTypeType>()->getInstanceType();
 }
 
 bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {

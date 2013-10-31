@@ -570,11 +570,11 @@ namespace decls_block {
   using AssociatedTypeDeclLayout = BCRecordLayout<
     ASSOCIATED_TYPE_DECL,
     IdentifierIDField, // name
-    DeclIDField, // context decl
-    TypeIDField, // underlying type
-    TypeIDField,  // archetype type
-    BCFixed<1>  // implicit flag
-                // Trailed by the conformance info (if any).
+    DeclIDField,       // context decl
+    TypeIDField,       // underlying type
+    TypeIDField,       // archetype type
+    BCFixed<1>         // implicit flag
+                       // Trailed by the conformance info (if any).
   >;
 
   template <unsigned Code>

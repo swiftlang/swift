@@ -892,13 +892,8 @@ void Serializer::writeCrossReference(const Decl *D) {
       // Otherwise, use the value's type for disambiguation.
       Type ty;
       if (!isa<TypeDecl>(value)) {
-        // If this value has an interface type, use its canonicalized form.
-        ty = value->getInterfaceType();
-        if (ty)
-          ty = ty->getCanonicalType();
-
-        if (!ty)
-          ty = value->getType();
+        // Use the canonicalized interface type for matching cross references.
+        ty = value->getInterfaceType()->getCanonicalType();
       }
       
       typeID = addTypeRef(ty);
