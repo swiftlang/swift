@@ -342,6 +342,14 @@ extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
 #if SWIFT_OBJC_INTEROP
 
+/// Increment the strong retain count of an object which might not be a native
+/// Swift object.
+extern "C" void *swift_unknownRetain(void *value);
+  
+/// Decrement the strong retain count of an object which might not be a native
+/// Swift object.
+extern "C" void swift_unknownRelease(void *value);
+  
 /// Increment the strong retain count of an object which may have been
 /// deallocated and which might not be a native Swift object.
 extern "C" void swift_unknownRetainUnowned(void *value);
