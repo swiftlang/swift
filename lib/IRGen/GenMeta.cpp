@@ -2909,47 +2909,6 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
 // Protocols
 
 namespace {
-  // TODO: Existential metadata should be instantiated through the runtime.
-  class ProtocolMetadataBuilder
-      : public MetadataLayout<ProtocolMetadataBuilder> {
-    typedef MetadataLayout super;
-    ProtocolDecl *Protocol;
-
-    SmallVector<llvm::Constant*, 8> Fields;
-
-  public:
-    ProtocolMetadataBuilder(IRGenModule &IGM, ProtocolDecl *protocol)
-      : super(IGM), Protocol(protocol) {}
-
-    void layout() {
-      super::layout();
-
-      // nominal type descriptor!
-      // and so on!
-    }
-
-    void addMetadataFlags() {
-      // Box the MetadataKind in a TypeMetadataStructTy so that we can
-      // just use FullTypeMetadataStructTy below.
-      auto metadata =
-        llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
-                            getMetadataKind(IGM, MetadataKind::Existential));
-      Fields.push_back(metadata);
-    }
-
-    void addValueWitnessTable() {
-      // Build a fresh value witness table.  FIXME: this is actually
-      // unnecessary --- every existential type will have the exact
-      // same value witness table.
-      CanType type = CanType(Protocol->getDeclaredType());
-      Fields.push_back(emitValueWitnessTable(IGM, type));
-    }
-
-    llvm::Constant *getInit() {
-      return llvm::ConstantStruct::get(IGM.FullTypeMetadataStructTy, Fields);
-    }
-  };
-
   class ProtocolDescriptorBuilder {
     IRGenModule &IGM;
     ProtocolDecl *Protocol;
@@ -3073,42 +3032,20 @@ namespace {
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
-  // TODO: Existential metadata should be emitted through the runtime instead
-  // of being statically emitted.
-  {
-    ProtocolMetadataBuilder builder(*this, protocol);
-    builder.layout();
-    auto init = builder.getInit();
-    
-    // Protocol metadata are always direct and never a pattern.
-    bool isIndirect = false;
-    bool isPattern = false;
-    
-    CanType declaredType = CanType(protocol->getDeclaredType());
-    auto var = cast<llvm::GlobalVariable>(
-                                    getAddrOfTypeMetadata(declaredType,
-                                                          isIndirect, isPattern,
-                                                          init->getType()));
-    var->setConstant(true);
-    var->setInitializer(init);
+  // If the protocol is Objective-C-compatible, go through the path that
+  // produces an ObjC-compatible protocol_t.
+  if (protocol->isObjC()) {
+    getObjCProtocolGlobalVars(protocol);
+    return;
   }
   
-  {
-    // If the protocol is Objective-C-compatible, go through the path that
-    // produces an ObjC-compatible protocol_t.
-    if (protocol->isObjC()) {
-      getObjCProtocolGlobalVars(protocol);
-      return;
-    }
-    
-    ProtocolDescriptorBuilder builder(*this, protocol);
-    builder.layout();
-    auto init = builder.getInit();
+  ProtocolDescriptorBuilder builder(*this, protocol);
+  builder.layout();
+  auto init = builder.getInit();
 
-    auto var = cast<llvm::GlobalVariable>(getAddrOfProtocolDescriptor(protocol));
-    var->setConstant(true);
-    var->setInitializer(init);
-  }
+  auto var = cast<llvm::GlobalVariable>(getAddrOfProtocolDescriptor(protocol));
+  var->setConstant(true);
+  var->setInitializer(init);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.
