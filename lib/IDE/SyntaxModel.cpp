@@ -117,23 +117,18 @@ private:
   bool popStructureNode();
 };
 
-bool SyntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N,
-                                                    SyntaxStructureKind* Kind) {
-  SyntaxStructureKind Result;
+SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
   if (isa<ClassDecl>(N))
-    Result = SyntaxStructureKind::Class;
+    return SyntaxStructureKind::Class;
   else if (isa<StructDecl>(N))
-    Result = SyntaxStructureKind::Struct;
+    return SyntaxStructureKind::Struct;
   else if (isa<ProtocolDecl>(N))
-    Result = SyntaxStructureKind::Protocol;
-  else if (isa<EnumDecl>(N))
-    Result = SyntaxStructureKind::Enum;
-  else
-    return false;
-
-  if (Kind)
-    *Kind = Result;
-  return true;
+    return SyntaxStructureKind::Protocol;
+  else {
+    // All other known NominalTypeDecl derived classes covered, so assert() here.
+    assert(isa<EnumDecl>(N));
+    return SyntaxStructureKind::Enum;
+  }
 }
 
 } // anonymous namespace
@@ -184,15 +179,12 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
   }
   else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      SyntaxStructureKind Kind;
-      if (SyntaxStructureKindFromNominalTypeDecl(NTD, &Kind)) {
-        SourceRange SR = NTD->getSourceRange();
-        SourceLoc NL = NTD->getNameLoc();
-        pushStructureNode({Kind,
-                           CharSourceRange(SM, SR.Start, SR.End),
-                           CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  NTD->getName().getLength()))});
-      }
+    SyntaxStructureKind Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
+    SourceRange SR = NTD->getSourceRange();
+    SourceLoc NL = NTD->getNameLoc();
+    pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
+                       CharSourceRange(SM, NL, NL.getAdvancedLoc(
+                                                 NTD->getName().getLength()))});
   }
   else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
@@ -220,9 +212,8 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
       popStructureNode();
     }
   }
-  else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
-    if (SyntaxStructureKindFromNominalTypeDecl(NTD, nullptr))
-      popStructureNode();
+  else if (isa<NominalTypeDecl>(D)) {
+    popStructureNode();
   }
   return true;
 }
