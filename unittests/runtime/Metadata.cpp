@@ -166,8 +166,8 @@ static const ExistentialTypeMetadata *test_getExistentialMetadata(
 {
   std::vector<const ProtocolDescriptor *> mutDescriptors(descriptors);
 
-  return swift_getExistentialMetadata(mutDescriptors.size(),
-                                      mutDescriptors.data());
+  return swift_getExistentialTypeMetadata(mutDescriptors.size(),
+                                          mutDescriptors.data());
 }
 
 TEST(MetadataTest, getExistentialMetadata) {
