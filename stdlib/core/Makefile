@@ -37,7 +37,7 @@ else ifeq ($(ARCH),ARM)
 else
   $(error unknown architecture $(ARCH))
 endif
-SWIFT_SOURCES := $(subst Word.swift,Word$(WORD_SIZE).swift,$(SWIFT_SOURCES))
+SWIFT_SOURCES := $(subst WordXX.swift,Word$(WORD_SIZE).swift,$(SWIFT_SOURCES))
 
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 ifneq ($(DISABLE_ASSERTIONS),1)
@@ -75,7 +75,7 @@ $(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PR
 
 
 # Build Axle version of the stdlib.
-AXLE_SWIFT_SOURCES := $(subst Word.swift,Word$(WORD_SIZE).swift,$(AXLE_SWIFT_SOURCES))
+AXLE_SWIFT_SOURCES := $(subst WordXX.swift,Word$(WORD_SIZE).swift,$(AXLE_SWIFT_SOURCES))
 ifneq ($(DISABLE_ASSERTIONS),1)
   AXLE_SWIFT_SOURCES := $(subst Assert.swift,AssertDebug.swift,$(AXLE_SWIFT_SOURCES))
 endif

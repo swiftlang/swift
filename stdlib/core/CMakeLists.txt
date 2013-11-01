@@ -8,7 +8,7 @@ configure_file(SwiftLibSources.txt SwiftLibSources.txt.copy)
 
 file(STRINGS SwiftLibSources.txt SWIFTLIB_SOURCES)
 
-# Replace Word.swift with Word64.swift or Word32.swift, according to
+# Replace WordXX.swift with Word64.swift or Word32.swift, according to
 # the target architecture
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(word_size 64)
@@ -19,7 +19,7 @@ else()
     "Target word size of ${CMAKE_SIZEOF_VOID_P} bytes not accounted for with an appropriate WordXX.swift")
 endif()
 
-string(REPLACE ";Word.swift" ";Word${word_size}.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
+string(REPLACE ";WordXX.swift" ";Word${word_size}.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 if(SWIFT_ASSERTS)
@@ -60,7 +60,7 @@ add_custom_command(TARGET swift_stdlib_core PRE_BUILD
 # The stdlib will be cut down further than what we have included here.
 configure_file(AxleSwiftLibSources.txt AxleSwiftLibSources.txt.copy)
 file(STRINGS AxleSwiftLibSources.txt AXLE_SWIFTLIB_SOURCES)
-string(REPLACE ";Word.swift" ";Word${word_size}.swift" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
+string(REPLACE ";WordXX.swift" ";Word${word_size}.swift" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
 if(SWIFT_ASSERTS)
   string(REPLACE ";Assert.swift" ";AssertDebug.swift" AXLE_SWIFTLIB_SOURCES "${AXLE_SWIFTLIB_SOURCES}")
 endif()

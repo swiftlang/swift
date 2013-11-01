@@ -46,6 +46,11 @@ bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
   return (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex, Kind));
 }
 
+static Type getPointerSizeType(ASTContext &Context) {
+  // FIXME: Size of a pointer here?
+  return BuiltinIntegerType::get(64, Context);
+}
+
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
@@ -78,6 +83,9 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIEEE32Type;
   if (Name == "FPIEEE64")
     return Context.TheIEEE64Type;
+
+  if (Name == "Word")
+    return getPointerSizeType(Context);
 
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "Int") {
@@ -271,11 +279,14 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   // the "isBuiltinTypeOverloaded" predicate successfully.
   switch (VK) {
   default: assert(0 && "Not a cast operation");
+
+  // Allow trunc/zext/sext of identical bit widths (i.e. a no-op) 
+  // because it simplifies interfacing Word with Int32 and Int64.
   case BuiltinValueKind::Trunc:
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <=
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <
         CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
     break;
@@ -285,7 +296,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >=
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >
         CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
     break;
@@ -425,11 +436,6 @@ static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
-}
-
-static Type getPointerSizeType(ASTContext &Context) {
-  // FIXME: Size of a pointer here?
-  return BuiltinIntegerType::get(64, Context);
 }
 
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
