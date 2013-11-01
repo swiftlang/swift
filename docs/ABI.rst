@@ -229,6 +229,50 @@ enum in declaration order.
 Existential Container Layout
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Values of protocol type, protocol composition type, or "any" type
+(``protocol<>``) are laid out using **existential containers** (so-called
+because these types are "existential types" in type theory). 
+
+Opaque Existential Containers
+`````````````````````````````
+
+If there is no class constraint on a protocol or protocol composition type,
+the existential container has to accommodate a value of arbitrary size and
+alignment. It does this using a **fixed-size buffer**, which is three pointers
+in size and pointer-aligned. This either directly contains the value, if its
+size and alignment are both less than or equal to the fixed-size buffer's, or
+contains a pointer to a side allocation owned by the existential container.
+The type of the contained value is identified by its `type metadata` record,
+and witness tables for all of the required protocol conformances are included.
+The layout is as if declared in the following C struct::
+
+  struct OpaqueExistentialContainer {
+    Metadata *type;
+    WitnessTable *witnessTables[NUM_WITNESS_TABLES];
+    void *fixedSizeBuffer[3];
+  };
+
+Class Existential Containers
+````````````````````````````
+
+If one or more of the protocols in a protocol or protocol composition type
+have a class constraint, then only class values can be stored in the existential
+container, and a more efficient representation is used. Class instances are
+always a single pointer in size, so a fixed-size buffer and potential side
+allocation is not needed, and class instances always have a reference to their
+own type metadata, so the separate metadata record is not needed. The
+layout is thus as if declared in the following C struct::
+
+  struct ClassExistentialContainer {
+    WitnessTable *witnessTables[NUM_WITNESS_TABLES];
+    HeapObject *value;
+  };
+
+Note that if no witness tables are needed, such as for the "any class" type
+``protocol<class>`` or an Objective-C protocol type, then the only element of
+the layout is the heap object pointer. This is ABI-compatible with ``id``
+and ``id <Protocol>`` types in Objective-C.
+
 Type Metadata
 -------------
 
