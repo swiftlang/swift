@@ -226,6 +226,9 @@ enum in declaration order.
     case Bignum(Bignum)     => <{ i64, i2 }> { (ptrtoint %Bignum to i64), 2 }
   }
 
+Existential Container Layout
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Type Metadata
 -------------
 
@@ -268,8 +271,9 @@ All metadata records share a common header, with the following fields:
     ``Builtin`` primitives that have no additional runtime information.
   * `Tuple metadata`_ has a kind of **9**.
   * `Function metadata`_ has a kind of **10**.
-  * `Protocol metadata`_ has a kind of **12**. This is used both for
-    protocol types and for protocol compositions.
+  * `Protocol metadata`_ has a kind of **12**. This is used for
+    protocol types, for protocol compositions, and for the "any" type
+    ``protocol<>``.
   * `Metatype metadata`_ has a kind of **13**.
   * `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
     pointing to the class's metaclass record. This isa pointer is guaranteed
@@ -352,8 +356,34 @@ contain the following fields:
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
 
-Protocol metadata records currently have no special fields beyond the
-`common metadata layout`_ fields.
+In addition to the `common metadata layout`_ fields, protocol metadata records
+contain the following fields:
+
+- A **layout flags** word is stored at **offset 1**. The bits of this word
+  describe the `existential container layout`_ used to represent
+  values of the type. The word is laid out as follows:
+
+  * The **number of witness tables** is stored in the least significant 31 bits.
+    Values of the protocol type contain this number of witness table pointers
+    in their layout.
+  * The **class constraint** is stored at bit 31. This bit is set if the type
+    is **not** class-constrained, meaning that struct, enum, or class values
+    can be stored in the type. If not set, then only class values can be stored
+    in the type, and the type uses a more efficient layout.
+
+  Note that the field is pointer-sized, even though only the lowest 32 bits are
+  currently inhabited on all platforms. These values can be derived from the
+  `protocol descriptor`_ records, but are pre-calculated for convenience.
+
+- The **number of protocols** that make up the protocol composition is stored at
+  **offset 2**. For the "any" types ``protocol<>`` or ``protocol<class>``, this
+  is zero. For a single-protocol type ``P``, this is one. For a protocol
+  composition type ``protocol<P, Q, ...>``, this is the number of protocols.
+
+- The **protocol descriptor vector** begins at **offset 3**. This is an inline
+  array of pointers to the `protocol descriptor`_ for every protocol in the
+  composition, or the single protocol descriptor for a protocol type. For
+  an "any" type, there is no protocol descriptor vector.
 
 Metatype Metadata
 ~~~~~~~~~~~~~~~~~
@@ -491,6 +521,9 @@ layout is as follows:
     + The **number of witnesses** for the type parameter is stored at
       **offset 7+n**. This is the number of witness table pointers that are
       stored for the type parameter in the generic parameter vector.
+
+Protocol Descriptor
+~~~~~~~~~~~~~~~~~~~
 
 Heap Objects
 ------------
