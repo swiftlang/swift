@@ -153,6 +153,7 @@ public:
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
+  llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
   union {
     llvm::PointerType *ObjCPtrTy;        /// %objc_object*
     llvm::PointerType *UnknownRefCountedPtrTy;

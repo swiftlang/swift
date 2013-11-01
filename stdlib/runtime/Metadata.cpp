@@ -1804,8 +1804,8 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
-swift::swift_getExistentialMetadata(size_t numProtocols,
-                                  const ProtocolDescriptor **protocols) {
+swift::swift_getExistentialTypeMetadata(size_t numProtocols,
+                                        const ProtocolDescriptor **protocols) {
   // Sort the protocol set.
   std::sort(protocols, protocols + numProtocols);
   

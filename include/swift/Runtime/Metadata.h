@@ -1243,8 +1243,8 @@ swift_getMetatypeMetadata(const Metadata *instanceType);
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 extern "C" const ExistentialTypeMetadata *
-swift_getExistentialMetadata(size_t numProtocols,
-                             const ProtocolDescriptor **protocols);
+swift_getExistentialTypeMetadata(size_t numProtocols,
+                                 const ProtocolDescriptor **protocols);
   
 /// \brief Checked dynamic cast to a class type.
 ///

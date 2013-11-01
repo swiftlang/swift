@@ -163,6 +163,16 @@ namespace irgen {
                                       SILType methodType,
                                       Mangle::ExplosionKind maxExplosion);
 
+  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  ///
+  /// For Swift protocols, this is a constant reference to the protocol
+  /// descriptor symbol.
+  /// For ObjC protocols, descriptors are uniqued at runtime by the ObjC
+  /// runtime. We need to load the unique reference from a global variable fixed up at
+  /// startup.
+  llvm::Value *emitProtocolDescriptorRef(IRGenFunction &IGF,
+                                         ProtocolDecl *protocol);
+
 } // end namespace irgen
 } // end namespace swift
 

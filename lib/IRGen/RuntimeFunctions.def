@@ -304,6 +304,15 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// type_metadata_t *swift_getExistentialTypeMetadata(size_t numProtocols,
+//                              const protocol_descriptor_t * const *protocols);
+FUNCTION(GetExistentialMetadata,
+         swift_getExistentialTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              ProtocolDescriptorPtrTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadOnly))
+
 // void swift_initClassMetadata_UniversalStrategy(type_metadata_t *self,
 //                                          type_metadata_t *super,
 //                                          size_t numFields,

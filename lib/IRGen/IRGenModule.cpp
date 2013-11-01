@@ -113,6 +113,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
     Int32Ty                 // flags
   });
   
+  ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
+  
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;

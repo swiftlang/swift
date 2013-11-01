@@ -318,10 +318,12 @@ namespace {
     }
 
     llvm::Value *visitNominalType(CanNominalType type) {
+      assert(!type->isExistentialType());
       return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }
 
     llvm::Value *visitBoundGenericType(CanBoundGenericType type) {
+      assert(!type->isExistentialType());
       return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }
 
@@ -480,10 +482,45 @@ namespace {
       IGF.unimplemented(SourceLoc(), "metadata ref for module type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
+      
+    llvm::Value *emitExistentialTypeMetadata(CanType type) {
+      SmallVector<ProtocolDecl*, 2> protocols;
+      bool isExistential = type->isExistentialType(protocols);
+      assert(isExistential); (void)isExistential;
+      
+      // Collect references to the protocol descriptors.
+      auto descriptorArrayTy
+        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
+                               protocols.size());
+      Address descriptorArray = IGF.createAlloca(descriptorArrayTy,
+                                                 IGF.IGM.getPointerAlignment(),
+                                                 "protocols");
+      descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
+                               IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
+      
+      unsigned index = 0;
+      for (auto *p : protocols) {
+        llvm::Value *ref = emitProtocolDescriptorRef(IGF, p);
+        Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
+                                               index, IGF.IGM.getPointerSize());
+        IGF.Builder.CreateStore(ref, slot);
+        ++index;
+      }
+      
+      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetExistentialMetadataFn(),
+                                        IGF.IGM.getSize(Size(protocols.size())),
+                                        descriptorArray.getAddress());
+      call->setDoesNotThrow();
+      call->setCallingConv(IGF.IGM.RuntimeCC);
+      return setLocal(type, call);
+    }
 
+    llvm::Value *visitProtocolType(CanProtocolType type) {
+      return emitExistentialTypeMetadata(type);
+    }
+      
     llvm::Value *visitProtocolCompositionType(CanProtocolCompositionType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for protocol comp type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      return emitExistentialTypeMetadata(type);
     }
 
     llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
@@ -3049,9 +3086,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     
     CanType declaredType = CanType(protocol->getDeclaredType());
     auto var = cast<llvm::GlobalVariable>(
-                                          getAddrOfTypeMetadata(declaredType,
-                                                                isIndirect, isPattern,
-                                                                init->getType()));
+                                    getAddrOfTypeMetadata(declaredType,
+                                                          isIndirect, isPattern,
+                                                          init->getType()));
     var->setConstant(true);
     var->setInitializer(init);
   }
@@ -3072,4 +3109,24 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     var->setConstant(true);
     var->setInitializer(init);
   }
+}
+
+/// \brief Load a reference to the protocol descriptor for the given protocol.
+///
+/// For Swift protocols, this is a constant reference to the protocol descriptor
+/// symbol.
+/// For ObjC protocols, descriptors are uniqued at runtime by the ObjC runtime.
+/// We need to load the unique reference from a global variable fixed up at
+/// startup.
+llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
+                                              ProtocolDecl *protocol) {
+  if (!protocol->isObjC())
+    return IGF.IGM.getAddrOfProtocolDescriptor(protocol);
+  
+  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol);
+  llvm::Value *val
+    = IGF.Builder.CreateLoad(refVar, IGF.IGM.getPointerAlignment());
+  val = IGF.Builder.CreateBitCast(val,
+                          IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
+  return val;
 }
