@@ -87,6 +87,7 @@ namespace {
 
     void removeDeadBlock(SILBasicBlock *BB);
     bool tryJumpThreading(BranchInst *BI);
+    void simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
     void simplifyBranchBlock(BranchInst *BI);
     void simplifyCondBrBlock(CondBranchInst *BI);
@@ -116,6 +117,24 @@ void SimplifyCFG::removeDeadBlock(SILBasicBlock *BB) {
   ++NumBlocksDeleted;
 }
 
+/// This is called when a predecessor of a block is dropped, to simplify the
+/// block and add it to the worklist.
+void SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
+  // TODO: If BB has only one predecessor and has bb args, fold them away, then
+  // use instsimplify on all the users of those values - even ones outside that
+  // block.
+
+
+  // Make sure that DestBB is in the worklist, as well as its remaining
+  // predecessors, since they may not be able to be simplified.
+  addToWorklist(BB);
+  for (auto *P : BB->getPreds())
+    addToWorklist(P);
+
+}
+
+
+
 /// Return true if there are any users of V outside the specified block.
 static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
   for (auto UI : V.getUses())
@@ -141,7 +160,6 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
     }
     return false;
   }
-
 
   return false;
 }
@@ -261,13 +279,8 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   addToWorklist(BI->getParent());
   BI->eraseFromParent();
 
-  // Make sure that DestBB is in the worklist, as well as its remaining
-  // predecessors, since they may not be able to be simplified.
-  addToWorklist(DestBB);
-  for (auto *P : DestBB->getPreds())
-    addToWorklist(P);
-
-
+  // We may be able to simplify DestBB now that it has one fewer predecessor.
+  simplifyAfterDroppingPredecessor(DestBB);
   ++NumJumpThreads;
   return true;
 }
@@ -314,14 +327,17 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
     bool isFalse = !IL->getValue();
-    auto *LiveBlock = isFalse ? BI->getFalseBB() : BI->getTrueBB();
+    auto *LiveBlock =  isFalse ? BI->getFalseBB() : BI->getTrueBB();
+    auto *DeadBlock = !isFalse ? BI->getFalseBB() : BI->getTrueBB();
+    auto *ThisBB = BI->getParent();
 
     SILBuilder(BI).createBranch(BI->getLoc(), LiveBlock);
-    addToWorklist(BI->getParent());
-    addToWorklist(BI->getTrueBB());
-    addToWorklist(BI->getFalseBB());
     BI->eraseFromParent();
     if (IL->use_empty()) IL->eraseFromParent();
+
+    addToWorklist(ThisBB);
+    simplifyAfterDroppingPredecessor(DeadBlock);
+    addToWorklist(LiveBlock);
     ++NumConstantFolded;
     return;
   }
