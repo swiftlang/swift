@@ -522,8 +522,58 @@ layout is as follows:
       **offset 7+n**. This is the number of witness table pointers that are
       stored for the type parameter in the generic parameter vector.
 
+Note that there is no nominal type descriptor for protocols or protocol types.
+See the `protocol descriptor`_ description below.
+
 Protocol Descriptor
 ~~~~~~~~~~~~~~~~~~~
+
+`Protocol metadata` contains references to zero, one, or more **protocol
+descriptors** that describe the protocols values of the type are required to
+conform to. The protocol descriptor is laid out to be compatible with
+Objective-C ``Protocol`` objects. The layout is as follows:
+
+- An **isa** placeholder is stored at **offset 0**. This field is populated by
+  the Objective-C runtime.
+- The mangled **name** is referenced as a null-terminated C string at
+  **offset 1**.
+- For an ObjC-compatible protocol, its **required instance methods** are stored
+  at **offset 2** as an ObjC-compatible method list. This is null for native
+  Swift protocols.
+- For an ObjC-compatible protocol, its **required class methods** are stored
+  at **offset 3** as an ObjC-compatible method list. This is null for native
+  Swift protocols.
+- For an ObjC-compatible protocol, its **optional instance methods** are stored
+  at **offset 4** as an ObjC-compatible method list. This is null for native
+  Swift protocols.
+- For an ObjC-compatible protocol, its **optional class methods** are stored
+  at **offset 5** as an ObjC-compatible method list. This is null for native
+  Swift protocols.
+- For an ObjC-compatible protocol, its **instance properties** are stored
+  at **offset 6** as an ObjC-compatible property list. This is null for native
+  Swift protocols.
+- The **size** of the protocol descriptor record is stored as a 32-bit integer
+  at **offset 7**. This is currently 72 on 64-bit platforms and 40 on 32-bit
+  platforms.
+- **Flags** are stored as a 32-bit integer after the size. The following bits
+  are currently used (counting from least significant bit zero):
+
+  * **Bit 0** is the **Swift bit**. It is set for all protocols defined in
+    Swift and unset for protocols defined in Objective-C.
+  * **Bit 1** is the **class constraint bit**. It is set if the protocol is
+    **not** class-constrained, meaning that any struct, enum, or class type
+    may conform to the protocol. It is unset if only classes can conform to
+    the protocol. (The inverted meaning is for compatibility with Objective-C
+    protocol records, in which the bit is never set. Objective-C protocols can
+    only be conformed to by classes.)
+  * **Bit 2** is the **witness table bit**. It is set if dispatch to the
+    protocol's methods is done through a witness table, which is either passed
+    as an extra parameter to generic functions or included in the `existential
+    container layout`_ of protocol types. It is unset if dispatch is done
+    through ``objc_msgSend`` and requires no additional information to accompany
+    a value of conforming type.
+  * **Bit 31** is set by the Objective-C runtime when it has done its
+    initialization of the protocol record. It is unused by the Swift runtime.
 
 Heap Objects
 ------------
