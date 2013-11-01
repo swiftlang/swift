@@ -406,6 +406,8 @@ namespace {
         getTypeVariable(getTypeVariable) { }
 
     Type operator()(Type type) {
+      assert(!type->is<PolymorphicFunctionType>() && "Shouldn't get here");
+      
       // Replace archetypes with fresh type variables.
       if (auto archetype = type->getAs<ArchetypeType>()) {
         auto known = replacements.find(archetype->getCanonicalType());
@@ -435,25 +437,6 @@ namespace {
         auto result = getTypeVariable(base, dependentMember->getAssocType());
         replacements[dependentMember->getCanonicalType()] = result;
         return result;
-      }
-
-      // Create type variables for all of the archetypes in a polymorphic
-      // function type.
-      if (auto polyFn = type->getAs<PolymorphicFunctionType>()) {
-        for (auto archetype : polyFn->getAllArchetypes())
-          (void)getTypeVariable(archetype);
-
-        // Transform the input and output types.
-        Type inputTy = cs.TC.transformType(polyFn->getInput(), *this);
-        if (!inputTy)
-          return Type();
-
-        Type resultTy = cs.TC.transformType(polyFn->getResult(), *this);
-        if (!resultTy)
-          return Type();
-
-        // Build the resulting (non-polymorphic) function type.
-        return FunctionType::get(inputTy, resultTy, cs.TC.Context);
       }
 
       // Create type variables for all of the parameters in a generic function
