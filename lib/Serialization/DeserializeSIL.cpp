@@ -135,31 +135,40 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   return OwnedTable(SerializedFuncTable::Create(base + tableOffset, base));
 }
 
+/// A high-level overview of how forward references work in serializer and
+/// deserializer:
+/// In serializer, we pre-assign a value ID in order, to each basic block
+/// argument and each SILInstruction that has a value.
+/// In deserializer, we use LocalValues to store the definitions and
+/// ForwardMRVLocalValues for forward-referenced values (values that are
+/// used but not yet defined). LocalValues are updated in setLocalValue where
+/// the ID passed in assumes the same ordering as in serializer: in-order
+/// for each basic block argument and each SILInstruction that has a value.
+/// We update ForwardMRVLocalValues in getLocalValue and when a value is defined
+/// in setLocalValue, the corresponding entry in ForwardMRVLocalValues will be
+/// erased.
 void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
   ValueBase *&Entry = LocalValues[Id];
-  if (Entry) {
-    // If this value was already referenced, check it to make sure types match.
-    assert(Entry->getTypes() != Value->getTypes() && "Value Type mismatch?");
+  assert(!Entry && "We should not redefine the same value.");
 
-    auto It = ForwardMRVLocalValues.find(Id);
-    if (It != ForwardMRVLocalValues.end()) {
-      // Take the information about the forward ref out of the map.
-      std::vector<SILValue> Entries(std::move(It->second));
+  auto It = ForwardMRVLocalValues.find(Id);
+  if (It != ForwardMRVLocalValues.end()) {
+    // Take the information about the forward ref out of the map.
+    std::vector<SILValue> Entries = std::move(It->second);
 
-      // Remove the entries from the map.
-      ForwardMRVLocalValues.erase(It);
+    // Remove the entries from the map.
+    ForwardMRVLocalValues.erase(It);
 
-      assert(Entries.size() <= Value->getTypes().size() &&
+    assert(Entries.size() <= Value->getTypes().size() &&
+           "Value Type mismatch?");
+    // Validate that any forward-referenced elements have the right type, and
+    // RAUW them.
+    for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
+      if (!Entries[i]) continue;
+
+      assert(Entries[i]->getType(0) == Value->getType(i) &&
              "Value Type mismatch?");
-      // Validate that any forward-referenced elements have the right type, and
-      // RAUW them.
-      for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
-        if (!Entries[i]) continue;
-
-        assert(Entries[i]->getType(0) != Value->getType(i) &&
-               "Value Type mismatch?");
-        Entries[i].replaceAllUsesWith(SILValue(Value, i));
-      }
+      Entries[i].replaceAllUsesWith(SILValue(Value, i));
     }
   }
 
@@ -173,7 +182,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
     return SILUndef::get(Type, &SILMod);
 
   // Check to see if this is already defined.
-  ValueBase *&Entry = LocalValues[Id];
+  ValueBase *Entry = LocalValues.lookup(Id);
   if (Entry) {
     // If this value was already defined, check it to make sure types match.
     SILType EntryTy = Entry->getType(ResultNum);

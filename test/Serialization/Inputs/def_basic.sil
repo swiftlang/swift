@@ -94,7 +94,7 @@ bb0:                                         // CHECK: bb0:
 
   // CHECK: integer_literal $Builtin.Int64, 1
   %3 = integer_literal $Builtin.Int64, 1
-  
+
   // CHECK: apply
   %4 = apply %1(%3, %2) : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
   // CHECK: return
@@ -174,7 +174,7 @@ bb0(%0 : $*P):
   %3 = apply %2(%1) : $@cc(method) ((), @inout @sil_self P) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
-  %6 = return %4 : $()                // CHECK: return 
+  %6 = return %4 : $()                // CHECK: return
 }
 
 
@@ -200,10 +200,10 @@ bb0:
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : $@cc(method) @thin ((), C) -> ()
-  
+
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
-  
+
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C
 
@@ -614,14 +614,14 @@ bb0(%0 : $Builtin.Int1):
   // CHECK: cond_br
   cond_br %0, bb1, bb2
 bb1:
-  %2 = integer_literal $Builtin.Int64, 5       
+  %2 = integer_literal $Builtin.Int64, 5
   br bb3(%2 : $Builtin.Int64)
   //CHECK: br bb3(%2 : $Builtin.Int64)
-bb2:                                            
-  %4 = integer_literal $Builtin.Int64, 6        
+bb2:
+  %4 = integer_literal $Builtin.Int64, 6
   br bb3(%4 : $Builtin.Int64)
   //CHECK: br bb3(%4 : $Builtin.Int64)
-bb3(%6 : $Builtin.Int64):                               
+bb3(%6 : $Builtin.Int64):
   //CHECK: bb3(%6 : $Builtin.Int64)
   return %6 : $Builtin.Int64
 }
@@ -939,7 +939,7 @@ bb0(%0 : $DynamicLookup):
 bb1:
   br bb3
 
-bb2:                                              
+bb2:
   br bb3
 
 bb3:
@@ -980,6 +980,52 @@ entry(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1
   %1 = tuple ()
   return %1 : $()
+}
+
+// rdar://15351123
+// CHECK-LABEL: @test_forward_ref
+sil [transparent] @test_forward_ref : $@thin (lhs: UInt8, rhs: UInt8) -> UInt8 {
+bb0(%0 : $UInt8, %1 : $UInt8):
+  %2 = alloc_stack $UInt8
+  %3 = alloc_stack $UInt8
+  store %0 to %2#1 : $*UInt8
+  store %1 to %3#1 : $*UInt8
+  // CHECK: %[[FUNC:[0-9]+]] = builtin_function_ref #Builtin.uadd_with_overflow_Int8
+  %6 = builtin_function_ref #Builtin.uadd_with_overflow_Int8 : $@thin (Builtin.Int8, Builtin.Int8, Builtin.Int1) -> (Builtin.Int8, Builtin.Int1)
+  %7 = struct_extract %0 : $UInt8, #value
+  %8 = struct_extract %1 : $UInt8, #value
+  br bb7
+bb1:
+  br bb2
+bb2:
+  // CHECK: apply %[[FUNC]](%{{[0-9]+}}, %{{[0-9]+}}, %[[FWD:[0-9]+]]
+  %11 = apply %6(%7, %8, %25) : $@thin (Builtin.Int8, Builtin.Int8, Builtin.Int1) -> (Builtin.Int8, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int8, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int8, Builtin.Int1), 1
+  %14 = struct $UInt8 (%12 : $Builtin.Int8)
+  cond_br %13, bb3, bb6
+bb3:
+  %16 = enum $Bool, #Bool.true!enumelt
+  br bb4(%16 : $Bool)
+bb4(%18 : $Bool):
+  br bb5
+bb5:
+  %20 = tuple (%14 : $UInt8, %18 : $Bool)
+  br bb9
+bb6:
+  %22 = enum $Bool, #Bool.false!enumelt
+  br bb4(%22 : $Bool)
+bb7:
+  br bb8
+bb8:
+  // CHECK: %[[FWD]] = integer_literal $Builtin.Int1, 0
+  %25 = integer_literal $Builtin.Int1, 0
+  br bb1
+bb9:
+  %27 = tuple_extract %20 : $(UInt8, Bool), 0
+  dealloc_stack %3#0 : $*@local_storage UInt8
+  dealloc_stack %2#0 : $*@local_storage UInt8
+  return %27 : $UInt8
 }
 
 class Foo {
@@ -1075,7 +1121,7 @@ bb0:
   %75 = function_ref @test_cond_branch_basic_block_args : $@thin (i: Int64, b: Builtin.Int1) -> Int64
 
   %77 = function_ref @test_autorelease_return : $@cc(objc_method) @thin (Bas, ()) -> NSString
-  %79 = function_ref @test_super_method : $@cc(method) @thin ((), Bas) -> Bas 
+  %79 = function_ref @test_super_method : $@cc(method) @thin ((), Bas) -> Bas
   %81 = function_ref @test_builtin_func_ref : $@thin (x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1
   %83 = function_ref @test_dealloc_ref : $@thin () -> ()
   %85 = function_ref @test_dealloc_box : $@thin () -> ()
@@ -1093,6 +1139,8 @@ bb0:
   %115 = function_ref @test_mark_fn_escape : $@thin () -> ()
   %117 = function_ref @test_copy_destroy_value : $@thin (v: Val) -> (Val)
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
+
+  %120 = function_ref @test_forward_ref : $@thin (lhs: UInt8, rhs: UInt8) -> UInt8
 
   %119 = tuple ()
   return %119 : $()

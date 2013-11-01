@@ -86,7 +86,6 @@ namespace {
     ValueID InstID = 0;
 
     llvm::DenseMap<const ValueBase*, ValueID> ValueIDs;
-    ValueID LastValueID = 0;
     ValueID addValueRef(SILValue SV) {
       return addValueRef(SV.getDef());
     }
@@ -147,24 +146,20 @@ SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                             VTableID(1) {
 }
 
-/// We enumerate all values to update ValueIDs in a separate pass
-/// to correctly handle forward reference of a value.
+/// We enumerate all values in a SILFunction beforehand to correctly
+/// handle forward references of values.
 ValueID SILSerializer::addValueRef(const ValueBase *Val) {
   if (!Val || isa<SILUndef>(Val))
     return 0;
 
-  ValueID &id = ValueIDs[Val];
-  if (id != 0)
-    return id;
-
-  id = ++LastValueID;
+  ValueID id = ValueIDs[Val];
+  assert(id != 0 && "We should have assigned a value ID to each value.");
   return id;
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F) {
   DEBUG(llvm::dbgs() << "Serialize SIL:\n";
         F.dump());
-  LastValueID = 0;
   ValueIDs.clear();
   InstID = 0;
 
@@ -181,8 +176,19 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
   BasicBlockMap.clear();
-  for (const SILBasicBlock &BB : F)
+  // Assign a value ID to each SILInstruction that has value and to each basic
+  // block argument.
+  unsigned ValueID = 0;
+  for (const SILBasicBlock &BB : F) {
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
+
+    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+      ValueIDs[static_cast<const ValueBase*>(*I)] = ++ValueID;
+
+    for (const SILInstruction &SI : BB)
+      if (SI.hasValue())
+        ValueIDs[&SI] = ++ValueID;
+  }
 
   for (const SILBasicBlock &BB : F)
     writeSILBasicBlock(BB);
