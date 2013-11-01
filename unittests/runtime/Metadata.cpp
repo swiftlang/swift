@@ -175,6 +175,7 @@ TEST(MetadataTest, getExistentialMetadata) {
     auto any1 = test_getExistentialMetadata({});
     auto any2 = test_getExistentialMetadata({});
     ASSERT_EQ(any1, any2);
+    ASSERT_EQ(MetadataKind::Existential, any1->getKind());
     ASSERT_EQ(0U, any1->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Any, any1->Flags.getClassConstraint());
     ASSERT_EQ(0U, any1->Protocols.NumProtocols);
@@ -183,6 +184,7 @@ TEST(MetadataTest, getExistentialMetadata) {
     auto a1 = test_getExistentialMetadata({&ProtocolA});
     auto a2 = test_getExistentialMetadata({&ProtocolA});
     ASSERT_EQ(a1, a2);
+    ASSERT_EQ(MetadataKind::Existential, a1->getKind());
     ASSERT_EQ(1U, a1->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Any, a1->Flags.getClassConstraint());
     ASSERT_EQ(1U, a1->Protocols.NumProtocols);
@@ -191,6 +193,7 @@ TEST(MetadataTest, getExistentialMetadata) {
    
     auto b = test_getExistentialMetadata({&ProtocolB});
     ASSERT_NE(a1, b);
+    ASSERT_EQ(MetadataKind::Existential, b->getKind());
     ASSERT_EQ(1U, b->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Any, b->Flags.getClassConstraint());
     ASSERT_EQ(1U, b->Protocols.NumProtocols);
@@ -202,6 +205,7 @@ TEST(MetadataTest, getExistentialMetadata) {
     auto ab = test_getExistentialMetadata({&ProtocolA, &ProtocolB});
     auto ba = test_getExistentialMetadata({&ProtocolB, &ProtocolA});
     ASSERT_EQ(ab, ba);
+    ASSERT_EQ(MetadataKind::Existential, ab->getKind());
     ASSERT_EQ(2U, ab->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Any, ab->Flags.getClassConstraint());
     ASSERT_EQ(2U, ab->Protocols.NumProtocols);
@@ -212,6 +216,7 @@ TEST(MetadataTest, getExistentialMetadata) {
   {
     auto classConstrained
       = test_getExistentialMetadata({&ProtocolClassConstrained});
+    ASSERT_EQ(MetadataKind::Existential, classConstrained->getKind());
     ASSERT_EQ(1U, classConstrained->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Class,
               classConstrained->Flags.getClassConstraint());
@@ -221,6 +226,7 @@ TEST(MetadataTest, getExistentialMetadata) {
   {
     auto noWitnessTable
       = test_getExistentialMetadata({&ProtocolNoWitnessTable});
+    ASSERT_EQ(MetadataKind::Existential, noWitnessTable->getKind());
     ASSERT_EQ(0U, noWitnessTable->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Class,
               noWitnessTable->Flags.getClassConstraint());
@@ -232,6 +238,7 @@ TEST(MetadataTest, getExistentialMetadata) {
     auto mixedWitnessTable
       = test_getExistentialMetadata({&ProtocolNoWitnessTable,
                                      &ProtocolA, &ProtocolB});
+    ASSERT_EQ(MetadataKind::Existential, mixedWitnessTable->getKind());
     ASSERT_EQ(2U, mixedWitnessTable->Flags.getNumWitnessTables());
     ASSERT_EQ(ProtocolClassConstraint::Class,
               mixedWitnessTable->Flags.getClassConstraint());
