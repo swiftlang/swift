@@ -731,7 +731,7 @@ bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
 
   TypeChecker TC(Ctx, diags);
   TC.typeCheckExpression(parsedExpr, DC, Type(), /*discardedExpr=*/true,
-                         /*allowFreeTypeVariables=*/true);
+                         FreeTypeVariableBinding::GenericParameters);
   
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)
                     && parsedExpr->getType()

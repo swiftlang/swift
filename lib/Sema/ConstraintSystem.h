@@ -823,6 +823,53 @@ struct SpecificConstraint {
   ConstraintKind Kind;
 };
 
+/// Abstract class implemented by clients that want to be involved in
+/// the process of opening dependent types to type variables.
+class DependentTypeOpener {
+public:
+  virtual ~DependentTypeOpener() { }
+
+  /// Invoked when a generic type parameter is opened to a type variable.
+  ///
+  /// \param param The generic type parameter.
+  ///
+  /// \param typeVar The type variable to which the generic parameter was
+  /// opened.
+  ///
+  /// \param replacementType If the caller sets this to a non-null type, the
+  /// type variable will be bound directly to this type.
+  virtual void openedGenericParameter(GenericTypeParamType *param,
+                                      TypeVariableType *typeVar,
+                                      Type &replacementType) { }
+
+  /// Invoked when an associated type reference is opened to a type
+  /// variable to determine how the associated type should be resolved.
+  ///
+  /// \param baseType The type of the base of the reference.
+  ///
+  /// \param baseTypeVar The type variable to which the base type was
+  /// opened.
+  ///
+  /// \param assocType The associated type being opened.
+  ///
+  /// \param memberTypeVar The type variable representing the
+  /// dependent member type.
+  ///
+  /// \param replacementType If the caller sets this to a non-null type, the
+  /// member type variable will be bound directly to this type.
+  ///
+  /// \returns true if the constraint system should introduce a
+  /// constraint that specifies that the member type is in fact a the
+  /// named member of the base's type variable.
+  virtual bool shouldBindAssociatedType(Type baseType,
+                                        TypeVariableType *baseTypeVar,
+                                        AssociatedTypeDecl *assocType,
+                                        TypeVariableType *memberTypeVar,
+                                        Type &replacementType) { 
+    return true;
+  }
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -971,7 +1018,7 @@ private:
   /// it.
   ///
   /// \returns the solution.
-  Solution finalize();
+  Solution finalize(FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
@@ -1232,9 +1279,11 @@ public:
   ///
   /// \returns The opened type.
   Type openType(Type type, DeclContext *dc = nullptr,
-                bool skipProtocolSelfConstraint = false) {
+                bool skipProtocolSelfConstraint = false,
+                DependentTypeOpener *opener = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, { }, replacements, dc, skipProtocolSelfConstraint);
+    return openType(type, { }, replacements, dc, skipProtocolSelfConstraint,
+                    opener);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -1253,12 +1302,16 @@ public:
   /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
   /// protocol's 'Self' type.
   ///
+  /// \param opener Abstract class that assists in opening dependent
+  /// types.
+  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(
          Type type, ArrayRef<ArchetypeType *> archetypes,
          llvm::DenseMap<CanType, TypeVariableType *> &replacements,
          DeclContext *dc = nullptr,
-         bool skipProtocolSelfConstraint = false);
+         bool skipProtocolSelfConstraint = false,
+         DependentTypeOpener *opener = nullptr);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
@@ -1278,6 +1331,7 @@ public:
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
+                   DependentTypeOpener *opener,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
   /// \brief Retrieve the type of a reference to the given value declaration.
@@ -1295,9 +1349,11 @@ public:
   ///
   /// \returns a pair containing the full opened type (if applicable) and
   /// opened type of a reference to declaration.
-  std::pair<Type, Type> getTypeOfReference(ValueDecl *decl,
-                                           bool isTypeReference,
-                                           bool isSpecialized);
+  std::pair<Type, Type> getTypeOfReference(
+                          ValueDecl *decl,
+                          bool isTypeReference,
+                          bool isSpecialized,
+                          DependentTypeOpener *opener = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -1314,9 +1370,11 @@ public:
   ///
   /// \returns a pair containing the full opened type (which includes the opened
   /// base) and opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
-                                                 bool isTypeReference,
-                                                 bool isDynamicResult);
+  std::pair<Type, Type> getTypeOfMemberReference(
+                          Type baseTy, ValueDecl *decl,
+                          bool isTypeReference,
+                          bool isDynamicResult,
+                          DependentTypeOpener *opener = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
@@ -1570,12 +1628,13 @@ public:
   /// \brief Solve the system of constraints.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  /// \param allowFreeTypeVariables Whether to allow free type variables in
+  /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool solve(SmallVectorImpl<Solution> &solutions,
-             bool allowFreeTypeVariables = false);
+             FreeTypeVariableBinding allowFreeTypeVariables
+               = FreeTypeVariableBinding::Disallow);
 
 private:
   // \brief Compare two solutions to the same set of constraints.

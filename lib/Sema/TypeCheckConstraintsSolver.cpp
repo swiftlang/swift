@@ -54,7 +54,8 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-Solution ConstraintSystem::finalize() {
+Solution ConstraintSystem::finalize(
+           FreeTypeVariableBinding allowFreeTypeVariables) {
   // Create the solution.
   Solution solution(*this);
 
@@ -63,8 +64,20 @@ Solution ConstraintSystem::finalize() {
   // FIXME: We could gather the requirements on these as well.
   unsigned index = 0;
   for (auto tv : TypeVariables) {
-    if (!getFixedType(tv))
+    if (getFixedType(tv))
+      continue;
+
+    switch (allowFreeTypeVariables) {
+    case FreeTypeVariableBinding::Disallow:
+      llvm_unreachable("Solver left free type variables");
+
+    case FreeTypeVariableBinding::Allow:
+      break;
+
+    case FreeTypeVariableBinding::GenericParameters:
       assignFixedType(tv, GenericTypeParamType::get(0, index++, TC.Context));
+      break;
+    }
   }
 
   // For each of the type variables, get its fixed type.
@@ -545,12 +558,13 @@ getPotentialBindings(ConstraintSystem &cs,
 /// \param solutions The set of solutions.
 ///
 /// \returns true if there are no solutions.
-static bool tryTypeVariableBindings(ConstraintSystem &cs,
-                                    unsigned depth,
-                                    TypeVariableConstraints &tvc,
-                                    ArrayRef<std::pair<Type, bool>> bindings,
-                                    SmallVectorImpl<Solution> &solutions,
-                                    bool allowFreeTypeVariables) {
+static bool tryTypeVariableBindings(
+              ConstraintSystem &cs,
+              unsigned depth,
+              TypeVariableConstraints &tvc,
+              ArrayRef<std::pair<Type, bool>> bindings,
+              SmallVectorImpl<Solution> &solutions,
+              FreeTypeVariableBinding allowFreeTypeVariables) {
   auto typeVar = tvc.TypeVar;
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
@@ -668,7 +682,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
-                             bool allowFreeTypeVariables) {
+                             FreeTypeVariableBinding allowFreeTypeVariables) {
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
   if (!solverState) {
@@ -703,10 +717,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   if (Constraints.empty()) {
     // If any free type variables remain and we're not allowed to have them,
     // fail.
-    if (!allowFreeTypeVariables && hasFreeTypeVariables())
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow &&
+        hasFreeTypeVariables())
       return true;
 
-    auto solution = finalize();
+    auto solution = finalize(allowFreeTypeVariables);
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2) << "(found solution)\n";
@@ -775,7 +790,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // variables, we still have a solution.  FIXME: It seems like this
     // should be easier to detect. Aren't there other kinds of
     // constraints that could show up here?
-    if (allowFreeTypeVariables && hasFreeTypeVariables()) {
+    if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
+        hasFreeTypeVariables()) {
       bool anyNonConformanceConstraints = false;
       for (auto constraint : Constraints) {
         if (constraint->getKind() == ConstraintKind::ConformsTo ||
@@ -790,7 +806,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       }
 
       if (!anyNonConformanceConstraints) {
-        auto solution = finalize();
+        auto solution = finalize(allowFreeTypeVariables);
         if (TC.getLangOpts().DebugConstraintSolver) {
           auto &log = getASTContext().TypeCheckerDebug->getStream();
           log.indent(solverState->depth * 2) << "(found solution)\n";

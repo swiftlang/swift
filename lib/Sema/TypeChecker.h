@@ -115,6 +115,17 @@ enum class Comparison {
   Worse
 };
 
+/// Specify how we handle the binding of underconstrained (free) type variables
+/// within a solution to a constraint system.
+enum class FreeTypeVariableBinding {
+  /// Disallow any binding of such free type variables.
+  Disallow,
+  /// Allow the free type variables to persist in the solution.
+  Allow,
+  /// Bind the type variables to fresh generic parameters.
+  GenericParameters
+};
+
 class TypeChecker : public ASTMutationListener, public LazyResolver {
 public:
   ASTContext &Context;
@@ -454,10 +465,14 @@ public:
   /// \param discardedExpr True if the result of this expression will be
   /// discarded.
   ///
+  /// \param allowFreeTypeVariables Whether free type variables are allowed in
+  /// the solution, and what to do with them.
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            Type convertType, bool discardedExpr,
-                           bool allowFreeTypeVariables = false);
+                           FreeTypeVariableBinding allowFreeTypeVariables
+                             = FreeTypeVariableBinding::Disallow);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.

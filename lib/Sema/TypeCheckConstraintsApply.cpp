@@ -54,7 +54,6 @@ Type Solution::computeSubstitutions(
                   auto archetype = tv->getImpl().getArchetype();
                   auto simplified = getFixedType(tv);
                   typeSubstitutions[archetype] = simplified;
-
                   return SubstitutedType::get(archetype, simplified,
                                               tc.Context);
                 }
@@ -83,19 +82,19 @@ Type Solution::computeSubstitutions(
                  ->castTo<ArchetypeType>()
                == substitutions.back().Archetype && "Archetype out-of-sync");
         ProtocolConformance *conformance = nullptr;
-        bool conforms = tc.conformsToProtocol(
-                             substitutions.back().Replacement,
-                             protoType->getDecl(),
-                             getConstraintSystem().DC,
-                             &conformance);
+        Type replacement = substitutions.back().Replacement;
+        bool conforms = tc.conformsToProtocol(replacement,
+                                              protoType->getDecl(),
+                                              getConstraintSystem().DC,
+                                              &conformance);
         assert((conforms ||
-                substitutions.back().Replacement->isExistentialType()) &&
+                replacement->isExistentialType()) &&
                "Constraint system missed a conformance?");
         (void)conforms;
 
         assert(conformance ||
-               substitutions.back().Replacement->is<ArchetypeType>() ||
-               substitutions.back().Replacement->isExistentialType());
+               replacement->isExistentialType() ||
+               replacement->is<ArchetypeType>());
         currentConformances.push_back(conformance);
         break;
       }

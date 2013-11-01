@@ -277,6 +277,7 @@ namespace {
   /// given type/
   class GetTypeVariable {
     ConstraintSystem &CS;
+    DependentTypeOpener *Opener;
     llvm::DenseMap<CanType, TypeVariableType *> &Replacements;
 
     /// The type variables introduced for (base type, associated type) pairs.
@@ -285,8 +286,9 @@ namespace {
 
   public:
     GetTypeVariable(ConstraintSystem &cs,
+                    DependentTypeOpener *opener,
                     llvm::DenseMap<CanType, TypeVariableType *> &replacements)
-      : CS(cs), Replacements(replacements) { }
+      : CS(cs), Opener(opener), Replacements(replacements) { }
 
     TypeVariableType *operator()(ArchetypeType *archetype) const {
       // Check whether we already have a replacement for this archetype.
@@ -337,14 +339,34 @@ namespace {
       if (known != MemberReplacements.end())
         return known->second;
 
-      auto archetype =base->castTo<TypeVariableType>()->getImpl().getArchetype()
-                        ->getNestedType(member->getName());
+      auto baseTypeVar = base->castTo<TypeVariableType>();
+      auto archetype = baseTypeVar->getImpl().getArchetype()
+                         ->getNestedType(member->getName());
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(
                                         (Expr *)nullptr,
                                         LocatorPathElt(archetype)),
                                       TVO_PrefersSubtypeBinding);
       MemberReplacements[{base->getCanonicalType(), member}] = tv;
-      CS.addTypeMemberConstraint(base, member->getName(), tv);
+
+      // Determine whether we should bind the new type variable as a
+      // member of the base type variable, or let it float.
+      Type replacementType;
+      bool shouldBindMember = true;
+      if (Opener) {
+        shouldBindMember = Opener->shouldBindAssociatedType(base, baseTypeVar,
+                                                            member, tv,
+                                                            replacementType);
+      }
+
+      // Bind the member's type variable as a type member of the base,
+      // if needed.
+      if (shouldBindMember)
+        CS.addTypeMemberConstraint(base, member->getName(), tv);
+
+      // If we have a replacement type, bind the member's type
+      // variable to it.
+      if (replacementType)
+        CS.addConstraint(ConstraintKind::Bind, tv, replacementType);
 
       // Add associated type constraints.
       // FIXME: Would be better to walk the requirements of the protocol
@@ -367,6 +389,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     bool skipProtocolSelfConstraint;
+    DependentTypeOpener *opener;
     llvm::DenseMap<CanType, TypeVariableType *> &replacements;
     GetTypeVariable &getTypeVariable;
 
@@ -375,10 +398,12 @@ namespace {
         ConstraintSystem &cs,
         DeclContext *dc,
         bool skipProtocolSelfConstraint,
+        DependentTypeOpener *opener,
         llvm::DenseMap<CanType, TypeVariableType *> &replacements,
         GetTypeVariable &getTypeVariable)
       : cs(cs), dc(dc), skipProtocolSelfConstraint(skipProtocolSelfConstraint),
-        replacements(replacements), getTypeVariable(getTypeVariable) { }
+        opener(opener), replacements(replacements), 
+        getTypeVariable(getTypeVariable) { }
 
     Type operator()(Type type) {
       // Replace archetypes with fresh type variables.
@@ -439,6 +464,7 @@ namespace {
                        genericFn->getGenericParams(),
                        genericFn->getRequirements(),
                        skipProtocolSelfConstraint,
+                       opener,
                        replacements);
 
         // Transform the input and output types.
@@ -485,8 +511,9 @@ Type ConstraintSystem::openType(
        ArrayRef<ArchetypeType *> archetypes,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements,
        DeclContext *dc,
-       bool skipProtocolSelfConstraint) {
-  GetTypeVariable getTypeVariable{*this, replacements};
+       bool skipProtocolSelfConstraint,
+       DependentTypeOpener *opener) {
+  GetTypeVariable getTypeVariable{*this, opener, replacements};
 
   // Create type variables for each archetype we're opening.
   for (auto archetype : archetypes)
@@ -494,6 +521,7 @@ Type ConstraintSystem::openType(
 
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
+                                              opener,
                                               replacements, getTypeVariable);
   return TC.transformType(startingType, replaceDependentTypes);
 }
@@ -706,15 +734,17 @@ static LValueType::Qual settableQualForDecl(Type baseType,
   return LValueType::Qual::NonSettable;
 }
 
-std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                                           bool isTypeReference,
-                                                           bool isSpecialized) {
+std::pair<Type, Type> 
+ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                     bool isTypeReference,
+                                     bool isSpecialized,
+                                     DependentTypeOpener *opener) {
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
-    auto openedType = openType(func->getInterfaceType(), func);
+    auto openedType = openType(func->getInterfaceType(), func, false, opener);
     auto openedFnType = openedType->castTo<FunctionType>();
 
     // The 'Self' type must be bound to an archetype.
@@ -736,7 +766,7 @@ std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
       return { nullptr, nullptr };
 
     // Open the type.
-    type = openType(type, value->getInnermostDeclContext());
+    type = openType(type, value->getInnermostDeclContext(), false, opener);
 
     // If it's a type reference, we're done.
     if (isTypeReference)
@@ -751,7 +781,7 @@ std::pair<Type, Type> ConstraintSystem::getTypeOfReference(ValueDecl *value,
   Type valueType = TC.getUnopenedTypeOfReference(value, Type(),
                                                  /*wantInterfaceType=*/true);
 
-  // Up and adjust the type of the reference.
+  // Adjust the type of the reference.
   valueType = adjustLValueForReference(openType(
                                          valueType,
                                          value->getInnermostDeclContext()),
@@ -765,6 +795,7 @@ void ConstraintSystem::openGeneric(
        ArrayRef<GenericTypeParamType *> params,
        ArrayRef<Requirement> requirements,
        bool skipProtocolSelfConstraint,
+       DependentTypeOpener *opener,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
 
   // Create the type variables for the generic parameters.
@@ -776,12 +807,22 @@ void ConstraintSystem::openGeneric(
                                         LocatorPathElt(archetype)),
                                       TVO_PrefersSubtypeBinding);
     replacements[gp->getCanonicalType()] = typeVar;
+
+    // Note that we opened a generic parameter to a type variable.
+    if (opener) {
+      Type replacementType;
+      opener->openedGenericParameter(gp, typeVar, replacementType);
+
+      if (replacementType)
+        addConstraint(ConstraintKind::Bind, typeVar, replacementType);
+    }
   }
 
-  GetTypeVariable getTypeVariable{*this, replacements};
+  GetTypeVariable getTypeVariable{*this, opener, replacements};
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
-                                              replacements, getTypeVariable);
+                                              opener, replacements, 
+                                              getTypeVariable);
 
   // Add the requirements as constraints.
   for (auto req : requirements) {
@@ -871,7 +912,8 @@ static void collectContextParamsAndRequirements(
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
-                                           bool isDynamicResult) {
+                                           bool isDynamicResult,
+                                           DependentTypeOpener *opener) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
   Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
@@ -884,7 +926,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
+    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false,
+                              opener);
   }
 
   // Handle associated type lookup as a special case, horribly.
@@ -933,7 +976,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // Open the type of the generic function or member of a generic type.
   Type openedType;
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
-    openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true);
+    openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true,
+                          opener);
   } else {
     openedType = TC.getUnopenedTypeOfReference(value, baseTy,
                                                /*wantInterfaceType=*/true);
@@ -948,12 +992,13 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       collectContextParamsAndRequirements(dc, genericParams, genericRequirements);
       openGeneric(dc, genericParams, genericRequirements,
                   /*skipProtocolSelfConstraint=*/true,
+                  opener,
                   replacements);
 
       // Open up the type of the member.
       openedType = openType(
                      openedType,
-                     { }, replacements);
+                     { }, replacements, nullptr, false, opener);
 
       // Determine the object type of 'self'.
       if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
@@ -2122,7 +2167,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (choice.getBaseType())
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
-                                   isTypeReference, isDynamicResult);
+                                   isTypeReference, isDynamicResult,
+                                   nullptr);
     else
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(),
@@ -3936,10 +3982,11 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
 }
 
 #pragma mark High-level entry points
-bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      Type convertType,
-                                      bool discardedExpr,
-                                      bool allowFreeTypeVariables) {
+bool TypeChecker::typeCheckExpression(
+       Expr *&expr, DeclContext *dc,
+       Type convertType,
+       bool discardedExpr,
+       FreeTypeVariableBinding allowFreeTypeVariables) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the

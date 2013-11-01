@@ -3105,6 +3105,8 @@ case TypeKind::Id:
           anyChanges = true;
 
         genericParams.push_back(newParam);
+      } else {
+        anyChanges = true;
       }
     }
 

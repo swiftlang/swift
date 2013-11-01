@@ -18,6 +18,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -147,14 +148,120 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
   return result;
 }
 
+namespace {
+  /// Dependent type opener that keeps track of the type variables to which
+  /// generic parameters and dependent member types were opened while
+  /// opening up the type of a witness.
+  class WitnessTypeOpener : public constraints::DependentTypeOpener {
+    ASTContext &Context;
+    llvm::DenseMap<TypeVariableType *, CanType> &Opened;
+
+  public:
+    WitnessTypeOpener(ASTContext &context,
+                      llvm::DenseMap<TypeVariableType *, CanType> &opened)
+      : Context(context), Opened(opened) { }
+
+    virtual void openedGenericParameter(GenericTypeParamType *param,
+                                        TypeVariableType *typeVar,
+                                        Type &replacementType) {
+      Opened[typeVar] = param->getCanonicalType();
+    }
+
+    virtual bool shouldBindAssociatedType(Type baseType,
+                                          TypeVariableType *baseTypeVar,
+                                          AssociatedTypeDecl *assocType,
+                                          TypeVariableType *memberTypeVar,
+                                          Type &replacementType) {
+      Opened[memberTypeVar] = DependentMemberType::get(baseType, assocType,
+                                                       Context)
+                                ->getCanonicalType();
+      return true;
+    }
+
+  };
+
+  /// Dependent type opener that maps the type of a requirement, replacing
+  /// already-known associated types to their type witnesses and inner generic
+  /// parameters to their archetypes.
+  class RequirementTypeOpener : public constraints::DependentTypeOpener {
+    /// The type variable that represents the 'Self' type.
+    TypeVariableType *SelfTypeVar = nullptr;
+
+    DeclContext *DC;
+    TypeWitnessMap &TypeWitnesses;
+    llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> &OpenedAssocTypes;
+
+  public:
+    RequirementTypeOpener(DeclContext *dc,
+                         TypeWitnessMap &typeWitnesses,
+                         llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
+                           &openedAssocTypes)
+      : DC(dc), TypeWitnesses(typeWitnesses), OpenedAssocTypes(openedAssocTypes)
+    {
+    }
+
+    virtual void openedGenericParameter(GenericTypeParamType *param,
+                                        TypeVariableType *typeVar,
+                                        Type &replacementType) {
+      // If this is the 'Self' type, record it.
+      if (param->getDepth() == 0 && param->getIndex() == 0)
+        SelfTypeVar = typeVar;
+      else
+        replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, param);
+    }
+
+    virtual bool shouldBindAssociatedType(Type baseType,
+                                          TypeVariableType *baseTypeVar,
+                                          AssociatedTypeDecl *assocType,
+                                          TypeVariableType *memberTypeVar,
+                                          Type &replacementType) {
+      // If the base is our 'Self' type, we might have a witness for this
+      // associated type already.
+      if (baseTypeVar == SelfTypeVar) {
+        // If we know about this associated type already, we know its
+        // replacement type. Otherwise, record it.
+        auto known = TypeWitnesses.find(assocType);
+        if (known != TypeWitnesses.end())
+          replacementType = known->second.Replacement;
+        else
+          OpenedAssocTypes[memberTypeVar] = assocType;
+
+        // Let the member type variable float; we don't want to
+        // resolve it as a member.
+        return false;
+      }
+
+      // If the base is somehow derived from our 'Self' type, we can go ahead
+      // and bind it. There's nothing more to do.
+      auto rootBaseType = baseType;
+      while (auto dependentMember = rootBaseType->getAs<DependentMemberType>())
+        rootBaseType = dependentMember->getBase();
+      if (auto rootGP = rootBaseType->getAs<GenericTypeParamType>()) {
+        if (rootGP->getDepth() == 0 && rootGP->getIndex() == 0)
+          return true;
+      } else {
+        return true;
+      }
+
+      // We have a dependent member type based on a generic parameter; map it
+      // to an archetype.
+      auto memberType = DependentMemberType::get(baseType, assocType,
+                                                 DC->getASTContext());
+      replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
+      return true;
+    }
+  };
+
+} // end anonymous namespace
+
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
 static RequirementMatch
 matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
-             ValueDecl *req, Type reqType,
+             ValueDecl *req,
              Type model, ValueDecl *witness,
-             ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) {
+             TypeWitnessMap &typeWitnesses) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -169,11 +276,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   const auto &reqAttrs = req->getAttrs();
   const auto &witnessAttrs = witness->getAttrs();
 
-  // Compute the type of the witness, below.
-  Type witnessType;
+  // Perform basic matching of the requirement and witness.
   bool decomposeFunctionType = false;
-
-  // Check properties specific to functions.
   if (auto funcReq = dyn_cast<FuncDecl>(req)) {
     auto funcWitness = cast<FuncDecl>(witness);
 
@@ -191,29 +295,10 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
     if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
-    // Determine the witness type.
-    witnessType = witness->getType();
-
-    // If the witness resides within a type context, substitute through the
-    // base type and ignore 'self'.
-    if (witness->getDeclContext()->isTypeContext()) {
-      witnessType = witness->getType()->castTo<AnyFunctionType>()->getResult();
-      witnessType = tc.substMemberTypeWithBase(dc->getParentModule(),
-                                               witnessType, witness, model);
-      assert(witnessType && "Cannot refer to witness?");
-    }
-
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else {
     // FIXME: Static variables will have to check static vs. non-static here.
-
-    // The witness type is the type of the declaration with the base
-    // substituted.
-    witnessType = tc.substMemberTypeWithBase(dc->getParentModule(),
-                                             witness->getType(), witness,
-                                             model);
-    assert(witnessType && "Cannot refer to witness?");
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
@@ -223,31 +308,52 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   // the required type and the witness type.
   constraints::ConstraintSystem cs(tc, dc);
 
-  // Open up the type of the requirement and witness, replacing any unresolved
-  // archetypes with type variables.
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
-  SmallVector<ArchetypeType *, 4> unresolvedArchetypes;
-  if (!unresolvedAssocTypes.empty()) {
-    for (auto assoc : unresolvedAssocTypes)
-      unresolvedArchetypes.push_back(assoc->getArchetype());
-
-    reqType = cs.openType(reqType, unresolvedArchetypes, replacements,
-                          req->getInnermostDeclContext());
+  // Open up the witness type.
+  Type witnessType = witness->getInterfaceType();
+  Type openWitnessType;
+  Type openedFullWitnessType;
+  llvm::DenseMap<TypeVariableType *, CanType> openedWitnessTypeVars;
+  WitnessTypeOpener witnessOpener(tc.Context, openedWitnessTypeVars);
+  if (witness->getDeclContext()->isTypeContext()) {
+    std::tie(openedFullWitnessType, openWitnessType) 
+      = cs.getTypeOfMemberReference(model, witness,
+                                    /*isTypeReference=*/false,
+                                    /*isDynamicResult=*/false,
+                                    &witnessOpener);
+  } else {
+    std::tie(openedFullWitnessType, openWitnessType) 
+      = cs.getTypeOfReference(witness,
+                              /*isTypeReference=*/false,
+                              /*isDynamicResult=*/false,
+                              &witnessOpener);
   }
-  
-  llvm::DenseMap<CanType, TypeVariableType *> witnessReplacements;
-  SmallVector<ArchetypeType *, 4> witnessArchetypes;
-  auto openWitnessType = cs.openType(witnessType, witnessArchetypes,
-                                     witnessReplacements,
-                                     witness->getInnermostDeclContext());
+  openWitnessType = openWitnessType->getRValueType();
+
+  // Open up the type of the requirement. We only truly open 'Self' and
+  // its associated types (recursively); inner generic type parameters get
+  // mapped to their archetypes directly.
+  llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
+  DeclContext *reqDC = req->getDeclContext();
+  if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req))
+    reqDC = reqFunc;
+  RequirementTypeOpener reqTypeOpener(reqDC, typeWitnesses, openedAssocTypes);
+  Type reqType, openedFullReqType;
+  std::tie(openedFullReqType, reqType)
+    = cs.getTypeOfMemberReference(model, req,
+                                  /*isTypeReference=*/false,
+                                  /*isDynamicResult=*/false,
+                                  &reqTypeOpener);
+  reqType = reqType->getRValueType();
 
   bool anyRenaming = false;
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
     auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
     auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
-    auto witnessInputType = openWitnessType->castTo<AnyFunctionType>()->getInput();
-    auto witnessResultType = openWitnessType->castTo<AnyFunctionType>()->getResult();
+    auto witnessInputType = openWitnessType->castTo<AnyFunctionType>()
+                              ->getInput();
+    auto witnessResultType = openWitnessType->castTo<AnyFunctionType>()
+                               ->getResult();
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
@@ -301,7 +407,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
 
   // Try to solve the system.
   SmallVector<constraints::Solution, 1> solutions;
-  if (cs.solve(solutions, /*allowFreeTypeVariables=*/true)) {
+  if (cs.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return RequirementMatch(witness, MatchKind::TypeConflict,
                             witnessType);
   }
@@ -313,49 +419,30 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
                                      : MatchKind::ExactMatch,
                           witnessType);
 
-  // If we deduced any associated types, record them in the result.
-  if (!replacements.empty()) {
-    for (auto assocType : unresolvedAssocTypes) {
-      auto archetype = assocType->getArchetype();
-      auto known = replacements.find(archetype->getCanonicalType());
-      if (known == replacements.end())
-        continue;
+  // For any associated types for which we deduced replacement types,
+  // record them now.
+  for (const auto &opened : openedAssocTypes) {
+    auto replacement = solution.simplifyType(tc, opened.first);
 
-      auto replacement = solution.simplifyType(tc, known->second);
-      assert(replacement && "Couldn't simplify type variable?");
+    // If any type variables remain in the replacement, we couldn't
+    // fully deduce it.
+    if (replacement->hasTypeVariable())
+      continue;
 
-      // If the replacement is dependent, we didn't deduce it.
-      if (replacement->isDependentType())
-        continue;
-
-      result.AssociatedTypeDeductions.push_back({assocType, replacement});
-    }
+    result.AssociatedTypeDeductions.push_back({opened.second, replacement});
   }
-  
-  // Save archetype mappings we deduced for the witness.
-  for (auto &witnessReplacement : witnessReplacements) {
-    auto archetype = witnessReplacement.first->castTo<ArchetypeType>();
-    auto typeVar = witnessReplacement.second;
-    
-    auto sub = solution.simplifyType(tc, typeVar);
-    assert(sub && "couldn't simplify type variable?");
-    
-    assert(!sub->hasTypeVariable() && "type variable in witness sub");
-    
-    // Produce conformances for the substitution.
-    SmallVector<ProtocolConformance*, 2> conformances;
-    for (auto archetypeProto : archetype->getConformsTo()) {
-      ProtocolConformance *conformance = nullptr;
-      bool conformed = tc.conformsToProtocol(sub, archetypeProto, dc,
-                                             &conformance);
-      assert(conformed &&
-             "archetype substitution did not conform to requirement?");
-      (void)conformed;
-      conformances.push_back(conformance);
-    }
-    
-    result.WitnessSubstitutions.push_back({archetype, sub,
-                                        tc.Context.AllocateCopy(conformances)});
+
+  if (openedFullWitnessType->hasTypeVariable()) {
+    // Figure out the context we're substituting into.
+    auto witnessDC = witness->getDeclContext();
+    if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
+      witnessDC = func;
+
+    // Compute the set of substitutions we'll need for the witness.
+    solution.computeSubstitutions(witness->getInterfaceType(),
+                                  witnessDC,
+                                  openedFullWitnessType,
+                                  result.WitnessSubstitutions);
   }
 
   return result;
@@ -401,9 +488,64 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
   str += deduced.getString();
 }
 
+/// Clean up the given declaration type for display purposes.
+static Type getTypeForDisplay(TypeChecker &tc, Module *module,
+                              ValueDecl *decl) {
+  // If we're not in a type context, just grab the interface type.
+  Type type = decl->getInterfaceType();
+  if (!decl->getDeclContext()->isTypeContext() ||
+      !isa<AbstractFunctionDecl>(decl))
+    return type;
+
+  // We have something function-like, so we want to strip off the 'self'.
+  if (auto genericFn = type->getAs<GenericFunctionType>()) {
+    if (auto resultFn = genericFn->getResult()->getAs<FunctionType>()) {
+      // For generic functions, build a new generic function... but strip off
+      // the requirements. They don't add value.
+      return GenericFunctionType::get(genericFn->getGenericParams(), { },
+                                      resultFn->getInput(),
+                                      resultFn->getResult(),
+                                      resultFn->getExtInfo(),
+                                      tc.Context);
+    }
+  }
+
+  return type->castTo<AnyFunctionType>()->getResult();
+}
+
+/// Clean up the given requirement type for display purposes.
+static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
+                                         Type model, ValueDecl *req,
+                                         const TypeWitnessMap &typeWitnesses) {
+  auto type = getTypeForDisplay(tc, module, req);
+
+  // Replace generic type parameters and associated types with their
+  // witnesses, when we have them.
+  auto selfTy = GenericTypeParamType::get(0, 0, tc.Context);
+  type = tc.transformType(type, [&](Type type) -> Type {
+    // If a dependent member refers to an associated type, replace it.
+    if (auto member = type->getAs<DependentMemberType>()) {
+      if (member->getBase()->isEqual(selfTy)) {
+        auto witness = typeWitnesses.find(member->getAssocType());
+        if (witness != typeWitnesses.end())
+          return witness->second.Replacement;
+      }
+    }
+
+    // Replace 'Self' with the model type.
+    if (type->isEqual(selfTy))
+      return model;
+
+    return type;
+  });
+
+  //
+  return type;
+}
+
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
-diagnoseMatch(TypeChecker &tc, ValueDecl *req,
+diagnoseMatch(TypeChecker &tc, Module *module, Type model, ValueDecl *req,
               const RequirementMatch &match,
               ArrayRef<std::pair<AssociatedTypeDecl *,Type>> deducedAssocTypes){
   // Form a string describing the associated type deductions.
@@ -440,7 +582,8 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 
   case MatchKind::TypeConflict:
     tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                match.WitnessType, withAssocTypes);
+                getTypeForDisplay(tc, module, match.Witness),
+                withAssocTypes);
     break;
 
   case MatchKind::StaticNonStaticConflict:
@@ -496,7 +639,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
   WitnessMap Mapping;
   TypeWitnessMap TypeWitnesses;
-  TypeSubstitutionMap TypeMapping;
   InheritedConformanceMap InheritedMapping;
   
   // See whether we can derive members of this conformance.
@@ -536,9 +678,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   bool Complained = false;
   auto metaT = MetaTypeType::get(T, TC.Context);
-
-  // Bind the implicit 'Self' type to the type T.
-  TypeMapping[Proto->getSelf()->getArchetype()] = T;
 
   // First, resolve any associated type members that have bindings. We'll
   // attempt to deduce any associated types that don't have explicit
@@ -600,7 +739,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     
     auto archetype = AssociatedType->getArchetype();
     if (Viable.size() == 1) {
-      TypeMapping[archetype] = Viable.front().second;
       TypeWitnesses[AssociatedType]
         = getArchetypeSubstitution(TC, DC, archetype, Viable.front().second);
       continue;
@@ -632,7 +770,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       for (auto Candidate : Viable)
         TC.diagnose(Candidate.first, diag::protocol_witness_type);
       
-      TypeMapping[archetype] = ErrorType::get(TC.Context);
       continue;
     }
 
@@ -655,7 +792,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     Candidate.second->getDeclaredType());
       }
 
-      TypeMapping[archetype] = ErrorType::get(TC.Context);
       continue;
     }
     
@@ -673,8 +809,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       
       for (auto candidate : candidates)
         TC.diagnose(candidate.first, diag::protocol_witness_type);
-      
-      TypeMapping[archetype] = ErrorType::get(TC.Context);
     } else {
       return nullptr;
     }
@@ -697,17 +831,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     
     TC.validateDecl(Requirement, true);
-
-    // Determine the type that the requirement is expected to have. If the
-    // requirement is for a function, look past the 'self' parameter.
-    Type reqType = Requirement->getType();
-    if (isa<AbstractFunctionDecl>(Requirement))
-      reqType = reqType->castTo<AnyFunctionType>()->getResult();
-
-    // Substitute the type mappings we have into the requirement type.
-    reqType = TC.substType(DC->getParentModule(), reqType, TypeMapping,
-                           /*IgnoreMissing=*/true);
-    assert(reqType && "We didn't check our type mappings?");
 
     // Gather the witnesses.
     SmallVector<ValueDecl *, 4> witnesses;
@@ -749,8 +872,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       if (!witness->hasType())
         TC.validateDecl(witness, true);
 
-      auto match = matchWitness(TC, Proto, DC, Requirement, reqType, T, witness,
-                                unresolvedAssocTypes);
+      auto match = matchWitness(TC, Proto, DC, Requirement, T, witness,
+                                TypeWitnesses);
       if (match.isViable()) {
         ++numViable;
         bestIdx = matches.size();
@@ -809,7 +932,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           for (auto deduction : best.AssociatedTypeDeductions) {
             auto assocType = deduction.first;
             auto archetype = assocType->getArchetype();
-            TypeMapping[archetype] = deduction.second;
 
             // Compute the archetype substitution.
             TypeWitnesses[assocType]
@@ -846,8 +968,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         witnesses.push_back(derived);
         // If the compiler or stdlib is broken, the derived witness may not be
         // viable.
-        if (matchWitness(TC, Proto, DC, Requirement, reqType, T, derived,
-                         unresolvedAssocTypes).isViable()) {
+        if (matchWitness(TC, Proto, DC, Requirement, T, derived,
+                         TypeWitnesses).isViable()) {
           numViable = 1;
           continue;
         }
@@ -887,6 +1009,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       Complained = true;
     }
 
+    // Determine the type that the requirement is expected to have.
+    Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
+                                                T, Requirement, TypeWitnesses);
+
     // Point out the requirement that wasn't met.
     TC.diagnose(Requirement,
                 numViable > 0? diag::ambiguous_witnesses
@@ -900,7 +1026,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     // Diagnose each of the matches.
     for (const auto &match : matches)
-      diagnoseMatch(TC, Requirement, match, deducedAssocTypes);
+      diagnoseMatch(TC, DC->getParentModule(), T, Requirement, match,
+                    deducedAssocTypes);
 
     // FIXME: Suggest a new declaration that does match?
   }
