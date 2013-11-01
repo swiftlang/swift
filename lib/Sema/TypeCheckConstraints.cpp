@@ -407,7 +407,7 @@ namespace {
 
     Type operator()(Type type) {
       assert(!type->is<PolymorphicFunctionType>() && "Shouldn't get here");
-      
+
       // Replace archetypes with fresh type variables.
       if (auto archetype = type->getAs<ArchetypeType>()) {
         auto known = replacements.find(archetype->getCanonicalType());
@@ -471,16 +471,22 @@ namespace {
           parentTy = cs.TC.transformType(parentTy, *this);
 
         auto unboundDecl = unbound->getDecl();
-        SmallVector<Type, 4> arguments;
-        // Open the primary archetypes and bind them to the type parameters.
-        for (auto archetype :
-                    unboundDecl->getGenericParams()->getPrimaryArchetypes())
-          arguments.push_back(getTypeVariable(archetype));
-        // Open the secondary archetypes.
-        for (auto archetype :
-             unboundDecl->getGenericParams()->getAssociatedArchetypes())
-          getTypeVariable(archetype);
-        
+
+        // Open up the generic type.
+        cs.openGeneric(unboundDecl,
+                       unboundDecl->getGenericParamTypes(),
+                       unboundDecl->getGenericRequirements(),
+                       /*skipProtocolSelfConstraint=*/false,
+                       opener,
+                       replacements);
+
+        // Map the generic parameters to their corresponding type variables.
+        llvm::SmallVector<Type, 4> arguments;
+        for (auto gp : unboundDecl->getGenericParamTypes()) {
+          assert(replacements.count(gp->getCanonicalType()) && 
+                 "Missing generic parameter?");
+          arguments.push_back(replacements[gp->getCanonicalType()]);
+        }
         return BoundGenericType::get(unboundDecl, parentTy, arguments);
       }
       
