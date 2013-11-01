@@ -110,7 +110,7 @@ public:
     });
   }
 
-  SILVerifier(Module *M, const SILFunction &F) : M(M), F(F) {
+  SILVerifier(const SILFunction &F) : M(F.getModule().getSwiftModule()), F(F) {
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
@@ -1644,7 +1644,6 @@ public:
   }
   
   void verify() {
-
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
 };
@@ -1656,14 +1655,14 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(Module *M) const {
+void SILFunction::verify() const {
 #ifndef NDEBUG
   if (isExternalDeclaration()) {
     assert(getLinkage() != SILLinkage::Internal &&
            "external declaration of internal SILFunction not allowed");
     return;
   }
-  SILVerifier(M, *this).verify();
+  SILVerifier(*this).verify();
 #endif
 }
 
@@ -1703,7 +1702,7 @@ void SILVTable::verify(const SILModule &M) const {
 }
 
 /// Verify the module.
-void SILModule::verify(Module *M) const {
+void SILModule::verify() const {
 #ifndef NDEBUG
   // Check all functions.
   llvm::StringSet<> functionNames;
@@ -1712,7 +1711,7 @@ void SILModule::verify(Module *M) const {
       llvm::errs() << "Function redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(M);
+    f.verify();
   }
   
   // Check all vtables.

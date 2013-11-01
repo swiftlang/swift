@@ -194,7 +194,7 @@ public:
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(Module *M) const;
+  void verify() const;
   
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

@@ -30,7 +30,8 @@
 using namespace swift;
 
 void swift::CompilerInstance::createSILModule() {
-  TheSILModule = SILModule::createEmptyModule(getASTContext());
+  assert(getTU());
+  TheSILModule = SILModule::createEmptyModule(getTU());
 }
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -74,9 +75,6 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Context->ImportSearchPaths.push_back(Invocation.getRuntimeIncludePath());
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-
-  if (Invocation.getInputKind() == SourceFile::SIL)
-    createSILModule();
 
   auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
   if (CodeCompletePoint.first) {
@@ -122,6 +120,9 @@ void swift::CompilerInstance::doIt() {
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
+
+  if (Kind == SourceFile::SIL)
+    createSILModule();
 
   if (Kind == SourceFile::REPL) {
     auto *SingleInputFile =

@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -87,9 +88,8 @@ private:
   mutable llvm::BumpPtrAllocator BPA;
   void *TypeListUniquing;
 
-  /// The context that uniques the types used by this
-  /// SILModule.
-  ASTContext &TheASTContext;
+  /// The swift Module associated with this SILModule.
+  Module *TheSwiftModule;
   
   /// The list of SILFunctions in the module.
   FunctionListType functions;
@@ -120,7 +120,7 @@ private:
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &TheASTContext);
+  SILModule(Module *M);
   
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -151,11 +151,14 @@ public:
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule> createEmptyModule(ASTContext &Context) {
-    return std::unique_ptr<SILModule>(new SILModule(Context));
+  static std::unique_ptr<SILModule> createEmptyModule(Module *M) {
+    return std::unique_ptr<SILModule>(new SILModule(M));
   }
   
-  ASTContext &getASTContext() const { return TheASTContext; }
+  /// Get the Swift module associated with this SIL module.
+  Module *getSwiftModule() const { return TheSwiftModule; }
+  /// Get the AST context used for type uniquing etc. by this SIL module.
+  ASTContext &getASTContext() const { return TheSwiftModule->Ctx; }
   
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;
@@ -221,7 +224,7 @@ public:
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify(Module *M) const;
+  void verify() const;
   
   /// Pretty-print the module.
   void dump() const;
@@ -238,7 +241,7 @@ public:
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
-    if (TheASTContext.LangOpts.UseMalloc)
+    if (getASTContext().LangOpts.UseMalloc)
       return AlignedAlloc(Size, Align);
     
     return BPA.Allocate(Size, Align);

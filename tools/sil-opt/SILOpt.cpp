@@ -186,7 +186,7 @@ int main(int argc, char **argv) {
     }
 
     // Verify the module after every pass.
-    CI.getSILModule()->verify(CI.getTU());
+    CI.getSILModule()->verify();
   }
 
   std::string ErrorInfo;

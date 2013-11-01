@@ -2410,7 +2410,7 @@ bool Parser::parseDeclSIL() {
 
   // If SIL prsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
-    FunctionState.F->verify(&SF.TU);
+    FunctionState.F->verify();
 
   return false;
 }

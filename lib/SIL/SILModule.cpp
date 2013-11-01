@@ -43,8 +43,8 @@ void SILExternalSource::anchor()
 /// SILModule that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
 
-SILModule::SILModule(ASTContext &Context)
-  : TheASTContext(Context), Stage(SILStage::Raw), Types(*this)
+SILModule::SILModule(Module *SwiftModule)
+  : TheSwiftModule(SwiftModule), Stage(SILStage::Raw), Types(*this)
 {
   TypeListUniquing = new SILTypeListUniquingType();
 }
