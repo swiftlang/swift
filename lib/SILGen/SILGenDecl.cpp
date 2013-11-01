@@ -601,6 +601,9 @@ public:
 static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
+  case CaptureKind::None:
+    break;
+
   case CaptureKind::Box: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.

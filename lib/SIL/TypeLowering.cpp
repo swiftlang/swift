@@ -121,6 +121,12 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
 
   if (capture->isReferencedAsLValue())
     return CaptureKind::Box;
+  
+  // "Captured" local typealiases require no context.
+  // FIXME: Is this true for dependent typealiases?
+  if (isa<TypeAliasDecl>(capture))
+    return CaptureKind::None;
+  
   return CaptureKind::Constant;
 }
 
@@ -1128,6 +1134,9 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
 
   for (ValueDecl *capture : captures) {
     switch (getDeclCaptureKind(capture)) {
+    case CaptureKind::None:
+      break;
+        
     case CaptureKind::Constant:
       // Constants are captured by value.
       assert(!capture->isReferencedAsLValue() &&

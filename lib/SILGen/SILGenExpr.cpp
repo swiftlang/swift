@@ -1418,40 +1418,43 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   SmallVector<SILValue, 4> capturedArgs;
   for (ValueDecl *capture : captures) {
     switch (getDeclCaptureKind(capture)) {
-      case CaptureKind::Box: {
-        // LValues are captured as both the box owning the value and the
-        // address of the value.
-        assert(VarLocs.count(capture) &&
-               "no location for captured var!");
-        
-        VarLoc const &vl = VarLocs[capture];
-        assert(vl.box && "no box for captured var!");
-        assert(vl.address && "no address for captured var!");
-        B.createStrongRetain(loc, vl.box);
-        capturedArgs.push_back(vl.box);
-        capturedArgs.push_back(vl.address);
-        break;
-      }
-      case CaptureKind::Constant: {
-        // SILValue is a constant such as a local func. Pass on the reference.
-        ManagedValue v = emitReferenceToDecl(loc, capture);
-        capturedArgs.push_back(v.forward(*this));
-        break;
-      }
-      case CaptureKind::GetterSetter: {
-        // Pass the setter and getter closure references on.
-        ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
-                                                 SILDeclRef::Kind::Setter));
-        capturedArgs.push_back(v.forward(*this));
-        SWIFT_FALLTHROUGH;
-      }
-      case CaptureKind::Getter: {
-        // Pass the getter closure reference on.
-        ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
-                                                 SILDeclRef::Kind::Getter));
-        capturedArgs.push_back(v.forward(*this));
-        break;
-      }
+    case CaptureKind::None:
+      break;
+
+    case CaptureKind::Box: {
+      // LValues are captured as both the box owning the value and the
+      // address of the value.
+      assert(VarLocs.count(capture) &&
+             "no location for captured var!");
+      
+      VarLoc const &vl = VarLocs[capture];
+      assert(vl.box && "no box for captured var!");
+      assert(vl.address && "no address for captured var!");
+      B.createStrongRetain(loc, vl.box);
+      capturedArgs.push_back(vl.box);
+      capturedArgs.push_back(vl.address);
+      break;
+    }
+    case CaptureKind::Constant: {
+      // SILValue is a constant such as a local func. Pass on the reference.
+      ManagedValue v = emitReferenceToDecl(loc, capture);
+      capturedArgs.push_back(v.forward(*this));
+      break;
+    }
+    case CaptureKind::GetterSetter: {
+      // Pass the setter and getter closure references on.
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                               SILDeclRef::Kind::Setter));
+      capturedArgs.push_back(v.forward(*this));
+      SWIFT_FALLTHROUGH;
+    }
+    case CaptureKind::Getter: {
+      // Pass the getter closure reference on.
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                               SILDeclRef::Kind::Getter));
+      capturedArgs.push_back(v.forward(*this));
+      break;
+    }
     }
   }
   
@@ -2194,6 +2197,9 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   };
 
   switch (getDeclCaptureKind(capture)) {
+  case CaptureKind::None:
+    break;
+
   case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(capture->getType()->getRValueType())
       .getAddressType();

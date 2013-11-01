@@ -44,6 +44,8 @@ Type getThickFunctionType(Type t);
 
 /// CaptureKind - Different ways in which a function can capture context.
 enum class CaptureKind {
+  /// No context arguments are necessary.
+  None,
   /// A local value captured as a mutable box.
   Box,
   /// A local value captured by value.
