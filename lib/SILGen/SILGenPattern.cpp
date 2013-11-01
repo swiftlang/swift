@@ -511,10 +511,10 @@ static void destructurePattern(SILGenFunction &gen,
     } else if (toArchetype) {
       if (newFromType->isExistentialType()) {
         newKind = CheckedCastKind::ExistentialToArchetype;
-      } else {
-        // FIXME: concrete-to-archetype
-        assert(newFromType->getClassOrBoundGenericClass());
+      } else if (newFromType->isSuperclassOf(newToType, nullptr)) {
         newKind = CheckedCastKind::SuperToArchetype;
+      } else {
+        newKind = CheckedCastKind::ConcreteToArchetype;
       }
     } else {
       // We have a class-to-class downcast.
