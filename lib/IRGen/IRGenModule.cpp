@@ -88,7 +88,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   WeakReferencePtrTy =
     createStructPointerType(*this, "swift.weak", { RefCountedPtrTy });
 
-  // A type metadata is the structure pointed to by the canonical
+  // A type metadata record is the structure pointed to by the canonical
   // address point of a type metadata.  This is at least one word, and
   // potentially more than that, past the start of the actual global
   // structure.
@@ -97,7 +97,23 @@ IRGenModule::IRGenModule(ASTContext &Context,
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
 
-  // A tuple type metadata has a couple extra fields.
+  // A protocol descriptor describes a protocol. It is not type metadata in
+  // and of itself, but is referenced in the structure of existential type
+  // metadata records.
+  ProtocolDescriptorStructTy = createStructType(*this, "swift.protocol", {
+    Int8PtrTy,              // objc isa
+    Int8PtrTy,              // name
+    Int8PtrTy,              // inherited protocols
+    Int8PtrTy,              // required objc instance methods
+    Int8PtrTy,              // required objc class methods
+    Int8PtrTy,              // optional objc instance methods
+    Int8PtrTy,              // optional objc class methods
+    Int8PtrTy,              // objc properties
+    Int32Ty,                // size
+    Int32Ty                 // flags
+  });
+  
+  // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
     SizeTy                  // size_t Offset;
@@ -109,7 +125,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
     llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
   });
 
-  // A full type metadata is basically just an adjustment to the
+  // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {

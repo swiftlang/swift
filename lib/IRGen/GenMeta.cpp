@@ -633,7 +633,7 @@ namespace {
       asImpl().addKindDependentFields();
       asImpl().addGenericParams();
     }
-    
+
     void addConstantSize(intptr_t value) {
       Fields.push_back(llvm::ConstantInt::get(IGM.SizeTy, value));
     }
@@ -2872,6 +2872,7 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
 // Protocols
 
 namespace {
+  // TODO: Existential metadata should be instantiated through the runtime.
   class ProtocolMetadataBuilder
       : public MetadataLayout<ProtocolMetadataBuilder> {
     typedef MetadataLayout super;
@@ -2911,24 +2912,164 @@ namespace {
       return llvm::ConstantStruct::get(IGM.FullTypeMetadataStructTy, Fields);
     }
   };
-}
 
-/// Emit global structures associated with the given protocol.  That
-/// just means the metadata, so go ahead and emit that.
+  class ProtocolDescriptorBuilder {
+    IRGenModule &IGM;
+    ProtocolDecl *Protocol;
+
+    SmallVector<llvm::Constant*, 8> Fields;
+
+  public:
+    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *protocol)
+      : IGM(IGM), Protocol(protocol) {}
+
+    void layout() {
+      addObjCCompatibilityIsa();
+      addName();
+      addInherited();
+      addObjCCompatibilityTables();
+      addSize();
+      addFlags();
+    }
+
+    llvm::Constant *null() {
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
+    
+    void addObjCCompatibilityIsa() {
+      // The ObjC runtime will drop a reference to its magic Protocol class
+      // here.
+      Fields.push_back(null());
+    }
+    
+    void addName() {
+      auto name = LinkEntity::forTypeMangling(
+                              Protocol->getDeclaredType()->getCanonicalType());
+      llvm::SmallString<32> mangling;
+      name.mangle(mangling);
+      Fields.push_back(IGM.getAddrOfGlobalString(mangling));
+    }
+    
+    void addInherited() {
+      // If there are no inherited protocols, produce null.
+      auto inherited = Protocol->getProtocols();
+      if (inherited.empty()) {
+        Fields.push_back(null());
+        return;
+      }
+      
+      // Otherwise, collect references to all of the inherited protocol
+      // descriptors.
+      SmallVector<llvm::Constant*, 4> inheritedDescriptors;
+      inheritedDescriptors.push_back(IGM.getSize(Size(inherited.size())));
+      
+      for (ProtocolDecl *p : inherited)
+        inheritedDescriptors.push_back(IGM.getAddrOfProtocolDescriptor(p));
+      
+      auto inheritedInit = llvm::ConstantStruct::getAnon(inheritedDescriptors);
+      auto inheritedVar = new llvm::GlobalVariable(IGM.Module,
+                                           inheritedInit->getType(),
+                                           /*isConstant*/ true,
+                                           llvm::GlobalValue::InternalLinkage,
+                                           inheritedInit);
+      
+      llvm::Constant *inheritedVarPtr
+        = llvm::ConstantExpr::getBitCast(inheritedVar, IGM.Int8PtrTy);
+      Fields.push_back(inheritedVarPtr);
+    }
+    
+    void addObjCCompatibilityTables() {
+      // Required instance methods
+      Fields.push_back(null());
+      // Required class methods
+      Fields.push_back(null());
+      // Optional instance methods
+      Fields.push_back(null());
+      // Optional class methods
+      Fields.push_back(null());
+      // Properties
+      Fields.push_back(null());
+    }
+    
+    void addSize() {
+      // The number of fields so far in words, plus 4 bytes for size and
+      // 4 bytes for flags.
+      unsigned sz = (Fields.size() * IGM.getPointerSize()).getValue() + 4 + 4;
+      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, sz));
+    }
+    
+    void addFlags() {
+      // enum : uint32_t {
+      //   IsSwift           = 1U <<  0U,
+      unsigned flags = 1;
+      
+      //   ClassConstraint   = 1U <<  1U,
+      // Set if the protocol is *not* class constrained.
+      if (!Protocol->requiresClass())
+        flags |= (1U << 1U);
+      
+      //   NeedsWitnessTable = 1U <<  2U,
+      if (requiresProtocolWitnessTable(Protocol))
+        flags |= (1U << 2U);
+
+      // };
+      
+      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, flags));
+    }
+
+    void addValueWitnessTable() {
+      // Build a fresh value witness table.  FIXME: this is actually
+      // unnecessary --- every existential type will have the exact
+      // same value witness table.
+      CanType type = CanType(Protocol->getDeclaredType());
+      Fields.push_back(emitValueWitnessTable(IGM, type));
+    }
+
+    llvm::Constant *getInit() {
+      return llvm::ConstantStruct::get(IGM.ProtocolDescriptorStructTy,
+                                       Fields);
+    }
+  };
+} // end anonymous namespace
+
+/// Emit global structures associated with the given protocol. This comprises
+/// the protocol descriptor, and for ObjC interop, references to the descriptor
+/// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
-  ProtocolMetadataBuilder builder(*this, protocol);
-  builder.layout();
-  auto init = builder.getInit();
+  // TODO: Existential metadata should be emitted through the runtime instead
+  // of being statically emitted.
+  {
+    ProtocolMetadataBuilder builder(*this, protocol);
+    builder.layout();
+    auto init = builder.getInit();
+    
+    // Protocol metadata are always direct and never a pattern.
+    bool isIndirect = false;
+    bool isPattern = false;
+    
+    CanType declaredType = CanType(protocol->getDeclaredType());
+    auto var = cast<llvm::GlobalVariable>(
+                                          getAddrOfTypeMetadata(declaredType,
+                                                                isIndirect, isPattern,
+                                                                init->getType()));
+    var->setConstant(true);
+    var->setInitializer(init);
+  }
+  
+  {
+    // If the protocol is Objective-C-compatible, go through the path that
+    // produces an ObjC-compatible protocol_t.
+    if (protocol->isObjC()) {
+      getObjCProtocolGlobalVars(protocol);
+      return;
+    }
+    
+    ProtocolDescriptorBuilder builder(*this, protocol);
+    builder.layout();
+    auto init = builder.getInit();
 
-  // Protocol metadata are always direct and never a pattern.
-  bool isIndirect = false;
-  bool isPattern = false;
-
-  CanType declaredType = CanType(protocol->getDeclaredType());
-  auto var = cast<llvm::GlobalVariable>(
-                         getAddrOfTypeMetadata(declaredType,
-                                               isIndirect, isPattern,
-                                               init->getType()));
-  var->setConstant(true);
-  var->setInitializer(init);
+    auto var = cast<llvm::GlobalVariable>(getAddrOfProtocolDescriptor(protocol));
+    var->setConstant(true);
+    var->setInitializer(init);
+  }
 }

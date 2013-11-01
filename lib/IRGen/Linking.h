@@ -130,6 +130,10 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
     
+    /// The protocol descriptor for a protocol type.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolDescriptor,
+    
     /// A type which is being mangled for the DWARF debug info.
     /// The pointer is a ValueDecl*.
     DebuggerDeclTypeMangling,
@@ -352,6 +356,13 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor,
+                      decl, Mangle::ExplosionKind::Minimal, 0);
+    return entity;
+  }
+  
+  static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolDescriptor,
                       decl, Mangle::ExplosionKind::Minimal, 0);
     return entity;
   }

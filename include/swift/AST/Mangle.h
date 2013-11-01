@@ -77,6 +77,7 @@ public:
   void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
   void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
+  void mangleProtocolName(ProtocolDecl *protocol);
   void mangleProtocolConformance(ProtocolConformance *conformance);
   
 private:
@@ -84,7 +85,6 @@ private:
                           unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
-  void mangleProtocolName(ProtocolDecl *protocol);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
   void mangleGetterOrSetterContext(FuncDecl *fn);

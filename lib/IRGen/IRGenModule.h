@@ -152,6 +152,7 @@ public:
   llvm::PointerType *TypeMetadataPatternPtrTy;/// %swift.type_pattern*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
+  llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
   union {
     llvm::PointerType *ObjCPtrTy;        /// %objc_object*
     llvm::PointerType *UnknownRefCountedPtrTy;
@@ -350,6 +351,7 @@ public:
                                         llvm::Type *definitionType = nullptr);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                  llvm::Type *ty = nullptr);
+  llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);

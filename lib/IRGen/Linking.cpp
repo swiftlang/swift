@@ -139,6 +139,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
                               ExplosionKind::Minimal);
     return;
 
+  //   global ::= 'Mp' type                       // protocol descriptor
+  case Kind::ProtocolDescriptor:
+    buffer << "_TMp";
+    mangler.mangleProtocolName(cast<ProtocolDecl>(getDecl()));
+    return;
+      
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
     buffer << "_TWo";

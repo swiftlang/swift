@@ -590,6 +590,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
+  case Kind::ProtocolDescriptor:
   case Kind::DebuggerDeclTypeMangling:
     return isLocalLinkageDecl(getDecl());
   
@@ -628,7 +629,8 @@ bool LinkEntity::isThunk() const {
     
     // Nominal type descriptors for Clang-imported types are always given
     // "thunk" linkage.
-    if (getKind() == Kind::NominalTypeDescriptor)
+    if (getKind() == Kind::NominalTypeDescriptor
+        || getKind() == Kind::ProtocolDescriptor)
       return true;
     
     return
@@ -1168,8 +1170,19 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 }
 
 llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
-                                                            llvm::Type* ty){
+                                                            llvm::Type* ty) {
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
+  return getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                               ty, ty, ty->getPointerTo(),
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D) {
+  if (D->isObjC())
+    return getAddrOfObjCProtocolRecord(D);
+  
+  auto entity = LinkEntity::forProtocolDescriptor(D);
+  auto ty = ProtocolDescriptorStructTy;
   return getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                ty, ty, ty->getPointerTo(),
                                DebugTypeInfo());

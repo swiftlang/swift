@@ -924,8 +924,10 @@ namespace {
       unsigned size = IGM.getPointerSize().getValue() * fields.size();
       size += 8; // 'size' and 'flags' fields that haven't been added yet.
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, size));
-      //   uint32_t flags; // always set to zero by compiler
-      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, 0));
+      //   uint32_t flags;
+      //   1 = Swift
+      unsigned swiftFlag = getProtocol()->hasClangNode() ? 0 : 1;
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, swiftFlag));
       // };
       
       return buildGlobalVariable(fields, "_PROTOCOL_");
