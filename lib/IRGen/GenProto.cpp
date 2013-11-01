@@ -1734,23 +1734,10 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
       
   case ValueWitness::TypeOf: {
-    // Only existentials need bespoke typeof witnesses.
-    assert(concreteType->isExistentialType() &&
-           "non-existentials should have a known typeof witness");
-    Address obj = getArgAs(IGF, argv, type, "obj");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    if (concreteType->isClassExistentialType()) {
-      auto &concreteTI = type.as<ClassExistentialTypeInfo>();
-      auto instance = concreteTI.loadValue(IGF, obj);
-      auto result = emitTypeMetadataRefForOpaqueHeapObject(IGF, instance);
-      IGF.Builder.CreateRet(result);
-    } else {
-      llvm::Value *result
-        = emitTypeMetadataRefForOpaqueExistential(IGF, obj, concreteType);
-      IGF.Builder.CreateRet(result);
-    }
-    return;
+    // Only existentials need bespoke typeof witnesses, which are instantiated
+    // by the runtime.
+    llvm_unreachable("should always be able to use a standard typeof witness "
+                     "from the runtime");
   }
   
   case ValueWitness::StoreExtraInhabitant: {
