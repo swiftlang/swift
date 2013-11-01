@@ -436,8 +436,7 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
     // Constant fold calls to builtins.
-    if (BuiltinFunctionRefInst *FR =
-          dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
       return constantFoldBuiltin(AI, FR, ResultsInError);
     }
     return SILValue();
@@ -445,13 +444,13 @@ static SILValue constantFoldInstruction(SILInstruction &I,
 
   // Constant fold extraction of a constant element.
   if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(&I)) {
-    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand().getDef()))
+    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
       return TheTuple->getElements()[TEI->getFieldNo()];
   }
 
   // Constant fold extraction of a constant struct element.
   if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(&I)) {
-    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand().getDef()))
+    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
       return Struct->getOperandForField(SEI->getField())->get();
   }
 
