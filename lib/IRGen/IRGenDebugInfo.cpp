@@ -1293,10 +1293,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
     }
     DITy.setTypeArray(DBuilder.getOrCreateArray(Protocols));
-
-    // Emit a typedef with the user-defined generic name.
-    auto UserName = Archetype->getName().str();
-    return DBuilder.createTypedef(DITy, UserName, File, L.Line, File);
+    return DITy;
   }
 
   case TypeKind::MetaType: {
