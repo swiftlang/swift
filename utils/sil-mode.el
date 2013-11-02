@@ -13,7 +13,7 @@
    ;; Integer literals
    '("\\b[-]?[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Decl and type keywords
-   `(,(regexp-opt '("class" "init" "destructor" "extension" "func"
+   `(,(regexp-opt '("class" "init" "destructor" "extension" "def"
                     "import" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "where")
                   'words) . font-lock-keyword-face)
