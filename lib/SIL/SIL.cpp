@@ -62,7 +62,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     assert(!func->isGetterOrSetter() &&
            "cannot create a Func SILDeclRef for a property accessor");
     assert(kind == Kind::Func &&
-           "can only create a Func SILDeclRef for a func decl");
+           "can only create a Func SILDeclRef for a function decl");
     naturalUncurryLevel = getFuncNaturalUncurryLevel(func);
   } else if (isa<ConstructorDecl>(vd)) {
     assert((kind == Kind::Allocator || kind == Kind::Initializer)

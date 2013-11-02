@@ -717,7 +717,7 @@ public:
 ///
 /// \code
 /// protocol Printable {
-///   func print(format : Format)
+///   def print(format : Format)
 /// }
 ///
 /// var p : Printable
@@ -758,10 +758,10 @@ public:
 ///
 /// \code
 /// protocol Printable {
-///   func print(format : Format)
+///   def print(format : Format)
 /// }
 ///
-/// func doPrint<P : Printable>(p : P) {
+/// def doPrint<P : Printable>(p : P) {
 ///   p.print(Format());
 /// }
 /// \endcode
@@ -826,7 +826,7 @@ public:
 ///
 /// \code
 /// class C {
-///   func [objc] foo(i : Int) -> String { ... }
+///   def [objc] foo(i : Int) -> String { ... }
 /// };
 ///
 /// var x : DynamicLookup = <some value>
@@ -1410,7 +1410,7 @@ public:
 /// \brief An expression that forces an optional to its underlying value.
 ///
 /// \code
-/// func parseInt(s : String) -> Int? { ... }
+/// def parseInt(s : String) -> Int? { ... }
 ///
 /// var maybeInt = parseInt("5"); // returns an Int?
 /// var forcedInt = parseInt("5")!; // returns an Int; fails on empty optional
@@ -1631,11 +1631,11 @@ public:
 ///
 /// \code
 /// protocol Printable {
-///   func print()
+///   def print()
 /// }
 ///
 /// struct Book {
-///   func print() { ... }
+///   def print() { ... }
 /// }
 ///
 /// var printable : Printable = Book() // erases type

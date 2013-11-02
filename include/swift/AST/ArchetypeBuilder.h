@@ -140,7 +140,7 @@ public:
   /// signature of a generic function. For example, given:
   ///
   /// \code
-  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// def f<K, V>(dict : Dictionary<K, V>) { ... }
   /// \endcode
   ///
   /// where \c Dictionary requires that its key type be \c Hashable,
@@ -156,7 +156,7 @@ public:
   /// signature of a generic function. For example, given:
   ///
   /// \code
-  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// def f<K, V>(dict : Dictionary<K, V>) { ... }
   /// \endcode
   ///
   /// where \c Dictionary requires that its key type be \c Hashable,

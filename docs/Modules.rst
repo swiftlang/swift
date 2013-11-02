@@ -28,7 +28,7 @@ code.
 
 You can also selectively import certain declarations from a module::
 
-  import func Chess.createGreedyPlayer
+  import def Chess.createGreedyPlayer
   import class Foundation.NSRegularExpression
 
 .. admonition:: Comparison with Other Languages
@@ -50,7 +50,7 @@ Once a module has been imported, its declarations are available for use within
 the current source file. These declarations can be referred to by name, or
 by `qualifying <qualified name>` them with the name of the module::
 
-  func playChess(blackPlayer : Chess.Player, whitePlayer : Chess.Player) {
+  def playChess(blackPlayer : Chess.Player, whitePlayer : Chess.Player) {
     var board = Board() // refers to Chess.Board
   }
 
@@ -178,7 +178,7 @@ To import only a certain declaration from the module, you use the appropriate
 declaration keyword::
 
   import class AppKit.NSWindow
-  import func AppKit.NSApplicationMain
+  import def AppKit.NSApplicationMain
   import var AppKit.NSAppKitVersionNumber
   import typealias AppKit.NSApplicationPresentationOptions
 

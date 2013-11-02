@@ -611,7 +611,7 @@ Break it down by types of declarations.
 
 * fields - direct access vs. getter/setter
 
-* funcs - as if top level
+* functions - as if top level
 
 * types - as if top level
 
@@ -623,7 +623,7 @@ Break it down by types of declarations.
 * virtual dispatch — table vs. dictionary, devirtualization (to which
   decl?). Some amount of table lookup can be done as static vs. dynamic offsets
 
-* funcs — inlineability
+* functions — inlineability
 
 * vars — direct access vs. getter/setter. Direct accesses for types that aren't
   inherently fragile need to be indirected because they may need to be

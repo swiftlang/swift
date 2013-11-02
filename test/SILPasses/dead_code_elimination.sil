@@ -41,7 +41,7 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT:  return
 // CHECK-NEXT: }
 
-// func loopWithFalse() -> () {
+// def loopWithFalse() -> () {
 //  while false {
 //    if (false)
 //      return
@@ -84,7 +84,7 @@ bb6:
 // CHECK-NEXT:}
 
 
-// func InfLoop() -> () {
+// def InfLoop() -> () {
 //  while true {
 //    if (false)
 //      return

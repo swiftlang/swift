@@ -254,7 +254,7 @@
     keyword ::= 'extension'
     keyword ::= 'import'
     keyword ::= 'init'
-    keyword ::= 'func'
+    keyword ::= 'def'
     keyword ::= 'metatype'
     keyword ::= 'enum'
     keyword ::= 'protocol'
@@ -625,7 +625,7 @@
   </pre>
   
   <p>The top level of a swift source file is grammatically identical to the
-  contents of a func decl.  Some declarations
+  contents of a function declaration.  Some declarations
   have semantic restrictions that only allow them within a translation unit
   though.
   </p>
@@ -661,7 +661,7 @@
     import-kind ::= 'enum'
     import-kind ::= 'protocol'
     import-kind ::= 'var'
-    import-kind ::= 'func'
+    import-kind ::= 'def'
     
     import-path ::= <a href="#any-identifier">any-identifier</a> ('.' <a href="#any-identifier">any-identifier</a>)*
   </pre>  
@@ -705,7 +705,7 @@
     
     <li><code>var</code> is used to import a module-scoped variable</li>
     
-    <li><code>func</code> will import all overloads of a function</li>
+    <li><code>def</code> will import all overloads of a function</li>
   </ul>
   
   <pre class="example">
@@ -719,7 +719,7 @@
     import typealias swift.io.BufferedStream
 
     <i>// Import all addition overloads.</i>
-    import func swift.+
+    import def swift.+
   </pre>
 
   <!-- ===================================================================== -->
@@ -835,14 +835,14 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <p>Note that both 'get' and 'set' are context-sensitive keywords.</p>
     
   <!-- ===================================================================== -->
-  <h3 id="decl-func">func Declarations</h3>
+  <h3 id="decl-func">Function Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'static'? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'static'? 'def' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
-  <p>'func' is a declaration for a function.  The argument list and
+  <p>'def' is a declaration for a function.  The argument list and
   optional return value are specified by the type production of the function,
   and the body is either a brace expression or elided.  Like all other
   declarations, functions are can have attributes.</p>
@@ -921,29 +921,29 @@ an lvalue unless it has a <code>var-get</code> clause but not
     requiring that an awkward keyword name be the same as the
     variable name.
 
-  <p>Here are some examples of func definitions:</p>
+  <p>Here are some examples of function definitions:</p>
   
   <pre class="example">
     <i>// Implicitly returns (), aka <a href="#stdlib-Void">Void</a></i>
-    func a() {}
+    def a() {}
 
     <i>// Same as 'a'</i>
-    func a1() -&gt; Void {}
+    def a1() -&gt; Void {}
     
     <i>// Function pointers to a function expression.</i>
-    var a2 = func ()-&gt;() {}
-    var a3 = func () {}
-    var a4 = func {}
+    var a2 = def ()-&gt;() {}
+    var a3 = def () {}
+    var a4 = def {}
 
     <i>// Really simple function</i>
-    func c(arg : Int) -&gt; Int { return arg+4 }
+    def c(arg : Int) -&gt; Int { return arg+4 }
 
     <i>// Simple operators.</i>
-    func [infix_left=190] +  (lhs : Int, rhs : Int) -&gt; Int
-    func [infix_left=160] == (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=190] +  (lhs : Int, rhs : Int) -&gt; Int
+    def [infix_left=160] == (lhs : Int, rhs : Int) -&gt; Bool
 
     <i>// Curried function with multiple return values:</i>
-    func d(a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
+    def d(a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
       return (a,b)
     }
     
@@ -951,14 +951,14 @@ an lvalue unless it has a <code>var-get</code> clause but not
     struct bankaccount { 
       amount : Int
     
-      static func bankaccount() -> bankaccount {
+      static def bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
-      func deposit(arg : Int) {
+      def deposit(arg : Int) {
         amount = amount + arg
       }
     
-      static func someMetaTypeMethod() {}
+      static def someMetaTypeMethod() {}
     }
     
     <i>// Dot syntax on metatype.</i>
@@ -979,7 +979,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
       case LeadPipe
     }
 
-    func accuseSuspect(suspect:PersonOfInterest)
+    def accuseSuspect(suspect:PersonOfInterest)
         inRoom(room:Room)
         withWeapon(weapon:Weapon) {
       println("It was \(suspect) in the \(room) with the \(weapon)")
@@ -1052,8 +1052,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
       case Two(Int, Int)
     }
     
-    func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
-    func test1() {
+    def f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
+    def test1() {
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
       f1(.None)                 <i>// Use of constructor with context sensitive type inference</i>
     
@@ -1067,9 +1067,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
       case Two(Int, Int)
     }
     
-    func f2(a : SomeMoreInts)
+    def f2(a : SomeMoreInts)
     
-    func test2() {
+    def test2() {
       <i>// Constructors for enum element can be used in the obvious way.</i>
       f2(.None)
       f2(.One(4))
@@ -1112,7 +1112,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     
     struct S2 {
       var a : Int
-      func f() -> Int { return b }
+      def f() -> Int { return b }
       var b : Int
     }
   </pre>
@@ -1129,10 +1129,10 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
       typealias CoordinateType = Int
     
-      func area() -> Int { return size.width*size.height }
+      def area() -> Int { return size.width*size.height }
     }
     
-    func test4() {
+    def test4() {
       var a : Point
       var b = Point.Point(1, 2)    // Silly but fine.
       var c = Point(y = 1, x = 2)  // Using metatype.
@@ -1176,8 +1176,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
      inheritance list.</p>
 
   <p>The body of a 'class' is a list of decls. Stored (non-computed) 'var' decls
-     declare members with storage in the class. Non-static 'var' and 'func'
-     decls declare instance members; static 'var' and 'func' decls declare
+     declare members with storage in the class. Non-static 'var' and 'def'
+     decls declare instance members; static 'var' and 'def' decls declare
      members of the class itself.  Both class and instance members can
      be overridden by a subclass.</p>
   <p>Type declarations inside a class act essentially the same way as type
@@ -1222,13 +1222,13 @@ an lvalue unless it has a <code>var-get</code> clause but not
  </pre>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="protocol-member-func">'func' protocol elements</h4>
+  <h4 id="protocol-member-func">'def' protocol elements</h4>
   
   <pre class="grammar">
     protocol-member ::= <a href="#decl-func">decl-func</a>
 </pre>
   
-  <p>'func' members of a protocol define a value of function type that may be
+  <p>'def' members of a protocol define a value of function type that may be
   accessed with dot syntax on a value of the protocol's type.  The function
   gets an implicit "self" argument of the protocol type and shall not
   be static.</p>
@@ -1273,7 +1273,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
   <p>'typealias' members of a protocol define associated types, which
   are types used within the description of a protocol (typically in
-  the inputs and outputs of 'func' members) that vary from one
+  the inputs and outputs of 'def' members) that vary from one
   conforming type to another. When an associated type has an <a
   href="#inheritance">inheritance</a> clause, any type meant to
   satisfy the associated type requirement must conform to each of the
@@ -1282,7 +1282,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <pre class="example">
     protocol Enumerable {
       typename EnumeratorType : Enumerator
-      func getElements() -> EnumeratorType
+      def getElements() -> EnumeratorType
     }
 </pre>
 
@@ -1521,8 +1521,8 @@ if vec[3] {
     For example, the following code:
 
   <pre class=example>
-    func foo(x: @inout Int) -> () -> Int {
-      func bar() -> Int {
+    def foo(x: @inout Int) -> () -> Int {
+      def bar() -> Int {
         x += 1
         return x
       }
@@ -1590,11 +1590,11 @@ if vec[3] {
   
   <i>// Definition of an 'assert' function.  Assertions and logging routines</i>
   <i>// often want to conditionally evaluate their argument.</i>
-  func assert(condition : @auto_closure () -> Bool)
+  def assert(condition : @auto_closure () -> Bool)
     
   <i>// Definition of the || operator - it captures its right hand side as</i>
   <i>// an autoclosure so it can short-circuit evaluate it.</i>
-  func [infix_left=110] || (lhs: Bool, rhs: @auto_closure ()->Bool) -&gt; Bool
+  def [infix_left=110] || (lhs: Bool, rhs: @auto_closure ()->Bool) -&gt; Bool
     
   <i>// Example uses of these functions:</i>
   assert(i &lt; j)
@@ -1658,7 +1658,7 @@ if vec[3] {
   <pre class="example">
     // Declares a type 'foo' as well as its metatype.
     struct foo {
-      static func bar() {}
+      static def bar() {}
     }
     
     // Declares x to be of type foo.  A reference to a name in type context
@@ -1783,7 +1783,7 @@ if vec[3] {
   var o = (1, 2, 3)              <i>// Type = (Int, Int, Int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
-  func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
+  def foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
 
   <i>// enum and struct declarations with tuple values.</i>
   struct S {
@@ -2022,10 +2022,10 @@ if vec[3] {
       To support these intrinsic use cases, the library is required to
       provide four functions with these exact signatures:
       <ul>
-        <li><code>func _doesOptionalHaveValue<T>(v : @inout T?) -> Builtin.Int1</code></li>
-        <li><code>func _getOptionalValue<T>(v : T?) -> T</code></li>
-        <li><code>func _injectValueIntoOptional<T>(v : T) -> T?</code></li>
-        <li><code>func _injectNothingIntoOptional<T>() -> T?</code></li>
+        <li><code>def _doesOptionalHaveValue<T>(v : @inout T?) -> Builtin.Int1</code></li>
+        <li><code>def _getOptionalValue<T>(v : T?) -> T</code></li>
+        <li><code>def _injectValueIntoOptional<T>(v : T) -> T?</code></li>
+        <li><code>def _injectNothingIntoOptional<T>() -> T?</code></li>
       </ul>
     </p>
 
@@ -2110,17 +2110,17 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     protocol VersionedDocument : Document { <i>// every VersionedDocument is a Document</i>
-      func bumpVersion()
+      def bumpVersion()
     }
 
-    func print(doc : Document) { <i>/* ... */</i> }
+    def print(doc : Document) { <i>/* ... */</i> }
 
     var myDocument : VersionedDocument;
     print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
 
     class StoredHTML : VersionedDocument { <i>// okay: StoredHTML conforms to VersionedDocument</i>
       var Title : String
-      func bumpVersion()
+      def bumpVersion()
     }
   </pre>
 
@@ -2154,7 +2154,7 @@ ill-formed if the type does not conform to the protocol.</p>
     against other values by <i>pattern matching</i>. Among other places,
     pattern matching occurs on the left-hand side of
     <a href="#decl-var"><tt>var</tt> bindings</a>, in the arguments of
-    <a href="#decl-func"><tt>func</tt> declarations</a>, and in the
+    <a href="#decl-func">function declarations</a>, and in the
     <tt>case</tt> labels of
     <a href="#stmt-switch"><tt>switch</tt> statements</a>.
     Some examples:</p>
@@ -2186,7 +2186,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>A pattern may be "irrefutable", meaning informally that it
     matches all values of its type.  Patterns in declarations, such as
     <a href="#decl-var"><tt>var</tt></a> and
-    <a href="#decl-func"><tt>func</tt></a>, are required to be irrefutable.
+    <a href="#decl-func">function declarations</a>, are required to be irrefutable.
     Patterns in the <tt>case</tt> labels of
     <a href="#stmt-switch"><tt>switch</tt> statements</a>, however,
     are not.</p>
@@ -2276,7 +2276,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <p>The left-hand pattern of a <a href="#decl-var"><tt>var</tt> declaration</a>
-    and the argument pattern of a <a href="#decl-func"><tt>func</tt> declaration</a>
+    and the argument pattern of a <a href="#decl-func">function declaration</a>
     are implicitly inside a <tt>var</tt> pattern; identifiers in their patterns
     always bind variables. Variable bindings are irrefutable.</p>
 
@@ -2414,7 +2414,7 @@ ill-formed if the type does not conform to the protocol.</p>
     }
 
     <i>// Define pattern matching of an integer value to a string expression.</i>
-    func ~=(pattern:String, value:Int) -&gt; Bool {
+    def ~=(pattern:String, value:Int) -&gt; Bool {
       return pattern == "\(value)"
     }
 
@@ -2749,9 +2749,9 @@ ill-formed if the type does not conform to the protocol.</p>
     instantiates the default argument.</p>
 
   <pre class="example">
-    func log(message:String,
-             file:String = __FILE__,
-             line:Int = __LINE__) {
+    def log(message:String,
+            file:String = __FILE__,
+            line:Int = __LINE__) {
       println("\(file):\(line): \(message)")
     }
 
@@ -2773,7 +2773,7 @@ ill-formed if the type does not conform to the protocol.</p>
      the type of the declaration returned by name lookup and overload
      resolution.  Value declarations are installed with <a 
      href="#decl-var">var</a> and the syntactic sugar forms like <a 
-     href="decl-func">func</a> declarations.</p>
+     href="decl-func">function</a> declarations.</p>
 
   <p>If an identifier refers to a generic type, an instance of that generic may
     be referenced by following the identifier with a list of type parameters
@@ -2783,7 +2783,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
       init() {}
-      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+      static def fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
     <i>// Construct an instance of the generic struct.</i>
@@ -2825,7 +2825,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     <i>// An operator that operates on metatypes.</i>
-    func @infix +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
+    def @infix +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
     
     var foo = (Dict&lt;String, Int&gt;) +-+ (Slice&lt;Char&gt;)
     println(foo)
@@ -2836,7 +2836,7 @@ ill-formed if the type does not conform to the protocol.</p>
   can also be corrected by adding or removing parentheses.
 
   <pre class="example">
-    func foo(x:Bool, y:Bool)
+    def foo(x:Bool, y:Bool)
     var a,b,c,d,e : Int
 
     foo(a &lt; b, c &gt; (d + e)) // ERROR: Misparses as (a&lt;b,c&gt;)(d + e)
@@ -2890,7 +2890,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <p>A closure defines an anonymous function as an expression. Like a
-  <a href="#decl-func">func</a> declaration, a closure has parameters,
+  <a href="#decl-func">function</a> declaration, a closure has parameters,
   a return type, and some number of statements that are executed when
   the closure is called. Like local functions, closures can capture
   values from its enclosing function and closure scopes. Closures are
@@ -2900,7 +2900,7 @@ ill-formed if the type does not conform to the protocol.</p>
   value is used as the result of the closure. Thus, the closure <code>{
   5 }</code> is equivalent to <code>{ return 5 }</code>.</p>
 
-  <p>Unlike <a href="#decl-func">func</a>
+  <p>Unlike <a href="#decl-func">function</a>
   declarations, the return type, parameter types, and even the <a
    href="#expr-anon-closure-arg">names of parameters</a> can be
   omitted from the definition of the closure, making it a concise
@@ -2912,9 +2912,9 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     <i>// Takes a closure that it calls to determine an ordering relation.</i>
-    func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
+    def magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
     
-    func f() {
+    def f() {
       <i>// Compare one way.  Closure is inferred to return Bool and take two ints</i>
       <i>// from the argument context.  This same information infers that $0 and $1</i>
       <i>// both have type 'Int'.</i>
@@ -2978,9 +2978,9 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <pre class="example">
     enum Direction { case Up, Down }
-    func search(val : Int, direction : Direction)
+    def search(val : Int, direction : Direction)
     
-    func f() {
+    def f() {
       search(42, .Up)
       search(17, .Down)
     }
@@ -3026,7 +3026,7 @@ ill-formed if the type does not conform to the protocol.</p>
     var g = (4, y : 5, 6)    <i>// Type = (Int, y : Int, Int)</i>
     
     <i>// Named arguments to functions.</i>
-    func foo(a : Int, b : Int)
+    def foo(a : Int, b : Int)
     foo(b = 4, a = 1)
   </pre>
 
@@ -3152,7 +3152,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <a href="#expr-call">expr-call</a>, if functions meant to be used
     with trailing closures are written as curried functions, e.g.,
     <pre>
-func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
+def map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     </pre>
     There are two problems with this (admittedly simpler) design.
     First, functions imported from C, C++, and Objective-C won't ever
@@ -3284,7 +3284,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
 
   <pre class="example">
     <i>// A function with some statements.</i> 
-    func fib(v : Int) -&gt; Int {
+    def fib(v : Int) -&gt; Int {
       if v &lt; 2 {
         return v
       }
@@ -3319,10 +3319,10 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </pre>
   
   <p>The return statement sets the return value of the current <a 
-     href="#decl-func">func declaration</a> or <a href="#expr-closure">closure
+     href="#decl-func">function declaration</a> or <a href="#expr-closure">closure
      expression</a> and transfers control out of the function.  It sets the
      return value by converting the specified expression result (or '()' if
-     none is specified) to the return type of the 'func'.
+     none is specified) to the return type of the 'def'.
   </p>
   
   <p>The stmt-return grammar is ambiguous: "{ return 4 }" could be parsed as
@@ -3567,7 +3567,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     'for' loop, not out of the 'switch' itself.</p>
 
   <pre class="example">
-    func classifyPoint(point:(Int, Int)) {
+    def classifyPoint(point:(Int, Int)) {
       switch point {
       case (0, 0):
         println("origin")
@@ -3696,7 +3696,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   language entity is being considered:</p>
   
   <p>Value names (for <a 
-  href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
+  href="#decl-var">var</a> and <a href="#decl-func">function</a> declarations) and
   type names (for <a href="#decl-typealias">typealias</a>, <a
   href="#decl-enum">enum</a>, and <a href="#decl-struct">struct</a>
   declarations) follow the same <a href="#namebind_scope">scope</a> and
@@ -3728,7 +3728,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
       imports if we wanted to.</li>
   <li>Bind to identifiers that are imported with an import directive.  Imports
       are searched in order of introduction (top-down).  The location of an
-      import directive in a file (e.g. between func decls) does not affect name
+      import directive in a file (e.g. between function declaration) does not affect name
       lookup, but the order of imports w.r.t. each other does.</li>
   </ul>
 
@@ -3871,31 +3871,31 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="stdlib">
     <i>// Simple binary operators, following the same precedence as C.</i>
-    func [infix_left=200] * (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=200] / (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=200] % (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=190] + (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=190] - (lhs: Int, rhs: Int) -&gt; Int
+    def [infix_left=200] * (lhs: Int, rhs: Int) -&gt; Int
+    def [infix_left=200] / (lhs: Int, rhs: Int) -&gt; Int
+    def [infix_left=200] % (lhs: Int, rhs: Int) -&gt; Int
+    def [infix_left=190] + (lhs: Int, rhs: Int) -&gt; Int
+    def [infix_left=190] - (lhs: Int, rhs: Int) -&gt; Int
     <i>// In C, &lt;&lt;, &gt;&gt; is 180.</i>
   </pre>
 
   <h4 id="stdlib-comparison">Relational and Equality Operators</h4>
 
   <pre class="stdlib">
-    func [infix_left=170] &lt;  : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &gt;  : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &lt;= : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &gt;= : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=160] == : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=160] != : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=170] &lt;  : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=170] &gt;  : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=170] &lt;= : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=170] &gt;= : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=160] == : (lhs : Int, rhs : Int) -&gt; Bool
+    def [infix_left=160] != : (lhs : Int, rhs : Int) -&gt; Bool
     <i>// In C, bitwise logical operators are 130,140,150.</i>
   </pre>
 
   <h4 id="stdlib-short-circuit-logical">Short Circuiting Logical Operators</h4>
   
   <pre class="stdlib">
-    func [infix_left=120] &amp;&amp; (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
-    func [infix_left=110] || (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
+    def [infix_left=120] &amp;&amp; (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
+    def [infix_left=110] || (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
     <i>// In C, 100 is ?:</i>
     <i>// In C, 90 is =, *=, += etc.</i>
   </pre>

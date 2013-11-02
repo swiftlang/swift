@@ -562,7 +562,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
 
-  case tok::kw_func:
+  case tok::kw_def:
     DeclResult = parseDeclFunc(StaticLoc, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
@@ -700,7 +700,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
     case tok::kw_var:
       Kind = ImportKind::Var;
       break;
-    case tok::kw_func:
+    case tok::kw_def:
       Kind = ImportKind::Func;
       break;
     default:
@@ -1006,7 +1006,7 @@ namespace {
           FuncDecl* Accessors[2] = {VD->getGetter(), VD->getSetter()};
           if (Accessors[0] && Accessors[1] &&
               !Context.SourceMgr.isBeforeInBuffer(
-                  Accessors[0]->getFuncLoc(), Accessors[1]->getFuncLoc())) {
+                  Accessors[0]->getDefLoc(), Accessors[1]->getDefLoc())) {
             std::swap(Accessors[0], Accessors[1]);
           }
           for (auto FD : Accessors) {
@@ -1554,7 +1554,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     StaticLoc = SourceLoc();
   }
   
-  SourceLoc FuncLoc = consumeToken(tok::kw_func);
+  SourceLoc DefLoc = consumeToken(tok::kw_def);
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
@@ -1564,7 +1564,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     diagnose(Tok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
-  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func")) {
+  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "function")) {
     ParserStatus NameStatus =
         parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren, tok::arrow,
                                 tok::l_brace, diag::invalid_diagnostic);
@@ -1625,7 +1625,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     Scope S(this, ScopeKind::FunctionBody);
 
     // Create the decl for the func and add it to the parent scope.
-    FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
+    FD = FuncDecl::create(Context, StaticLoc, DefLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
                           FuncRetTy, CurDeclContext);
 
@@ -2341,8 +2341,8 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     // Add get/set in source order.
     FuncDecl* Accessors[2] = {Get, Set};
     if (Accessors[0] && Accessors[1] &&
-        !SourceMgr.isBeforeInBuffer(Accessors[0]->getFuncLoc(),
-                                    Accessors[1]->getFuncLoc())) {
+        !SourceMgr.isBeforeInBuffer(Accessors[0]->getDefLoc(),
+                                    Accessors[1]->getDefLoc())) {
       std::swap(Accessors[0], Accessors[1]);
     }
     for (auto FD : Accessors) {

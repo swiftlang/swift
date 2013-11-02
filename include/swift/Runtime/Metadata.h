@@ -1156,7 +1156,7 @@ struct GenericMetadata {
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:
-///   func swift_getGenericMetadata(header, arguments) {
+///   def swift_getGenericMetadata(header, arguments) {
 ///     if (metadata = getExistingMetadata(&header.PrivateData,
 ///                                        arguments[0..header.NumArguments]))
 ///       return metadata

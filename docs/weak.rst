@@ -606,7 +606,7 @@ conversions in the right places.
 These implicit conversions require some thought.  Consider code like
 the following::
 
-  func moveToWindow(newWindow : Window) {
+  def moveToWindow(newWindow: Window) {
     var oldWindow = self.window   // an [unowned] back reference
     oldWindow.hide()              // might remove the UI's strong reference
     oldWindow.remove(self)
@@ -626,7 +626,7 @@ generic code and substituting the arguments wherever they're written.
 But if a generic argument can be :code:`[unowned] T`, then this
 won't be true; consider::
 
-  func foo<T>(x : T) {
+  def foo<T>(x: T) {
     var y = x
     ...
   }
@@ -962,7 +962,7 @@ This feature generalizes the above, removing some redundancy in large
 closures and adding a small amount of expressive power.
 
 A :code:`capture` declaration can only appear in a closure: an
-anonymous closure expression or :code:`func` declaration that appears
+anonymous closure expression or function declaration that appears
 directly within a function.  (By "directly" I mean not within, say, a
 local type declaration within the function).  :code:`capture` will
 need to at least become a context-sensitive keyword.
@@ -988,8 +988,8 @@ expression in the enclosing context.  Since the expression is
 evaluated in the enclosing context, it cannot refer to "previous"
 captures; otherwise we could have some awkward ambiguities.  I think
 we should reserve the right to not execute an initializer if the
-closure will never be called; this is more important for local
-:code:`func` declarations than for anonymous closure expressions.
+closure will never be called; this is more important for local function
+declarations than for anonymous closure expressions.
 
 The fields introduced by :code:`capture` declarations should be
 immutable by default, but programmers should be able to write

@@ -106,7 +106,7 @@ bb0:                                         // CHECK: bb0:
 sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
 
 // Parse SIL generated from the following swift program:
-// func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
+// def x(a : Bool) -> Int { if a { return 4 } else {return 5} }
 sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), @inout Bool) -> Builtin.Int1
 sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
 
@@ -162,7 +162,7 @@ bb3(%17 : $Int64):
 
 
 protocol P {
-  func doIt()
+  def doIt()
 }
 
 sil @existentials : $@thin (n : P) -> () {
@@ -180,11 +180,11 @@ bb0(%0 : $*P):
 
 
 class C {
-  func doIt() {}
+  def doIt() {}
 }
 
 class D : C {
-  func doIt() {
+  def doIt() {
     super.doIt()
   }
 }
@@ -215,7 +215,7 @@ bb0:
 }
 
 // Generated from:
-// func archetype_member_ref<T:Runcible>(x:T) {
+// def archetype_member_ref<T:Runcible>(x:T) {
 //   x.free_method()
 //   var u = x.associated_method()
 //   T.static_method()
@@ -226,9 +226,9 @@ protocol Runcible {
   var free:Int
   var associated:U
 
-  func free_method() -> Int
-  func associated_method() -> U.metatype
-  static func static_method()
+  def free_method() -> Int
+  def associated_method() -> U.metatype
+  static def static_method()
 }
 
 // CHECK: $@thin <T : Runcible> (x: T) -> ()
@@ -279,7 +279,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
 }
 
 @class_protocol protocol ClassBound {
-  func classBoundMethod()
+  def classBoundMethod()
 }
 
 // CHECK: $@thin (x: ClassBound) -> ()
@@ -912,7 +912,7 @@ bb0(%0 : $Float32):
 }
 
 class X {
-  @objc func f() { }
+  @objc def f() { }
 }
 
 // CHECK-LABEL: sil @test_dynamic_lookup_br : $@thin (obj: DynamicLookup) -> ()

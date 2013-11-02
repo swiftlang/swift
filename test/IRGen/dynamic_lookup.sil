@@ -4,8 +4,8 @@ import swift
 import Builtin 
 
 class X {
-  @objc func f() { }
-  @objc static func g() { }
+  @objc def f() { }
+  @objc static def g() { }
   @objc var value : Int { 
     return 17
   }

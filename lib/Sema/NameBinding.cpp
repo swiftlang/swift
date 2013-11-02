@@ -194,7 +194,7 @@ static const char *getImportKindString(ImportKind kind) {
   case ImportKind::Var:
     return "var";
   case ImportKind::Func:
-    return "func";
+    return "def";
   }
 }
 

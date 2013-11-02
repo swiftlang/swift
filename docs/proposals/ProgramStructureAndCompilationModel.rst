@@ -146,7 +146,7 @@ Subcomponents are explicitly declared, and these declarations can include:
   aren't provided by the subcomponents they explicitly depend on. This is used
   to handle cyclic dependencies across subcomponents within an ownership domain:
   for example: "libsystem depends on libcompiler_rt", however, "libcompiler_rt
-  depends on 'func abort();' in libsystem". This preserves the acyclic
+  depends on 'def abort();' in libsystem". This preserves the acyclic
   compilation order across components.
 
 * A list of subdirectories to get source files out of (see filesystem layout

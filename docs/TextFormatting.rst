@@ -73,10 +73,10 @@ The simple extension story for beginners is as follows:
 
   and it will have the same printed representation you see in the
   interpreter (REPL). To customize the representation, give your type
-  a ``func format()`` that returns a ``String``::
+  a ``def format()`` that returns a ``String``::
 
     extension Person : Printable {
-      func format() -> String {
+      def format() -> String {
         return "\(lastName), \(firstName)"
       }
     }
@@ -113,13 +113,13 @@ into which we can stream text: [#character]_
 ::
 
   protocol OutputStream {
-    func append(text: String)
+    def append(text: String)
   }
 
 Every ``String`` can be used as an ``OutputStream`` directly::
 
   extension String : OutputStream {
-    func append(text: String)
+    def append(text: String)
   }
 
 Debug Printing
@@ -136,7 +136,7 @@ need to declare conformance: simply give the type a ``debugFormat()``
 
     /// \brief Produce a textual representation for the REPL and
     /// Debugger.
-    func debugFormat() -> DebugRepresentation
+    def debugFormat() -> DebugRepresentation
   }
 
 Because ``String`` is a ``Streamable``, your implementation of
@@ -176,14 +176,14 @@ implement::
     ///
     /// In general you can return a String here, but if you need more
     /// control, return a custom Streamable type
-    func format() -> PrintRepresentation {
+    def format() -> PrintRepresentation {
       return debugFormat()
     }
 
     /// \brief Simply convert to String
     ///
     /// You'll never want to reimplement this
-    func toString() -> String {
+    def toString() -> String {
       var result: String
       self.format().write(result)
       return result
@@ -200,10 +200,10 @@ representation before writing an object to a stream, we provide a
 naturally ::
 
   protocol Streamable : Printable {
-    func writeTo<T: OutputStream>(target: [inout] T)
+    def writeTo<T: OutputStream>(target: [inout] T)
 
     // You'll never want to reimplement this
-    func format() -> PrintRepresentation {
+    def format() -> PrintRepresentation {
       return this
     }
   }
@@ -215,7 +215,7 @@ How ``String`` Fits In
 adds surrounding quotes and escapes special characters::
 
   extension String : DebugPrintable {
-    func debugFormat() -> EscapedStringRepresentation {
+    def debugFormat() -> EscapedStringRepresentation {
       return EscapedStringRepresentation(self)
     }
   }
@@ -223,7 +223,7 @@ adds surrounding quotes and escapes special characters::
   struct EscapedStringRepresentation : Streamable {
     var _value: String
 
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    def writeTo<T: OutputStream>(target: [inout] T) {
       target.append("\"")
       for c in _value {
         target.append(c.escape())
@@ -236,11 +236,11 @@ Besides modeling ``OutputStream``, ``String`` also conforms to
 ``Streamable``::
 
   extension String : Streamable {
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    def writeTo<T: OutputStream>(target: [inout] T) {
       target.append(self) // Append yourself to the stream
     }
 
-    func format() -> String {
+    def format() -> String {
       return this
     }
   }
@@ -259,12 +259,12 @@ complicated ``format(…)`` might be written::
 
   protocol PrintableInteger 
     : IntegerLiteralConvertible, Comparable, SignedNumber, Printable {
-    func %(lhs: Self, rhs: Self) -> Self
-    func /(lhs: Self, rhs: Self) -> Self
+    def %(lhs: Self, rhs: Self) -> Self
+    def /(lhs: Self, rhs: Self) -> Self
     constructor(x: Int)
-    func toInt() -> Int
+    def toInt() -> Int
 
-    func format(radix: Int = 10, fill: String = " ", width: Int = 0) 
+    def format(radix: Int = 10, fill: String = " ", width: Int = 0) 
       -> RadixFormat<This> {
 
       return RadixFormat(this, radix: radix, fill: fill, width: width)
@@ -274,12 +274,12 @@ complicated ``format(…)`` might be written::
   struct RadixFormat<T: PrintableInteger> : Streamable {
     var value: T, radix = 10, fill = " ", width = 0
 
-    func writeTo<S: OutputStream>(target: [inout] S) {
+    def writeTo<S: OutputStream>(target: [inout] S) {
       _writeSigned(value, &target)
     }
 
     // Write the given positive value to stream
-    func _writePositive<T:PrintableInteger, S: OutputStream>( 
+    def _writePositive<T:PrintableInteger, S: OutputStream>( 
       value: T, stream: [inout] S
     ) -> Int {
       if value == 0 { return 0 }
@@ -292,7 +292,7 @@ complicated ``format(…)`` might be written::
       return nDigits + 1
     }
 
-    func _writeSigned<T:PrintableInteger, S: OutputStream>(
+    def _writeSigned<T:PrintableInteger, S: OutputStream>(
       value: T, target: [inout] S
     ) {
       var width = 0
@@ -320,7 +320,7 @@ complicated ``format(…)`` might be written::
   }
 
   extension Int : PrintableInteger {
-    func toInt() -> Int { return this }
+    def toInt() -> Int { return this }
   }
 
 
@@ -341,7 +341,7 @@ adapter that transforms its input to upper case before writing it to
 an underlying stream::
 
   struct UpperStream<UnderlyingStream:OutputStream> : OutputStream {
-    func append(x: String) { base.append( x.toUpper() ) }
+    def append(x: String) { base.append( x.toUpper() ) }
     var base: UnderlyingStream
   }
 
@@ -353,8 +353,8 @@ processed and written to the underlying stream:
 .. parsed-literal::
 
   struct TrimStream<UnderlyingStream:OutputStream> : OutputStream {
-    func append(x: String) { ... }
-    **func close() { ... }**
+    def append(x: String) { ... }
+    **def close() { ... }**
     var base: UnderlyingStream
     var bufferedWhitespace: String
   }
@@ -371,7 +371,7 @@ For every conceivable ``OutputStream`` adaptor there's a corresponding
   struct UpperStreamable<UnderlyingStreamable:Streamable> {
     var base: UnderlyingStreamable
 
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    def writeTo<T: OutputStream>(target: [inout] T) {
       var adaptedStream = UpperStream(target)
       self.base.writeTo(&adaptedStream)
       target = adaptedStream.base
@@ -382,7 +382,7 @@ Then, we could extend ``Streamable`` as follows::
 
   extension Streamable {
     typealias Upcased : Streamable = UpperStreamable<This>
-    func toUpper() -> UpperStreamable<This> {
+    def toUpper() -> UpperStreamable<This> {
       return Upcased(self)
     }
   }
@@ -430,7 +430,7 @@ the underlying stream, which can then be “written back.”  :
 
   struct AdaptedStreamable<T:Streamable> {
     ...
-    func writeTo<Target: OutputStream>(target: [inout] Target) {
+    def writeTo<Target: OutputStream>(target: [inout] Target) {
       // create the stream that transforms the representation
       var adaptedTarget = adapt(target, adapter);
       // write the Base object to the target stream

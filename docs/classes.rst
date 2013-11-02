@@ -13,10 +13,10 @@ Syntax overview
 
   class MyClass {
     var MyVar : Int
-    func f(x : Int) -> Int {
+    def f(x : Int) -> Int {
       return MyVar + x
     }
-    static func getAMyclass() -> MyClass {
+    static def getAMyclass() -> MyClass {
       return new MyClass
     }
     constructor() {
@@ -28,17 +28,17 @@ Syntax overview
   }
 
   extension MyClass {
-    func g() -> Int {
+    def g() -> Int {
       return 4
     }
   }
 
-  func f() {
+  def f() {
     var x = new MyClass(10)
   }
   
   class MyDerived : MyClass {
-    func h() {}
+    def h() {}
   }
   
 
@@ -249,10 +249,10 @@ based on an NSView method)::
 
 We tentatively decided to do something like the following::
 
-  func addTrackingRect(rect : NSRect)
-       owner(owner : Id)
-       withUserData(data : Id)
-       assumeInside(inside : Bool) -> Void {
+  def addTrackingRect(rect : NSRect)
+      owner(owner : Id)
+      withUserData(data : Id)
+      assumeInside(inside : Bool) -> Void {
     // Impl
   }
 
@@ -270,7 +270,7 @@ included if not for ObjC interop.
 
 We seriously considered two other proposals for the declaration in swift.  One::
 
-  func addTrackingRect(rect : NSRect, owner : Id, withUserData : Id, assumeInside : Bool) {
+  def addTrackingRect(rect : NSRect, owner : Id, withUserData : Id, assumeInside : Bool) {
     // Impl
   }
 

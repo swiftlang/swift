@@ -28,7 +28,7 @@ expressed in terms of a wholesale assignment.  Even if we tried to
 impose an “assignment-only” limitation, I'd still be free to write::
 
   extension String {
-    func inplace_upper() {
+    def inplace_upper() {
         this = self.upper()
     }
   }
@@ -139,7 +139,7 @@ those cases where the string's buffer is uniquely referenced::
   struct String {
     ...
 
-    func inplace_upper() {
+    def inplace_upper() {
       self.unique()                  // copy buffer iff refcount > 1
       for i in 0..buffer.length {
         buffer[i].inplace_upper()    // naïve ASCII-only implementation
@@ -223,7 +223,7 @@ versa. This provides a consistent interface to operators for free without
 boilerplate::
 
       operator infix ☃ {}
-      func ☃ (x:Int, y:Int) -> Int { ... }
+      def ☃ (x:Int, y:Int) -> Int { ... }
 
       // Users want this to work...
       var x = 0
@@ -231,7 +231,7 @@ boilerplate::
 
       // ...without typing all this
       operator infix ☃= { assignment }
-      func ☃=(x:[inout] Int, y:Int) {
+      def ☃=(x:[inout] Int, y:Int) {
         x = x ☃ y
       }
 
@@ -243,12 +243,12 @@ user's behalf::
       struct BigInt { ... }
   
       // Users want to write this:
-      func foo(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
+      def foo(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
         return x + y + z
       }
   
       // but want the perfomance of this:
-      func fooʹ(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
+      def fooʹ(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
         var r = x
         r += y
         r += z
@@ -280,8 +280,8 @@ Alternatively, if baking a naming convention into the compiler is unpalatable,
 we can use declaration attributes::
 
       struct String {
-        func [inplace_of=upper] inplace_upper() { ... }
-        func [inplace=inplace_upper] upper() { ... }
+        def [inplace_of=upper] inplace_upper() { ... }
+        def [inplace=inplace_upper] upper() { ... }
       }
 
 Default implementations
@@ -291,19 +291,19 @@ When an in-place relationship is created, a definition matching either the
 in-place or value-creating form introduces an implicit definition of the other
 form::
 
-      func += (x:[inout] String, y:String) { ... }
-      // Implicitly defines func + (x:String, y:String) -> String
+      def += (x:[inout] String, y:String) { ... }
+      // Implicitly defines def + (x:String, y:String) -> String
 
-      func + (x:Int, y:Int) -> Int { ... }
-      // Implicitly defines func += (x:[inout] Int, y:Int) -> ()
+      def + (x:Int, y:Int) -> Int { ... }
+      // Implicitly defines def += (x:[inout] Int, y:Int) -> ()
 
       struct String {
-        func upper() -> String { ... }
+        def upper() -> String { ... }
         // Implicitly defines inplace_upper() -> ()
       }
 
       struct Stringʹ {
-        func inplace_upper() { ... }
+        def inplace_upper() { ... }
         // Implicitly defines upper() -> Stringʹ
       }
 
@@ -312,14 +312,14 @@ Both forms can also be explicitly defined if desired.
 The implicit value-creating definition copies its left argument and applies the
 in-place form, as if written::
 
-      func + (x:String, y:String) -> String {
+      def + (x:String, y:String) -> String {
         var r = x
         x += y
         return r
       }
 
       extension Stringʹ {
-        func upper() -> Stringʹ {
+        def upper() -> Stringʹ {
           var r = this
           r.inplace_upper()
           return r
@@ -329,12 +329,12 @@ in-place form, as if written::
 The implicit in-place form applies the value-creating form to its arguments and
 assigns the result to its left argument, as if written::
 
-      func += (x:[inout] Int, y:Int) {
+      def += (x:[inout] Int, y:Int) {
         x = x + y
       }
 
       extension String {
-        func inplace_upper() {
+        def inplace_upper() {
           this = self.upper()
         }
       }

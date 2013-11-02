@@ -77,7 +77,7 @@ bb0:
 
 // This function shouldn't produce any diagnostics.
 //
-// func used_by_inout(a : Int) -> (Int, Int) {
+// def used_by_inout(a : Int) -> (Int, Int) {
 //  var t = a
 //  takes_Int_inout(&a)
 //  return (t,a)

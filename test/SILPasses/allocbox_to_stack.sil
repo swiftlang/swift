@@ -141,7 +141,7 @@ bb0(%0 : $SomeClass):
 }
 
 protocol LogicValue {
-  func getLogicValue() -> Bool
+  def getLogicValue() -> Bool
 }
 
 // CHECK-LABEL: @protocols

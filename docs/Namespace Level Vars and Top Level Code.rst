@@ -25,7 +25,7 @@ below).
 This means that if you write code like this (optionally we could require an
 attribute to make it clear that the value is actor local)::
 
-  func foo(a : int) -> int { print(a) return 0 }
+  def foo(a : int) -> int { print(a) return 0 }
 
   var x = foo(1)
   var y = foo(2)

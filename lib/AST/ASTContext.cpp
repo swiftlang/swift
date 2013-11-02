@@ -63,19 +63,19 @@ struct ASTContext::Implementation {
   /// The declaration of swift.Optional<T>.
   NominalTypeDecl *OptionalDecl = nullptr;
 
-  /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
+  /// def _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecl = nullptr;
 
-  /// func _getOptionalValue<T>(v : Optional<T>) -> T
+  /// def _getOptionalValue<T>(v : Optional<T>) -> T
   FuncDecl *GetOptionalValueDecl = nullptr;
 
-  /// func _injectValueIntoOptional<T>(v : T) -> Optional<T>
+  /// def _injectValueIntoOptional<T>(v : T) -> Optional<T>
   FuncDecl *InjectValueIntoOptionalDecl = nullptr;
 
-  /// func _injectNothingIntoOptional<T>() -> Optional<T>
+  /// def _injectNothingIntoOptional<T>() -> Optional<T>
   FuncDecl *InjectNothingIntoOptionalDecl = nullptr;
 
-  /// func _getBool(Builtin.Int1) -> Bool
+  /// def _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
 
   /// \brief The set of known protocols, lazily populated as needed.

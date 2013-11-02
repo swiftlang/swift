@@ -15,7 +15,7 @@ import swift
 
 class C {}
 @class_protocol protocol P {
-  func explode()
+  def explode()
 }
 
 struct A {

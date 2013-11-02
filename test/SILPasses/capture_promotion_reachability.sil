@@ -13,7 +13,7 @@ bb0:
 }
 
 /*
-func test_reachability_1(b: Builtin.Int1, x : Builtin.Int64, y : Builtin.Int64) {
+def test_reachability_1(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
   if (b) {
     x = y
   }
@@ -89,7 +89,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 /*
-func test_reachability_2(b: Builtin.Int1, x : Builtin.Int64, y : Builtin.Int64) {
+def test_reachability_2(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
   var t : () -> Builtin.Int64 = { x } // unpromotable
   if (b) {
     x = y
@@ -165,7 +165,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 /*
-func test_reachability_3(b: Builtin.Int1, x : Builtin.Int64, y : Builtin.Int64) {
+def test_reachability_3(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
   var t : () -> Builtin.Int64 = { x } // unpromotable
   if (b) {
     t = { x } // unpromotable
@@ -241,7 +241,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 /*
-func test_reachability_4(b: Builtin.Int1, x : Builtin.Int64, y : Builtin.Int64) {
+def test_reachability_4(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
   var t : () -> Builtin.Int64 = { x } // unpromotable
   while (b) {
     x = y

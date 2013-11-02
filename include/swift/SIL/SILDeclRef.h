@@ -116,7 +116,7 @@ struct SILDeclRef {
   
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
-  /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
+  /// - If 'loc' is a function or closure, this returns a Func SILDeclRef.
   /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
   ///   Setter SILDeclRef for the computed VarDecl.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef

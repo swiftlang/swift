@@ -187,7 +187,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
     module->getImportedModules(reexports, false);
     reexports.append(extraImports.begin(), extraImports.end());
 
-    // Prefer scoped imports (import func swift.max) to whole-module imports.
+    // Prefer scoped imports (import def swift.max) to whole-module imports.
     SmallVector<ValueDecl *, 8> unscopedValues;
     SmallVector<ValueDecl *, 8> scopedValues;
     for (auto next : reexports) {

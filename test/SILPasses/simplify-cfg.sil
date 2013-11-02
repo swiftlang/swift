@@ -45,7 +45,7 @@ bb4(%8 : $Int64):
   return %8 : $Int64
 }
 
-// func testThread(a : Bool) -> Int {
+// def testThread(a : Bool) -> Int {
 //   if a { return 42 } else { return 17 } }
 //
 /// CHECK-LABEL: sil @testThread

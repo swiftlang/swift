@@ -340,7 +340,7 @@ public:
   ///
   /// \code
   /// class Vector<T> {
-  ///   func add(value : T) { }
+  ///   def add(value : T) { }
   /// }
   /// \endcode
   ///
@@ -2421,7 +2421,7 @@ public:
   ///
   /// \code
   /// struct X<T> {
-  ///   func f<U>() { }
+  ///   def f<U>() { }
   /// }
   /// \endcode
   ///
@@ -2433,7 +2433,7 @@ public:
   ///
   /// \code
   /// struct X<T, U> {
-  ///   func f<V>() { }
+  ///   def f<V>() { }
   /// }
   /// \endcode
   ///
