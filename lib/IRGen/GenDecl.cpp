@@ -372,11 +372,17 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   llvm::Function *initFn = nullptr;
   if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
     // Create a global initializer for library modules.
-    // FIXME: If there is more than one source file, the names will collide.
     // FIXME: This is completely, utterly, wrong -- we don't want library
-    // initializers anyway.
+    // initializers at all.
+    // FIXME: In the mean time, it would be nice to include the /name/ of the
+    // source file, not just a number.
+    ArrayRef<SourceFile *> allSourceFiles = SF.TU.getSourceFiles();
+    auto pos = std::find(allSourceFiles.begin(), allSourceFiles.end(), &SF);
+    size_t which = pos - allSourceFiles.begin();
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    SF.TU.Name.str() + ".init", &Module);
+                                    SF.TU.Name.str() + Twine(".init.")
+                                                     + Twine(which),
+                                    &Module);
     initFn->setAttributes(attrs);
     
     // Insert a call to the top_level_code symbol from the SIL module.
