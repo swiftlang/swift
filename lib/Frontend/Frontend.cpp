@@ -26,6 +26,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift;
 
@@ -90,6 +91,9 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                                      CodeCompletePoint.second);
   }
 
+  bool MainMode = (Invocation.getInputKind() == SourceFile::Main);
+  bool SILMode = (Invocation.getInputKind() == SourceFile::SIL);
+
   for (auto &File : Invocation.getInputFilenames()) {
     // Open the input file.
     llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -99,18 +103,29 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                            File, Err.message());
       return true;
     }
+
+    using namespace llvm::sys::path;
+    if (SILMode || (MainMode && filename(File) == "main.swift"))
+      MainBufferIndex = BufferIDs.size();
+
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
     BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(InputFile.take(),
                                                       llvm::SMLoc()));
   }
 
   for (auto Buf : Invocation.getInputBuffers()) {
+    if (SILMode)
+      MainBufferIndex = BufferIDs.size();
+
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(
         llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
                                              Buf->getBufferIdentifier()),
                                                      llvm::SMLoc()));
   }
+
+  if (MainMode && MainBufferIndex == NO_SUCH_BUFFER && BufferIDs.size() == 1)
+    MainBufferIndex = 0;
 
   return false;
 }
@@ -121,8 +136,11 @@ void swift::CompilerInstance::doIt() {
   TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
-  if (Kind == SourceFile::SIL)
+  if (Kind == SourceFile::SIL) {
+    assert(BufferIDs.size() == 1);
+    assert(MainBufferIndex != NO_SUCH_BUFFER);
     createSILModule();
+  }
 
   if (Kind == SourceFile::REPL) {
     auto *SingleInputFile =
@@ -141,62 +159,60 @@ void swift::CompilerInstance::doIt() {
 
   PersistentParserState PersistentState;
 
-  if (Kind == SourceFile::Library) {
-    for (auto &BufferID : BufferIDs) {
-      auto *NextInput =
-        new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
-      TU->addSourceFile(*NextInput);
+  if (MainBufferIndex != NO_SUCH_BUFFER) {
+    // Parse the main file first. This may only be a main source file or a SIL
+    // file, which requires pumping the parser.
+    assert(Kind == SourceFile::Main || Kind == SourceFile::SIL);
 
-      bool Done;
-      parseIntoTranslationUnit(*NextInput, BufferID, &Done, nullptr,
+    unsigned BufferID = BufferIDs[MainBufferIndex];
+    if (Kind == SourceFile::Main)
+      SourceMgr.setHashbangBufferID(BufferID);
+
+    SILParserState SILContext(TheSILModule.get());
+    auto *SingleInputFile =
+      new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+    TU->addSourceFile(*SingleInputFile);
+
+    unsigned CurTUElem = 0;
+    bool Done;
+    do {
+      // Pump the parser multiple times if necessary.  It will return early
+      // after parsing any top level code in a main module, or in SIL mode when
+      // there are chunks of swift decls (e.g. imports and types) interspersed
+      // with 'sil' definitions.
+      parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
+                               TheSILModule ? &SILContext : nullptr,
                                &PersistentState, DelayedCB.get());
-      assert(Done && "Parser returned early?");
-      (void) Done;
-
-      performNameBinding(*NextInput);
-    }
-
-    if (!Invocation.getParseOnly()) {
-      // Type-check each top-level input.
-      auto InputSourceFiles = TU->getSourceFiles().slice(0, BufferIDs.size());
-      for (auto SF : InputSourceFiles)
-        performTypeChecking(*SF);
-    }
-
-    if (DelayedCB) {
-      performDelayedParsing(TU, PersistentState,
-                            Invocation.getCodeCompletionFactory());
-    }
-    return;
+      if (!Invocation.getParseOnly())
+        performTypeChecking(*SingleInputFile, CurTUElem);
+      CurTUElem = SingleInputFile->Decls.size();
+    } while (!Done);
   }
 
-  // This may only be a main module or SIL, which requires pumping the parser.
-  assert(Kind == SourceFile::Main || Kind == SourceFile::SIL);
-  assert(BufferIDs.size() == 1 && "This mode only allows one input");
-  unsigned BufferID = BufferIDs[0];
+  for (size_t i = 0, e = BufferIDs.size(); i < e; ++i) {
+    if (i == MainBufferIndex)
+      continue;
+    auto BufferID = BufferIDs[i];
 
-  if (Kind == SourceFile::Main)
-    SourceMgr.setHashbangBufferID(BufferID);
+    auto *NextInput = new (*Context) SourceFile(*TU, SourceFile::Library,
+                                                Invocation.getParseStdlib());
+    TU->addSourceFile(*NextInput);
 
-  SILParserState SILContext(TheSILModule.get());
-  auto *SingleInputFile =
-    new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
-  TU->addSourceFile(*SingleInputFile);
-
-  unsigned CurTUElem = 0;
-  bool Done;
-  do {
-    // Pump the parser multiple times if necessary.  It will return early
-    // after parsing any top level code in a main module, or in SIL mode when
-    // there are chunks of swift decls (e.g. imports and types) interspersed
-    // with 'sil' definitions.
-    parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
-                             TheSILModule ? &SILContext : nullptr,
+    bool Done;
+    parseIntoTranslationUnit(*NextInput, BufferID, &Done, nullptr,
                              &PersistentState, DelayedCB.get());
-    if (!Invocation.getParseOnly())
-      performTypeChecking(*SingleInputFile, CurTUElem);
-    CurTUElem = SingleInputFile->Decls.size();
-  } while (!Done);
+    assert(Done && "Parser returned early?");
+    (void) Done;
+
+    performNameBinding(*NextInput);
+  }
+
+  if (!Invocation.getParseOnly()) {
+    // Type-check each top-level input besides the main source file.
+    auto InputSourceFiles = TU->getSourceFiles().slice(0, BufferIDs.size());
+    for (auto SF : InputSourceFiles)
+      performTypeChecking(*SF);
+  }
 
   if (DelayedCB) {
     performDelayedParsing(TU, PersistentState,

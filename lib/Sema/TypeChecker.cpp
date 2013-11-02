@@ -457,6 +457,9 @@ static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
 }
 
 void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return;
+
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);

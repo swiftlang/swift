@@ -245,20 +245,21 @@ public:
 class CompilerInstance {
   CompilerInvocation Invocation;
   SourceManager SourceMgr;
-  std::vector<unsigned> BufferIDs;
-  DiagnosticEngine Diagnostics;
+  DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
-  TranslationUnit *TU;
-  SerializedModuleLoader *SML;
+  TranslationUnit *TU = nullptr;
+  SerializedModuleLoader *SML = nullptr;
+
+  std::vector<unsigned> BufferIDs;
+
+  enum : unsigned { NO_SUCH_BUFFER = ~0U };
+  unsigned MainBufferIndex = NO_SUCH_BUFFER;
 
   void createSILModule();
 
 public:
-  CompilerInstance() : Diagnostics(SourceMgr), TU(nullptr) {
-  }
-
   SourceManager &getSourceMgr() { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
