@@ -215,6 +215,8 @@ namespace swift {
 
   /// The extension for serialized modules.
   static const char * const SERIALIZED_MODULE_EXTENSION = "swiftmodule";
+  /// The extension for SIL files.
+  static const char * const SIL_EXTENSION = "sil";
 } // end namespace swift
 
 #endif
