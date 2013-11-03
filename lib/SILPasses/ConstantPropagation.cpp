@@ -480,28 +480,23 @@ static bool CCPFunctionBody(SILFunction &F) {
     }
   }
 
+  llvm::DenseSet<SILInstruction*> FoldedUsers;
+
   while (!WorkList.empty()) {
     ValueBase *I = *WorkList.begin();
     WorkList.remove(I);
 
     // Go through all users of the constant and try to fold them.
-    llvm::DenseSet<SILInstruction*> FoldedUsers;
+    FoldedUsers.clear();
     for (auto Use : I->getUses()) {
       SILInstruction *User = Use->getUser();
 
       // It is possible that we had processed this user already. Do not try
       // to fold it again if we had previously produced an error while folding
-      // it.
-      // (It is not always possible to fold an instruction in case of error.)
+      // it.  It is not always possible to fold an instruction in case of error.
       if (ErrorSet.count(User))
         continue;
 
-      // TODO: This is handling folding of tupleelement/tuple and
-      // structelement/structs inline with constant folding.  This should
-      // probably handle them in the prepass, instead of handling them in the
-      // worklist loop.  They are conceptually very different operations and
-      // are technically not constant folding.
-      //
       // Some constant users may indirectly cause folding of their users.
       if (isa<StructInst>(User) || isa<TupleInst>(User)) {
         WorkList.insert(User);
@@ -519,11 +514,33 @@ static bool CCPFunctionBody(SILFunction &F) {
       FoldedUsers.insert(User);
       ++NumInstFolded;
 
+      // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
+      // any tuple_extract instructions using the apply.  This is a common case
+      // for functions returning multiple values.
+      if (auto *TI = dyn_cast<TupleInst>(C)) {
+        for (auto UI = User->use_begin(), E = User->use_end(); UI != E;) {
+          Operand *O = *UI++;
+
+          // If the user is a tuple_extract, just substitute the right value in.
+          if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
+            SILValue NewVal = TI->getOperand(TEI->getFieldNo());
+            SILValue(TEI, 0).replaceAllUsesWith(NewVal);
+            TEI->dropAllReferences();
+            FoldedUsers.insert(TEI);
+            WorkList.insert(NewVal.getDef());
+          }
+        }
+        
+        if (User->use_empty())
+          FoldedUsers.insert(TI);
+      }
+      
+      
       // We were able to fold, so all users should use the new folded value.
       assert(User->getTypes().size() == 1 &&
              "Currently, we only support single result instructions");
       SILValue(User).replaceAllUsesWith(C);
-
+      
       // The new constant could be further folded now, add it to the worklist.
       WorkList.insert(C.getDef());
     }

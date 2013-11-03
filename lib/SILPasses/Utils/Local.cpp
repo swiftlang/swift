@@ -75,9 +75,9 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
 
     // Check if any of the operands will become dead as well.
     MutableArrayRef<Operand> Ops = I->getAllOperands();
-    for (auto OpI = Ops.begin(), OpE = Ops.end(); OpI != OpE; ++OpI) {
-      Operand &Op = *OpI;
+    for (Operand &Op : Ops) {
       SILValue OpVal = Op.get();
+      if (!OpVal) continue;
 
       // Remove the reference from the instruction being deleted to this
       // operand.

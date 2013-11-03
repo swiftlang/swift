@@ -408,7 +408,7 @@ void swift::performSILCombine(SILModule *M) {
     // If F is just a declaration without any basic blocks, skip it.
     if (F.empty())
       continue;
-
+    
     // Clear the combiner just in case.
     Combiner.clear();
     // Record if we made any changes.
