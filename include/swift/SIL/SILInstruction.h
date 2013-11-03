@@ -198,6 +198,7 @@ public:
     : BASE(KIND, Loc, Ty, std::forward<A>(args)...), Operands(this, Operand) {}
   
   SILValue getOperand() const { return Operands[0].get(); }
+  void setOperand(SILValue V) { Operands[0].set(V); }
   
   /// getType() is ok if this is known to only have one type.
   template<typename X = void>
