@@ -19,7 +19,6 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/AST/KernelOrShaderKind.h"
 #include "swift/AST/Ownership.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -254,9 +253,6 @@ public:
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
-  bool isKernel() const { return has(AK_kernel); }
-  bool isVertex() const { return has(AK_vertex); }
-  bool isFragment() const { return has(AK_fragment); }
 
 
   Resilience getResilienceKind() const {
@@ -280,13 +276,6 @@ public:
   void clearOwnership() {
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
-  }
-
-  KernelOrShaderKind getKernelOrShaderKind() const {
-    if (isKernel()) return KernelOrShaderKind::Kernel;
-    if (isVertex()) return KernelOrShaderKind::Fragment;
-    if (isFragment()) return KernelOrShaderKind::Vertex;
-    return KernelOrShaderKind::Default;
   }
 };
   

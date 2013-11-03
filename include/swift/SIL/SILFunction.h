@@ -18,7 +18,6 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/AST/KernelOrShaderKind.h"
 
 namespace swift {
 
@@ -73,9 +72,6 @@ private:
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
 
-  /// Whether this is a compute kernel/graphics shader.
-  KernelOrShaderKind KernelOrShader;
-
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
   
@@ -88,7 +84,6 @@ public:
   SILFunction(SILModule &Module, SILLinkage Linkage,
               StringRef MangledName, SILType LoweredType,
               Optional<SILLocation> Loc = Nothing,
-              KernelOrShaderKind KOS = KernelOrShaderKind::Default,
               IsTransparent_t isTrans = IsNotTransparent);
 
   ~SILFunction();
@@ -149,20 +144,6 @@ public:
 
   /// Get the source location of the function.
   SILDebugScope *getDebugScope() const { return DebugScope; }
-  
-  /// Axle-related accessors.
-  KernelOrShaderKind getKernelOrShaderKind() const {
-    return KernelOrShader;
-  }
-  bool isKernel() const {
-    return KernelOrShader == KernelOrShaderKind::Kernel;
-  }
-  bool isVertex() const {
-    return KernelOrShader == KernelOrShaderKind::Vertex;
-  }
-  bool isFragment() const {
-    return KernelOrShader == KernelOrShaderKind::Fragment;
-  }
   
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }

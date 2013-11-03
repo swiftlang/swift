@@ -3023,23 +3023,4 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                 diag::class_protocol_not_protocol);
     D->getMutableAttrs().clearAttribute(AK_class_protocol);
   }
-  
-
-  if (!isa<FuncDecl>(D)) {
-    if (Attrs.isKernel()) {
-      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
-                  "kernel");
-      D->getMutableAttrs().clearAttribute(AK_kernel);
-    }
-    if (Attrs.isVertex()) {
-      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
-                  "vertex");
-      D->getMutableAttrs().clearAttribute(AK_vertex);
-    }
-    if (Attrs.isFragment()) {
-      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
-                  "fragment");
-      D->getMutableAttrs().clearAttribute(AK_fragment);
-    }
-  }
 }

@@ -1584,38 +1584,6 @@ ERROR(error_immediate_mode_missing_library,frontend,none,
   "could not load %select{shared library|framework}0 '%1'",
   (unsigned, StringRef))
 
-//==============================================================================
-// Axle Diagnostics.
-//==============================================================================
-ERROR(axle_expected_vec_element_type,type_parsing,PointsToFirstBadToken,
-      "expected vector element type", ())
-ERROR(axle_expected_vec_comma,type_parsing,PointsToFirstBadToken,
-      "expected comma between vector element type and length", ())
-ERROR(axle_expected_vec_length,type_parsing,PointsToFirstBadToken,
-      "expected vector length", ())
-ERROR(axle_expected_vec_rangle,type_parsing,PointsToFirstBadToken,
-      "expected '>' to complete vector type", ())
-ERROR(axle_expected_mat_element_type,type_parsing,PointsToFirstBadToken,
-      "expected matrix element type", ())
-ERROR(axle_expected_mat_comma,type_parsing,PointsToFirstBadToken,
-      "expected comma between matrix element type and number of rows", ())
-ERROR(axle_expected_mat_rows,type_parsing,PointsToFirstBadToken,
-      "expected matrix rows", ())
-ERROR(axle_expected_mat_second_comma,type_parsing,PointsToFirstBadToken,
-      "expected comma between matrix rows and columns", ())
-ERROR(axle_expected_mat_columns,type_parsing,PointsToFirstBadToken,
-      "expected matrix columns", ())
-ERROR(axle_expected_mat_rangle,type_parsing,PointsToFirstBadToken,
-      "expected '>' to complete matrix type", ())
-ERROR(axle_invalid_vec_type,sema_tcd,none,
-  "invalid vector element type %0", (Type))
-ERROR(axle_missing_vec_type,sema_tcd,none,
-  "missing vector implementation type %0 for %1", (StringRef, Type))
-ERROR(axle_invalid_mat_type,sema_tcd,none,
-  "invalid matrix element type %0", (Type))
-ERROR(axle_missing_mat_type,sema_tcd,none,
-  "missing matrix implementation type %0 for %1", (StringRef, Type))
-
 #if defined(DIAG)
 #  undef DIAG
 #endif

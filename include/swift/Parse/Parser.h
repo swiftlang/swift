@@ -581,9 +581,8 @@ public:
   ///
   /// \returns null, IdentTypeRepr or ErrorTypeRepr.
   ParserResult<TypeRepr>
-  parseTypeIdentifierOrAxleSugarWithRecovery(
-    Diag<> MessageID,
-    Diag<TypeLoc> NonIdentifierTypeMessageID);
+  parseTypeIdentifierWithRecovery(Diag<> MessageID,
+                                  Diag<TypeLoc> NonIdentifierTypeMessageID);
 
   ParserResult<TypeRepr> parseTypeAnnotation();
   ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
@@ -593,14 +592,7 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
   ParserResult<IdentTypeRepr> parseTypeIdentifier();
-  ParserResult<TypeRepr> parseTypeIdentifierOrAxleSugar();
 
-  /// Determine whether we're at the start of Axle's \c Vec<T,N>,
-  /// \c Matrix<T,N>, or \c Matrix<T,N,M> sugar.
-  bool atStartOfAxleSugarType();
-
-  ParserResult<VecTypeRepr> parseTypeAxleVec(SourceLoc vecLoc);
-  ParserResult<MatrixTypeRepr> parseTypeAxleMatrix(SourceLoc matrixLoc);
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
@@ -681,16 +673,12 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
-  bool canParseAsAxleSugarArguments();
-
   bool canParseType();
   bool canParseTypeIdentifier();
-  bool canParseTypeIdentifierOrAxleSugar();
   bool canParseTypeComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeArray();
   bool canParseGenericArguments();
-  bool canParseAxleSugarArguments();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing

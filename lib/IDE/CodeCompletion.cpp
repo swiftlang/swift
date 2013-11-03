@@ -1487,10 +1487,6 @@ public:
     // Same: swift.IntegerLiteralType.
     addKeyword("__LINE__", "Int");
     addKeyword("__COLUMN__", "Int");
-
-    if (Ctx.LangOpts.Axle)
-      addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/true);
-
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
@@ -1540,9 +1536,6 @@ public:
 
     RequestedCachedResults =
         RequestedResultsTy::toplevelResults().onlyTypes();
-
-    if (Ctx.LangOpts.Axle)
-      addAxleSugarTypeCompletions(/*MetatypeAnnotation=*/false);
   }
 
   void getToplevelTUCompletions(bool OnlyTypes) {
@@ -1580,48 +1573,6 @@ public:
 
     for (auto *VD : Decls) {
       foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
-  }
-
-private:
-  void addAxleSugarTypeCompletions(bool MetatypeAnnotation) {
-    {
-      // Vec<type, length>
-      CodeCompletionResultBuilder Builder(
-          Sink,
-          CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::OtherModule);
-      Builder.addTextChunk("Vec");
-      Builder.addLeftAngle();
-      Builder.addGenericParameter("type");
-      Builder.addComma();
-      Builder.addGenericParameter("length");
-      Builder.addRightAngle();
-
-      if (MetatypeAnnotation) {
-        Builder.addTypeAnnotation("Vec<...>.metatype");
-      }
-    }
-
-    {
-      // Matrix<type, rows, columns>
-      CodeCompletionResultBuilder Builder(
-          Sink,
-          CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::OtherModule);
-      Builder.addTextChunk("Matrix");
-      Builder.addLeftAngle();
-      Builder.addGenericParameter("type");
-      Builder.addComma();
-      Builder.addGenericParameter("rows");
-      // FIXME: Make this a default argument.
-      Builder.addComma();
-      Builder.addGenericParameter("columns");
-      Builder.addRightAngle();
-
-      if (MetatypeAnnotation) {
-        Builder.addTypeAnnotation("Matrix<...>.metatype");
-      }
     }
   }
 };

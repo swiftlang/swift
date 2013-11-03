@@ -1149,13 +1149,6 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
   Imports.push_back(std::make_pair(Module::ImportedModule({}, M), false));
-  if (SF.TU.Ctx.LangOpts.Axle && !hasBuiltinModuleAccess) {
-    Module *AxleModule =
-        SF.TU.Ctx.getModule({{SF.TU.Ctx.AxleStdlibModuleName, SourceLoc()}});
-    if(AxleModule)
-        Imports.push_back(
-            std::make_pair(Module::ImportedModule({}, AxleModule), false));
-  }
   SF.setImports(SF.TU.Ctx.AllocateCopy(Imports));
 }
 

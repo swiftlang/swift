@@ -38,7 +38,6 @@
 
 #include "CallEmission.h"
 #include "Explosion.h"
-#include "GenAxleMeta.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
@@ -996,10 +995,6 @@ void IRGenSILFunction::emitSILFunction() {
   for (SILBasicBlock &bb : *CurSILFn)
     if (!visitedBlocks.count(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
-
-  // Generate metadata for Axle.
-  if (IGM.AxleMeta)
-    IGM.AxleMeta->createFunctionMetadata(CurSILFn, CurFn);
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {

@@ -1349,43 +1349,6 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
 
-  // Axle: if the identifier is 'Vec' or 'Matrix' and it's followed by
-  // an argument list for the sugared vector or matrix types, parse them.
-  if (Context.LangOpts.Axle) {
-    if (text.str().equals("Vec") && canParseAsAxleSugarArguments()) {
-      // Parse the vector type.
-      ParserResult<VecTypeRepr> vecTy = parseTypeAxleVec(loc);
-      LAngleLoc = Tok.getLoc();
-      if (vecTy.isParseError()) {
-        diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-        return new (Context) ErrorExpr(loc);
-      }
-
-      // FIXME: Better handling of code completion here?
-      if (vecTy.hasCodeCompletion())
-        return new (Context) ErrorExpr(loc);
-
-      return new (Context) MetatypeExpr(vecTy.get());
-    }
-
-    if (text.str().equals("Matrix") && canParseAsAxleSugarArguments()) {
-      // Parse the matrix type.
-      ParserResult<MatrixTypeRepr> matrixTy = parseTypeAxleMatrix(loc);
-      LAngleLoc = Tok.getLoc();
-      if (matrixTy.isParseError()) {
-        diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-        return new (Context) ErrorExpr(loc);
-      }
-
-      // FIXME: Better handling of code completion here?
-      if (matrixTy.hasCodeCompletion())
-        return new (Context) ErrorExpr(loc);
-
-      return new (Context) MetatypeExpr(matrixTy.get());
-
-    }
-  }
-
   if (canParseAsGenericArgumentList()) {
     hasGenericArgumentList = true;
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {

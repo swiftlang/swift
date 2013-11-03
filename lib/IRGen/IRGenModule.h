@@ -45,10 +45,6 @@ namespace llvm {
   class AttributeSet;
 }
 
-namespace axle {
-  class GenAxleMeta;
-}
-
 namespace swift {
   class ASTContext;
   class BraceStmt;
@@ -110,9 +106,6 @@ public:
   SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
-
-  /// Axle metadata generator.  Is a nullptr if we compile without -std=axle.
-  axle::GenAxleMeta *AxleMeta;
 
   /// Does the current target require Objective-C interoperation?
   static const bool ObjCInterop = true;

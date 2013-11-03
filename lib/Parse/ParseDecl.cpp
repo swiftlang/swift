@@ -235,26 +235,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::string_literal);
     break;
   }
-
-  case AK_kernel:
-  case AK_vertex:
-  case AK_fragment:
-    // Reject Axle specific attributes in non-axle mode.
-    if (!Context.LangOpts.Axle) {
-      diagnose(Loc, diag::invalid_attribute_for_lang,
-               0 /* axle */);
-      Attributes.clearAttribute(attr);
-      return false;
-    }
-      
-    // Check multiple specifications by temporarily removing this attribute.
-    Attributes.clearAttribute(attr);
-    if (Attributes.getKernelOrShaderKind() != KernelOrShaderKind::Default) {
-      diagnose(Loc, diag::duplicate_attribute);
-      break;
-    }
-    Attributes.setAttr(attr, Loc);
-    break;
   }
 
   return false;
@@ -739,7 +719,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   ParserStatus Status;
   do {
     // Parse the inherited type (which must be a protocol).
-    ParserResult<TypeRepr> Ty = parseTypeIdentifierOrAxleSugar();
+    ParserResult<TypeRepr> Ty = parseTypeIdentifier();
     Status |= Ty;
 
     // Record the type.
@@ -828,7 +808,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
                                                        DeclAttributes &Attr) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  ParserResult<TypeRepr> Ty = parseTypeIdentifierOrAxleSugarWithRecovery(
+  ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
   if (Ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<ExtensionDecl>();

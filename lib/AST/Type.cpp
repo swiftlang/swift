@@ -779,8 +779,6 @@ TypeBase *TypeBase::getDesugaredType() {
     return cast<AssociatedTypeType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
-  case TypeKind::Vec:
-  case TypeKind::Matrix:
     return cast<SyntaxSugarType>(this)->getDesugaredType();
   case TypeKind::Substituted:
     return cast<SubstitutedType>(this)->getDesugaredType();
@@ -809,44 +807,6 @@ Type SyntaxSugarType::getImplementationType() {
   auto &ctx = *ImplOrContext.get<const ASTContext *>();
   NominalTypeDecl *implDecl;
 
-  // Map Vec<T, N> to the underlying struct type.
-  if (auto vecTy = dyn_cast<VecType>(this)) {
-    llvm::SmallString<16> buffer;
-    StringRef name = vecTy->getStructName(buffer);
-    if (name.empty())
-      ImplOrContext = ErrorType::get(ctx);
-    else {
-      SmallVector<ValueDecl *, 4> decls;
-      ctx.lookupInSwiftModule(name, decls);
-      if (decls.size() == 1 && isa<StructDecl>(decls[0])) {
-        ImplOrContext = cast<StructDecl>(decls[0])->getDeclaredType();
-      } else {
-        ImplOrContext = ErrorType::get(ctx);
-      }
-    }
-
-    return ImplOrContext.get<Type>();
-  }
-
-  // Map Matrix<T, N> or Matrix<T, N, M> to the underlying struct type.
-  if (auto matrixTy = dyn_cast<MatrixType>(this)) {
-    llvm::SmallString<16> buffer;
-    StringRef name = matrixTy->getStructName(buffer);
-    if (name.empty())
-      ImplOrContext = ErrorType::get(ctx);
-    else {
-      SmallVector<ValueDecl *, 4> decls;
-      ctx.lookupInSwiftModule(name, decls);
-      if (decls.size() == 1 && isa<StructDecl>(decls[0])) {
-        ImplOrContext = cast<StructDecl>(decls[0])->getDeclaredType();
-      } else {
-        ImplOrContext = ErrorType::get(ctx);
-      }
-    }
-
-    return ImplOrContext.get<Type>();
-  }
-
   if (isa<ArraySliceType>(this)) {
     implDecl = ctx.getSliceDecl();
     assert(implDecl && "Slice type has not been set yet");
@@ -860,78 +820,6 @@ Type SyntaxSugarType::getImplementationType() {
   // Record the implementation type.
   ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
   return ImplOrContext.get<Type>();
-}
-
-StringRef VecType::getStructName(llvm::SmallVectorImpl<char> &buffer) const {
-  // The name always starts with "Vec" followed by the number of elements.
-  llvm::raw_svector_ostream os(buffer);
-  os << "Vec" << Length;
-  
-  // Make sure we have a nominal type.
-  auto nominalTy = getBaseType()->getAs<NominalType>();
-  if (!nominalTy)
-    return "";
-
-  // Make sure the nominal type is within the "swift" module.
-  auto nominal = nominalTy->getDecl();
-  auto owningModule = dyn_cast<Module>(nominal->getDeclContext());
-  if (!owningModule || owningModule->Name.str() != "swift")
-    return "";
-
-  // Map the known Swift types to suffixes 'f', 'b', 'i8', etc.
-  auto name = nominal->getName().str();
-  if (name == "Bool")
-    os << 'b';
-  else if (name == "Float16")
-    os << 'h';
-  else if (name == "Float32")
-    os << 'f';
-  else if (name == "Float64")
-    os << 'd';
-  else if (name.startswith("Int"))
-    os << 'i' << name.drop_front(3);
-  else if (name.startswith("UInt"))
-    os << "ui" << name.drop_front(4);
-  else
-    return "";
-
-  return os.str();
-}
-
-StringRef MatrixType::getStructName(llvm::SmallVectorImpl<char> &buffer) const {
-  // The name always starts with "Matrix" followed by the number of rows and
-  // (if different from the number of rows) 'x' followed by the number of
-  // columns.
-  llvm::raw_svector_ostream os(buffer);
-  os << "Matrix" << getRows();
-
-  if (getRows() != getColumns())
-    os << "x" << getColumns();
-
-  // Make sure we have a nominal type.
-  auto nominalTy = getBaseType()->getAs<NominalType>();
-  if (!nominalTy)
-    return "";
-
-  // Make sure the nominal type is within the "swift" module.
-  auto nominal = nominalTy->getDecl();
-  auto owningModule = dyn_cast<Module>(nominal->getDeclContext());
-  if (!owningModule || owningModule->Name.str() != "swift")
-    return "";
-
-  // Map the known Swift types to suffixes 'f', 'b', 'i8', etc.
-  auto name = nominal->getName().str();
-  if (name == "Float16")
-    os << 'h';
-  else if (name == "Float32")
-    os << 'f';
-  else if (name == "Float64")
-    os << 'd';
-  else
-    return "";
-
-  return os.str();
-
 }
 
 TypeBase *SubstitutedType::getDesugaredType() {
@@ -1094,9 +982,7 @@ bool TypeBase::isSpelledLike(Type other) {
     return pMe->getUnderlyingType()->isSpelledLike(pThem->getUnderlyingType());
   }
   case TypeKind::ArraySlice:
-  case TypeKind::Optional: 
-  case TypeKind::Vec:
-  case TypeKind::Matrix: {
+  case TypeKind::Optional: {
     auto aMe = cast<SyntaxSugarType>(me);
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());

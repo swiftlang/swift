@@ -29,7 +29,6 @@ using namespace swift;
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
-///     identifier ':' type-axle-vec
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
@@ -59,7 +58,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
       if (Tok.getKind() == tok::identifier) {
-        Ty = parseTypeIdentifierOrAxleSugar();
+        Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
       } else {
@@ -155,7 +154,7 @@ bool Parser::parseGenericWhereClause(
   do {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
-    ParserResult<TypeRepr> FirstType = parseTypeIdentifierOrAxleSugar();
+    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
     if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
       Invalid = true;
       break;
@@ -170,7 +169,7 @@ bool Parser::parseGenericWhereClause(
       if (Tok.is(tok::kw_protocol)) {
         Protocol = parseTypeComposition();
       } else {
-        Protocol = parseTypeIdentifierOrAxleSugar();
+        Protocol = parseTypeIdentifier();
       }
       if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
         Invalid = true;
@@ -191,7 +190,7 @@ bool Parser::parseGenericWhereClause(
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseTypeIdentifierOrAxleSugar();
+      ParserResult<TypeRepr> SecondType = parseTypeIdentifier();
       if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
         Invalid = true;
         break;

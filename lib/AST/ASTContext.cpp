@@ -106,8 +106,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<std::pair<Type, unsigned>, VecType*> VecTypes;
-    llvm::FoldingSet<MatrixType> MatrixTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
@@ -213,7 +211,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
     StdlibModuleName(getIdentifier("swift")),
-    AxleStdlibModuleName(getIdentifier("axle")),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -1403,45 +1400,6 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
   auto protoTy = new (C, AllocationArena::Permanent) ProtocolType(D, C);
   D->setDeclaredType(protoTy);
   return protoTy;
-}
-
-VecType *VecType::get(Type base, unsigned length, const ASTContext &C) {
-  bool hasTypeVariable = base->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
-
-  VecType *&entry = C.Impl.getArena(arena).VecTypes[{base, length}];
-  if (entry) return entry;
-
-  return entry = new (C, arena) VecType(C, base, length, hasTypeVariable);
-}
-
-MatrixType *MatrixType::get(Type baseTy, unsigned rows,
-                            Optional<unsigned> columns,
-                            const ASTContext &ctx) {
-  llvm::FoldingSetNodeID id;
-  MatrixType::Profile(id, baseTy, rows, columns);
-
-  auto arena = getArena(baseTy->hasTypeVariable());
-  void *insertPos;
-  if (MatrixType *matrixType
-        = ctx.Impl.getArena(arena).MatrixTypes.FindNodeOrInsertPos(id,
-                                                                   insertPos))
-    return matrixType;
-
-  auto matrixTy = new (ctx, arena) MatrixType(ctx, baseTy, rows, columns,
-                                              baseTy->hasTypeVariable());
-  ctx.Impl.getArena(arena).MatrixTypes.InsertNode(matrixTy, insertPos);
-  return matrixTy;
-
-}
-
-void MatrixType::Profile(llvm::FoldingSetNodeID &id, Type baseType,
-                         unsigned rows, Optional<unsigned> columns) {
-  id.AddPointer(baseType.getPointer());
-  id.AddInteger(rows);
-  id.AddBoolean(static_cast<bool>(columns));
-  if (columns)
-    id.AddInteger(*columns);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

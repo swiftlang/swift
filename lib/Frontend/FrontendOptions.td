@@ -29,6 +29,3 @@ def Xclang : Separate<["-"], "Xclang">,
 // LangOptions
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
-
-def std_EQ : Joined<["-"], "std=">,
-  HelpText<"Language standard to compile for">;

@@ -60,12 +60,6 @@ ATTR(transparent)
 ATTR(unowned)
 ATTR(weak)
 
-// Axle-specific attributes
-ATTR(kernel)
-ATTR(vertex)
-ATTR(fragment)
-
-
 #undef BOTH_ATTR
 #undef TYPE_ATTR
 #undef ATTR

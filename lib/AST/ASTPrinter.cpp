@@ -1399,22 +1399,6 @@ public:
     OS << '?';
   }
 
-  void visitVecType(VecType *T) {
-    OS << "Vec<";
-    visit(T->getBaseType());
-    OS << ", " << T->getLength() << ">";
-  }
-
-  void visitMatrixType(MatrixType *T) {
-    OS << "Matrix<";
-    visit(T->getBaseType());
-    OS << ", " << T->getRows();
-    if (auto columns = T->getColumnsAsSpecified()) {
-      OS << ", " << *columns;
-    }
-    OS << ">";
-  }
-
   void visitProtocolType(ProtocolType *T) {
     OS << T->getDecl()->getName().str();
   }

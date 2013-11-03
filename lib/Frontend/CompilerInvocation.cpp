@@ -28,10 +28,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::SmallString<128> LibPath(Path);
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  if (getLangOptions().Axle)
-    llvm::sys::path::append(LibPath, "lib", "axle");
-  else
-    llvm::sys::path::append(LibPath, "lib", "swift");
+  llvm::sys::path::append(LibPath, "lib", "swift");
   setRuntimeIncludePath(LibPath.str());
 }
 
@@ -129,14 +126,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_link_library:
       addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
-      break;
-      
-    case OPT_std_EQ:
-      if (strcmp(InputArg->getValue(), "axle") == 0)
-        LangOpts.Axle = true;
-      else
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       InputArg->getSpelling(), InputArg->getValue());
       break;
     }
   }
