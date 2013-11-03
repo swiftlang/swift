@@ -375,7 +375,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       // instruction inlined in the case that it succeeds. We purposely
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
-      // the inlined function when processed independently
+      // the inlined function when processed independently.
       DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
                          << " into @" << InnerAI->getFunction()->getName()
                          << "\n");
@@ -401,7 +401,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
       cleanupCalleeValue(Builder, CalleeValue, CaptureArgs);
 
-      // Reposition iterators possibly invalidated by mutation
+      // Reposition iterators possibly invalidated by mutation.
       FI = SILFunction::iterator(ApplyBlock);
       I = ApplyBlock->begin();
       E = ApplyBlock->end();

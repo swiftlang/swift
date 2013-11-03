@@ -20,6 +20,7 @@ namespace {
     SILValue visitSILInstruction(SILInstruction *I) { return SILValue(); }
 
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
+    SILValue visitStructExtractInst(StructExtractInst *SEI);
   };
 } // end anonymous namespace
 
@@ -29,6 +30,14 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
     return TheTuple->getElements()[TEI->getFieldNo()];
 
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
+  // struct_extract(struct(x, y), x) -> x
+  if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
+    return Struct->getOperandForField(SEI->getField())->get();
+  
   return SILValue();
 }
 
