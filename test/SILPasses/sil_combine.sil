@@ -3,6 +3,7 @@
 import Builtin
 import swift
 
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -132,7 +133,7 @@ bb0(%0 : $B):
 // CHECK-NOT: object_pointer_to_ref
 // CHECK: }
 sil @removeTriviallyDeadCrossBasicBlocks : $@thin (b : B, m : Builtin.Int1) -> () {
-bb0(%0:  $B, %1: $Builtin.Int1):
+bb0(%0: $B, %1: $Builtin.Int1):
   %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer
   %13 = cond_br %1, bb1, bb2
 bb1:
@@ -157,4 +158,14 @@ bb0:
   dealloc_stack %1#0 : $*@local_storage ((), (), ())
   %3 = tuple ()
   return %3 : $()
+}
+
+// CHECK-LABEL: sil @tuple_extract
+// CHECK: bb
+// CHECK-NEXT: return %0
+sil @tuple_extract : $@thin (a : Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = tuple (%0 : $Int64, %0 : $Int64)
+  %2 = tuple_extract %1 : $(Int64, Int64), 0
+  return %2 : $Int64
 }

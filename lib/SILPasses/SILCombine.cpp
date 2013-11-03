@@ -29,6 +29,7 @@
 #include "swift/Subsystems.h"
 using namespace swift;
 
+STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
@@ -69,15 +70,17 @@ public:
   /// Add the given list of instructions in reverse order to the worklist. This
   /// routine assumes that the worklist is empty and the given list has no
   /// duplicates.
-  void addInitialGroup(SILInstruction *const *List, unsigned NumEntries) {
+  void addInitialGroup(ArrayRef<SILInstruction *> List) {
     assert(Worklist.empty() && "Worklist must be empty to add initial group");
-    Worklist.reserve(NumEntries+16);
-    WorklistMap.resize(NumEntries);
-    DEBUG(llvm::dbgs() << "SC: ADDING: " << NumEntries
+    Worklist.reserve(List.size()+16);
+    WorklistMap.resize(List.size());
+    DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
                        << " instrs to worklist\n");
-    for (unsigned Idx = 0; NumEntries; --NumEntries) {
-      SILInstruction *I = List[NumEntries-1];
-      WorklistMap.insert(std::make_pair(I, Idx++));
+    while (!List.empty()) {
+      SILInstruction *I = List.back();
+      List = List.slice(0, List.size()-1);
+      
+      WorklistMap.insert(std::make_pair(I, Worklist.size()));
       Worklist.push_back(I);
     }
   }
@@ -88,7 +91,7 @@ public:
     if (It == WorklistMap.end()) return; // Not in worklist.
 
     // Don't bother moving everything down, just null out the slot. We will
-    // check before we process any instruction if it is 0.
+    // check before we process any instruction if it is null.
     Worklist[It->second] = 0;
 
     WorklistMap.erase(It);
@@ -104,8 +107,8 @@ public:
   /// When an instruction has been simplified, add all of its users to the
   /// worklist since additional simplifications of its users may have been
   /// exposed.
-  void addUsersToWorklist(SILInstruction &I) {
-    for (auto UI : I.getUses())
+  void addUsersToWorklist(ValueBase *I) {
+    for (auto UI : I->getUses())
       add(UI->getUser());
   }
 
@@ -175,7 +178,7 @@ public:
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
   SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V) {
-    Worklist.addUsersToWorklist(I);   // Add all modified instrs to worklist.
+    Worklist.addUsersToWorklist(&I);   // Add all modified instrs to worklist.
 
     DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
           "    with " << *V << '\n');
@@ -207,8 +210,8 @@ public:
     return 0;  // Don't do anything with I
   }
 
-  void addInitialGroup(SILInstruction *const *List, unsigned NumEntries) {
-    Worklist.addInitialGroup(List, NumEntries);
+  void addInitialGroup(ArrayRef<SILInstruction *> List) {
+    Worklist.addInitialGroup(List);
   }
 
   /// Base visitor that does not do anything.
@@ -281,8 +284,7 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
   // function down. This jives well with the way that it adds all uses of
   // instructions to the worklist after doing a transformation, thus avoiding
   // some N^2 behavior in pathological cases.
-  SC.addInitialGroup(&InstrsForSILCombineWorklist[0],
-                     InstrsForSILCombineWorklist.size());
+  SC.addInitialGroup(InstrsForSILCombineWorklist);
 }
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
@@ -299,7 +301,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     SILInstruction *I = Worklist.removeOne();
 
     // When we erase an instruction, we use the map in the worklist to check if
-    // the instruction is in the worklist. If it is, we replace it with 0
+    // the instruction is in the worklist. If it is, we replace it with null
     // instead of shifting all members of the worklist towards the front. This
     // check makes sure that if we run into any such residual null pointers, we
     // skip them.
@@ -318,6 +320,25 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // Now that we have an instruction, try simplifying it.
     Builder->setInsertionPoint(I->getParent(), I);
 
+    // Check to see if we can instsimplify the instruction.
+    if (SILValue Result = simplifyInstruction(I)) {
+      ++NumSimplified;
+
+      DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
+                         << "    New = " << *Result.getDef() << '\n');
+        
+      // Everything uses the new instruction now.
+      replaceInstUsesWith(*I, Result.getDef());
+        
+      // Push the new instruction and any users onto the worklist.
+      Worklist.addUsersToWorklist(Result.getDef());
+      
+      eraseInstFromFunction(*I);
+      MadeChange = true;
+      continue;
+    }
+    
+    
 #ifndef NDEBUG
     std::string OrigI;
 #endif
@@ -336,9 +357,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
         // Push the new instruction and any users onto the worklist.
         Worklist.add(Result);
-        Worklist.addUsersToWorklist(*Result);
+        Worklist.addUsersToWorklist(Result);
 
-        // Insert the new instruction into the basic block...
+        // Insert the new instruction into the basic block.
         SILBasicBlock *InstParent = I->getParent();
         SILBasicBlock::iterator InsertPos = I;
 
@@ -355,7 +376,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
           eraseInstFromFunction(*I);
         } else {
           Worklist.add(I);
-          Worklist.addUsersToWorklist(*I);
+          Worklist.addUsersToWorklist(I);
         }
       }
       MadeChange = true;
