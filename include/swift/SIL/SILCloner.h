@@ -625,10 +625,10 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   doPostProcess(Inst,
-    Builder.createTupleExtractInst(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()),
-                                   Inst->getFieldNo(),
-                                   getOpType(Inst->getType())));
+    Builder.createTupleExtract(getOpLocation(Inst->getLoc()),
+                               getOpValue(Inst->getOperand()),
+                               Inst->getFieldNo(),
+                               getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

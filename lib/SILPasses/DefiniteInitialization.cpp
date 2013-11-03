@@ -182,35 +182,18 @@ static void getScalarizedElements(SILValue V,
   CanType AggType = V.getType().getSwiftRValueType();
 
   if (TupleType *TT = AggType->getAs<TupleType>()) {
-    // If this is exploding a tuple_inst, just return the element values.  This
-    // can happen when recursively scalarizing stuff.
-    if (auto *TI = dyn_cast<TupleInst>(V)) {
-      for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
-        ElementVals.push_back(TI->getOperand(i));
-      return;
-    }
-
     for (auto &Field : TT->getFields()) {
       (void)Field;
-      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size()));
+      ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
     }
     return;
   }
 
   assert(AggType->is<StructType>() ||
          AggType->is<BoundGenericStructType>());
-
-  // If this is exploding a struct_inst, just return the element values.  This
-  // can happen when recursively scalarizing stuff.
-  if (auto *SI = dyn_cast<StructInst>(V)) {
-    for (unsigned i = 0, e = SI->getNumOperands(); i != e; ++i)
-      ElementVals.push_back(SI->getOperand(i));
-    return;
-  }
-
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
   for (auto *VD : SD->getStoredProperties()) {
-    ElementVals.push_back(B.createStructExtract(Loc, V, VD));
+    ElementVals.push_back(B.emitStructExtract(Loc, V, VD));
   }
 }
 
@@ -341,7 +324,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
       // Keep track of what subelement is being referenced.
       unsigned NumSubElt = getNumSubElements(Elt.getType()->getCanonicalType());
       if (SubElementNumber < NumSubElt) {
-        Val = B.createTupleExtract(Loc, Val, EltNo);
+        Val = B.emitTupleExtract(Loc, Val, EltNo);
         return ExtractSubElement(Val, SubElementNumber, B, Loc);
       }
 
@@ -359,7 +342,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
         getNumSubElements(SILBuilder::getStructFieldType(ValTy, D));
 
       if (SubElementNumber < NumSubElt) {
-        Val = B.createStructExtract(Loc, Val, D);
+        Val = B.emitStructExtract(Loc, Val, D);
         return ExtractSubElement(Val, SubElementNumber, B, Loc);
       }
 

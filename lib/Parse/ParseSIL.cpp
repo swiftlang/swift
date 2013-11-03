@@ -1694,7 +1694,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                   SILType::getPrimitiveAddressType(ResultTy));
     else
       ResultVal = B.createTupleExtract(InstLoc, Val, Field,
-                          SILType::getPrimitiveObjectType(ResultTy)).getDef();
+                          SILType::getPrimitiveObjectType(ResultTy));
     break;
   }
   case ValueKind::ReturnInst: {

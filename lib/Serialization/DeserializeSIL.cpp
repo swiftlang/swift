@@ -920,9 +920,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     case ValueKind::TupleExtractInst:
       ResultVal = Builder.createTupleExtract(Loc,
-                      getLocalValue(ValID, ValResNum, ST),
-                      TyID,
-                      getSILType(ResultTy, SILValueCategory::Object)).getDef();
+                                             getLocalValue(ValID, ValResNum,ST),
+                                             TyID,
+                                getSILType(ResultTy, SILValueCategory::Object));
       break;
     }
     break;

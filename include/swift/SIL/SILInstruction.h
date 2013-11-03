@@ -1106,6 +1106,10 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
+  SILValue getFieldValue(const VarDecl *V) const {
+    return getOperandForField(V)->get();
+  }
+  
   /// Return the Operand associated with the given VarDecl.
   const Operand *getOperandForField(const VarDecl *V) const {
     return const_cast<StructInst*>(this)->getOperandForField(V);

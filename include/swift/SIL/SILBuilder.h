@@ -428,21 +428,8 @@ public:
                     InjectEnumAddrInst(Loc, Operand, Element));
   }
   
-  SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
-                              unsigned FieldNo, SILType ResultTy) {
-    return insert(new (F.getModule())
-                    TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
-  }
-
-  SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
-                              unsigned FieldNo) {
-    return createTupleExtract(Loc, Operand, FieldNo,
-                              getTupleElementType(Operand.getType(), FieldNo,
-                                                  SILValueCategory::Object));
-  }
-
-  TupleExtractInst *createTupleExtractInst(SILLocation Loc, SILValue Operand,
-                                           unsigned FieldNo, SILType ResultTy) {
+  TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
+                                       unsigned FieldNo, SILType ResultTy) {
     return insert(new (F.getModule())
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
@@ -839,6 +826,37 @@ public:
   /// require memory management.
   SILValue emitGeneralizedValue(SILLocation loc, SILValue value);
   
+  SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,
+                            unsigned FieldNo, SILType ResultTy) {
+    // Fold tuple_extract(tuple(x,y,z),2)
+    if (auto *TI = dyn_cast<TupleInst>(Operand))
+      return TI->getOperand(FieldNo);
+    
+    return createTupleExtract(Loc, Operand, FieldNo, ResultTy);
+  }
+  
+  SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,
+                            unsigned FieldNo) {
+    return emitTupleExtract(Loc, Operand, FieldNo,
+                            getTupleElementType(Operand.getType(), FieldNo,
+                                                SILValueCategory::Object));
+  }
+  
+  SILValue emitStructExtract(SILLocation Loc, SILValue Operand,
+                             VarDecl *Field, SILType ResultTy) {
+    if (auto *SI = dyn_cast<StructInst>(Operand))
+      return SI->getFieldValue(Field);
+    
+    return createStructExtract(Loc, Operand, Field, ResultTy);
+  }
+  
+  SILValue emitStructExtract(SILLocation Loc, SILValue Operand, VarDecl *Field){
+    return emitStructExtract(Loc, Operand, Field,
+                               getStructFieldType(Operand.getType(), Field,
+                                                  SILValueCategory::Object));
+  }
+
+
   //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//

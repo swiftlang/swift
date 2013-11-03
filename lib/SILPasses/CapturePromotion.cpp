@@ -420,9 +420,9 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       if (I != AddrArgumentMap.end()) {
         // Loads of a struct_element_addr of an argument get replaced with
         // struct_extract of the new object type argument.
-        SILValue V = getBuilder().createStructExtract(Inst->getLoc(), I->second,
-                                                      SEAI->getField(),
-                                                      Inst->getType());
+        SILValue V = getBuilder().emitStructExtract(Inst->getLoc(), I->second,
+                                                    SEAI->getField(),
+                                                    Inst->getType());
         ValueMap.insert(std::make_pair(Inst, V));
         return;
       }

@@ -331,7 +331,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
              diag::circular_transparent);
     return false;
   }
-
+  
   // Add to the current inlining set (immutably, so we only affect the set
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
