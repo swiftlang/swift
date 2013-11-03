@@ -2214,6 +2214,17 @@ public:
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
   
+  /// \brief Return the block that will be branched to on the specified enum.
+  SILBasicBlock *getCaseDestination(EnumElementDecl *D) {
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCase(i);
+      if (Entry.first == D) return Entry.second;
+    }
+    // switch_enum is required to be fully covered, return the default if we
+    // didn't find anything.
+    return getDefaultBB();
+  }
+  
   bool hasDefault() const { return HasDefault; }
   SILBasicBlock *getDefaultBB() const {
     assert(HasDefault && "doesn't have a default");

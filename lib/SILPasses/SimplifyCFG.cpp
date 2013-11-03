@@ -91,6 +91,8 @@ namespace {
 
     void simplifyBranchBlock(BranchInst *BI);
     void simplifyCondBrBlock(CondBranchInst *BI);
+    void simplifySwitchEnumBlock(SwitchEnumInst *SEI);
+
   };
 } // end anonymous namespace
 
@@ -347,6 +349,36 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 }
 
 
+/// simplifySwitchEnumBlock - Simplify a basic block that ends with a
+/// switch_enum instruction.
+void SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
+  if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
+    auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
+    auto *ThisBB = SEI->getParent();
+
+    bool DroppedLiveBlock = false;
+    // Copy the successors into a vector, dropping one entry for the liveblock.
+    SmallVector<SILBasicBlock*, 4> Dests;
+    for (auto &S : SEI->getSuccessors()) {
+      if (S == LiveBlock && !DroppedLiveBlock)
+        DroppedLiveBlock = true;
+      else
+        Dests.push_back(S);
+    }
+    
+    SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
+    SEI->eraseFromParent();
+    if (EI->use_empty()) EI->eraseFromParent();
+    
+    addToWorklist(ThisBB);
+    
+    for (auto B : Dests)
+      simplifyAfterDroppingPredecessor(B);
+    addToWorklist(LiveBlock);
+    ++NumConstantFolded;
+    return;
+  }
+}
 
 void SimplifyCFG::run() {
   // Add all of the blocks to the function.
@@ -369,6 +401,8 @@ void SimplifyCFG::run() {
       simplifyCondBrBlock(CBI);
     else if (auto *SII = dyn_cast<SwitchIntInst>(TI))
       (void)SII;
+    else if (auto *SEI = dyn_cast<SwitchEnumInst>(TI))
+      simplifySwitchEnumBlock(SEI);
   }
 }
 

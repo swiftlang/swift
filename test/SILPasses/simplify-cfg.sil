@@ -97,4 +97,16 @@ bb2:
   return %1 : $Int64
 }
 
+/// CHECK-LABEL: sil @testSwitchEnumFold
+/// CHECK-NEXT: bb0(
+/// CHECK-NEXT: return %0 : $Int64
+sil @testSwitchEnumFold : $@thin (a: Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = enum $Bool, #Bool.true!enumelt
+  switch_enum %1 : $Bool, case #Bool.true!enumelt: bb2, case #Bool.false!enumelt: bb1
+bb1:
+  unreachable
+bb2:
+  return %0 : $Int64
+}
 
