@@ -81,28 +81,21 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void
-cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
-                   SILValue CalleeValue,
-                   SmallVectorImpl<SILValue>& CaptureArgs) {
-  auto eraseInstruction = [&](SILInstruction *Inst) {
-    if (static_cast<SILInstruction*>(I) == Inst)
-      ++I;
-    Inst->eraseFromParent();
-  };
-
-  // Handle the case where the callee of the apply is a load instruction
+cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
+                   ArrayRef<SILValue> CaptureArgs) {
+  // Handle the case where the callee of the apply is a load instruction.
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
     SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand().getDef());
     assert(ABI && LI->getOperand().getResultNumber() == 1);
 
-    // The load instruction must have no more uses left to erase it
+    // The load instruction must have no more uses left to erase it.
     if (!LI->use_empty())
       return;
-    eraseInstruction(LI);
+    LI->eraseFromParent();
 
     // Look through uses of the alloc box the load is loading from to find up to
-    // one store and up to one strong release
+    // one store and up to one strong release.
     StoreInst *SI = nullptr;
     StrongReleaseInst *SRI = nullptr;
     for (auto UI = ABI->use_begin(), UE = ABI->use_end(); UI != UE; ++UI) {
@@ -116,10 +109,10 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
         return;
     }
 
-    // If we found a store, record its source and erase it
+    // If we found a store, record its source and erase it.
     if (SI) {
       CalleeValue = SI->getSrc();
-      eraseInstruction(SI);
+      SI->eraseFromParent();
     } else {
       CalleeValue = SILValue();
     }
@@ -131,11 +124,11 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
         B.setInsertionPoint(SRI);
         B.createStrongRelease(SRI->getLoc(), CalleeValue);
       }
-      eraseInstruction(SRI);
+      SRI->eraseFromParent();
     }
 
     assert(ABI->use_empty());
-    eraseInstruction(ABI);
+    ABI->eraseFromParent();
     if (!CalleeValue.isValid())
       return;
   }
@@ -166,12 +159,12 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
           typeLowering.emitDestroyValue(B, SRI->getLoc(), CaptureArg);
         }
       }
-      eraseInstruction(SRI);
+      SRI->eraseFromParent();
     }
 
     CalleeValue = PAI->getCallee();
     assert(PAI->use_empty());
-    eraseInstruction(PAI);
+    PAI->eraseFromParent();
   } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -189,17 +182,17 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
 
     // If there is a strong release of the thin-to-thick function, erase it
     if (SRI)
-      eraseInstruction(SRI);
+      SRI->eraseFromParent();
 
     CalleeValue = TTTFI->getOperand();
     assert(TTTFI->use_empty());
-    eraseInstruction(TTTFI);
+    TTTFI->eraseFromParent();
   }
 
   if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
     if (FRI->use_empty())
-      eraseInstruction(FRI);
+      FRI->eraseFromParent();
   }
 }
 
@@ -376,27 +369,42 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         return false;
       }
 
+      auto *ApplyBlock = InnerAI->getParent();
+      
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently
-      if (!Inliner.inlineFunction(I, CalleeFunction,
+      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+                         << " into @" << InnerAI->getFunction()->getName()
+                         << "\n");
+      
+      
+      // Decrement our iterator (carefully to avoid going off the front) so it
+      // is valid after inlining is done.  Inlining deletes the apply, and can
+      // introduce multiple new basic blocks.
+      if (I != FI->begin())
+        --I;
+      else
+        I = FI->end();
+      if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
                                   InnerAI->getSubstitutions(), FullArgs)) {
-        // If inlining failed, then I is left unchanged, so increment it
-        // before continuing rather than process the same apply instruction
-        // twice.
+        I = InnerAI;
         ++I;
         continue;
       }
 
-      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick, CaptureArgs);
-      cleanupCalleeValue(Builder, I, CalleeValue, CaptureArgs);
+      // Reestablish our iterator if it wrapped.
+      if (I == ApplyBlock->end())
+        I = FI->begin();
+      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
+      cleanupCalleeValue(Builder, CalleeValue, CaptureArgs);
 
       // Reposition iterators possibly invalidated by mutation
-      FI = SILFunction::iterator(I->getParent());
-      FE = F->end();
-      E = FI->end();
+      FI = SILFunction::iterator(ApplyBlock);
+      I = ApplyBlock->begin();
+      E = ApplyBlock->end();
       ++NumMandatoryInlines;
     }
   }
