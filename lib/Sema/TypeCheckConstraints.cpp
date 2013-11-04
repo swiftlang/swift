@@ -3404,15 +3404,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
-  // Check whether both the input and result types of the first are
-  // subtypes of the second.
+  // Check whether both the input type of the first is a subtype of the second.
   auto funcTy1 = type1->castTo<FunctionType>();
   auto funcTy2 = type2->castTo<FunctionType>();
-  auto &context = tc.Context;
-  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput(), dc) ||
-        (funcTy1->getInput()->getUnlabeledType(context)->isEqual(
-           funcTy2->getInput()->getUnlabeledType(context)) &&
-          tc.isSubtypeOf(funcTy1->getResult(), funcTy2->getResult(), dc));
+  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput(), dc);
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
