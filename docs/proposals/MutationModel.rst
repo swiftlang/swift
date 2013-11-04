@@ -79,7 +79,9 @@ non-mutating operations, which I think is probably unacceptable.
 Ban ``get:``\ -Only Properties of Value Type
 --------------------------------------------
 
-The upshot of this decision would be that these get-only properties ::
+The upshot of this decision would be that these get-only properties
+
+.. parsed-literal::
 
  var x = w.children\ **.length**
  var i = someString\ **.startIndex**
@@ -153,12 +155,11 @@ getter even when its target object is known not to be
 modified. [#slice]_
 
 There are probably further optimizations that could be extracted by
-imposing other semantic rules, but discovering these should probably
-be driven by what looks like an opportunity to the core compiler team.
-Unfortunately, all such decisions **should probably be made early**
-because it is impossible to automate the enforcement of such rules
-with tools, and it's much easier to lift restrictions on users than
-add them.
+imposing other semantic rules, but discovering these should be driven
+by what looks like an opportunity to the core compiler team.
+Unfortunately, all such rules **should be made early** if possible,
+because it is impossible to automate their enforcement with tools, and
+it's much easier to lift restrictions on users than it is to add them.
 
 Declaring Immutable Data
 ------------------------
