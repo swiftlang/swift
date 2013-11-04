@@ -245,11 +245,20 @@ all follow the final keyword::
   var (foo:bars:) : (Int, Float...) -> ()
   (foo: 1, bars: 1.0, 2.5, 3.0)
 
+Simple names can be bound to functions of any type or to non-function values,
+as before.
+
 Default arguments
 -----------------
 
-Default arguments become a feature of a declaration, not of its type.
-All default arguments must follow the required arguments of the declaration.
+If present, defaulted parameters must follow the required parameters of the
+declaration::
+
+  def foo(x: Int, y: Int, z: Int = 3) // OK
+
+  // Error: required argument 'w' comes after defaulted argument 'z'
+  def foo(x: Int, y: Int, z: Int = 3, w: Int)
+
 If the argument corresponding to a keyword name in a declaration is defaulted,
 that keyword is a **defaulted keyword**. Keyword names corresponding to
 required arguments are **required keywords**. Defaulted keywords must be unique
