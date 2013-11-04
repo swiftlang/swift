@@ -10,9 +10,10 @@ In short
 - Compound-named functions with root namess are called using our existing
   labeled tuple syntax, ``root(keyword: x, keyword: y)``. The keywords are
   optional if there is a root name. Compound-named functions without root names
-  are invoked with our old 'dot-paren' syntax, except the dot is no longer
-  a strict requirement, since tuple literals don't have labels.
+  are invoked with bare parenthesized syntax.
   ``(keyword: x, keyword: y)`` is a call to ``(keyword:keyword:)``.
+  ``object.(keyword: x, keyword: y)`` is a call to the method
+  ``object.(keyword:keyword:)``.
 - We import Objective-C methods as rootless compound names, such as
   ``(tableView:dataSourceForColumn:)``, ``(getCharacters:range:)``, etc.
 
@@ -45,44 +46,6 @@ Some examples of identifiers, simple or compound::
 
   // Compound names with a root.
   set(x:y:)
-
-Compound names can be bound to variables, functions, and enum cases, and must
-be bound to a value of `matching function type`_. They can also be used in
-expressions like simple identifiers::
-
-  // Binding variables
-  var (tableView:dataSourceForColumn:) = foo.(tableView:dataSourceForColumn:)
-  var memcpy(dest:src:n:) = Darwin.memcpy
-  var (foo:bar:bas:) = memcpy(dest:src:n:)
-  
-  // Defining functions
-  def set(x:y:)(x: Int, y: Int) { ... }
-  def (tableView:dataSourceForColumn:)(tableView: NSTableView,
-                                        column: NSTableViewColumn)
-       -> NSTableViewDataSource {
-    ...
-  }
-
-  // Calling functions and methods
-  memcpy(dest:src:n:)(destPtr, srcPtr, size)
-  foo.(tableView:dataSourceForColumn:)(employees, lastName)
-
-  // Using functions as values
-  var pairs = [(0, 1), (1, 1), (1, 2), (2, 3), (3, 5)]
-  pairs.each(set(x:y:))
-
-  // Keyword enum cases
-  enum Shape {
-    case Point(x:y:)(Double, Double)
-    case LineSegment(x1:y1:x2:y2:)(Double, Double, Double, Double)
-  }
-
-  var diagonal: Shape = .LineSegment(x1:y1:x2:y2:)(-1, -1, 1, 1)
-
-The above declaration and call syntax is of course not how you would normally
-want to use functions with compound names in practice. We thus also
-provide specialized "keyword" syntax for declaring and calling compound-named
-functions:
 
 Keyword function declarations
 -----------------------------
@@ -128,22 +91,11 @@ the keyword name::
   }
 
 The same keyword name can be used in multiple positions, except for defaulted
-keywords (see below). Required keywords are positional.
+keywords (see below); non-defaulted keywords are positional::
 
   // Declares set(x:x:)
   def set x:(Int) x:(Int) {
-  }
-
-Keyword enum cases
--------------------
-
-``case`` declarations can also use keyword sugar::
-
-  enum Shape {
-    // Declares Shape.Point(x:y:)
-    case Point x:(Double) y:(Double)
-    // Declares Shape.LineSegment(x1:y1:x2:y2:)
-    case LineSegment x1:(Double) y1:(Double) x2:(Double) y2:(Double)
+    ...
   }
 
 Keyword function calls
@@ -152,7 +104,7 @@ Keyword function calls
 Our current keyword tuple literal syntax is repurposed as sugar for calling
 compound-named functions. The root name of the function's compound name, if any,
 appears to the left of the parens; if there is no root name, the opening paren
-starts the function call, as in our previous "dot-paren" syntax experiment::
+starts the function call::
 
   // Sugar for foo.(tableView:dataSourceForColumn:)(...)
   foo.(tableView: employees, dataSourceForColumn: lastName)
@@ -168,8 +120,18 @@ starts the function call, as in our previous "dot-paren" syntax experiment::
   // Sugar for set(x:y:)(...)
   set(x: 1, y: 2)
 
-Keyword case expressions and patterns
--------------------------------------
+Keyword enum cases
+------------------
+
+``case`` declarations in enums can also use keyword sugar::
+
+  enum Shape {
+    // Declares Shape.Point(x:y:) with payload type (Double, Double)
+    case Point x:(Double) y:(Double)
+    // Declares Shape.LineSegment(x1:y1:x2:y2:)
+    //   with payload type (Double, Double, Double, Double)
+    case LineSegment x1:(Double) y1:(Double) x2:(Double) y2:(Double)
+  }
 
 Keyword call syntax can also be used to construct enum keyword cases. Enum
 patterns can also use keyword call syntax to destructure keyword cases in
@@ -179,7 +141,7 @@ patterns can also use keyword call syntax to destructure keyword cases in
 
   switch diagonal {
   case .LineSegment(x1: var x1, y1: _, x2: var x2, y2: _):
-    println("horizontal span \(x2 - y2)")
+    println("horizontal span \(x2 - y1)")
   }
 
 Keyword initializers
@@ -210,6 +172,45 @@ Keyword initializers
     }
   }
 
+Unsugared compound names in expressions and declarations
+--------------------------------------------------------
+
+Compound names can be used unsugared like simple names. They can be
+bound to variables, functions, and enum cases, and must
+be bound to a value of `matching function type`_. They can also be used in
+expressions like simple identifiers::
+
+  // Binding variables
+  var (tableView:dataSourceForColumn:) = foo.(tableView:dataSourceForColumn:)
+  var memcpy(dest:src:n:) = Darwin.memcpy
+  var (foo:bar:bas:) = memcpy(dest:src:n:)
+  
+  // Defining functions
+  def set(x:y:)(x: Int, y: Int) { ... }
+  def (tableView:dataSourceForColumn:)(tableView: NSTableView,
+                                        column: NSTableViewColumn)
+       -> NSTableViewDataSource {
+    ...
+  }
+
+  // Calling functions and methods
+  memcpy(dest:src:n:)(destPtr, srcPtr, size)
+  foo.(tableView:dataSourceForColumn:)(employees, lastName)
+
+  // Using functions as values
+  var pairs = [(0, 1), (1, 1), (1, 2), (2, 3), (3, 5)]
+  pairs.each(set(x:y:))
+
+  // Keyword enum cases
+  enum Shape {
+    case Point(x:y:)(Double, Double)
+    case LineSegment(x1:y1:x2:y2:)(Double, Double, Double, Double)
+  }
+
+  var diagonal: Shape = .LineSegment(x1:y1:x2:y2:)(-1, -1, 1, 1)
+
+The above declaration and call syntax is of course not how you would normally
+want to use functions with compound names in practice.
 
 Matching function type
 ----------------------
@@ -269,7 +270,7 @@ necessary to reference the name, either in unapplied or applied form::
 If a compound name has a root name, name lookup is done by the root name, and
 any additional keyword names are optional. Keywords are not required except
 when lookup would otherwise be ambiguous. Required keywords must appear
-in declaration position if given; they cannot be reorderd::
+in declaration position if given; they cannot be reordered::
 
   def set x:(x:Double) y:(y:Double)
   def set x:(x:Int) z:(z:Int) 
