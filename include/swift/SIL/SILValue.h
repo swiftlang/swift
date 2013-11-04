@@ -180,6 +180,12 @@ public:
   static SILValue getFromOpaqueValue(void *p) {
     return SILValue(p);
   }
+
+  enum {
+    NumLowBitsAvailable =
+      llvm::PointerLikeTypeTraits<decltype(ValueAndResultNumber)>::
+          NumLowBitsAvailable
+  };
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
@@ -648,7 +654,7 @@ namespace llvm {
       return SILValue::getFromOpaqueValue(p);
     }
     
-    enum { NumLowBitsAvailable = 2 - swift::ValueResultNumberBits };
+    enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 }  // end namespace llvm
 
