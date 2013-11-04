@@ -1598,7 +1598,20 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
   Explosion e(ExplosionKind::Maximal);
-  emitStringLiteral(*this, i->getValue(), e);
+
+  e.add(IGM.getAddrOfGlobalString(i->getValue()));
+  e.add(Builder.getInt64(i->getValue().size()));
+
+  // Determine whether this is an ASCII string.
+  bool isASCII = true;
+  for (unsigned char c : i->getValue()) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
+  e.add(Builder.getInt1(isASCII));
+
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
@@ -2133,7 +2146,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   if (IGM.DebugInfo) {
     auto Indirection = IndirectValue;
-    // LValues [inout] are implicitly indirect because of their type.
+    // LValues (@inout) are implicitly indirect because of their type.
     if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
       Indirection = DirectValue;
     // FIXME: [inout] arguments that are not promoted are emitted as

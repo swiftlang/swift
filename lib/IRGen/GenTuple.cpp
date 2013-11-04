@@ -273,8 +273,7 @@ void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                              Explosion &tuple,
                                              unsigned fieldNo,
                                              Explosion &out) {
-  FOR_TUPLE_IMPL(IGF, tupleType,
-                 projectElementFromExplosion,
+  FOR_TUPLE_IMPL(IGF, tupleType, projectElementFromExplosion,
                  tuple, fieldNo, out);
 }
 
@@ -282,27 +281,5 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           Address tuple,
                                           SILType tupleType,
                                           unsigned fieldNo) {
-  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress,
-                 tuple, fieldNo);
-}
-
-/// Emit a string literal, either as a C string pointer or as a (pointer, size)
-/// tuple.
-// FIXME: Why is this here?
-void swift::irgen::emitStringLiteral(IRGenFunction &IGF,
-                                     StringRef string,
-                                     Explosion &out) {
-  auto ptr = IGF.IGM.getAddrOfGlobalString(string);
-  out.add(ptr);
-  out.add(IGF.Builder.getInt64(string.size()));
-
-  // Determine whether this is an ASCII string.
-  bool isASCII = true;
-  for (unsigned char c : string) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
-  out.add(IGF.Builder.getInt1(isASCII));
+  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple, fieldNo);
 }

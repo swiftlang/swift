@@ -40,13 +40,6 @@ namespace irgen {
                                         unsigned fieldNo,
                                         Explosion &out);
 
- 
-
-  /// Emit a string literal rvalue.
-  void emitStringLiteral(IRGenFunction &IGF,
-                         StringRef string,
-                         Explosion &out);
-  
 } // end namespace irgen
 } // end namespace swift
 
