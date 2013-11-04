@@ -3175,6 +3175,90 @@ namespace {
   };
 }
 
+namespace {
+  /// Describes the relationship between the context types for two declarations.
+  enum class SelfTypeRelationship {
+    /// The types are unrelated; ignore the bases entirely.
+    Unrelated,
+    /// The types are equivalent.
+    Equivalent,
+    /// The first type is a subclass of the second.
+    Subclass,
+    /// The second type is a subclass of the first.
+    Superclass,
+    /// The first type conforms to the second
+    ConformsTo,
+    /// The second type conforms to the first.
+    ConformedToBy
+  };
+}
+
+/// Determines whether the first type is nominally a superclass of the second
+/// type, ignore generic arguments.
+static bool isNominallySuperclassOf(TypeChecker &tc, Type type1, Type type2) {
+  auto nominal1 = type1->getAnyNominal();
+  if (!nominal1)
+    return false;
+
+  for (auto super2 = type2; super2; super2 = super2->getSuperclass(&tc)) {
+    if (super2->getAnyNominal() == nominal1)
+      return true;
+  }
+
+  return false;
+}
+
+/// Determine the relationship between the self types of the given declaration
+/// contexts..
+static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
+                                                        DeclContext *dc,
+                                                        DeclContext *dc1,
+                                                        DeclContext *dc2){
+  // If at least one of the contexts is a non-type context, the two are
+  // unrelated.
+  if (!dc1->isTypeContext() || !dc2->isTypeContext())
+    return SelfTypeRelationship::Unrelated;
+
+  Type type1 = dc1->getDeclaredTypeInContext();
+  Type type2 = dc2->getDeclaredTypeInContext();
+
+  // If the types are equal, the answer is simple.
+  if (type1->isEqual(type2))
+    return SelfTypeRelationship::Equivalent;
+
+  // If both types can have superclasses, which whether one is a superclass
+  // of the other. The subclass is the common base type.
+  if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
+    if (isNominallySuperclassOf(tc, type1, type2))
+      return SelfTypeRelationship::Superclass;
+
+    if (isNominallySuperclassOf(tc, type2, type1))
+      return SelfTypeRelationship::Subclass;
+
+    return SelfTypeRelationship::Unrelated;
+  }
+
+  // If neither or both are protocol types, consider the bases unrelated.
+  bool isProtocol1 = type1->is<ProtocolType>();
+  bool isProtocol2 = type2->is<ProtocolType>();
+  if (isProtocol1 == isProtocol2)
+    return SelfTypeRelationship::Unrelated;
+
+  // Just one of the two is a protocol. Check whether the other conforms to
+  // that protocol.
+  Type protoTy = isProtocol1? type1 : type2;
+  Type modelTy = isProtocol1? type2 : type1;
+  auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+
+  // If the model type does not conform to the protocol, the bases are
+  // unrelated.
+  if (!tc.conformsToProtocol(modelTy, proto, dc))
+    return SelfTypeRelationship::Unrelated;
+
+  return isProtocol1? SelfTypeRelationship::ConformedToBy
+                    : SelfTypeRelationship::ConformsTo;
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -3241,9 +3325,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // Compare generic signatures.
   // FIXME: This path could subsume the prior path.
   if (poly1 || poly2) {
-    // FIXME: Don't deal with just methods yet.
-    if (decl1->getDeclContext()->isTypeContext() ||
-        decl2->getDeclContext()->isTypeContext()) {
+    // We can't handle comparing generic subscripts yet.
+    if (isa<SubscriptDecl>(decl1)) {
       return false;
     }
 
@@ -3251,17 +3334,62 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     ConstraintSystem cs(tc, dc);
 
     // Get the type of a reference to the second declaration.
-    Type fullOpenedType2, openedType2;
-    std::tie(fullOpenedType2, openedType2)
-      = cs.getTypeOfReference(decl2, /*isTypeReference=*/false,
-                              /*isSpecialized=*/false);
+    Type openedType2 = cs.openType(decl2->getInterfaceType(),
+                                   decl2->getPotentialGenericDeclContext());
 
     // Get the type of a reference to the first declaration, swapping in
     // archetypes for the dependent types.
     ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
-    Type openedType1 = cs.getTypeOfReference(decl1, /*isTypeReference=*/false,
-                                             /*isSpecialized=*/false, &opener)
-                         .second;
+    Type openedType1 = cs.openType(decl1->getInterfaceType(),
+                                   decl1->getPotentialGenericDeclContext(),
+                                   /*skipProtocolSelfConstraint=*/false,
+                                   &opener);
+
+    // Extract the self types from the declarations, if they have them.
+    Type selfTy1;
+    Type selfTy2;
+    if (decl1->getDeclContext()->isTypeContext() &&
+        isa<AbstractFunctionDecl>(decl1)) {
+      auto funcTy1 = openedType1->castTo<FunctionType>();
+      selfTy1 = funcTy1->getInput()->getRValueInstanceType();
+      openedType1 = funcTy1->getResult();
+    }
+    if (decl2->getDeclContext()->isTypeContext() &&
+        isa<AbstractFunctionDecl>(decl2)) {
+      auto funcTy2 = openedType2->castTo<FunctionType>();
+      selfTy2 = funcTy2->getInput()->getRValueInstanceType();
+      openedType2 = funcTy2->getResult();
+    }
+
+    // Determine the relationship between the 'self' types and add the
+    // appropriate constraints. The constraints themselves never fail, but
+    // they help deduce type variables that were opened.
+    switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
+                                           decl2->getDeclContext())) {
+    case SelfTypeRelationship::Unrelated:
+      // Skip the self types parameter entirely.
+      break;
+
+    case SelfTypeRelationship::Equivalent:
+      cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2);
+      break;
+
+    case SelfTypeRelationship::Subclass:
+      cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy1, selfTy2);
+      break;
+
+    case SelfTypeRelationship::Superclass:
+      cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy2, selfTy1);
+      break;
+
+    case SelfTypeRelationship::ConformsTo:
+      cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2);
+      break;
+
+    case SelfTypeRelationship::ConformedToBy:
+      cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1);
+      break;
+    }
 
     // Check whether the first function type's input is a subtype of the second
     // type's inputs, i.e., can we forward the arguments?
@@ -4587,6 +4715,11 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 }
 
 bool TypeChecker::isTrivialSubtypeOf(Type type1, Type type2, DeclContext *dc) {
+  // FIXME: Egregious hack due to checkClassOverrides being awful.
+  if (type1->is<PolymorphicFunctionType>() ||
+      type2->is<PolymorphicFunctionType>())
+    return false;
+
   ConstraintSystem cs(*this, dc);
   cs.addConstraint(ConstraintKind::TrivialSubtype, type1, type2);
   SmallVector<Solution, 1> solutions;

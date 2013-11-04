@@ -324,6 +324,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         AnyFunctionType *MemberFTy =
             MemberVD->getType()->getAs<AnyFunctionType>();
         AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
+        // FIXME: We should be dealing in interface types here.
         if (MemberFTy && OtherFTy) {
           isSubtype = TC.isTrivialSubtypeOf(MemberFTy->getResult(),
                                             OtherFTy->getResult(),
