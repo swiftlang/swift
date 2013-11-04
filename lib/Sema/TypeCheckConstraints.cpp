@@ -284,8 +284,7 @@ namespace {
       MemberReplacements;
 
   public:
-    GetTypeVariable(ConstraintSystem &cs,
-                    DependentTypeOpener *opener)
+    GetTypeVariable(ConstraintSystem &cs, DependentTypeOpener *opener)
       : CS(cs), Opener(opener) { }
 
     TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
@@ -907,9 +906,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Figure out the declaration context to use when opening this type.
-  DeclContext *dc = value->getDeclContext();
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    dc = func;
+  DeclContext *dc = value->getPotentialGenericDeclContext();
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;

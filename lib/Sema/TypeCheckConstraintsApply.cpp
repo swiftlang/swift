@@ -287,9 +287,7 @@ namespace {
       // specialized reference to it.
       if (auto genericFn
             = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        auto dc = decl->getDeclContext();
-        if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-          dc = func;
+        auto dc = decl->getPotentialGenericDeclContext();
 
         SmallVector<Substitution, 4> substitutions;
         auto type = solution.computeSubstitutions(genericFn, dc, openedType,
@@ -329,9 +327,7 @@ namespace {
 
         // Figure out the declaration context where we'll get the generic
         // parameters.
-        auto dc = member->getDeclContext();
-        if (auto func = dyn_cast<AbstractFunctionDecl>(member))
-          dc = func;
+        auto dc = member->getPotentialGenericDeclContext();
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;

@@ -434,9 +434,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
 
   if (openedFullWitnessType->hasTypeVariable()) {
     // Figure out the context we're substituting into.
-    auto witnessDC = witness->getDeclContext();
-    if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
-      witnessDC = func;
+    auto witnessDC = witness->getPotentialGenericDeclContext();
 
     // Compute the set of substitutions we'll need for the witness.
     solution.computeSubstitutions(witness->getInterfaceType(),
