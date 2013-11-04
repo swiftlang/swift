@@ -1048,6 +1048,19 @@ sil @dynamic_single_payload_empty_payload_inject_no_payload : $() -> DynamicSing
   return %u : $DynamicSinglePayload<()>
 }
 
+// <rdar://problem/15383966>
+// CHECK: define void @dynamic_single_payload_generic_destroy
+// CHECK:   br i1
+// CHECK: <label>
+// CHECK:   call void %destroy
+// CHECK: <label>
+sil @dynamic_single_payload_generic_destroy : $@thin <T> DynamicSinglePayload<T> -> () {
+entry(%x : $*DynamicSinglePayload<T>):
+  destroy_addr %x : $*DynamicSinglePayload<T>
+  %z = tuple ()
+  return %z : $()
+}
+
 enum MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
   case y(Builtin.Int32)

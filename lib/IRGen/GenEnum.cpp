@@ -820,7 +820,7 @@ public:
       }
       bodyStruct->setBody(body, /*isPacked*/true);
     }
-
+    
   public:
     PayloadEnumImplStrategyBase(TypeInfoKind tik, unsigned NumElements,
                                  std::vector<Element> &&WithPayload,
@@ -1561,10 +1561,8 @@ public:
       llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr);
       
       // If there is, project and destroy it.
-      if (payloadTy) {
-        Address payloadAddr = projectPayloadData(IGF, addr);
-        getPayloadTypeInfo().destroy(IGF, payloadAddr);
-      }
+      Address payloadAddr = projectPayloadData(IGF, addr);
+      getPayloadTypeInfo().destroy(IGF, payloadAddr);
       
       IGF.Builder.CreateBr(endBB);
       IGF.Builder.emitBlock(endBB);
