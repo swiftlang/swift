@@ -278,7 +278,6 @@ namespace {
   class GetTypeVariable {
     ConstraintSystem &CS;
     DependentTypeOpener *Opener;
-    llvm::DenseMap<CanType, TypeVariableType *> &Replacements;
 
     /// The type variables introduced for (base type, associated type) pairs.
     llvm::DenseMap<std::pair<CanType, AssociatedTypeDecl *>, TypeVariableType *>
@@ -286,9 +285,8 @@ namespace {
 
   public:
     GetTypeVariable(ConstraintSystem &cs,
-                    DependentTypeOpener *opener,
-                    llvm::DenseMap<CanType, TypeVariableType *> &replacements)
-      : CS(cs), Opener(opener), Replacements(replacements) { }
+                    DependentTypeOpener *opener)
+      : CS(cs), Opener(opener) { }
 
     TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
       auto known = MemberReplacements.find({base->getCanonicalType(), member});
@@ -457,7 +455,7 @@ Type ConstraintSystem::openType(
        DeclContext *dc,
        bool skipProtocolSelfConstraint,
        DependentTypeOpener *opener) {
-  GetTypeVariable getTypeVariable{*this, opener, replacements};
+  GetTypeVariable getTypeVariable{*this, opener};
 
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
@@ -758,7 +756,7 @@ void ConstraintSystem::openGeneric(
     }
   }
 
-  GetTypeVariable getTypeVariable{*this, opener, replacements};
+  GetTypeVariable getTypeVariable{*this, opener};
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
                                               opener, replacements, 
