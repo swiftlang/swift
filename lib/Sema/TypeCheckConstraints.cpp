@@ -721,7 +721,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Adjust the type of the reference.
   valueType = adjustLValueForReference(
                 openType(valueType,
-                         value->getPotentialGenericDeclContext(),
+                         value->getInnermostDeclContext(),
                          /*skipProtocolSelfConstraint=*/false,
                          opener),
                 value->getAttrs().isAssignment(),
@@ -908,7 +908,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Figure out the declaration context to use when opening this type.
-  DeclContext *dc = value->getPotentialGenericDeclContext();
+  DeclContext *dc = value->getInnermostDeclContext();
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
@@ -3335,13 +3335,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
     // Get the type of a reference to the second declaration.
     Type openedType2 = cs.openType(decl2->getInterfaceType(),
-                                   decl2->getPotentialGenericDeclContext());
+                                   decl2->getInnermostDeclContext());
 
     // Get the type of a reference to the first declaration, swapping in
     // archetypes for the dependent types.
-    ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+    ArchetypeOpener opener(decl1->getInnermostDeclContext());
     Type openedType1 = cs.openType(decl1->getInterfaceType(),
-                                   decl1->getPotentialGenericDeclContext(),
+                                   decl1->getInnermostDeclContext(),
                                    /*skipProtocolSelfConstraint=*/false,
                                    &opener);
 

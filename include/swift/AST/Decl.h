@@ -1080,10 +1080,6 @@ public:
   /// Overwrite the type of this declaration.
   void overwriteType(Type T);
 
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  DeclContext *getPotentialGenericDeclContext();
-
   /// Retrieve the "interface" type of this value, which is the type used when
   /// the declaration is viewed from the outside. For a generic function,
   /// this will have generic function type using generic parameters rather than
