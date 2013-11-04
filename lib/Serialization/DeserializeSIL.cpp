@@ -307,6 +307,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
     InFunc = getFuncForReference(FuncName,
                                  getSILType(Ty, SILValueCategory::Object),
                                  SILMod);
+  funcOrOffset = InFunc;
   assert(InFunc->empty() &&
          "SILFunction to be deserialized starts being empty.");
 
@@ -1247,7 +1248,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Pair> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE) {
+  while (kind != SIL_VTABLE && kind != SIL_FUNCTION) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
@@ -1262,10 +1263,12 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     entry = SILCursor.advance(AF_DontPopBlockAtEnd);
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       // EndBlock means the end of this VTable.
-      return SILVTable::create(SILMod, theClass, vtableEntries);
+      break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
-  return SILVTable::create(SILMod, theClass, vtableEntries);
+  SILVTable *vT = SILVTable::create(SILMod, theClass, vtableEntries);
+  vTableOrOffset = vT;
+  return vT;
 }
 
 SILVTable *SILDeserializer::lookupVTable(Identifier Name) {

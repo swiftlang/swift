@@ -1180,7 +1180,8 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
-    checkAllowedAttributes<AK_objc>(theClass);
+    checkAllowedAttributes<
+      AK_objc, AK_resilient, AK_fragile, AK_born_fragile>(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
@@ -1190,6 +1191,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclRef(DC),
                             theClass->isImplicit(),
                             theClass->isObjC(),
+                            (unsigned)theClass->getAttrs().getResilienceKind(),
                             addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());

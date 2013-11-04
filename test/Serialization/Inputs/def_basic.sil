@@ -1028,13 +1028,15 @@ bb9:
   return %27 : $UInt8
 }
 
+@fragile
 class Foo {
   subscript (x: Int, y: Int) -> Int
   var x: Int
   var y: Int
 }
 
-// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
+// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin ((), (x: Int64, y: Int64), Foo) -> Int64 {
+// CHECK_DECL-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin ((), (x: Int64, y: Int64), Foo) -> Int64{{$}} 
 sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin ((), (x: Int64, y: Int64), Foo) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   %3 = tuple ()
@@ -1055,7 +1057,8 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   return %13 : $Int64
 }
 
-// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin ((value: Int64), (x: Int64, y: Int64), Foo) -> () {
+// CHECK_DECL-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin ((value: Int64), (x: Int64, y: Int64), Foo) -> (){{$}}
 sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin ((value: Int64), (x: Int64, y: Int64), Foo) -> () {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
   %4 = alloc_stack $Int64  // var value           // users: %16, %5
@@ -1079,6 +1082,10 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
 // CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
 // CHECK: }
+// CHECK_DECL-LABEL: sil_vtable Foo {
+// CHECK_DECL: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
+// CHECK_DECL: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+// CHECK_DECL: }
 sil_vtable Foo {
   #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
   #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis

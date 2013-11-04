@@ -1330,8 +1330,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     bool isImplicit, isObjC;
     TypeID superclassID;
+    unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, isObjC, superclassID);
+                                         isImplicit, isObjC, resilienceKind,
+                                         superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1351,6 +1353,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setImplicit();
     if (superclassID)
       theClass->setSuperclass(getType(superclassID));
+    if ((Resilience)resilienceKind == Resilience::Fragile)
+      theClass->getMutableAttrs().setAttr(AK_fragile, SourceLoc());
+    else if ((Resilience)resilienceKind == Resilience::InherentlyFragile)
+      theClass->getMutableAttrs().setAttr(AK_born_fragile, SourceLoc());
+    else if ((Resilience)resilienceKind == Resilience::Resilient)
+      theClass->getMutableAttrs().setAttr(AK_resilient, SourceLoc());
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {

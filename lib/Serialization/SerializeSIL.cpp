@@ -110,6 +110,10 @@ namespace {
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
+    /// SILFunctions that are required by SILVTable.
+    llvm::SmallVector<const SILFunction *, 16> FuncsForVTable;
+    llvm::SmallSet<const SILFunction *, 16> FuncSetForVTable;
+
     std::array<unsigned, 256> SILAbbrCodes;
     template <typename Layout>
     void registerSILAbbr() {
@@ -126,7 +130,7 @@ namespace {
     void handleMethodInst(const MethodInst *MI, SILValue operand,
                           SmallVectorImpl<ValueID> &ListOfValues);
 
-    void writeSILFunction(const SILFunction &F);
+    void writeSILFunction(const SILFunction &F, bool DeclOnly = false);
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
     void writeVTable(const SILVTable &vt);
@@ -157,7 +161,7 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
   return id;
 }
 
-void SILSerializer::writeSILFunction(const SILFunction &F) {
+void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   DEBUG(llvm::dbgs() << "Serialize SIL:\n";
         F.dump());
   ValueIDs.clear();
@@ -172,6 +176,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)F.getLinkage(), (unsigned)F.isTransparent(),
                        FnID);
+  if (DeclOnly)
+    return;
   
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
@@ -1119,6 +1125,8 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   for (auto &entry : vt.getEntries()) {
     SmallVector<ValueID, 4> ListOfValues;
     handleSILDeclRef(S, entry.first, ListOfValues);
+    FuncsForVTable.push_back(entry.second);
+    FuncSetForVTable.insert(entry.second);
     // Each entry is a pair of SILDeclRef and SILFunction.
     VTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[VTableEntryLayout::Code],
@@ -1157,14 +1165,8 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
     registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
 
-    // Go through all SILFunctions in M, and if it is transparent,
-    // write out the SILFunction.
-    for (const SILFunction &F : *M) {
-      if ((EnableSerializeAll || F.isTransparent())
-          && !F.empty())
-        writeSILFunction(F);
-    }
-
+    // Write out VTables first because it may require serializations of
+    // non-transparent SILFunctions (body is not needed).
     // Go through all SILVTables in M, and if it is fragile, write out the
     // VTable.
     for (const SILVTable &vt : M->getVTables()) {
@@ -1173,6 +1175,22 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
           cd->getAttrs().getResilienceKind() == Resilience::Fragile)
         writeVTable(vt);
     }
+
+    // Go through all SILFunctions in M, and if it is transparent,
+    // write out the SILFunction.
+    for (const SILFunction &F : *M) {
+      if ((EnableSerializeAll || F.isTransparent())
+          && !F.empty()) {
+        writeSILFunction(F);
+        // If a SILFunction is already serialized, remove it from the set.
+        FuncSetForVTable.erase(&F);
+      }
+    }
+
+    // Serialize the declaration only.
+    for (unsigned I = 0, E = FuncsForVTable.size(); I < E; I++)
+      if (FuncSetForVTable.count(FuncsForVTable[I]))
+        writeSILFunction(*FuncsForVTable[I], true);
   }
   {
     BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
