@@ -854,13 +854,32 @@ public:
                                         Type castTy,
                                         CheckedCastKind kind);
   
+  /// \brief Emits the abstraction change needed, if any, to perform casts from
+  /// the type represented by \c origTL to each of the types represented by
+  /// \c castTLs.
+  ///
+  /// \param loc      The AST location associated with the operation.
+  /// \param original The value to cast.
+  /// \param origTL   The original type.
+  /// \param castTLs  The types to which to cast.
+  ///
+  /// \returns The value shifted to the highest abstraction level necessary
+  /// for the casts, or a null SILValue if no abstraction changes are needed.
+  SILValue emitCheckedCastAbstractionChange(SILLocation loc,
+                                       SILValue original,
+                                       const TypeLowering &origTL,
+                                       ArrayRef<const TypeLowering *> castTLs);
+  
   /// \brief Emit a conditional checked cast branch. Does not re-abstract the
   /// argument to the success branch. Terminates the current BB.
   ///
   /// \param loc          The AST location associated with the operation.
   /// \param original     The value to cast.
-  /// \param origTy       The original AST-level type.
-  /// \param castTy       The destination type.
+  /// \param originalAbstracted
+  ///                     The result of \c emitCheckedCastAbstractionChange
+  ///                     applied to the original value.
+  /// \param origTL       The original AST-level type.
+  /// \param castTL       The destination type.
   /// \param kind         The semantics of the cast.
   ///
   /// \returns a pair of SILBasicBlocks, representing the success and failure
@@ -869,8 +888,9 @@ public:
   std::pair<SILBasicBlock*, SILBasicBlock*>
   emitCheckedCastBranch(SILLocation loc,
                         SILValue original,
-                        Type origTy,
-                        Type castTy,
+                        SILValue originalAbstracted,
+                        const TypeLowering &origTL,
+                        const TypeLowering &castTL,
                         CheckedCastKind kind);
 
   /// Inject a loadable value into an optional.

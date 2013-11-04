@@ -287,7 +287,22 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
   }
       
   case PatternKind::Isa: {
-    /// Emit all the 'is' checks.
+    auto &origTL = gen.getTypeLowering(headPattern->getType());
+    auto castTLs
+      = map<SmallVector<const TypeLowering *,4>>(patterns,
+          [&](const SpecializingPattern &p) {
+            return &gen.getTypeLowering(
+              cast<IsaPattern>(p.pattern)->getCastTypeLoc().getType());
+          });
+    
+    
+    /// Emit an abstraction change if any of the casts will require it.
+    SILValue vAbstract
+      = gen.emitCheckedCastAbstractionChange(const_cast<Pattern*>(headPattern),
+                                             v, origTL, castTLs);
+    
+    /// Emit all of the 'is' checks.
+    unsigned i = 0;
     for (SpecializingPattern p : patterns) {
       auto *ip = cast<IsaPattern>(p.pattern);
       RegularLocation Loc(const_cast<IsaPattern*>(ip));
@@ -297,9 +312,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       // Perform a conditional cast branch.
       SILBasicBlock *trueBB, *falseBB;
       std::tie(trueBB, falseBB) = gen.emitCheckedCastBranch(Loc,
-                                        v,
-                                        ip->getType(),
-                                        ip->getCastTypeLoc().getType(),
+                                        v, vAbstract,
+                                        origTL, *castTLs[i],
                                         ip->getCastKind());
       
       // On the true branch, we can get the cast value from the BB argument.
@@ -321,6 +335,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
       // Dispatch continues on the "false" block.
       gen.B.emitBlock(falseBB);
+      
+      ++i;
     }
 
     // The current block is now the "default" block.

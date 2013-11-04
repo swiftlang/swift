@@ -728,20 +728,41 @@ SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
   return result;
 }
 
+SILValue
+SILGenFunction::emitCheckedCastAbstractionChange(SILLocation loc,
+                                       SILValue original,
+                                       const TypeLowering &origTL,
+                                       ArrayRef<const TypeLowering *> castTLs) {
+  // If the original type is already address-only, we don't need to abstract
+  // further.
+  if (origTL.isAddressOnly()) {
+    return SILValue();
+  }
+  
+  // If any of the cast-to types are address-only, spill to a temporary.
+  if (std::find_if(castTLs.begin(), castTLs.end(),
+                   [](const TypeLowering *tl){ return tl->isAddressOnly(); })
+        != castTLs.end()) {
+    SILValue temp = emitTemporaryAllocation(loc, origTL.getLoweredType());
+    B.createStore(loc, original, temp);
+    return temp;
+  }
+  
+  // Otherwise, no abstraction change is needed.
+  return SILValue();
+}
+
 std::pair<SILBasicBlock*, SILBasicBlock*>
 SILGenFunction::emitCheckedCastBranch(SILLocation loc,
                                       SILValue original,
-                                      Type origTy,
-                                      Type castTy,
+                                      SILValue originalAbstracted,
+                                      const TypeLowering &origLowering,
+                                      const TypeLowering &castLowering,
                                       CheckedCastKind kind) {
-  auto &origLowering = getTypeLowering(origTy);
-  auto &castLowering = getTypeLowering(castTy);
-  
   // Spill to a temporary if casting from loadable to address-only.
   if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
-    SILValue temp = emitTemporaryAllocation(loc, origLowering.getLoweredType());
-    B.createStore(loc, original, temp);
-    original = temp;
+    assert(originalAbstracted && "no abstracted value for cast");
+    original = originalAbstracted;
   }
   
   // Get the cast destination type at the least common denominator abstraction
@@ -781,13 +802,17 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   
   // Keep the original cleanup because the cast-to result, while more specific,
   // is conditionally wrapped up in an optional.
-  SILValue originalVal = original.getValue();
+  SILValue origVal = original.getValue();
   CleanupsDepth resultCleanup = original.getCleanup();
   SILBasicBlock *success, *failure;
-  std::tie(success, failure) = SGF.emitCheckedCastBranch(E, originalVal,
-                                                 E->getSubExpr()->getType(),
-                                                 E->getCastTypeLoc().getType(),
-                                                 E->getCastKind());
+  auto &origTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  auto &castTL = SGF.getTypeLowering(E->getCastTypeLoc().getType());
+  SILValue origAbs = SGF.emitCheckedCastAbstractionChange(E, origVal,
+                                                          origTL,
+                                                          &castTL);
+  std::tie(success, failure) = SGF.emitCheckedCastBranch(E, origVal, origAbs,
+                                                         origTL, castTL,
+                                                         E->getCastKind());
   
   // Handle the cast success case.
   SGF.B.emitBlock(success);
@@ -798,15 +823,14 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   // be left in a partially initialized state after the optional injection
   // function.
   AllocStackInst *copyBuf = nullptr;
-  if (originalVal.getType().isExistentialType()
-      && !originalVal.getType().isClassExistentialType()) {
+  if (origVal.getType().isExistentialType()
+      && !origVal.getType().isClassExistentialType()) {
     copyBuf = SGF.B.createAllocStack(E, castResult.getType());
     SGF.B.createCopyAddr(E, castResult, SILValue(copyBuf, 1),
                          IsNotTake, IsInitialization);
   }
 
   // Load the BB argument if casting from address-only to loadable type.
-  auto &castTL = SGF.getTypeLowering(castResult.getType());
   if (castResult.getType().isAddress() && !castTL.isAddressOnly())
     castResult = SGF.B.createLoad(E, castResult);
 
@@ -873,11 +897,16 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   // Cast the value using a conditional cast.
   ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
                                                               E->getSubExpr());
+  auto &origTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  auto &castTL = SGF.getTypeLowering(E->getCastTypeLoc().getType());
+  SILValue origAbs = SGF.emitCheckedCastAbstractionChange(E,original.getValue(),
+                                                          origTL,
+                                                          &castTL);
+  
   SILBasicBlock *success, *failure;
   std::tie(success, failure)
-    = SGF.emitCheckedCastBranch(E, original.getValue(),
-                                E->getSubExpr()->getType(),
-                                E->getCastTypeLoc().getType(),
+    = SGF.emitCheckedCastBranch(E, original.getValue(), origAbs,
+                                origTL, castTL,
                                 E->getCastKind());
 
   // Join the branches into an i1 value representing the success of the cast.
