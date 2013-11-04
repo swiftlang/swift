@@ -290,50 +290,6 @@ namespace {
                     llvm::DenseMap<CanType, TypeVariableType *> &replacements)
       : CS(cs), Opener(opener), Replacements(replacements) { }
 
-    TypeVariableType *operator()(ArchetypeType *archetype) const {
-      // Check whether we already have a replacement for this archetype.
-      auto known = Replacements.find(archetype->getCanonicalType());
-      if (known != Replacements.end())
-        return known->second;
-
-      // Create a new type variable to replace this archetype.
-      // FIXME: Path to this declaration being opened, then to the archetype.
-      auto tv = CS.createTypeVariable(
-                  CS.getConstraintLocator((Expr *)nullptr,
-                                          LocatorPathElt(archetype)),
-                  TVO_PrefersSubtypeBinding);
-
-      // If there is a superclass for the archetype, add the appropriate
-      // trivial subtype requirement on the type variable.
-      if (auto superclass = archetype->getSuperclass()) {
-        CS.addConstraint(ConstraintKind::TrivialSubtype, tv, superclass);
-      }
-
-      // The type variable must be convertible of the composition of all of
-      // its protocol conformance requirements, i.e., it must conform to
-      // each of those protocols.
-      auto conformsTo = archetype->getConformsTo();
-      if (!conformsTo.empty()) {
-        // FIXME: Can we do this more efficiently, since we know that the
-        // protocol list has already been minimized?
-        for (auto protocol : conformsTo) {
-          CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                           protocol->getDeclaredType());
-        }
-      }
-
-      // Record the type variable that corresponds to this archetype.
-      Replacements[archetype->getCanonicalType()] = tv;
-
-      // Build archetypes for each of the nested types.
-      for (auto nested : archetype->getNestedTypes()) {
-        auto nestedTv = (*this)(nested.second);
-        CS.addTypeMemberConstraint(tv, nested.first, nestedTv);
-      }
-
-      return tv;
-    }
-
     TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
       auto known = MemberReplacements.find({base->getCanonicalType(), member});
       if (known != MemberReplacements.end())
@@ -497,16 +453,11 @@ namespace {
 
 Type ConstraintSystem::openType(
        Type startingType,
-       ArrayRef<ArchetypeType *> archetypes,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements,
        DeclContext *dc,
        bool skipProtocolSelfConstraint,
        DependentTypeOpener *opener) {
   GetTypeVariable getTypeVariable{*this, opener, replacements};
-
-  // Create type variables for each archetype we're opening.
-  for (auto archetype : archetypes)
-    (void)getTypeVariable(archetype);
 
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
@@ -985,9 +936,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                   replacements);
 
       // Open up the type of the member.
-      openedType = openType(
-                     openedType,
-                     { }, replacements, nullptr, false, opener);
+      openedType = openType(openedType, replacements, nullptr, false, opener);
 
       // Determine the object type of 'self'.
       if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
@@ -996,8 +945,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                 ->getCanonicalType()];
       } else {
         // Open the nominal type.
-        selfTy = openType(nominal->getDeclaredInterfaceType(), { },
-                          replacements);
+        selfTy = openType(nominal->getDeclaredInterfaceType(), replacements);
       }
     } else {
       selfTy = value->getDeclContext()->getDeclaredTypeOfContext();

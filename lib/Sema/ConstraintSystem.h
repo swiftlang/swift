@@ -1266,9 +1266,8 @@ public:
     typeVar->getImpl().assignFixedType(type, getSavedBindings());
   }
 
-  /// \brief "Open" the given type by replacing any occurrences of archetypes,
-  /// generic parameter types, and dependent member types with fresh type
-  /// variables.
+  /// \brief "Open" the given type by replacing any occurrences of generic
+  /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
   ///
@@ -1282,17 +1281,13 @@ public:
                 bool skipProtocolSelfConstraint = false,
                 DependentTypeOpener *opener = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, { }, replacements, dc, skipProtocolSelfConstraint,
-                    opener);
+    return openType(type, replacements, dc, skipProtocolSelfConstraint, opener);
   }
 
-  /// \brief "Open" the given type by replacing any occurrences of archetypes
-  /// (including those implicit in unbound generic types) with fresh type
-  /// variables.
+  /// \brief "Open" the given type by replacing any occurrences of generic
+  /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
-  ///
-  /// \param archetypes The set of archetypes we're opening.
   ///
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
@@ -1306,12 +1301,11 @@ public:
   /// types.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(
-         Type type, ArrayRef<ArchetypeType *> archetypes,
-         llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-         DeclContext *dc = nullptr,
-         bool skipProtocolSelfConstraint = false,
-         DependentTypeOpener *opener = nullptr);
+  Type openType(Type type,
+                llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+                DeclContext *dc = nullptr,
+                bool skipProtocolSelfConstraint = false,
+                DependentTypeOpener *opener = nullptr);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
