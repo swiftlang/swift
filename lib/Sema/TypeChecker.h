@@ -723,7 +723,7 @@ public:
   LookupResult lookupConstructors(Type type, DeclContext *dc);
 
   /// \brief Look up the Bool type in the standard library.
-  Type lookupBoolType();
+  Type lookupBoolType(const DeclContext *dc);
 
   /// Diagnose an ambiguous member type lookup result.
   void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
@@ -776,7 +776,7 @@ public:
   ///
   /// This is "swift", if that module is imported, or the current translation
   /// unit if we're parsing the standard library.
-  Module *getStdlibModule();
+  Module *getStdlibModule(const DeclContext *dc);
 
   /// \name AST Mutation Listener Implementation
   /// @{

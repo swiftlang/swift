@@ -190,16 +190,14 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   ASTContext &context = TC.Context;
 
   // Dig up Bool, true, and false. We'll need them.
-  UnqualifiedLookup lookupBool(context.getIdentifier("Bool"),
-                               TC.getStdlibModule(), nullptr);
-  auto boolDecl = lookupBool.getSingleTypeResult();
+  Type boolTy = TC.lookupBoolType(DC);
   UnqualifiedLookup lookupTrue(context.getIdentifier("true"),
-                               TC.getStdlibModule(), nullptr);
+                               TC.getStdlibModule(DC), nullptr);
   auto trueDecl = lookupTrue.isSuccess()
                     ? dyn_cast<VarDecl>(lookupTrue.Results[0].getValueDecl())
                     : nullptr;
   UnqualifiedLookup lookupFalse(context.getIdentifier("false"),
-                                TC.getStdlibModule(), nullptr);
+                                TC.getStdlibModule(DC), nullptr);
   auto falseDecl = lookupFalse.isSuccess()
                      ? dyn_cast<VarDecl>(lookupFalse.Results[0].getValueDecl())
                      : nullptr;
@@ -207,12 +205,10 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // If we have Bool/true/false, create the declaration "first" to capture the
   // first walk through the loop and initialize it to "true".
   VarDecl *firstVar = nullptr;
-  if (boolDecl && trueDecl && falseDecl) {
-    auto boolTy = boolDecl->getDeclaredType();
-    
+  if (boolTy && trueDecl && falseDecl) {
     firstVar = new (context) VarDecl(Loc,
                                      context.getIdentifier("first"),
-                                     boolDecl->getDeclaredType(), DC);
+                                     boolTy, DC);
     Pattern *pattern = new (context) NamedPattern(firstVar);
     pattern->setType(boolTy);
     pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
@@ -516,7 +512,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   
   SmallVector<ValueDecl*, 4> PrintDecls;
   UnqualifiedLookup PrintDeclLookup(C.getIdentifier("print"),
-                                    TC->getStdlibModule(), TC);
+                                    TC->getStdlibModule(&SF), TC);
   if (!PrintDeclLookup.isSuccess())
     return;
   for (auto Result : PrintDeclLookup.Results)

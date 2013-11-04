@@ -124,31 +124,24 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   llvm_unreachable("Unhandled literal kind");
 }
 
-Module *TypeChecker::getStdlibModule() {
+Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (StdlibModule)
     return StdlibModule;
 
   if (!StdlibModule)
     StdlibModule = Context.LoadedModules.lookup(Context.StdlibModuleName.str());
-  if (!StdlibModule) {
-    // FIXME: Hack. There should just be a pointer on ASTContext to the main
-    // module.
-    for (auto &entry : Context.LoadedModules) {
-      if (auto TU = dyn_cast_or_null<TranslationUnit>(entry.getValue()))
-        if (!TU->getSourceFiles().front()->getImportBufferID().hasValue())
-          StdlibModule = TU;
-    }
-    assert(StdlibModule && "no main module found");
-  }
+  if (!StdlibModule)
+    StdlibModule = dc->getParentModule();
 
+  assert(StdlibModule && "no main module found");
   Context.recordKnownProtocols(StdlibModule);
   return StdlibModule;
 }
 
-Type TypeChecker::lookupBoolType() {
+Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return boolType.cache([&]{
     UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
-                                 getStdlibModule(), nullptr,
+                                 getStdlibModule(dc), nullptr,
                                  SourceLoc(),
                                  /*IsTypeLookup=*/true);
     if (!boolLookup.isSuccess()) {
@@ -470,7 +463,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
 
   // Lookup the swift module.  This ensures that we record all known protocols
   // in the AST.
-  (void) TC.getStdlibModule();
+  (void) TC.getStdlibModule(&SF);
 
   // Resolve extensions. This has to occur first during type checking,
   // because the extensions need to be wired into the AST for name lookup

@@ -495,7 +495,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     *type = lookupGlobalType(*this, dc, name);
 
     if (!*type)
-      *type = lookupGlobalType(*this, getStdlibModule(), name);
+      *type = lookupGlobalType(*this, getStdlibModule(dc), name);
 
     // Strip off one level of sugar; we don't actually want to print
     // the name of the typealias itself anywhere.

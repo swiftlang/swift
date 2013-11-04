@@ -952,7 +952,7 @@ namespace {
     
     Type visitIsaExpr(IsaExpr *expr) {
       // The result is Bool.
-      return CS.getTypeChecker().lookupBoolType();
+      return CS.getTypeChecker().lookupBoolType(CS.DC);
     }
     
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {

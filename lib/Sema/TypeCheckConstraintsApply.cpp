@@ -803,7 +803,7 @@ namespace {
       // Find the maximum-sized builtin integer type.
       // FIXME: Cache name lookup.
       auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinIntegerType");
-      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(), &tc);
+      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(dc), &tc);
       auto maxTypeDecl
         = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
       if (!maxTypeDecl ||
@@ -852,7 +852,7 @@ namespace {
       // Find the maximum-sized builtin float type.
       // FIXME: Cache name lookup.
       auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinFloatType");
-      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(), &tc);
+      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(dc), &tc);
       auto maxTypeDecl
       = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
       if (!maxTypeDecl ||
