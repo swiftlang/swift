@@ -1007,10 +1007,10 @@ StringRef Module::getModuleFilename() const {
     return StringRef();
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Figure out what the right intent is here.
+    // FIXME: Figure out what the right intent is here. Modules can consist of
+    // more than one file.
     if (TU->getSourceFiles().size() == 1)
-      if (auto ID = TU->getSourceFiles().front()->getImportBufferID())
-        return Ctx.SourceMgr->getMemoryBuffer(*ID)->getBufferIdentifier();
+      return TU->getSourceFiles().front()->getFilename();
     return StringRef();
   }
 
@@ -1153,9 +1153,9 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 }
 
 SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
-                       Optional<unsigned> ImportID, bool hasBuiltinModuleAccess)
+                       Optional<unsigned> bufferID, bool hasBuiltinModuleAccess)
   : DeclContext(DeclContextKind::SourceFile, &tu),
-    ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {
+    BufferID(bufferID ? *bufferID : -1), TU(tu), Kind(K) {
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 
@@ -1166,6 +1166,12 @@ bool SourceFile::walk(ASTWalker &walker) {
       return true;
   }
   return false;
+}
+
+StringRef SourceFile::getFilename() const  {
+  if (BufferID == -1)
+    return "";
+  return TU.Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
 }
 
 

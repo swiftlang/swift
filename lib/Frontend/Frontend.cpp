@@ -144,7 +144,7 @@ void swift::CompilerInstance::doIt() {
 
   if (Kind == SourceFile::REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+      new (*Context) SourceFile(*TU, Kind, {}, Invocation.getParseStdlib());
     TU->addSourceFile(*SingleInputFile);
     return;
   }
@@ -170,7 +170,8 @@ void swift::CompilerInstance::doIt() {
 
     SILParserState SILContext(TheSILModule.get());
     auto *SingleInputFile =
-      new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
+      new (*Context) SourceFile(*TU, Kind, BufferID,
+                                Invocation.getParseStdlib());
     TU->addSourceFile(*SingleInputFile);
 
     unsigned CurTUElem = 0;
@@ -195,6 +196,7 @@ void swift::CompilerInstance::doIt() {
     auto BufferID = BufferIDs[i];
 
     auto *NextInput = new (*Context) SourceFile(*TU, SourceFile::Library,
+                                                BufferID,
                                                 Invocation.getParseStdlib());
     TU->addSourceFile(*NextInput);
 

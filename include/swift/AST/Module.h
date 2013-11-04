@@ -347,9 +347,10 @@ private:
   /// This is filled in by the Name Binding phase.
   ArrayRef<std::pair<Module::ImportedModule, bool>> Imports;
 
-  /// \brief The buffer ID for the file that was imported as this TU, or -1
-  /// if this TU is not an imported TU.
-  int ImportBufferID;
+  /// \brief The ID for the memory buffer containing this file's source.
+  ///
+  /// May be -1, to indicate no association with a buffer.
+  int BufferID;
 
 public:
   /// The translation unit that this file is a part of.
@@ -395,13 +396,8 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Parsing;
 
-  SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> ImportID,
-             bool hasBuiltinModuleAccess);
-  SourceFile(TranslationUnit &tu, SourceKind K, unsigned ImportID)
-    : SourceFile(tu, K, ImportID, false) {}
-  SourceFile(TranslationUnit &tu, SourceKind K,
-             bool hasBuiltinModuleAccess = false)
-    : SourceFile(tu, K, Nothing, hasBuiltinModuleAccess) {}
+  SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> bufferID,
+             bool hasBuiltinModuleAccess = false);
   ~SourceFile();
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
@@ -431,13 +427,17 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  /// \brief The buffer ID for the file that was imported as this TU, or Nothing
-  /// if this is not an imported TU.
-  Optional<unsigned> getImportBufferID() const {
-    if (ImportBufferID == -1)
+  /// \brief The buffer ID for the file that was imported, or Nothing if there
+  /// is no associated buffer.
+  Optional<unsigned> getBufferID() const {
+    if (BufferID == -1)
       return Nothing;
-    return ImportBufferID;
+    return BufferID;
   }
+
+  /// If this buffer corresponds to a file on disk, returns the path.
+  /// Otherwise, return an empty string.
+  StringRef getFilename() const;
 
   /// Traverse the decls within this file.
   ///
