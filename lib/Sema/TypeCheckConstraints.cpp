@@ -3266,8 +3266,9 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
 static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                                   ValueDecl *decl1, ValueDecl *decl2) {
   // If the kinds are different, there's nothing we can do.
-  // FIXME: This is wrong for type declarations.
-  if (decl1->getKind() != decl2->getKind())
+  // FIXME: This is wrong for type declarations, which we're skipping
+  // entirely.
+  if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
 
   // A witness is always more specialized than the requirement it satisfies.
@@ -3404,7 +3405,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
-  // Check whether both the input type of the first is a subtype of the second.
+  // Check whether the input type of the first is a subtype of the second.
   auto funcTy1 = type1->castTo<FunctionType>();
   auto funcTy2 = type2->castTo<FunctionType>();
   return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput(), dc);
