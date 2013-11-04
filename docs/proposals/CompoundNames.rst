@@ -330,6 +330,9 @@ the unnamed default keywords implicitly bound to their default values::
   var b = foo(z:x:) // b has type (String, Int) -> String
   var c = foo(x:y:) // c has type (Int, Float) -> String
 
+The default values in this case are evaluated at the point the partial name
+is referenced as part of creating the function value.
+
 Duplicate definitions with compound names
 -----------------------------------------
 
