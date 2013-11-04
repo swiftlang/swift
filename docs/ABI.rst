@@ -725,6 +725,8 @@ such as its enclosing module, function, or nominal type.
 Types
 ~~~~~
 
+::
+
   type ::= 'A' natural type                  // fixed-size array
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
   type ::= 'Bi' natural '_'                  // Builtin.Int<n>
