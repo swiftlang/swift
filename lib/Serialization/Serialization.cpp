@@ -176,10 +176,12 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
 }
 
 IdentifierID Serializer::addModuleRef(const Module *M) {
-  assert(M != TU && "cannot form cross-reference to module being serialized");
   if (M == TU->Ctx.TheBuiltinModule)
-    return 0;
+    return BUILTIN_MODULE_ID;
+  if (M == TU)
+    return CURRENT_MODULE_ID;
 
+  assert(!M->Name.empty());
   return addIdentifierRef(M->Name);
 }
 
@@ -626,20 +628,19 @@ Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
                                         IdentifierID &moduleID) {
   bool append = !isa<NormalProtocolConformance>(conformance);
   if (append) {
-    // Encode the type in typeID. Set moduleID to 0 to indicate that the
-    // underlying conformance will follow.
+    // Encode the type in typeID. Set moduleID to BUILTIN_MODULE_ID to indicate
+    // that the underlying conformance will follow. This is safe because there
+    // should never be any conformances in the Builtin module.
     typeID = addTypeRef(conformance->getType());
-    moduleID = 0;
+    moduleID = serialization::BUILTIN_MODULE_ID;
   } else {
     typeID = addDeclRef(conformance->getType()->getAnyNominal());
     assert(typeID && "Missing nominal type for specialized conformance");
 
-    // '0' is a sentinel for a trailing underlying conformance record.
-    // Use '1' to mean 'this module', and add 2 to any other module reference.
-    if (conformance->getContainingModule() == TU)
-      moduleID = 1;
-    else
-      moduleID = addModuleRef(conformance->getContainingModule()) + 2;
+    // BUILTIN_MODULE_ID is a sentinel for a trailing underlying conformance
+    // record.
+    moduleID = addModuleRef(conformance->getContainingModule());
+    assert(moduleID != serialization::BUILTIN_MODULE_ID);
   }
 
   return append;
@@ -2015,8 +2016,6 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU,
 
   writeAllDeclsAndTypes();
   writeAllIdentifiers();
-
-  //
 
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);

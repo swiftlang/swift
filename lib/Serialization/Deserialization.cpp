@@ -151,18 +151,14 @@ ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
                                       DeclID typeID,
                                       IdentifierID moduleID,
                                       llvm::BitstreamCursor &Cursor) {
-  if (!moduleID) {
+  if (moduleID == serialization::BUILTIN_MODULE_ID) {
     // The underlying conformance is in the following record.
     return maybeReadConformance(getType(typeID), Cursor)->second;
   }
 
   // Dig out the protocol conformance within the nominal declaration.
   auto nominal = cast<NominalTypeDecl>(getDecl(typeID));
-  Module *owningModule;
-  if (moduleID == 1)
-    owningModule = ModuleContext;
-  else
-    owningModule = getModule(getIdentifier(moduleID-2));
+  Module *owningModule = getModule(moduleID);
   (void)owningModule; // FIXME: Currently only used for checking.
 
   // Search protocols
@@ -674,8 +670,9 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   if (IID == 0)
     return Identifier();
 
-  assert(IID <= Identifiers.size() && "invalid identifier ID");
-  auto identRecord = Identifiers[IID-1];
+  size_t rawID = IID - NUM_SPECIAL_MODULES;
+  assert(rawID < Identifiers.size() && "invalid identifier ID");
+  auto identRecord = Identifiers[rawID];
 
   if (identRecord.Offset == 0)
     return identRecord.Ident;
@@ -706,6 +703,14 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
+Module *ModuleFile::getModule(ModuleID MID) {
+  if (MID == BUILTIN_MODULE_ID)
+    return ModuleContext->Ctx.TheBuiltinModule;
+  if (MID == CURRENT_MODULE_ID)
+    return ModuleContext;
+  return getModule(getIdentifier(MID));
+}
+
 Module *ModuleFile::getModule(Identifier name) {
   if (name.empty())
     return ModuleContext->Ctx.TheBuiltinModule;
@@ -715,7 +720,7 @@ Module *ModuleFile::getModule(Identifier name) {
   if (name == ModuleContext->Name) {
     if (!ShadowedModule) {
       auto importer = ModuleContext->Ctx.getClangModuleLoader();
-      assert(importer && "no way to import shadowed module (recursive xref?)");
+      assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
                                             std::make_pair(name, SourceLoc()));
       assert(ShadowedModule && "missing shadowed module");
@@ -1603,7 +1608,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isWithinExtension, rawAccessPath);
 
     // First, find the module this reference is referring to.
-    Module *M = getModule(getIdentifier(rawAccessPath.front()));
+    Module *M = getModule(rawAccessPath.front());
     assert(M && "missing dependency");
     rawAccessPath = rawAccessPath.slice(1);
 
@@ -1613,7 +1618,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       // Start by looking up the top-level decl in the module.
       Module *baseModule = M;
       if (isWithinExtension) {
-        baseModule = getModule(getIdentifier(rawAccessPath.front()));
+        baseModule = getModule(rawAccessPath.front());
         assert(baseModule && "missing dependency");
         rawAccessPath = rawAccessPath.slice(1);
       }

@@ -134,7 +134,10 @@ private:
   TypeID LastTypeID = 0;
 
   /// The last assigned IdentifierID for types from this module.
-  IdentifierID LastIdentifierID = 0;
+  ///
+  /// Note that special module IDs must not be valid IdentifierIDs, except that
+  /// 0 will always represent the empty identifier.
+  IdentifierID LastIdentifierID = serialization::NUM_SPECIAL_MODULES - 1;
 
   /// Returns the record code for serializing the given vector of offsets.
   ///
@@ -290,8 +293,8 @@ public:
   ///
   /// The module's name will be scheduled for serialization if necessary.
   ///
-  /// \returns The ID for the identifier for the module's name, or 0 for the
-  ///          builtin module.
+  /// \returns The ID for the identifier for the module's name, or one of the
+  /// special module codes defined above.
   IdentifierID addModuleRef(const Module *M);
 
   /// Writes a list of generic substitutions. abbrCode is needed to support

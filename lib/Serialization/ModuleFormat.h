@@ -50,6 +50,10 @@ using TypeIDField = DeclIDField;
 using IdentifierID = Fixnum<31>;
 using IdentifierIDField = BCFixed<31>;
 
+// ModuleID must be the same as IdentifierID because it is stored the same way.
+using ModuleID = IdentifierID;
+using ModuleIDField = IdentifierIDField;
+
 using BitOffset = Fixnum<31>;
 using BitOffsetField = BCFixed<31>;
 
@@ -169,6 +173,22 @@ enum LibraryKind : uint8_t {
   Framework
 };
 using LibraryKindField = BCFixed<1>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR. Adding a new ID requires adding a byte of overhead to the
+// identifier table in Serializer::writeAllIdentifiers.
+enum : uint8_t {
+  /// Special IdentifierID value for the Builtin module.
+  BUILTIN_MODULE_ID = 0,
+  /// Special IdentifierID value for the current module.
+  CURRENT_MODULE_ID,
+
+  /// The number of special modules. This value should never be encoded;
+  /// it should only be used to count the number of names above. As such, it
+  /// is correct and necessary to add new values above this one.
+  NUM_SPECIAL_MODULES
+};
+
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -846,9 +866,9 @@ namespace decls_block {
     DeclIDField,         // the nominal type decl for the generic conformance,
                          // or the conforming type for the generic conformance
                          // record that follows
-    IdentifierIDField,   // the module in which the generic conformance occurs,
-                         // or 0 to indicate that the generic conformance
-                         // is in the following record
+    ModuleIDField,       // the module in which the generic conformance occurs,
+                         // or BUILTIN_MODULE_ID to indicate that the generic
+                         // conformance is in the following record
     BCVBR<5>,            // type mapping count
     BCVBR<5>,            // # of substitutions for the conformance
     BCArray<DeclIDField> // the type witnesses
@@ -858,13 +878,13 @@ namespace decls_block {
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
-    DeclIDField,       // the protocol
-    DeclIDField,       // the nominal type decl for the inherited conformance,
-                       // or the conforming type for the inherited conformance
-                       // record that follows
-    IdentifierIDField  // the module in which the inherited conformance occurs,
-                       // or 0 to indicate that the inherited conformance is
-                       // in the following record
+    DeclIDField,  // the protocol
+    DeclIDField,  // the nominal type decl for the inherited conformance,
+                  // or the conforming type for the inherited conformance
+                  // record that follows
+    ModuleIDField // the module in which the inherited conformance occurs,
+                  // or BUILTIN_MODULE_ID to indicate that the inherited
+                  // conformance is in the following record
   >;
 
   using DeclContextLayout = BCRecordLayout<
@@ -878,8 +898,8 @@ namespace decls_block {
     TypeIDField,   // type if value, operator kind if operator,
                    // index if generic parameter
     BCFixed<1>,    // within extension?
-    BCArray<IdentifierIDField> // extension module name (if extension value)
-                               // base module name
+    BCArray<IdentifierIDField> // extension module ID (if extension value)
+                               // base module ID
                                // access path
   >;
 }

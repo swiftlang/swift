@@ -370,10 +370,13 @@ public:
                 Optional<DeclContext *> ForcedContext = {},
                 std::function<void(Decl*)> DidRecord = nullptr);
 
+  /// Returns the appropriate module for the given ID.
+  Module *getModule(serialization::ModuleID MID);
+
   /// Returns the appropriate module for the given name.
   ///
   /// If the name matches the name of the current module, a shadowed module
-  /// is loaded instead. An empty name represents the Builtin module.
+  /// is loaded instead.
   Module *getModule(Identifier name);
 
   /// Reads a substitution record from \c DeclTypeCursor.
