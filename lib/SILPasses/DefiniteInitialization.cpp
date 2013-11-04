@@ -1517,7 +1517,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       assert(!InStructSubElement && !InEnumSubElement &&
              "enum_data_addr shouldn't apply to subelements");
       // Keep track of the fact that we're inside of an enum.  This informs our
-      // recursion that tuple
+      // recursion that tuple stores are not scalarized outside, and that stores
+      // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
       collectUses(SILValue(User, 0), BaseElt);
       continue;
@@ -1530,9 +1531,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
              "init_existential should not apply to subelements");
       Uses[BaseElt].push_back({ User, UseKind::Store });
       
-      // Set the "InStructSubElement" flag (so we don't consider stores to be
-      // full definitions) and recursively process the uses.
-      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+      // Set the "InEnumSubElement" flag (so we don't consider tuple indexes to
+      // index across elements) and recursively process the uses.
+      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
       collectUses(SILValue(User, 0), BaseElt);
       continue;
     }

@@ -574,7 +574,7 @@ bb5:                                              // Preds: bb4
 }
 
 
-
+// CHECK-LABEL: sil @destroy_addr
 sil @destroy_addr : $@cc(method) @thin ((), SomeClass) -> SomeClass {
 bb0(%0 : $SomeClass):
   %1 = alloc_stack $SomeClass
@@ -588,5 +588,28 @@ bb0(%0 : $SomeClass):
   destroy_addr %1#1 : $*SomeClass                 // id: %14
   dealloc_stack %1#0 : $*@local_storage SomeClass // id: %15
   return %12 : $SomeClass                         // id: %16
+}
+
+
+protocol P {}
+class C : P {}
+
+sil @use : $@thin P -> ()
+
+
+// rdar://15379013
+// CHECK-LABEL: sil @init_existential_with_class
+sil @init_existential_with_class : $@thin (@inout C) -> () {
+entry(%a : $*C):
+  %p = alloc_stack $P
+  %q = init_existential %p#1 : $*P, $*C
+  
+  // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
+  copy_addr %a to [initialization] %q : $*C
+  %u = function_ref @use : $@thin P -> ()
+  %v = apply %u(%p#1) : $@thin P -> ()
+  dealloc_stack %p#0 : $*@local_storage P
+  %z = tuple ()
+  return %z : $()
 }
 
