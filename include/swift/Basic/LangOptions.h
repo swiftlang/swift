@@ -32,9 +32,6 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
-    
-    /// \brief Whether to enable SILGen peepholes for lvalue-to-lvalue copies.
-    bool SILGenLValuePeepholes = false;
   };
 }
 
