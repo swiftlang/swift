@@ -127,7 +127,7 @@ public:
   static inline swift::ValueBase *getFromVoidPointer(void *P) {
     return (swift::ValueBase*)P;
   }
-  enum { NumLowBitsAvailable = alignof(swift::ValueBase) };
+  enum { NumLowBitsAvailable = 3 };
 };
 } // end namespace llvm
 
