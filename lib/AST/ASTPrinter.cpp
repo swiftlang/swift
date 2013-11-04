@@ -564,6 +564,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl->getAttrs());
+  printImplicitObjCNote(decl);
   OS << "protocol ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
