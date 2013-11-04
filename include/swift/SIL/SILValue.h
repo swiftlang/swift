@@ -116,7 +116,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 }  // end namespace swift
 
 namespace llvm {
-// TypeBase* is always at least eight-byte aligned; make the three tag bits
+// ValueBase* is always at least eight-byte aligned; make the three tag bits
 // available through PointerLikeTypeTraits.
 template<>
 class PointerLikeTypeTraits<swift::ValueBase*> {
