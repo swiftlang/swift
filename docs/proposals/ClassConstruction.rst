@@ -127,25 +127,32 @@ Here are the proposed rules:
   default, part of the public interface of a subclass defined in
   Objective-C.
 
-* `init`` methods defined in Swift never override anything.  We have a
-  mechanism for “virtual initialization:” ``init`` methods can call
+* ``self.init(…)`` calls in Swift never dispatch virtually.  We have a
+  safe model for “virtual initialization:” ``init`` methods can call
   overridable methods after all instance variables and superclasses
-  are initialized.  We've got a beautiful model for making that safe,
-  and there's no need to complicate the picture with ``init`` method
-  overriding.
+  are initialized.  Allowing *virtual* constructor delegation would
+  undermine that safety.
 
-* ``init`` methods defined in Swift can't be overridden, even by
-  subclasses defined in Objective-C.
-    
-* ``init`` methods defined in Objective-C *can* be overridden by
-  subclasses defined in Objective-C, even if there are intervening
-  Swift classes.  This allows lovers of the designated initialization
-  pattern to continue using it on the Objective-C side even when parts
-  of the class hierarchy have been moved to Swift.
-    
 * As a convenience, when a subclass' instance variables all have
   initializers, it should be possible to explicitly expose superclass
   init methods in a Swift subclass without writing out complete
   forwarding functions.  For example::
 
     @inherit init(x:y:z) // one possible syntax
+
+  .. Note:: Allowing ``@inherit init(*)`` is a terrible idea
+
+     It allows superclasses to break their subclasses by adding
+     ``init`` methods.
+
+     
+Summary
+=======
+
+By eliminating by-default ``init``\ method inheritance and disabling
+virtual dispatch in constructor delegation, we give class designers
+full control over the state of his constructed instances.  By
+preserving virtual dispatch for non-``self``, non-``super`` calls to
+``init`` methods, we allow Objective-C programmers to keep using the
+patterns that depend on virtual dispatch, including designated
+initializers and ``initWithCoder`` methods.
