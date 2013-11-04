@@ -7,7 +7,7 @@ In short
 - Compound-named functions are declared with a variation of our selector syntax,
   ``def root keyword:(x:T) keyword:(y:U)`` with a root name, or
   ``def keyword:(x:T) keyword:(y:U)`` without one.
-- Compound-named functions with root namess are called using our existing
+- Compound-named functions with root names are called using our existing
   labeled tuple syntax, ``root(keyword: x, keyword: y)``. The keywords are
   optional if there is a root name. Compound-named functions without root names
   are invoked with bare parenthesized syntax.
