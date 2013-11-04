@@ -287,7 +287,7 @@ namespace {
       // specialized reference to it.
       if (auto genericFn
             = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        auto dc = decl->getInnermostDeclContext();
+        auto dc = decl->getPotentialGenericDeclContext();
 
         SmallVector<Substitution, 4> substitutions;
         auto type = solution.computeSubstitutions(genericFn, dc, openedType,
@@ -327,7 +327,7 @@ namespace {
 
         // Figure out the declaration context where we'll get the generic
         // parameters.
-        auto dc = member->getInnermostDeclContext();
+        auto dc = member->getPotentialGenericDeclContext();
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;

@@ -333,7 +333,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   // its associated types (recursively); inner generic type parameters get
   // mapped to their archetypes directly.
   llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
-  DeclContext *reqDC = req->getInnermostDeclContext();
+  DeclContext *reqDC = req->getPotentialGenericDeclContext();
   RequirementTypeOpener reqTypeOpener(reqDC, typeWitnesses, openedAssocTypes);
   Type reqType, openedFullReqType;
   std::tie(openedFullReqType, reqType)
@@ -432,7 +432,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
 
   if (openedFullWitnessType->hasTypeVariable()) {
     // Figure out the context we're substituting into.
-    auto witnessDC = witness->getInnermostDeclContext();
+    auto witnessDC = witness->getPotentialGenericDeclContext();
 
     // Compute the set of substitutions we'll need for the witness.
     solution.computeSubstitutions(witness->getInterfaceType(),
