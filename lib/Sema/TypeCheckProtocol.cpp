@@ -333,9 +333,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   // its associated types (recursively); inner generic type parameters get
   // mapped to their archetypes directly.
   llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
-  DeclContext *reqDC = req->getDeclContext();
-  if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req))
-    reqDC = reqFunc;
+  DeclContext *reqDC = req->getPotentialGenericDeclContext();
   RequirementTypeOpener reqTypeOpener(reqDC, typeWitnesses, openedAssocTypes);
   Type reqType, openedFullReqType;
   std::tie(openedFullReqType, reqType)

@@ -274,7 +274,7 @@ static bool isProtocolSelfType(Type type) {
 
 namespace {
   /// Function object that retrieves a type variable corresponding to the
-  /// given type/
+  /// given dependent type.
   class GetTypeVariable {
     ConstraintSystem &CS;
     DependentTypeOpener *Opener;
@@ -719,11 +719,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                                  /*wantInterfaceType=*/true);
 
   // Adjust the type of the reference.
-  valueType = adjustLValueForReference(openType(
-                                         valueType,
-                                         value->getInnermostDeclContext()),
-                                       value->getAttrs().isAssignment(),
-                                       TC.Context);
+  valueType = adjustLValueForReference(
+                openType(valueType,
+                         value->getPotentialGenericDeclContext(),
+                         /*skipProtocolSelfConstraint=*/false,
+                         opener),
+                value->getAttrs().isAssignment(),
+                TC.Context);
   return { valueType, valueType };
 }
 
@@ -3137,6 +3139,42 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   return proto1? Comparison::Worse : Comparison::Better;
 }
 
+namespace {
+  /// Dependent type opener that maps from a dependent type to its corresponding
+  /// archetype in the given context.
+  class ArchetypeOpener : public constraints::DependentTypeOpener {
+    DeclContext *DC;
+    llvm::DenseMap<TypeVariableType *, Type> Mapped;
+
+  public:
+    explicit ArchetypeOpener(DeclContext *dc) : DC(dc) { }
+
+    virtual void openedGenericParameter(GenericTypeParamType *param,
+                                        TypeVariableType *typeVar,
+                                        Type &replacementType) {
+      replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, param);
+
+      Mapped[typeVar] = param;
+    }
+
+    virtual bool shouldBindAssociatedType(Type baseType,
+                                          TypeVariableType *baseTypeVar,
+                                          AssociatedTypeDecl *assocType,
+                                          TypeVariableType *memberTypeVar,
+                                          Type &replacementType) {
+      assert(Mapped.count(baseTypeVar) && "Missing base mapping?");
+      auto memberType = DependentMemberType::get(Mapped[baseTypeVar],
+                                                 assocType,
+                                                 DC->getASTContext());
+      replacementType = ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
+
+      // Record this mapping.
+      Mapped[memberTypeVar] = memberType;
+      return true;
+    }
+  };
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -3200,9 +3238,42 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     return poly2;
   }
 
-  // FIXME: Should be able to compare polymorphic types here.
+  // Compare generic signatures.
+  // FIXME: This path could subsume the prior path.
   if (poly1 || poly2) {
-    return false;
+    // FIXME: Don't deal with just methods yet.
+    if (decl1->getDeclContext()->isTypeContext() ||
+        decl2->getDeclContext()->isTypeContext()) {
+      return false;
+    }
+
+    // Construct a constraint system to compare the two declarations.
+    ConstraintSystem cs(tc, dc);
+
+    // Get the type of a reference to the second declaration.
+    Type fullOpenedType2, openedType2;
+    std::tie(fullOpenedType2, openedType2)
+      = cs.getTypeOfReference(decl2, /*isTypeReference=*/false,
+                              /*isSpecialized=*/false);
+
+    // Get the type of a reference to the first declaration, swapping in
+    // archetypes for the dependent types.
+    ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+    Type openedType1 = cs.getTypeOfReference(decl1, /*isTypeReference=*/false,
+                                             /*isSpecialized=*/false, &opener)
+                         .second;
+
+    // Check whether the first function type's input is a subtype of the second
+    // type's inputs, i.e., can we forward the arguments?
+    auto funcTy1 = openedType1->castTo<FunctionType>();
+    auto funcTy2 = openedType2->castTo<FunctionType>();
+    cs.addConstraint(ConstraintKind::Subtype,
+                     funcTy1->getInput(),
+                     funcTy2->getInput());
+
+    // Solve the system.
+    SmallVector<Solution, 1> solutions;
+    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
   // Check whether both the input and result types of the first are
