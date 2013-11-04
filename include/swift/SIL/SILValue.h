@@ -40,7 +40,7 @@ namespace swift {
 /// ValueBase - This is the base class of the SIL value hierarchy, which
 /// represents a runtime computed value.  Things like SILInstruction derive
 /// from this.
-class ValueBase : public SILAllocated<ValueBase> {
+class alignas(8) ValueBase : public SILAllocated<ValueBase> {
   PointerUnion<SILType, SILTypeList*> TypeOrTypeList;
   Operand *FirstUse = nullptr;
   friend class Operand;
@@ -113,12 +113,31 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   V.print(OS);
   return OS;
 }
+}  // end namespace swift
+
+namespace llvm {
+// TypeBase* is always at least eight-byte aligned; make the three tag bits
+// available through PointerLikeTypeTraits.
+template<>
+class PointerLikeTypeTraits<swift::ValueBase*> {
+public:
+  static inline void *getAsVoidPointer(swift::ValueBase *I) {
+    return (void*)I;
+  }
+  static inline swift::ValueBase *getFromVoidPointer(void *P) {
+    return (swift::ValueBase*)P;
+  }
+  enum { NumLowBitsAvailable = alignof(swift::ValueBase) };
+};
+} // end namespace llvm
+
+namespace swift {
 
 enum {
   /// The number of bits required to store a ResultNumber.
   /// This is primarily here as a way to allow everything that
   /// depends on it to be easily grepped.
-  ValueResultNumberBits = 1
+  ValueResultNumberBits = 2
 };
 
 /// SILValue - A SILValue is a use of a specific result of an ValueBase.  As
