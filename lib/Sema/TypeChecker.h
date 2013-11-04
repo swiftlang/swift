@@ -318,14 +318,15 @@ public:
   /// \brief Determine whether one type would be a valid substitution for an
   /// archetype.
   ///
-  /// \param t1 The potential substitution type.
+  /// \param type The potential type.
   ///
-  /// \param t2 The potential substituted archetype.
+  /// \param archetype The archetype for which type may (or may not) be
+  /// substituted.
   ///
   /// \param dc The context of the check.
   ///
   /// \returns true if \c t1 is a valid substitution for \c t2.
-  bool isSubstitutableFor(Type t1, ArchetypeType *t2, DeclContext *dc);
+  bool isSubstitutableFor(Type type, ArchetypeType *archetype, DeclContext *dc);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type

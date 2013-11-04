@@ -4593,15 +4593,24 @@ bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   return !cs.solve(solutions);
 }
 
-bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2,
+bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
   ConstraintSystem cs(*this, dc);
-  
-  llvm::DenseMap<CanType, TypeVariableType*> replacements;
-  Type type2var = cs.openType(type2, type2, replacements, nullptr);
 
-  cs.addConstraint(ConstraintKind::Equal, type1, type2var);
-  
+  // Add all of the requirements of the archetype to the given type.
+  // FIXME: Short-circuit if any of the constraints fails.
+  if (archetype->requiresClass() && !type->mayHaveSuperclass())
+    return false;
+
+  if (auto superclass = archetype->getSuperclass()) {
+    cs.addConstraint(ConstraintKind::TrivialSubtype, type, superclass);
+  }
+  for (auto proto : archetype->getConformsTo()) {
+    cs.addConstraint(ConstraintKind::ConformsTo, type,
+                     proto->getDeclaredType());
+  }
+
+  // Solve the system.
   SmallVector<Solution, 1> solution;
   return !cs.solve(solution);
 }
