@@ -261,3 +261,10 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 }
 
 #endif
+
+extern "C"
+long long
+countLeadingZeros(long long x)
+{
+    return __builtin_clzll(x);
+}
