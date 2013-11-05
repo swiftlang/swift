@@ -23,6 +23,13 @@
 using namespace swift;
 using namespace Lowering;
 
+template<typename...T, typename...U>
+static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+                     U &&...args) {
+  Context.Diags.diagnose(loc,
+                         diag, std::forward<U>(args)...);
+}
+
 //===--------------------------------------------------------------------===//
 // SILGenFunction visit*Stmt implementation
 //===--------------------------------------------------------------------===//
@@ -94,19 +101,41 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(Cleanups, *this, CleanupLocation(S));
+  const unsigned ReturnStmtType   = 0;
+  const unsigned ContinueStmtType = 1;
+  const unsigned UnknownStmtType  = 2;
+  unsigned StmtType = UnknownStmtType;
 
   for (auto &ESD : S->getElements()) {
-    assert(B.hasValidInsertionPoint());
-    
+    // If we ever reach an unreachable point, stop emitting statements and issue
+    // an unreachable code diagnostic. This will need revision if we ever add
+    // goto.
+    if (!B.hasValidInsertionPoint()) {
+      if (StmtType != UnknownStmtType) {
+        diagnose(getASTContext(),
+                 BraceStmt::getElementStartLoc(ESD),
+                 diag::unreachable_code_after_stmt,
+                 StmtType);
+      } else {
+        diagnose(getASTContext(),
+                 BraceStmt::getElementStartLoc(ESD),
+                 diag::unreachable_code);
+      }
+      return;
+    }
+
+    // Process children.
     if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
       visit(S);
+      if (isa<ContinueStmt>(S))
+        StmtType = ContinueStmtType;
+      if (isa<ReturnStmt>(S))
+        StmtType = ReturnStmtType;
       
-      // If we ever reach an unreachable point, stop emitting statements.
-      // This will need revision if we ever add goto.
-      if (!B.hasValidInsertionPoint()) return;
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
       FullExpr scope(Cleanups, CleanupLocation(E));
       emitRValue(E);
+
     } else
       visit(ESD.get<Decl*>());
   }
@@ -448,6 +477,7 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   // Emit top-level statements and expressions into the toplevel function until
   // we hit an unreachable point.
   assert(TopLevelSGF && "top-level code in a non-main module!");
+// TODO:
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
   

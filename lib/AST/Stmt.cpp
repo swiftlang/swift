@@ -78,6 +78,16 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
+SourceLoc BraceStmt::getElementStartLoc(const ExprStmtOrDecl &ASTNode) {
+  if (const Expr *E = ASTNode.dyn_cast<Expr*>())
+    return E->getStartLoc();
+  if (const Stmt *S = ASTNode.dyn_cast<Stmt*>())
+    return S->getStartLoc();
+  if (const Decl *D = ASTNode.dyn_cast<Decl*>())
+    return D->getStartLoc();
+  llvm_unreachable("unsupported AST node");
+}
+
 SourceRange ReturnStmt::getSourceRange() const {
   SourceLoc Start = ReturnLoc;
   SourceLoc End = ReturnLoc;

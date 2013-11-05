@@ -107,6 +107,9 @@ class BraceStmt : public Stmt {
 public:
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
+  /// \brief Get the start location of the node.
+  static SourceLoc getElementStartLoc(const ExprStmtOrDecl &ASTNode);
+
 private:
   unsigned NumElements;
   

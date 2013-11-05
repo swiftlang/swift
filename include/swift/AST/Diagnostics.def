@@ -1512,6 +1512,9 @@ NOTE(unreachable_code_branch,sil_analysis,none,
      "condition always evaluates to %select{false|true}0", (bool))
 NOTE(call_to_noreturn_note,sil_analysis,none,
      "a call to a noreturn function", ())
+WARNING(unreachable_code_after_stmt,sil_analysis,none,
+        "code after '%select{return|continue}0' will never be executed", 
+        (unsigned))
 WARNING(switch_on_a_constant,sil_analysis,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,sil_analysis,none, "will never be executed", ())
