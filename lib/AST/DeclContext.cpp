@@ -69,6 +69,45 @@ Type DeclContext::getDeclaredTypeInContext() {
   }
 }
 
+Type DeclContext::getSelfTypeInContext(bool isStatic,
+                                       bool isConstructor,
+                                       GenericParamList **outerGenericParams) {
+  if (outerGenericParams)
+    *outerGenericParams = nullptr;
+
+  // Determine the type of the container.
+  Type containerTy = getDeclaredTypeInContext();
+  if (!containerTy)
+    return nullptr;
+
+  // For a protocol, the type of 'self' is the parameter type 'Self', not
+  // the protocol itself.
+  if (auto proto = containerTy->getAs<ProtocolType>()) {
+    auto self = proto->getDecl()->getSelf();
+    assert(self && "Missing 'Self' type in protocol");
+    containerTy = self->getArchetype();
+  }
+
+  // Capture the generic parameters, if requested.
+  if (outerGenericParams)
+    *outerGenericParams = getGenericParamsOfContext();
+
+  // 'static' functions have 'self' of type metatype<T>.
+  if (isStatic)
+    return MetaTypeType::get(containerTy, getASTContext());
+
+  // Reference types have 'self' of type T.
+  //
+  // FIXME: Constructor 'self' values are never @inout, which is weird.
+  if (containerTy->hasReferenceSemantics() || isConstructor)
+    return containerTy;
+
+  // All other types have 'self' of @inout T.
+  return LValueType::get(containerTy,
+                         LValueType::Qual::DefaultForInOutSelf,
+                         getASTContext());
+}
+
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
     case DeclContextKind::Module:

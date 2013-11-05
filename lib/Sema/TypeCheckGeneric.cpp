@@ -628,8 +628,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 /// Replace the type of 'self' in the given function declaration's argument
 /// patterns.
 ///
-/// FIXME: This almost duplicates FuncDecl::computeSelfType(), which should
-/// migrate into the type checker anyway.
+/// FIXME: This almost duplicates AbstractFunctionDecl::computeSelfType(), which
+/// should migrate into the type checker anyway.
 static Type computeSelfType(AbstractFunctionDecl *func,
                             bool isInitializing = false) {
   // Figure out the type we're in.

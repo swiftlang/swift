@@ -2255,6 +2255,16 @@ public:
     return ArrayRef<const Pattern *>(Patterns.data(), Patterns.size());
   }
 
+  /// \brief If this is a method in a type or extension thereof, compute
+  /// and return the type to be used for the 'self' argument of the type, or an
+  /// empty Type() if no 'self' argument should exist.  This can
+  /// only be used after name binding has resolved types.
+  ///
+  /// \param outerGenericParams If non-NULL, and this function is an instance
+  /// of a generic type, will be set to the generic parameter list of that
+  /// generic type.
+  Type computeSelfType(GenericParamList **outerGenericParams = nullptr);
+
   /// \brief This method returns the implicit 'self' decl.
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
@@ -2376,17 +2386,6 @@ public:
   unsigned getNaturalArgumentCount() const {
     return getNumParamPatternsImpl();
   }
-
-  /// \brief If this is a method in a type extension for some type, compute
-  /// and return the type to be used for the 'self' argument of the type
-  /// (which varies based on whether the extended type is a reference type
-  /// or not), or an empty Type() if no 'self' argument should exist.  This can
-  /// only be used after name binding has resolved types.
-  ///
-  /// \param OuterGenericParams If non-NULL, and this function is an instance
-  /// of a generic type, will be set to the generic parameter list of that
-  /// generic type.
-  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getDefLoc() const { return DefLoc; }
@@ -2781,9 +2780,6 @@ public:
     BodyParams = bodyParams;
   }
 
-  /// \brief Compute and return the type of 'self'.
-  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
-
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
 
@@ -2830,9 +2826,6 @@ public:
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
-
-  /// \brief Compute and return the type of 'self'.
-  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;

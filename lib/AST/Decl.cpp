@@ -850,6 +850,14 @@ bool VarDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
+Type AbstractFunctionDecl::computeSelfType(
+                             GenericParamList **outerGenericParams) {
+  bool isStatic = isa<FuncDecl>(this) && cast<FuncDecl>(this)->isStatic();
+  return getDeclContext()->getSelfTypeInContext(isStatic,
+                                                isa<ConstructorDecl>(this),
+                                                outerGenericParams);
+}
+
 VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
   if (auto FD = dyn_cast<FuncDecl>(this)) {
     VarDecl *SelfDecl = FD->getImplicitSelfDeclImpl();
@@ -968,46 +976,6 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
     BodyParamsRef[i] = BodyParams[i];
 
   this->FnRetType = FnRetType;
-}
-
-Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
-  if (OuterGenericParams)
-    *OuterGenericParams = nullptr;
-  
-  Type ContainerType = getExtensionType();
-  if (ContainerType.isNull()) return ContainerType;
-
-  // For a protocol, the type of 'self' is the parameter type 'Self', not
-  // the protocol itself.
-  if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
-    auto Self = Protocol->getDecl()->getSelf();
-    assert(Self && "Missing 'Self' type in protocol");
-    ContainerType = Self->getArchetype();
-  }
-
-  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
-    // If we have an unbound generic type, bind the type to the archetypes
-    // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
-    ContainerType = getDeclContext()->getDeclaredTypeInContext();
-
-    if (OuterGenericParams)
-      *OuterGenericParams = D->getGenericParams();
-  } else if (OuterGenericParams) {
-    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
-  }
-
-  // 'static' functions have 'self' of type metatype<T>.
-  if (isStatic())
-    return MetaTypeType::get(ContainerType, getASTContext());
-
-  if (ContainerType->hasReferenceSemantics())
-    return ContainerType;
-
-  // Otherwise, make an l-value type.
-  return LValueType::get(ContainerType,
-                         LValueType::Qual::DefaultForInOutSelf,
-                         getASTContext());
 }
 
 Type FuncDecl::getResultType() const {
@@ -1286,25 +1254,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
   return { getConstructorLoc(), Body->getEndLoc() };
 }
 
-Type
-ConstructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
-  Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
-
-  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
-    // If we have an unbound generic type, bind the type to the archetypes
-    // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
-    ContainerType = getDeclContext()->getDeclaredTypeInContext();
-
-    if (OuterGenericParams)
-      *OuterGenericParams = D->getGenericParams();
-  } else if (OuterGenericParams) {
-    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
-  }
-
-  return ContainerType;
-}
-
 Type ConstructorDecl::getArgumentType() const {
   Type ArgTy = getType();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
@@ -1374,25 +1323,6 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   }
 
   return out.str();
-}
-
-Type
-DestructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
-  Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
-
-  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
-    // If we have an unbound generic type, bind the type to the archetypes
-    // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
-    ContainerType = getDeclContext()->getDeclaredTypeInContext();
-
-    if (OuterGenericParams)
-      *OuterGenericParams = D->getGenericParams();
-  } else if (OuterGenericParams) {
-    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
-  }
-
-  return ContainerType;
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
