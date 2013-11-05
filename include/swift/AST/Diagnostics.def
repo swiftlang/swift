@@ -1091,6 +1091,9 @@ ERROR(decl_attribute_applied_to_type,sema_tcd,none,
       "attribute can only be applied to declarations, not types", ())
 ERROR(optional_attribute_non_protocol,sema_tcd,none,
       "'optional' attribute can only be applied to protocol members", ())
+ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
+      "'optional' attribute can only be applied to members of an @objc protocol", 
+      ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
