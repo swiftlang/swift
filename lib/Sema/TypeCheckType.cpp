@@ -900,9 +900,35 @@ static void lookupStdlibTypes(TypeChecker &TC,
   }
 }
 
-bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
+bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
   if (T->is<ClassType>())
     return true;
+
+  SmallVector<ProtocolDecl *, 4> Protocols;
+  if (T->isExistentialType(Protocols)) {
+    if (Protocols.empty()) {
+      // protocol<> is not @objc.
+      return false;
+    }
+    // Check that all protocols are @objc.
+    for (auto PD : Protocols) {
+      if (!PD->getAttrs().isObjC())
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
+  if (isClassOrObjCProtocol(*this, T))
+    return true;
+
+  if (auto MTT = T->getAs<MetaTypeType>()) {
+    if (isClassOrObjCProtocol(*this, MTT->getInstanceType()))
+      return true;
+  }
 
   if (ObjCMappedTypes.empty()) {
     // Populate the cache.
