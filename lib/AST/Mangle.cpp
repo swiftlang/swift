@@ -440,7 +440,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= P <protocol-list> _   # protocol composition
 /// <type> ::= Q <index>             # archetype with depth=0, index=N
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
-/// <
+///
 /// <type> ::= R <type>              # lvalue
 /// <type> ::= T <tuple-element>* _  # tuple
 /// <type> ::= U <generic-parameter>+ _ <type>
