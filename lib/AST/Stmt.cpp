@@ -60,32 +60,22 @@ return cast<ID##Stmt>(this)->getSourceRange();
   llvm_unreachable("statement type not handled!");
 }
 
-BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elts,
+BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
                      SourceLoc rbloc, Optional<bool> implicit)
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
 {
   memcpy(getElementsStorage(), elts.data(),
-         elts.size() * sizeof(ExprStmtOrDecl));
+         elts.size() * sizeof(ASTNode));
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
-                             ArrayRef<ExprStmtOrDecl> elts, SourceLoc rbloc,
+                             ArrayRef<ASTNode> elts, SourceLoc rbloc,
                              Optional<bool> implicit) {
   void *Buffer = ctx.Allocate(sizeof(BraceStmt)
-                                + elts.size() * sizeof(ExprStmtOrDecl),
+                                + elts.size() * sizeof(ASTNode),
                               alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
-}
-
-SourceLoc BraceStmt::getElementStartLoc(const ExprStmtOrDecl &ASTNode) {
-  if (const Expr *E = ASTNode.dyn_cast<Expr*>())
-    return E->getStartLoc();
-  if (const Stmt *S = ASTNode.dyn_cast<Stmt*>())
-    return S->getStartLoc();
-  if (const Decl *D = ASTNode.dyn_cast<Decl*>())
-    return D->getStartLoc();
-  llvm_unreachable("unsupported AST node");
 }
 
 SourceRange ReturnStmt::getSourceRange() const {

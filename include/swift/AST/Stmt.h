@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Optional.h"
@@ -104,27 +105,21 @@ public:
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
 /// { var x = 10; println(10) }.
 class BraceStmt : public Stmt {
-public:
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-
-  /// \brief Get the start location of the node.
-  static SourceLoc getElementStartLoc(const ExprStmtOrDecl &ASTNode);
-
 private:
   unsigned NumElements;
   
   SourceLoc LBLoc;
   SourceLoc RBLoc;
 
-  BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elements,SourceLoc rbloc,
+  BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elements,SourceLoc rbloc,
             Optional<bool> implicit);
-  ExprStmtOrDecl *getElementsStorage() {
-    return reinterpret_cast<ExprStmtOrDecl*>(this + 1);
+  ASTNode *getElementsStorage() {
+    return reinterpret_cast<ASTNode*>(this + 1);
   }
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
-                           ArrayRef<ExprStmtOrDecl> elements,
+                           ArrayRef<ASTNode> elements,
                            SourceLoc rbloc,
                            Optional<bool> implicit = {});
 
@@ -134,12 +129,12 @@ public:
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   /// The elements contained within the BraceStmt.
-  MutableArrayRef<ExprStmtOrDecl> getElements() {
-    return MutableArrayRef<ExprStmtOrDecl>(getElementsStorage(), NumElements);
+  MutableArrayRef<ASTNode> getElements() {
+    return MutableArrayRef<ASTNode>(getElementsStorage(), NumElements);
   }
 
   /// The elements contained within the BraceStmt (const version).
-  ArrayRef<ExprStmtOrDecl> getElements() const {
+  ArrayRef<ASTNode> getElements() const {
     return const_cast<BraceStmt*>(this)->getElements();
   }
 

@@ -371,7 +371,7 @@ namespace {
       setVarDeclContexts(paramPatterns, constructor);
 
       // Assign all of the member variables appropriately.
-      SmallVector<BraceStmt::ExprStmtOrDecl, 4> stmts;
+      SmallVector<ASTNode, 4> stmts;
       unsigned paramIdx = 0;
       for (auto member : members) {
         auto var = dyn_cast<VarDecl>(member);
@@ -2595,7 +2595,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Finally, set the body.
   func->setBody(BraceStmt::create(context, SourceLoc(),
-                                  BraceStmt::ExprStmtOrDecl(ret),
+                                  ASTNode(ret),
                                   SourceLoc()));
 
   // Write the function up as the getter.

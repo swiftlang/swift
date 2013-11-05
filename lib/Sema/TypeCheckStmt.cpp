@@ -701,7 +701,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       initializedMembers.insert(member);
   }
 
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
+  SmallVector<ASTNode, 4> defaultInits;
 
   // If this is the implicit default constructor for a class with a superclass,
   // call the superclass constructor.

@@ -64,8 +64,6 @@ class Parser {
   void operator=(const Parser&) = delete;
 
 public:
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-
   SourceManager &SourceMgr;
   const unsigned BufferID;
   DiagnosticEngine &Diags;
@@ -438,7 +436,7 @@ public:
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);
 
-  ParserStatus parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
+  ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                bool IsTopLevel,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace);
@@ -748,7 +746,7 @@ public:
 
   static bool isStartOfStmt(const Token &Tok);
   ParserResult<Stmt> parseStmt();
-  ParserStatus parseExprOrStmt(ExprStmtOrDecl &Result);
+  ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtWhile();

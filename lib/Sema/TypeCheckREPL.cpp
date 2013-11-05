@@ -27,7 +27,7 @@ using namespace swift;
 static void
 PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
                    SmallVectorImpl<ValueDecl*> &PrintDecls,
-                   SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
+                   SmallVectorImpl<ASTNode> &BodyContent) {
   ASTContext &Context = TC.Context;
   Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
   Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc, /*Implicit=*/true);
@@ -40,7 +40,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               Type SugarT, CanType T,
               SourceLoc Loc, SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
-              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+              SmallVectorImpl<ASTNode> &BodyContent,
               SmallVectorImpl<ValueDecl*> &PrintDecls,
               DeclContext *DC);
 
@@ -49,7 +49,7 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
             Type SugarT, StructDecl *SD,
             SourceLoc Loc, SourceLoc EndLoc,
             SmallVectorImpl<unsigned> &MemberIndexes,
-            SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+            SmallVectorImpl<ASTNode> &BodyContent,
             SmallVectorImpl<ValueDecl*> &PrintDecls,
             DeclContext *DC) {
   auto TypeStr
@@ -130,7 +130,7 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
            Type SugarT, ClassDecl *CD,
            SourceLoc Loc, SourceLoc EndLoc,
            SmallVectorImpl<unsigned> &MemberIndexes,
-           SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+           SmallVectorImpl<ASTNode> &BodyContent,
            SmallVectorImpl<ValueDecl*> &PrintDecls) {
 
   ASTContext &Context = TC.Context;
@@ -184,7 +184,7 @@ static void
 PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
            SourceLoc Loc, SourceLoc EndLoc,
            SmallVectorImpl<unsigned> &MemberIndexes,
-           SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+           SmallVectorImpl<ASTNode> &BodyContent,
            SmallVectorImpl<ValueDecl*> &PrintDecls,
            DeclContext *DC) {
   ASTContext &context = TC.Context;
@@ -265,7 +265,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
 
   // Construct the loop body.
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> loopBodyContents;
+  SmallVector<ASTNode, 4> loopBodyContents;
 
   SmallVector<unsigned, 2> subMemberIndexes;
   
@@ -277,10 +277,10 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     Expr *setFirstToFalse
       = new (context) AssignExpr(firstRef, Loc, falseRef, /*Implicit=*/true);
     Stmt *thenStmt = BraceStmt::create(context, Loc,
-                               BraceStmt::ExprStmtOrDecl(setFirstToFalse), Loc);
+                                       ASTNode(setFirstToFalse), Loc);
 
     // else branch: print a comma.
-    SmallVector<BraceStmt::ExprStmtOrDecl, 4> elseBodyContents;
+    SmallVector<ASTNode, 4> elseBodyContents;
     PrintLiteralString(", ", TC, Loc, PrintDecls, elseBodyContents);
     Stmt *elseStmt = BraceStmt::create(context, Loc, elseBodyContents, Loc);
 
@@ -322,7 +322,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               Type SugarT, CanType T,
               SourceLoc Loc, SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
-              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+              SmallVectorImpl<ASTNode> &BodyContent,
               SmallVectorImpl<ValueDecl*> &PrintDecls,
               DeclContext *DC) {
   ASTContext &Context = TC.Context;
@@ -552,7 +552,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   auto TmpStr = C.getIdentifier(PrefixString).str();
   
   // Fill in body of function.  Start with the string prefix to print.
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
+  SmallVector<ASTNode, 4> BodyContent;
   PrintLiteralString(TmpStr, *TC, Loc, PrintDecls, BodyContent);
   
   SmallVector<unsigned, 4> MemberIndexes;
@@ -570,7 +570,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
     return ;
   
   // Inject the call into the top level stream by wrapping it with a TLCD.
-  auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
+  auto *BS = BraceStmt::create(C, Loc, ASTNode(TheCall),
                                EndLoc);
   SF.Decls.push_back(new (C) TopLevelCodeDecl(&SF, BS));
 }
@@ -676,7 +676,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                            PBD->getInit(), &SF);
 
   auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
-                                   BraceStmt::ExprStmtOrDecl(metavarBinding),
+                                   ASTNode(metavarBinding),
                                    metavarBinding->getEndLoc());
 
   auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&SF, MVBrace);

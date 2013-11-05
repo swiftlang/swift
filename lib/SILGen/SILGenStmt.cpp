@@ -113,12 +113,12 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
     if (!B.hasValidInsertionPoint()) {
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(),
-                 BraceStmt::getElementStartLoc(ESD),
+                 ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt,
                  StmtType);
       } else {
         diagnose(getASTContext(),
-                 BraceStmt::getElementStartLoc(ESD),
+                 ESD.getStartLoc(),
                  diag::unreachable_code);
       }
       return;

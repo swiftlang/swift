@@ -59,7 +59,7 @@ bool Parser::parseTopLevel() {
   skipExtraTopLevelRBraces(*this);
 
   // Parse the body of the file.
-  SmallVector<ExprStmtOrDecl, 128> Items;
+  SmallVector<ASTNode, 128> Items;
 
   // If we are in SIL mode, and if the first token is the start of a sil
   // declaration, parse that one SIL function and return to the top level.  This
@@ -1104,7 +1104,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Establish the new context.
       ContextChange CC(*this, Get);
 
-      SmallVector<ExprStmtOrDecl, 16> Entries;
+      SmallVector<ASTNode, 16> Entries;
       parseBraceItems(Entries, false /*NotTopLevel*/,
                       BraceItemListKind::Variable);
       BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
@@ -1223,7 +1223,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     ContextChange CC(*this, Set);
     
     // Parse the body.
-    SmallVector<ExprStmtOrDecl, 16> Entries;
+    SmallVector<ASTNode, 16> Entries;
     parseBraceItems(Entries, false /*NotTopLevel*/,
                     BraceItemListKind::Variable);
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
@@ -1423,7 +1423,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
       if (PBD == 0) continue;
       auto *Brace = BraceStmt::create(Context, PBD->getStartLoc(),
-                                      ExprStmtOrDecl(PBD), PreviousLoc);
+                                      ASTNode(PBD), PreviousLoc);
 
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext, Brace);
       PBD->setDeclContext(TLCD);

@@ -138,7 +138,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
     
     auto body = BraceStmt::create(C, SourceLoc(),
-                            BraceStmt::ExprStmtOrDecl(returnStmt), SourceLoc());
+                                  ASTNode(returnStmt), SourceLoc());
     
     cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false, body));
   }
@@ -146,7 +146,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
-                                BraceStmt::ExprStmtOrDecl(switchStmt),
+                                ASTNode(switchStmt),
                                 SourceLoc());
   toRawDecl->setBody(body);
   
@@ -237,7 +237,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
     
     auto body = BraceStmt::create(C, SourceLoc(),
-                            BraceStmt::ExprStmtOrDecl(returnStmt), SourceLoc());
+                                  ASTNode(returnStmt), SourceLoc());
     
     cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false, body));
   }
@@ -257,7 +257,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                          /*implicit*/ true);
   auto dfltReturnStmt = new (C) ReturnStmt(SourceLoc(), dfltReturnExpr);
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
-                        BraceStmt::ExprStmtOrDecl(dfltReturnStmt), SourceLoc());
+                                    ASTNode(dfltReturnStmt), SourceLoc());
   cases.push_back(CaseStmt::create(C, dfltLabel, /*hasBoundDecls*/false,
                                    dfltBody));
   
@@ -265,7 +265,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   auto switchStmt = SwitchStmt::create(SourceLoc(), rawRef, SourceLoc(),
                                        cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
-                                BraceStmt::ExprStmtOrDecl(switchStmt),
+                                ASTNode(switchStmt),
                                 SourceLoc());
   fromRawDecl->setBody(body);
   

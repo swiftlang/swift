@@ -71,7 +71,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   }
 }
 
-ParserStatus Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
+ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
@@ -103,7 +103,7 @@ ParserStatus Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
 
 static bool isTerminatorForBraceItemListKind(const Token &Tok,
                                              BraceItemListKind Kind,
-                                 ArrayRef<Parser::ExprStmtOrDecl> ParsedDecls) {
+                                             ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
@@ -156,7 +156,7 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 }
 
 static void unwrapIfDiscardedClosure(Parser &P,
-                                     Parser::ExprStmtOrDecl &Result) {
+                                     ASTNode &Result) {
   // If we parsed a bare closure as an expression, it will be a discarded value
   // expression and the type checker will complain.
   //
@@ -200,7 +200,7 @@ static void unwrapIfDiscardedClosure(Parser &P,
 ///     stmt-fallthrough
 ///   stmt-assign:
 ///     expr '=' expr
-ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
+ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      bool IsTopLevel, BraceItemListKind Kind) {
   // This forms a lexical scope.
   Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
@@ -214,7 +214,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
          Tok.isNot(tok::kw_sil_vtable) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
     bool NeedParseErrorRecovery = false;
-    ExprStmtOrDecl Result;
+    ASTNode Result;
 
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
@@ -285,7 +285,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         diagnose(StartLoc,
                  Result.is<Stmt*>() ? diag::illegal_top_level_stmt
                                     : diag::illegal_top_level_expr);
-        Result = ExprStmtOrDecl();
+        Result = ASTNode();
       }
 
       if (!Result.isNull())
@@ -350,7 +350,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   ContextChange CC(*this, TLCD);
 
   SourceLoc StartLoc = Tok.getLoc();
-  ExprStmtOrDecl Result;
+  ASTNode Result;
   parseExprOrStmt(Result);
   if (!Result.isNull()) {
     auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
@@ -409,7 +409,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
-  SmallVector<ExprStmtOrDecl, 16> Entries;
+  SmallVector<ASTNode, 16> Entries;
   SourceLoc RBLoc;
 
   ParserStatus Status = parseBraceItems(Entries, false /*NotTopLevel*/);
@@ -912,7 +912,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
       diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
       DiagnosedNotCoveredStmt = true;
     }
-    ExprStmtOrDecl NotCoveredStmt;
+    ASTNode NotCoveredStmt;
     Status |= parseExprOrStmt(NotCoveredStmt);
   }
   
@@ -1079,7 +1079,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
     diagnose(boundDecls[0]->getLoc(),
              diag::var_binding_with_multiple_case_patterns);
 
-  SmallVector<ExprStmtOrDecl, 8> bodyItems;
+  SmallVector<ASTNode, 8> bodyItems;
 
   SourceLoc startOfBody = Tok.getLoc();
   Status |=
