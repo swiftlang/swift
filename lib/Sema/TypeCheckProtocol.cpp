@@ -347,11 +347,12 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
     auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
-    auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
+    auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult()
+                           ->getRValueType();
     auto witnessInputType = openWitnessType->castTo<AnyFunctionType>()
                               ->getInput();
     auto witnessResultType = openWitnessType->castTo<AnyFunctionType>()
-                               ->getResult();
+                               ->getResult()->getRValueType();
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
