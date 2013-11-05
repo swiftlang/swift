@@ -157,6 +157,16 @@ public:
 
   Range<pred_iterator> getPreds() const { return {pred_begin(), pred_end() }; }
 
+  SILBasicBlock *getSinglePredecessor() {
+    if (pred_empty() || std::next(pred_begin()) != pred_end())
+      return 0;
+
+    return *pred_begin();
+  }
+  const SILBasicBlock *getSinglePredecessor() const {
+    return const_cast<SILBasicBlock*>(this)->getSinglePredecessor();
+  }
+
   /// Pretty-print the SILBasicBlock.
   void dump() const;
 

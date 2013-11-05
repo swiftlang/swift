@@ -16,6 +16,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -89,6 +90,7 @@ namespace {
     bool tryJumpThreading(BranchInst *BI);
     void simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
+    void simplifyBranchOperands(OperandValueArrayRef Operands);
     void simplifyBranchBlock(BranchInst *BI);
     void simplifyCondBrBlock(CondBranchInst *BI);
     void simplifySwitchEnumBlock(SwitchEnumInst *SEI);
@@ -288,9 +290,26 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 }
 
 
+/// simplifyBranchOperands - Simplify operands of branches, since it can
+/// result in exposing opportunities for CFG simplification.
+void SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
+  for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
+    if (auto *I = dyn_cast<SILInstruction>(*O))
+      if (SILValue Result = simplifyInstruction(I)) {
+        SILValue(I, 0).replaceAllUsesWith(Result.getDef());
+        if (isInstructionTriviallyDead(I))
+          I->eraseFromParent();
+      }
+}
+
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
+  // First simplify instructions generating branch operands since that
+  // can expose CFG simplifications.
+  simplifyBranchOperands(BI->getArgs());
+
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
 
   // If this block branches to a block with a single predecessor (us), then
@@ -325,6 +344,10 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
 /// branch.
 void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
+  // First simplify instructions generating branch operands since that
+  // can expose CFG simplifications.
+  simplifyBranchOperands(BI->getTrueArgs());
+  simplifyBranchOperands(BI->getFalseArgs());
 
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {

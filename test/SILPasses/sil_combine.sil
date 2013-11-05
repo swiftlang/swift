@@ -169,3 +169,103 @@ bb0(%0 : $Int64):
   %2 = tuple_extract %1 : $(Int64, Int64), 0
   return %2 : $Int64
 }
+
+// CHECK-LABEL: sil @fold_integer_literal
+// CHECK: bb
+// CHECK: cond_br
+// CHECK: {{^bb}}
+// CHECK-NOT: integer_literal
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NOT: integer_literal
+// CHECK-NEXT: br
+sil @fold_integer_literal : $@thin (x: Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  br bb2(%1 : $Builtin.Int1)
+
+bb3:
+  %2 = integer_literal $Builtin.Int1, 0
+  br bb2(%2 : $Builtin.Int1)
+
+bb2(%3 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @do_not_fold_integer_literal
+// CHECK: bb
+// CHECK: cond_br
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br
+sil @do_not_fold_integer_literal : $@thin (x: Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, 0
+  br bb2(%1 : $Builtin.Int1)
+
+bb3:
+  %2 = integer_literal $Builtin.Int1, -1
+  br bb2(%2 : $Builtin.Int1)
+
+bb2(%3 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @fold_enum
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br
+sil @fold_enum : $@thin (x: Bool) -> Bool {
+bb0(%0 : $Bool):
+  switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+
+bb1:
+  %1 = enum $Bool, #Bool.true!enumelt
+  br bb3(%1 : $Bool)
+
+bb2:
+  %2 = enum $Bool, #Bool.false!enumelt
+  br bb3(%2 : $Bool)
+
+bb3(%3 : $Bool):
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @do_not_fold_enum
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br
+sil @do_not_fold_enum : $@thin (x: Bool) -> Bool {
+bb0(%0 : $Bool):
+  switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+
+bb1:
+  %1 = enum $Bool, #Bool.false!enumelt
+  br bb3(%1 : $Bool)
+
+bb2:
+  %2 = enum $Bool, #Bool.true!enumelt
+  br bb3(%2 : $Bool)
+
+bb3(%3 : $Bool):
+  return %3 : $Bool
+}

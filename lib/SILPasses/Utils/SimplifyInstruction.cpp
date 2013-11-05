@@ -14,6 +14,10 @@
 #include "swift/SIL/SILVisitor.h"
 using namespace swift;
 
+namespace swift {
+  class ASTContext;
+}
+
 namespace {
   class InstSimplifier : public SILInstructionVisitor<InstSimplifier, SILValue>{
   public:
@@ -21,6 +25,8 @@ namespace {
 
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
+    SILValue visitIntegerLiteralInst(IntegerLiteralInst *ILI);
+    SILValue visitEnumInst(EnumInst *EI);
   };
 } // end anonymous namespace
 
@@ -38,6 +44,55 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getOperandForField(SEI->getField())->get();
   
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
+  // Simplify bool integer_literal insts to the condition that
+  // generates them when possible, e.g. an Int1 integer_literal 1 in
+  // the TrueBB branch target of a conditional branch.
+  auto *BB = ILI->getParent();
+  auto &Context = BB->getParent()->getASTContext();
+  if (ILI->getType() != SILType::getBuiltinIntegerType(1, Context))
+    return SILValue();
+
+  auto *Pred = BB->getSinglePredecessor();
+  if (!Pred)
+    return SILValue();
+
+  if (auto *CBI = dyn_cast<CondBranchInst>(Pred->getTerminator())) {
+    auto Value = ILI->getValue().getBoolValue();
+    auto *OtherBB = Value ? CBI->getTrueBB() : CBI->getFalseBB();
+
+    if (BB == OtherBB)
+      return CBI->getCondition();
+  }
+
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
+  // Simplify enum insts to the value from a switch_enum when possible, e.g.
+  // for
+  //   switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1
+  // bb1:
+  //   %1 = enum $Bool, #Bool.true!enumelt
+  //
+  // we'll return %0
+
+  auto *BB = EI->getParent();
+  auto *Pred = BB->getSinglePredecessor();
+  if (!Pred)
+    return SILValue();
+
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(Pred->getTerminator())) {
+    if (EI->getType() != SEI->getOperand().getType())
+      return SILValue();
+
+    if (BB == SEI->getCaseDestination(EI->getElement()))
+      return SEI->getOperand();
+  }
+
   return SILValue();
 }
 
