@@ -581,23 +581,28 @@ Objective-C ``Protocol`` objects. The layout is as follows:
   the Objective-C runtime.
 - The mangled **name** is referenced as a null-terminated C string at
   **offset 1**.
+- If the protocol inherits one or more other protocols, a pointer to the
+  **inherited protocols list** is stored at **offset 2**. The list starts with
+  the number of inherited protocols as a pointer-sized integer, and is followed
+  by that many protocol descriptor pointers. If the protocol inherits no other
+  protocols, this pointer is null.
 - For an ObjC-compatible protocol, its **required instance methods** are stored
-  at **offset 2** as an ObjC-compatible method list. This is null for native
-  Swift protocols.
-- For an ObjC-compatible protocol, its **required class methods** are stored
   at **offset 3** as an ObjC-compatible method list. This is null for native
   Swift protocols.
-- For an ObjC-compatible protocol, its **optional instance methods** are stored
+- For an ObjC-compatible protocol, its **required class methods** are stored
   at **offset 4** as an ObjC-compatible method list. This is null for native
   Swift protocols.
-- For an ObjC-compatible protocol, its **optional class methods** are stored
+- For an ObjC-compatible protocol, its **optional instance methods** are stored
   at **offset 5** as an ObjC-compatible method list. This is null for native
   Swift protocols.
+- For an ObjC-compatible protocol, its **optional class methods** are stored
+  at **offset 6** as an ObjC-compatible method list. This is null for native
+  Swift protocols.
 - For an ObjC-compatible protocol, its **instance properties** are stored
-  at **offset 6** as an ObjC-compatible property list. This is null for native
+  at **offset 7** as an ObjC-compatible property list. This is null for native
   Swift protocols.
 - The **size** of the protocol descriptor record is stored as a 32-bit integer
-  at **offset 7**. This is currently 72 on 64-bit platforms and 40 on 32-bit
+  at **offset 8**. This is currently 72 on 64-bit platforms and 40 on 32-bit
   platforms.
 - **Flags** are stored as a 32-bit integer after the size. The following bits
   are currently used (counting from least significant bit zero):
