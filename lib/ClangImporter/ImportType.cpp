@@ -69,65 +69,11 @@ namespace {
 
         return nullptr;
 
-      case clang::BuiltinType::Bool:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CBool");
-
-      case clang::BuiltinType::Char_U:
-      case clang::BuiltinType::Char_S:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar");
-
-      case clang::BuiltinType::UChar:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedChar");
-
-      case clang::BuiltinType::UShort:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedShort");
-
-      case clang::BuiltinType::UInt:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedInt");
-
-      case clang::BuiltinType::ULong:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedLong");
-
-      case clang::BuiltinType::ULongLong:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(),
-                                      "CUnsignedLongLong");
-
-      case clang::BuiltinType::UInt128:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedInt128");
-
-      case clang::BuiltinType::WChar_S:
-      case clang::BuiltinType::WChar_U:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CWideChar");
-
-      case clang::BuiltinType::Char16:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar16");
-
-      case clang::BuiltinType::Char32:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar32");
-
-      case clang::BuiltinType::SChar:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CSignedChar");
-
-      case clang::BuiltinType::Short:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CShort");
-
-      case clang::BuiltinType::Int:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CInt");
-
-      case clang::BuiltinType::Long:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CLong");
-
-      case clang::BuiltinType::LongLong:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CLongLong");
-
-      case clang::BuiltinType::Int128:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CInt128");
-
-      case clang::BuiltinType::Float:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CFloat");
-
-      case clang::BuiltinType::Double:
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CDouble");
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:            \
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(),  \
+                                      #SWIFT_TYPE_NAME);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
       case clang::BuiltinType::Dependent:
