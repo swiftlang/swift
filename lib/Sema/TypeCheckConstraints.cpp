@@ -3259,6 +3259,23 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
                     : SelfTypeRelationship::ConformsTo;
 }
 
+// Given a type and a declaration context, return a type with a curried
+// 'self' type as input if the declaration context describes a type.
+static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
+  if (!dc->isTypeContext())
+    return type;
+
+  auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
+  auto selfTy = nominal->getInterfaceType()->castTo<MetaTypeType>()
+                  ->getInstanceType();
+  if (nominal->isGenericContext())
+    return GenericFunctionType::get(nominal->getGenericParamTypes(),
+                                    nominal->getGenericRequirements(),
+                                    selfTy, type, AnyFunctionType::ExtInfo(),
+                                    ctx);
+  return FunctionType::get(selfTy, type, ctx);
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -3270,6 +3287,14 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // entirely.
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
+
+  // A non-generic declaration is more specialized than a generic declaration.
+  if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
+    auto func2 = cast<AbstractFunctionDecl>(decl2);
+    if (static_cast<bool>(func1->getGenericParams()) !=
+          static_cast<bool>(func2->getGenericParams()))
+      return func2->getGenericParams();
+  }
 
   // A witness is always more specialized than the requirement it satisfies.
   switch (compareWitnessAndRequirement(tc, dc, decl1, decl2)) {
@@ -3283,115 +3308,103 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     return false;
   }
 
-  Type type1;
-  Type type2;
+  Type type1 = decl1->getInterfaceType();
+  Type type2 = decl2->getInterfaceType();
 
-  if (auto func1 = dyn_cast<FuncDecl>(decl1)) {
-    auto func2 = cast<FuncDecl>(decl2);
-    type1 = func1->getType();
-    type2 = func2->getType();
+  /// What part of the type should we check?
+  enum {
+    CheckAll,
+    CheckInput,
+    CheckResult
+  } checkKind;
+  if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
+    // Nothing to do: these have the curried 'self' already.
+    checkKind = CheckInput;
 
-    // Skip the 'self' parameter.
-    // FIXME: Might not actually be what we want to do. Think about this more.
-    if (func1->getDeclContext()->isTypeContext())
-      type1 = type1->castTo<AnyFunctionType>()->getResult();
-    if (func2->getDeclContext()->isTypeContext())
-      type2 = type2->castTo<AnyFunctionType>()->getResult();
-  } else if (auto constructor1 = dyn_cast<ConstructorDecl>(decl1)) {
-    auto constructor2 = cast<ConstructorDecl>(decl2);
-    type1 = constructor1->getType();
-    type2 = constructor2->getType();
-
-    // Skip the 'self' parameter.
-    // FIXME: Might not actually be what we want to do. Think about this more.
-    type1 = type1->castTo<AnyFunctionType>()->getResult();
-    type2 = type2->castTo<AnyFunctionType>()->getResult();
-  } else if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
-    auto subscript2 = cast<SubscriptDecl>(decl2);
-    type1 = subscript1->getType();
-    type2 = subscript2->getType();
+    // Only check the result type for conversion functions.
+    if (auto func = dyn_cast<FuncDecl>(decl1)) {
+      if (func->getAttrs().isConversion())
+        checkKind = CheckResult;
+    }
   } else {
-    // FIXME: Deal with variables, types, etc.
-    return false;
+    // Add a curried 'self' type.
+    assert(!type1->is<GenericFunctionType>() && "Odd generic function type?");
+    assert(!type2->is<GenericFunctionType>() && "Odd generic function type?");
+    type1 = addCurriedSelfType(tc.Context, type1, decl1->getDeclContext());
+    type2 = addCurriedSelfType(tc.Context, type2, decl2->getDeclContext());
+
+    // For a subscript declaration, only look at the input type (i.e., the
+    // indices).
+    if (isa<SubscriptDecl>(decl1))
+      checkKind = CheckInput;
+    else
+      checkKind = CheckAll;
   }
 
-  // If one is polymorphic and the other is not, prefer the monomorphic result.
-  // FIXME: Isn't this a special case of the subtype check below?
-  bool poly1 = type1->is<PolymorphicFunctionType>();
-  bool poly2 = type2->is<PolymorphicFunctionType>();
-  if (poly1 != poly2) {
-    return poly2;
+  // Construct a constraint system to compare the two declarations.
+  ConstraintSystem cs(tc, dc);
+
+  // Get the type of a reference to the second declaration.
+  Type openedType2 = cs.openType(type2,decl2->getPotentialGenericDeclContext());
+
+  // Get the type of a reference to the first declaration, swapping in
+  // archetypes for the dependent types.
+  ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+  Type openedType1 = cs.openType(type1, decl1->getPotentialGenericDeclContext(),
+                                 /*skipProtocolSelfConstraint=*/false,
+                                 &opener);
+
+  // Extract the self types from the declarations, if they have them.
+  Type selfTy1;
+  Type selfTy2;
+  if (decl1->getDeclContext()->isTypeContext()) {
+    auto funcTy1 = openedType1->castTo<FunctionType>();
+    selfTy1 = funcTy1->getInput()->getRValueInstanceType();
+    openedType1 = funcTy1->getResult();
+  }
+  if (decl2->getDeclContext()->isTypeContext()) {
+    auto funcTy2 = openedType2->castTo<FunctionType>();
+    selfTy2 = funcTy2->getInput()->getRValueInstanceType();
+    openedType2 = funcTy2->getResult();
   }
 
-  // Compare generic signatures.
-  // FIXME: This path could subsume the prior path.
-  if (poly1 || poly2) {
-    // We can't handle comparing generic subscripts yet.
-    if (isa<SubscriptDecl>(decl1)) {
-      return false;
-    }
+  // Determine the relationship between the 'self' types and add the
+  // appropriate constraints. The constraints themselves never fail, but
+  // they help deduce type variables that were opened.
+  switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
+                                      decl2->getDeclContext())) {
+  case SelfTypeRelationship::Unrelated:
+    // Skip the self types parameter entirely.
+    break;
 
-    // Construct a constraint system to compare the two declarations.
-    ConstraintSystem cs(tc, dc);
+  case SelfTypeRelationship::Equivalent:
+    cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2);
+    break;
 
-    // Get the type of a reference to the second declaration.
-    Type openedType2 = cs.openType(decl2->getInterfaceType(),
-                                   decl2->getPotentialGenericDeclContext());
+  case SelfTypeRelationship::Subclass:
+    cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy1, selfTy2);
+    break;
 
-    // Get the type of a reference to the first declaration, swapping in
-    // archetypes for the dependent types.
-    ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
-    Type openedType1 = cs.openType(decl1->getInterfaceType(),
-                                   decl1->getPotentialGenericDeclContext(),
-                                   /*skipProtocolSelfConstraint=*/false,
-                                   &opener);
+  case SelfTypeRelationship::Superclass:
+    cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy2, selfTy1);
+    break;
 
-    // Extract the self types from the declarations, if they have them.
-    Type selfTy1;
-    Type selfTy2;
-    if (decl1->getDeclContext()->isTypeContext() &&
-        isa<AbstractFunctionDecl>(decl1)) {
-      auto funcTy1 = openedType1->castTo<FunctionType>();
-      selfTy1 = funcTy1->getInput()->getRValueInstanceType();
-      openedType1 = funcTy1->getResult();
-    }
-    if (decl2->getDeclContext()->isTypeContext() &&
-        isa<AbstractFunctionDecl>(decl2)) {
-      auto funcTy2 = openedType2->castTo<FunctionType>();
-      selfTy2 = funcTy2->getInput()->getRValueInstanceType();
-      openedType2 = funcTy2->getResult();
-    }
+  case SelfTypeRelationship::ConformsTo:
+    cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2);
+    break;
 
-    // Determine the relationship between the 'self' types and add the
-    // appropriate constraints. The constraints themselves never fail, but
-    // they help deduce type variables that were opened.
-    switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
-                                           decl2->getDeclContext())) {
-    case SelfTypeRelationship::Unrelated:
-      // Skip the self types parameter entirely.
-      break;
+  case SelfTypeRelationship::ConformedToBy:
+    cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1);
+    break;
+  }
 
-    case SelfTypeRelationship::Equivalent:
-      cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2);
-      break;
+  switch (checkKind) {
+  case CheckAll:
+    // Check whether the first type is a subtype of the second.
+    cs.addConstraint(ConstraintKind::Subtype, openedType1, openedType2);
+    break;
 
-    case SelfTypeRelationship::Subclass:
-      cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy1, selfTy2);
-      break;
-
-    case SelfTypeRelationship::Superclass:
-      cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy2, selfTy1);
-      break;
-
-    case SelfTypeRelationship::ConformsTo:
-      cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2);
-      break;
-
-    case SelfTypeRelationship::ConformedToBy:
-      cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1);
-      break;
-    }
-
+  case CheckInput: {
     // Check whether the first function type's input is a subtype of the second
     // type's inputs, i.e., can we forward the arguments?
     auto funcTy1 = openedType1->castTo<FunctionType>();
@@ -3399,16 +3412,24 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     cs.addConstraint(ConstraintKind::Subtype,
                      funcTy1->getInput(),
                      funcTy2->getInput());
-
-    // Solve the system.
-    SmallVector<Solution, 1> solutions;
-    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
+    break;
   }
 
-  // Check whether the input type of the first is a subtype of the second.
-  auto funcTy1 = type1->castTo<FunctionType>();
-  auto funcTy2 = type2->castTo<FunctionType>();
-  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput(), dc);
+  case CheckResult: {
+    // Check whether the first function type's input is a subtype of the second
+    // type's inputs, i.e., can we forward the arguments?
+    auto funcTy1 = openedType1->castTo<FunctionType>();
+    auto funcTy2 = openedType2->castTo<FunctionType>();
+    cs.addConstraint(ConstraintKind::Subtype,
+                     funcTy1->getResult(),
+                     funcTy2->getResult());
+    break;
+  }
+  }
+
+  // Solve the system.
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
