@@ -2212,23 +2212,15 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->getAttrs().isObjC()) {
       bool isObjC = true;
 
-      SmallVector<ProtocolDecl*, 2> inheritedProtocols;
-      for (auto directInherited : proto->getInherited()) {
-        if (!directInherited.getType()->isExistentialType(inheritedProtocols))
-          continue;
-
-        for (auto inherited : inheritedProtocols) {
-          if (!inherited->getAttrs().isObjC()) {
-            diagnose(proto->getLoc(),
-                     diag::objc_protocol_inherits_non_objc_protocol,
-                     proto->getDeclaredType(), inherited->getDeclaredType());
-            diagnose(inherited->getLoc(), diag::protocol_here,
-                     inherited->getName());
-            isObjC = false;
-          }
+      for (auto inherited : proto->getProtocols()) {
+        if (!inherited->getAttrs().isObjC()) {
+          diagnose(proto->getLoc(),
+                   diag::objc_protocol_inherits_non_objc_protocol,
+                   proto->getDeclaredType(), inherited->getDeclaredType());
+          diagnose(inherited->getLoc(), diag::protocol_here,
+                   inherited->getName());
+          isObjC = false;
         }
-
-        inheritedProtocols.clear();
       }
 
       proto->setIsObjC(isObjC);
