@@ -28,6 +28,8 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
+#include "clang/Lex/Lexer.h"
+
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -485,6 +487,7 @@ namespace {
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
                     { }, nullptr, dc);
+        enumDecl->computeType();
         result = enumDecl;
         break;
       }
@@ -655,7 +658,7 @@ namespace {
                                     ImportTypeKind::Normal);
         if (!type)
           return nullptr;
-        // FIXME: Importing the type will can recursively revisit this same
+        // FIXME: Importing the type will recursively revisit this same
         // EnumConstantDecl. Short-circuit out if we already emitted the import
         // for this decl.
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
@@ -2298,9 +2301,37 @@ classifyEnum(const clang::EnumDecl *decl) {
   // name for the Swift type.
   if (name.empty())
     return EnumKind::Constants;
-
-  // FIXME: For now, Options is the only usable answer, because enums
-  // are broken in IRgen.
+  
+  // Was the enum declared using NS_ENUM?
+  // TODO: Or NS_OPTIONS?
+  // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
+  if (SwiftContext.LangOpts.ImportNSEnum) {
+    auto &ClangSM = getClangASTContext().getSourceManager();
+    auto loc = decl->getLocStart();
+    if (loc.isMacroID()) {
+      auto expansionLoc = ClangSM.getExpansionLoc(decl->getLocStart());
+      expansionLoc = ClangSM.getSpellingLoc(expansionLoc);
+      auto expansionFile = ClangSM.getFileID(expansionLoc);
+      auto expansionBuffer = ClangSM.getBuffer(expansionFile, expansionLoc);
+      auto expansionPtr = ClangSM.getCharacterData(expansionLoc);
+      
+      clang::Lexer lex(expansionLoc,
+                       getClangASTContext().getLangOpts(),
+                       expansionBuffer->getBufferStart(),
+                       expansionPtr,
+                       expansionBuffer->getBufferEnd());
+      clang::Token token;
+      lex.LexFromRawLexer(token);
+      if (token.is(clang::tok::raw_identifier) &&
+          StringRef(token.getRawIdentifierData(), token.getLength()) == "NS_ENUM")
+      {
+        return EnumKind::Enum;
+      }
+    }
+  }
+  
+  // FIXME: Fall back to the 'Options' path, which isn't really implemented
+  // and makes an int typealias with constants.
   return EnumKind::Options;
 }
 

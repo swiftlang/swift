@@ -669,7 +669,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
         continue;
       }
        if (isa<StructDecl>(decl) || isa<ClassDecl>(decl) ||
-           isa<ProtocolDecl>(decl)) {
+           isa<EnumDecl>(decl) || isa<ProtocolDecl>(decl)) {
          // Type decls should already be typed by the ClangImporter and don't
          // need additional typechecking.
          continue;

@@ -51,3 +51,27 @@ void *allocate(NSZone *zone);
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
 @end
 
+#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+
+typedef NS_ENUM(NSUInteger, NSRuncingMode) {
+  NSRuncingMince,
+  NSRuncingQuince
+};
+
+typedef NS_ENUM(int, NSUnderlyingType) {
+  NSUnderlyingTypeZim,
+  NSUnderlyingTypeZang,
+  NSUnderlyingTypeFoo = 11,
+  NSUnderlyingTypeBar = 22,
+  NSUnderlyingTypeBas
+};
+
+typedef NS_ENUM(unsigned, NSUnsignedUnderlyingTypeNegativeValue) {
+  NSNegativeOne = -1,
+  NSNegativeTwo = -2,
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreak) {
+  NSPrefixWordBreakBanjo,
+  NSPrefixWordBreakBandana
+};

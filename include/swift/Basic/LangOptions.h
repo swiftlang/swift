@@ -32,6 +32,10 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
+    
+    /// \brief Importing Objective-C enums declared using the NS_ENUM macro
+    /// as Swift enums.
+    bool ImportNSEnum = false;
   };
 }
 
