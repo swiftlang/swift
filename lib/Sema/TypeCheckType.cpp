@@ -883,3 +883,55 @@ Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
   return memberTypes.back().second;
 }
 
+bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
+  CanType CT = T->getCanonicalType();
+  if (CT->is<ClassType>())
+    return true;
+
+  if (ObjCRepresentableTypes.empty()) {
+    // Populate the cache.
+    SmallVector<Identifier, 16> StdlibTypeNames;
+    StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
+
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+    StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
+                    NATIVE_MODULE, NATIVE_TYPE)                            \
+    if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) \
+      StdlibTypeNames.push_back(Context.getIdentifier(#NATIVE_TYPE));
+#include "swift/SIL/BridgedTypes.def"
+
+    Module *Stdlib = getStdlibModule(DC);
+
+    SmallVector<ValueDecl *, 4> Results;
+    for (Identifier Id : StdlibTypeNames) {
+      Stdlib->lookupValue({}, Id, NLKind::UnqualifiedLookup, Results);
+      for (auto *VD : Results) {
+        if (auto *TD = dyn_cast<TypeDecl>(VD)) {
+          validateDecl(TD);
+          ObjCRepresentableTypes.insert(
+              TD->getDeclaredType()->getCanonicalType());
+        }
+      }
+      Results.clear();
+    }
+
+    if(auto *DynamicLookup =
+           Context.getProtocol(KnownProtocolKind::DynamicLookup)) {
+      validateDecl(DynamicLookup);
+      CanType DynamicLookupType =
+          DynamicLookup->getDeclaredType()->getCanonicalType();
+      ObjCRepresentableTypes.insert(DynamicLookupType);
+      ObjCRepresentableTypes.insert(
+          MetaTypeType::get(DynamicLookupType, Context)->getCanonicalType());
+    }
+  }
+
+  if (ObjCRepresentableTypes.count(CT))
+    return true;
+
+  return false;
+}
+

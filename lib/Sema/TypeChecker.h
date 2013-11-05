@@ -146,6 +146,8 @@ private:
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
 
+  llvm::DenseSet<CanType> ObjCRepresentableTypes;
+
   Module *StdlibModule = nullptr;
 
   /// The index of the next response metavariable to bind to a REPL result.
@@ -796,6 +798,8 @@ public:
   virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) override;
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
+
+  bool isTypeRepresentableInObjC(const DeclContext *DC, Type T);
 };
 
 } // end namespace swift

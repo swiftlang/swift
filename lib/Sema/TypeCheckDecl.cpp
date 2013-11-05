@@ -1110,9 +1110,12 @@ public:
         ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
         ProtocolDecl *protocolContext =
             dyn_cast<ProtocolDecl>(VD->getDeclContext());
-        VD->setIsObjC(VD->getAttrs().isObjC()
-                      || (classContext && classContext->isObjC())
-                      || (protocolContext && protocolContext->isObjC()));
+        if (TC.isTypeRepresentableInObjC(VD->getDeclContext(),
+                                         VD->getType())) {
+          VD->setIsObjC(VD->getAttrs().isObjC()
+                        || (classContext && classContext->isObjC())
+                        || (protocolContext && protocolContext->isObjC()));
+        }
       }
 
       return;
