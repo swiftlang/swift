@@ -838,6 +838,54 @@ void VarDecl::setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
     Set->makeSetter(this);
 }
 
+Type VarDecl::getGetterType() const {
+  // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*isConstructor=*/false,
+                                                       &outerParams);
+
+  // Form the getter type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getType(), ctx);
+
+  // Add 'self'.
+  if (outerParams)
+    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams, ctx);
+  else
+    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+
+  return getterTy;
+}
+
+Type VarDecl::getSetterType() const {
+  // If we have a getter, use its type.
+  if (auto setter = getSetter())
+    return setter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*isConstructor=*/false,
+                                                       &outerParams);
+
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  Type setterTy = FunctionType::get(getType(), TupleType::getEmpty(ctx),
+                                    ctx);
+
+  // Prepend the 'self' type.
+  if (outerParams)
+    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams, ctx);
+  else
+    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+
+  return setterTy;
+}
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();
   if (name.empty())
@@ -1167,6 +1215,61 @@ static bool isIntegralType(Type type) {
   }
 
   return false;
+}
+
+Type SubscriptDecl::getGetterType() const {
+  // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*isConstructor=*/false,
+                                                       &outerParams);
+
+  // Form the () -> element function type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getElementType(),
+                                    ctx);
+
+  // Prepend the indices.
+  getterTy = FunctionType::get(getIndices()->getType(), getterTy, ctx);
+  // Prepend the 'self' type.
+  if (outerParams)
+    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams, ctx);
+  else
+    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+
+  return getterTy;
+}
+
+Type SubscriptDecl::getSetterType() const {
+  // If we have a getter, use its type.
+  if (auto setter = getSetter())
+    return setter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*isConstructor=*/false,
+                                                       &outerParams);
+
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  Type setterTy = FunctionType::get(getElementType(), TupleType::getEmpty(ctx),
+                                    ctx);
+
+  // Prepend the indices.
+  setterTy = FunctionType::get(getIndices()->getType(), setterTy, ctx);
+
+  // Prepend the 'self' type.
+  if (outerParams)
+    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams, ctx);
+  else
+    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+
+  return setterTy;
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {

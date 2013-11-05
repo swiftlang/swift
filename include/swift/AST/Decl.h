@@ -2035,7 +2035,13 @@ public:
 
   /// \brief Retrieve the setter used to mutate the value of this variable.
   FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
-  
+
+  /// Retrieve the type of the getter.
+  Type getGetterType() const;
+
+  /// Retrieve the type of the setter.
+  Type getSetterType() const;
+
   /// \brief Returns whether the var is settable, either because it is a
   /// stored var or because it has a custom setter.
   bool isSettable() const { return !GetSet || GetSet->Set; }
@@ -2708,6 +2714,12 @@ public:
   
   /// \brief Returns whether the subscript operation has a setter.
   bool isSettable() const { return Set; }
+
+  /// Retrieve the type of the getter.
+  Type getGetterType() const;
+
+  /// Retrieve the type of the setter.
+  Type getSetterType() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
