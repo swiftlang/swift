@@ -31,6 +31,7 @@ namespace swift {
 
 class ArchetypeBuilder;
 class GenericTypeResolver;
+class NominalTypeDecl;
 class TypeChecker;
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -146,6 +147,14 @@ private:
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
 
+  /// The \c swift.UnsafePointer<T> declaration.
+  Optional<NominalTypeDecl *> UnsafePointerDecl;
+
+  /// A set of types that can be trivially mapped to Objective-C types.
+  llvm::DenseSet<CanType> ObjCMappedTypes;
+
+  /// A set of types that are representable in Objective-C, but require
+  /// non-trivial bridging.
   llvm::DenseSet<CanType> ObjCRepresentableTypes;
 
   Module *StdlibModule = nullptr;
@@ -586,6 +595,9 @@ public:
   /// \returns the default type, or null if there is no default type for
   /// this protocol.
   Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
+
+  /// \brief Retrieve the \c swift.UnsafePointer<T> declaration.
+  NominalTypeDecl *getUnsafePointerDecl(const DeclContext *DC);
 
   /// \brief Convert the given expression to the given type.
   ///

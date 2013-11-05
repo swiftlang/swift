@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -438,7 +439,6 @@ static Type lookupGlobalType(TypeChecker &TC, DeclContext *dc, StringRef name) {
   return TD->getDeclaredType();
 }
 
-
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
@@ -506,6 +506,14 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   }
 
   return *type;
+}
+
+NominalTypeDecl *TypeChecker::getUnsafePointerDecl(const DeclContext *DC) {
+  return UnsafePointerDecl.cache([&] {
+    UnqualifiedLookup lookup(Context.getIdentifier("UnsafePointer"),
+                             getStdlibModule(DC), nullptr);
+    return cast_or_null<NominalTypeDecl>(lookup.getSingleTypeResult());
+  });
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
