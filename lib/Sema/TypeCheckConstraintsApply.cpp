@@ -364,6 +364,15 @@ namespace {
             = isa<ProtocolDecl>(member->getDeclContext()) &&
               (baseTy->is<ArchetypeType>() || baseTy->isExistentialType());
 
+      // If we are referring to an optional member of a protocol.
+      if (isArchetypeOrExistentialRef && member->getAttrs().isOptional()) {
+        auto proto =tc.getProtocol(memberLoc, KnownProtocolKind::DynamicLookup);
+        if (!proto)
+          return nullptr;
+
+        baseTy = proto->getDeclaredType();
+      }
+
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
@@ -387,7 +396,12 @@ namespace {
       if (isArchetypeOrExistentialRef) {
         Expr *ref;
 
-        if (baseTy->is<ArchetypeType>()) {
+        if (member->getAttrs().isOptional()) {
+          base = tc.coerceToRValue(base);
+          if (!base) return nullptr;
+          ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
+                                                   memberLoc);
+        } else if (baseTy->is<ArchetypeType>()) {
           ref = new (context) ArchetypeMemberRefExpr(base, dotLoc, memberRef,
                                                      memberLoc);
         } else {
@@ -620,7 +634,19 @@ namespace {
       // Form the subscript expression.
 
       // Handle dynamic lookup.
-      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
+          subscript->getAttrs().isOptional()) {
+        // If we've found an optional method in a protocol, the base type is
+        // DynamicLookup.
+        if (selected.choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
+          auto proto = tc.getProtocol(index->getStartLoc(),
+                                      KnownProtocolKind::DynamicLookup);
+          if (!proto)
+            return nullptr;
+
+          baseTy = proto->getDeclaredType();
+        }
+
         // Materialize if we need to.
         base = coerceObjectArgumentToType(base, baseTy, locator);
         if (!base)

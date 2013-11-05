@@ -1305,6 +1305,11 @@ static bool archetypeConformsToProtocol(TypeChecker &tc, Type type,
                                         ArchetypeType *archetype,
                                         ProtocolDecl *protocol,
                                         SourceLoc complainLoc) {
+  // An archetype that must be a class trivially conforms to DynamicLookup.
+  if (archetype->requiresClass() &&
+      protocol == tc.Context.getProtocol(KnownProtocolKind::DynamicLookup))
+    return true;
+
   for (auto ap : archetype->getConformsTo()) {
     if (ap == protocol || ap->inheritsFrom(protocol))
       return true;
@@ -1329,6 +1334,11 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
   bool isExistential = type->isExistentialType(protocols);
   assert(isExistential && "Not existential?");
   (void)isExistential;
+
+  // An existential that must be a class trivially conforms to DynamicLookup.
+  if (type->isClassExistentialType() &&
+      protocol == tc.Context.getProtocol(KnownProtocolKind::DynamicLookup))
+    return true;
 
   for (auto ap : protocols) {
     // If this isn't the protocol we're looking for, continue looking.
