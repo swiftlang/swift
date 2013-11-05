@@ -223,9 +223,6 @@ private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
 
-  ///\ brief The Swift standard library module.
-  Module *swiftModule = nullptr;
-  
   /// A pair containing a ClangModule and whether the adapters of its
   /// re-exported modules have all been forced to load already.
   using ModuleInitPair = llvm::PointerIntPair<ClangModule *, 1, bool>;

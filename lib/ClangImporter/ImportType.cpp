@@ -707,24 +707,11 @@ Type ClangImporter::Implementation::importFunctionType(
 }
 
 Module *ClangImporter::Implementation::getSwiftModule() {
-  if (swiftModule)
-    return swiftModule;
-
-  auto known =
-      SwiftContext.LoadedModules.find(SwiftContext.StdlibModuleName.str());
-  if (known == SwiftContext.LoadedModules.end())
-    return nullptr;
-
-  swiftModule = known->second;
-  return swiftModule;
+  return SwiftContext.getStdlibModule();
 }
 
 Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
-  auto known = SwiftContext.LoadedModules.find(name);
-  if (known == SwiftContext.LoadedModules.end())
-    return nullptr;
-
-  return known->second;
+  return SwiftContext.getLoadedModule(SwiftContext.getIdentifier(name));
 }
 
 bool ClangImporter::Implementation::hasFoundationModule() {

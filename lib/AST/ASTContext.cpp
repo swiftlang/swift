@@ -267,11 +267,7 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
 void ASTContext::lookupInSwiftModule(
                    StringRef name,
                    SmallVectorImpl<ValueDecl *> &results) const {
-  // Find the "swift" module.
-  std::pair<Identifier, SourceLoc> ModulePath[] = {
-    { StdlibModuleName, SourceLoc() }
-  };
-  Module *M = getLoadedModule(ModulePath);
+  Module *M = getStdlibModule();
   if (!M)
     return;
 
@@ -658,10 +654,13 @@ Module *ASTContext::getLoadedModule(
 
   // TODO: Swift submodules.
   if (ModulePath.size() == 1) {
-    if (Module *M = LoadedModules.lookup(ModulePath[0].first.str()))
-      return M;
+    return getLoadedModule(ModulePath[0].first);
   }
   return nullptr;
+}
+
+Module *ASTContext::getLoadedModule(Identifier ModuleName) const {
+  return LoadedModules.lookup(ModuleName.str());
 }
 
 Module *
@@ -681,6 +680,14 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   }
 
   return nullptr;
+}
+
+Module *ASTContext::getStdlibModule() const {
+  if (TheStdlibModule)
+    return TheStdlibModule;
+
+  TheStdlibModule = getLoadedModule(StdlibModuleName);
+  return TheStdlibModule;
 }
 
 ClangNode ASTContext::getClangNode(Decl *decl) {

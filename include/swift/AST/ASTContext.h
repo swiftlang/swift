@@ -168,6 +168,9 @@ public:
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;
 
+  /// The standard library module.
+  mutable Module *TheStdlibModule = nullptr;
+
   /// The name of the standard library module "swift".
   Identifier StdlibModuleName;
 
@@ -411,6 +414,8 @@ public:
   Module *getLoadedModule(
       ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
 
+  Module *getLoadedModule(Identifier ModuleName) const;
+
   /// \brief Attempts to load a module into this ASTContext.
   ///
   /// If a module by this name has already been loaded, the existing module will
@@ -418,6 +423,8 @@ public:
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
   Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
+
+  Module *getStdlibModule() const;
 
   /// \brief Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
