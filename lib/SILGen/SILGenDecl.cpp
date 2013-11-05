@@ -1081,6 +1081,9 @@ public:
     assert(conformance);
     if (protocol->isObjC())
       for (auto &mapping : conformance->getWitnesses()) {
+        if (!mapping.second)
+          continue;
+        
         ValueDecl *vd = mapping.second.getDecl();
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);

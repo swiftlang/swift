@@ -2705,7 +2705,8 @@ namespace {
 
     void addStaticMethod(FuncDecl *iface) {
       const auto &witness = Conformance.getWitness(iface);
-      
+      assert(witness && "Cannot handle missing optional requirements");
+
       FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getStaticMethodWitness(impl,
                                       iface->getType()->getCanonicalType(),
@@ -2714,6 +2715,7 @@ namespace {
 
     void addInstanceMethod(FuncDecl *iface) {
       const auto &witness = Conformance.getWitness(iface);
+      assert(witness && "Cannot handle missing optional requirements");
 
       FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getInstanceMethodWitness(impl,

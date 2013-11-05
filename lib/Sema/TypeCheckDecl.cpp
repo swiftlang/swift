@@ -1405,8 +1405,10 @@ public:
     if (!conformance)
       return;
     if (protocol->isObjC())
-      for (auto &mapping : conformance->getWitnesses())
-        mapping.second.getDecl()->setIsObjC(true);
+      for (auto &mapping : conformance->getWitnesses()) {
+        if (mapping.second)
+          mapping.second.getDecl()->setIsObjC(true);
+      }
     for (auto &inherited : conformance->getInheritedConformances())
       checkObjCConformance(inherited.first, inherited.second);
   }

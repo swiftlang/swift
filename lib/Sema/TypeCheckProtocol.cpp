@@ -977,7 +977,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
     }
     
-    // We have either no matches or an ambiguous match. Diagnose it.
+    // We have either no matches or an ambiguous match.
+
+    // If the requirement is optional, it's okay: just record that the
+    // requirement was not satisfied.
+    if (Requirement->getAttrs().isOptional()) {
+      Mapping[Requirement] = ConcreteDeclRef();
+      continue;
+    }
+
+    // Diagnose the error.
 
     // If we're not supposed to complain, don't; just return null to indicate
     // failure.
@@ -1217,8 +1226,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
       } else if (auto nominal = witnessTy->getAnyNominal()) {
         witnessOwner = getNominalOrExtensionDecl(nominal->getDeclContext());
       }
-    } else {
-      auto witness = conformance->getWitness(valueReq).getDecl();
+    } else if (auto witness = conformance->getWitness(valueReq).getDecl()) {
       witnessOwner = getNominalOrExtensionDecl(witness->getDeclContext());
     }
 
