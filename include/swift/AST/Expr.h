@@ -2645,6 +2645,7 @@ public:
   
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
+  SourceLoc getLoc() const { return EqualLoc; }
   SourceRange getSourceRange() const;
   
   /// True if the node has been processed by binary expression folding.

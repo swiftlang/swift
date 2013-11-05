@@ -1366,6 +1366,11 @@ ERROR(ambiguous_operator_ref,tce_sema,none,
 ERROR(partial_application_of_value_type_method,tce_sema,none,
       "partial application of struct or enum method is not allowed", ())
 
+ERROR(self_assignment_var,tce_sema,none,
+      "assigning a variable to itself", ())
+ERROR(self_assignment_prop,tce_sema,none,
+      "assigning a property to itself", ())
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------

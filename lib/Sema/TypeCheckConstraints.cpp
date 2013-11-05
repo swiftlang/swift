@@ -17,6 +17,7 @@
 
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -4231,6 +4232,8 @@ bool TypeChecker::typeCheckExpression(
     log << "---Type-checked expression---\n";
     result->dump(log);
   }
+
+  performExprDiagnostics(*this, result);
 
   expr = result;
   cleanup.disable();

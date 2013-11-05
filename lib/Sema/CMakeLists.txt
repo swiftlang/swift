@@ -5,6 +5,7 @@ add_swift_library(swiftSema
   NameBinding.cpp
   SourceLoader.cpp
   DerivedConformanceRawRepresentable.cpp
+  MiscDiagnostics.cpp
   TypeChecker.cpp
   TypeCheckConstraints.cpp
   TypeCheckConstraintsApply.cpp
