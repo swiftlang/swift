@@ -125,7 +125,7 @@ enum AttrKind {
   AK_Count
 };
 
-// Define enumerators for each attribute, e.g. AK_weak.
+// Define enumerators for each type attribute, e.g. TAK_weak.
 enum TypeAttrKind {
 #define ATTR(X)
 #define TYPE_ATTR(X) TAK_##X,
@@ -253,7 +253,7 @@ public:
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
-
+  bool isOptional() const { return has(AK_optional); }
 
   Resilience getResilienceKind() const {
     if (has(AK_resilient))

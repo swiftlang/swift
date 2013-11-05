@@ -3043,4 +3043,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                 diag::class_protocol_not_protocol);
     D->getMutableAttrs().clearAttribute(AK_class_protocol);
   }
+
+  // Only protocol members can be @optional.
+  if (Attrs.isOptional() && !isa<ProtocolDecl>(D->getDeclContext())) {
+    TC.diagnose(Attrs.getLoc(AK_optional),
+                diag::optional_attribute_non_protocol);
+    D->getMutableAttrs().clearAttribute(AK_optional);
+  }
 }

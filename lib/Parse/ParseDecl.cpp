@@ -115,6 +115,7 @@ bool Parser::parseTopLevel() {
 ///     'weak'
 ///     'unowned'
 ///     'noreturn'
+///     'optional'
 /// \endverbatim
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.

@@ -176,6 +176,8 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
     OS << "@class_protocol ";
   if (Attrs.isExported())
     OS << "@exported ";
+  if (Attrs.isOptional())
+    OS << "@optional ";
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,

@@ -1089,6 +1089,8 @@ ERROR(type_attribute_applied_to_decl,sema_tcd,none,
       "attribute can only be applied to types, not declarations", ())
 ERROR(decl_attribute_applied_to_type,sema_tcd,none,
       "attribute can only be applied to declarations, not types", ())
+ERROR(optional_attribute_non_protocol,sema_tcd,none,
+      "'optional' attribute can only be applied to protocol members", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
