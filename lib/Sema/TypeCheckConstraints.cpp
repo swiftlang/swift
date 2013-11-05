@@ -977,7 +977,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // depending on
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (isDynamicResult)
+    if (isDynamicResult || subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy, TC.Context);
     else
       elementTy = LValueType::get(elementTy,
@@ -2109,11 +2109,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              isTypeReference,
                              choice.isSpecialized());
 
-    if (isDynamicResult) {
-      // For a non-subscript declaration found via dynamic lookup,
-      // strip off the lvalue-ness (one cannot assign to such
-      // declarations) and make a reference to that declaration be
-      // optional.
+    if (isDynamicResult || choice.getDecl()->getAttrs().isOptional()) {
+      // For a non-subscript declaration found via dynamic lookup or as an
+      // optional requirement in a protocol, strip off the lvalue-ness (one
+      // cannot assign to such declarations) and make a reference to that
+      // declaration be optional.
       //
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
