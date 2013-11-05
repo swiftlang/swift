@@ -54,11 +54,14 @@ TypeChecker::~TypeChecker() {
 }
 
 void TypeChecker::handleExternalDecl(Decl *decl) {
-  if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    addImplicitConstructors(structDecl);
+  if (auto SD = dyn_cast<StructDecl>(decl)) {
+    addImplicitConstructors(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
     addImplicitDestructor(CD);
+  }
+  if (auto ED = dyn_cast<EnumDecl>(decl)) {
+    addRawRepresentableConformance(ED);
   }
 }
 

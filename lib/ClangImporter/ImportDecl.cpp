@@ -481,15 +481,31 @@ namespace {
         break;
       }
 
-      case EnumKind::Enum:
+      case EnumKind::Enum: {
+        // Compute the underlying type.
+        auto underlyingType = Impl.importType(decl->getIntegerType(),
+                                              ImportTypeKind::Normal);
+        if (!underlyingType)
+          return nullptr;
+        
         enumDecl = new (Impl.SwiftContext)
           EnumDecl(Impl.importSourceLoc(decl->getLocStart()),
-                    name,
-                    Impl.importSourceLoc(decl->getLocation()),
-                    { }, nullptr, dc);
+                   name, Impl.importSourceLoc(decl->getLocation()),
+                   {}, nullptr, dc);
         enumDecl->computeType();
+        
+        // Set up the C underlying type as its Swift raw type.
+        enumDecl->setRawType(underlyingType);
+        
+        ProtocolDecl *rawRepresentable = Impl.SwiftContext
+          .getProtocol(KnownProtocolKind::RawRepresentable);
+        auto protoList = Impl.SwiftContext.AllocateCopy(
+                                          llvm::makeArrayRef(rawRepresentable));
+        enumDecl->setProtocols(protoList);
+        
         result = enumDecl;
         break;
+      }
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl);
@@ -516,8 +532,8 @@ namespace {
                                                        decl->getRBraceLoc())));
       }
       
-      // Add the struct decl to ExternalDefinitions so that IRGen can emit
-      // metadata for it.
+      // Add the struct decl to ExternalDefinitions so that we can type-check
+      // raw values and IRGen can emit metadata for it.
       // FIXME: There might be better ways to do this.
       Impl.SwiftContext.addedExternalDecl(result);
       return result;
@@ -714,6 +730,7 @@ namespace {
         auto dc = Impl.importDeclContextOf(decl);
         if (!dc)
           return nullptr;
+        auto theEnum = cast<EnumDecl>(dc);
 
         // FIXME: Importing the type will can recursively revisit this same
         // EnumConstantDecl. Short-circuit out if we already emitted the import
@@ -722,15 +739,30 @@ namespace {
         if (known != Impl.ImportedDecls.end())
           return known->second;
 
-        // FIXME: Import the raw type from the enum element decl.
+        // Use the constant's underlying value as its raw value in Swift.
+        bool negative = false;
+        llvm::APSInt rawValue = decl->getInitVal();
+        if (rawValue.slt(0)) {
+          rawValue = -rawValue;
+          negative = true;
+        }
+        llvm::SmallString<12> rawValueText;
+        decl->getInitVal().toString(rawValueText);
+        StringRef rawValueTextC
+          = context.AllocateCopy(StringRef(rawValueText));
+        auto rawValueExpr = new (context) IntegerLiteralExpr(rawValueTextC,
+                                                         SourceLoc(),
+                                                         /*implicit*/ false);
+        if (negative)
+          rawValueExpr->setNegative(SourceLoc());
+        
         auto element
           = new (context) EnumElementDecl(SourceLoc(),
                                           name, TypeLoc(),
-                                          SourceLoc(), nullptr,
+                                          SourceLoc(), rawValueExpr,
                                           dc);
 
         // Give the enum element the appropriate type.
-        auto theEnum = cast<EnumDecl>(dc);
         auto argTy = MetaTypeType::get(theEnum->getDeclaredType(), context);
         element->overwriteType(FunctionType::get(argTy,
                                                  theEnum->getDeclaredType(),

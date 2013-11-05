@@ -415,6 +415,9 @@ public:
   /// user-provided destructor.
   void addImplicitDestructor(ClassDecl *CD);
 
+  /// \brief Add the RawRepresentable methods to an enum with a raw type.
+  void addRawRepresentableConformance(EnumDecl *ED);
+  
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.

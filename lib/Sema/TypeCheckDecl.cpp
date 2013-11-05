@@ -1779,65 +1779,65 @@ public:
     elt->setInterfaceType(interfaceTy);
   }
 
-  void visitEnumElementDecl(EnumElementDecl *ED) {
-    if (IsSecondPass || ED->hasType())
+  void visitEnumElementDecl(EnumElementDecl *EED) {
+    if (IsSecondPass || EED->hasType())
       return;
 
-    validateAttributes(TC, ED);
+    validateAttributes(TC, EED);
 
-    EnumDecl *UD = ED->getParentEnum();
-    Type ElemTy = UD->getDeclaredTypeInContext();
+    EnumDecl *ED = EED->getParentEnum();
+    Type ElemTy = ED->getDeclaredTypeInContext();
 
-    if (!ED->getArgumentTypeLoc().isNull())
-      if (TC.validateType(ED->getArgumentTypeLoc(), ED->getDeclContext())) {
-        ED->overwriteType(ErrorType::get(TC.Context));
-        ED->setInvalid();
+    if (!EED->getArgumentTypeLoc().isNull())
+      if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext())) {
+        EED->overwriteType(ErrorType::get(TC.Context));
+        EED->setInvalid();
         return;
       }
 
     // Check the raw value, if we have one.
-    if (auto *rawValue = ED->getRawValueExpr()) {
-      auto rawTy = UD->getRawType();
+    if (auto *rawValue = EED->getRawValueExpr()) {
+      auto rawTy = ED->getRawType();
       if (!rawTy) {
         TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
         // Recover by setting the raw type as this element's type.
       }
       Expr *typeCheckedExpr = rawValue;
-      if (!TC.typeCheckExpression(typeCheckedExpr, UD, rawTy, false))
-        ED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+      if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, false))
+        EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
     }
 
     // If we have a simple element, just set the type.
-    if (ED->getArgumentType().isNull()) {
+    if (EED->getArgumentType().isNull()) {
       Type argTy = MetaTypeType::get(ElemTy, TC.Context);
       Type fnTy;
-      if (auto gp = UD->getGenericParamsOfContext())
+      if (auto gp = ED->getGenericParamsOfContext())
         fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp, TC.Context);
       else
         fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
-      ED->setType(fnTy);
-      if (ED->getDeclContext()->isGenericContext())
-        computeEnumElementInterfaceType(ED);
+      EED->setType(fnTy);
+      if (EED->getDeclContext()->isGenericContext())
+        computeEnumElementInterfaceType(EED);
       return;
     }
 
-    Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
-    if (auto gp = UD->getGenericParamsOfContext())
+    Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy, TC.Context);
+    if (auto gp = ED->getGenericParamsOfContext())
       fnTy = PolymorphicFunctionType::get(MetaTypeType::get(ElemTy, TC.Context),
                                           fnTy, gp, TC.Context);
     else
       fnTy = FunctionType::get(MetaTypeType::get(ElemTy, TC.Context), fnTy,
                                TC.Context);
-    ED->setType(fnTy);
+    EED->setType(fnTy);
 
-    if (ED->getDeclContext()->isGenericContext())
-      computeEnumElementInterfaceType(ED);
+    if (EED->getDeclContext()->isGenericContext())
+      computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
-    if (!ED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(ED->getLoc(), diag::enum_element_not_materializable);
-      ED->overwriteType(ErrorType::get(TC.Context));
-      ED->setInvalid();
+    if (!EED->getArgumentType()->isMaterializable()) {
+      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
+      EED->overwriteType(ErrorType::get(TC.Context));
+      EED->setInvalid();
     }
   }
 
@@ -2447,6 +2447,23 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
 
   CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
+}
+
+void TypeChecker::addRawRepresentableConformance(EnumDecl *ED) {
+  // Type-check the raw values of the enum.
+  for (auto elt : ED->getAllElements()) {
+    assert(elt->hasRawValueExpr());
+    Expr *typeChecked = elt->getRawValueExpr();
+    bool error = typeCheckExpression(typeChecked, ED,
+                                     ED->getRawType(), false);
+    assert(!error); (void)error;
+    elt->setTypeCheckedRawValueExpr(typeChecked);
+  }
+  
+  // Type-check the protocol conformances of the enum decl to instantiate its
+  // derived conformances.
+  DeclChecker(*this, false, false)
+    .checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
 }
 
 bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
