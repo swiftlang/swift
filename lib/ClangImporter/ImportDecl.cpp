@@ -2347,7 +2347,7 @@ classifyEnum(const clang::EnumDecl *decl) {
       auto expansionBuffer = ClangSM.getBuffer(expansionFile, expansionLoc);
       auto expansionPtr = ClangSM.getCharacterData(expansionLoc);
       
-      clang::Lexer lex(expansionLoc,
+      clang::Lexer lex(clang::SourceLocation(),
                        getClangASTContext().getLangOpts(),
                        expansionBuffer->getBufferStart(),
                        expansionPtr,
