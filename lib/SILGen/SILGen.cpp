@@ -230,6 +230,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
   if(isa<ClangModule>(dc) &&
      (isa<ConstructorDecl>(d) ||
       isa<SubscriptDecl>(d) ||
+      isa<EnumElementDecl>(d) ||
       (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed())))
     return SILLinkage::Thunk;
   

@@ -58,6 +58,16 @@ typedef long NSInteger;
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end
 
+#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+
 struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);
+
+typedef  NS_ENUM(NSInteger, NSRuncingOptions) {
+  NSRuncingMince = 123,
+  NSRuncingQuinceSliced = 4567,
+  NSRuncingQuinceJulienned = 5678,
+  NSRuncingQuinceDiced = 6789
+};
+

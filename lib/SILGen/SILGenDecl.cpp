@@ -1039,13 +1039,17 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(cast<ConstructorDecl>(d));
     break;
   }
-  case DeclKind::Enum:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::Protocol: {
-    // Nothing to do in SILGen for external types.
+  case DeclKind::Enum: {
+    // Emit the enum cases.
+    for (auto elt : cast<EnumDecl>(d)->getAllElements())
+      emitEnumConstructor(elt);
     break;
   }
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+    // Nothing to do in SILGen for other external types.
+    break;
       
   case DeclKind::Extension:
   case DeclKind::PatternBinding:

@@ -32,3 +32,5 @@ typedef signed char BOOL;
 NSString *bar(void);
 void setBar(NSString *s);
 
+#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+
