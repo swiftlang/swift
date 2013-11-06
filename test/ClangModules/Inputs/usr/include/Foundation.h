@@ -84,3 +84,13 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak2) {
 typedef NS_ENUM(NSInteger, NSSingleConstantEnum) {
   NSSingleConstantValue,
 };
+
+@protocol NSWobbling
+-(void)wobble;
+
+@optional
+-(void)wibble;
+
+- (id)objectAtIndexedSubscript:(NSUInteger)idx;
+@end
+

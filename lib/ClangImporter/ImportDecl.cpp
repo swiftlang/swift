@@ -1095,6 +1095,11 @@ namespace {
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
 
+      // Optional methods in protocols.
+      if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
+          isa<ProtocolDecl>(dc))
+        result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+
       // Mark this as an Objective-C method.
       result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->setIsObjC(true);
@@ -1622,6 +1627,7 @@ namespace {
           return protocol->lookupInstanceMethod(Sel);
       };
 
+      bool optionalMethods = true;
       FuncDecl *getter = nullptr, *setter = nullptr;
       if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
         getter = cast<FuncDecl>(decl);
@@ -1634,6 +1640,12 @@ namespace {
           // Don't allow static setters.
           if (setter && setter->isStatic())
             setter = nullptr;
+
+          if (setter) {
+            optionalMethods = optionalMethods &&
+              objcSetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
         }
       } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript){
         setter = cast<FuncDecl>(decl);
@@ -1646,6 +1658,12 @@ namespace {
           // Don't allow static getters.
           if (getter && getter->isStatic())
             return nullptr;
+
+          if (getter) {
+            optionalMethods = optionalMethods &&
+              objcGetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
         }
 
         // FIXME: Swift doesn't have write-only subscripting.
@@ -1662,6 +1680,13 @@ namespace {
           // Don't allow static setters.
           if (setter && setter->isStatic())
             setter = nullptr;
+
+          if (setter) {
+            optionalMethods = optionalMethods &&
+              objcSetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
+
         }
       } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
         setter = cast<FuncDecl>(decl);
@@ -1674,12 +1699,17 @@ namespace {
           // Don't allow static getters.
           if (getter && getter->isStatic())
             return nullptr;
+
+          if (getter) {
+            optionalMethods = optionalMethods &&
+              objcGetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
         }
 
         // FIXME: Swift doesn't have write-only subscripting.
         if (!getter)
           return nullptr;
-
       } else {
         llvm_unreachable("Unknown getter/setter selector");
       }
@@ -1768,6 +1798,10 @@ namespace {
       if (setterThunk)
         setterThunk->makeSetter(subscript);
       subscript->setIsObjC(true);
+
+      // Optional subscripts in protocols.
+      if (optionalMethods && isa<ProtocolDecl>(dc))
+        subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
       // Note that we've created this subscript.
       Impl.Subscripts[{getter, setter}] = subscript;
@@ -2300,6 +2334,9 @@ namespace {
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
         result->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
+      if (decl->getPropertyImplementation() == clang::ObjCPropertyDecl::Optional
+          && isa<ProtocolDecl>(dc))
+        result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
       // FIXME: Handle IBOutletCollection.
 
       if (overridden)
