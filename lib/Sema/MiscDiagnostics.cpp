@@ -83,12 +83,15 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
   auto RetExpr = RS->getResult();
   auto RSLoc = RS->getStartLoc();
   auto RetExprLoc = RetExpr->getStartLoc();
+  // FIXME: Expose getColumnNumber() in LLVM SourceMgr to make this check
+  // cheaper.
   if (RSLoc.isInvalid() || RetExprLoc.isInvalid() || (RSLoc == RetExprLoc))
     return;
   SourceManager &SM = TC.Context.SourceMgr;
   if (SM.getLineAndColumn(RSLoc).second ==
       SM.getLineAndColumn(RetExprLoc).second) {
-    TC.diagnose(RetExpr->getStartLoc(), diag::unreachable_code_after_return);
+    TC.diagnose(RetExpr->getStartLoc(), diag::unindented_code_after_return);
+    TC.diagnose(RetExpr->getStartLoc(), diag::indent_expression_to_silence);
     return;
   }
   return;

@@ -1371,8 +1371,11 @@ ERROR(self_assignment_var,tce_sema,none,
 ERROR(self_assignment_prop,tce_sema,none,
       "assigning a property to itself", ())
 
-WARNING(unreachable_code_after_return,tce_sema,none,
-        "expression following 'return' will never be executed", ())
+WARNING(unindented_code_after_return,tce_sema,none,
+        "expression following ‘return’ is treated as an argument of "
+        "the 'return'", ())
+NOTE(indent_expression_to_silence,tce_sema,none,
+     "indent the expression to confirm the intent", ())
 
 //------------------------------------------------------------------------------
 // Type Check Statements
