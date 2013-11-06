@@ -4688,7 +4688,18 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   EP->setMatchVar(matchVar);
   
   // Find '~=' operators for the match.
-  UnqualifiedLookup matchLookup(Context.getIdentifier("~="), DC, this);
+  // First try the current context.
+  auto matchOperator = Context.getIdentifier("~=");
+  UnqualifiedLookup matchLookup(matchOperator, DC, this);
+  // If that doesn't work, fall back to the stdlib. Some contexts (viz.
+  // Clang modules) don't normally see the stdlib.
+  // FIXME: There might be better ways to do this.
+  if (!matchLookup.isSuccess()) {
+    matchLookup = UnqualifiedLookup(matchOperator,
+                                    Context.getStdlibModule(),
+                                    this);
+  }
+  
   if (!matchLookup.isSuccess()) {
     diagnose(EP->getLoc(), diag::no_match_operator);
     return true;
