@@ -42,8 +42,8 @@ static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
     return std::make_pair(nullptr, D);
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    return std::make_pair(findSimpleReferencedDecl(MRE->getBase()),
-                          MRE->getMember().getDecl());
+    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
   }
 
   return std::make_pair(nullptr, nullptr);
