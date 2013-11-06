@@ -18,11 +18,13 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Basic/IdentifierTable.h"
+#include <set>
 
 namespace clang {
 class APValue;
@@ -221,6 +223,10 @@ struct ClangImporter::Implementation {
 
   /// \brief Keep track of enum constant name prefixes in enums.
   llvm::DenseMap<const clang::EnumDecl *, StringRef> EnumConstantNamePrefixes;
+  
+  /// \brief Keep track of enum constant values that have been imported.
+  std::set<std::pair<const clang::EnumDecl *, llvm::APSInt>>
+    EnumConstantValues;
   
 private:
   /// \brief NSObject, imported into Swift.

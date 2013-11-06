@@ -85,6 +85,13 @@ typedef NS_ENUM(NSInteger, NSSingleConstantEnum) {
   NSSingleConstantValue,
 };
 
+typedef NS_ENUM(unsigned char, NSEnumWithAliases) {
+  NSAliasesOriginal = 129,
+  NSAliasesBySameValue = 129,
+  NSAliasesByEquivalentValue = -127,
+  NSAliasesByName = NSAliasesOriginal,
+};
+
 @protocol NSWobbling
 -(void)wobble;
 
