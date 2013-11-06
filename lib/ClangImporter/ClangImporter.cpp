@@ -389,14 +389,22 @@ ClangImporter::Implementation::importName(Identifier name) {
 
 Identifier
 ClangImporter::Implementation::importName(clang::DeclarationName name,
-                                          StringRef suffix) {
+                                          StringRef suffix,
+                                          StringRef removePrefix) {
   // FIXME: At some point, we'll be able to import operators as well.
   if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
     return Identifier();
 
+  StringRef nameStr = name.getAsIdentifierInfo()->getName();
+  // Remove the prefix, if any.
+  if (!removePrefix.empty()) {
+    assert(nameStr.startswith(removePrefix)
+           && "name doesn't start with given removal prefix");
+    nameStr = nameStr.slice(removePrefix.size(), nameStr.size());
+  }
+
   // Get the Swift identifier.
   if (suffix.empty()) {
-    StringRef nameStr = name.getAsIdentifierInfo()->getName();
     if (isSwiftReservedName(nameStr))
       return Identifier();
 
@@ -405,7 +413,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 
   // Append the suffix, and try again.
   llvm::SmallString<64> nameBuf;
-  nameBuf += name.getAsIdentifierInfo()->getName();
+  nameBuf += nameStr;
   nameBuf += suffix;
 
   if (isSwiftReservedName(nameBuf))

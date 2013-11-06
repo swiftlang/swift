@@ -142,13 +142,13 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       break;
 
     case MappedCTypeKind::FloatIEEEdouble:
-      assert(Bitwidth == 64 && "FloatIEEEsingle should be 64 bits wide");
+      assert(Bitwidth == 64 && "FloatIEEEdouble should be 64 bits wide");
       if (&Sem != &APFloat::IEEEdouble)
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatX87DoubleExtended:
-      assert(Bitwidth == 80 && "FloatIEEEsingle should be 80 bits wide");
+      assert(Bitwidth == 80 && "FloatX87DoubleExtended should be 80 bits wide");
       if (&Sem != &APFloat::x87DoubleExtended)
         return std::make_pair(Type(), "");
       break;
@@ -203,6 +203,28 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   if (MD->getClassInterface()->getName() != "NSDictionary")
     return false;
   return true;
+}
+
+/// \brief Returns the common prefix of two strings at camel-case word
+/// granularity.
+///
+/// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
+/// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.
+///
+/// This is used to derive the common prefix of enum constants so we can elide
+/// it from the Swift interface.
+static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
+  unsigned prefixLength = 0;
+  unsigned commonSize = std::min(a.size(), b.size());
+  for (size_t i = 0; i < commonSize; ++i) {
+    // If this is a camel-case word boundary, advance the prefix length.
+    if (isupper(a[i]) && isupper(b[i]))
+      prefixLength = i;
+
+    if (a[i] != b[i])
+      return a.slice(0, prefixLength);
+  }
+  return a.slice(0, commonSize);
 }
 
 namespace {
@@ -504,6 +526,25 @@ namespace {
         enumDecl->setProtocols(protoList);
         
         result = enumDecl;
+        
+        // Find the common prefix of the enumerator names. We'll elide this from
+        // the Swift interface because Swift enum cases are naturally namespaced
+        // by the enum type.
+        auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
+        if (ec != ecEnd) {
+          StringRef commonPrefix = (*ec)->getName();
+          ++ec;
+          // If there's only one enum constant, we can't come up with any
+          // reasonable prefix automatically, so bail.
+          if (ec == ecEnd) {
+            commonPrefix = "";
+          } else {
+            for (; ec != ecEnd; ++ec)
+              commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
+            Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
+          }
+        }
+        
         break;
       }
       }
@@ -511,6 +552,7 @@ namespace {
       result->setClangNode(decl);
 
       // Import each of the enumerators.
+      
       SmallVector<Decl *, 4> members;
       for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
            ec != ecEnd; ++ec) {
@@ -647,11 +689,20 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto &context = Impl.SwiftContext;
       
-      auto name = Impl.importName(decl->getDeclName());
+      auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
+      
+      // Look up the common name prefix for this enum's constants.
+      StringRef enumPrefix = "";
+      auto foundPrefix = Impl.EnumConstantNamePrefixes.find(clangEnum);
+      if (foundPrefix != Impl.EnumConstantNamePrefixes.end()) {
+        enumPrefix = foundPrefix->second;
+      }
+      
+      auto name = Impl.importName(decl->getDeclName(), /*suffix*/ "",
+                                  enumPrefix);
       if (name.empty())
         return nullptr;
 
-      auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       switch (Impl.classifyEnum(clangEnum)) {
       case EnumKind::Constants: {
         // The enumeration was simply mapped to an integral type. Create a

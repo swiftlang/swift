@@ -75,3 +75,12 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak) {
   NSPrefixWordBreakBanjo,
   NSPrefixWordBreakBandana
 };
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreak2) {
+  NSPrefixWordBreakBarBas,
+  NSPrefixWordBreakBareBass,
+};
+
+typedef NS_ENUM(NSInteger, NSSingleConstantEnum) {
+  NSSingleConstantValue,
+};

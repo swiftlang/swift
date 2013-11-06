@@ -219,6 +219,9 @@ struct ClangImporter::Implementation {
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
 
+  /// \brief Keep track of enum constant name prefixes in enums.
+  llvm::DenseMap<const clang::EnumDecl *, StringRef> EnumConstantNamePrefixes;
+  
 private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
@@ -273,7 +276,11 @@ public:
   ///
   /// \param suffix The suffix to append to the Clang name to produce the
   /// Swift name.
-  Identifier importName(clang::DeclarationName name, StringRef suffix = "");
+  ///
+  /// \param removePrefix The prefix to remove from the Clang name to produce
+  /// the Swift name.
+  Identifier importName(clang::DeclarationName name, StringRef suffix = "",
+                        StringRef removePrefix = "");
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
