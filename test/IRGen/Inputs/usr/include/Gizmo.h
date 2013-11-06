@@ -69,3 +69,8 @@ typedef NS_ENUM(unsigned short, NSRuncingOptions) {
   NSRuncingQuinceJulienned = 5678,
   NSRuncingQuinceDiced = 6789,
 };
+
+typedef NS_ENUM(int, NSRadixedOptions) {
+  NSRadixedOctal = 0755,
+  NSRadixedHex = 0xFFFF,
+};
