@@ -150,32 +150,32 @@ void ModelASTWalker::visitTranslationUnit(TranslationUnit &TU,
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isGetterOrSetter()) {
+  if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
+    if (FD && FD->isGetterOrSetter()) {
       // Pass get / set context sensitive keyword token.
       SourceLoc SL = FD->getDefLoc();
-      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                              CharSourceRange(SL, 3)
-                            }))
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword, CharSourceRange(SL, 3)}))
         return false;
     }
     else {
-      SourceRange SR = FD->getSourceRange();
-      SourceLoc NL = FD->getNameLoc();
+      // Pass Function / Method structure node
+      SourceRange SR = AFD->getSourceRange();
+      SourceLoc NL = AFD->getNameLoc();
       SyntaxStructureKind Kind;
-      const DeclContext *DC = FD->getDeclContext();
+      const DeclContext *DC = AFD->getDeclContext();
       if (DC->isTypeContext()) {
-        if (FD->isStatic())
+        if (FD && FD->isStatic())
           Kind = SyntaxStructureKind::StaticFunction;
         else
           Kind = SyntaxStructureKind::InstanceFunction;
       }
       else
-         Kind = SyntaxStructureKind::FreeFunction;
+        Kind = SyntaxStructureKind::FreeFunction;
 
       pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  FD->getName().getLength()))});
+                                                 AFD->getName().getLength()))});
     }
   }
   else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -201,8 +201,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 }
 
 bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-    if (!FD->isGetterOrSetter()) {
+  if (isa<AbstractFunctionDecl>(D)) {
+    FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!(FD && FD->isGetterOrSetter())) {
       popStructureNode();
     }
   }
