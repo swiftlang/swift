@@ -40,6 +40,16 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 
 #undef BUILTIN_CAST_OPERATION
 
+/// Cast-or-bitcast operations have type T1 -> T2. 
+/// T1 and T2 may be the same size, unlike the corresponding true casts.
+#ifndef BUILTIN_CAST_OR_BITCAST_OPERATION
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
+#endif
+BUILTIN_CAST_OR_BITCAST_OPERATION(TruncOrBitCast, "truncOrBitCast", "n")
+BUILTIN_CAST_OR_BITCAST_OPERATION(ZExtOrBitCast,  "zextOrBitCast",  "n")
+BUILTIN_CAST_OR_BITCAST_OPERATION(SExtOrBitCast,  "sextOrBitCast",  "n")
+#undef BUILTIN_CAST_OR_BITCAST_OPERATION
+
 /// Binary operations have type (T,T) -> T.
 #ifndef BUILTIN_BINARY_OPERATION
 #define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload) \

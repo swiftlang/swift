@@ -280,9 +280,15 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   switch (VK) {
   default: assert(0 && "Not a cast operation");
 
-  // Allow trunc/zext/sext of identical bit widths (i.e. a no-op) 
-  // because it simplifies interfacing Word with Int32 and Int64.
   case BuiltinValueKind::Trunc:
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinIntegerType>() ||
+        !CheckOutput->is<BuiltinIntegerType>() ||
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <=
+        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+      return nullptr;
+    break;
+  case BuiltinValueKind::TruncOrBitCast:
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
@@ -293,6 +299,16 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       
   case BuiltinValueKind::ZExt:
   case BuiltinValueKind::SExt: {
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinIntegerType>() ||
+        !CheckOutput->is<BuiltinIntegerType>() ||
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >=
+        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+      return nullptr;
+    break;
+  }
+  case BuiltinValueKind::ZExtOrBitCast:
+  case BuiltinValueKind::SExtOrBitCast: {
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
@@ -644,7 +660,10 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
-#define BUILTIN_CAST_OPERATION(id, attrs, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_CAST_OPERATION(id, attrs, name) \
+   OverloadedBuiltinKind::Special,
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(id, attrs, name) \
+   OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
@@ -988,6 +1007,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
       
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_CAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
       

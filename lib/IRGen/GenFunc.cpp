@@ -813,6 +813,27 @@ static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
   result.add(output);
 }
 
+static void emitCastOrBitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
+                                     Explosion &result,
+                                     Explosion &args,
+                                     BuiltinValueKind BV) {
+  llvm::Value *input = args.claimNext();
+  Type DestType = fn->getType()->castTo<AnyFunctionType>()->getResult();
+  llvm::Type *destTy = IGF.IGM.getTypeInfo(DestType).getStorageType();
+  assert(args.empty() && "wrong operands to cast operation");
+  llvm::Value *output;
+  switch (BV) {
+  default: llvm_unreachable("Not a cast-or-bitcast operation");
+  case BuiltinValueKind::TruncOrBitCast:
+    output = IGF.Builder.CreateTruncOrBitCast(input, destTy); break;
+  case BuiltinValueKind::ZExtOrBitCast:
+    output = IGF.Builder.CreateZExtOrBitCast(input, destTy); break;
+  case BuiltinValueKind::SExtOrBitCast:
+    output = IGF.Builder.CreateSExtOrBitCast(input, destTy); break;
+  }
+  result.add(output);
+}
+
 static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                                Explosion &result,
                                Explosion &args,
@@ -920,6 +941,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 #define BUILTIN_CAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCastBuiltin(IGF, fn, *out, args, llvm::Instruction::id);
+
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs) \
+  if (Builtin.ID == BuiltinValueKind::id) \
+    return emitCastOrBitCastBuiltin(IGF, fn, *out, args, BuiltinValueKind::id);
   
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) { \

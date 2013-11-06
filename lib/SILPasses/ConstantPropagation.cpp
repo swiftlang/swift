@@ -243,7 +243,10 @@ case BuiltinValueKind::id:
 
   case BuiltinValueKind::Trunc:
   case BuiltinValueKind::ZExt:
-  case BuiltinValueKind::SExt: {
+  case BuiltinValueKind::SExt:
+  case BuiltinValueKind::TruncOrBitCast:
+  case BuiltinValueKind::ZExtOrBitCast:
+  case BuiltinValueKind::SExtOrBitCast: {
 
     // We can fold if the value being cast is a constant.
     IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
@@ -251,24 +254,33 @@ case BuiltinValueKind::id:
       return nullptr;
 
     // Get the cast result.
-    APInt CastResV;
+    Type SrcTy = Builtin.Types[0];
     Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
+    uint32_t SrcBitWidth = 
+      SrcTy->castTo<BuiltinIntegerType>()->getBitWidth();
     uint32_t DestBitWidth =
       DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
-    switch (Builtin.ID) {
-    default : llvm_unreachable("Invalid case.");
-    case BuiltinValueKind::Trunc:
-      CastResV = V->getValue().trunc(DestBitWidth);
-      break;
-    case BuiltinValueKind::ZExt:
-      CastResV = V->getValue().zext(DestBitWidth);
-      break;
-    case BuiltinValueKind::SExt:
-      CastResV = V->getValue().sext(DestBitWidth);
-      break;
+
+    APInt CastResV;
+    if (SrcBitWidth == DestBitWidth) {
+      CastResV = V->getValue();
+    } else switch (Builtin.ID) {
+      default : llvm_unreachable("Invalid case.");
+      case BuiltinValueKind::Trunc:
+      case BuiltinValueKind::TruncOrBitCast:
+        CastResV = V->getValue().trunc(DestBitWidth);
+        break;
+      case BuiltinValueKind::ZExt:
+      case BuiltinValueKind::ZExtOrBitCast:
+        CastResV = V->getValue().zext(DestBitWidth);
+        break;
+      case BuiltinValueKind::SExt:
+      case BuiltinValueKind::SExtOrBitCast:
+        CastResV = V->getValue().sext(DestBitWidth);
+        break;
     }
 
-    // Add the literal instruction to represnet the result of the cast.
+    // Add the literal instruction to represent the result of the cast.
     SILBuilder B(AI);
     return B.createIntegerLiteral(AI->getLoc(), AI->getType(), CastResV);
   }
