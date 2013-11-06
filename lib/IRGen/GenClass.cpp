@@ -732,6 +732,8 @@ namespace {
     SmallVector<llvm::Constant*, 8> Ivars;
     SmallVector<llvm::Constant*, 16> InstanceMethods;
     SmallVector<llvm::Constant*, 16> ClassMethods;
+    SmallVector<llvm::Constant*, 16> OptInstanceMethods;
+    SmallVector<llvm::Constant*, 16> OptClassMethods;
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
     llvm::Constant *Name = nullptr;
@@ -918,10 +920,9 @@ namespace {
       //   const method_list_t *requiredClassMethods;
       fields.push_back(buildClassMethodList());
       //   const method_list_t *optionalInstanceMethods;
-      // FIXME: when we import optional protocol methods, populate this
-      fields.push_back(null());
+      fields.push_back(buildOptInstanceMethodList());
       //   const method_list_t *optionalClassMethods;
-      fields.push_back(null());
+      fields.push_back(buildOptClassMethodList());
       //   const property_list_t *properties;
       fields.push_back(buildPropertyList());
       //   uint32_t size;
@@ -1063,9 +1064,15 @@ namespace {
           !requiresObjCMethodDescriptor(method)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
-        InstanceMethods.push_back(entry);
+        if (method->getAttrs().isOptional())
+          OptInstanceMethods.push_back(entry);
+        else
+          InstanceMethods.push_back(entry);
       } else {
-        ClassMethods.push_back(entry);
+        if (method->getAttrs().isOptional())
+          OptClassMethods.push_back(entry);
+        else
+          ClassMethods.push_back(entry);
       }
     }
 
@@ -1074,7 +1081,10 @@ namespace {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, constructor);
-      InstanceMethods.push_back(entry);
+      if (constructor->getAttrs().isOptional())
+        OptInstanceMethods.push_back(entry);
+      else
+        InstanceMethods.push_back(entry);
     }
 
   private:
@@ -1104,6 +1114,17 @@ namespace {
                                               "_CATEGORY_INSTANCE_METHODS_",
                                               "_PROTOCOL_INSTANCE_METHODS_"));
     }
+
+    llvm::Constant *buildOptClassMethodList() {
+      return buildMethodList(OptClassMethods,
+                             "_PROTOCOL_CLASS_METHODS_OPT_");
+    }
+
+    llvm::Constant *buildOptInstanceMethodList() {
+      return buildMethodList(OptInstanceMethods,
+                             "_PROTOCOL_INSTANCE_METHODS_OPT_");
+    }
+
 
     /// struct method_list_t {
     ///   uint32_t entsize; // runtime uses low bits for its own purposes
@@ -1255,9 +1276,17 @@ namespace {
         if (llvm::Constant *prop = buildProperty(var))
           Properties.push_back(prop);
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
-        InstanceMethods.push_back(getter_setter.first);
-        if (getter_setter.second)
-          InstanceMethods.push_back(getter_setter.second);
+        if (var->getAttrs().isOptional())
+          OptInstanceMethods.push_back(getter_setter.first);
+        else
+          InstanceMethods.push_back(getter_setter.first);
+
+        if (getter_setter.second) {
+          if (var->getAttrs().isOptional())
+            OptInstanceMethods.push_back(getter_setter.second);
+          else
+            InstanceMethods.push_back(getter_setter.second);
+        }
       }
     }
     
@@ -1408,9 +1437,17 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(subscript)) return;
       auto getter_setter = emitObjCSubscriptMethodDescriptors(IGM, subscript);
-      InstanceMethods.push_back(getter_setter.first);
-      if (getter_setter.second)
-        InstanceMethods.push_back(getter_setter.second);
+      if (subscript->getAttrs().isOptional())
+        OptInstanceMethods.push_back(getter_setter.first);
+      else
+        InstanceMethods.push_back(getter_setter.first);
+
+      if (getter_setter.second) {
+        if (subscript->getAttrs().isOptional())
+          OptInstanceMethods.push_back(getter_setter.second);
+        else
+          InstanceMethods.push_back(getter_setter.second);
+      }
     }
 
     /// The destructor doesn't really require any special
