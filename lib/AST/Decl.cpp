@@ -853,11 +853,14 @@ Type VarDecl::getGetterType() const {
   auto &ctx = getASTContext();
   Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getType(), ctx);
 
-  // Add 'self'.
-  if (outerParams)
-    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams, ctx);
-  else
-    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+  // Add 'self', if we have one.
+  if (selfTy) {
+    if (outerParams)
+      getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams,
+                                              ctx);
+    else
+      getterTy = FunctionType::get(selfTy, getterTy, ctx);
+  }
 
   return getterTy;
 }
@@ -875,14 +878,19 @@ Type VarDecl::getSetterType() const {
 
   // Form the element -> () function type.
   auto &ctx = getASTContext();
-  Type setterTy = FunctionType::get(getType(), TupleType::getEmpty(ctx),
+  TupleTypeElt valueElt(getType(), ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
+                                    TupleType::getEmpty(ctx),
                                     ctx);
 
-  // Prepend the 'self' type.
-  if (outerParams)
-    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams, ctx);
-  else
-    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+  // Add the 'self' type, if we have one.
+  if (selfTy) {
+    if (outerParams)
+      setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams,
+                                              ctx);
+    else
+      setterTy = FunctionType::get(selfTy, setterTy, ctx);
+  }
 
   return setterTy;
 }
@@ -1235,6 +1243,7 @@ Type SubscriptDecl::getGetterType() const {
 
   // Prepend the indices.
   getterTy = FunctionType::get(getIndices()->getType(), getterTy, ctx);
+  
   // Prepend the 'self' type.
   if (outerParams)
     getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams, ctx);
@@ -1257,7 +1266,9 @@ Type SubscriptDecl::getSetterType() const {
 
   // Form the element -> () function type.
   auto &ctx = getASTContext();
-  Type setterTy = FunctionType::get(getElementType(), TupleType::getEmpty(ctx),
+  TupleTypeElt valueElt(getElementType(), ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
+                                    TupleType::getEmpty(ctx),
                                     ctx);
 
   // Prepend the indices.

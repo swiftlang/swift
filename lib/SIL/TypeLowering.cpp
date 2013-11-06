@@ -1046,30 +1046,6 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(CanType type) {
   return *theInfo;
 }
 
-/// Get the type of a variable accessor, () -> T for a getter or (value:T) -> ()
-/// for a setter.
-Type TypeConverter::getAccessorType(SILDeclRef::Kind kind,
-                                    Type valueType) const {
-  if (kind == SILDeclRef::Kind::Getter) {
-    return FunctionType::get(TupleType::getEmpty(Context), valueType, Context);
-  }
-  if (kind == SILDeclRef::Kind::Setter) {
-    TupleTypeElt valueParam(valueType, Context.getIdentifier("value"));
-    return FunctionType::get(TupleType::get(valueParam, Context),
-                             TupleType::getEmpty(Context),
-                             Context);
-  }
-  llvm_unreachable("not an accessor");
-}
-
-/// Get the type of a subscript accessor, Index -> Accessor.
-Type TypeConverter::getSubscriptAccessorType(SILDeclRef::Kind kind,
-                                             Type indexType,
-                                             Type elementType) const {
-  Type accessorType = getAccessorType(kind, elementType);
-  return FunctionType::get(indexType, accessorType, Context);
-}
-
 /// Get the type of the 'self' parameter for methods of a type.
 Type TypeConverter::getMethodSelfType(Type selfType) const {
   if (selfType->hasReferenceSemantics()) {
@@ -1077,20 +1053,6 @@ Type TypeConverter::getMethodSelfType(Type selfType) const {
   } else {
     return LValueType::get(selfType, LValueType::Qual::DefaultForType, Context);
   }
-}
-
-Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
-                                       Type methodType,
-                                       GenericParamList *genericParams) const {
-  if (!contextType)
-    return methodType;
-  Type selfType = getMethodSelfType(contextType);
-  
-  if (genericParams)
-    return PolymorphicFunctionType::get(selfType, methodType, genericParams,
-                                        Context);
-
-  return FunctionType::get(selfType, methodType, Context);
 }
 
 /// Get the type of a global variable accessor function, () -> [inout] T.
@@ -1145,15 +1107,22 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy = getAccessorType(SILDeclRef::Kind::Setter,
-                                      capture->getType());
+      Type setterTy;
+      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
+        setterTy = subscript->getSetterType();
+      else
+        setterTy = cast<VarDecl>(capture)->getSetterType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy = getAccessorType(SILDeclRef::Kind::Getter,
-                                      capture->getType());
+      Type getterTy;
+      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
+        getterTy = subscript->getGetterType();
+      else
+        getterTy = cast<VarDecl>(capture)->getGetterType();
+
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
@@ -1219,41 +1188,26 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
-    Type contextType = vd->getDeclContext()->getDeclaredTypeOfContext();
-    GenericParamList *genericParams = nullptr;
-    if (contextType) {
-      if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
-        // Bind the generic parameters.
-        // FIXME: see computeSelfType()
-        genericParams = ugt->getDecl()->getGenericParams();
-        contextType = vd->getDeclContext()->getDeclaredTypeInContext();
-      }
-    }
-    
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
-      Type subscriptType = getSubscriptAccessorType(c.kind,
-                                                    sd->getIndices()->getType(),
-                                                    sd->getElementType());
-      return getMethodTypeInContext(contextType, subscriptType, genericParams);
+      return c.kind == SILDeclRef::Kind::Getter? sd->getGetterType()
+                                               : sd->getSetterType();
     }
 
-    Type accessorType = getAccessorType(c.kind, vd->getType());
-    Type accessorMethodType = getMethodTypeInContext(contextType,
-                                                     accessorType,
-                                                     genericParams);
+    VarDecl *var = cast<VarDecl>(c.getDecl());
+    Type accessorMethodType
+      = c.kind == SILDeclRef::Kind::Getter? var->getGetterType()
+                                          : var->getSetterType();
     
     // If this is a local variable, its property methods may be closures.
-    if (VarDecl *var = dyn_cast<VarDecl>(c.getDecl())) {
-      if (var->isComputed()) {
-        FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
-          ? var->getGetter()
-          : var->getSetter();
-        auto *propTy = accessorMethodType->castTo<AnyFunctionType>();
-        SmallVector<ValueDecl*, 4> LocalCaptures;
-        property->getCaptureInfo().getLocalCaptures(LocalCaptures);
-        return getFunctionTypeWithCaptures(propTy, LocalCaptures,
-                                           var->getDeclContext());
-      }
+    if (var->isComputed()) {
+      FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
+        ? var->getGetter()
+        : var->getSetter();
+      auto *propTy = accessorMethodType->castTo<AnyFunctionType>();
+      SmallVector<ValueDecl*, 4> LocalCaptures;
+      property->getCaptureInfo().getLocalCaptures(LocalCaptures);
+      return getFunctionTypeWithCaptures(propTy, LocalCaptures,
+                                         var->getDeclContext());
     }
     return accessorMethodType;
   }

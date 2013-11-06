@@ -628,8 +628,11 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Setter,
-                                               capture->getType());
+    Type setTy;
+    if (auto subscript = dyn_cast<SubscriptDecl>(capture))
+      setTy = subscript->getSetterType();
+    else
+      setTy = cast<VarDecl>(capture)->getSetterType();
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
     gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
@@ -638,8 +641,11 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Getter,
-                                               capture->getType());
+    Type getTy;
+    if (auto subscript = dyn_cast<SubscriptDecl>(capture))
+      getTy = subscript->getGetterType();
+    else
+      getTy = cast<VarDecl>(capture)->getGetterType();
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
     gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;

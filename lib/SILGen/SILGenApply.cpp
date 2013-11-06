@@ -1680,7 +1680,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
                                    RValue &selfValue,
-                                   Type substAccessorType)
+                                   Type accessorType)
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
@@ -1698,11 +1698,13 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // FIXME: Generic subscript operator could add another layer of
   // substitutions.
   if (!substitutions.empty()) {
-    substAccessorType = getThinFunctionType(substAccessorType,
-                                            gen.SGM.getConstantCC(constant));
+    accessorType = accessorType->castTo<PolymorphicFunctionType>()
+                     ->substGenericArgs(gen.SGM.SwiftModule, substitutions);
+    accessorType = getThinFunctionType(accessorType,
+                                       gen.SGM.getConstantCC(constant));
 
     callee.setSubstitutions(gen, loc, substitutions,
-                            substAccessorType->getCanonicalType(), 0);
+                            accessorType->getCanonicalType(), 0);
   }
   return callee;
 }
@@ -1715,23 +1717,19 @@ ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
                                              RValue &&subscripts,
                                              Type resultType,
                                              SGFContext c) {
-  // Derive the specialized type of the accessor.
-  auto &tc = SGM.Types;
+  // Compute the type of the accessor.
   Type accessType;
-  if (subscripts)
-    accessType = tc.getSubscriptAccessorType(SILDeclRef::Kind::Getter,
-                                             subscripts.getType(),
-                                             resultType);
-  else
-    accessType = tc.getAccessorType(SILDeclRef::Kind::Getter, resultType);
-  if (selfValue)
-    accessType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
-                                           accessType);
+  if (auto subscript = dyn_cast<SubscriptDecl>(get.getDecl())) {
+    accessType = subscript->getGetterType();
+  } else {
+    auto var = cast<VarDecl>(get.getDecl());
+    accessType = var->getGetterType();
+  }
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      accessType);
-  
+
   CallEmission emission(*this, std::move(getter));
   auto *accessFnTy = accessType->castTo<AnyFunctionType>();
   // Self ->
@@ -1756,19 +1754,14 @@ void SILGenFunction::emitSetAccessor(SILLocation loc,
                                      RValue &&selfValue,
                                      RValue &&subscripts,
                                      RValue &&setValue) {
-  // Derive the specialized type of the accessor.
-  auto &tc = SGM.Types;
+  // Compute the type of the accessor.
   Type accessType;
-  if (subscripts)
-    accessType = tc.getSubscriptAccessorType(SILDeclRef::Kind::Setter,
-                                             subscripts.getType(),
-                                             setValue.getType());
-  else
-    accessType = tc.getAccessorType(SILDeclRef::Kind::Setter,
-                                    setValue.getType());
-  if (selfValue)
-    accessType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
-                                           accessType);
+  if (auto subscript = dyn_cast<SubscriptDecl>(set.getDecl())) {
+    accessType = subscript->getSetterType();
+  } else {
+    auto var = cast<VarDecl>(set.getDecl());
+    accessType = var->getSetterType();
+  }
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,

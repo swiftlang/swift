@@ -355,27 +355,6 @@ public:
   /// Returns the type of the "self" parameter to methods of a type.
   Type getMethodSelfType(Type selfType) const;
   
-  /// Returns the type of a variable accessor, () -> T for a getter,
-  /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
-  /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
-  Type getAccessorType(SILDeclRef::Kind kind, Type propType) const;
-  
-  /// Returns the type of a subscript accessor, Index -> () -> T
-  /// for a getter, or Index -> (value:T) -> () for a setter.
-  /// 'kind' must be one of the Kind constants
-  /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
-  Type getSubscriptAccessorType(SILDeclRef::Kind kind,
-                                Type indexType,
-                                Type elementType) const;
-
-  /// Get the type of a method of function type M for a type:
-  ///   This -> M for a concrete This,
-  ///   <T,U,...> This -> M for an unbound generic This,
-  ///   or the type M of the function itself if the context type is null.
-  Type getMethodTypeInContext(Type /*nullable*/ contextType,
-                              Type methodType,
-                              GenericParamList *genericParams = nullptr) const;
-  
   /// Convert a nested function type into an uncurried representation.
   CanAnyFunctionType getUncurriedFunctionType(CanAnyFunctionType t,
                                               unsigned uncurryLevel);
