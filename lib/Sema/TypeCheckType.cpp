@@ -930,6 +930,12 @@ bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
       return true;
   }
 
+  if (auto NTD = T->getAnyNominal()) {
+    // If the type was imported from Clang, it is representable in Objective-C.
+    if (NTD->hasClangNode())
+      return true;
+  }
+
   if (ObjCMappedTypes.empty()) {
     // Populate the cache.
     SmallVector<Identifier, 16> StdlibTypeNames;
