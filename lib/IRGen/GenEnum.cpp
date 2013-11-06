@@ -815,8 +815,8 @@ public:
       auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
       auto intType = getDiscriminatorType();
       
-      APInt intValue(intType->getBitWidth(), intExpr->getDigitsText(),
-                     /*radix*/ 0);
+      APInt intValue = IntegerLiteralExpr::getValue(intExpr->getDigitsText(),
+                                                    intType->getBitWidth());
       
       if (intExpr->isNegative())
         intValue = -intValue;
