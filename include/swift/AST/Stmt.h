@@ -157,7 +157,7 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 
-  bool hasResult() { return Result != 0; }
+  bool hasResult() const { return Result != 0; }
   Expr *getResult() const {
     assert(Result && "ReturnStmt doesn't have a result");
     return Result;

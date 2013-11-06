@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "MiscDiagnostics.h"
+#include "swift/Subsystems.h"
 #include "swift/Basic/Optional.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -116,6 +117,7 @@ public:
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == 0) return true;
     S = S2;
+    performStmtDiagnostics(TC, S);
     return false;
   }
   

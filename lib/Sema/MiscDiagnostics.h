@@ -15,10 +15,13 @@
 
 namespace swift {
   class Expr;
+  class Stmt;
   class TypeChecker;
 
-/// Emit diagnostics for a given expression.
+/// \brief Emit diagnostics for a given expression.
 void performExprDiagnostics(TypeChecker &TC, const Expr *E);
+  /// \brief Emit diagnostics for a given statement.
+void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 } // namespace swift
 

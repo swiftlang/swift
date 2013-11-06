@@ -16,6 +16,7 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 
@@ -64,10 +65,45 @@ static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
 }
 
 //===--------------------------------------------------------------------===//
+// Diagnose unreachable code.
+//===--------------------------------------------------------------------===//
+
+/// Issue a warning on code containing retrun expression on a differnt line than
+/// the return keyword and both have the same indentation:
+///  ...
+///  return
+///  foo()
+static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
+  auto *RS = dyn_cast<ReturnStmt>(S);
+  if (!RS)
+    return;
+  if (!RS->hasResult())
+    return;
+
+  auto RetExpr = RS->getResult();
+  auto RSLoc = RS->getStartLoc();
+  auto RetExprLoc = RetExpr->getStartLoc();
+  if (RSLoc.isInvalid() || RetExprLoc.isInvalid() || (RSLoc == RetExprLoc))
+    return;
+  SourceManager &SM = TC.Context.SourceMgr;
+  if (SM.getLineAndColumn(RSLoc).second ==
+      SM.getLineAndColumn(RetExprLoc).second) {
+    TC.diagnose(RetExpr->getStartLoc(), diag::unreachable_code_after_return);
+    return;
+  }
+  return;
+
+}
+
+//===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
 
 void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E) {
   diagSelfAssignment(TC, E);
+}
+
+void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
+  return diagUnreachableCode(TC, S);
 }
 
