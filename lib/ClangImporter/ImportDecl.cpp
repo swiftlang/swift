@@ -793,12 +793,13 @@ namespace {
         // Use the constant's underlying value as its raw value in Swift.
         bool negative = false;
         llvm::APSInt rawValue = decl->getInitVal();
-        if (rawValue.slt(0)) {
+        if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
+            && rawValue.slt(0)) {
           rawValue = -rawValue;
           negative = true;
         }
         llvm::SmallString<12> rawValueText;
-        decl->getInitVal().toString(rawValueText);
+        rawValue.toString(rawValueText, 10, /*signed*/ false);
         StringRef rawValueTextC
           = context.AllocateCopy(StringRef(rawValueText));
         auto rawValueExpr = new (context) IntegerLiteralExpr(rawValueTextC,

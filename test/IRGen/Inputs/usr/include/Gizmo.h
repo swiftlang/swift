@@ -74,3 +74,13 @@ typedef NS_ENUM(int, NSRadixedOptions) {
   NSRadixedOctal = 0755,
   NSRadixedHex = 0xFFFF,
 };
+
+typedef NS_ENUM(int, NSNegativeOptions) {
+  NSNegativeFoo = -1,
+  NSNegativeBar = -0x7FFFFFFF - 1,
+};
+
+typedef NS_ENUM(unsigned, NSNegativeUnsignedOptions) {
+  NSNegativeUnsignedFoo = -1,
+  NSNegativeUnsignedBar = -0x7FFFFFFF - 1,
+};
