@@ -23,7 +23,7 @@ using namespace swift;
 // Diagnose assigning variable to itself.
 //===--------------------------------------------------------------------===//
 
-static Decl *findSimpleReferencedDecl(Expr *E) {
+static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();
 
@@ -33,7 +33,7 @@ static Decl *findSimpleReferencedDecl(Expr *E) {
   return nullptr;
 }
 
-static std::pair<Decl *, Decl *> findReferencedDecl(Expr *E) {
+static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();
 
@@ -48,7 +48,7 @@ static std::pair<Decl *, Decl *> findReferencedDecl(Expr *E) {
   return std::make_pair(nullptr, nullptr);
 }
 
-static void diagSelfAssignment(TypeChecker &TC, Expr *E) {
+static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
   auto *AE = dyn_cast<AssignExpr>(E);
   if (!AE)
     return;
@@ -67,7 +67,7 @@ static void diagSelfAssignment(TypeChecker &TC, Expr *E) {
 // High-level entry points.
 //===--------------------------------------------------------------------===//
 
-void swift::performExprDiagnostics(TypeChecker &TC, Expr *E) {
+void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E) {
   diagSelfAssignment(TC, E);
 }
 

@@ -18,7 +18,7 @@ namespace swift {
   class TypeChecker;
 
 /// Emit diagnostics for a given expression.
-void performExprDiagnostics(TypeChecker &TC, Expr *E);
+void performExprDiagnostics(TypeChecker &TC, const Expr *E);
 
 } // namespace swift
 
