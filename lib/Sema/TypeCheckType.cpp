@@ -579,7 +579,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   return result.get<Type>();
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
+bool TypeChecker::validateType(TypeLoc &Loc, bool isSILType, DeclContext *DC,
                                bool allowUnboundGenerics,
                                GenericTypeResolver *resolver) {
   // FIXME: Verify that these aren't circular and infinite size.
@@ -589,8 +589,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    Loc.setType(resolveType(Loc.getTypeRepr(), DC, allowUnboundGenerics,
-                            resolver),
+    Loc.setType(resolveType(Loc.getTypeRepr(), isSILType, DC,
+                            allowUnboundGenerics, resolver),
                 true);
     return Loc.isError();
   }
@@ -615,23 +615,26 @@ namespace {
       assert(resolver);
     }
 
-    Type resolveType(TypeRepr *repr);
+    Type resolveType(TypeRepr *repr, bool isSILType);
 
   private:
-    Type resolveAttributedType(AttributedTypeRepr *repr);
-    Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr);
+    Type resolveAttributedType(AttributedTypeRepr *repr, bool isSILType);
+    Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
+                               bool isSILType);
     Type resolveFunctionType(FunctionTypeRepr *repr,
+                             bool isSILType,
                              FunctionType::ExtInfo extInfo
                                = FunctionType::ExtInfo());
-    Type resolveArrayType(ArrayTypeRepr *repr);
-    Type resolveOptionalType(OptionalTypeRepr *repr);
-    Type resolveTupleType(TupleTypeRepr *repr);
-    Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr);
-    Type resolveMetaTypeType(MetaTypeTypeRepr *repr);
+    Type resolveArrayType(ArrayTypeRepr *repr, bool isSILType);
+    Type resolveOptionalType(OptionalTypeRepr *repr, bool isSILType);
+    Type resolveTupleType(TupleTypeRepr *repr, bool isSILType);
+    Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr,
+                                        bool isSILType);
+    Type resolveMetaTypeType(MetaTypeTypeRepr *repr, bool isSILType);
   };
 }
 
-Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
+Type TypeChecker::resolveType(TypeRepr *TyR, bool isSILType, DeclContext *DC,
                               bool allowUnboundGenerics,
                               GenericTypeResolver *resolver) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
@@ -642,17 +645,17 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     resolver = &defaultResolver;
 
   TypeResolver typeResolver(*this, DC, allowUnboundGenerics, resolver);
-  return typeResolver.resolveType(TyR);
+  return typeResolver.resolveType(TyR, isSILType);
 }
 
-Type TypeResolver::resolveType(TypeRepr *repr) {
+Type TypeResolver::resolveType(TypeRepr *repr, bool isSILType) {
   assert(repr && "Cannot validate null TypeReprs!");
   switch (repr->getKind()) {
   case TypeReprKind::Error:
     return ErrorType::get(Context);
 
   case TypeReprKind::Attributed:
-    return resolveAttributedType(cast<AttributedTypeRepr>(repr));
+    return resolveAttributedType(cast<AttributedTypeRepr>(repr), isSILType);
 
   case TypeReprKind::Ident:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr),
@@ -661,40 +664,43 @@ Type TypeResolver::resolveType(TypeRepr *repr) {
                                     Resolver);
 
   case TypeReprKind::Function:
-    return resolveFunctionType(cast<FunctionTypeRepr>(repr));
+    return resolveFunctionType(cast<FunctionTypeRepr>(repr), isSILType);
 
   case TypeReprKind::Array:
-    return resolveArrayType(cast<ArrayTypeRepr>(repr));
+    return resolveArrayType(cast<ArrayTypeRepr>(repr), isSILType);
 
   case TypeReprKind::Optional:
-    return resolveOptionalType(cast<OptionalTypeRepr>(repr));
+    return resolveOptionalType(cast<OptionalTypeRepr>(repr), isSILType);
 
   case TypeReprKind::Tuple:
-    return resolveTupleType(cast<TupleTypeRepr>(repr));
+    return resolveTupleType(cast<TupleTypeRepr>(repr), isSILType);
 
   case TypeReprKind::Named:
     llvm_unreachable("NamedTypeRepr only shows up as an element of Tuple");
 
   case TypeReprKind::ProtocolComposition:
     return resolveProtocolCompositionType(
-                                    cast<ProtocolCompositionTypeRepr>(repr));
+                                    cast<ProtocolCompositionTypeRepr>(repr),
+                                          isSILType);
 
   case TypeReprKind::MetaType:
-    return resolveMetaTypeType(cast<MetaTypeTypeRepr>(repr));
+    return resolveMetaTypeType(cast<MetaTypeTypeRepr>(repr), isSILType);
   }
   llvm_unreachable("all cases should be handled");
 }
 
-Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr) {
+Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
+                                         bool isSILType) {
   // Copy the attributes, since we're about to start hacking on them.
   TypeAttributes attrs = repr->getAttrs();
   assert(!attrs.empty());
 
-  return resolveAttributedType(attrs, repr->getTypeRepr());
+  return resolveAttributedType(attrs, repr->getTypeRepr(), isSILType);
 }
 
 Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
-                                         TypeRepr *repr) {
+                                         TypeRepr *repr,
+                                         bool isSILType) {
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
@@ -734,7 +740,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   attrs.has(TAK_noreturn),
                                   attrs.has(TAK_auto_closure),
                                   attrs.has(TAK_objc_block));
-    ty = resolveFunctionType(fnRepr, extInfo);
+    ty = resolveFunctionType(fnRepr, isSILType, extInfo);
 
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
@@ -750,7 +756,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   } 
 
   // If we didn't build the type differently above, build it normally now.
-  if (!ty) ty = resolveType(repr);
+  if (!ty) ty = resolveType(repr, isSILType);
 
   if (ty->is<ErrorType>())
     return ty;
@@ -799,19 +805,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 }
 
 Type TypeResolver::resolveFunctionType(FunctionTypeRepr *repr,
+                                       bool isSILType,
                                        FunctionType::ExtInfo extInfo) {
-  Type inputTy = resolveType(repr->getArgsTypeRepr());
+  Type inputTy = resolveType(repr->getArgsTypeRepr(), isSILType);
   if (inputTy->is<ErrorType>())
     return inputTy;
-  Type outputTy = resolveType(repr->getResultTypeRepr());
+  Type outputTy = resolveType(repr->getResultTypeRepr(), isSILType);
   if (outputTy->is<ErrorType>())
     return outputTy;
   return FunctionType::get(inputTy, outputTy, extInfo, Context);
 }
 
-Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr) {
+Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr, bool isSILType) {
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase());
+  Type baseTy = resolveType(repr->getBase(), isSILType);
   if (baseTy->is<ErrorType>())
     return baseTy;
   
@@ -830,9 +837,10 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr) {
   return sliceTy;
 }
 
-Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr) {
+Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr, bool isSILType) {
+  // The T in T? is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase());
+  Type baseTy = resolveType(repr->getBase(), false);
   if (baseTy->is<ErrorType>())
     return baseTy;
 
@@ -843,17 +851,17 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr) {
   return optionalTy;
 }
 
-Type TypeResolver::resolveTupleType(TupleTypeRepr *repr) {
+Type TypeResolver::resolveTupleType(TupleTypeRepr *repr, bool isSILType) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getElements().size());
   for (auto tyR : repr->getElements()) {
     if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
-      Type ty = resolveType(namedTyR->getTypeRepr());
+      Type ty = resolveType(namedTyR->getTypeRepr(), isSILType);
       if (ty->is<ErrorType>())
         return ty;
       elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
     } else {
-      Type ty = resolveType(tyR);
+      Type ty = resolveType(tyR, isSILType);
       if (ty->is<ErrorType>())
         return ty;
       elements.push_back(TupleTypeElt(ty));
@@ -874,10 +882,12 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr) {
 }
 
 Type TypeResolver::resolveProtocolCompositionType(
-                                         ProtocolCompositionTypeRepr *repr) {
+                                         ProtocolCompositionTypeRepr *repr,
+                                                  bool isSILType) {
   SmallVector<Type, 4> ProtocolTypes;
   for (auto tyR : repr->getProtocols()) {
-    Type ty = TC.resolveType(tyR, DC, /*allowUnboundGenerics=*/false, Resolver);
+    Type ty = TC.resolveType(tyR, isSILType, DC,
+                             /*allowUnboundGenerics=*/false, Resolver);
     if (ty->is<ErrorType>())
       return ty;
     if (!ty->isExistentialType()) {
@@ -902,8 +912,9 @@ Type TypeResolver::resolveProtocolCompositionType(
   return ProtocolCompositionType::get(Context, ProtocolTypes);
 }
 
-Type TypeResolver::resolveMetaTypeType(MetaTypeTypeRepr *repr) {
-  Type ty = resolveType(repr->getBase());
+Type TypeResolver::resolveMetaTypeType(MetaTypeTypeRepr *repr, bool isSILType) {
+  // The instance type of a metatype is always abstract, not SIL-lowered.
+  Type ty = resolveType(repr->getBase(), false);
   if (ty->is<ErrorType>())
     return ty;
   return MetaTypeType::get(ty, Context);

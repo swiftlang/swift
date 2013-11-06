@@ -580,7 +580,7 @@ bool SILParser::performTypeLocChecking(TypeLoc &T) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
-  return swift::performTypeLocChecking(P.Context, T, &P.SF);
+  return swift::performTypeLocChecking(P.Context, T, /*SIL*/ true, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.

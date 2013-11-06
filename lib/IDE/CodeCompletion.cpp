@@ -688,8 +688,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    return !performTypeLocChecking(P.Context, ParsedTypeLoc, CurDeclContext,
-                                   false);
+    return !performTypeLocChecking(P.Context, ParsedTypeLoc, /*SIL*/ false,
+                                   CurDeclContext, false);
   }
 
 public:

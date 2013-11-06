@@ -702,14 +702,14 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   DeclContext *DC,
+                                   bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
   if (ProduceDiagnostics) {
     return TypeChecker(Ctx).validateType(T, DC);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC);
+    return TypeChecker(Ctx, Diags).validateType(T, isSILType, DC);
   }
 }
 

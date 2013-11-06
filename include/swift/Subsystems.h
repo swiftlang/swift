@@ -130,7 +130,8 @@ namespace swift {
   /// parsing, code completion).
   ///
   /// \returns false on success, true on error.
-  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
+  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
+                              bool isSILType, DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
   /// Turn the given translation unit into SIL IR.
