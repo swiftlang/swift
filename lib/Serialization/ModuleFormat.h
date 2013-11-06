@@ -647,6 +647,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // iboutlet?
+    BCFixed<1>,   // optional?
     TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
@@ -665,6 +666,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // ibaction?
     BCFixed<1>,   // transparent?
+    BCFixed<1>,   // optional?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type
@@ -715,6 +717,7 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
+    BCFixed<1>,  // optional?
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
     TypeIDField, // interface type

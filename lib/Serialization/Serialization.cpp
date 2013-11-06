@@ -1238,7 +1238,9 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
-    checkAllowedAttributes<AK_iboutlet, AK_objc, AK_unowned, AK_weak>(var);
+    checkAllowedAttributes<
+      AK_iboutlet, AK_objc, AK_optional, AK_unowned, AK_weak
+    >(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
@@ -1250,6 +1252,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isImplicit(),
                           var->isObjC(),
                           var->getAttrs().isIBOutlet(),
+                          var->getAttrs().isOptional(),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),
@@ -1262,7 +1265,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
       AK_asmname, AK_assignment, AK_conversion, AK_ibaction, AK_infix,
-      AK_noreturn, AK_objc, AK_postfix, AK_prefix, AK_transparent
+      AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent
     >(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -1279,6 +1282,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
                            fn->isTransparent(),
+                           fn->getAttrs().isOptional(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
@@ -1320,7 +1324,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
-    checkAllowedAttributes<AK_objc>(subscript);
+    checkAllowedAttributes<AK_objc, AK_optional>(subscript);
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
 
@@ -1329,6 +1333,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(DC),
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
+                                subscript->getAttrs().isOptional(),
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),

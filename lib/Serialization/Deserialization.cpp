@@ -1052,13 +1052,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBOutlet;
+    bool isImplicit, isObjC, isIBOutlet, isOptional;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isIBOutlet, typeID, 
+                                       isObjC, isIBOutlet, isOptional, typeID,
                                        interfaceTypeID,
                                        getterID, setterID, overriddenID);
 
@@ -1086,7 +1086,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     var->setIsObjC(isObjC);
     if (isIBOutlet)
       var->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
-
+    if (isOptional)
+      var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+    
     var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
   }
@@ -1098,7 +1100,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool hasSelectorStyleSignature;
     bool isClassMethod;
     bool isAssignmentOrConversion;
-    bool isObjC, isIBAction, isTransparent;
+    bool isObjC, isIBAction, isTransparent, isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1109,6 +1111,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         hasSelectorStyleSignature,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
+                                        isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID);
@@ -1178,6 +1181,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->getMutableAttrs().setAttr(AK_ibaction, SourceLoc());
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
+    if (isOptional)
+      fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
@@ -1488,13 +1493,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::SUBSCRIPT_DECL: {
     DeclID contextID;
-    bool isImplicit, isObjC;
+    bool isImplicit, isObjC, isOptional;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             isObjC, declTypeID, elemTypeID,
+                                             isObjC, isOptional,
+                                             declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              overriddenID);
@@ -1522,7 +1528,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       subscript->setImplicit();
     subscript->setIsObjC(isObjC);
-
+    if (isOptional)
+      subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
     subscript->setOverriddenDecl(overriddenDecl);
 
