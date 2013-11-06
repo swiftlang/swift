@@ -50,7 +50,9 @@ enum class SyntaxStructureKind : uint8_t {
   FreeFunction,
   InstanceFunction,
   StaticFunction,
-  InstanceVariable
+  IBActionFunction,
+  InstanceVariable,
+  IBOutletVariable
 };
 
 struct SyntaxStructureNode {

@@ -159,7 +159,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         return false;
     }
     else {
-      // Pass Function / Method structure node
+      // Pass Function / Method structure node.
       SourceRange SR = AFD->getSourceRange();
       SourceLoc NL = AFD->getNameLoc();
       SyntaxStructureKind Kind;
@@ -167,6 +167,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (DC->isTypeContext()) {
         if (FD && FD->isStatic())
           Kind = SyntaxStructureKind::StaticFunction;
+        else if (AFD->getAttrs().isIBAction())
+          Kind = SyntaxStructureKind::IBActionFunction;
         else
           Kind = SyntaxStructureKind::InstanceFunction;
       }
@@ -191,8 +193,12 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (DC->isTypeContext()) {
       SourceRange SR = VD->getSourceRange();
       SourceLoc NL = VD->getNameLoc();
-      pushStructureNode({SyntaxStructureKind::InstanceVariable,
-                         CharSourceRange(SM, SR.Start, SR.End),
+      SyntaxStructureKind Kind;
+      if (VD->getAttrs().isIBOutlet())
+        Kind = SyntaxStructureKind::IBOutletVariable;
+      else
+        Kind = SyntaxStructureKind::InstanceVariable;
+      pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                   VD->getName().getLength()))});
     }
