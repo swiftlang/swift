@@ -1,3 +1,33 @@
+2013-11-13
+----------
+
+* Objective-C-compatible protocols can now contain optional
+  requirements, indicated by the @optional attribute:
+
+    @class_protocol @objc protocol NSWobbling {
+      @optional def wobble()
+    }
+
+  A class that conforms to the NSWobbling protocol above can (but does
+  not have to) implement wobble. When referring to the 'wobble'
+  method for a value of type NSWobbling (or a value of generic type
+  that is bounded by NSWobbling), the result is an optional value
+  indicating whether the underlying object actually responds to the
+  given selector, using the same mechanism as messaging 'id'. One can
+  use '!' to assume that the method is always there, '?' to chain the
+  optional, or conditional branches to handle each case distinctly:
+
+    def tryToWobble(w : NSWobbling) {
+      w.wobble()   // error: cannot call a value of optional type
+      w.wobble!()  // okay: calls -wobble, but fails at runtime if not there
+      w.wobble?()  // okay: calls -wobble only if it's there, otherwise no-op
+      if w.wobble {
+        // okay: we know -wobble is there
+      } else {
+        // okay: we know -wobble is not there
+      }
+    }
+
 2013-11-06
 ----------
 
