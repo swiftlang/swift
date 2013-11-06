@@ -91,6 +91,16 @@ namespace llvm {
   };
 }
 
+static TranslationUnit *getTranslationUnit(TranslationUnitOrSourceFile DC) {
+  if (auto TU = DC.dyn_cast<TranslationUnit *>())
+    return TU;
+  return &DC.get<SourceFile *>()->TU;
+}
+
+static ASTContext &getContext(TranslationUnitOrSourceFile DC) {
+  return getTranslationUnit(DC)->Ctx;
+}
+
 static const Decl *getDeclForContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
@@ -373,18 +383,15 @@ void flattenImportPath(const Module::ImportedModule &import,
 }
 
 void Serializer::writeInputFiles(const TranslationUnit *TU,
-                                 FileBufferIDs inputFiles,
+                                 FilenamesTy inputFiles,
                                  StringRef moduleLinkName) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
 
-  auto &sourceMgr = TU->Ctx.SourceMgr;
-  for (auto bufferID : inputFiles) {
-    // FIXME: We could really use a real FileManager here.
-    auto buffer = sourceMgr->getMemoryBuffer(bufferID);
-    llvm::SmallString<128> path(buffer->getBufferIdentifier());
+  for (auto filename : inputFiles) {
+    llvm::SmallString<128> path(filename);
 
     llvm::error_code err;
     err = llvm::sys::fs::make_absolute(path);
@@ -966,8 +973,8 @@ void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
-  Module *M = D->getModuleContext();
-  if (M != TU) {
+  const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
+  if (SF ? (topLevel != SF) : (topLevel->getParentModule() != TU)) {
     writeCrossReference(D);
     return;
   }
@@ -1982,17 +1989,19 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
-void Serializer::writeTranslationUnit(const TranslationUnit *TU,
+void Serializer::writeTranslationUnit(TranslationUnitOrSourceFile DC,
                                       const SILModule *M) {
   assert(!this->TU && "already serializing a translation unit");
-  this->TU = TU;
+  this->TU = getTranslationUnit(DC);
+  this->SF = DC.dyn_cast<SourceFile *>();
 
   this->M = M;
   writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
-  for (auto SF : TU->getSourceFiles()) {
-    for (auto D : SF->Decls) {
+  ArrayRef<const SourceFile *> files = SF ? SF : TU->getSourceFiles();
+  for (auto nextFile : files) {
+    for (auto D : nextFile->Decls) {
       if (isa<ImportDecl>(D))
         continue;
       else if (auto VD = dyn_cast<ValueDecl>(D)) {
@@ -2049,44 +2058,43 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU,
 #endif
 }
 
-void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
-                               const SILModule *M,
-                               FileBufferIDs inputFiles,
+void Serializer::writeToStream(raw_ostream &os, TranslationUnitOrSourceFile DC,
+                               const SILModule *M, FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
   for (unsigned char byte : SIGNATURE)
     Out.Emit(byte, 8);
 
   writeHeader();
-  writeInputFiles(TU, inputFiles, moduleLinkName);
-  writeTranslationUnit(TU, M);
+  writeInputFiles(getTranslationUnit(DC), inputFiles, moduleLinkName);
+  writeTranslationUnit(DC, M);
 
   os.write(Buffer.data(), Buffer.size());
   os.flush();
   Buffer.clear();
 }
 
-void swift::serialize(const TranslationUnit *TU, const SILModule *M,
-                      const char *outputPath,
-                      FileBufferIDs inputFiles, StringRef moduleLinkName) {
+void swift::serialize(TranslationUnitOrSourceFile DC, const SILModule *M,
+                      const char *outputPath, FilenamesTy inputFiles,
+                      StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
                            llvm::sys::fs::F_Binary);
 
   if (out.has_error() || !errorInfo.empty()) {
-    TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                           errorInfo);
+    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                  outputPath, errorInfo);
     out.clear_error();
     return;
   }
 
-  serializeToStream(TU, out, M, inputFiles, moduleLinkName);
+  serializeToStream(DC, out, M, inputFiles, moduleLinkName);
 }
 
-void swift::serializeToStream(const TranslationUnit *TU,
+void swift::serializeToStream(TranslationUnitOrSourceFile DC,
                               raw_ostream &out, const SILModule *M,
-                              FileBufferIDs inputFiles,
+                              FilenamesTy inputFiles,
                               StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, TU, M, inputFiles, moduleLinkName);
+  S.writeToStream(out, DC, M, inputFiles, moduleLinkName);
 }

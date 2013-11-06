@@ -183,18 +183,20 @@ namespace swift {
   /// diagnostics if any.
   void emitSILDataflowDiagnostics(SILModule *M);
 
+  using TranslationUnitOrSourceFile =
+    PointerUnion<TranslationUnit *, SourceFile *>;
+
   /// Serializes a translation unit to the given output file.
-  ///
-  /// This interface is still prone to change!
-  void serialize(const TranslationUnit *TU, const SILModule *M,
+  void serialize(TranslationUnitOrSourceFile DC, const SILModule *M,
                  const char *outputPath,
-                 ArrayRef<unsigned> inputFileBufferIDs = {},
+                 ArrayRef<std::string> inputFilenames = {},
                  StringRef moduleLinkName = {});
 
   /// Serializes a translation unit to a stream.
-  void serializeToStream(const TranslationUnit *TU, llvm::raw_ostream &out,
+  void serializeToStream(TranslationUnitOrSourceFile DC,
+                         llvm::raw_ostream &out,
                          const SILModule *M = nullptr,
-                         ArrayRef<unsigned> inputFileBufferIDs = {},
+                         ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
 
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.

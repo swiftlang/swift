@@ -18,8 +18,9 @@
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
 #include "ModuleFormat.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
-#include "llvm/ADT/ArrayRef.h"
+#include "swift/Basic/LLVM.h"
 #include <array>
 #include <queue>
 
@@ -29,7 +30,7 @@ namespace swift {
 
 namespace serialization {
 
-typedef llvm::ArrayRef<unsigned> FileBufferIDs;
+typedef ArrayRef<std::string> FilenamesTy;
 
 class Serializer {
   SmallVector<char, 0> Buffer;
@@ -40,6 +41,12 @@ class Serializer {
 
   /// The TranslationUnit currently being serialized.
   const TranslationUnit *TU = nullptr;
+
+  /// The SourceFile currently being serialized, if any.
+  ///
+  /// If this is non-null, only decls actually from this SourceFile will be
+  /// serialized. Any other decls will be cross-referenced instead.
+  const SourceFile *SF = nullptr;
 
   /// The SILModule currently being serialized.
   const SILModule *M = nullptr;
@@ -166,7 +173,7 @@ private:
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputFiles(const TranslationUnit *TU, FileBufferIDs inputFiles,
+  void writeInputFiles(const TranslationUnit *TU, FilenamesTy inputFiles,
                        StringRef moduleLinkName);
 
   /// Writes the given pattern, recursively.
@@ -258,15 +265,15 @@ private:
   void writeSILFunctions(const SILModule *M);
 
   /// Top-level entry point for serializing a translation unit module.
-  void writeTranslationUnit(const TranslationUnit *TU, const SILModule *M);
+  void writeTranslationUnit(TranslationUnitOrSourceFile DC, const SILModule *M);
 
 public:
   Serializer() = default;
 
   /// Serialize a translation unit to the given stream.
-  void writeToStream(raw_ostream &os, const TranslationUnit *TU,
-                     const SILModule *M,
-                     FileBufferIDs inputFiles, StringRef moduleLinkName);
+  void writeToStream(raw_ostream &os, TranslationUnitOrSourceFile DC,
+                     const SILModule *M, FilenamesTy inputFiles,
+                     StringRef moduleLinkName);
 
   /// Records the use of the given Type.
   ///
