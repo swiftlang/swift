@@ -569,10 +569,11 @@ public:
   
   /// Implementation strategy for no-payload enums, in other words, 'C-like'
   /// enums where none of the cases have data.
-  class NoPayloadEnumImplStrategy final
-    : public SingleScalarTypeInfo<NoPayloadEnumImplStrategy,
+  class NoPayloadEnumImplStrategyBase
+    : public SingleScalarTypeInfo<NoPayloadEnumImplStrategyBase,
                                   EnumImplStrategy>
   {
+  protected:
     llvm::IntegerType *getDiscriminatorType() const {
       llvm::StructType *Struct = getStorageType();
       return cast<llvm::IntegerType>(Struct->getElementType(0));
@@ -580,18 +581,11 @@ public:
     
     /// Map the given element to the appropriate value in the
     /// discriminator type.
-    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target) const {
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : target->getParentEnum()->getAllElements()) {
-        if (elt == target) break;
-        index++;
-      }
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
-    }
+    virtual llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
+      const = 0;
     
   public:
-    NoPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+    NoPayloadEnumImplStrategyBase(TypeInfoKind tik, unsigned NumElements,
                            std::vector<Element> &&WithPayload,
                            std::vector<Element> &&WithRecursivePayload,
                            std::vector<Element> &&WithNoPayload)
@@ -604,11 +598,6 @@ public:
       assert(!ElementsWithNoPayload.empty());
     }
     
-    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      CanType type,
-                                      EnumDecl *theEnum,
-                                      llvm::StructType *enumTy) override;
-
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<EnumElementDecl*,
@@ -772,6 +761,89 @@ public:
     }
     
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
+  };
+  
+  /// Implementation strategy for native Swift no-payload enums.
+  class NoPayloadEnumImplStrategy final
+    : public NoPayloadEnumImplStrategyBase
+  {
+  protected:
+    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
+    const override {
+      // The elements are assigned discriminators in declaration order.
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : target->getParentEnum()->getAllElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+    
+  public:
+    NoPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+                              std::vector<Element> &&WithPayload,
+                              std::vector<Element> &&WithRecursivePayload,
+                              std::vector<Element> &&WithNoPayload)
+      : NoPayloadEnumImplStrategyBase(tik, NumElements,
+                                      std::move(WithPayload),
+                                      std::move(WithRecursivePayload),
+                                      std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.empty());
+      assert(!ElementsWithNoPayload.empty());
+    }
+
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                     CanType type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
+  };
+  
+  /// Implementation strategy for no-payload enums with C-compatible
+  /// enums where none of the cases have data.
+  class CCompatibleEnumImplStrategy final
+    : public NoPayloadEnumImplStrategyBase
+  {
+  protected:
+    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
+    const override {
+      // The elements are assigned discriminators ABI-compatible with their
+      // raw values from C.
+      assert(target->hasRawValueExpr()
+             && "c-compatible enum elt has no raw value?!");
+      auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
+      auto intType = getDiscriminatorType();
+      
+      APInt intValue(intType->getBitWidth(), intExpr->getDigitsText(),
+                     /*radix*/ 0);
+      
+      if (intExpr->isNegative())
+        intValue = -intValue;
+      
+      return llvm::ConstantInt::get(intType->getContext(), intValue);
+    }
+    
+  public:
+    CCompatibleEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+                                std::vector<Element> &&WithPayload,
+                                std::vector<Element> &&WithRecursivePayload,
+                                std::vector<Element> &&WithNoPayload)
+      : NoPayloadEnumImplStrategyBase(tik, NumElements,
+                                      std::move(WithPayload),
+                                      std::move(WithRecursivePayload),
+                                      std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.empty());
+      assert(!ElementsWithNoPayload.empty());
+    }
+    
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                     CanType type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
+
+    
   };
   
   /// Common base class for enums with one or more cases with data.
@@ -2683,6 +2755,15 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
   
+  // Enums from Clang use C-compatible layout.
+  if (theEnum->hasClangNode()) {
+    assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
+    return new CCompatibleEnumImplStrategy(tik, numElements,
+                                       std::move(elementsWithPayload),
+                                       std::move(elementsWithRecursivePayload),
+                                       std::move(elementsWithNoPayload));
+  }
+  
   if (numElements <= 1)
     return new SingletonEnumImplStrategy(tik, numElements,
                                     std::move(elementsWithPayload),
@@ -2974,6 +3055,44 @@ namespace {
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                      enumTy, tagSize, std::move(spareBits),
                                      Alignment(tagBytes), IsPOD));
+  }
+  
+  TypeInfo *
+  CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                      CanType type,
+                                                      EnumDecl *theEnum,
+                                                      llvm::StructType *enumTy){
+    // The type should have come from Clang and should have a raw type.
+    assert(theEnum->hasClangNode()
+           && "c-compatible enum didn't come from clang!");
+    assert(theEnum->hasRawType()
+           && "c-compatible enum doesn't have raw type!");
+    assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
+           && "c-compatible enum is generic!");
+    
+    // The raw type should be a C integer type, which should have a single
+    // scalar representation as a Swift struct. We'll use that same
+    // representation type for the enum so that it's ABI-compatible.
+    auto &rawTI = TC.getCompleteTypeInfo(
+                                     theEnum->getRawType()->getCanonicalType());
+    auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
+    assert(rawFixedTI.isPOD(ResilienceScope::Component)
+           && "c-compatible raw type isn't POD?!");
+    ExplosionSchema rawSchema = rawTI.getSchema(ExplosionKind::Minimal);
+    assert(rawSchema.size() == 1
+           && "c-compatible raw type has non-single-scalar representation?!");
+    assert(rawSchema.begin()[0].isScalar()
+           && "c-compatible raw type has non-single-scalar representation?!");
+    llvm::Type *tagTy = rawSchema.begin()[0].getScalarType();
+    
+    llvm::Type *body[] = { tagTy };
+    enumTy->setBody(body, /*isPacked*/ false);
+    
+    return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
+                                                 rawFixedTI.getFixedSize(),
+                                                 rawFixedTI.getSpareBits(),
+                                                 rawFixedTI.getFixedAlignment(),
+                                                 IsPOD));
   }
   
   TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
