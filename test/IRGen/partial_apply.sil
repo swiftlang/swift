@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm | FileCheck %s
+// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs -I=%S/Inputs %s -emit-llvm | FileCheck %s
 
 import Builtin
 import Foundation

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -enable-dynamic-value-type-layout -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs -I=%S %s -emit-llvm | FileCheck %s
+// RUN: %swift -enable-dynamic-value-type-layout -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs -I=%S/Inputs %s -emit-llvm | FileCheck %s
 
 import Builtin
 import swift
