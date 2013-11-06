@@ -675,6 +675,66 @@ public:
       // witness table initialization.
     }
     
+    /// \group Required for SingleScalarTypeInfo
+    
+    llvm::Type *getScalarType() const {
+      return getDiscriminatorType();
+    }
+    
+    static Address projectScalar(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {}
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {}
+    
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src)
+    const override {
+      // No-payload enums are always POD, so we can always initialize by
+      // primitive copy.
+      llvm::Value *val = IGF.Builder.CreateLoad(src);
+      IGF.Builder.CreateStore(val, dest);
+    }
+    
+    static constexpr IsPOD_t IsScalarPOD = IsPOD;
+  };
+  
+  /// Implementation strategy for native Swift no-payload enums.
+  class NoPayloadEnumImplStrategy final
+    : public NoPayloadEnumImplStrategyBase
+  {
+  protected:
+    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
+    const override {
+      // The elements are assigned discriminators in declaration order.
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : target->getParentEnum()->getAllElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+    
+  public:
+    NoPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+                              std::vector<Element> &&WithPayload,
+                              std::vector<Element> &&WithRecursivePayload,
+                              std::vector<Element> &&WithNoPayload)
+      : NoPayloadEnumImplStrategyBase(tik, NumElements,
+                                      std::move(WithPayload),
+                                      std::move(WithRecursivePayload),
+                                      std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.empty());
+      assert(!ElementsWithNoPayload.empty());
+    }
+
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                     CanType type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
+    
     /// \group Extra inhabitants for no-payload enums.
 
     // No-payload enums have all values above their greatest discriminator
@@ -738,66 +798,6 @@ public:
                 llvm::ConstantInt::get(payloadTy, ElementsWithNoPayload.size()));
       IGF.Builder.CreateStore(index, dest);
     }
-    
-    /// \group Required for SingleScalarTypeInfo
-    
-    llvm::Type *getScalarType() const {
-      return getDiscriminatorType();
-    }
-    
-    static Address projectScalar(IRGenFunction &IGF, Address addr) {
-      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
-    }
-
-    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {}
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {}
-    
-    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src)
-    const override {
-      // No-payload enums are always POD, so we can always initialize by
-      // primitive copy.
-      llvm::Value *val = IGF.Builder.CreateLoad(src);
-      IGF.Builder.CreateStore(val, dest);
-    }
-    
-    static constexpr IsPOD_t IsScalarPOD = IsPOD;
-  };
-  
-  /// Implementation strategy for native Swift no-payload enums.
-  class NoPayloadEnumImplStrategy final
-    : public NoPayloadEnumImplStrategyBase
-  {
-  protected:
-    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
-    const override {
-      // The elements are assigned discriminators in declaration order.
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : target->getParentEnum()->getAllElements()) {
-        if (elt == target) break;
-        index++;
-      }
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
-    }
-    
-  public:
-    NoPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
-                              std::vector<Element> &&WithPayload,
-                              std::vector<Element> &&WithRecursivePayload,
-                              std::vector<Element> &&WithNoPayload)
-      : NoPayloadEnumImplStrategyBase(tik, NumElements,
-                                      std::move(WithPayload),
-                                      std::move(WithRecursivePayload),
-                                      std::move(WithNoPayload))
-    {
-      assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
-    }
-
-    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                     CanType type,
-                                     EnumDecl *theEnum,
-                                     llvm::StructType *enumTy) override;
   };
   
   /// Implementation strategy for no-payload enums with C-compatible
@@ -843,7 +843,36 @@ public:
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
+    /// \group Extra inhabitants for C-compatible enums.
+
+    // C-compatible enums have scattered inhabitants. For now, expose no
+    // extra inhabitants.
     
+    bool mayHaveExtraInhabitants() const override {
+      return false;
+    }
+    
+    unsigned getFixedExtraInhabitantCount() const override {
+      return 0;
+    }
+    
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      llvm_unreachable("no extra inhabitants");
+    }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      llvm_unreachable("no extra inhabitants");
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      llvm_unreachable("no extra inhabitants");
+    }
   };
   
   /// Common base class for enums with one or more cases with data.

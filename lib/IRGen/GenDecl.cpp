@@ -852,9 +852,10 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
     // Emit Swift metadata for the external struct.
     emitStructMetadata(*this, cast<StructDecl>(D));
     break;
-
   case DeclKind::Enum:
-      
+    // Emit Swift metadata for the external enum.
+    emitEnumMetadata(*this, cast<EnumDecl>(D));
+    break;
 
   case DeclKind::Class:
     // No need to emit Swift metadata for external ObjC classes.
