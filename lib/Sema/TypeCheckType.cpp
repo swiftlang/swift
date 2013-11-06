@@ -599,6 +599,38 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
   return Loc.isError();
 }
 
+namespace {
+  class TypeResolver {
+    TypeChecker &TC;
+    ASTContext &Context;
+    DeclContext *DC;
+    bool AllowUnboundGenerics;
+    GenericTypeResolver *Resolver;
+
+  public:
+    TypeResolver(TypeChecker &tc, DeclContext *DC, bool allowUnboundGenerics,
+                 GenericTypeResolver *resolver)
+      : TC(tc), Context(tc.Context), DC(DC),
+        AllowUnboundGenerics(allowUnboundGenerics), Resolver(resolver) {
+      assert(resolver);
+    }
+
+    Type resolveType(TypeRepr *repr);
+
+  private:
+    Type resolveAttributedType(AttributedTypeRepr *repr);
+    Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr);
+    Type resolveFunctionType(FunctionTypeRepr *repr,
+                             FunctionType::ExtInfo extInfo
+                               = FunctionType::ExtInfo());
+    Type resolveArrayType(ArrayTypeRepr *repr);
+    Type resolveOptionalType(OptionalTypeRepr *repr);
+    Type resolveTupleType(TupleTypeRepr *repr);
+    Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr);
+    Type resolveMetaTypeType(MetaTypeTypeRepr *repr);
+  };
+}
+
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               bool allowUnboundGenerics,
                               GenericTypeResolver *resolver) {
@@ -609,245 +641,272 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   if (!resolver)
     resolver = &defaultResolver;
 
-  assert(TyR && "Cannot validate null TypeReprs!");
-  switch (TyR->getKind()) {
+  TypeResolver typeResolver(*this, DC, allowUnboundGenerics, resolver);
+  return typeResolver.resolveType(TyR);
+}
+
+Type TypeResolver::resolveType(TypeRepr *repr) {
+  assert(repr && "Cannot validate null TypeReprs!");
+  switch (repr->getKind()) {
   case TypeReprKind::Error:
     return ErrorType::get(Context);
 
-  case TypeReprKind::Attributed: {
-    Type Ty;
-    auto AttrTyR = cast<AttributedTypeRepr>(TyR);
-    
-    Ty = resolveType(AttrTyR->getTypeRepr(), DC, allowUnboundGenerics,
-                     resolver);
-    if (Ty->is<ErrorType>())
-      return Ty;
-
-    // Copy the attributes, since we're about to start hacking on them.
-    TypeAttributes attrs = AttrTyR->getAttrs();
-    assert(!attrs.empty());
-
-    // In SIL, handle @sil_self, which extracts the Self type of a protocol.
-    if (attrs.has(TAK_sil_self)) {
-      if (auto protoTy = Ty->getAs<ProtocolType>()) {
-        Ty = protoTy->getDecl()->getSelf()->getArchetype();
-      } else {
-        diagnose(attrs.getLoc(TAK_sil_self), diag::sil_self_non_protocol, Ty)
-          .highlight(AttrTyR->getTypeRepr()->getSourceRange());
-      }
-      attrs.clearAttribute(TAK_sil_self);
-    }
-
-    if (attrs.has(TAK_inout)) {
-      LValueType::Qual quals;
-      Ty = LValueType::get(Ty, quals, Context);
-      attrs.clearAttribute(TAK_inout);
-    }
-
-    // Handle the auto_closure, cc, and objc_block attributes for function types.
-    static const TypeAttrKind FunctionAttrs[] = {
-      TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn
-    };
-    
-    bool HasFunctionAttr = false;
-    for (auto i : FunctionAttrs)
-      if (attrs.has(i)) {
-        HasFunctionAttr = true;
-        break;
-      }
-      
-    if (HasFunctionAttr) {
-      FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
-      TupleType *InputTy = 0;
-      if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
-      
-      // Function attributes require a syntactic function type.
-      if (FT == 0) {
-        for (auto i : FunctionAttrs) {
-          if (attrs.has(i)) {
-            diagnose(attrs.getLoc(i), diag::attribute_requires_function_type);
-            attrs.clearAttribute(i);
-          }
-        }
-        
-      } else if (attrs.has(TAK_auto_closure) &&
-                 (InputTy == 0 || !InputTy->getFields().empty())) {
-        // auto_closures must take () syntactically.
-        diagnose(attrs.getLoc(TAK_auto_closure),
-                 diag::autoclosure_function_input_nonunit, FT->getInput());
-      } else {
-        // Otherwise, we're ok, rebuild type, adding the required bits.
-        auto Info = FunctionType::ExtInfo(attrs.hasCC()
-                                          ? attrs.getAbstractCC()
-                                          : AbstractCC::Freestanding,
-                                          attrs.has(TAK_thin),
-                                          attrs.has(TAK_noreturn),
-                                          attrs.has(TAK_auto_closure),
-                                          attrs.has(TAK_objc_block));
-        Ty = FunctionType::get(FT->getInput(), FT->getResult(), Info,
-                               Context);
-      }
-      for (auto i : FunctionAttrs)
-        attrs.clearAttribute(i);
-      attrs.cc = Nothing;
-    }
-
-    // In SIL translation units *only*, permit @weak and @unowned to
-    // apply directly to types.
-    if (attrs.hasOwnership() && Ty->hasReferenceSemantics()) {
-      if (auto SF = DC->getParentSourceFile()) {
-        if (SF->Kind == SourceFile::SIL) {
-          Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
-          attrs.clearOwnership();
-        }
-      }
-    }
-
-    // Diagnose @local_storage in nested positions.
-    if (attrs.has(TAK_local_storage)) {
-      assert(DC->getParentSourceFile()->Kind == SourceFile::SIL);
-      diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
-      attrs.clearAttribute(TAK_local_storage);
-    }
-
-    for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
-      if (attrs.has((TypeAttrKind)i))
-        diagnose(attrs.getLoc((TypeAttrKind)i),
-                 diag::attribute_does_not_apply_to_type);
-
-    return Ty;
-  }
+  case TypeReprKind::Attributed:
+    return resolveAttributedType(cast<AttributedTypeRepr>(repr));
 
   case TypeReprKind::Ident:
-    return resolveIdentifierType(DC, cast<IdentTypeRepr>(TyR),
-                                 allowUnboundGenerics,
-                                 /*diagnoseErrors*/ true,
-                                 resolver);
+    return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr),
+                                    AllowUnboundGenerics,
+                                    /*diagnoseErrors*/ true,
+                                    Resolver);
 
-  case TypeReprKind::Function: {
-    auto FnTyR = cast<FunctionTypeRepr>(TyR);
-    Type inputTy = resolveType(FnTyR->getArgsTypeRepr(), DC,
-                               allowUnboundGenerics, resolver);
-    if (inputTy->is<ErrorType>())
-      return inputTy;
-    Type outputTy = resolveType(FnTyR->getResultTypeRepr(), DC,
-                                allowUnboundGenerics, resolver);
-    if (outputTy->is<ErrorType>())
-      return outputTy;
-    return FunctionType::get(inputTy, outputTy, Context);
-  }
+  case TypeReprKind::Function:
+    return resolveFunctionType(cast<FunctionTypeRepr>(repr));
 
-  case TypeReprKind::Array: {
-    // FIXME: diagnose non-materializability of element type!
-    auto ArrTyR = cast<ArrayTypeRepr>(TyR);
-    Type baseTy = resolveType(ArrTyR->getBase(), DC, allowUnboundGenerics,
-                              resolver);
-    if (baseTy->is<ErrorType>())
-      return baseTy;
+  case TypeReprKind::Array:
+    return resolveArrayType(cast<ArrayTypeRepr>(repr));
 
-    if (ExprHandle *sizeEx = ArrTyR->getSize()) {
-      // FIXME: We don't support fixed-length arrays yet.
-      // FIXME: We need to check Size! (It also has to be convertible to int).
-      diagnose(ArrTyR->getBrackets().Start, diag::unsupported_fixed_length_array)
-        .highlight(sizeEx->getExpr()->getSourceRange());
-      return ErrorType::get(Context);
-    }
+  case TypeReprKind::Optional:
+    return resolveOptionalType(cast<OptionalTypeRepr>(repr));
 
-    auto sliceTy = getArraySliceType(ArrTyR->getBrackets().Start, baseTy);
-    if (!sliceTy)
-      return ErrorType::get(Context);
-
-    return sliceTy;
-  }
-
-  case TypeReprKind::Optional: {
-    // FIXME: diagnose non-materializability of element type!
-    auto optTyR = cast<OptionalTypeRepr>(TyR);
-    Type baseTy = resolveType(optTyR->getBase(), DC, allowUnboundGenerics,
-                              resolver);
-    if (baseTy->is<ErrorType>())
-      return baseTy;
-
-    auto optionalTy = getOptionalType(optTyR->getQuestionLoc(), baseTy);
-    if (!optionalTy)
-      return ErrorType::get(Context);
-
-    return optionalTy;
-  }
-
-  case TypeReprKind::Tuple: {
-    auto TupTyR = cast<TupleTypeRepr>(TyR);
-    SmallVector<TupleTypeElt, 8> Elements;
-    for (auto tyR : TupTyR->getElements()) {
-      if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
-        Type ty = resolveType(namedTyR->getTypeRepr(), DC,
-                              allowUnboundGenerics, resolver);
-        if (ty->is<ErrorType>())
-          return ty;
-        Elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
-      } else {
-        Type ty = resolveType(tyR, DC, allowUnboundGenerics, resolver);
-        if (ty->is<ErrorType>())
-          return ty;
-        Elements.push_back(TupleTypeElt(ty));
-      }
-    }
-
-    if (TupTyR->hasEllipsis()) {
-      Type BaseTy = Elements.back().getType();
-      Type FullTy = getArraySliceType(TupTyR->getEllipsisLoc(), BaseTy);
-      Identifier Name = Elements.back().getName();
-      // FIXME: Where are we rejecting default arguments for variadic
-      // parameters?
-      Elements.back() = TupleTypeElt(FullTy, Name, DefaultArgumentKind::None,
-                                     true);
-    }
-
-    return TupleType::get(Elements, Context);
-  }
+  case TypeReprKind::Tuple:
+    return resolveTupleType(cast<TupleTypeRepr>(repr));
 
   case TypeReprKind::Named:
     llvm_unreachable("NamedTypeRepr only shows up as an element of Tuple");
 
-  case TypeReprKind::ProtocolComposition: {
-    auto ProtTyR = cast<ProtocolCompositionTypeRepr>(TyR);
-    SmallVector<Type, 4> ProtocolTypes;
-    for (auto tyR : ProtTyR->getProtocols()) {
-      Type ty = resolveType(tyR, DC, /*allowUnboundGenerics=*/false, resolver);
+  case TypeReprKind::ProtocolComposition:
+    return resolveProtocolCompositionType(
+                                    cast<ProtocolCompositionTypeRepr>(repr));
+
+  case TypeReprKind::MetaType:
+    return resolveMetaTypeType(cast<MetaTypeTypeRepr>(repr));
+  }
+  llvm_unreachable("all cases should be handled");
+}
+
+Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr) {
+  // Copy the attributes, since we're about to start hacking on them.
+  TypeAttributes attrs = repr->getAttrs();
+  assert(!attrs.empty());
+
+  return resolveAttributedType(attrs, repr->getTypeRepr());
+}
+
+Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
+                                         TypeRepr *repr) {
+  // The type we're working with, in case we want to build it differently
+  // based on the attributes we see.
+  Type ty;
+
+  // Pass down the variable function type attributes to the
+  // function-type creator.
+  static const TypeAttrKind FunctionAttrs[] = {
+    TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn
+  };
+
+  bool hasFunctionAttr = false;
+  for (auto i : FunctionAttrs)
+    if (attrs.has(i)) {
+      hasFunctionAttr = true;
+      break;
+    }
+
+  // Function attributes require a syntactic function type.
+  FunctionTypeRepr *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
+  if (hasFunctionAttr && fnRepr) {
+    // auto_closures must take () syntactically.
+    if (attrs.has(TAK_auto_closure)) {
+      auto input = fnRepr->getArgsTypeRepr();
+      auto inputTuple = dyn_cast<TupleTypeRepr>(input);
+      if (inputTuple == 0 || !inputTuple->getElements().empty()) {
+        TC.diagnose(attrs.getLoc(TAK_auto_closure),
+                    diag::autoclosure_function_input_nonunit)
+          .highlight(input->getSourceRange());
+      }
+    }
+
+    // Resolve the function type directly with these attributes.
+    FunctionType::ExtInfo extInfo(attrs.hasCC()
+                                    ? attrs.getAbstractCC()
+                                    : AbstractCC::Freestanding,
+                                  attrs.has(TAK_thin),
+                                  attrs.has(TAK_noreturn),
+                                  attrs.has(TAK_auto_closure),
+                                  attrs.has(TAK_objc_block));
+    ty = resolveFunctionType(fnRepr, extInfo);
+
+    for (auto i : FunctionAttrs)
+      attrs.clearAttribute(i);
+    attrs.cc = Nothing;
+
+  } else if (hasFunctionAttr) {
+    for (auto i : FunctionAttrs) {
+      if (attrs.has(i)) {
+        TC.diagnose(attrs.getLoc(i), diag::attribute_requires_function_type);
+        attrs.clearAttribute(i);
+      }
+    }
+  } 
+
+  // If we didn't build the type differently above, build it normally now.
+  if (!ty) ty = resolveType(repr);
+
+  if (ty->is<ErrorType>())
+    return ty;
+
+  // In SIL, handle @sil_self, which extracts the Self type of a protocol.
+  if (attrs.has(TAK_sil_self)) {
+    if (auto protoTy = ty->getAs<ProtocolType>()) {
+      ty = protoTy->getDecl()->getSelf()->getArchetype();
+    } else {
+      TC.diagnose(attrs.getLoc(TAK_sil_self), diag::sil_self_non_protocol, ty)
+        .highlight(repr->getSourceRange());
+    }
+    attrs.clearAttribute(TAK_sil_self);
+  }
+
+  if (attrs.has(TAK_inout)) {
+    LValueType::Qual quals;
+    ty = LValueType::get(ty, quals, Context);
+    attrs.clearAttribute(TAK_inout);
+  }
+
+  // In SIL translation units *only*, permit @weak and @unowned to
+  // apply directly to types.
+  if (attrs.hasOwnership() && ty->hasReferenceSemantics()) {
+    if (auto SF = DC->getParentSourceFile()) {
+      if (SF->Kind == SourceFile::SIL) {
+        ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
+        attrs.clearOwnership();
+      }
+    }
+  }
+
+  // Diagnose @local_storage in nested positions.
+  if (attrs.has(TAK_local_storage)) {
+    assert(DC->getParentSourceFile()->Kind == SourceFile::SIL);
+    TC.diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
+    attrs.clearAttribute(TAK_local_storage);
+  }
+
+  for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
+    if (attrs.has((TypeAttrKind)i))
+      TC.diagnose(attrs.getLoc((TypeAttrKind)i),
+                  diag::attribute_does_not_apply_to_type);
+
+  return ty;
+}
+
+Type TypeResolver::resolveFunctionType(FunctionTypeRepr *repr,
+                                       FunctionType::ExtInfo extInfo) {
+  Type inputTy = resolveType(repr->getArgsTypeRepr());
+  if (inputTy->is<ErrorType>())
+    return inputTy;
+  Type outputTy = resolveType(repr->getResultTypeRepr());
+  if (outputTy->is<ErrorType>())
+    return outputTy;
+  return FunctionType::get(inputTy, outputTy, extInfo, Context);
+}
+
+Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr) {
+  // FIXME: diagnose non-materializability of element type!
+  Type baseTy = resolveType(repr->getBase());
+  if (baseTy->is<ErrorType>())
+    return baseTy;
+  
+  if (ExprHandle *sizeEx = repr->getSize()) {
+    // FIXME: We don't support fixed-length arrays yet.
+    // FIXME: We need to check Size! (It also has to be convertible to int).
+    TC.diagnose(repr->getBrackets().Start, diag::unsupported_fixed_length_array)
+      .highlight(sizeEx->getExpr()->getSourceRange());
+    return ErrorType::get(Context);
+  }
+
+  auto sliceTy = TC.getArraySliceType(repr->getBrackets().Start, baseTy);
+  if (!sliceTy)
+    return ErrorType::get(Context);
+
+  return sliceTy;
+}
+
+Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr) {
+  // FIXME: diagnose non-materializability of element type!
+  Type baseTy = resolveType(repr->getBase());
+  if (baseTy->is<ErrorType>())
+    return baseTy;
+
+  auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
+  if (!optionalTy)
+    return ErrorType::get(Context);
+
+  return optionalTy;
+}
+
+Type TypeResolver::resolveTupleType(TupleTypeRepr *repr) {
+  SmallVector<TupleTypeElt, 8> elements;
+  elements.reserve(repr->getElements().size());
+  for (auto tyR : repr->getElements()) {
+    if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
+      Type ty = resolveType(namedTyR->getTypeRepr());
       if (ty->is<ErrorType>())
         return ty;
-      if (!ty->isExistentialType()) {
-        diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
-                 ty);
-        continue;
-      }
-
-      // The special DynamicLookup protocol can't be part of a protocol
-      // composition.
-      if (auto protoTy = ty->getAs<ProtocolType>()){
-        if (protoTy->getDecl()->isSpecificProtocol(
-              KnownProtocolKind::DynamicLookup)) {
-          diagnose(tyR->getStartLoc(),
-                   diag::protocol_composition_dynamic_lookup);
-          continue;
-        }
-      }
-
-      ProtocolTypes.push_back(ty);
+      elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
+    } else {
+      Type ty = resolveType(tyR);
+      if (ty->is<ErrorType>())
+        return ty;
+      elements.push_back(TupleTypeElt(ty));
     }
-    return ProtocolCompositionType::get(Context, ProtocolTypes);
   }
 
-  case TypeReprKind::MetaType: {
-    Type ty = resolveType(cast<MetaTypeTypeRepr>(TyR)->getBase(), DC,
-                          allowUnboundGenerics, resolver);
+  if (repr->hasEllipsis()) {
+    Type baseTy = elements.back().getType();
+    Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
+    Identifier name = elements.back().getName();
+    // FIXME: Where are we rejecting default arguments for variadic
+    // parameters?
+    elements.back() = TupleTypeElt(fullTy, name, DefaultArgumentKind::None,
+                                   true);
+  }
+
+  return TupleType::get(elements, Context);
+}
+
+Type TypeResolver::resolveProtocolCompositionType(
+                                         ProtocolCompositionTypeRepr *repr) {
+  SmallVector<Type, 4> ProtocolTypes;
+  for (auto tyR : repr->getProtocols()) {
+    Type ty = TC.resolveType(tyR, DC, /*allowUnboundGenerics=*/false, Resolver);
     if (ty->is<ErrorType>())
       return ty;
-    return MetaTypeType::get(ty, Context);
-  }
-  }
+    if (!ty->isExistentialType()) {
+      TC.diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
+                  ty);
+      continue;
+    }
 
-  llvm_unreachable("all cases should be handled");
+    // The special DynamicLookup protocol can't be part of a protocol
+    // composition.
+    if (auto protoTy = ty->getAs<ProtocolType>()){
+      if (protoTy->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::DynamicLookup)) {
+        TC.diagnose(tyR->getStartLoc(),
+                    diag::protocol_composition_dynamic_lookup);
+        continue;
+      }
+    }
+
+    ProtocolTypes.push_back(ty);
+  }
+  return ProtocolCompositionType::get(Context, ProtocolTypes);
+}
+
+Type TypeResolver::resolveMetaTypeType(MetaTypeTypeRepr *repr) {
+  Type ty = resolveType(repr->getBase());
+  if (ty->is<ErrorType>())
+    return ty;
+  return MetaTypeType::get(ty, Context);
 }
 
 Type TypeChecker::transformType(Type type,

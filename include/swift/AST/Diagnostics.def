@@ -806,7 +806,7 @@ ERROR(operator_attributes,attribute_parsing,none,
 ERROR(attribute_requires_function_type,attribute_parsing,none,
       "attribute only applies to syntactic function types", ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
-      "auto_closure argument type %0 must be '()'", (Type))
+      "auto_closure argument type must be '()'", ())
 
 // asmname
 ERROR(asmname_expected_equals,attribute_parsing,none,
