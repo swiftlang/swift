@@ -2447,28 +2447,26 @@ classifyEnum(const clang::EnumDecl *decl) {
   // Was the enum declared using NS_ENUM?
   // TODO: Or NS_OPTIONS?
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
-  if (SwiftContext.LangOpts.ImportNSEnum) {
-    auto &ClangSM = getClangASTContext().getSourceManager();
-    auto loc = decl->getLocStart();
-    if (loc.isMacroID()) {
-      auto expansionLoc = ClangSM.getExpansionLoc(decl->getLocStart());
-      expansionLoc = ClangSM.getSpellingLoc(expansionLoc);
-      auto expansionFile = ClangSM.getFileID(expansionLoc);
-      auto expansionBuffer = ClangSM.getBuffer(expansionFile, expansionLoc);
-      auto expansionPtr = ClangSM.getCharacterData(expansionLoc);
-      
-      clang::Lexer lex(clang::SourceLocation(),
-                       getClangASTContext().getLangOpts(),
-                       expansionBuffer->getBufferStart(),
-                       expansionPtr,
-                       expansionBuffer->getBufferEnd());
-      clang::Token token;
-      lex.LexFromRawLexer(token);
-      if (token.is(clang::tok::raw_identifier) &&
-          StringRef(token.getRawIdentifierData(), token.getLength()) == "NS_ENUM")
-      {
-        return EnumKind::Enum;
-      }
+  auto &ClangSM = getClangASTContext().getSourceManager();
+  auto loc = decl->getLocStart();
+  if (loc.isMacroID()) {
+    auto expansionLoc = ClangSM.getExpansionLoc(decl->getLocStart());
+    expansionLoc = ClangSM.getSpellingLoc(expansionLoc);
+    auto expansionFile = ClangSM.getFileID(expansionLoc);
+    auto expansionBuffer = ClangSM.getBuffer(expansionFile, expansionLoc);
+    auto expansionPtr = ClangSM.getCharacterData(expansionLoc);
+    
+    clang::Lexer lex(clang::SourceLocation(),
+                     getClangASTContext().getLangOpts(),
+                     expansionBuffer->getBufferStart(),
+                     expansionPtr,
+                     expansionBuffer->getBufferEnd());
+    clang::Token token;
+    lex.LexFromRawLexer(token);
+    if (token.is(clang::tok::raw_identifier) &&
+        StringRef(token.getRawIdentifierData(), token.getLength()) == "NS_ENUM")
+    {
+      return EnumKind::Enum;
     }
   }
   
