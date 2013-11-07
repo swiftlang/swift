@@ -97,7 +97,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
       -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-      -DLLVM_TARGETS_TO_BUILD="X86" \
+      -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
       -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
       .. &&
