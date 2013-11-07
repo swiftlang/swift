@@ -150,7 +150,7 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
   llvm::TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "generic",
                                   /*features*/ "",
-                                  TargetOpts, Reloc::Default,
+                                  TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
     TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
