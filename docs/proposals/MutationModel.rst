@@ -38,7 +38,7 @@ Consider::
 
 What do we do with this?  Since ``+=`` has an ``@inout`` first
 argument, we detect this situation statically (hopefully one day we’ll
-have a better error message): [#append]_
+have a better error message): 
 
 ::
    
@@ -46,7 +46,7 @@ have a better error message): [#append]_
  w.title += " (parenthesized remark)"
  ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Great.  Now what about this? ::
+Great.  Now what about this? [#append]_ ::
 
   w.title.append(" (fool the compiler)")
 
