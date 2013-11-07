@@ -30,6 +30,7 @@ namespace llvm {
 
 namespace swift {
   class ValueDecl;
+  class AbstractClosureExpr;
   class ClosureExpr;
   class AutoClosureExpr;
   class ASTContext;
@@ -48,8 +49,7 @@ namespace swift {
 /// initializing entry points of a constructor, the getter and setter for
 /// a computed variable, etc.
 struct SILDeclRef {
-  typedef llvm::PointerUnion3<ValueDecl *, ClosureExpr *,
-                              AutoClosureExpr *> Loc;
+  typedef llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *> Loc;
   
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
@@ -142,18 +142,23 @@ struct SILDeclRef {
   
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
   bool hasClosureExpr() const {
-    return loc.is<ClosureExpr *>();
+    return loc.is<AbstractClosureExpr *>()
+      && isa<ClosureExpr>(getAbstractClosureExpr() );
   }
   bool hasAutoClosureExpr() const {
-    return loc.is<AutoClosureExpr *>();
+    return loc.is<AbstractClosureExpr *>()
+      && isa<AutoClosureExpr>(getAbstractClosureExpr());
   }
 
   ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
+  AbstractClosureExpr *getAbstractClosureExpr() const {
+    return loc.dyn_cast<AbstractClosureExpr *>();
+  }
   ClosureExpr *getClosureExpr() const {
-    return loc.dyn_cast<ClosureExpr *>();
+    return dyn_cast<ClosureExpr>(getAbstractClosureExpr());
   }
   AutoClosureExpr *getAutoClosureExpr() const {
-    return loc.dyn_cast<AutoClosureExpr *>();
+    return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
   }
 
   /// True if the SILDeclRef references a function.

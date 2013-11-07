@@ -1149,6 +1149,10 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
     if (auto pft = getConstantType(SILDeclRef(func))
           .getAs<PolymorphicFunctionType>())
       genericParams = &pft->getGenericParams();
+  } else if (auto closure = dyn_cast<AbstractClosureExpr>(parentContext)) {
+    if (auto pft = getConstantType(SILDeclRef(closure))
+        .getAs<PolymorphicFunctionType>())
+      genericParams = &pft->getGenericParams();
   } else {
     genericParams = parentContext->getGenericParamsOfContext();
   }
@@ -1168,15 +1172,10 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     SmallVector<ValueDecl*, 4> LocalCaptures;
-    if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
-      auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());
-    }
-    if (auto *CE = c.loc.dyn_cast<AutoClosureExpr *>()) {
-      auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());
+    if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
+      auto *FuncTy = ACE->getType()->castTo<AnyFunctionType>();
+      ACE->getCaptureInfo().getLocalCaptures(LocalCaptures);
+      return getFunctionTypeWithCaptures(FuncTy,LocalCaptures,ACE->getParent());
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
