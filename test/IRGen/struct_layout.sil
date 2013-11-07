@@ -1,4 +1,5 @@
 // RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck -check-prefix=INTEL %s
+// RUN: %swift -triple armv7-apple-ios7 %s -emit-llvm | FileCheck -check-prefix=ARM32 %s
 
 import Builtin
 import swift
@@ -10,6 +11,15 @@ import swift
 // INTEL: @_TWVV13struct_layout14Rdar15410780_A = constant {{.*}} (i64 257
 // INTEL: @_TWVV13struct_layout14Rdar15410780_B = constant {{.*}} (i64 258
 
+// ARM32: %V13struct_layout14Rdar15410780_C = type <{ %Sq.0 }>
+// ARM32: %Sq.0 = type <{ [20 x i8], [1 x i8] }>
+// ARM32: %SS = type <{ %VSs14StringByteData }>
+// ARM32: %VSs14StringByteData = type <{ %VSs13UnsafePointer, [4 x i8], %Si, %swift.refcounted* }>
+// ARM32: %VSs13UnsafePointer = type <{ i8* }>
+// ARM32: %Si = type <{ i64 }>
+
+// ARM32: @_TWVV13struct_layout14Rdar15410780_C = constant {{.*}} (i32 21
+
 // <rdar://problem/15410780>
 struct Rdar15410780_A {
   var a: Builtin.Int2048
@@ -18,4 +28,8 @@ struct Rdar15410780_A {
 
 struct Rdar15410780_B {
   var c: Rdar15410780_A?
+}
+
+struct Rdar15410780_C {
+  var d: String?
 }
