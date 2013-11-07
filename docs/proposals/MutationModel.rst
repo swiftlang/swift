@@ -175,8 +175,8 @@ For example, consider this extension to our ``Number`` struct:
    }
 
 Also imagine we have a class called ``CNumber`` defined exactly the
-same way as number (except that it's a class).  Then, the following
-table holds:
+same way as ``Number`` (except that it's a class).  Then, the
+following table holds:
 
 +----------------------+----------------------------------+------------------------+
 |          Declaration:|::                                |                        |
@@ -200,8 +200,8 @@ table holds:
 |                      |                                  |                        |
 +----------------------+----------------------------------+                        |
 | ``x.name``           |**lvalue** (instance variables    |                        |
-|                      | implicitly have ``set:``         |                        |
-|                      | clause)                          |                        |
+|                      |implicitly have a ``set:``        |                        |
+|                      |clause)                           |                        |
 +----------------------+----------------------------------+------------------------+
 
 The Big Rule
@@ -214,7 +214,7 @@ For example:
                 
 .. parsed-literal::
 
-   clay = 43                // OK; a var is always assignable
+   clay = 43           // OK; a var is always assignable
    **stone =** clay \* 1000 // **Error:** stone is an rvalue
 
    swap(&clay, **&stone**) // **Error:** 'stone' is an rvalue; can't take its address
