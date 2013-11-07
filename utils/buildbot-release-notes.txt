@@ -51,6 +51,16 @@
 
 * 'func' keyword was changed to 'def'.
 
+* Implicit conversions are now allowed from an optional type 'T?' to another
+  optional type 'U?' if 'T' is implicitly convertible to 'U'. For example,
+  optional subclasses convert to their optional base classes:
+
+    class Base {}
+    class Derived : Base {}
+
+    var d: Derived? = Derived()
+    var b: Base? = d
+
 2013-10-30
 ----------
 
@@ -59,7 +69,7 @@
   global and instance variables:
 
     class MyClass {
-      var size = 0 // inferred to Int    
+      var size = 0 // inferred to Int
     }
 
     var name = "Swift"
@@ -67,7 +77,8 @@
   Additionally, the arguments of a generic type can also be inferred
   from the initializer:
 
-    var dict : Dictionary = ["Hello" : 1, "World" : 2] // infers Dictionary<String, Int>
+    // infers Dictionary<String, Int>
+    var dict: Dictionary = ["Hello": 1, "World": 2]
 
 
 2013-10-23
