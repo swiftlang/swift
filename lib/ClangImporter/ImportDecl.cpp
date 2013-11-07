@@ -426,6 +426,69 @@ namespace {
       // We're done.
       return constructor;
     }
+    
+    /// Get the Swift name for an enum constant.
+    Identifier getEnumConstantName(const clang::EnumConstantDecl *decl,
+                                   const clang::EnumDecl *clangEnum) {
+      // Look up the common name prefix for this enum's constants.
+      StringRef enumPrefix = "";
+      auto foundPrefix = Impl.EnumConstantNamePrefixes.find(clangEnum);
+      if (foundPrefix != Impl.EnumConstantNamePrefixes.end()) {
+        enumPrefix = foundPrefix->second;
+      }
+      
+      return Impl.importName(decl->getDeclName(), /*suffix*/ "", enumPrefix);
+    }
+    
+    /// Import an enum constant as a case of a Swift enum.
+    Decl *importEnumCase(const clang::EnumConstantDecl *decl,
+                         const clang::EnumDecl *clangEnum,
+                         EnumDecl *theEnum) {
+      auto &context = Impl.SwiftContext;
+      auto name = getEnumConstantName(decl, clangEnum);
+      if (name.empty())
+        return nullptr;
+      
+      // Use the constant's underlying value as its raw value in Swift.
+      bool negative = false;
+      llvm::APSInt rawValue = decl->getInitVal();
+      
+      // Check that we didn't already import an enum constant for this enum
+      // with the same value. Swift enums don't currently support aliases.
+      if (Impl.EnumConstantValues.count({clangEnum, rawValue}))
+        return nullptr;
+      
+      Impl.EnumConstantValues.insert({clangEnum, rawValue});
+      
+      if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
+          && rawValue.slt(0)) {
+        rawValue = -rawValue;
+        negative = true;
+      }
+      llvm::SmallString<12> rawValueText;
+      rawValue.toString(rawValueText, 10, /*signed*/ false);
+      StringRef rawValueTextC
+        = context.AllocateCopy(StringRef(rawValueText));
+      auto rawValueExpr = new (context) IntegerLiteralExpr(rawValueTextC,
+                                                       SourceLoc(),
+                                                       /*implicit*/ false);
+      if (negative)
+        rawValueExpr->setNegative(SourceLoc());
+      
+      auto element
+        = new (context) EnumElementDecl(SourceLoc(),
+                                        name, TypeLoc(),
+                                        SourceLoc(), rawValueExpr,
+                                        theEnum);
+
+      // Give the enum element the appropriate type.
+      auto argTy = MetaTypeType::get(theEnum->getDeclaredType(), context);
+      element->overwriteType(FunctionType::get(argTy,
+                                               theEnum->getDeclaredType(),
+                                               context));
+      Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
+      return element;
+    }
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
@@ -450,7 +513,8 @@ namespace {
       // Create the enum declaration and record it.
       Decl *result;
       EnumDecl *enumDecl = nullptr;
-      switch (Impl.classifyEnum(decl)) {
+      auto enumKind = Impl.classifyEnum(decl);
+      switch (enumKind) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
         // underlying type.
@@ -556,7 +620,16 @@ namespace {
       SmallVector<Decl *, 4> members;
       for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
            ec != ecEnd; ++ec) {
-        auto ood = Impl.importDecl(*ec);
+        Decl *ood;
+        switch (enumKind) {
+        case EnumKind::Constants:
+        case EnumKind::Options:
+          ood = Impl.importDecl(*ec);
+          break;
+        case EnumKind::Enum:
+          ood = importEnumCase(*ec, decl, enumDecl);
+          break;
+        }
         if (!ood)
           continue;
 
@@ -574,7 +647,7 @@ namespace {
                                                        decl->getRBraceLoc())));
       }
       
-      // Add the struct decl to ExternalDefinitions so that we can type-check
+      // Add the type decl to ExternalDefinitions so that we can type-check
       // raw values and IRGen can emit metadata for it.
       // FIXME: There might be better ways to do this.
       Impl.SwiftContext.addedExternalDecl(result);
@@ -687,19 +760,9 @@ namespace {
     }
 
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
-      auto &context = Impl.SwiftContext;
-      
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      // Look up the common name prefix for this enum's constants.
-      StringRef enumPrefix = "";
-      auto foundPrefix = Impl.EnumConstantNamePrefixes.find(clangEnum);
-      if (foundPrefix != Impl.EnumConstantNamePrefixes.end()) {
-        enumPrefix = foundPrefix->second;
-      }
-      
-      auto name = Impl.importName(decl->getDeclName(), /*suffix*/ "",
-                                  enumPrefix);
+      auto name = getEnumConstantName(decl, clangEnum);
       if (name.empty())
         return nullptr;
 
@@ -776,59 +839,10 @@ namespace {
       }
 
       case EnumKind::Enum: {
-        // The enumeration was mapped to a Swift enum. Create an element of
-        // that enum.
-        auto dc = Impl.importDeclContextOf(decl);
-        if (!dc)
-          return nullptr;
-        auto theEnum = cast<EnumDecl>(dc);
-
-        // FIXME: Importing the type will can recursively revisit this same
-        // EnumConstantDecl. Short-circuit out if we already emitted the import
-        // for this decl.
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
-
-        // Use the constant's underlying value as its raw value in Swift.
-        bool negative = false;
-        llvm::APSInt rawValue = decl->getInitVal();
-        
-        // Check that we didn't already import an enum constant for this enum
-        // with the same value. Swift enums don't currently support aliases.
-        if (Impl.EnumConstantValues.count({clangEnum, rawValue}))
-          return nullptr;
-        
-        Impl.EnumConstantValues.insert({clangEnum, rawValue});
-        
-        if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
-            && rawValue.slt(0)) {
-          rawValue = -rawValue;
-          negative = true;
-        }
-        llvm::SmallString<12> rawValueText;
-        rawValue.toString(rawValueText, 10, /*signed*/ false);
-        StringRef rawValueTextC
-          = context.AllocateCopy(StringRef(rawValueText));
-        auto rawValueExpr = new (context) IntegerLiteralExpr(rawValueTextC,
-                                                         SourceLoc(),
-                                                         /*implicit*/ false);
-        if (negative)
-          rawValueExpr->setNegative(SourceLoc());
-        
-        auto element
-          = new (context) EnumElementDecl(SourceLoc(),
-                                          name, TypeLoc(),
-                                          SourceLoc(), rawValueExpr,
-                                          dc);
-
-        // Give the enum element the appropriate type.
-        auto argTy = MetaTypeType::get(theEnum->getDeclaredType(), context);
-        element->overwriteType(FunctionType::get(argTy,
-                                                 theEnum->getDeclaredType(),
-                                                 context));
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
-        return element;
+        // The enumeration was mapped to a Swift enum, so its elements were
+        // created as children of that enum. They aren't available
+        // independently.
+        return nullptr;
       }
       }
     }
