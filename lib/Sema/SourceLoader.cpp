@@ -113,8 +113,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
                                           false);
 
-  unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take(),
-                                                       moduleID.second);
+  unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take());
 
   auto *importTU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;

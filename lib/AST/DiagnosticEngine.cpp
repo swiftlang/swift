@@ -400,7 +400,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         // Build a buffer with the pretty-printed declaration.
         auto memBuffer = llvm::MemoryBuffer::getMemBufferCopy(buffer,
                                                               bufferName);
-        SourceMgr->AddNewSourceBuffer(memBuffer, llvm::SMLoc());
+        SourceMgr.addNewSourceBuffer(memBuffer);
 
         // Go through all of the pretty-printed entries and record their
         // locations.

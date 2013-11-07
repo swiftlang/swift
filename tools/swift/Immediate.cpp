@@ -1103,7 +1103,7 @@ public:
         auto Buffer =
           llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
         unsigned BufferID =
-          CI.getSourceMgr()->AddNewSourceBuffer(Buffer, llvm::SMLoc());
+          CI.getSourceMgr().addNewSourceBuffer(Buffer);
         Lexer L(CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
         Token Tok;
         L.lex(Tok);

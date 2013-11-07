@@ -85,7 +85,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
         llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
                                              MemBuf->getBufferIdentifier());
     unsigned CodeCompletionBufferID =
-        SourceMgr->AddNewSourceBuffer(CodeCompletionBuffer, llvm::SMLoc());
+        SourceMgr.addNewSourceBuffer(CodeCompletionBuffer);
     BufferIDs.push_back(CodeCompletionBufferID);
     SourceMgr.setCodeCompletionPoint(CodeCompletionBufferID,
                                      CodeCompletePoint.second);
@@ -109,8 +109,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       MainBufferIndex = BufferIDs.size();
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(InputFile.take(),
-                                                      llvm::SMLoc()));
+    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(InputFile.take()));
   }
 
   for (auto Buf : Invocation.getInputBuffers()) {
@@ -118,10 +117,9 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       MainBufferIndex = BufferIDs.size();
 
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(
+    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(
         llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
-                                             Buf->getBufferIdentifier()),
-                                                     llvm::SMLoc()));
+                                             Buf->getBufferIdentifier())));
   }
 
   if (MainMode && MainBufferIndex == NO_SUCH_BUFFER && BufferIDs.size() == 1)

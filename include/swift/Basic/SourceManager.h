@@ -93,8 +93,8 @@ public:
     return unsigned(BufferID);
   }
 
-  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer, SourceLoc IncludeLoc) {
-    return LLVMSourceMgr.AddNewSourceBuffer(Buffer, IncludeLoc.Value);
+  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
+    return LLVMSourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
   }
 
   /// \brief Returns the SourceLoc for the beginning of the specified buffer

@@ -26,7 +26,7 @@ bool swift::appendToREPLTranslationUnit(SourceFile &SF,
   assert(SF.Kind == SourceFile::REPL && "Can't append to a non-REPL TU");
 
   SourceManager &SrcMgr = SF.TU.getASTContext().SourceMgr;
-  RC.CurBufferID = SrcMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  RC.CurBufferID = SrcMgr.addNewSourceBuffer(Buffer);
   
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;

@@ -27,7 +27,7 @@ public:
                               bool KeepComments,
                               bool KeepEOF = false) {
     MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
-    unsigned BufID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+    unsigned BufID = SourceMgr.addNewSourceBuffer(Buf);
 
     std::vector<Token> Toks;
     if (KeepEOF)
@@ -88,7 +88,7 @@ TEST_F(LexerTest, CharacterLiterals) {
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
   Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
@@ -112,7 +112,7 @@ TEST_F(LexerTest, RestoreBasic) {
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 14));
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
   Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
@@ -159,7 +159,7 @@ TEST_F(LexerTest, RestoreNewlineFlag) {
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
   Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
@@ -206,7 +206,7 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
   SourceMgr.setCodeCompletionPoint(BufferID, 6);
 
   Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
@@ -260,7 +260,7 @@ TEST_F(LexerTest, getLocForStartOfToken) {
   const char *Source = "aaa \n \tbbb \"hello\" \"-\\(val)-\"";
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
-  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
   // First is character offset, second is its token offset.
   unsigned Offs[][2] =

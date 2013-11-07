@@ -8,7 +8,7 @@ using namespace llvm;
 
 static std::vector<SourceLoc> tokenize(SourceManager &SM, StringRef Source) {
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
-  SM->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  SM.addNewSourceBuffer(Buf);
 
   SourceLoc BeginLoc(SMLoc::getFromPointer(Buf->getBuffer().begin()));
   std::vector<SourceLoc> Result;

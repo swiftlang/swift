@@ -119,7 +119,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   auto Buffer =
       llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
-  *BufferID = Ctx.SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  *BufferID = Ctx.SourceMgr.addNewSourceBuffer(Buffer);
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
