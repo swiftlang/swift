@@ -212,10 +212,11 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
 }
 
 SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
-  /// Anonymous functions always have internal linkage.
+  // Anonymous functions always have internal linkage.
   if (!constant.hasDecl())
     return SILLinkage::Internal;
-    
+  
+  // Function-local declarations always have internal linkage.
   ValueDecl *d = constant.getDecl();
   DeclContext *dc = d->getDeclContext();
   while (!dc->isModuleContext()) {
@@ -224,16 +225,22 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
     dc = dc->getParent();
   }
   
+  // Currying and calling convention thunks have thunk linkage.
   if (constant.isCurried || constant.isForeignThunk())
     return SILLinkage::Thunk;
   
+  // Declarations imported from Clang modules have thunk linkage.
+  // FIXME: They shouldn't.
   if(isa<ClangModule>(dc) &&
      (isa<ConstructorDecl>(d) ||
       isa<SubscriptDecl>(d) ||
       isa<EnumElementDecl>(d) ||
-      (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed())))
+      (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed()) ||
+      (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext()))))
     return SILLinkage::Thunk;
   
+  // Otherwise, we have external linkage.
+  // FIXME: access control
   return SILLinkage::External;
 }
 
