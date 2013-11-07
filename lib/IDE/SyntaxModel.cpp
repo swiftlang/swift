@@ -167,15 +167,14 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (DC->isTypeContext()) {
         if (FD && FD->isStatic())
           Kind = SyntaxStructureKind::StaticFunction;
-        else if (AFD->getAttrs().isIBAction())
-          Kind = SyntaxStructureKind::IBActionFunction;
         else
           Kind = SyntaxStructureKind::InstanceFunction;
       }
       else
         Kind = SyntaxStructureKind::FreeFunction;
 
-      pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
+      pushStructureNode({Kind, AFD->getAttrs(),
+                         CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                  AFD->getName().getLength()))});
     }
@@ -184,7 +183,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SyntaxStructureKind Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
     SourceRange SR = NTD->getSourceRange();
     SourceLoc NL = NTD->getNameLoc();
-    pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
+    pushStructureNode({Kind, NTD->getAttrs(),
+                       CharSourceRange(SM, SR.Start, SR.End),
                        CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                  NTD->getName().getLength()))});
   }
@@ -193,12 +193,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (DC->isTypeContext()) {
       SourceRange SR = VD->getSourceRange();
       SourceLoc NL = VD->getNameLoc();
-      SyntaxStructureKind Kind;
-      if (VD->getAttrs().isIBOutlet())
-        Kind = SyntaxStructureKind::IBOutletVariable;
-      else
-        Kind = SyntaxStructureKind::InstanceVariable;
-      pushStructureNode({Kind, CharSourceRange(SM, SR.Start, SR.End),
+      SyntaxStructureKind Kind = SyntaxStructureKind::InstanceVariable;
+      pushStructureNode({Kind, VD->getAttrs(),
+                         CharSourceRange(SM, SR.Start, SR.End),
                          CharSourceRange(SM, NL, NL.getAdvancedLoc(
                                                   VD->getName().getLength()))});
     }

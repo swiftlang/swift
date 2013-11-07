@@ -14,6 +14,7 @@
 #define SWIFT_IDE_SYNTAX_MODEL_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Attr.h"
 
 namespace swift {
   class SourceManager;
@@ -50,13 +51,12 @@ enum class SyntaxStructureKind : uint8_t {
   FreeFunction,
   InstanceFunction,
   StaticFunction,
-  IBActionFunction,
   InstanceVariable,
-  IBOutletVariable
 };
 
 struct SyntaxStructureNode {
   SyntaxStructureKind Kind;
+  DeclAttributes Attrs;
   CharSourceRange Range;
   CharSourceRange NameRange;
 };
