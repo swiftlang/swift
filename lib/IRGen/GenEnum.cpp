@@ -3166,9 +3166,7 @@ namespace {
     
     // The enum has the alignment of the payload. The size includes the added
     // tag bits.
-    auto sizeWithTag = payloadTI.getFixedSize()
-      .roundUpToAlignment(payloadTI.getFixedAlignment())
-      .getValue();
+    auto sizeWithTag = payloadTI.getFixedSize().getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
     /// FIXME: Spare bits.

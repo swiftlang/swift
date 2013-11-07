@@ -1,0 +1,21 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck -check-prefix=INTEL %s
+
+import Builtin
+import swift
+
+// INTEL: %V13struct_layout14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
+// INTEL: %V13struct_layout14Rdar15410780_B = type <{ %Sq }>
+// INTEL: %Sq = type <{ [257 x i8], [1 x i8] }>
+
+// INTEL: @_TWVV13struct_layout14Rdar15410780_A = constant {{.*}} (i64 257
+// INTEL: @_TWVV13struct_layout14Rdar15410780_B = constant {{.*}} (i64 258
+
+// <rdar://problem/15410780>
+struct Rdar15410780_A {
+  var a: Builtin.Int2048
+  var b: Int8
+}
+
+struct Rdar15410780_B {
+  var c: Rdar15410780_A?
+}
