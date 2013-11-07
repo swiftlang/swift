@@ -28,6 +28,24 @@
       }
     }
 
+* Enums from Cocoa that are declared with the NS_ENUM macro are now imported
+  into Swift as Swift enums. Like all Swift enums, the constants of the Cocoa
+  enum are scoped as members of the enum type, so the importer strips off the
+  common prefix of all of the constant names in the enum when forming the Swift
+  interface. For example, this Objective-C declaration:
+
+    typedef NS_ENUM(NSInteger, NSComparisonResult) {
+      NSOrderedAscending,
+      NSOrderedSame,
+      NSOrderedDescending,
+    };
+
+  shows up in Swift as:
+
+    enum NSComparisonResult : Int {
+      case Ascending, Same, Descending
+    }
+
 2013-11-06
 ----------
 
