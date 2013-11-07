@@ -1,18 +1,25 @@
-=================================
- An Mutation Model for Swift 1.0
-=================================
+.. raw:: html
 
-:TL;DR: By declaring properties and ``subscript`` methods with no
-        setter, we can create values that can't be directly mutated,
-        and by using ``@inout``, we can express whether a function
-        mutates a value.  This partial mutation model already exists
-        in the language, but is incomplete.  This proposal completes
-        the model and suggests several possible directions in which
-        it could be extended.
+   <style>
+   table.docutils td, table.docutils th {
+       border: 1px solid #aaa;
+   }
+   </style>
+   
+    
+==================================
+Immutability and Read-Only Methods
+==================================
 
-:Acknowledgement: This proposal is a refinement and partitioning of an
-                  idea that's long been advocated by John McCall.
-           
+:Abstract: Swift programmers can already express the concept of
+           read-only properties and subscripts, and can express their
+           intention to write on a function parameter.  However, the
+           model is incomplete, which currently leads to the compiler
+           to accept (and silently drop) mutations made by methods of
+           these read-only entities.  This proposal completes the
+           model, and additionally allows the user to declare truly
+           immutable data.
+
 The Problem
 ===========
 
@@ -20,8 +27,8 @@ Consider::
 
  class Window {
 
-   var title: String {
-   get:                          // No setter!
+   var title: String { // title is not writable
+   get:
      return somethingComputed()
    }
  }
@@ -46,157 +53,233 @@ Great.  Now what about this? ::
 Today, we allow it, but since there’s no way to implement the
 write-back onto ``w.title``, the changes are silently dropped.
 
-Not-Recommended Approaches
-==========================
+Unsatisfying Approaches
+=======================
 
-.. admonition:: Spoiler alert
+We considered three alternatives to the current proposal, none of
+which were considered satisfactory:
 
-                Nothing in this section works out very well
+1. Ban method calls on read-only properties of value type
+2. Ban read-only properties of value type
+3. Status quo: silently drop the effects of some method calls
 
-Treat All Method Calls as Mutations
------------------------------------
+For rationales explaining why these approaches were rejected, please
+refer to earlier versions of this document.
 
-Since the self parameter of a method on a value type is implicitly
-passed as ``@inout``, we could choose to treat this case consistently
-and diagnose it as an error.  But then, we have no way to allow this
-*non-mutating* method call:
+Proposed Solution
+=================
 
-.. parsed-literal::
+Terminology
+-----------
 
-   var words = w.title.\ **split()**
+Classes and generic parameters that conform to a protocol attributed
+``@class_protocol`` are called **reference types**.  All other types
+are **value types**.
 
-or, pretty much any other non-mutating access to ``w.title``, without
-forcing the user to create a temporary
+Mutating and Read-Only Methods
+------------------------------
 
-.. parsed-literal::
-
-   **var title** = w.title
-   var words = title.split()
-
-As a result, it becomes **impossible to “method-chain”** innocuous
-non-mutating operations, which I think is probably unacceptable.
-
-Ban ``get:``\ -Only Properties of Value Type
---------------------------------------------
-
-The upshot of this decision would be that these get-only properties
+A method attributed with ``@inout`` is considered **mutating**.
+Otherwise, it is considered **read-only**.
 
 .. parsed-literal::
 
- var x = w.children\ **.length**
- var i = someString\ **.startIndex**
+   struct Number {
+     init(x: Int) { name = x.toString() }
 
-would have to be written as methods:
+     def getValue() {              // read-only method
+       return Int(name)
+     }
+     **@inout** def increment() {  // mutating method
+       name = (Int(name)+1).toString()
+     }
+     var name: String
+   }
+
+The implicit ``self`` parameter of a method is semantically an
+``@inout`` parameter if and only if the method is attributed with
+``@inout``.  Read-only methods do not “write back” onto their target
+objects.
+
+A program that applies the ``@inout`` attribute to a method of a
+class—or of a protocol attributed with ``@class_protocol``—is
+ill-formed.  [Note: it is logically consistent to think of all methods
+of classes as read-only, even though they may in fact modify instance
+variables, because they never “write back” onto the source reference.]
+
+Mutating Operations
+-------------------
+
+The following are considered **mutating operations** on an lvalue
+
+1. Assignment to the lvalue
+2. Taking its address
+
+Remember that the following operations all take an lvalue's address
+implicitly:
+
+* passing it to a mutating (``@inout``) method::
+
+    var x = Number(42)
+    x.increment()         // mutating operation
+  
+* passing it to a function attributed with ``@assignment``::
+
+    var y = 31
+    y += 3                // mutating operation
+
+* assigning to a subscript or property (including an instance
+  variable) of a value type::
+
+    x._i = 3             // mutating operation
+    var z: Array<Int> = [1000]
+    z[0] = 2             // mutating operation
+
+Binding for Rvalues
+-------------------
+
+Just as ``var`` declares a name for an lvalue, ``let`` now gives a
+name to an rvalue:
 
 .. parsed-literal::
 
-   var x = w.children\ **.length()**
-   var i = someString\ **.startIndex()**
+   var clay = 42
+   **let** stone = clay + 100 // stone can now be used as an rvalue
 
-As first, this doesn't seem too onerous, but the ripple effects
-continue.  For example, any get-only properties of value type exposed
-by Objective C would have to be presented as methods in Swift, and
-we’d also have to ban get-only properties of generic type unless the
-types are constrained to be classes.
+The grammar rules for ``let`` are identical to those for ``var``.
 
-Status Quo
-----------
+Properties and Subscripts
+-------------------------
 
-This approach has the great advantage of requiring no new compiler
-work.  It has the obvious problem that perfectly sensible-looking code
-fails to fulfill the user's intention even though the static type
-system has all the information it needs to diagnose the issue.
+A subscript or property access expression is an rvalue if
 
-Recommended Approach
-====================
+* the property or subscript has no ``set:`` clause
+* the target of the property or subscript expression is an rvalue of
+  value type
 
-The Basics
-----------
+For example, consider this extension to our ``Number`` struct:
+  
+.. parsed-literal::
 
-The rules described in this section are enough to solve the stated
-problem.  Following sections cover our additional options.
+   extension Number {
+     var readOnlyValue: Int { return getValue()  }
 
-1. Allow users to declare a method as ``@inout``, meaning that it
-   mutates the target.
+     var writableValue: Int {
+       return getValue() **set(x):** name = x.toString()
+     }
 
-   .. parsed-literal::
+     subscript(n: Int) -> String { return name }
+     subscript(n: String) -> Int {
+       return 42 **set(x):** name = x.toString()
+     }
+   }
 
-      struct String {
-        **@inout** def append(s: String) {
-          self += s
-        }
-      }
+Also imagine we have a class called ``CNumber`` defined exactly the
+same way as number (except that it's a class).  Then, the following
+table holds:
 
-  The ``self`` parameter to a method not so labelled would no longer
-  considered implicitly ``@inout``.
-      
-  [This attribute is meaningless on methods of types known to be
-  classes; how and whether to diagnose that use is TBD].
++----------------------+----------------------------------+------------------------+
+|          Declaration:|::                                |                        |
+|                      |                                  |::                      |
+|Expression            |   var x = Number(42)  // this    |                        |
+|                      |   var x = CNumber(42) // or this |  let x = Number(42)    |
+|                      |   let x = CNumber(42) // or this |                        |
++======================+==================================+========================+
+| ``x.readOnlyValue``  |**rvalue** (no ``set:`` clause)   |**rvalue** (target is an|
+|                      |                                  |rvalue of value type)   |
+|                      |                                  |                        |
++----------------------+                                  |                        |
+| ``x[3]``             |                                  |                        |
+|                      |                                  |                        |
+|                      |                                  |                        |
++----------------------+----------------------------------+                        |
+| ``x.writeableValue`` |**lvalue** (has ``set:`` clause)  |                        |
+|                      |                                  |                        |
++----------------------+                                  |                        |
+| ``x["tree"]``        |                                  |                        |
+|                      |                                  |                        |
++----------------------+----------------------------------+                        |
+| ``x.name``           |**lvalue** (instance variables    |                        |
+|                      | implicitly have ``set:``         |                        |
+|                      | clause)                          |                        |
++----------------------+----------------------------------+------------------------+
 
-2. Make it an error to use a mutating method on a value-typed
-   ``get:``\ -only property or on the value-typed result of using a
-   ``get:``\ -only ``subscript`` method.
+The Big Rule
+-------------
 
-3. Make it an error for a non-\ ``@inout`` method to call an
-   ``@inout`` method on the target object.
+.. Error:: A program that applies a mutating operation to an rvalue is ill-formed
+   :class: warning
+        
+For example:
+                
+.. parsed-literal::
 
-Optimizing Based On Non-Mutation
---------------------------------
+   clay = 43                // OK; a var is always assignable
+   **stone =** clay \* 1000 // **Error:** stone is an rvalue
 
-.. Note:: This is an optional part of the proposal
+   swap(&clay, **&stone**) // **Error:** 'stone' is an rvalue; can't take its address
 
-Imposing a rule for the design of sound value types would allow us to
-make optimizations based on static knowledge of mutation.  In
-particular, access to the properties and subscripts of value types
-would not be allowed to act as references onto shared mutable state.
+   **stone +=** 3          // **Error:** += is declared @inout, @assignment and thus
+                       // implicitly takes the address of 'stone'
 
-Without this guarantee, we can’t avoid repeatedly calling a property’s
-getter even when its target object is known not to be
-modified. [#slice]_
+   **let** x = Number(42)  // x is an rvalue
+   x.getValue()        // ok, read-only method
+   x.increment()       // **Error:** calling mutating method on rvalue
+   x.readOnlyValue     // ok, read-only property
+   x.writableValue     // ok, there's no assignment to writableValue
+   x.writableValue++   // **Error:** assigning into a property of an immutable value
 
-There are probably further optimizations that could be extracted by
-imposing other semantic rules, but discovering these should be driven
-by what looks like an opportunity to the core compiler team.
-Unfortunately, all such rules **should be made early** if possible,
-because it is impossible to automate their enforcement with tools, and
-it's much easier to lift restrictions on users than it is to add them.
+Non-``@inout`` Function Parameters are RValues
+----------------------------------------------
 
-Declaring Immutable Data
-------------------------
+A function that performs a mutating operation on a parameter is
+ill-formed unless that parameter was attributed with ``@inout``.  A
+method that performs a mutating operation on ``self`` is ill-formed
+unless the method is attributed with ``@inout``:
 
-.. Note:: This is an optional part of the proposal
+.. parsed-literal::
 
-As Joe Groff has clarified for me, the rest of this proposal does not
-deal with “immutability” in the strongest sense, because a
-``get:``\ -only property such as an ``Array``\ 's ``.count`` can be
-changed by other (mutating) methods of the target object.  This
-section deals with true immutability.
+  def f(x: Int, y: @inout Int) {
+    y = x         // ok, y is an @inout parameter
+    x = y         // **Error:** function parameter 'x' is immutable
+  }
 
-John McCall has proposed that in addition to always-mutable ``var``\
-s, we allow the declaration of ``val``\ s, which are immutable after
-construction.  His suggestion integrates in obvious ways with the rest
-of this proposal: calling an ``@inout`` method on a ``val`` is simply
-prohibited.  Taking the optimization opportunity of the previous
-suggestion also requires prohibiting assignment to a property or to a
-subscript of a ``val``.
+Protocols and Constraints
+-------------------------
 
-John has thought through ``val`` much more than I have, so I defer
-further elaboration to him.
+When a protocol declares a property or ``subscript`` requirement, a
+``{ get }`` or ``{ get set }`` clause is always required.
 
-Summary
-=======
+.. parsed-literal::
 
-The fundamental problem here is that we’ve given people ways express
-mutation and to prevent assignment but have not extended the
-expression of mutation to target objects, leaving a hole.  This
-proposal closes the hole and suggests two additional improvements.
-Thanks for reading!
+   protocol Bitset {
+     var count: Int { **get** }
+     var intValue: Int { **get set** }
+     subscript(bitIndex: Int) -> Bool { **get set** }
+   }
 
---------
+Where a ``{ get set }`` clause appears, the corresponding expression
+on a type that conforms to the protocol must be an lvalue or the
+program is ill-formed:
+
+.. parsed-literal::
+
+  struct BS {
+    var count: Int    // ok; an lvalue or an rvalue is fine
+
+    var intValue : Int { 
+      return 3
+    set:             // ok, lvalue required and has a set clause
+      ignore(value)
+    }
+  
+    subscript(i: Int) -> Bool {
+      return true   // **Error:** needs a set: clause to yield an lvalue
+    }
+  }
+
+-----------------
 
 .. [#append] String will acquire an ``append(other: String)`` method as part of the
              formatting plan, but this scenario applies equally to any
              method of a value type
-
-.. [#slice] The current ``Slice<T>`` is banned by this rule, but
-            that's okay because we're replacing it with ``Array<T>``
