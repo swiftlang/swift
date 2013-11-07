@@ -340,6 +340,14 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     }
 
     // The current block is now the "default" block.
+    // Clean up the re-abstracted value, if any; we don't need it anymore.
+    if (vAbstract) {
+      // FIXME: different kinds of abstraction change in the future?
+      auto alloc = cast<AllocStackInst>(vAbstract);
+      gen.B.createDeallocStack(const_cast<Pattern*>(headPattern),
+                               alloc->getContainerResult());
+    }
+    
     SILBasicBlock *defaultBB = gen.B.getInsertionBB();
     gen.B.clearInsertionPoint();
     return defaultBB;
