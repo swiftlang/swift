@@ -486,7 +486,6 @@ namespace {
       element->overwriteType(FunctionType::get(argTy,
                                                theEnum->getDeclaredType(),
                                                context));
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
       return element;
     }
 
