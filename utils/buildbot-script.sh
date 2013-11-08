@@ -26,16 +26,16 @@ if [ "$1" = "-release" ]; then
   # Include a custom name to avoid picking up stale module files.
   CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
 else
-  BUILD_TYPE=Debug
-  PACKAGE=
-  CUSTOM_VERSION_NAME=
+  BUILD_TYPE="${SWIFT_BUILD_TYPE:-Debug}"
+  PACKAGE="${SWIFT_PACKAGE}"
+  CUSTOM_VERSION_NAME="${SWIFT_CUSTOM_VERSION_NAME}"
 fi
 
 # Set this to the path to the 'cmake' executable.
-CMAKE=/usr/local/bin/cmake
+CMAKE=${SWIFT_CMAKE:-$(which cmake || echo /usr/local/bin/cmake)}
 
 # Set this to the install prefix for release builds.
-INSTALL_PREFIX=/usr
+INSTALL_PREFIX=${SWIFT_INSTALL_PREFIX:-/usr}
 
 # Set these to the paths of the OS X SDK and toolchain.
 SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
