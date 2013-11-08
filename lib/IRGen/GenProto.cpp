@@ -2509,7 +2509,7 @@ namespace {
         CanType sigSelfType
           = CanType(sigTupleType->getFields().back().getType());
         
-        assert(isa<ClassType>(implSelfType));
+        assert(implSelfType->getClassOrBoundGenericClass());
         assert(isa<LValueType>(sigSelfType));
 
         CanType sigSelfTypeForImpl =
