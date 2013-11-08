@@ -64,6 +64,8 @@ class CompilerInvocation {
   std::vector<std::string> InputFilenames;
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
+  std::string OutputFilename;
+
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
   /// \brief Code completion offset in bytes from the beginning of the main
@@ -201,6 +203,13 @@ public:
 
   ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
   ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const { return InputBuffers; }
+
+  void setOutputFilename(StringRef Filename) {
+    OutputFilename = Filename;
+  }
+  StringRef getOutputFilename() const {
+    return OutputFilename;
+  }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
     assert(Buf);

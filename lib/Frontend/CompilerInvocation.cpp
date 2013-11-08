@@ -128,6 +128,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
       break;
 
+    case OPT_output:
+      setOutputFilename(InputArg->getValue());
+      break;
+
     case OPT_INPUT:
       addInputFilename(InputArg->getValue());
       break;
