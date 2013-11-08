@@ -56,18 +56,20 @@ test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
 test -d "$WORKSPACE/SourceKit"
 
-# Make sure install-test-script.sh is available alongside us.
-INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
-RELEASE_NOTES_TXT="$(dirname "$0")/buildbot-release-notes.txt"
+if [[ "$PACKAGE" ]]; then
+  # Make sure install-test-script.sh is available alongside us.
+  INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
+  RELEASE_NOTES_TXT="$(dirname "$0")/buildbot-release-notes.txt"
 
-if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
-  echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
-  exit 1
-fi
+  if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
+    echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
+    exit 1
+  fi
 
-if [ \! -f "$RELEASE_NOTES_TXT" ]; then
-  echo "Release notes file $RELEASE_NOTES_TXT is unavailable!"
-  exit 1
+  if [ \! -f "$RELEASE_NOTES_TXT" ]; then
+    echo "Release notes file $RELEASE_NOTES_TXT is unavailable!"
+    exit 1
+  fi
 fi
 
 # Symlink clang into the llvm tree.
