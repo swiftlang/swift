@@ -119,6 +119,7 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
+      -DSWIFT_RUN_LONG_TESTS="ON" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
       .. &&
     make -j8) || exit 1

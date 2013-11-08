@@ -30,6 +30,9 @@ if "@MODULES_SDK@" != "" and platform.system() != 'Linux':
   config.available_features.add("sdk")
   config.substitutions.append(('%sdk', "@MODULES_SDK@"))
 
+if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
+  config.available_features.add("long_tests")
+
 # Enable interpreter-based tests on platforms where the interpterer is known to
 # work.
 if platform.system() != 'Linux':

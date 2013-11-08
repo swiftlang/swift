@@ -138,6 +138,7 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
 
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
+set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
 
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
