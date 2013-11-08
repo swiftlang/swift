@@ -14,6 +14,8 @@
 #define SWIFT_SOURCEMANAGER_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
 
 namespace swift {
@@ -27,6 +29,9 @@ class SourceManager {
 
   /// \brief The buffer ID where a hashbang line #! is allowed.
   unsigned HashbangBufferID = ~0U;
+
+  /// Associates buffer identifiers to buffer IDs.
+  llvm::StringMap<unsigned> BufIdentIDMap;
 
 public:
   SourceManager() {}
@@ -93,9 +98,11 @@ public:
     return unsigned(BufferID);
   }
 
-  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
-    return LLVMSourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
-  }
+  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer);
+
+  /// Returns a buffer ID for a previously added buffer with the given
+  /// buffer identifier, or Nothing if there is no such buffer.
+  Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier);
 
   /// \brief Returns the SourceLoc for the beginning of the specified buffer
   /// (at offset zero).

@@ -94,7 +94,24 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   bool MainMode = (Invocation.getInputKind() == SourceFile::Main);
   bool SILMode = (Invocation.getInputKind() == SourceFile::SIL);
 
+  // Add the memory buffers first, these will be associated with a filename
+  // and they can replace the contents of an input filename.
+  for (auto Buf : Invocation.getInputBuffers()) {
+    if (SILMode)
+      MainBufferIndex = BufferIDs.size();
+
+    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
+    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(
+        llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
+                                             Buf->getBufferIdentifier())));
+  }
+
   for (auto &File : Invocation.getInputFilenames()) {
+    // FIXME: Working with filenames is fragile, maybe use the real path
+    // or have some kind of FileManager.
+    if (SourceMgr.getIDForBufferIdentifier(File).hasValue())
+      continue; // replaced by a memory buffer.
+
     // Open the input file.
     llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
     if (llvm::error_code Err =
@@ -110,16 +127,6 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
     BufferIDs.push_back(SourceMgr.addNewSourceBuffer(InputFile.take()));
-  }
-
-  for (auto Buf : Invocation.getInputBuffers()) {
-    if (SILMode)
-      MainBufferIndex = BufferIDs.size();
-
-    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(
-        llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
-                                             Buf->getBufferIdentifier())));
   }
 
   if (MainMode && MainBufferIndex == NO_SUCH_BUFFER && BufferIDs.size() == 1)

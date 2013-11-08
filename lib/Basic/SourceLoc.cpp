@@ -22,6 +22,20 @@ SourceLoc SourceManager::getCodeCompletionLoc() const {
       .getAdvancedLoc(CodeCompletionOffset);
 }
 
+size_t SourceManager::addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
+  auto ID = LLVMSourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  BufIdentIDMap[Buffer->getBufferIdentifier()] = ID;
+  return ID;
+}
+
+Optional<unsigned> SourceManager::getIDForBufferIdentifier(
+    StringRef BufIdentifier) {
+  auto It = BufIdentIDMap.find(BufIdentifier);
+  if (It == BufIdentIDMap.end())
+    return Nothing;
+  return It->second;
+}
+
 SourceLoc SourceManager::getLocForBufferStart(unsigned BufferID) const {
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
   return SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBufferStart()));
