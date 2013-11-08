@@ -155,7 +155,11 @@ if [ \! "$SKIP_BUILD_SWIFT_STDLIB" ]; then
   build_stdlib arm64  iphoneos.internal 6.0
 
   # Symlink OS X stdlib into built tools so that the tools can be run in-place
-  ln -fhs "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/swift/"* "$WORKSPACE/swift/build/lib/swift/"
+  for lib in "$WORKSPACE/swift/build/stdlib/macosx-x86_64/lib/swift/"* ; do
+    if [ -e "$lib" ] ; then
+      ln -fhs "$lib" "$WORKSPACE/swift/build/lib/swift/"
+    fi
+  done
 fi
 
 # Run the Swift tests.
