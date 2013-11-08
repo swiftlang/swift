@@ -200,6 +200,11 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getSwiftRValueType()->getEnumOrBoundGenericEnum();
   }
+  /// Retrieve the NominalTypeDecl for a type that maps to a Swift
+  /// nominal or bound generic nominal type.
+  NominalTypeDecl *getNominalOrBoundGenericNominal() const {
+    return getSwiftRValueType()->getNominalOrBoundGenericNominal();
+  }
   
   /// True if the type is an address type.
   bool isAddress() const { return getCategory() == SILValueCategory::Address; }
@@ -245,7 +250,20 @@ public:
   const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();
   }
-  
+
+  /// Given that this is a nominal type, return the lowered type of
+  /// the given field.  Applies substitutions as necessary.  The
+  /// result will be an address type if the base type is an address
+  /// type or a class.
+  SILType getFieldType(VarDecl *field, SILModule &M) const;
+
+  /// Given that this is a tuple type, return the lowered type of the
+  /// given tuple element.  The result will have the same value
+  /// category as the base type.
+  SILType getTupleElementType(unsigned index) const {
+    return SILType(castTo<TupleType>().getElementType(index), getCategory());
+  }
+
   //
   // Accessors for types used in SIL instructions:
   //

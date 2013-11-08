@@ -235,18 +235,18 @@ static SILValue scalarizeLoad(LoadInst *LI,
 // Access Path Analysis Logic
 //===----------------------------------------------------------------------===//
 
-static unsigned getNumSubElements(CanType T) {
-  if (TupleType *TT = T->getAs<TupleType>()) {
+static unsigned getNumSubElements(SILType T, SILModule &M) {
+  if (auto TT = T.getAs<TupleType>()) {
     unsigned NumElements = 0;
-    for (auto &Elt : TT->getFields())
-      NumElements += getNumSubElements(Elt.getType()->getCanonicalType());
+    for (auto index : indices(TT.getElementTypes()))
+      NumElements += getNumSubElements(T.getTupleElementType(index), M);
     return NumElements;
   }
 
-  if (auto *SD = T->getStructOrBoundGenericStruct()) {
+  if (auto *SD = T.getStructOrBoundGenericStruct()) {
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
-      NumElements += getNumSubElements(SILBuilder::getStructFieldType(T, D));
+      NumElements += getNumSubElements(T.getFieldType(D, M), M);
     return NumElements;
   }
 
@@ -265,22 +265,24 @@ static bool TryComputingAccessPath(SILValue Pointer, unsigned &SubEltNumber,
     if (RootInst == Pointer.getDef())
       return true;
 
+    SILModule &M = RootInst->getModule();
+
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
-      TupleType *TT = TEAI->getTupleType();
+      SILType TT = TEAI->getOperand().getType();
 
       // Keep track of what subelement is being referenced.
-      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i)
-        SubEltNumber += getNumSubElements(TT->getElementType(i)
-                                          ->getCanonicalType());
+      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
+        SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
+      }
       Pointer = TEAI->getOperand();
     } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
-      CanType ST = SEAI->getOperand().getType().getSwiftRValueType();
+      SILType ST = SEAI->getOperand().getType();
 
       // Keep track of what subelement is being referenced.
       StructDecl *SD = SEAI->getStructDecl();
       for (auto *D : SD->getStoredProperties()) {
         if (D == SEAI->getField()) break;
-        SubEltNumber += getNumSubElements(SILBuilder::getStructFieldType(ST,D));
+        SubEltNumber += getNumSubElements(ST.getFieldType(D, M), M);
       }
 
       Pointer = SEAI->getOperand();
@@ -315,31 +317,30 @@ static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
 /// the path.
 static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
                                   SILBuilder &B, SILLocation Loc) {
-  CanType ValTy = Val.getType().getSwiftRValueType();
+  SILType ValTy = Val.getType();
 
   // Extract tuple elements.
-  if (TupleType *TT = ValTy->getAs<TupleType>()) {
-    unsigned EltNo = 0;
-    for (auto &Elt : TT->getFields()) {
+  if (auto TT = ValTy.getAs<TupleType>()) {
+    for (unsigned EltNo : indices(TT.getElementTypes())) {
       // Keep track of what subelement is being referenced.
-      unsigned NumSubElt = getNumSubElements(Elt.getType()->getCanonicalType());
+      SILType EltTy = ValTy.getTupleElementType(EltNo);
+      unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
-        Val = B.emitTupleExtract(Loc, Val, EltNo);
+        Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
         return ExtractSubElement(Val, SubElementNumber, B, Loc);
       }
 
       SubElementNumber -= NumSubElt;
-      ++EltNo;
     }
 
-    assert(0 && "Didn't find field");
+    llvm_unreachable("Didn't find field");
   }
 
   // Extract struct elements.
-  if (auto *SD = ValTy->getStructOrBoundGenericStruct()) {
+  if (auto *SD = ValTy.getStructOrBoundGenericStruct()) {
     for (auto *D : SD->getStoredProperties()) {
-      unsigned NumSubElt =
-        getNumSubElements(SILBuilder::getStructFieldType(ValTy, D));
+      auto fieldType = ValTy.getFieldType(D, B.getModule());
+      unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
 
       if (SubElementNumber < NumSubElt) {
         Val = B.emitStructExtract(Loc, Val, D);
@@ -349,7 +350,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
       SubElementNumber -= NumSubElt;
 
     }
-    assert(0 && "Didn't find field");
+    llvm_unreachable("Didn't find field");
   }
 
   // Otherwise, we're down to a scalar.
@@ -423,6 +424,8 @@ namespace {
   /// ElementPromotion - This is the main heavy lifting for processing the uses
   /// of an element of an allocation.
   class ElementPromotion {
+    SILModule &M;
+
     /// TheMemory - This is either an alloc_box instruction or a
     /// mark_uninitialized instruction.  This represents the start of the
     /// lifetime of the value being analyzed.
@@ -453,13 +456,13 @@ namespace {
     void doIt();
 
   private:
-    CanType getTheMemoryType() const {
+    SILType getTheMemoryType() const {
       if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-        return ABI->getElementType().getSwiftRValueType();
+        return ABI->getElementType();
       if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
-        return ASI->getElementType().getSwiftRValueType();
+        return ASI->getElementType();
       // mark_uninitialized.
-      return TheMemory->getType(0).getObjectType().getSwiftRValueType();
+      return TheMemory->getType(0).getObjectType();
     }
     
     enum DIKind {
@@ -502,9 +505,10 @@ namespace {
 
 ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
                                    unsigned ElementNumber, ElementUses &Uses)
-  : TheMemory(TheMemory), ElementNumber(ElementNumber), Uses(Uses) {
+  : M(TheMemory->getModule()), TheMemory(TheMemory),
+    ElementNumber(ElementNumber), Uses(Uses) {
 
-  NumMemorySubElements = getNumSubElements(getTheMemoryType());
+  NumMemorySubElements = getNumSubElements(getTheMemoryType(), M);
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -560,7 +564,7 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy = getTheMemoryType();
+  CanType AllocTy = getTheMemoryType().getSwiftRValueType();
   getPathStringToElement(AllocTy, ElementNumber, Name);
   
   diagnose(Use->getModule(), Use->getLoc(), DiagMessage, Name);
@@ -837,13 +841,14 @@ void ElementPromotion::
 updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
                       llvm::SmallBitVector &ConflictingValues) {
+  SILModule &M = Inst->getModule();
 
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
     unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
-    CanType ValTy = Inst->getOperand(0).getType().getSwiftRValueType();
+    SILType ValTy = Inst->getOperand(0).getType();
 
-    for (unsigned i = 0, e = getNumSubElements(ValTy); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, M); i != e; ++i) {
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
 
@@ -868,10 +873,10 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   // copy_addr to its individual pieces.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
     unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
-    CanType ValTy = Inst->getOperand(1).getType().getSwiftRValueType();
+    SILType ValTy = Inst->getOperand(1).getType();
 
     bool AnyRequired = false;
-    for (unsigned i = 0, e = getNumSubElements(ValTy); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, M); i != e; ++i) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -1027,10 +1032,12 @@ static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
 /// build out the right aggregate type (LoadTy) by emitting tuple and struct
 /// instructions as necessary.
 static SILValue
-AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
+AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
                          SILValue Address,
                        ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
                          unsigned FirstElt) {
+  assert(LoadTy.isObject());
+  SILModule &M = Inst->getModule();
 
   // Check to see if the requested value is fully available, as an aggregate.
   // This is a super-common case for single-element structs, but is also a
@@ -1038,11 +1045,11 @@ AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
   if (FirstElt < AvailableValues.size()) {  // #Elements may be zero.
     SILValue FirstVal = AvailableValues[FirstElt].first;
     if (FirstVal.isValid() && AvailableValues[FirstElt].second == 0 &&
-        FirstVal.getType().getSwiftRValueType() == LoadTy) {
+        FirstVal.getType() == LoadTy) {
       // If the first element of this value is available, check any extra ones
       // before declaring success.
       bool AllMatch = true;
-      for (unsigned i = 0, e = getNumSubElements(LoadTy); i != e; ++i)
+      for (unsigned i = 0, e = getNumSubElements(LoadTy, M); i != e; ++i)
         if (AvailableValues[FirstElt+i].first != FirstVal ||
             AvailableValues[FirstElt+i].second != i) {
           AllMatch = false;
@@ -1057,52 +1064,48 @@ AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
 
   SILBuilder B(Inst);
 
-  if (TupleType *TT = LoadTy->getAs<TupleType>()) {
+  if (TupleType *TT = LoadTy.getAs<TupleType>()) {
     SmallVector<SILValue, 4> ResultElts;
 
-    unsigned EltNo = 0;
-    for (auto &Elt : TT->getFields()) {
-      CanType EltTy = Elt.getType()->getCanonicalType();
-      unsigned NumSubElt = getNumSubElements(EltTy);
+    for (unsigned EltNo : indices(TT->getFields())) {
+      SILType EltTy = LoadTy.getTupleElementType(EltNo);
+      unsigned NumSubElt = getNumSubElements(EltTy, M);
 
       // If we are missing any of the available values in this struct element,
       // compute an address to load from.
       SILValue EltAddr;
       if (anyMissing(FirstElt, NumSubElt, AvailableValues))
-        EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo);
+        EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo,
+                                           EltTy.getAddressType());
 
       ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
                                                     AvailableValues, FirstElt));
       FirstElt += NumSubElt;
-      ++EltNo;
     }
 
-    return B.createTuple(Inst->getLoc(),
-                         SILType::getPrimitiveObjectType(LoadTy),
-                         ResultElts);
+    return B.createTuple(Inst->getLoc(), LoadTy, ResultElts);
   }
 
   // Extract struct elements.
-  if (auto *SD = LoadTy->getStructOrBoundGenericStruct()) {
+  if (auto *SD = LoadTy.getStructOrBoundGenericStruct()) {
     SmallVector<SILValue, 4> ResultElts;
 
     for (auto *FD : SD->getStoredProperties()) {
-      CanType EltTy = SILBuilder::getStructFieldType(LoadTy, FD);
-      unsigned NumSubElt = getNumSubElements(EltTy);
+      SILType EltTy = LoadTy.getFieldType(FD, M);
+      unsigned NumSubElt = getNumSubElements(EltTy, M);
 
       // If we are missing any of the available values in this struct element,
       // compute an address to load from.
       SILValue EltAddr;
       if (anyMissing(FirstElt, NumSubElt, AvailableValues))
-        EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD);
+        EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD,
+                                            EltTy.getAddressType());
 
       ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
                                                     AvailableValues, FirstElt));
       FirstElt += NumSubElt;
     }
-    return B.createStruct(Inst->getLoc(),
-                          SILType::getPrimitiveObjectType(LoadTy),
-                          ResultElts);
+    return B.createStruct(Inst->getLoc(), LoadTy, ResultElts);
   }
 
   // Otherwise, we have a simple primitive.  If the value is available, use it,
@@ -1113,7 +1116,7 @@ AggregateAvailableValues(SILInstruction *Inst, CanType LoadTy,
 
   SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
   // It must be the same type as LoadTy if available.
-  assert(EltVal.getType().getSwiftRValueType() == LoadTy &&
+  assert(EltVal.getType() == LoadTy &&
          "Subelement types mismatch");
   return EltVal;
 }
@@ -1147,12 +1150,12 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   if (hasEscapedAt(Inst))
     return false;
 
-  CanType LoadTy = Inst->getOperand(0).getType().getSwiftRValueType();
+  SILType LoadTy = Inst->getOperand(0).getType().getObjectType();
 
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy);
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, M);
   
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);

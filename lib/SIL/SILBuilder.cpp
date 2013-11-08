@@ -17,26 +17,6 @@ using namespace swift;
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
 
-CanType SILBuilder::getStructFieldType(CanType Ty, VarDecl *Field) {
-  return Ty->getTypeOfMember(Field->getModuleContext(), Field, nullptr)
-           ->getCanonicalType();
-}
-
-
-SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo,
-                                        SILValueCategory Cat) {
-  TupleType *TT = Ty.getAs<TupleType>();
-  auto EltTy = TT->getFields()[EltNo].getType()->getCanonicalType();
-  return SILType::getPrimitiveType(EltTy, Cat);
-}
-
-SILType SILBuilder::getStructFieldType(SILType Ty, VarDecl *Field,
-                                       SILValueCategory Cat) {
-  assert(Field->getDeclContext() == Ty.getStructOrBoundGenericStruct());
-  auto FieldTy = getStructFieldType(Ty.getSwiftRValueType(), Field);
-  return SILType::getPrimitiveType(FieldTy, Cat);
-}
-
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                               SILModule &M) {
   SILFunctionType *FTI = origTy.getFunctionTypeInfo(M);

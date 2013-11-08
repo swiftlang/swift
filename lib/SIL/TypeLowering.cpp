@@ -1287,3 +1287,16 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
 
   return silSubstType;
 }
+
+SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
+  assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
+  auto fieldTy =
+    getSwiftRValueType()->getTypeOfMember(field->getModuleContext(),
+                                          field, nullptr);
+  auto loweredTy = M.Types.getLoweredType(fieldTy);
+  if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
+    return loweredTy.getAddressType();
+  } else {
+    return loweredTy.getObjectType();
+  }
+}
