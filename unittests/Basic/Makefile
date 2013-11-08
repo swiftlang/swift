@@ -14,5 +14,6 @@ SWIFT_LEVEL = ../..
 TESTNAME = Basic
 include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := $(TARGETS_TO_BUILD)
+USEDLIBS = swiftBasic.a
 
 include $(SWIFT_LEVEL)/unittests/Makefile
