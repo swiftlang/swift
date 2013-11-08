@@ -1,4 +1,4 @@
-#!/bin/sh -ex
+#!/bin/bash -ex -o pipefail
 
 # The Jenkins workspace is set up as follows:
 # - LLVM checked out to ${WORKSPACE}/llvm
