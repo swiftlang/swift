@@ -1,7 +1,6 @@
 add_swift_executable(swift
   Helpers.cpp
   Immediate.cpp
-  SerializedDiagnosticConsumer.cpp
   swift.cpp
   DEPENDS swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftSerialization
           swiftFrontend swiftClangImporter swiftIDE

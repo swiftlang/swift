@@ -7,6 +7,7 @@ add_swift_library(swiftFrontend
   DiagnosticVerifier.cpp
   Frontend.cpp
   PrintingDiagnosticConsumer.cpp
+  SerializedDiagnosticConsumer.cpp
   DEPENDS swiftAST swiftParse swiftSema swiftSerialization swiftSIL)
 
 add_dependencies(swiftFrontend SwiftFrontendOptionsTableGen)

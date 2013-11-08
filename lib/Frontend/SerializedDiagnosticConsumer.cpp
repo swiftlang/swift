@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SerializedDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
