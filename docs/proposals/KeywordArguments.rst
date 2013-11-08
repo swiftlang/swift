@@ -149,6 +149,13 @@ name, by selector order, and by type::
   def foo(x: Int) bas(y: Int) bar(z: Int)
   def foo(x: Int) bar(y: Int) bas(z: Float)
 
+Tuple- and selector-style declarations are not considered duplicates, even if
+they can match the same keywords with the same types::
+
+  // OK, not duplicates
+  def foo(x: Int, bar: Int)
+  def foo(x: Int) bar(x: Int)
+
 Unapplied Name Lookup
 ---------------------
 
@@ -188,3 +195,34 @@ named selector pieces in order::
   c.foo:bas:bar: // Finds c.foo:bas:bar:
   c.foo          // Finds c.foo
 
+QoI Issues
+----------
+
+Under this proposal, keyword resolution relies on being able to find a named
+function declaration. This means that keywords cannot be used with arbitrary
+expressions of function type. One way we can do this is syntactically, as
+proposed above, treating "named application" as a special case. If we do this,
+we would still want to parse keywords in nameless applications for recovery.
+There are also functional operators like ``!`` and ``?`` that we need to
+forward keyword arguments through. Are there others? What about parens?
+``(foo)(bar: x)`` should probably work.
+
+Syntactic Edge Cases
+--------------------
+
+The selector method reference syntax ``foo.bar:bas:`` can form ambiguities
+with the ternary and dictionary literal expression syntax::
+
+  a?b?c.d:e:f
+
+  [a?b.c:d: e]
+
+Neither example seems likely in practice. We can address this by requiring no
+spaces in ``foo.bar:bas:``, and favoring that parse. This allows the ternary
+parse to be asserted using whitespace::
+
+  a ? b ? c.d : e : f
+
+  [a ? b.c : d: e]
+
+Removing the ternary from the language would also eliminate the ambiguities.
