@@ -27,7 +27,7 @@ namespace swift {
   class DiagnosticConsumer;
 
   namespace serialized_diagnostics {
-    /// \brief Create a DiagnostcConsumer that serializes diagnostics to a
+    /// \brief Create a DiagnosticConsumer that serializes diagnostics to a
     ///        stream.
     ///
     /// \param OS the stream to emit the diagnostics.  The consumer takes
