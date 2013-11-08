@@ -31,15 +31,15 @@ else
   CUSTOM_VERSION_NAME=
 fi
 
-# Set these to the paths of the OS X SDK and toolchain.
-SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolchain
-
 # Set this to the path to the 'cmake' executable.
 CMAKE=/usr/local/bin/cmake
 
 # Set this to the install prefix for release builds.
 INSTALL_PREFIX=/usr
+
+# Set these to the paths of the OS X SDK and toolchain.
+SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
+TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolchain
 
 # Set this to the path on matte to which release packages should be delivered.
 PACKAGE_PATH=/Users/swift-discuss
