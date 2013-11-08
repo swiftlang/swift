@@ -550,6 +550,11 @@ macro(add_swift_executable name)
   link_system_libs( ${name} )
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set_target_properties(${name}
+      PROPERTIES
+      LINK_FLAGS "-Wl,-exported_symbol,_main")
+  endif()
 endmacro(add_swift_executable)
 
 # Add compiler flags for a target.

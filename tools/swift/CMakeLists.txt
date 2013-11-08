@@ -22,9 +22,8 @@ endif()
 
 # Add a run-path so that the interpreter can find the swift runtime libraries.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_target_properties(swift
-    PROPERTIES
-    LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib/swift")
+  set_property(TARGET swift APPEND_STRING PROPERTY
+    LINK_FLAGS " -Wl,-rpath -Wl,@executable_path/../lib/swift")
 endif()
 
 install(TARGETS swift
