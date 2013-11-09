@@ -46,10 +46,29 @@
       case Ascending, Same, Descending
     }
 
-  The enum cases can then take advantage of type inference from context, as in:
+  The enum cases can then take advantage of type inference from context.
+  In Objective-C, you would write:
+
+    NSNumber *foo = [NSNumber numberWithInt: 1];
+    NSNumber *bar = [NSNumber numberWithInt: 2];
+
+    switch ([foo compare: bar]) {
+    case NSOrderedAscending:
+      NSLog(@"ascending\n");
+      break;
+    case NSOrderedSame:
+      NSLog(@"same\n");
+      break;
+    case NSOrderedDescending:
+      NSLog(@"descending\n");
+      break;
+    }
+
+  In Swift, this becomes:
 
     var foo: NSNumber = 1
     var bar: NSNumber = 2
+
     switch foo.compare(bar) {
     case .Ascending:
       println("ascending")
