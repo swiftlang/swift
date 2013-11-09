@@ -369,20 +369,20 @@ public:
   //===--------------------------------------------------------------------===//
 
   // Builtin type and simple types that are used frequently.
-  const Type TheErrorType;       /// TheErrorType - This is the error singleton.
-  const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
-  const Type TheObjectPointerType; /// Builtin.ObjectPointer
-  const Type TheObjCPointerType; /// Builtin.ObjCPointer
-  const Type TheRawPointerType;  /// Builtin.RawPointer
+  const CanType TheErrorType;       /// TheErrorType - This is the error singleton.
+  const CanType TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
+  const CanType TheObjectPointerType; /// Builtin.ObjectPointer
+  const CanType TheObjCPointerType; /// Builtin.ObjCPointer
+  const CanType TheRawPointerType;  /// Builtin.RawPointer
   
-  const Type TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
-  const Type TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
+  const CanType TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
+  const CanType TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
   
   // Target specific types.
-  const Type TheIEEE16Type;     /// TheIEEE16Type  - 16-bit IEEE floating point
-  const Type TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
-  const Type TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
-  const Type ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
+  const CanType TheIEEE16Type;     /// TheIEEE16Type  - 16-bit IEEE floating point
+  const CanType TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
+  const CanType TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
+  const CanType ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
 
   /// \brief Adds a module loader to this AST context.
   ///
