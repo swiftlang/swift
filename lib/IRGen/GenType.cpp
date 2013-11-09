@@ -366,11 +366,11 @@ unsigned irgen::getHeapObjectExtraInhabitantCount(IRGenModule &IGM) {
   
   // FIXME: We could also make extra inhabitants using spare bits, but we
   // probably don't need to.
-  uintptr_t rawCount = IGM.TargetInfo.LeastValidPointerValue
+  uint64_t rawCount = IGM.TargetInfo.LeastValidPointerValue
     >> getNumLowObjCReservedBits(IGM);
   
   // The runtime limits the count to INT_MAX.
-  return std::max((uintptr_t)INT_MAX, rawCount);
+  return std::max((uint64_t)INT_MAX, rawCount);
 }
 
 llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
@@ -383,7 +383,7 @@ llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
   
   assert(index < getHeapObjectExtraInhabitantCount(IGM) &&
          "heap object extra inhabitant out of bounds");
-  uintptr_t value = (uintptr_t)index << getNumLowObjCReservedBits(IGM);
+  uint64_t value = (uint64_t)index << getNumLowObjCReservedBits(IGM);
   return llvm::ConstantInt::get(IGM.getLLVMContext(), APInt(bits, value));
 }
 
