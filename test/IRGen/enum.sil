@@ -918,6 +918,41 @@ end:
   return %x : $()
 }
 
+class C {}
+
+enum SinglePayloadClass {
+  case x(C)
+  case y
+  case z
+  case w
+}
+
+// CHECK: define void @single_payload_class_switch(i64) {
+// CHECK: entry:
+// CHECK:   switch i64 %0, label {{%.*}} [
+// CHECK:     i64 0, label {{%.*}}
+// CHECK:     i64 2, label {{%.*}}
+// CHECK:     i64 4, label {{%.*}}
+// CHECK:   ]
+// CHECK: ; <label>
+// CHECK:   inttoptr i64 %0 to %C4enum1C*
+sil @single_payload_class_switch : $(SinglePayloadClass) -> () {
+entry(%c : $SinglePayloadClass):
+  switch_enum %c : $SinglePayloadClass, case #SinglePayloadClass.x!enumelt.1: x_dest, case #SinglePayloadClass.y!enumelt: y_dest, case #SinglePayloadClass.z!enumelt: z_dest, case #SinglePayloadClass.w!enumelt: w_dest
+
+x_dest(%d : $C):
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
 enum DynamicSinglePayload<T> {
   case x(T)
   case y

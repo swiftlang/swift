@@ -315,7 +315,8 @@ namespace {
 
     FuncTypeInfo(AnyFunctionType *formalType, llvm::StructType *storageType,
                  Size size, Alignment align, unsigned numCurries)
-      : ScalarTypeInfo(storageType, size, align),
+      // FIXME: Spare bits.
+      : ScalarTypeInfo(storageType, size, llvm::BitVector{}, align),
         FormalType(formalType) {
       
       // Initialize the curryings.
@@ -485,8 +486,8 @@ namespace {
   class BlockTypeInfo : public HeapTypeInfo<BlockTypeInfo> {
   public:
     BlockTypeInfo(llvm::PointerType *storageType,
-                  Size size, Alignment align)
-      : HeapTypeInfo(storageType, size, align) {
+                  Size size, llvm::BitVector spareBits, Alignment align)
+      : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
     bool hasSwiftRefcount() const { return false; }
@@ -497,6 +498,7 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
   if (T->isBlock())
     return new BlockTypeInfo(IGM.ObjCPtrTy,
                              IGM.getPointerSize(),
+                             IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
   
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,

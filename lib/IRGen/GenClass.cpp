@@ -139,10 +139,11 @@ namespace {
     void generateLayout(IRGenModule &IGM) const;
 
   public:
-    ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
+    ClassTypeInfo(llvm::PointerType *irType, Size size,
+                  llvm::BitVector spareBits, Alignment align,
                   ClassDecl *D, bool hasSwiftRefcount)
-      : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr),
-        HasSwiftRefcount(hasSwiftRefcount) {}
+      : HeapTypeInfo(irType, size, spareBits, align), TheClass(D),
+        Layout(nullptr), HasSwiftRefcount(hasSwiftRefcount) {}
 
     bool hasSwiftRefcount() const {
       return HasSwiftRefcount;
@@ -1500,6 +1501,7 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::PointerType *irType = ST->getPointerTo();
   bool hasSwiftRefcount = ::hasSwiftRefcount(IGM, D);
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
+                           IGM.getHeapObjectSpareBits(),
                            IGM.getPointerAlignment(),
                            D, hasSwiftRefcount);
 }

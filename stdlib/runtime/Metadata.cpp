@@ -1775,8 +1775,11 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
   case ProtocolClassConstraint::Class:
     // A class-constrained existential with no witness tables can share the
     // Builtin.ObjCPointer witnesses.
+    // FIXME: Except that IRGen doesn't expose extra inhabitants for class
+    // protocol types yet.
     if (numWitnessTables == 0)
-      return &_TWVBO;
+      return &ClassExistentialValueWitnesses<0>::ValueWitnessTable;
+      // FIXME: return &_TWVBO;
 
     // Use statically-instantiated witnesses for the common case of a
     // one-witness-table class existential.

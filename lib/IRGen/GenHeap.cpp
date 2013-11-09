@@ -565,8 +565,9 @@ namespace {
     : public HeapTypeInfo<BuiltinObjectPointerTypeInfo> {
   public:
     BuiltinObjectPointerTypeInfo(llvm::PointerType *storage,
-                                 Size size, Alignment align)
-    : HeapTypeInfo(storage, size, align) {}
+                                 Size size, llvm::BitVector spareBits,
+                                 Alignment align)
+    : HeapTypeInfo(storage, size, spareBits, align) {}
 
     /// Builtin.ObjectPointer uses Swift reference-counting.
     bool hasSwiftRefcount() const { return true; }
@@ -575,8 +576,9 @@ namespace {
 
 const TypeInfo *TypeConverter::convertBuiltinObjectPointer() {
   return new BuiltinObjectPointerTypeInfo(IGM.RefCountedPtrTy,
-                                          IGM.getPointerSize(),
-                                          IGM.getPointerAlignment());
+                                      IGM.getPointerSize(),
+                                      IGM.getHeapObjectSpareBits(),
+                                      IGM.getPointerAlignment());
 }
 
 namespace {

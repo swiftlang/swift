@@ -109,7 +109,7 @@ public:
   /// Returns the fixed number of "extra inhabitants" (that is, bit
   /// patterns that don't represent valid values of the type) in the type
   /// representation.
-  virtual unsigned getFixedExtraInhabitantCount() const {
+  virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
     return getSpareBitExtraInhabitantCount();
   }
 
@@ -119,8 +119,8 @@ public:
 
   /// We can statically determine the presence of extra inhabitants for fixed
   /// types.
-  bool mayHaveExtraInhabitants() const override {
-    return getFixedExtraInhabitantCount() > 0;
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return getFixedExtraInhabitantCount(IGM) > 0;
   }
 
   /// Create a constant of the given bit width holding one of the extra

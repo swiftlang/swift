@@ -213,7 +213,7 @@ public:
                                            llvm::Value *metadata,
                                            llvm::Value *vwtable) const = 0;
 
-  virtual bool mayHaveExtraInhabitants() const = 0;
+  virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const = 0;
@@ -223,7 +223,7 @@ public:
   
   /// \group Delegated FixedTypeInfo operations
   
-  virtual unsigned getFixedExtraInhabitantCount() const = 0;
+  virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const = 0;
   
   virtual llvm::ConstantInt *
   getFixedExtraInhabitantValue(IRGenModule &IGM,
@@ -519,12 +519,12 @@ public:
       IGF.Builder.emitBlock(noXIBB);
     }
     
-    bool mayHaveExtraInhabitants() const override {
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       // FIXME: Hold off on registering extra inhabitants for dynamic enums
       // until initializeMetadata handles them.
       if (!getSingleton())
         return false;
-      return getSingleton()->mayHaveExtraInhabitants();
+      return getSingleton()->mayHaveExtraInhabitants(IGM);
     }
     
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
@@ -549,11 +549,11 @@ public:
                                            getSingletonAddress(IGF, dest));
     }
     
-    unsigned getFixedExtraInhabitantCount() const override {
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       assert(TIK >= Fixed);
       if (!getSingleton())
         return 0;
-      return getFixedSingleton()->getFixedExtraInhabitantCount();
+      return getFixedSingleton()->getFixedExtraInhabitantCount(IGM);
     }
     
     llvm::ConstantInt *
@@ -740,11 +740,11 @@ public:
     // No-payload enums have all values above their greatest discriminator
     // value that fit inside their storage size available as extra inhabitants.
     
-    bool mayHaveExtraInhabitants() const override {
-      return getFixedExtraInhabitantCount() > 0;
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return getFixedExtraInhabitantCount(IGM) > 0;
     }
     
-    unsigned getFixedExtraInhabitantCount() const override {
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       unsigned bits = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
       assert(bits < 32 && "freakishly huge no-payload enum");
       return (1U << bits) - ElementsWithNoPayload.size();
@@ -848,11 +848,11 @@ public:
     // C-compatible enums have scattered inhabitants. For now, expose no
     // extra inhabitants.
     
-    bool mayHaveExtraInhabitants() const override {
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return false;
     }
     
-    unsigned getFixedExtraInhabitantCount() const override {
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return 0;
     }
     
@@ -1202,7 +1202,7 @@ public:
         payload = value.claimNext();
       llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
       unsigned extraInhabitantCount
-        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGF.IGM);
       
       // If there are extra tag bits, switch over them first.
       SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
@@ -1426,7 +1426,7 @@ public:
       // by setting the tag bits.
       unsigned tagIndex = getSimpleElementTagIndex(elt);
       unsigned numExtraInhabitants
-        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGF.IGM);
       llvm::Value *payload = nullptr;
       unsigned extraTagValue;
       if (tagIndex < numExtraInhabitants) {
@@ -1528,7 +1528,7 @@ public:
       // If we used extra inhabitants to represent empty case discriminators,
       // weed them out.
       unsigned numExtraInhabitants
-        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGF.IGM);
       if (numExtraInhabitants > 0) {
         auto *payloadBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         auto *swi = IGF.Builder.CreateSwitch(payload, payloadBB);
@@ -1538,8 +1538,11 @@ public:
         for (auto i = elements.begin(), end = elements.end();
              i != end && inhabitant < numExtraInhabitants;
              ++i, ++inhabitant) {
-          if (*i == getPayloadElement())
+          if (*i == getPayloadElement()) {
             ++i;
+            if (i == end)
+              break;
+          }
           auto xi = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
                       IGF.IGM,
                       getFixedPayloadTypeInfo().getFixedSize().getValueInBits(),
@@ -1897,16 +1900,16 @@ public:
     // FIXME: If we spilled extra tag bits, we could offer spare bits from the
     // tag.
     
-    bool mayHaveExtraInhabitants() const override {
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       if (TIK >= Fixed)
-        return getFixedExtraInhabitantCount() > 0;
+        return getFixedExtraInhabitantCount(IGM) > 0;
 
-      return getPayloadTypeInfo().mayHaveExtraInhabitants();
+      return getPayloadTypeInfo().mayHaveExtraInhabitants(IGM);
     }
     
-    unsigned getFixedExtraInhabitantCount() const override {
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       unsigned payloadXI
-        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGM);
       
       unsigned numEmptyCases = ElementsWithNoPayload.size();
       
@@ -2695,7 +2698,7 @@ public:
     
     // TODO
     
-    bool mayHaveExtraInhabitants() const override { return false; }
+    bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
     
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src) const override {
@@ -2708,7 +2711,7 @@ public:
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
     
-    unsigned getFixedExtraInhabitantCount() const override {
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return 0;
     }
     
@@ -2866,8 +2869,8 @@ namespace {
                                          llvm::Value *vwtable) const override {
       return Strategy.initializeMetadata(IGF, metadata, vwtable);
     }
-    bool mayHaveExtraInhabitants() const override {
-      return Strategy.mayHaveExtraInhabitants();
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return Strategy.mayHaveExtraInhabitants(IGM);
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src) const override {
@@ -2890,8 +2893,8 @@ namespace {
     
     /// \group Methods delegated to the EnumImplStrategy
 
-    unsigned getFixedExtraInhabitantCount() const override {
-      return Strategy.getFixedExtraInhabitantCount();
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return Strategy.getFixedExtraInhabitantCount(IGM);
     }
 
     llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
@@ -2953,8 +2956,8 @@ namespace {
                             unsigned offset) const override {
       return Strategy.unpackEnumPayload(IGF, payload, dest, offset);
     }
-    unsigned getFixedExtraInhabitantCount() const override {
-      return Strategy.getFixedExtraInhabitantCount();
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return Strategy.getFixedExtraInhabitantCount(IGM);
     }
     
     llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
@@ -3134,7 +3137,7 @@ namespace {
     unsigned numTags = ElementsWithNoPayload.size();
     
     auto &payloadTI = getFixedPayloadTypeInfo(); // FIXME non-fixed payload
-    fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount();
+    fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount(TC.IGM);
     
     // Determine how many tag bits we need. Given N extra inhabitants, we
     // represent the first N tags using those inhabitants. For additional tags,
@@ -3670,4 +3673,44 @@ irgen::interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
   // Create the value.
   llvm::APInt value(bits, valueParts);
   return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
+}
+
+static void setAlignmentBits(llvm::BitVector &v, Alignment align) {
+  switch (align.getValue()) {
+  case 16:
+    v[3] = true;
+    SWIFT_FALLTHROUGH;
+  case 8:
+    v[2] = true;
+    SWIFT_FALLTHROUGH;
+  case 4:
+    v[1] = true;
+    SWIFT_FALLTHROUGH;
+  case 2:
+    v[0] = true;
+    SWIFT_FALLTHROUGH;
+  case 1:
+  case 0:
+    break;
+  default:
+    llvm_unreachable("unexpected heap object alignment");
+  }
+}
+
+const llvm::BitVector &
+IRGenModule::getHeapObjectSpareBits() const {
+  return HeapPointerSpareBits.cache([&]{
+    // Start with the spare bit mask for all pointers.
+    llvm::BitVector r = TargetInfo.PointerSpareBits;
+
+    // Low bits are made available by heap object alignment.
+    setAlignmentBits(r, TargetInfo.HeapObjectAlignment);
+    
+    // Mask out bits reserved by the Objective-C runtime.
+    llvm::BitVector objcMask = TargetInfo.ObjCPointerReservedBits;
+    objcMask.flip();
+    r &= objcMask;
+    
+    return r;
+  });
 }

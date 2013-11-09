@@ -876,7 +876,9 @@ namespace {
                              Size size,
                              Alignment align,
                              ArrayRef<ProtocolEntry> protocols)
-      : ScalarExistentialTypeInfoBase(protocols.size(), ty, size, align)
+      // FIXME: Spare bits.
+      : ScalarExistentialTypeInfoBase(protocols.size(), ty, size,
+                                      llvm::BitVector{}, align)
     {
       for (unsigned i = 0; i != NumProtocols; ++i) {
         new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
@@ -1137,7 +1139,7 @@ namespace {
       llvm_unreachable("initializing value witness table for archetype?!");
     }
     
-    bool mayHaveExtraInhabitants() const override {
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
@@ -1165,11 +1167,12 @@ namespace {
     bool HasSwiftRefcount;
     
     ClassArchetypeTypeInfo(ArchetypeType *archetype,
-                                  llvm::PointerType *storageType,
-                                  Size size, Alignment align,
-                                  ArrayRef<ProtocolEntry> protocols,
-                                  bool hasSwiftRefcount)
-      : HeapTypeInfo(storageType, size, align),
+                           llvm::PointerType *storageType,
+                           Size size, llvm::BitVector spareBits,
+                           Alignment align,
+                           ArrayRef<ProtocolEntry> protocols,
+                           bool hasSwiftRefcount)
+      : HeapTypeInfo(storageType, size, spareBits, align),
         ArchetypeTypeInfoBase(archetype, this + 1, protocols),
         HasSwiftRefcount(hasSwiftRefcount)
     {}
@@ -1177,15 +1180,16 @@ namespace {
   public:
     static const ClassArchetypeTypeInfo *create(ArchetypeType *archetype,
                                            llvm::PointerType *storageType,
-                                           Size size, Alignment align,
+                                           Size size, llvm::BitVector spareBits,
+                                           Alignment align,
                                            ArrayRef<ProtocolEntry> protocols,
                                            bool hasSwiftRefcount) {
       void *buffer = operator new(sizeof(ClassArchetypeTypeInfo)
                                     + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer)
         ClassArchetypeTypeInfo(archetype,
-                                      storageType, size, align,
-                                      protocols, hasSwiftRefcount);
+                               storageType, size, spareBits, align,
+                               protocols, hasSwiftRefcount);
     }
     
     bool hasSwiftRefcount() const {
@@ -2206,7 +2210,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (packing != FixedPacking::OffsetZero)
         flags |= ValueWitnessFlags::IsNonInline;
       
-      if (fixedTI->getFixedExtraInhabitantCount() > 0)
+      if (fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
         flags |= ValueWitnessFlags::Enum_HasExtraInhabitants;
       
       auto value = IGM.getSize(Size(flags));
@@ -2227,18 +2231,18 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   
   case ValueWitness::StoreExtraInhabitant:
   case ValueWitness::GetExtraInhabitantIndex: {
-    assert(concreteTI.mayHaveExtraInhabitants());
+    assert(concreteTI.mayHaveExtraInhabitants(IGM));
     
     goto standard;
   }
     
   case ValueWitness::ExtraInhabitantFlags: {
-    assert(concreteTI.mayHaveExtraInhabitants());
+    assert(concreteTI.mayHaveExtraInhabitants(IGM));
     
     // If we locally know that the type has fixed layout, we can emit
     // meaningful flags for it.
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
-      uint64_t numExtraInhabitants = fixedTI->getFixedExtraInhabitantCount();
+      uint64_t numExtraInhabitants = fixedTI->getFixedExtraInhabitantCount(IGM);
       assert(numExtraInhabitants <= ExtraInhabitantFlags::NumExtraInhabitantsMask);
       auto value = IGM.getSize(Size(numExtraInhabitants));
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
@@ -2799,7 +2803,7 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
                                     packing, abstractType, concreteType,
                                     concreteTI));
   }
-  if (concreteTI.mayHaveExtraInhabitants()) {
+  if (concreteTI.mayHaveExtraInhabitants(IGM)) {
     for (auto i = unsigned(ValueWitness::First_ExtraInhabitantValueWitness);
          i <= unsigned(ValueWitness::Last_ExtraInhabitantValueWitness);
          ++i) {
@@ -3087,10 +3091,11 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     }
     
     return ClassArchetypeTypeInfo::create(archetype,
-                                                 reprTy,
-                                                 IGM.getPointerSize(),
-                                                 IGM.getPointerAlignment(),
-                                                 protocols, swiftRefcount);
+                                      reprTy,
+                                      IGM.getPointerSize(),
+                                      IGM.getHeapObjectSpareBits(),
+                                      IGM.getPointerAlignment(),
+                                      protocols, swiftRefcount);
   }
   
   // Otherwise, for now, always use an opaque indirect type.

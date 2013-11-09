@@ -249,7 +249,7 @@ public:
 
   /// Does this type statically have extra inhabitants, or may it dynamically
   /// have extra inhabitants based on type arguments?
-  virtual bool mayHaveExtraInhabitants() const = 0;
+  virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
   
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.

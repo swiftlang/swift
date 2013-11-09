@@ -31,8 +31,10 @@ class UnownedTypeInfo;
 class ReferenceTypeInfo : public LoadableTypeInfo {
 protected:
   // FIXME: Get spare bits for pointers from a TargetInfo-like structure.
-  ReferenceTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : LoadableTypeInfo(type, size, {}, align, IsNotPOD, STIK_Reference) {}
+  ReferenceTypeInfo(llvm::Type *type, Size size, llvm::BitVector spareBits,
+                    Alignment align)
+    : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD, STIK_Reference)
+  {}
 
 public:
   /// Strongly retains a value.

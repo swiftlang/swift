@@ -163,6 +163,10 @@ public:
     // We always use the pointer's width as its swift ABI alignment.
     return Alignment(PtrSize.getValue());
   }
+  
+  /// Return the spare bit mask to use for types that comprise heap object
+  /// pointers.
+  const llvm::BitVector &getHeapObjectSpareBits() const;
 
   Size getWeakReferenceSize() const { return PtrSize; }
   Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
@@ -277,6 +281,8 @@ private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
 
+  mutable Optional<llvm::BitVector> HeapPointerSpareBits;
+  
 //--- Generic ---------------------------------------------------------------
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,

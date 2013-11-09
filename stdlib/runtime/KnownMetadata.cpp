@@ -16,7 +16,8 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Alloc.h"
-#include <string.h>
+#include <cstring>
+#include <climits>
 
 using namespace swift;
 
@@ -130,25 +131,126 @@ const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
   return classMetadata;
 }
 
+// The extra inhabitants and spare bits of heap object pointers.
+// These must align with the values in IRGen's SwiftTargetInfo.cpp.
+#if defined(__x86_64__)
+
+# ifdef __APPLE__
+// Darwin reserves the low 4GB of address space.
+static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
+# else
+// Assume only the null 4K page is reserved.
+static const uintptr_t LeastValidPointerValue = 4096U;
+# endif
+
+// Only the bottom 47 bits are used, and heap objects are eight-byte-aligned.
+static const uintptr_t SwiftSpareBitsMask   = 0xFFFF800000000007ULL;
+// Objective-C reserves the high and low bits for tagged pointers.
+static const uintptr_t ObjCSpareBitsMask    = 0x8FFF800000000006ULL;
+static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
+
+// Number of low bits reserved by Objective-C.
+static const unsigned ObjCReservedLowBits = 1U;
+
+#elif defined(__arm64__)
+
+// Darwin reserves the low 4GB of address space.
+static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
+
+// TBI guarantees the top byte of pointers is unused.
+// Heap objects are eight-byte aligned.
+static const uintptr_t SwiftSpareBitsMask   = 0xFF00000000000007ULL;
+// Objective-C reserves the high and low bits for tagged pointers.
+static const uintptr_t ObjCSpareBitsMask    = 0x8F00000000000006ULL;
+static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
+
+// Number of low bits reserved by Objective-C.
+static const unsigned ObjCReservedLowBits = 1U;
+
+#else
+
+// Assume only 0 is an invalid pointer.
+static const uintptr_t LeastValidPointerValue = 1U;
+// Make no assumptions about spare bits.
+static const uintptr_t SwiftSpareBitsMask = 0U;
+static const uintptr_t ObjCSpareBitsMask = 0U;
+static const uintptr_t ObjCReservedBitsMask = 0U;
+static const unsigned ObjCReservedLowBits = 0U;
+
+#endif
+
+/// Store an invalid pointer value as an extra inhabitant of a heap object.
+static void storeHeapObjectExtraInhabitant(HeapObject **dest,
+                                           int index,
+                                           const Metadata *self) {
+  // This must be consistent with the storeHeapObjectExtraInhabitant
+  // implementation in IRGen's GenType.cpp.
+  
+  // FIXME: We could use high spare bits to produce extra inhabitants, but we
+  // probably won't need to.
+  *dest = (HeapObject*)((uintptr_t)index << ObjCReservedLowBits);
+}
+
+/// Return the extra inhabitant index for an invalid pointer value, or -1 if
+/// the pointer is valid.
+static int getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
+                                             const Metadata *self) {
+  // This must be consistent with the getHeapObjectExtraInhabitant
+  // implementation in IRGen's GenType.cpp.
+
+  uintptr_t val = (uintptr_t)*src;
+
+  // Return -1 for valid pointers.
+  // FIXME: We could use high spare bits to produce extra inhabitants, but we
+  // probably won't need to.
+  if (val >= LeastValidPointerValue)
+    return -1;
+  
+  // Return -1 for ObjC tagged pointers.
+  // FIXME: This check is unnecessary for known-Swift types.
+  if (val & ObjCReservedBitsMask)
+    return -1;
+  
+  return (int)(val >> ObjCReservedLowBits);
+}
+
+static constexpr unsigned getHeapObjectExtraInhabitantCount() {
+  // This must be consistent with the getHeapObjectExtraInhabitantCount
+  // implementation in IRGen's GenType.cpp.
+  
+  // The runtime needs no more than INT_MAX inhabitants.
+  return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
+    ? (unsigned)INT_MAX
+    : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
+}
+
 /// The basic value-witness table for Swift object pointers.
-const ValueWitnessTable swift::_TWVBo = {
-  (value_witness_types::destroyBuffer*) &destroyWithRelease,
-  (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithRetain,
-  (value_witness_types::projectBuffer*) &projectBuffer,
-  (value_witness_types::deallocateBuffer*) &doNothing,
-  (value_witness_types::destroy*) &destroyWithRelease,
-  (value_witness_types::initializeBufferWithCopy*) &initWithRetain,
-  (value_witness_types::initializeWithCopy*) &initWithRetain,
-  (value_witness_types::assignWithCopy*) &assignWithRetain,
-  (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
-  (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
-  (value_witness_types::assignWithTake*) &assignWithoutRetain,
-  (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeOf*) &swift_objectTypeof,
-  (value_witness_types::size) sizeof(void*),
-  ValueWitnessFlags().withAlignment(alignof(void*)).withPOD(false)
-                     .withInlineStorage(true),
-  (value_witness_types::stride) sizeof(void*)
+const ExtraInhabitantsValueWitnessTable swift::_TWVBo = {
+  {
+    (value_witness_types::destroyBuffer*) &destroyWithRelease,
+    (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithRetain,
+    (value_witness_types::projectBuffer*) &projectBuffer,
+    (value_witness_types::deallocateBuffer*) &doNothing,
+    (value_witness_types::destroy*) &destroyWithRelease,
+    (value_witness_types::initializeBufferWithCopy*) &initWithRetain,
+    (value_witness_types::initializeWithCopy*) &initWithRetain,
+    (value_witness_types::assignWithCopy*) &assignWithRetain,
+    (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
+    (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
+    (value_witness_types::assignWithTake*) &assignWithoutRetain,
+    (value_witness_types::allocateBuffer*) &projectBuffer,
+    (value_witness_types::typeOf*) &swift_objectTypeof,
+    (value_witness_types::size) sizeof(void*),
+    ValueWitnessFlags().withAlignment(alignof(void*))
+                       .withPOD(false)
+                       .withExtraInhabitants(true)
+                       .withInlineStorage(true),
+    (value_witness_types::stride) sizeof(void*),
+  },
+  (value_witness_types::storeExtraInhabitant*) &storeHeapObjectExtraInhabitant,
+  (value_witness_types::getExtraInhabitantIndex*) &getHeapObjectExtraInhabitantIndex,
+  ExtraInhabitantFlags()
+    .withNumExtraInhabitants(getHeapObjectExtraInhabitantCount())
 };
 
 /*** Objective-C pointers ****************************************************/
@@ -213,24 +315,31 @@ const Metadata *swift::swift_unknownTypeOf(HeapObject *object)
 }
 
 /// The basic value-witness table for ObjC object pointers.
-const ValueWitnessTable swift::_TWVBO = {
-  (value_witness_types::destroyBuffer*) &destroyWithObjCRelease,
-  (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithObjCRetain,
-  (value_witness_types::projectBuffer*) &projectBuffer,
-  (value_witness_types::deallocateBuffer*) &doNothing,
-  (value_witness_types::destroy*) &destroyWithObjCRelease,
-  (value_witness_types::initializeBufferWithCopy*) &initWithObjCRetain,
-  (value_witness_types::initializeWithCopy*) &initWithObjCRetain,
-  (value_witness_types::assignWithCopy*) &assignWithObjCRetain,
-  (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
-  (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
-  (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
-  (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeOf*) &swift_objcTypeof,
-  (value_witness_types::size) sizeof(void*),
-  ValueWitnessFlags().withAlignment(alignof(void*)).withPOD(false)
-                     .withInlineStorage(true),
-  (value_witness_types::stride) sizeof(void*)
+const ExtraInhabitantsValueWitnessTable swift::_TWVBO = {
+  {
+    (value_witness_types::destroyBuffer*) &destroyWithObjCRelease,
+    (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithObjCRetain,
+    (value_witness_types::projectBuffer*) &projectBuffer,
+    (value_witness_types::deallocateBuffer*) &doNothing,
+    (value_witness_types::destroy*) &destroyWithObjCRelease,
+    (value_witness_types::initializeBufferWithCopy*) &initWithObjCRetain,
+    (value_witness_types::initializeWithCopy*) &initWithObjCRetain,
+    (value_witness_types::assignWithCopy*) &assignWithObjCRetain,
+    (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
+    (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
+    (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
+    (value_witness_types::allocateBuffer*) &projectBuffer,
+    (value_witness_types::typeOf*) &swift_objcTypeof,
+    (value_witness_types::size) sizeof(void*),
+    ValueWitnessFlags().withAlignment(alignof(void*)).withPOD(false)
+                       .withInlineStorage(true)
+                       .withExtraInhabitants(true),
+    (value_witness_types::stride) sizeof(void*)
+  },
+  (value_witness_types::storeExtraInhabitant*) &storeHeapObjectExtraInhabitant,
+  (value_witness_types::getExtraInhabitantIndex*) &getHeapObjectExtraInhabitantIndex,
+  ExtraInhabitantFlags()
+    .withNumExtraInhabitants(getHeapObjectExtraInhabitantCount())
 };
 
 /*** Functions ***************************************************************/

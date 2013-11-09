@@ -129,7 +129,7 @@ public:
   }
 
   /// FIXME: Dynamic extra inhabitant lookup.
-  bool mayHaveExtraInhabitants() const override { return false; }
+  bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");

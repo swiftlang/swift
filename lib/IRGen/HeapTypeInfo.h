@@ -21,10 +21,23 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
+#include "SwiftTargetInfo.h"
 
 namespace swift {
 namespace irgen {
 
+// Extra inhabitants of heap object pointers.
+
+unsigned getHeapObjectExtraInhabitantCount(IRGenModule &IGM);
+llvm::ConstantInt *getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                          unsigned bits,
+                                                          unsigned index);
+llvm::Value *getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src);
+void storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest);
+  
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
 ///
@@ -38,8 +51,9 @@ class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
 protected:
   using super::asDerived;
 public:
-  HeapTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-    : super(storage, size, align) {}
+  HeapTypeInfo(llvm::PointerType *storage, Size size, llvm::BitVector spareBits,
+               Alignment align)
+    : super(storage, size, spareBits, align) {}
 
   bool isSingleRetainablePointer(ResilienceScope scope) const {
     return asDerived().hasSwiftRefcount();
@@ -126,6 +140,32 @@ public:
     } else {
       return TC.createUnknownUnownedStorageType(this->getStorageType());
     }
+  }
+
+  // Extra inhabitants of heap object pointers.
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return getHeapObjectExtraInhabitantCount(IGM);
+  }
+
+  llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                unsigned bits,
+                                                unsigned index) const override {
+    return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index);
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src)
+  const override {
+    return getHeapObjectExtraInhabitantIndex(IGF, src);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest) const override {
+    return storeHeapObjectExtraInhabitant(IGF, index, dest);
   }
 };
 

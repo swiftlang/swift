@@ -122,8 +122,9 @@ namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
   class ObjCTypeInfo : public HeapTypeInfo<ObjCTypeInfo> {
   public:
-    ObjCTypeInfo(llvm::PointerType *storageType, Size size, Alignment align)
-      : HeapTypeInfo(storageType, size, align) {
+    ObjCTypeInfo(llvm::PointerType *storageType, Size size,
+                 llvm::BitVector spareBits, Alignment align)
+      : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
     /// Builtin.ObjCPointer requires ObjC reference-counting.
@@ -133,6 +134,7 @@ namespace {
 
 const TypeInfo *TypeConverter::convertBuiltinObjCPointer() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
+                          IGM.getHeapObjectSpareBits(),
                           IGM.getPointerAlignment());
 }
 
