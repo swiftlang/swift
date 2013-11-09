@@ -31,14 +31,6 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-static void skipExtraTopLevelRBraces(Parser &P) {
-  while (P.Tok.is(tok::r_brace)) {
-    P.diagnose(P.Tok, diag::extra_rbrace)
-        .fixItRemove(P.Tok.getLoc());
-    P.consumeToken();
-  }
-}
-
 /// \brief Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -56,10 +48,10 @@ bool Parser::parseTopLevel() {
 
   CurDeclContext = &SF;
 
-  skipExtraTopLevelRBraces(*this);
-
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
+
+  skipExtraTopLevelRBraces();
 
   // If we are in SIL mode, and if the first token is the start of a sil
   // declaration, parse that one SIL function and return to the top level.  This
@@ -80,8 +72,6 @@ bool Parser::parseTopLevel() {
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode
                                         : BraceItemListKind::TopLevelLibrary);
   }
-
-  skipExtraTopLevelRBraces(*this);
 
   // If this is a MainModule, determine if we found code that needs to be
   // executed (this is used by the repl to know whether to compile and run the
@@ -104,6 +94,17 @@ bool Parser::parseTopLevel() {
   State->markParserPosition(Tok.getLoc(), PreviousLoc);
 
   return FoundTopLevelCodeToExecute;
+}
+
+bool Parser::skipExtraTopLevelRBraces() {
+  if (!Tok.is(tok::r_brace))
+    return false;
+  while (Tok.is(tok::r_brace)) {
+    diagnose(Tok, diag::extra_rbrace)
+        .fixItRemove(Tok.getLoc());
+    consumeToken();
+  }
+  return true;
 }
 
 /// \verbatim

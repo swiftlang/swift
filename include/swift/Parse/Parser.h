@@ -451,6 +451,12 @@ public:
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
   bool parseTopLevel();
+
+  /// Skips the current token if it is '}', and emits a diagnostic.
+  ///
+  /// \returns true if any tokens were skipped.
+  bool skipExtraTopLevelRBraces();
+
   void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
                    bool IsTopLevel);
   ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);

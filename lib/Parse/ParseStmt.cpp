@@ -214,10 +214,16 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   SmallVector<Decl*, 8> TmpDecls;
 
   bool PreviousHadSemi = true;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
+  while ((Kind == BraceItemListKind::TopLevelLibrary ||
+          Tok.isNot(tok::r_brace)) &&
+         Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
+    if (Kind == BraceItemListKind::TopLevelLibrary &&
+        skipExtraTopLevelRBraces())
+      continue;
+
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
 
