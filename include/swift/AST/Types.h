@@ -2795,11 +2795,27 @@ case TypeKind::Id:
     return *this;
   }
 
-#define ARTIFICIAL_TYPE(Id, Parent) \
-case TypeKind::Id:
-#define TYPE(Id, Parent)
-#include "swift/AST/TypeNodes.def"
-    llvm_unreachable("transforming artificial type?");
+  /// We could potentially support arbitrary transforms on SIL
+  /// function types.  However, *substitution* specifically is
+  /// inappropriate because the parameters and results of SIL
+  /// functions need to have SIL-lowered types.
+  case TypeKind::SILFunction:
+    llvm_unreachable("transforming SIL function type?");
+
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage: {
+    auto storageTy = cast<ReferenceStorageType>(base);
+    Type refTy = storageTy->getReferentType();
+    Type substRefTy = refTy.transform(ctx, fn);
+    if (!substRefTy)
+      return Type();
+
+    if (substRefTy.getPointer() == refTy.getPointer())
+      return *this;
+
+    return ReferenceStorageType::get(substRefTy, storageTy->getOwnership(),
+                                     ctx);
+  }
 
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(base);
