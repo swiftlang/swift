@@ -823,7 +823,12 @@ public:
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
 
-  bool isTypeRepresentableInObjC(const DeclContext *DC, Type T);
+  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD);
+  bool isRepresentableInObjC(const VarDecl *VD);
+  bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
+  bool isRepresentableInObjC(const DeclContext *DC, Type T);
+
+  void fillObjCRepresentableTypeCache(const DeclContext *DC);
 };
 
 } // end namespace swift

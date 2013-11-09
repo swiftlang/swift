@@ -991,7 +991,62 @@ bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
   return false;
 }
 
-bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
+static bool isParamRepresentableInObjC(TypeChecker &TC,
+                                       const DeclContext *DC,
+                                       const Pattern *P) {
+  auto *TP = dyn_cast<TypedPattern>(P);
+  if (!TP)
+    return false;
+  if (!TC.isRepresentableInObjC(DC, TP->getType()))
+    return false;
+  auto *SubPattern = TP->getSubPattern();
+  return isa<NamedPattern>(SubPattern) || isa<AnyPattern>(SubPattern);
+}
+
+static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
+                                              const DeclContext *DC,
+                                              const Pattern *P) {
+  if (auto *TP = dyn_cast<TuplePattern>(P)) {
+    for (auto TupleElt : TP->getFields()) {
+      if (!isParamRepresentableInObjC(TC, DC, TupleElt.getPattern()))
+        return false;
+    }
+    return true;
+  }
+  auto *PP = cast<ParenPattern>(P);
+  return isParamRepresentableInObjC(TC, DC, PP->getSubPattern());
+}
+
+bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD) {
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    if (!FD->getGetterOrSetterDecl()) {
+      unsigned ExpectedParamPatterns = 1;
+      if (FD->getImplicitSelfDecl())
+        ExpectedParamPatterns++;
+      if (FD->getArgParamPatterns().size() != ExpectedParamPatterns)
+        return false;
+    }
+  }
+
+  if (!isParamPatternRepresentableInObjC(*this, AFD,
+                                         AFD->getArgParamPatterns()[1]))
+    return false;
+
+  if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+    Type Result = FD->getResultType();
+    if (!Result->isVoid() && !isRepresentableInObjC(FD, Result))
+      return false;
+  }
+
+  return true;
+}
+
+bool TypeChecker::isRepresentableInObjC(const VarDecl *VD) {
+  return isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+}
+
+bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
+                                                 Type T) {
   if (isClassOrObjCProtocol(*this, T))
     return true;
 
@@ -1006,43 +1061,9 @@ bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
       return true;
   }
 
-  if (ObjCMappedTypes.empty()) {
-    // Populate the cache.
-    SmallVector<Identifier, 16> StdlibTypeNames;
-
-    StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
-    StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-
-    Module *Stdlib = getStdlibModule(DC);
-    lookupStdlibTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
-
-    StdlibTypeNames.clear();
-#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
-                    NATIVE_MODULE, NATIVE_TYPE)                            \
-    if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) \
-      StdlibTypeNames.push_back(Context.getIdentifier(#NATIVE_TYPE));
-#include "swift/SIL/BridgedTypes.def"
-
-    lookupStdlibTypes(*this, Stdlib, StdlibTypeNames, ObjCRepresentableTypes);
-
-    if (auto *DynamicLookup =
-           Context.getProtocol(KnownProtocolKind::DynamicLookup)) {
-      validateDecl(DynamicLookup);
-      CanType DynamicLookupType =
-          DynamicLookup->getDeclaredType()->getCanonicalType();
-      ObjCMappedTypes.insert(DynamicLookupType);
-      ObjCMappedTypes.insert(
-          MetaTypeType::get(DynamicLookupType, Context)->getCanonicalType());
-    }
-  }
-
-  {
-    CanType CT = T->getCanonicalType();
-    if (ObjCMappedTypes.count(CT) || ObjCRepresentableTypes.count(CT))
-      return true;
-  }
+  fillObjCRepresentableTypeCache(DC);
+  if (ObjCMappedTypes.count(T->getCanonicalType()))
+    return true;
 
   // An UnsafePointer<T> is representable in Objective-C if T is a trivially
   // mapped type, or T is a representable UnsafePointer<U> type.
@@ -1058,6 +1079,72 @@ bool TypeChecker::isTypeRepresentableInObjC(const DeclContext *DC, Type T) {
       return true;
     break;
   }
+
   return false;
+}
+
+bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
+  if (isTriviallyRepresentableInObjC(DC, T))
+    return true;
+
+  if (auto FT = T->getAs<FunctionType>()) {
+    if (FT->isThin())
+      return false;
+    Type Input = FT->getInput();
+    if (auto InputTuple = Input->getAs<TupleType>()) {
+      for (auto &Elt : InputTuple->getFields()) {
+        if (!isRepresentableInObjC(DC, Elt.getType()))
+          return false;
+      }
+    } else if (!isRepresentableInObjC(DC, Input)) {
+      return false;
+    }
+
+    Type Result = FT->getResult();
+    if (!Result->isVoid() && !isRepresentableInObjC(DC, Result))
+      return false;
+
+    return true;
+  }
+
+  fillObjCRepresentableTypeCache(DC);
+  if (ObjCRepresentableTypes.count(T->getCanonicalType()))
+    return true;
+
+  return false;
+}
+
+void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
+  if (!ObjCMappedTypes.empty())
+    return;
+
+  SmallVector<Identifier, 16> StdlibTypeNames;
+
+  StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+  StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  Module *Stdlib = getStdlibModule(DC);
+  lookupStdlibTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
+
+  StdlibTypeNames.clear();
+#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
+                    NATIVE_MODULE, NATIVE_TYPE)                            \
+  if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) \
+    StdlibTypeNames.push_back(Context.getIdentifier(#NATIVE_TYPE));
+#include "swift/SIL/BridgedTypes.def"
+
+  lookupStdlibTypes(*this, Stdlib, StdlibTypeNames, ObjCRepresentableTypes);
+
+  if (auto *DynamicLookup =
+         Context.getProtocol(KnownProtocolKind::DynamicLookup)) {
+    validateDecl(DynamicLookup);
+    CanType DynamicLookupType =
+        DynamicLookup->getDeclaredType()->getCanonicalType();
+    ObjCMappedTypes.insert(DynamicLookupType);
+    ObjCMappedTypes.insert(
+        MetaTypeType::get(DynamicLookupType, Context)->getCanonicalType());
+  }
 }
 
