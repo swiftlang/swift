@@ -192,6 +192,8 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     assert(ACE->getParamPatterns().size() >= 1 &&
            "no param patterns for function?!");
     naturalUncurryLevel = getFuncNaturalUncurryLevel(ACE);
+  } else {
+    llvm_unreachable("impossible SILDeclRef loc");
   }
 
   // Set the uncurry level.
