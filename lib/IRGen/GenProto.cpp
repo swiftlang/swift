@@ -1200,8 +1200,8 @@ namespace {
   /// Return the ArchetypeTypeInfoBase information from the TypeInfo for any
   /// archetype.
   static const ArchetypeTypeInfoBase &
-  getArchetypeInfo(IRGenFunction &IGF, ArchetypeType *t) {
-    const TypeInfo &ti = IGF.getTypeInfo(t);
+  getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t) {
+    const TypeInfo &ti = IGF.getTypeInfoForLowered(t);
     if (t->requiresClass())
       return ti.as<ClassArchetypeTypeInfo>();
     return ti.as<OpaqueArchetypeTypeInfo>();
@@ -2462,7 +2462,7 @@ namespace {
       }
 
       // Peel off the result address if necessary.
-      auto &sigResultTI = IGF.getTypeInfo(argSite.getSigResultType());
+      auto &sigResultTI = IGF.getTypeInfoForUnlowered(argSite.getSigResultType());
       llvm::Value *sigResultAddr = nullptr;
       if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult(IGF.IGM)) {
         sigResultAddr = sigParams.claimNext();
@@ -2521,7 +2521,7 @@ namespace {
         assert(isa<ArchetypeType>(sigSelfTypeForImpl));
         (void)sigSelfTypeForImpl;
 
-        auto &remappedSelfTI = IGF.getTypeInfo(implSelfType);
+        auto &remappedSelfTI = IGF.getTypeInfoForUnlowered(implSelfType);
 
         // It's an l-value, so the final value is the address.  Cast to T*.
         auto sigSelfValue = sigClause.takeLast();
@@ -2567,7 +2567,7 @@ namespace {
       // Emit the call.
       CanType sigResultType = argSite.getSigResultType();
       CanType implResultType = argSite.getImplResultType();
-      auto &implResultTI = IGM.getTypeInfo(implResultType);
+      auto &implResultTI = IGM.getTypeInfoForUnlowered(implResultType);
 
       // If we have a result address, emit to memory.
       if (sigResultAddr) {
@@ -2849,7 +2849,7 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
   if (auto ugt = dyn_cast<UnboundGenericType>(ty))
     ty = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
   
-  return !IGM.getTypeInfo(ty).isFixedSize();
+  return !IGM.getTypeInfoForUnlowered(ty).isFixedSize();
 }
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
@@ -2861,7 +2861,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
     concreteType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
   }
   
-  auto &concreteTI = IGM.getTypeInfo(concreteType);
+  auto &concreteTI = IGM.getTypeInfoForUnlowered(concreteType);
   FixedPacking packing = concreteTI.getFixedPacking(IGM);
   
   addValueWitnesses(IGM, packing, abstractType,
@@ -3086,7 +3086,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       ClassDecl *superClass = super->getClassOrBoundGenericClass();
       swiftRefcount = hasSwiftRefcount(IGM, superClass);
       
-      auto &superTI = IGM.getTypeInfo(super);
+      auto &superTI = IGM.getTypeInfoForUnlowered(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
     
@@ -3627,7 +3627,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
   // Otherwise, we can construct the witnesses from the protocol
   // conformances.
-  auto &replTI = IGF.getTypeInfo(replType);
+  auto &replTI = IGF.getTypeInfoForUnlowered(replType);
 
   assert(archetypeProtos.size() == sub.Conformance.size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
@@ -3710,7 +3710,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     if (protocols.empty())
       continue;
 
-    auto &argTI = IGF.getTypeInfo(argType);
+    auto &argTI = IGF.getTypeInfoForUnlowered(argType);
 
     // Add witness tables for each of the required protocols.
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
@@ -4079,7 +4079,7 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
   
   // Find the archetype we're calling on.
   // FIXME: static methods
-  ArchetypeType *archetype = cast<ArchetypeType>(baseTy.getSwiftRValueType());
+  auto archetype = baseTy.castTo<ArchetypeType>();
   
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
@@ -4103,7 +4103,7 @@ llvm::Value *
 irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                        Address addr,
                                        SILType type) {
-  ArchetypeType *archetype = type.castTo<ArchetypeType>();
+  auto archetype = type.castTo<ArchetypeType>();
   auto &archetypeTI = getArchetypeInfo(IGF, archetype);
   
   // Acquire the archetype's static metadata.
@@ -4194,7 +4194,7 @@ irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
                                                CanType type) {
   assert(type->isExistentialType());
   assert(!type->isClassExistentialType());
-  auto &baseTI = IGF.getTypeInfo(type).as<OpaqueExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfoForLowered(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
   auto existLayout = baseTI.getLayout();
@@ -4211,7 +4211,7 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                      Explosion &value,
                                                      CanType type) {
   assert(type->isClassExistentialType());
-  auto &baseTI = IGF.getTypeInfo(type).as<ClassExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfoForLowered(type).as<ClassExistentialTypeInfo>();
   
   // Extract the class instance pointer.
   llvm::Value *instance = baseTI.getValue(IGF, value);

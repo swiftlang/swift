@@ -126,8 +126,10 @@ public:
                        const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
-  const TypeInfo &getTypeInfo(Type T);
-  const TypeInfo &getTypeInfo(CanType T);
+  const TypeInfo &getTypeInfoForUnlowered(Type subst);
+  const TypeInfo &getTypeInfoForUnlowered(Type orig, Type subst);
+  const TypeInfo &getTypeInfoForUnlowered(CanType orig, CanType subst);
+  const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);

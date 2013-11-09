@@ -3285,12 +3285,12 @@ namespace {
   }
 }
 
-const TypeInfo *TypeConverter::convertEnumType(CanType type,
-                                                EnumDecl *theEnum) {
+const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
+                                               EnumDecl *theEnum) {
   llvm::StructType *convertedStruct = IGM.createNominalType(theEnum);
 
   // Create a forward declaration for that type.
-  addForwardDecl(type.getPointer(), convertedStruct);
+  addForwardDecl(key, convertedStruct);
 
   // Determine the implementation strategy.
   EnumImplStrategy *strategy = EnumImplStrategy::get(*this, type, theEnum);

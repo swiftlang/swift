@@ -188,13 +188,19 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
-  const TypeInfo &getTypeInfo(CanType T);
-  const TypeInfo &getTypeInfo(Type T);
+  const TypeInfo &getTypeInfoForUnlowered(CanType orig, CanType subst);
+  const TypeInfo &getTypeInfoForUnlowered(Type orig, Type subst);
+  const TypeInfo &getTypeInfoForUnlowered(Type subst);
+  const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
-  llvm::Type *getStorageType(CanType T);
-  llvm::PointerType *getStoragePointerType(CanType T);
+  llvm::Type *getStorageTypeForUnlowered(Type T);
+  llvm::Type *getStorageTypeForLowered(CanType T);
+  llvm::Type *getStorageType(SILType T);
+  llvm::PointerType *getStoragePointerTypeForUnlowered(Type T);
+  llvm::PointerType *getStoragePointerTypeForLowered(CanType T);
+  llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(CanType T, ExplosionSchema &schema);

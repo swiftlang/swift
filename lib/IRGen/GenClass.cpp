@@ -183,9 +183,9 @@ namespace {
 
   public:
     LayoutClass(IRGenModule &IGM, ResilienceScope resilience,
-                ClassDecl *theClass, CanType type)
+                ClassDecl *theClass, SILType type)
         : IGM(IGM), Resilience(resilience) {
-      layout(theClass, type);
+      layout(theClass, type.getSwiftRValueType());
     }
 
     /// The root class for purposes of metaclass objects.
@@ -290,12 +290,22 @@ namespace {
   };
 }  // end anonymous namespace.
 
+/// Return the lowered type for the class's 'self' type within its context.
+static SILType getSelfType(ClassDecl *base) {
+  auto loweredTy = base->getDeclaredTypeInContext()->getCanonicalType();
+  return SILType::getPrimitiveObjectType(loweredTy);
+}
+
+/// Return the type info for the class's 'self' type within its context.
+static const ClassTypeInfo &getSelfTypeInfo(IRGenModule &IGM, ClassDecl *base) {
+  return IGM.getTypeInfo(getSelfType(base)).as<ClassTypeInfo>();
+}
+
 /// Return the index of the given field within the class.
 static unsigned getFieldIndex(IRGenModule &IGM,
                               ClassDecl *base, VarDecl *target) {
   // FIXME: This is algorithmically terrible.
-  auto &ti = IGM.getTypeInfo(base->getDeclaredTypeInContext())
-    .as<ClassTypeInfo>();
+  auto &ti = getSelfTypeInfo(IGM, base);
   
   auto props = ti.getAllStoredProperties(IGM);
   auto found = std::find(props.begin(), props.end(), target);
@@ -361,11 +371,12 @@ namespace {
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   CanType classType) {
+      SILType baseType = SILType::getPrimitiveObjectType(classType);
+
       for (VarDecl *var : theClass->getStoredProperties()) {
-        CanType type = classType->getTypeOfMember(theClass->getModuleContext(),
-                                                  var, nullptr)
-                                ->getCanonicalType();
+        SILType type = baseType.getFieldType(var, *IGM.SILMod);
         auto &eltType = IGM.getTypeInfo(type);
+
         // FIXME: Type-parameter-dependent field layout isn't fully
         // implemented yet.
         if (!eltType.isFixedSize() && !IGM.Opts.EnableDynamicValueTypeLayout) {
@@ -451,10 +462,12 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
 
 /// Emit a field l-value by applying the given offset to the given base.
 static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
+                                        SILType baseType,
                                         llvm::Value *base,
                                         llvm::Value *offset,
                                         VarDecl *field) {
-  auto &fieldTI = IGF.getTypeInfo(field->getType());
+  auto &fieldTI =
+    IGF.getTypeInfo(baseType.getFieldType(field, *IGF.IGM.SILMod));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
@@ -465,8 +478,7 @@ llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
                                                             VarDecl *field) {
   assert(!field->isComputed());
   // FIXME: This field index computation is an ugly hack.
-  auto &ti = IGM.getTypeInfo(theClass->getDeclaredTypeInContext())
-    .as<ClassTypeInfo>();
+  auto &ti = getSelfTypeInfo(IGM, theClass);
 
   unsigned fieldIndex = getFieldIndex(IGM, theClass, field);
   auto &element = ti.getElements(IGM)[fieldIndex];
@@ -482,8 +494,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
   
-  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass,
-                     baseType.getSwiftRValueType());
+  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
   
   auto &entry = layout.getFieldEntry(field);
   switch (entry.getAccess()) {
@@ -500,13 +511,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     case FieldAccess::NonConstantDirect: {
       Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
       auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
-      return emitAddressAtOffset(IGF, base, offset, field);
+      return emitAddressAtOffset(IGF, baseType, base, offset, field);
     }
       
     case FieldAccess::ConstantIndirect: {
       auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
       auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
-      return emitAddressAtOffset(IGF, base, offset, field);
+      return emitAddressAtOffset(IGF, baseType, base, offset, field);
     }
       
     case FieldAccess::NonConstantIndirect: {
@@ -519,7 +530,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
         IGF.emitByteOffsetGEP(metadata, indirectOffset, IGF.IGM.SizeTy);
       auto offset =
         IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
-      return emitAddressAtOffset(IGF, base, offset, field);
+      return emitAddressAtOffset(IGF, baseType, base, offset, field);
     }
   }
   llvm_unreachable("bad field-access strategy");
@@ -536,9 +547,8 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, deallocator);
 
-  Type selfType = theClass->getDeclaredTypeInContext();
-  const ClassTypeInfo &info =
-    IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  SILType selfType = getSelfType(theClass);
+  auto &info = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
   
   llvm::Value *obj = deallocator->getArgumentList().begin();
   obj = IGF.Builder.CreateBitCast(obj, info.getStorageType());
@@ -553,8 +563,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   if (layout.isFixedLayout()) {
     size = info.getLayout(IGM).emitSize(IGF.IGM);
   } else {
-    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, obj,
-                 SILType::getPrimitiveObjectType(selfType->getCanonicalType()));
+    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, obj, selfType);
     std::tie(size, alignMask)
       = emitClassFragileInstanceSizeAndAlignMask(IGF, theClass, metadata);
   }
@@ -564,7 +573,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
-  auto &classTI = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   llvm::Value *metadata = emitClassHeapMetadataRef(IGF, selfType);
 
   // If the root class isn't known to use the Swift allocator, we need
@@ -590,8 +599,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
                                                         IRGenModule &IGM,
                                                         ClassDecl *Class) {
-  auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
-    .as<ClassTypeInfo>();
+  auto &classTI = getSelfTypeInfo(IGM, Class);
 
   auto &layout = classTI.getLayout(IGM);
   if (layout.isFixedLayout())
@@ -603,8 +611,7 @@ llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceAlignMask(
                                                              IRGenModule &IGM,
                                                              ClassDecl *Class) {
-  auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
-  .as<ClassTypeInfo>();
+  auto &classTI = getSelfTypeInfo(IGM, Class);
   
   auto &layout = classTI.getLayout(IGM);
   if (layout.isFixedLayout())
@@ -1201,7 +1208,7 @@ namespace {
       assert(Layout && FieldLayout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
       auto &elt = FieldLayout->getElements()[NextFieldIndex++];
-      auto &ivarTI = IGM.getTypeInfo(ivar->getType());
+      auto &ivarTI = IGM.getTypeInfoForUnlowered(ivar->getType());
       
       llvm::Constant *offsetPtr;
       if (elt.getKind() == ElementLayout::Kind::Fixed) {
@@ -1461,10 +1468,10 @@ namespace {
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
-  auto &classTI = IGM.getTypeInfo(type).as<ClassTypeInfo>();
+  SILType selfType = getSelfType(cls);
+  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &fieldLayout = classTI.getLayout(IGM);
-  LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
+  LayoutClass layout(IGM, ResilienceScope::Universal, cls, selfType);
   ClassDataBuilder builder(IGM, cls, layout, fieldLayout,
                            classTI.getInheritedStoredProperties(IGM).size());
 

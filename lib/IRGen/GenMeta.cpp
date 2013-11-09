@@ -296,7 +296,7 @@ namespace {
     /// the runtime always provides an entry for such a type;  right
     /// now, that mapping is as one of the integer types.
     llvm::Value *visitOpaqueType(CanType type) {
-      auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfo(type));
+      auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
       assert(opaqueTI.getFixedSize() ==
              Size(opaqueTI.getFixedAlignment().getValue()));
       assert(opaqueTI.getFixedSize().isPowerOf2());
@@ -2645,8 +2645,12 @@ namespace {
     void addFieldOffset(VarDecl *var) {
       assert(!var->isComputed()
              && "storing field offset for computed property?!");
-      llvm::Constant *offset = emitPhysicalStructMemberFixedOffset(IGM,
-                  Target->getDeclaredTypeInContext()->getCanonicalType(), var);
+      SILType structType =
+        SILType::getPrimitiveAddressType(
+                       Target->getDeclaredTypeInContext()->getCanonicalType());
+
+      llvm::Constant *offset =
+        emitPhysicalStructMemberFixedOffset(IGM, structType, var);
       // If we have a fixed offset, add it. Otherwise, leave zero as a
       // placeholder.
       if (offset)
@@ -2734,7 +2738,7 @@ namespace {
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
       emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
-      IGM.getTypeInfo(Target->getDeclaredTypeInContext())
+      IGM.getTypeInfoForUnlowered(Target->getDeclaredTypeInContext())
         .initializeMetadata(IGF, metadata, vwtable);
     }
   };
@@ -2852,10 +2856,10 @@ public:
   }
   
   void emitInitializeMetadata(IRGenFunction &IGF,
-                                       llvm::Value *metadata,
-                                       llvm::Value *vwtable) {
+                              llvm::Value *metadata,
+                              llvm::Value *vwtable) {
     emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
-    IGM.getTypeInfo(Target->getDeclaredTypeInContext())
+    IGM.getTypeInfoForUnlowered(Target->getDeclaredTypeInContext())
       .initializeMetadata(IGF, metadata, vwtable);
   }
 };

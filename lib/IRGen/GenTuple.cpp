@@ -241,7 +241,10 @@ namespace {
       return TupleFieldInfo(field, fieldTI);
     }
 
-    Type getType(const TupleTypeElt &field) { return field.getType(); }
+    SILType getType(const TupleTypeElt &field) {
+      // We know we're working with a lowered type here.
+      return SILType::getPrimitiveObjectType(CanType(field.getType()));
+    }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
       return StructLayout(IGM, LayoutKind::NonHeapObject,

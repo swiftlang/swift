@@ -424,9 +424,9 @@ namespace {
       // representation.
       if (origTy->requiresClass()) {
         llvm::Value *inValue = In.claimNext();
-        auto &ti = IGF.getTypeInfo(origTy);
+        auto origStorageType = IGF.IGM.getStorageTypeForLowered(origTy);
         auto addr = IGF.Builder.CreateBitCast(inValue,
-                                              ti.StorageType,
+                                              origStorageType,
                                               "substitution.class_bound");
         Out.add(addr);
         return;
@@ -445,7 +445,7 @@ namespace {
 
       // Otherwise, we need to make a temporary.
       // FIXME: this temporary has to get cleaned up!
-      auto &substTI = IGF.getTypeInfo(substTy);
+      auto &substTI = IGF.getTypeInfoForUnlowered(substTy);
       auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
 
       // Initialize into it.
@@ -469,7 +469,7 @@ namespace {
         auto nextIndex = 0;
         for (auto eltType : tupleTy.getElementTypes()) {
           auto index = nextIndex++;
-          auto &eltTI = IGF.getTypeInfo(eltType);
+          auto &eltTI = IGF.getTypeInfoForUnlowered(eltType);
           if (eltTI.isKnownEmpty()) continue;
 
           auto eltAddr = projectTupleElementAddress(IGF, dest,
@@ -515,7 +515,7 @@ namespace {
       // Substitute a loadable instantiation for an address-only one by emitting
       // to a temporary.
       if (origIndirect && !substIndirect) {
-        auto &substTI = IGF.getTypeInfo(substTy);
+        auto &substTI = IGF.getTypeInfoForUnlowered(substTy);
         auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
         initIntoTemporary(substTy, substTI, addr);
         addr = IGF.Builder.CreateBitCast(addr, origIndirect);
@@ -558,7 +558,7 @@ namespace {
         return Out.add(substMV);
 
       // A bitcast will be sufficient.
-      auto &origObjectTI = IGF.IGM.getTypeInfo(origObjectTy);
+      auto &origObjectTI = IGF.IGM.getTypeInfoForUnlowered(origObjectTy);
       auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
 
       auto substValue = substMV;
@@ -643,7 +643,7 @@ namespace {
     /// The unsubstituted type is an archetype.  In explosion terms,
     /// that makes it a single pointer-to-opaque.
     void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
-      auto &substTI = IGF.getTypeInfo(substTy);
+      auto &substTI = IGF.getTypeInfoForLowered(substTy);
 
       llvm::Value *inValue = In.claimNext();
       auto inAddr = IGF.Builder.CreateBitCast(inValue,
@@ -711,7 +711,7 @@ namespace {
         return Out.add(origMV);
 
       // A bitcast will be sufficient.
-      auto &substObjectTI = IGF.IGM.getTypeInfo(substObjectTy);
+      auto &substObjectTI = IGF.IGM.getTypeInfoForUnlowered(substObjectTy);
       auto substPtrTy = substObjectTI.getStorageType()->getPointerTo();
 
       auto substValue =

@@ -1129,7 +1129,7 @@ void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   VarDecl *global = i->getGlobal();
-  auto &type = getTypeInfo(global->getType());
+  auto &type = getTypeInfoForUnlowered(global->getType());
   
   Address addr;
   
@@ -2051,9 +2051,8 @@ visitStrongRetainAutoreleasedInst(swift::StrongRetainAutoreleasedInst *i) {
 static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
                                                     SILType silType) {
   assert(silType.isObject());
-  auto type = silType.getSwiftRValueType();
-  type = cast<ReferenceStorageType>(type).getReferentType();
-  return cast<ReferenceTypeInfo>(IGF.getTypeInfo(type));
+  auto type = silType.castTo<ReferenceStorageType>().getReferentType();
+  return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
 }
 
 void IRGenSILFunction::

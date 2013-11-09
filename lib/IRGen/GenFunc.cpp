@@ -539,7 +539,7 @@ static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
     if (requiresExternalByvalArgument(IGM, argTy)) {
-      const TypeInfo &ti = IGM.getTypeInfo(argTy);
+      const TypeInfo &ti = IGM.getTypeInfoForLowered(argTy);
       assert(isa<FixedTypeInfo>(ti) &&
              "emitting 'byval' argument with non-fixed layout?");
       byvals.push_back({argTypes.size(), ti.getBestKnownAlignment()});
@@ -666,7 +666,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
     hasAggregateResult = schema.requiresIndirectResult(IGM);
     if (hasAggregateResult) {
-      const TypeInfo &info = IGM.getTypeInfo(formalResultType);
+      const TypeInfo &info = IGM.getTypeInfoForUnlowered(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
       resultType = IGM.VoidTy;
       
@@ -713,7 +713,7 @@ IRGenModule::getFunctionType(AbstractCC cc,
                              unsigned curryingLevel, ExtraData extraData,
                              llvm::AttributeSet &attrs) {
   assert(isa<AnyFunctionType>(type));
-  const FuncTypeInfo &fnTypeInfo = getTypeInfo(type).as<FuncTypeInfo>();
+  const FuncTypeInfo &fnTypeInfo = getTypeInfoForUnlowered(type).as<FuncTypeInfo>();
   Signature sig = fnTypeInfo.getSignature(*this, cc, explosionKind,
                                           curryingLevel, extraData);
   attrs = sig.getAttributes();
@@ -809,7 +809,7 @@ static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                             llvm::Instruction::CastOps opcode) {
   llvm::Value *input = args.claimNext();
   Type DestType = fn->getType()->castTo<AnyFunctionType>()->getResult();
-  llvm::Type *destTy = IGF.IGM.getTypeInfo(DestType).getStorageType();
+  llvm::Type *destTy = IGF.IGM.getStorageTypeForUnlowered(DestType);
   assert(args.empty() && "wrong operands to cast operation");
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
   result.add(output);
@@ -821,7 +821,7 @@ static void emitCastOrBitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                                      BuiltinValueKind BV) {
   llvm::Value *input = args.claimNext();
   Type DestType = fn->getType()->castTo<AnyFunctionType>()->getResult();
-  llvm::Type *destTy = IGF.IGM.getTypeInfo(DestType).getStorageType();
+  llvm::Type *destTy = IGF.IGM.getStorageTypeForUnlowered(DestType);
   assert(args.empty() && "wrong operands to cast operation");
   llvm::Value *output;
   switch (BV) {
@@ -879,7 +879,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     out->add(valueTI.getSize(IGF));
     return;
   }
@@ -887,7 +887,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     out->add(valueTI.getStride(IGF));
     return;
   }
@@ -895,7 +895,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     // The alignof value is one greater than the alignment mask.
     out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF),
                                    IGF.IGM.getSize(Size(1))));
@@ -919,7 +919,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
     for (auto T : IInfo.Types)
-      ArgTys.push_back(IGF.IGM.getTypeInfo(T).getStorageType());
+      ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(T->getCanonicalType()));
       
     auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
                                              (llvm::Intrinsic::ID)IID, ArgTys);
@@ -960,7 +960,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 if (Builtin.ID == BuiltinValueKind::id) { \
   SmallVector<llvm::Type*, 2> ArgTys; \
   const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn); \
-  ArgTys.push_back(IGF.IGM.getTypeInfo(BInfo.Types[0]).getStorageType()); \
+  ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType())); \
   auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module, \
     getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), ArgTys); \
   SmallVector<llvm::Value*, 2> IRArgs; \
@@ -1154,7 +1154,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::STruncWithOverflow ||
       Builtin.ID == BuiltinValueKind::UTruncWithOverflow) {
     const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getTypeInfo(BInfo.Types[1]).getStorageType();
+    auto ToTy = IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *V = IGF.Builder.CreateTrunc(Arg, ToTy);
@@ -1164,10 +1164,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
-    auto TruncTy = IGF.IGM.getTypeInfo(
-        BuiltinIntegerType::get(32, IGF.IGM.Context)).getStorageType();
+    auto TruncTy = IGF.IGM.Int32Ty;
     const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getTypeInfo(BInfo.Types[1]).getStorageType();
+    auto ToTy = IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
@@ -1298,7 +1297,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
 
   // For aliasable types, just bitcast the output address.
   case ResultDifference::Aliasable: {
-    auto origTy = IGF.IGM.getStoragePointerType(CurOrigType);
+    auto origTy = IGF.IGM.getStoragePointerTypeForUnlowered(CurOrigType);
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
     SWIFT_FALLTHROUGH;
   }
@@ -1320,9 +1319,9 @@ void CallEmission::emitToExplosion(Explosion &out) {
   assert(RemainingArgsForCallee == 0);
   assert(LastArgWritten <= 1);
 
-  Type substResultType = getCallee().getSubstResultType();
+  CanType substResultType = getCallee().getSubstResultType();
   auto &substResultTI =
-    cast<LoadableTypeInfo>(IGF.getTypeInfo(substResultType));
+    cast<LoadableTypeInfo>(IGF.getTypeInfoForLowered(substResultType));
 
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
@@ -1396,7 +1395,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     // There's a related FIXME in the Builtin.load/move code.
     IGF.unimplemented(SourceLoc(), "remapping explosion");
     const TypeInfo &substResultTI =
-      IGF.getTypeInfo(getCallee().getSubstResultType());
+      IGF.getTypeInfoForLowered(getCallee().getSubstResultType());
     IGF.emitFakeExplosion(substResultTI, out);
     return;
   }
@@ -1512,7 +1511,7 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                      CanType ty) {
-  auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
+  auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfoForLowered(ty));
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     // FIXME: deallocate temporary!
     Address addr = ti.allocateStack(IGF, "byval-temporary").getAddress();
@@ -1915,7 +1914,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // FIXME: Keep LValueTypes out of this.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   for (SILType argType : argTypes) {
-    auto &ti = IGF.getTypeInfo(argType.getSwiftType());
+    auto &ti = IGF.getTypeInfoForLowered(argType.getSwiftType());
     argTypeInfos.push_back(&ti);
 
     // Update the single-swift-refcounted check, unless we already ruled that
@@ -1945,7 +1944,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   if (fnContext) {
     args.add(fnContext);
     argTypeInfos.push_back(
-                 &IGF.IGM.getTypeInfo(IGF.IGM.Context.TheObjectPointerType));
+         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheObjectPointerType));
     // If this is the only context argument we end up with, we can just share
     // it.
     if (args.size() == 1)
@@ -1996,7 +1995,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     llvm::Value *fnRawPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     args.add(fnRawPtr);
     argTypeInfos.push_back(
-                       &IGF.IGM.getTypeInfo(IGF.IGM.Context.TheRawPointerType));
+             &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
     
   }
 

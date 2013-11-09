@@ -322,10 +322,10 @@ namespace {
       return StructFieldInfo(field, fieldTI);
     }
 
-    Type getType(VarDecl *field) {
+    SILType getType(VarDecl *field) {
       assert(field->getDeclContext() == TheStruct->getAnyNominal());
-      return TheStruct->getTypeOfMember(field->getModuleContext(),
-                                        field, nullptr);
+      auto silType = SILType::getPrimitiveAddressType(TheStruct);
+      return silType.getFieldType(field, *IGM.SILMod);
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -364,7 +364,7 @@ void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
 }
 
 llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
-                                                           CanType baseType,
+                                                           SILType baseType,
                                                            VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
 }
@@ -428,7 +428,8 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 #include "llvm/Support/raw_ostream.h"
 
-const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
+const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
+                                                 StructDecl *D) {
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
   for (VarDecl *VD : D->getStoredProperties())
@@ -438,7 +439,7 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   auto ty = IGM.createNominalType(D);
 
   // Register a forward declaration before we look at any of the child types.
-  addForwardDecl(type.getPointer(), ty);
+  addForwardDecl(key, ty);
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);

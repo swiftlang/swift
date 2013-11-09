@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -553,14 +554,25 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   return *TypeMetadataPtrTI;
 }
 
-/// Get the fragile type information for the given type.
-const TypeInfo &IRGenFunction::getTypeInfo(Type T) {
-  return IGM.getTypeInfo(T->getCanonicalType());
+/// Get the fragile type information for the given unlowered type.
+const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type subst) {
+  return IGM.getTypeInfoForUnlowered(subst);
+}
+
+/// Get the fragile type information for the given unlowered type.
+const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type orig, Type subst) {
+  return IGM.getTypeInfoForUnlowered(orig, subst);
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenFunction::getTypeInfo(CanType T) {
-  return IGM.getTypeInfo(T);
+const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(CanType orig,
+                                                       CanType subst) {
+  return IGM.getTypeInfoForUnlowered(orig, subst);
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenFunction::getTypeInfoForLowered(CanType T) {
+  return IGM.getTypeInfoForLowered(T);
 }
 
 /// Get the fragile type information for the given type.
@@ -571,14 +583,29 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 /// Get a pointer to the storage type for the given type.  Note that,
 /// unlike fetching the type info and asking it for the storage type,
 /// this operation will succeed for forward-declarations.
-llvm::PointerType *IRGenModule::getStoragePointerType(CanType T) {
-  return getStorageType(T)->getPointerTo();
+llvm::PointerType *IRGenModule::getStoragePointerType(SILType T) {
+  return getStoragePointerTypeForLowered(T.getSwiftRValueType());
+}
+llvm::PointerType *IRGenModule::getStoragePointerTypeForUnlowered(Type T) {
+  return getStorageTypeForUnlowered(T)->getPointerTo();
+}
+llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
+  return getStorageTypeForLowered(T)->getPointerTo();
+}
+
+llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
+  return getStorageType(SILMod->Types.getLoweredType(subst));
+}
+
+llvm::Type *IRGenModule::getStorageType(SILType T) {
+  return getStorageTypeForLowered(T.getSwiftRValueType());
 }
 
 /// Get the storage type for the given type.  Note that, unlike
 /// fetching the type info and asking it for the storage type, this
 /// operation will succeed for forward-declarations.
-llvm::Type *IRGenModule::getStorageType(CanType T) {
+llvm::Type *IRGenModule::getStorageTypeForLowered(CanType T) {
+  // TODO: we can avoid creating entries for some obvious cases here.
   auto entry = Types.getTypeEntry(T);
   if (auto ti = entry.dyn_cast<const TypeInfo*>()) {
     return ti->getStorageType();
@@ -588,18 +615,30 @@ llvm::Type *IRGenModule::getStorageType(CanType T) {
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenModule::getTypeInfo(Type T) {
-  return getTypeInfo(T->getCanonicalType());
+const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type subst) {
+  return getTypeInfoForUnlowered(subst, subst);
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenModule::getTypeInfo(CanType T) {
-  return Types.getCompleteTypeInfo(T);
+const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type orig, Type subst) {
+  return getTypeInfoForUnlowered(orig->getCanonicalType(),
+                                 subst->getCanonicalType());
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenModule::getTypeInfoForUnlowered(CanType orig,
+                                                     CanType subst) {
+  return getTypeInfo(SILMod->Types.getLoweredType(subst)); // FIXME
 }
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getTypeInfo(SILType T) {
-  return Types.getCompleteTypeInfo(T.getSwiftRValueType());
+  return getTypeInfoForLowered(T.getSwiftRValueType());
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
+  return Types.getCompleteTypeInfo(T);
 }
 
 /// 
@@ -802,7 +841,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
 /// just a bare pointer.  For heap l-values, this is a pair of a bare
 /// pointer with an object reference.
 const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
-  auto referenceType = IGM.getStoragePointerType(CanType(T->getObjectType()));
+  auto referenceType =
+    IGM.getStoragePointerTypeForUnlowered(CanType(T->getObjectType()));
   
   // If it's not a heap l-value, just use the reference type as a
   // primitive pointer.
@@ -866,9 +906,9 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     case DeclKind::Class:
       return convertClassType(cast<ClassDecl>(decl));
     case DeclKind::Enum:
-      return convertEnumType(type, cast<EnumDecl>(decl));
+      return convertEnumType(type.getPointer(), type, cast<EnumDecl>(decl));
     case DeclKind::Struct:
-      return convertStructType(type, cast<StructDecl>(decl));
+      return convertStructType(type.getPointer(), type, cast<StructDecl>(decl));
     }
     llvm_unreachable("bad declaration kind");
   }
@@ -906,13 +946,15 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   }
 
   case DeclKind::Enum: {
-    auto result = convertEnumType(CanType(key), cast<EnumDecl>(decl));
+    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto result = convertStructType(CanType(key), cast<StructDecl>(decl));
+    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
@@ -987,7 +1029,7 @@ void IRGenModule::getSchema(CanType type, ExplosionSchema &schema) {
   }
 
   // Okay, that didn't work;  just do the general thing.
-  getTypeInfo(type).getSchema(schema);
+  getTypeInfoForLowered(type).getSchema(schema);
 }
 
 /// Compute the explosion schema for the given type.
@@ -1003,7 +1045,7 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
   }
 
   // If the type isn't loadable, the explosion size is always 1.
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfo(type));
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfoForLowered(type));
   if (!loadableTI) return 1;
 
   // Okay, that didn't work;  just do the general thing.
@@ -1029,7 +1071,7 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
 /// Determine whether this type requires an indirect result.
 llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
                                                        ExplosionKind kind) {
-  auto &ti = getTypeInfo(type);
+  auto &ti = getTypeInfoForLowered(type);
   ExplosionSchema schema = ti.getSchema(kind);
   if (schema.requiresIndirectResult(*this))
     return ti.getStorageType()->getPointerTo();
@@ -1047,7 +1089,7 @@ bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
         return false;
     return true;
   }
-  return getTypeInfo(type).isPOD(scope);
+  return getTypeInfoForLowered(type).isPOD(scope);
 }
 
 

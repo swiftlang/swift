@@ -502,7 +502,7 @@ void IRGenModule::emitGlobalLists() {
 void IRGenModule::emitGlobalTopLevel() {
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
-    TypeInfo const &ti = getTypeInfo(global->getType());
+    TypeInfo const &ti = getTypeInfoForUnlowered(global->getType());
     emitGlobalVariable(global, ti);
   }
   
@@ -879,7 +879,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
     return Address(gv, Alignment(gv->getAlignment()));
   }
 
-  const TypeInfo &type = getTypeInfo(var->getType());
+  const TypeInfo &type = getTypeInfoForUnlowered(var->getType());
 
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -1212,7 +1212,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   if (kind == DestructorKind::Deallocating) {
     dtorTy = DeallocatingDtorTy;
   } else {
-    const TypeInfo &info = getTypeInfo(cd->getDeclaredTypeInContext());
+    auto &info = getTypeInfoForUnlowered(cd->getDeclaredTypeInContext());
     dtorTy = llvm::FunctionType::get(RefCountedPtrTy,
                                      info.getStorageType(),
                                      /*isVarArg*/ false);
