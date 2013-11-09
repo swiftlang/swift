@@ -46,6 +46,19 @@
       case Ascending, Same, Descending
     }
 
+  The enum cases can then take advantage of type inference from context, as in:
+
+    var foo: NSNumber = 1
+    var bar: NSNumber = 2
+    switch foo.compare(bar) {
+    case .Ascending:
+      println("ascending")
+    case .Same:
+      println("same")
+    case .Descending:
+      println("descending")
+    }
+
 2013-11-06
 ----------
 
