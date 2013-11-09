@@ -970,7 +970,7 @@ static void lookupStdlibTypes(TypeChecker &TC,
   }
 }
 
-bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
+static bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
   if (T->is<ClassType>())
     return true;
 
@@ -1041,8 +1041,44 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD) {
   return true;
 }
 
-bool TypeChecker::isRepresentableInObjC(const VarDecl *VD) {
-  return isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
+  Type T = VD->getType();
+  bool Result = isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+  if (!Diagnose || Result)
+    return Result;
+
+  // TODO: everywhere below: highlight variable type.
+
+  // Special diagnostic for tuples.
+  if (T->is<TupleType>()) {
+    if (T->isVoid())
+      diagnose(VD->getLoc(), diag::objc_invalid_on_var_empty_tuple);
+    else
+      diagnose(VD->getLoc(), diag::objc_invalid_on_var_tuple);
+    return Result;
+  }
+
+  // Special diagnostic for protocols and protocol compositions.
+  SmallVector<ProtocolDecl *, 4> Protocols;
+  if (T->isExistentialType(Protocols)) {
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var);
+    if (Protocols.empty()) {
+      // protocol<> is not @objc.
+      diagnose(VD->getLoc(), diag::empty_protocol_composition_not_objc);
+      return Result;
+    }
+    // Find a protocol that is not @objc.
+    for (auto PD : Protocols) {
+      if (!PD->getAttrs().isObjC()) {
+        diagnose(VD->getLoc(), diag::protocol_not_objc, PD->getDeclaredType());
+        return Result;
+      }
+    }
+    return Result;
+  }
+
+  diagnose(VD->getLoc(), diag::objc_invalid_on_var);
+  return Result;
 }
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,

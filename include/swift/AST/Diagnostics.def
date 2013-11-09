@@ -1460,6 +1460,24 @@ ERROR(optional_intrinsics_not_found,sema_tct,none,
 ERROR(bool_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
 
+//------------------------------------------------------------------------------
+// @objc
+//------------------------------------------------------------------------------
+
+ERROR(objc_invalid_on_var,sema_objc,none,
+      "property can not be marked @objc because its type can not be "
+      "represented in Objective-C", ())
+NOTE(empty_protocol_composition_not_objc,sema_objc,none,
+     "'protocol<>' is not considered '@objc'; use 'DynamicLookup' instead", ())
+NOTE(protocol_not_objc,sema_objc,none,
+     "protocol %0 is not '@objc'", (Type))
+ERROR(objc_invalid_on_var_empty_tuple,sema_objc,none,
+      "property can not be marked @objc because empty tuple type can not be "
+      "represented in Objective-C", ())
+ERROR(objc_invalid_on_var_tuple,sema_objc,none,
+      "property can not be marked @objc because tuples can not be "
+      "represented in Objective-C", ())
+
 //==============================================================================
 // SIL Generation Diagnostics
 //==============================================================================

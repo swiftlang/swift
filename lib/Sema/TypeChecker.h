@@ -824,7 +824,7 @@ public:
                                  Identifier name) override;
 
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD);
-  bool isRepresentableInObjC(const VarDecl *VD);
+  bool isRepresentableInObjC(const VarDecl *VD, bool Diagnose);
   bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const DeclContext *DC, Type T);
 
