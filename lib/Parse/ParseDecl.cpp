@@ -76,9 +76,9 @@ bool Parser::parseTopLevel() {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseSILVTable();
   } else {
-    parseBraceItems(Items, true,
+    parseBraceItems(Items,
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode
-                                        : BraceItemListKind::Brace);
+                                        : BraceItemListKind::TopLevelLibrary);
   }
 
   skipExtraTopLevelRBraces(*this);
@@ -1105,8 +1105,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       ContextChange CC(*this, Get);
 
       SmallVector<ASTNode, 16> Entries;
-      parseBraceItems(Entries, false /*NotTopLevel*/,
-                      BraceItemListKind::Variable);
+      parseBraceItems(Entries, BraceItemListKind::Variable);
       BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                           Entries, Tok.getLoc());
       Get->setBody(Body);
@@ -1224,8 +1223,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
-    parseBraceItems(Entries, false /*NotTopLevel*/,
-                    BraceItemListKind::Variable);
+    parseBraceItems(Entries, BraceItemListKind::Variable);
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                         Entries, Tok.getLoc());
     Set->setBody(Body);

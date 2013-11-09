@@ -1246,8 +1246,7 @@ Expr *Parser::parseExprClosure() {
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
-  parseBraceItems(bodyElements, /*IsTopLevel=*/false,
-                     BraceItemListKind::Brace);
+  parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   // Parse the closing '}'.
   SourceLoc rightBrace;

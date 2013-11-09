@@ -130,6 +130,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
           return true;
     }
     return false;
+  case BraceItemListKind::TopLevelLibrary:
+    return false;
   }
 }
 
@@ -201,7 +203,10 @@ static void unwrapIfDiscardedClosure(Parser &P,
 ///   stmt-assign:
 ///     expr '=' expr
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
-                                     bool IsTopLevel, BraceItemListKind Kind) {
+                                     BraceItemListKind Kind) {
+  bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
+                    (Kind == BraceItemListKind::TopLevelLibrary);
+
   // This forms a lexical scope.
   Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
 
@@ -412,7 +417,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   SmallVector<ASTNode, 16> Entries;
   SourceLoc RBLoc;
 
-  ParserStatus Status = parseBraceItems(Entries, false /*NotTopLevel*/);
+  ParserStatus Status = parseBraceItems(Entries);
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
     RBLoc = PreviousLoc;
@@ -1082,8 +1087,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   SmallVector<ASTNode, 8> bodyItems;
 
   SourceLoc startOfBody = Tok.getLoc();
-  Status |=
-      parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);
+  Status |= parseBraceItems(bodyItems, BraceItemListKind::Case);
   BraceStmt *body = BraceStmt::create(Context,
                                       startOfBody, bodyItems, Tok.getLoc());
 

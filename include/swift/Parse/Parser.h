@@ -56,7 +56,9 @@ namespace swift {
     Case,
     /// The top-level of a file, when not in parse-as-library mode (i.e. the
     /// repl or a script).
-    TopLevelCode
+    TopLevelCode,
+    /// The top-level of a file, when in parse-as-library mode.
+    TopLevelLibrary,
   };
 
 class Parser {
@@ -437,7 +439,6 @@ public:
                            TopLevelCodeDecl *TLCD);
 
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
-                               bool IsTopLevel,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
