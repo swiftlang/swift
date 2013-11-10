@@ -132,6 +132,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       setSerializedDiagnosticsPath(InputArg->getValue());
       break;
 
+    case OPT_module_source_list_path:
+      setModuleSourceListPath(InputArg->getValue());
+      break;
+
     case OPT_output:
       setOutputFilename(InputArg->getValue());
       break;

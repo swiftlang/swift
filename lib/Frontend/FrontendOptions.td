@@ -20,6 +20,9 @@ def output : Separate<["-"], "o">,
 def serialized_diagnostics_path : Separate<["-"], "serialize-diagnostics">,
   HelpText<"File for serializing diagnostics in a binary format">;
 
+def module_source_list_path : Separate<["-"], "module-source-list">,
+  HelpText<"Provide a list of all source files in the module">;
+
 def parse_as_library : Flag<["-"], "parse-as-library">,
   HelpText<"Declare that the input is a library, not a script">;
 

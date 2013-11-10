@@ -51,6 +51,7 @@ class CompilerInvocation {
   std::string RuntimeIncludePath;
   std::string SDKPath;
   std::string SerializedDiagnosticsPath;
+  std::string ModuleSourceListPath;
   std::vector<std::string> ExtraClangArgs;
 
   LangOptions LangOpts;
@@ -155,6 +156,13 @@ public:
   }
   StringRef getSerializedDiagnosticsPath() const {
     return SerializedDiagnosticsPath;
+  }
+
+  void setModuleSourceListPath(StringRef Path) {
+    ModuleSourceListPath = Path;
+  }
+  StringRef getModuleSourceListPath() const {
+    return ModuleSourceListPath;
   }
 
   LangOptions &getLangOptions() {
