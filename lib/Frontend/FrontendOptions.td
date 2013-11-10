@@ -17,6 +17,9 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
 def output : Separate<["-"], "o">,
   HelpText<"Output filename">;
 
+def serialized_diagnostics_path : Separate<["-"], "serialize-diagnostics">,
+  HelpText<"File for serializing diagnostics in a binary format">;
+
 def parse_as_library : Flag<["-"], "parse-as-library">,
   HelpText<"Declare that the input is a library, not a script">;
 

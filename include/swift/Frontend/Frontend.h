@@ -50,6 +50,7 @@ class CompilerInvocation {
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
+  std::string SerializedDiagnosticsPath;
   std::vector<std::string> ExtraClangArgs;
 
   LangOptions LangOpts;
@@ -147,6 +148,13 @@ public:
 
   StringRef getSDKPath() const {
     return SDKPath;
+  }
+
+  void setSerializedDiagnosticsPath(StringRef Path) {
+    SerializedDiagnosticsPath = Path;
+  }
+  StringRef getSerializedDiagnosticsPath() const {
+    return SerializedDiagnosticsPath;
   }
 
   LangOptions &getLangOptions() {
