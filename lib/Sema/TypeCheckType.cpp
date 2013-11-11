@@ -1052,28 +1052,33 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
   // Special diagnostic for tuples.
   if (T->is<TupleType>()) {
     if (T->isVoid())
-      diagnose(VD->getLoc(), diag::objc_invalid_on_var_empty_tuple);
+      diagnose(VD->getLoc(), diag::objc_invalid_on_var_empty_tuple)
+          .highlight(VD->getTypeSourceRangeForDiagnostics());
     else
-      diagnose(VD->getLoc(), diag::objc_invalid_on_var_tuple);
+      diagnose(VD->getLoc(), diag::objc_invalid_on_var_tuple)
+          .highlight(VD->getTypeSourceRangeForDiagnostics());
     return Result;
   }
 
   // Special diagnostic for structs.
   if (T->is<StructType>()) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var_struct);
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var_struct)
+        .highlight(VD->getTypeSourceRangeForDiagnostics());
     return Result;
   }
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var_enum);
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var_enum)
+        .highlight(VD->getTypeSourceRangeForDiagnostics());
     return Result;
   }
 
   // Special diagnostic for protocols and protocol compositions.
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var);
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var)
+        .highlight(VD->getTypeSourceRangeForDiagnostics());
     if (Protocols.empty()) {
       // protocol<> is not @objc.
       diagnose(VD->getLoc(), diag::empty_protocol_composition_not_objc);
@@ -1089,7 +1094,8 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
     return Result;
   }
 
-  diagnose(VD->getLoc(), diag::objc_invalid_on_var);
+  diagnose(VD->getLoc(), diag::objc_invalid_on_var)
+      .highlight(VD->getTypeSourceRangeForDiagnostics());
   return Result;
 }
 

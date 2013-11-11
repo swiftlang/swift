@@ -822,6 +822,17 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams()[0].getAsTypeParam();
 }
 
+SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
+  if (!getParentPattern())
+    return getSourceRange();
+
+  auto *Pat = getParentPattern()->getPattern();
+  if (auto *TP = dyn_cast<TypedPattern>(Pat)) {
+    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
+  }
+  return getSourceRange();
+}
+
 void VarDecl::setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
                                    FuncDecl *Get, FuncDecl *Set,
                                    SourceLoc RBraceLoc) {

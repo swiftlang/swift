@@ -2020,6 +2020,12 @@ public:
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const { return getNameLoc(); }
 
+  /// \brief Retrieve the source range of the variable type.
+  ///
+  /// Only for use in diagnostics.  It is not always possible to always
+  /// precisely point to the variable type because of type aliases.
+  SourceRange getTypeSourceRangeForDiagnostics() const;
+
   /// \brief Determine whether this variable is computed, which means it
   /// has no storage but does have a user-defined getter or setter.
   ///
