@@ -1366,7 +1366,7 @@ WARNING(unindented_code_after_return,tce_sema,none,
         "expression following 'return' is treated as an argument of "
         "the 'return'", ())
 NOTE(indent_expression_to_silence,tce_sema,none,
-     "indent the expression to confirm the intent", ())
+     "indent the expression to silence this warning", ())
 
 //------------------------------------------------------------------------------
 // Type Check Statements
