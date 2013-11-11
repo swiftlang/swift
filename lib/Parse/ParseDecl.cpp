@@ -504,9 +504,36 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
   case tok::kw_var:
+    // TODO: Static properties are only implemented for non-generic value types.
     if (StaticLoc.isValid()) {
-      diagnose(Tok, diag::unimplemented_static_var)
-        .highlight(SourceRange(StaticLoc));
+      // Selector for unimplemented_static_var message.
+      enum : unsigned {
+        Misc,
+        GenericTypes,
+        Classes,
+        Protocols,
+      };
+      
+      auto unimplementedStatic = [&](unsigned diagSel) {
+        diagnose(Tok, diag::unimplemented_static_var, diagSel)
+          .highlight(SourceRange(StaticLoc));
+      };
+      
+      if (auto nom = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
+        if (nom->getGenericParams()) {
+          unimplementedStatic(GenericTypes);
+        } else if (isa<ClassDecl>(CurDeclContext)) {
+          unimplementedStatic(Classes);
+        } else if (isa<ProtocolDecl>(CurDeclContext)) {
+          unimplementedStatic(Protocols);
+        } else if (!isa<StructDecl>(CurDeclContext)
+                   && !isa<EnumDecl>(CurDeclContext)) {
+          unimplementedStatic(Misc);
+        }
+      } else {
+        unimplementedStatic(Misc);
+      }
+
       UnhandledStatic = false;
     }
     Status = parseDeclVar(Flags, Attributes, Entries);

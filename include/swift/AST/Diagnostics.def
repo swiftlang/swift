@@ -178,7 +178,8 @@ ERROR(decl_not_static,decl_parsing,none,
 
 // Var Name
 ERROR(unimplemented_static_var,decl_parsing,none,
-     "static variables not yet supported", ())
+     "static variables not yet supported in "
+     "%select{this context|generic types|classes|protocols}0", (unsigned))
 
 // Variable getters/setters
 ERROR(getset_missing_type,decl_parsing,none,
