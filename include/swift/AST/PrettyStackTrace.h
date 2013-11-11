@@ -30,6 +30,9 @@ namespace swift {
   class Stmt;
   class TypeRepr;
 
+void printSourceLocDescription(llvm::raw_ostream &out, SourceLoc loc,
+                               ASTContext &Context);
+
 /// PrettyStackTraceLocation - Observe that we are doing some
 /// processing starting at a fixed location.
 class PrettyStackTraceLocation : public llvm::PrettyStackTraceEntry {

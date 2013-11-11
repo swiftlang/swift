@@ -150,8 +150,13 @@ void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
+void swift::printSourceLocDescription(llvm::raw_ostream &out,
+                                      SourceLoc loc, ASTContext &ctx) {
+  loc.print(out, ctx.SourceMgr);
+}
+
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
-  Loc.print(out, Context.SourceMgr);
+  printSourceLocDescription(out, Loc, Context);
   out << '\n';
 }
