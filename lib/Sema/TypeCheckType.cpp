@@ -1058,6 +1058,18 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
     return Result;
   }
 
+  // Special diagnostic for structs.
+  if (T->is<StructType>()) {
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var_struct);
+    return Result;
+  }
+
+  // Special diagnostic for enums.
+  if (T->is<EnumType>()) {
+    diagnose(VD->getLoc(), diag::objc_invalid_on_var_enum);
+    return Result;
+  }
+
   // Special diagnostic for protocols and protocol compositions.
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {

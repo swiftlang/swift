@@ -1466,6 +1466,12 @@ ERROR(objc_invalid_on_var_empty_tuple,sema_objc,none,
 ERROR(objc_invalid_on_var_tuple,sema_objc,none,
       "property can not be marked @objc because tuples can not be "
       "represented in Objective-C", ())
+ERROR(objc_invalid_on_var_struct,sema_objc,none,
+      "property can not be marked @objc because Swift structs can not be "
+      "represented in Objective-C", ())
+ERROR(objc_invalid_on_var_enum,sema_objc,none,
+      "property can not be marked @objc because Swift enums can not be "
+      "represented in Objective-C", ())
 
 //==============================================================================
 // SIL Generation Diagnostics
