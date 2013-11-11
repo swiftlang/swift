@@ -786,9 +786,6 @@ ERROR(cannot_combine_attribute,attribute_parsing,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
       "expected ']' or ',' in attribute list", ())
-ERROR(invalid_attribute_for_lang,attribute_parsing,none,
-      "attribute is only valid in language mode '%select{axle}0'",
-      (unsigned))
 
 ERROR(expected_decl_attribute_not_type,attribute_parsing,none,
       "expected declaration attribute, not a type attribute", ())
@@ -838,10 +835,6 @@ ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
       "non-class type %1; consider adding a class bound", (unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have Optional type %0", (Type))
-
-// kernel, vertex, fragment
-ERROR(attribute_requires_function_decl,attribute_parsing,none,
-      "%0 attribute only applies to function declarations", (StringRef))
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
@@ -1031,8 +1024,6 @@ ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(enum_element_not_materializable,sema_tcd,none,
       "type of enum case is not materializable", ())
-ERROR(invalid_enum_case_result_type,sema_tcd,none,
-      "result type of enum case must be an instance of the enum", ())
 
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
@@ -1397,8 +1388,6 @@ ERROR(assignment_lhs_not_settable,sema_tcs,none,
 // ForEach Stmt
 ERROR(enumerable_protocol_broken,sema_tcs,none,
       "Enumerable protocol definition is broken", ())
-ERROR(range_protocol_broken,sema_tcs,none,
-      "Enumerator protocol definition is broken", ())
 ERROR(generator_protocol_broken,sema_tcs,none,
       "Generator protocol definition is broken", ())
 
