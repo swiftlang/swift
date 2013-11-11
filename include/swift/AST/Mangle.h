@@ -64,9 +64,12 @@ class Mangler {
   llvm::DenseMap<ArchetypeType*, ArchetypeInfo> Archetypes;
   unsigned ArchetypesDepth = 0;
   DeclContext *DeclCtx = nullptr;
+  bool MangleArchetypesWithContext;
   
 public:
-  Mangler(raw_ostream &buffer) : Buffer(buffer) {}
+  /// \param ForDebugging - use the 'QC' mangling format for archetypes.
+  Mangler(raw_ostream &buffer, bool ForDebugging = false)
+    : Buffer(buffer), MangleArchetypesWithContext(ForDebugging) {}
   void mangleContextOf(ValueDecl *decl);
   void mangleDeclContext(DeclContext *ctx);
   void mangleDeclName(ValueDecl *decl, IncludeType includeType);

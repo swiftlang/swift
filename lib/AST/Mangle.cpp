@@ -303,7 +303,9 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
     ArchetypeInfo info;
     info.Depth = ArchetypesDepth;
     info.Index = index++;
-    assert(!Archetypes.count(archetype));
+    // When mangling for DWARF we will visit the same generic
+    // parameter a second time wile mangling its declcontext.
+    assert(MangleArchetypesWithContext || !Archetypes.count(archetype));
     Archetypes.insert(std::make_pair(archetype, info));
 
     if (!mangle) continue;
@@ -440,6 +442,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= P <protocol-list> _   # protocol composition
 /// <type> ::= Q <index>             # archetype with depth=0, index=N
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
+/// <type> ::= 'Qq' index context    # archetype+context (DWARF only)
 ///
 /// <type> ::= R <type>              # lvalue
 /// <type> ::= T <tuple-element>* _  # tuple
@@ -654,11 +657,18 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
 
-    unsigned relativeDepth = ArchetypesDepth - info.Depth;
-    if (relativeDepth != 0) {
-      Buffer << 'd' << Index(relativeDepth - 1);
+    if (MangleArchetypesWithContext) {
+      // The DWARF output created by swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext.
+      Buffer << 'q' << Index(info.Index);
+      mangleDeclContext(DeclCtx);
+    } else {
+      unsigned relativeDepth = ArchetypesDepth - info.Depth;
+      if (relativeDepth != 0) {
+        Buffer << 'd' << Index(relativeDepth - 1);
+      }
+      Buffer << Index(info.Index);
     }
-    Buffer << Index(info.Index);
     return;
   }
 

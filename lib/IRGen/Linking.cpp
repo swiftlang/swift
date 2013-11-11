@@ -78,7 +78,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // Almost everything below gets the common prefix:
   //   mangled-name ::= '_T' global
 
-  Mangler mangler(buffer);
+  Mangler mangler(buffer, getKind() == Kind::DebuggerDeclTypeMangling);
   switch (getKind()) {
   // FIXME: Mangle a more descriptive symbol name for anonymous funcs.
   case Kind::AnonymousFunction:
