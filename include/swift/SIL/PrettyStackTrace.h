@@ -25,6 +25,9 @@ namespace swift {
   class ASTContext;
   class SILFunction;
 
+void printSILLocationDescription(llvm::raw_ostream &out, SILLocation loc,
+                                 ASTContext &ctx);
+
 /// PrettyStackTraceLocation - Observe that we are doing some
 /// processing starting at a SIL location.
 class PrettyStackTraceSILLocation : public llvm::PrettyStackTraceEntry {

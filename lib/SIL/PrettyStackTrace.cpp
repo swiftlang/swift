@@ -22,9 +22,14 @@
 
 using namespace swift;
 
-static void printSILLocation(llvm::raw_ostream &out, SILLocation loc,
-                             ASTContext &Context) {
-  if (auto decl = loc.getAsASTNode<Decl>()) {
+void swift::printSILLocationDescription(llvm::raw_ostream &out,
+                                        SILLocation loc,
+                                        ASTContext &Context) {
+  if (loc.isNull()) {
+    out << "<<invalid location>>";
+  } else if (!loc.hasASTLocation()) {
+    printSourceLocDescription(out, loc.getSourceLoc(), Context);
+  } else if (auto decl = loc.getAsASTNode<Decl>()) {
     printDeclDescription(out, decl, Context);
   } else if (auto expr = loc.getAsASTNode<Expr>()) {
     printExprDescription(out, expr, Context);
@@ -38,11 +43,7 @@ static void printSILLocation(llvm::raw_ostream &out, SILLocation loc,
 
 void PrettyStackTraceSILLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " at ";
-  if (Loc.isNull()) {
-    out << "<<invalid location>>";
-  } else {
-    printSILLocation(out, Loc, Context);
-  }
+  printSILLocationDescription(out, Loc, Context);
 }
 
 void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
@@ -56,7 +57,7 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
 
   if (!TheFn->getLocation().isNull()) {
     out << " for ";
-    printSILLocation(out, TheFn->getLocation(),
-                     TheFn->getModule().getASTContext());
+    printSILLocationDescription(out, TheFn->getLocation(),
+                                TheFn->getModule().getASTContext());
   }
 }
