@@ -108,8 +108,7 @@ onerous. DaveA provides a reasonable suggestion::
   class C : A {
     var value = "Hello"
 
-    @inherit init
-    @inherit init:withFoo:
+    @inherit init(Int)
   }
 
 *Note*: one can only inherit an initializer into a class ``C`` if all
@@ -161,7 +160,7 @@ address this issue, one would add::
   class D : A {
     var floating: Double
 
-    /*@virtual optional*/ init(x: Int) {
+    @virtual init(x: Int) {
       floating = 3.14159
       super.init(x)
     }
@@ -175,7 +174,7 @@ in-class initializers::
     var floating = 3.14159
 
     /* compiler-synthesized */
-    /*@virtual optional*/ init(x: Int) {
+    @virtual init(x: Int) {
       super.init(x)
     }
   }
@@ -183,7 +182,8 @@ in-class initializers::
 This looks a lot like inherited initializers, and can eliminate some
 boilerplate for simple subclasses. The primary downside is that the
 synthesized implementation might not be the right one, e.g., it will
-almost surely be wrong for an inherited ``-initWithCoder:``.
+almost surely be wrong for an inherited ``-initWithCoder:``. I don't
+think this is worth doing.
 
 *Note*: as a somewhat unfortunate side effect of the terminology, the
 initializers for structs and enums are considered to be virtual,
