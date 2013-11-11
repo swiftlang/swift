@@ -102,9 +102,19 @@ A tuple-style declaration matches a named application if:
     foo(1, "two", '3', x: 4)    // doesn't match; 'x' already given positionally
     foo(1, "two", z: '3', z: '4') // doesn't match; multiple 'z'
 
-- The base name is the name of a non-function definition of function type, the
-  input types match the input type of the referenced function value, and there
-  are no keyword arguments::
+- If the final declared keyword parameter takes a variadic argument, the keyword
+  in the argument list may be followed by multiple
+  non-keyworded arguments. All arguments up to either the next keyword or
+  the end of the argument list become that keyword's argument::
+
+    def foo(x: Int, y: String, z: Char...) {}
+    foo(1, "two", '3', '4', '5')       // matches, z = ['3', '4', '5']
+    foo(1, "two", z: '3', '4', '5')    // same
+    foo(1, z: '3', '4', '5', y: "two") // same
+
+- If the base name is the name of a non-function definition of function type,
+  the input types match the input type of the referenced function value, and
+  there are no keyword arguments::
 
     var foo: (Int, Int) -> ()
     foo(1, 2) // matches
@@ -136,6 +146,16 @@ A selector-style declaration matches a named application if:
 
     def foo(x: Int) foo(y: String) foo(z: Char) {}
     foo(1, foo: "two", foo: '3') // matches
+
+- If the final selector piece declares a variadic parameter, then the keyword
+  in the call expression may be followed by multiple arguments. All arguments
+  up to the end of the argument list become the keyword parameter's value.
+  (Because of strict keyword ordering, additional keywords may not follow.)
+  For example::
+
+    def foo(x: Int) bar(y: String...) {}
+
+    foo(1, bar: "two", "three", "four") // matches, y = ["two", "three", "four"]
 
 Duplicate Definitions
 ---------------------
@@ -222,22 +242,7 @@ There are also functional operators like ``!`` and ``?`` that we need to
 forward keyword arguments through. Are there others? What about parens?
 ``(foo)(bar: x)`` should probably work.
 
-Syntactic Edge Cases
---------------------
-
-The selector method reference syntax ``foo.bar:bas:`` can form ambiguities
-with the ternary and dictionary literal expression syntax::
-
-  a?b?c.d:e:f
-
-  [a?b.c:d: e]
-
-Neither example seems likely in practice. We can address this by requiring no
-spaces in ``foo.bar:bas:``, and favoring that parse. This allows the ternary
-parse to be asserted using whitespace::
-
-  a ? b ? c.d : e : f
-
-  [a ? b.c : d: e]
-
-Removing the ternary from the language would also eliminate the ambiguities.
+This proposal also prevents a single-element name from being referenced with
+selector syntax as ``foo.bar:``. For QoI, we should recognize attempts to
+reference a member in this way, such as ``if var f = foo.bar: {}`` or
+``[foo.bar:: bas]``, and fixit away the trailing colon.
