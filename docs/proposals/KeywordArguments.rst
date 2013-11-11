@@ -25,13 +25,7 @@ Keyword Apply Syntax
 --------------------
 ::
   
-  // Apply an arbitrary expression that produces a function
-  expr-apply ::= expr-postfix expr-tuple
-
-  // Apply a named function with keyword arguments -- a **named application**
-  expr-apply ::= identifier ('?' | '!')? '(' (kw-arg (',' kw-arg)*)? ')'
-  expr-apply ::= expr-postfix '.' identifier ('?' | '!')?
-    '(' (kw-arg (',' kw-arg)*)? ')'
+  expr-apply ::= expr-postfix '(' (kw-arg (',' kw-arg)*)? ')'
   kw-arg ::= (identifier ':')? expr
 
   // Examples
@@ -41,22 +35,36 @@ Keyword Apply Syntax
   foo!(1, bar: 2, bas: 3)
   a.foo?(1, bar: 2, bas: 3)
 
-Keyword syntax becomes a feature of named apply expressions. When a named
-function is applied, a declaration is looked up using the name and any
+Keyword syntax becomes a feature of apply expressions. When a named
+function or method is applied, a declaration is looked up using the name and any
 keyword arguments that are provided. An arbitrary expression that produces
 a function result may be applied, but cannot be used with keyword arguments.
-
-As a special case, the optional chaining operators ``!`` and ``?`` are looked
-through; if ``!`` or ``?`` is applied to a named function which is then called,
-then the keywords are still used to perform name lookup.
 
 Named Application Lookup
 ------------------------
 
 A named application is matched to a declaration using both the base name, which
 appears to the left of the open parens, and the keyword arguments that are
-provided. The matching rules are different for "tuple-style" and "keyword-style"
-declarations
+provided. The matching rules are different for "tuple-style" and
+"keyword-style" declarations:
+
+Finding the base name
+`````````````````````
+
+The callee of an apply is an arbitrary expression. If the expression is a
+standalone declaration reference or a member reference, then the apply is a
+**named application**, and the name is used as the **base name** during function
+name lookup, as described below. Certain expression productions are looked
+through when looking for a base name:
+
+- The ``Optional`` postfix operators ``!`` and ``?``.
+  ``foo.bar!()`` and ``bas?()`` are named applications, as is ``foo?!?()``.
+- Parens. ``(foo.bar)()``` is a named application.
+
+These productions are looked through to arbitrary depth, so ``((foo!?)?!)()``
+is also a named application.
+
+Unnamed applications cannot use keyword arguments.
 
 Tuple-Style Declarations
 ````````````````````````
@@ -93,6 +101,14 @@ A tuple-style declaration matches a named application if:
     foo(z: '3', q: 1, y: "two") // doesn't match; no keyword 'q'
     foo(1, "two", '3', x: 4)    // doesn't match; 'x' already given positionally
     foo(1, "two", z: '3', z: '4') // doesn't match; multiple 'z'
+
+- The base name is the name of a non-function definition of function type, the
+  input types match the input type of the referenced function value, and there
+  are no keyword arguments::
+
+    var foo: (Int, Int) -> ()
+    foo(1, 2) // matches
+    foo(x: 1, y: 2) // doesn't match
 
 Selector-Style Declarations
 ```````````````````````````
@@ -200,9 +216,8 @@ QoI Issues
 
 Under this proposal, keyword resolution relies on being able to find a named
 function declaration. This means that keywords cannot be used with arbitrary
-expressions of function type. One way we can do this is syntactically, as
-proposed above, treating "named application" as a special case. If we do this,
-we would still want to parse keywords in nameless applications for recovery.
+expressions of function type.
+We however still need to parse keywords in nameless applications for recovery.
 There are also functional operators like ``!`` and ``?`` that we need to
 forward keyword arguments through. Are there others? What about parens?
 ``(foo)(bar: x)`` should probably work.
