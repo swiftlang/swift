@@ -29,6 +29,32 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
+/// \brief Construct (int, overflow) result tuple.
+static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
+                                                        APInt Res,
+                                                        bool Overflow) {
+  // Get the SIL subtypes of the returned tuple type.
+  SILType FuncResType = AI->getFunctionTypeInfo()->getResult().getSILType();
+  TupleType *T = FuncResType.castTo<TupleType>();
+  assert(T->getNumElements() == 2);
+  SILType ResTy1 =
+  SILType::getPrimitiveType(CanType(T->getElementType(0)),
+                            SILValueCategory::Object);
+  SILType ResTy2 =
+  SILType::getPrimitiveType(CanType(T->getElementType(1)),
+                            SILValueCategory::Object);
+
+  // Construct the folded instruction - a tuple of two literals, the
+  // result and overflow.
+  SILBuilder B(AI);
+  SILLocation Loc = AI->getLoc();
+  SILValue Result[] = {
+    B.createIntegerLiteral(Loc, ResTy1, Res),
+    B.createIntegerLiteral(Loc, ResTy2, Overflow)
+  };
+  return B.createTuple(Loc, FuncResType, Result);
+}
+
 /// \brief Fold arithmetic intrinsics with overflow.
 static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                                                       llvm::Intrinsic::ID ID,
@@ -82,26 +108,6 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     break;
   }
 
-  // Get the SIL subtypes of the returned tuple type.
-  SILType FuncResType = AI->getFunctionTypeInfo()->getResult().getSILType();
-  TupleType *T = FuncResType.castTo<TupleType>();
-  assert(T->getNumElements() == 2);
-  SILType ResTy1 =
-    SILType::getPrimitiveType(CanType(T->getElementType(0)),
-                              SILValueCategory::Object);
-  SILType ResTy2 =
-    SILType::getPrimitiveType(CanType(T->getElementType(1)),
-                              SILValueCategory::Object);
-
-  // Construct the folded instruction - a tuple of two literals, the
-  // result and overflow.
-  SILBuilder B(AI);
-  SILLocation Loc = AI->getLoc();
-  SILValue Result[] = {
-    B.createIntegerLiteral(Loc, ResTy1, Res),
-    B.createIntegerLiteral(Loc, ResTy2, Overflow)
-  };
-
   // If we can statically determine that the operation overflows,
   // warn about it.
   if (Overflow && ReportOverflow) {
@@ -110,6 +116,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     // two arguments of the same type, use the type of the LHS argument.
     // This would detect '+'/'+=' and such.
     Type OpType;
+    SILLocation Loc = AI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     if (CE) {
       const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
@@ -145,7 +152,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     }
   }
 
-  return B.createTuple(Loc, FuncResType, Result);
+  return constructResultWithOverflowTuple(AI, Res, Overflow);
 }
 
 static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
@@ -404,8 +411,7 @@ case BuiltinValueKind::id:
     }
 
     // The call to the builtin should be replaced with the constant value.
-    SILBuilder B(AI);
-    return B.createIntegerLiteral(Loc, AI->getType(), TruncVal);
+    return constructResultWithOverflowTuple(AI, TruncVal, false);
   }
 
   case BuiltinValueKind::IntToFPWithOverflow: {

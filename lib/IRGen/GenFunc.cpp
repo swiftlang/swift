@@ -1148,7 +1148,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  // TODO: replace with an assert - these should be constant folded.
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::STruncWithOverflow ||
@@ -1158,9 +1157,11 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *V = IGF.Builder.CreateTrunc(Arg, ToTy);
-    return out->add(V);
+    out->add(V);
+    // FIXME: This is a hack. It should be replaced before we start using
+    // implementation of this builtin.
+    return out->add(IGF.Builder.getInt1(false));
   }
-  // TODO: replace with an assert - these should be constant folded.
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {

@@ -635,7 +635,9 @@ static ValueDecl *getTruncWithOverflowOperation(ASTContext &Context,
     return nullptr;
 
   TupleTypeElt ArgElts[] = { InTy };
-  Type ResultTy = OutTy;
+  Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
+  TupleTypeElt ResultElts[] = { OutTy, OverflowBitTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
 
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }

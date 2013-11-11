@@ -68,7 +68,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
   @@transparent
   static def _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
-    return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val))
+    return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val).0)
   }
 
   @@transparent
