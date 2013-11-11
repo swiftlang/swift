@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_METADATA_H
 #define SWIFT_RUNTIME_METADATA_H
 
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -568,6 +569,58 @@ namespace {
   struct _ResultOf<R(A...)> {
     using type = R;
   };
+}
+  
+namespace heap_object_abi {
+  
+// The extra inhabitants and spare bits of heap object pointers.
+// These must align with the values in IRGen's SwiftTargetInfo.cpp.
+#if defined(__x86_64__)
+
+# ifdef __APPLE__
+// Darwin reserves the low 4GB of address space.
+static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
+# else
+// Assume only the null 4K page is reserved.
+static const uintptr_t LeastValidPointerValue = 4096U;
+# endif
+
+// Only the bottom 47 bits are used, and heap objects are eight-byte-aligned.
+static const uintptr_t SwiftSpareBitsMask   = 0xFFFF800000000007ULL;
+// Objective-C reserves the high and low bits for tagged pointers.
+static const uintptr_t ObjCSpareBitsMask    = 0x8FFF800000000006ULL;
+static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
+
+// Number of low bits reserved by Objective-C.
+static const unsigned ObjCReservedLowBits = 1U;
+
+#elif defined(__arm64__)
+
+// Darwin reserves the low 4GB of address space.
+static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
+
+// TBI guarantees the top byte of pointers is unused.
+// Heap objects are eight-byte aligned.
+static const uintptr_t SwiftSpareBitsMask   = 0xFF00000000000007ULL;
+// Objective-C reserves the high and low bits for tagged pointers.
+static const uintptr_t ObjCSpareBitsMask    = 0x8F00000000000006ULL;
+static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
+
+// Number of low bits reserved by Objective-C.
+static const unsigned ObjCReservedLowBits = 1U;
+
+#else
+
+// Assume only 0 is an invalid pointer.
+static const uintptr_t LeastValidPointerValue = 1U;
+// Make no assumptions about spare bits.
+static const uintptr_t SwiftSpareBitsMask = 0U;
+static const uintptr_t ObjCSpareBitsMask = 0U;
+static const uintptr_t ObjCReservedBitsMask = 0U;
+static const unsigned ObjCReservedLowBits = 0U;
+
+#endif
+
 }
   
 /// The common structure of all type metadata.
@@ -1395,7 +1448,7 @@ OpaqueValue *swift_assignExistentialWithCopy0(OpaqueValue *dest,
 OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
                                               const OpaqueValue *src,
                                               const Metadata *type);
-
+  
 /// \brief Standard 'typeof' value witness for heap object references that may
 /// not be native Swift objects.
 ///
@@ -1405,6 +1458,31 @@ OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
 extern "C"
 const Metadata *swift_unknownTypeOf(HeapObject *obj);
 
+/// Standard value witness for calculating the numeric index of an extra
+/// inhabitant in memory.
+int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
+                                            const Metadata *self);
+  
+/// Standard value witness for storing an extra inhabitant of a heap object
+/// pointer to memory.
+void swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
+                                          int index,
+                                          const Metadata *self);
+  
+/// Return the number of extra inhabitants in a heap object pointer.
+extern "C"
+inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
+  // This must be consistent with the getHeapObjectExtraInhabitantCount
+  // implementation in IRGen's GenType.cpp.
+  
+  using namespace heap_object_abi;
+  
+  // The runtime needs no more than INT_MAX inhabitants.
+  return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
+    ? (unsigned)INT_MAX
+    : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
+}
+  
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

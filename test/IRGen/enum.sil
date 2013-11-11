@@ -953,6 +953,78 @@ end:
   return undef : $()
 }
 
+@class_protocol protocol PC {}
+@objc, @class_protocol protocol PO {}
+
+enum SinglePayloadClassProtocol {
+  case x(PC)
+  case y, z, w
+}
+
+enum SinglePayloadObjCProtocol {
+  case x(PO)
+  case y, z, w
+}
+
+// CHECK: define void @single_payload_class_protocol_switch(i128) {
+// CHECK:   switch i128 %0, label {{%.*}} [
+// CHECK:     i128 0, label {{%.*}}
+// --           0x2_0000_0000_0000_0000
+// CHECK:     i128 36893488147419103232, label {{%.*}}
+// --           0x4_0000_0000_0000_0000
+// CHECK:     i128 73786976294838206464, label {{%.*}}
+// CHECK:   ]
+
+// CHECK:   [[WITNESS_INT:%.*]] = trunc i128 %0 to i64
+// CHECK:   inttoptr i64 [[WITNESS_INT]] to i8**
+// CHECK:   [[OBJECT_SHR:%.*]] = lshr i128 %0, 64
+// CHECK:   [[OBJECT_INT:%.*]] = trunc i128 [[OBJECT_SHR]] to i64
+// CHECK:   inttoptr i64 [[OBJECT_INT]] to %objc_object*
+
+sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
+entry(%c : $SinglePayloadClassProtocol):
+  switch_enum %c : $SinglePayloadClassProtocol, case #SinglePayloadClassProtocol.x!enumelt.1: x_dest, case #SinglePayloadClassProtocol.y!enumelt: y_dest, case #SinglePayloadClassProtocol.z!enumelt: z_dest, case #SinglePayloadClassProtocol.w!enumelt: w_dest
+
+x_dest(%d : $PC):
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
+// CHECK: define void @single_payload_objc_protocol_switch(i64) {
+// CHECK:   switch i64 %0, label {{%.*}}
+// CHECK:     i64 0, label {{%.*}}
+// CHECK:     i64 2, label {{%.*}}
+// CHECK:     i64 4, label {{%.*}}
+// CHECK:   ]
+
+// CHECK:   inttoptr i64 %0 to %objc_object*
+
+sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
+entry(%c : $SinglePayloadObjCProtocol):
+  switch_enum %c : $SinglePayloadObjCProtocol, case #SinglePayloadObjCProtocol.x!enumelt.1: x_dest, case #SinglePayloadObjCProtocol.y!enumelt: y_dest, case #SinglePayloadObjCProtocol.z!enumelt: z_dest, case #SinglePayloadObjCProtocol.w!enumelt: w_dest
+
+x_dest(%d : $PO):
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
+
 enum DynamicSinglePayload<T> {
   case x(T)
   case y

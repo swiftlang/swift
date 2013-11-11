@@ -1006,6 +1006,50 @@ namespace {
       return new WeakClassExistentialTypeInfo(NumProtocols, storageTy, size,
                                               TC.IGM.getWeakReferenceAlignment());
     }
+    
+    // Extra inhabitants of class existential containers.
+    // We use the heap object extra inhabitants over the class pointer value.
+    // We could get even more extra inhabitants from the witness table
+    // pointer(s), but it's unlikely we would ever need to.
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+    
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getHeapObjectExtraInhabitantCount(IGM);
+    }
+    
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                              unsigned bits,
+                                              unsigned index) const override {
+      // We place the extra inhabitant in the class pointer slot.
+      auto offset = IGM.getPointerSize().getValueInBits() * NumProtocols;
+      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index,
+                                                    offset);
+    }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src)
+    const override {
+      // NB: We assume that the witness table slots are zero if an extra
+      // inhabitant is stored in the container.
+      
+      src = projectValue(IGF, src);
+      return getHeapObjectExtraInhabitantIndex(IGF, src);
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest) const override {
+      for (unsigned i = 0; i < NumProtocols; ++i) {
+        Address witnessDest = projectWitnessTable(IGF, dest, i);
+        IGF.Builder.CreateStore(
+                      llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy),
+                      witnessDest);
+      }
+      
+      Address valueDest = projectValue(IGF, dest);
+      storeHeapObjectExtraInhabitant(IGF, index, valueDest);
+    }
   };
 
   /// Common type implementation details for all archetypes.

@@ -131,58 +131,12 @@ const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
   return classMetadata;
 }
 
-// The extra inhabitants and spare bits of heap object pointers.
-// These must align with the values in IRGen's SwiftTargetInfo.cpp.
-#if defined(__x86_64__)
-
-# ifdef __APPLE__
-// Darwin reserves the low 4GB of address space.
-static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
-# else
-// Assume only the null 4K page is reserved.
-static const uintptr_t LeastValidPointerValue = 4096U;
-# endif
-
-// Only the bottom 47 bits are used, and heap objects are eight-byte-aligned.
-static const uintptr_t SwiftSpareBitsMask   = 0xFFFF800000000007ULL;
-// Objective-C reserves the high and low bits for tagged pointers.
-static const uintptr_t ObjCSpareBitsMask    = 0x8FFF800000000006ULL;
-static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
-
-// Number of low bits reserved by Objective-C.
-static const unsigned ObjCReservedLowBits = 1U;
-
-#elif defined(__arm64__)
-
-// Darwin reserves the low 4GB of address space.
-static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
-
-// TBI guarantees the top byte of pointers is unused.
-// Heap objects are eight-byte aligned.
-static const uintptr_t SwiftSpareBitsMask   = 0xFF00000000000007ULL;
-// Objective-C reserves the high and low bits for tagged pointers.
-static const uintptr_t ObjCSpareBitsMask    = 0x8F00000000000006ULL;
-static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
-
-// Number of low bits reserved by Objective-C.
-static const unsigned ObjCReservedLowBits = 1U;
-
-#else
-
-// Assume only 0 is an invalid pointer.
-static const uintptr_t LeastValidPointerValue = 1U;
-// Make no assumptions about spare bits.
-static const uintptr_t SwiftSpareBitsMask = 0U;
-static const uintptr_t ObjCSpareBitsMask = 0U;
-static const uintptr_t ObjCReservedBitsMask = 0U;
-static const unsigned ObjCReservedLowBits = 0U;
-
-#endif
-
 /// Store an invalid pointer value as an extra inhabitant of a heap object.
-static void storeHeapObjectExtraInhabitant(HeapObject **dest,
-                                           int index,
-                                           const Metadata *self) {
+void swift::swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
+                                                 int index,
+                                                 const Metadata *self) {
+  using namespace heap_object_abi;
+  
   // This must be consistent with the storeHeapObjectExtraInhabitant
   // implementation in IRGen's GenType.cpp.
   
@@ -193,8 +147,10 @@ static void storeHeapObjectExtraInhabitant(HeapObject **dest,
 
 /// Return the extra inhabitant index for an invalid pointer value, or -1 if
 /// the pointer is valid.
-static int getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
-                                             const Metadata *self) {
+int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
+                                                   const Metadata *self) {
+  using namespace heap_object_abi;
+
   // This must be consistent with the getHeapObjectExtraInhabitant
   // implementation in IRGen's GenType.cpp.
 
@@ -214,15 +170,6 @@ static int getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
   return (int)(val >> ObjCReservedLowBits);
 }
 
-static constexpr unsigned getHeapObjectExtraInhabitantCount() {
-  // This must be consistent with the getHeapObjectExtraInhabitantCount
-  // implementation in IRGen's GenType.cpp.
-  
-  // The runtime needs no more than INT_MAX inhabitants.
-  return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
-    ? (unsigned)INT_MAX
-    : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
-}
 
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBo = {
@@ -247,10 +194,12 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBo = {
                        .withInlineStorage(true),
     (value_witness_types::stride) sizeof(void*),
   },
-  (value_witness_types::storeExtraInhabitant*) &storeHeapObjectExtraInhabitant,
-  (value_witness_types::getExtraInhabitantIndex*) &getHeapObjectExtraInhabitantIndex,
+  (value_witness_types::storeExtraInhabitant*)
+    &swift_storeHeapObjectExtraInhabitant,
+  (value_witness_types::getExtraInhabitantIndex*)
+    &swift_getHeapObjectExtraInhabitantIndex,
   ExtraInhabitantFlags()
-    .withNumExtraInhabitants(getHeapObjectExtraInhabitantCount())
+    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
 };
 
 /*** Objective-C pointers ****************************************************/
@@ -336,10 +285,12 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBO = {
                        .withExtraInhabitants(true),
     (value_witness_types::stride) sizeof(void*)
   },
-  (value_witness_types::storeExtraInhabitant*) &storeHeapObjectExtraInhabitant,
-  (value_witness_types::getExtraInhabitantIndex*) &getHeapObjectExtraInhabitantIndex,
+  (value_witness_types::storeExtraInhabitant*)
+    &swift_storeHeapObjectExtraInhabitant,
+  (value_witness_types::getExtraInhabitantIndex*)
+    &swift_getHeapObjectExtraInhabitantIndex,
   ExtraInhabitantFlags()
-    .withNumExtraInhabitants(getHeapObjectExtraInhabitantCount())
+    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
 };
 
 /*** Functions ***************************************************************/

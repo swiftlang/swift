@@ -26,17 +26,35 @@
 namespace swift {
 namespace irgen {
 
-// Extra inhabitants of heap object pointers.
+/// \group Extra inhabitants of heap object pointers.
 
+/// Return the number of extra inhabitant representations for heap objects,
+/// that is, the number of invalid heap object pointer values that can be used
+/// to represent enum tags for enums involving a reference type as a payload.
 unsigned getHeapObjectExtraInhabitantCount(IRGenModule &IGM);
+  
+/// Return an indexed extra inhabitant constant for a heap object pointer.
+///
+/// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
+/// arguments can be used to position the inhabitant within the larger integer
+/// constant.
 llvm::ConstantInt *getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
                                                           unsigned bits,
-                                                          unsigned index);
+                                                          unsigned index,
+                                                          unsigned offset);
+  
+/// Calculate the index of a heap object extra inhabitant representation stored
+/// in memory.
 llvm::Value *getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src);
+
+/// Calculate an extra inhabitant representation from an index and store it to
+/// memory.
 void storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest);
+
+/// \group HeapTypeInfo
   
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
@@ -155,7 +173,7 @@ public:
   llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
                                                 unsigned bits,
                                                 unsigned index) const override {
-    return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index);
+    return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src)

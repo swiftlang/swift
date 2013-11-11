@@ -376,7 +376,8 @@ unsigned irgen::getHeapObjectExtraInhabitantCount(IRGenModule &IGM) {
 llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
                                                        IRGenModule &IGM,
                                                        unsigned bits,
-                                                       unsigned index) {
+                                                       unsigned index,
+                                                       unsigned offset) {
   // This must be consistent with the extra inhabitant calculation implemented
   // in the runtime's storeHeapObjectExtraInhabitant and
   // getHeapObjectExtraInhabitantIndex functions in KnownMetadata.cpp.
@@ -384,7 +385,11 @@ llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
   assert(index < getHeapObjectExtraInhabitantCount(IGM) &&
          "heap object extra inhabitant out of bounds");
   uint64_t value = (uint64_t)index << getNumLowObjCReservedBits(IGM);
-  return llvm::ConstantInt::get(IGM.getLLVMContext(), APInt(bits, value));
+  APInt apValue(bits, value);
+  if (offset > 0)
+    apValue = apValue.shl(offset);
+  
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), apValue);
 }
 
 llvm::Value *irgen::getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,

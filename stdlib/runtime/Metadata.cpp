@@ -1582,7 +1582,17 @@ struct ClassExistentialValueWitnesses {
     return swift_unknownTypeOf(obj->getValue(self));
   }
   
-  static const ValueWitnessTable ValueWitnessTable;
+  static void storeExtraInhabitant(Container *obj, int index,
+                                   const Metadata *self) {
+    swift_storeHeapObjectExtraInhabitant(&obj->getValue(self), index, self);
+  }
+  
+  static int getExtraInhabitantIndex(Container *obj,
+                                     const Metadata *self) {
+    return swift_getHeapObjectExtraInhabitantIndex(&obj->getValue(self), self);
+  }
+  
+  static const ExtraInhabitantsValueWitnessTable ValueWitnessTable;
 };
   
 /// Fixed-size class-constrained existential container.
@@ -1715,19 +1725,25 @@ struct ClassExistentialValueWitnesses<VariableValueWitnesses>::Container {
 };
   
 template<unsigned NUM_VALUE_WITNESSES>
-const ValueWitnessTable
+const ExtraInhabitantsValueWitnessTable
 ClassExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
+  {
 #define FIXED_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
-  (value_witness_types::WITNESS*)WITNESS,
+    (value_witness_types::WITNESS*)WITNESS,
   
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(FIXED_CLASS_EXISTENTIAL_WITNESS)
+    FOR_ALL_FUNCTION_VALUE_WITNESSES(FIXED_CLASS_EXISTENTIAL_WITNESS)
+    /*size*/ Container::size(),
+    /*flags*/ ValueWitnessFlags().withAlignment(Container::alignment())
+      .withPOD(false)
+      .withInlineStorage(Container::isInline())
+      .withExtraInhabitants(true),
+    /*stride*/ Container::stride()
+  },
+  FIXED_CLASS_EXISTENTIAL_WITNESS(storeExtraInhabitant)
+  FIXED_CLASS_EXISTENTIAL_WITNESS(getExtraInhabitantIndex)
+  ExtraInhabitantFlags()
+    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
 #undef FIXED_CLASS_EXISTENTIAL_WITNESS
-  /*size*/ Container::size(),
-  /*flags*/ ValueWitnessFlags().withAlignment(Container::alignment())
-    .withPOD(false)
-    .withInlineStorage(Container::isInline())
-    .withExtraInhabitants(false),
-  /*stride*/ Container::stride()
 };
   
 static std::unordered_map<unsigned, const ValueWitnessTable*>
@@ -1744,21 +1760,27 @@ existential_instantiateClassValueWitnesses(unsigned numWitnessTables) {
   using VarClassValueWitnesses
     = ClassExistentialValueWitnesses<VariableValueWitnesses>;
   
-  auto *vwt = new ValueWitnessTable;
+  auto *vwt = new ExtraInhabitantsValueWitnessTable;
 #define STORE_VAR_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
   vwt->WITNESS = (value_witness_types::WITNESS*)      \
     VarClassValueWitnesses::WITNESS;
   FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_CLASS_EXISTENTIAL_WITNESS)
-#undef STORE_VAR_CLASS_EXISTENTIAL_WITNESS
   
   vwt->size = VarClassValueWitnesses::Container::size(numWitnessTables);
   vwt->flags = ValueWitnessFlags()
     .withAlignment(VarClassValueWitnesses::Container::alignment(numWitnessTables))
     .withPOD(false)
     .withInlineStorage(false)
-    .withExtraInhabitants(false);
+    .withExtraInhabitants(true);
   vwt->stride = VarClassValueWitnesses::Container::stride(numWitnessTables);
 
+  STORE_VAR_CLASS_EXISTENTIAL_WITNESS(storeExtraInhabitant)
+  STORE_VAR_CLASS_EXISTENTIAL_WITNESS(getExtraInhabitantIndex)
+  
+  vwt->extraInhabitantFlags = ExtraInhabitantFlags()
+    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount());
+#undef STORE_VAR_CLASS_EXISTENTIAL_WITNESS
+  
   ClassExistentialValueWitnessTables.insert({numWitnessTables, vwt});
   
   return vwt;
@@ -1775,11 +1797,8 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
   case ProtocolClassConstraint::Class:
     // A class-constrained existential with no witness tables can share the
     // Builtin.ObjCPointer witnesses.
-    // FIXME: Except that IRGen doesn't expose extra inhabitants for class
-    // protocol types yet.
     if (numWitnessTables == 0)
-      return &ClassExistentialValueWitnesses<0>::ValueWitnessTable;
-      // FIXME: return &_TWVBO;
+      return &_TWVBO;
 
     // Use statically-instantiated witnesses for the common case of a
     // one-witness-table class existential.
