@@ -1008,7 +1008,6 @@ entry(%r : $*DynamicSinglePayload<T>):
 // -- Ensure instantiations of single-payload types with empty payloads work.
 //    Bug discovered by Greg Parker.
 
-
 // CHECK: define void @dynamic_single_payload_empty_payload_switch(i2) {
 // CHECK:   switch i2 {{%.*}}, label {{.*}} [
 // CHECK:     i2 0, label {{.*}}
@@ -1826,6 +1825,59 @@ sil @multi_payload_two_spare_bits_inject_c : $() -> MultiPayloadTwoSpareBits {
 entry:
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.c!enumelt
   return %u : $MultiPayloadTwoSpareBits
+}
+
+class D {}
+
+enum MultiPayloadClasses {
+  case x(C)
+  case y(D)
+  case z
+  case w
+}
+
+// CHECK: define void @multi_payload_classes_switch(i64) {
+// CHECK:   %1 = lshr i64 %0, 1
+// CHECK:   %2 = trunc i64 %1 to i18
+// CHECK:   %3 = and i18 %2, 3
+// CHECK:   %4 = lshr i64 %0, 45
+// CHECK:   %5 = trunc i64 %4 to i18
+// CHECK:   %6 = and i18 %5, -4
+// CHECK:   %7 = or i18 %3, %6
+// CHECK:   switch i18 %7, label {{%.*}} [
+// CHECK:     i18 0, label {{%.*}}
+// CHECK:     i18 1, label {{%.*}}
+// CHECK:     i18 2, label {{%.*}}
+// CHECK:   ]
+// CHECK:   switch i64 %0, label {{%.*}} [
+// CHECK:     i64 4, label {{%.*}}
+// CHECK:     i64 5, label {{%.*}}
+// CHECK:   ]
+// -- Extract x(C)
+// CHECK:   inttoptr i64 %0 to %C4enum1C*
+// -- Extract y(D)
+// --                                     0x80007ffffffffff9
+// CHECK:   [[MASKED:%.*]] = and i64 %0, -9223231299366420487
+// CHECK:   inttoptr i64 [[MASKED]] to %C4enum1D*
+
+sil @multi_payload_classes_switch : $(MultiPayloadClasses) -> () {
+entry(%c : $MultiPayloadClasses):
+  switch_enum %c : $MultiPayloadClasses, case #MultiPayloadClasses.x!enumelt.1: x_dest, case #MultiPayloadClasses.y!enumelt.1: y_dest, case #MultiPayloadClasses.z!enumelt: z_dest, case #MultiPayloadClasses.w!enumelt: w_dest
+
+x_dest(%x : $C):
+  br end
+
+y_dest(%y : $D):
+  br end
+
+z_dest:
+  br end
+
+w_dest:
+  br end
+
+end:
+  return undef : $()
 }
 
 // -- test for a switch_enum bug for multi-payload, no-empty-case enums
