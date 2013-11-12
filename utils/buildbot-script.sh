@@ -276,11 +276,6 @@ fi
 
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
-  export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
-  export SIL_OPT="${SWIFT_BUILD_DIR}/bin/sil-opt"
-  export SWIFT_IDE_TEST="${SWIFT_BUILD_DIR}/bin/swift-ide-test"
-  export SWIFT_DEMANGLE="${SWIFT_BUILD_DIR}/bin/swift-demangle"
-  export LLDB_MODULEIMPORT_TEST="${SWIFT_BUILD_DIR}/bin/lldb-moduleimport-test"
   echo "--- Running Swift Tests ---"
   (cd "${SWIFT_BUILD_DIR}" &&
     make check-swift) || exit 1
