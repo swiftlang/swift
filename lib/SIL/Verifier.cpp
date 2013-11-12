@@ -666,6 +666,8 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
+    require(!EI->getField()->isStatic(),
+            "cannot get address of static property with struct_element_addr");
     require(!EI->getField()->isComputed(),
             "cannot load computed property with struct_extract");
 
@@ -705,6 +707,8 @@ public:
     require(sd, "struct_element_addr operand must be struct address");
     require(EI->getType(0).isAddress(),
             "result of struct_element_addr must be address");
+    require(!EI->getField()->isStatic(),
+            "cannot get address of static property with struct_element_addr");
     require(!EI->getField()->isComputed(),
             "cannot get address of computed property with struct_element_addr");
 
@@ -721,6 +725,8 @@ public:
     requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
     require(EI->getType(0).isAddress(),
             "result of ref_element_addr must be lvalue");
+    require(!EI->getField()->isStatic(),
+            "cannot get address of static property with struct_element_addr");
     require(!EI->getField()->isComputed(),
             "cannot get address of computed property with ref_element_addr");
     SILType operandTy = EI->getOperand().getType();
