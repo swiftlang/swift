@@ -2301,8 +2301,10 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       if (!var)
         continue;
 
-      // Computed properties are not initialized.
+      // Computed and static properties are not initialized.
       if (var->isComputed())
+        continue;
+      if (var->isStatic())
         continue;
       tc.validateDecl(var);
 
@@ -2663,7 +2665,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     patternBind->getPattern()->collectVariables(variables);
 
     for (auto var : variables) {
-      if (var->isComputed() || var->isInvalid())
+      if (var->isStatic() || var->isComputed() || var->isInvalid())
         continue;
 
       // If this variable is not default-initializable, we're done: we can't

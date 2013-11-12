@@ -730,7 +730,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     for (auto member : nominalDecl->getMembers()) {
       // We only care about pattern bindings.
       auto patternBind = dyn_cast<PatternBindingDecl>(member);
-      if (!patternBind || patternBind->isInvalid())
+      if (!patternBind || patternBind->isInvalid() || patternBind->isStatic())
         continue;
 
       // If the pattern has an initializer, use it.
@@ -763,6 +763,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       // Initialize the variables.
       for (auto var : variables) {
         if (var->isComputed())
+          continue;
+        if (var->isStatic())
           continue;
 
         // If we already saw an initializer for this member, don't

@@ -108,6 +108,17 @@ class alignas(8) Decl {
   enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
+  
+  class PatternBindingDeclBitfields {
+    friend class PatternBindingDecl;
+    unsigned : NumDeclBits;
+    
+    /// \brief Whether this pattern binding declares static variables.
+    unsigned IsStatic : 1;
+  };
+  enum { NumPatternBindingDeclBits = 1 };
+  static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
+  
   class ValueDeclBitfields {
     friend class ValueDecl;
     unsigned : NumDeclBits;
@@ -254,6 +265,7 @@ class alignas(8) Decl {
 protected:
   union {
     DeclBitfields DeclBits;
+    PatternBindingDeclBitfields PatternBindingDeclBits;
     ValueDeclBitfields ValueDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
@@ -999,6 +1011,8 @@ public:
     : Decl(DeclKind::PatternBinding, Parent),
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
+    if (StaticLoc.isValid())
+      PatternBindingDeclBits.IsStatic = true;
   }
 
   SourceLoc getStartLoc() const {
@@ -1017,6 +1031,9 @@ public:
   void setInit(Expr *expr, bool checked) {
     InitAndChecked.setPointerAndInt(expr, checked);
   }
+  
+  bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
+  void setStatic(bool s) { PatternBindingDeclBits.IsStatic = s; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;

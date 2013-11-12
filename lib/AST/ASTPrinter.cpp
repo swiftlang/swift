@@ -493,6 +493,8 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   recordDeclLoc(decl);
+  if (decl->isStatic())
+    OS << "static ";
   OS << "var ";
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
