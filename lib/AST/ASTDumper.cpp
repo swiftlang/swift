@@ -386,6 +386,9 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
+      if (VD->isStatic())
+        OS << " static";
+      
       if (VD->isComputed()) {
         if (FuncDecl *Get = VD->getGetter()) {
           OS << "\n";

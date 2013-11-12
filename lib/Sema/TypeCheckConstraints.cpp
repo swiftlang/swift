@@ -1009,11 +1009,13 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     }
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
              (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
+             (isa<VarDecl>(value) && cast<VarDecl>(value)->isStatic()) ||
              isa<TypeDecl>(value) ||
              isInstance) {
-    // For a constructor, enum element, static method, or an instance method
-    // referenced through an instance, we've consumed the curried 'self'
-    // already. For a type, strip off the 'self' we artificially added.
+    // For a constructor, enum element, static method, static property,
+    // or an instance method referenced through an instance, we've consumed the
+    // curried 'self' already. For a type, strip off the 'self' we artificially
+    // added.
     type = openedFnType->getResult();
   } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
     // For a dynamic result referring to an instance function through
@@ -2606,9 +2608,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
-    // If we aren't looking in a metatype, ignore static functions.
-    if (!isMetatype && !baseObjTy->is<ModuleType>() &&
-        isa<FuncDecl>(result) && !result->isInstanceMember())
+    // If we aren't looking in a metatype, ignore static functions and
+    // variables.
+    if (!isMetatype && !baseObjTy->is<ModuleType>()
+        && (isa<FuncDecl>(result) || isa<VarDecl>(result))
+        && !result->isInstanceMember())
       continue;
 
     // If we're doing dynamic lookup into a metatype of DynamicLookup and we've

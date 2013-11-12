@@ -377,7 +377,7 @@ namespace {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
         base = coerceObjectArgumentToType(
-                 base, isArchetypeOrExistentialRef? baseTy : containerTy,
+                 base, isArchetypeOrExistentialRef ? baseTy : containerTy,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
@@ -413,8 +413,9 @@ namespace {
         return ref;
       }
 
-      // For types and variables, build member references.
-      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+      // For types and instance variables, build member references.
+      if (isa<TypeDecl>(member)
+          || (member->isInstanceMember() && isa<VarDecl>(member))) {
         auto result
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit);
@@ -423,8 +424,8 @@ namespace {
         result->setType(simplifyType(openedType));
         return result;
       }
-
-      // Handle all other function references.
+      
+      // Handle all other references.
       Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
       ref->setType(refTy);
 
@@ -432,7 +433,19 @@ namespace {
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
         apply = new (context) ConstructorRefCallExpr(ref, base);
+      } else if (isa<VarDecl>(member) && cast<VarDecl>(member)->isStatic()) {
+        // Reference to a static property.
+        // FIXME: When we support class or protocol properties, this should
+        // probably become some sort of member ref
+        // to represent the dynamic lookup of the property address.
+        assert((base->getType()->castTo<MetaTypeType>()->getInstanceType()
+                  ->getStructOrBoundGenericStruct()
+                || base->getType()->castTo<MetaTypeType>()->getInstanceType()
+                  ->getEnumOrBoundGenericEnum())
+               && "dynamic type properties not implemented");
+        return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       } else if (!baseIsInstance && member->isInstanceMember()) {
+        // Reference to an unbound instance method.
         return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -3050,7 +3063,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
-  // Tail-recurse to actually call the constructor.
+  // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator);
 }
 
