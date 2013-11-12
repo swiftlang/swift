@@ -2763,7 +2763,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (isa<ClassDecl>(D)) {
       /* ok */
     } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
-      if (isOperator)
+      if (isOperator || cast<FuncDecl>(D)->getGetterOrSetterDecl())
         error = diag::invalid_objc_decl;
     } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
       /* ok */
