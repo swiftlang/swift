@@ -15,12 +15,11 @@ CMAKE_DEFAULT="$(which cmake || echo /usr/local/bin/cmake)"
 # will remain unset unless set explicitly
 KNOWN_SETTINGS=(
     # name                      default          description
-    build-dir                   ""               "Out-of-tree build directory; default is in-tree"
+    build-dir                   ""               "out-of-tree build directory; default is in-tree"
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
     cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
     package                     ""               "set to build packages"
     prefix                      "/usr"           "installation prefix"
-    incremental                 ""               "set to "
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
