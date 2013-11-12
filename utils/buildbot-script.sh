@@ -1,41 +1,150 @@
 #!/bin/bash -ex -o pipefail
+#
+# Note: Jenkins is set up to restore the repositories to pristine
+# state before building, so we rebuild from scratch every time.  If
+# you use this script yourself, it will NOT auto-clean before building
 
-# The Jenkins workspace is set up as follows:
-# - LLVM checked out to ${WORKSPACE}/llvm
-# - Clang checked out to ${WORKSPACE}/clang
-# - Swift checked out to ${WORKSPACE}/swift
-# - SourceKit checked out to ${WORKSPACE}/SourceKit
-# Jenkins is set up to restore the repositories to pristine state before
-# building, so we rebuild from scratch every time.
+# Set up the default path to cmake
+CMAKE_DEFAULT="$(which cmake || echo /usr/local/bin/cmake)"
 
-# Flags for testing:
-# SKIP_BUILD_LLVM -- set to skip building LLVM/Clang
-# SKIP_BUILD_SWIFT -- set to skip building Swift
-# SKIP_BUILD_SOURCEKIT -- set to skip building SourceKit
-# SKIP_TEST_SWIFT -- set to skip testing Swift
-# SKIP_TEST_SWIFT_PERFORMANCE -- set to skip testing Swift performance
-# SKIP_PACKAGE_SWIFT -- set to skip packaging Swift
-# SKIP_TEST_SOURCEKIT -- set to skip testing SourceKit
-# SKIP_PACKAGE_SOURCEKIT -- set to skip packaging SourceKit
+# Declare the set of known settings along with each one's description
+#
+# If you add a user-settable variable, add it to this list.
+#
+# a default value of "" indicates that the corresponding variable
+# will remain unset unless set explicitly
+KNOWN_SETTINGS=(
+    # name                      default          description
+    build-dir                   ""               "Out-of-tree build directory; default is in-tree"
+    build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
+    cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
+    package                     ""               "set to build packages"
+    prefix                      "/usr"           "installation prefix"
+    incremental                 ""               "set to "
+    skip-build-llvm             ""               "set to skip building LLVM/Clang"
+    skip-build-swift            ""               "set to skip building Swift"
+    skip-build-sourcekit        ""               "set to skip building SourceKit"
+    skip-test-swift             ""               "set to skip testing Swift"
+    skip-test-swift-performance ""               "set to skip testing Swift performance"
+    skip-package-swift          ""               "set to skip packaging Swift"
+    skip-test-sourcekit         ""               "set to skip testing SourceKit"
+    skip-package-sourcekit      ""               "set to skip packaging SourceKit"
+    workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
+)
 
-# The -release flag enables a release build, which will additionally build
-# a package if the build and test succeeds.
-if [ "$1" = "-release" ]; then
-  BUILD_TYPE=RelWithDebInfo
-  PACKAGE=1
-  # Include a custom name to avoid picking up stale module files.
-  CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
-else
-  BUILD_TYPE="${SWIFT_BUILD_TYPE:-Debug}"
-  PACKAGE="${SWIFT_PACKAGE}"
-  CUSTOM_VERSION_NAME="${SWIFT_CUSTOM_VERSION_NAME}"
-fi
+function to_varname() {
+    echo "${1//-/_}" | tr '[:lower:]' '[:upper:]'
+}
 
-# Set this to the path to the 'cmake' executable.
-CMAKE=${SWIFT_CMAKE:-$(which cmake || echo /usr/local/bin/cmake)}
+# Set up an "associative array" of settings for error checking, and set
+# (or unset) each corresponding variable to its default value
+# If the Mac's bash were not stuck in the past, we could "declare -A" an
+# associative array, but instead we have to hack it by defining variables
+# declare -A IS_KNOWN_SETTING
+for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+    setting="${KNOWN_SETTINGS[i]}"
+    
+    default_value="${KNOWN_SETTINGS[$((i+1))]}"
+    
+    varname="$(to_varname "${setting}")"    # upcase the setting name to get the variable
+    eval "${varname}_IS_KNOWN_SETTING=1"
+
+    if [[ "${default_value}" ]] ; then
+        # For an explanation of the backslash see http://stackoverflow.com/a/9715377
+        eval ${varname}=$\default_value
+    else
+        unset ${varname}
+    fi
+done
+
+COMMAND_NAME="$(basename "$0")"
+
+# Print instructions for using this script to stdout
+usage() {
+    echo "Usage: ${COMMAND_NAME} [--help|-h] [ --SETTING=VALUE | --SETTING VALUE | --SETTING | --release ] *"
+    echo
+    echo "  Available settings. Each setting corresponds to a variable,"
+    echo "  obtained by upcasing its name, in this script.  A variable"
+    echo "  with no default listed here will be unset in the script if"
+    echo "  not explicitly specified.  A setting passed in the 2nd form"
+    echo "  will set its corresponding variable to \"1\"."
+    echo
+
+    setting_list="
+ | |Setting| Default|Description
+ | |-------| -------|-----------
+"
+
+    for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+        setting_list+="\
+ | |--${KNOWN_SETTINGS[i]}| ${KNOWN_SETTINGS[$((i+1))]}|${KNOWN_SETTINGS[$((i+2))]}
+"
+    done
+    echo "${setting_list}" | column -x -s'|' -t
+    echo
+    echo "Note: when using the form --SETTING VALUE, VALUE must not begin "
+    echo "      with a hyphen."
+    echo "Note: the \"--release\" option creates a pre-packaged combination"
+    echo "      of settings used by the buildbot."
+}
+
+# Scan all command-line arguments
+while [[ "$1" ]] ; do
+    case "$1" in
+        -h | --help )
+            usage
+            exit
+            ;;
+
+        
+        --* )
+            dashless="${1:2}"
+            
+            # drop suffix beginning with the first "="
+            setting="${dashless%%=*}" 
+
+            # compute the variable to set
+            varname="$(to_varname "${setting}")"
+
+            # check to see if this is a known option
+            known_var_name="${varname}_IS_KNOWN_SETTING"
+            if [[ ! "${!known_var_name}" ]] ; then
+                echo "Error: Unknown setting: ${setting}" 1>&2
+                usage 1>&2
+                exit 1
+            fi
+
+            # find the intended value
+            if [[ "${dashless}" == *=* ]] ; then              # if there's an '=', the value
+                value="${dashless#*=}"                        #   is everything after the first '='
+            elif [[ "$2" ]] && [[ "${2:0:1}" != "-" ]] ; then # else if the next parameter exists
+                value="$2"                                    #    but isn't  an option, use that
+                shift
+            else                                             # otherwise, the value is 1
+                value=1                                  
+            fi
+            
+            # For explanation of backslash see http://stackoverflow.com/a/9715377
+            eval ${varname}=$\value
+            ;;
+
+        # The --release flag enables a release build, which will additionally build
+        # a package if the build-and-test succeeds.
+        --release | -release )
+            BUILD_TYPE=RelWithDebInfo
+            PACKAGE=1
+            # Include a custom name to avoid picking up stale module files.
+            CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
+            ;;
+        *)
+            usage
+            exit 1
+    esac
+    shift
+done
 
 # Set this to the install prefix for release builds.
-INSTALL_PREFIX=${SWIFT_INSTALL_PREFIX:-/usr}
+INSTALL_PREFIX="${PREFIX}"
 
 # Set these to the paths of the OS X SDK and toolchain.
 SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
@@ -56,6 +165,23 @@ test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
 test -d "$WORKSPACE/SourceKit"
 
+# Calculate build directories for each product
+for product in swift llvm SourceKit ; do
+    varname="$(echo "${product}" | tr '[:lower:]' '[:upper:]')"_BUILD_DIR
+    if [[ "${BUILD_DIR}" ]] ; then
+        product_build_dir="${BUILD_DIR}/${product}"
+    else
+        product_build_dir="${WORKSPACE}/${product}/build"
+    fi
+    eval "$varname=\$product_build_dir"
+done
+
+SWIFT_MODULE_CACHE="${BUILD_DIR:-${WORKSPACE}}/swift-module-cache"
+echo SWIFT_MODULE_CACHE="${SWIFT_MODULE_CACHE}"
+
+echo "LLVM_BUILD_DIR=${LLVM_BUILD_DIR}"
+echo "SWIFT_BUILD_DIR=${SWIFT_BUILD_DIR}"
+
 if [[ "$PACKAGE" ]]; then
   # Make sure install-test-script.sh is available alongside us.
   INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
@@ -73,16 +199,16 @@ if [[ "$PACKAGE" ]]; then
 fi
 
 # Symlink clang into the llvm tree.
-ln -sf "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
+ln -sf  "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
 
 # Create a fresh directory for the Swift Clang module cache.
-if [ -e "$WORKSPACE/swift-module-cache" ]; then
-  rm -rf "$WORKSPACE/swift-module-cache" || exit 1
+if [ -e "${SWIFT_MODULE_CACHE}" ]; then
+  rm -rf "${SWIFT_MODULE_CACHE}" || exit 1
 fi
-mkdir -p "$WORKSPACE/swift-module-cache"
+mkdir -p "${SWIFT_MODULE_CACHE}"
 
 # Make extra sure it's empty.
-if [ "$(ls -A "$WORKSPACE/swift-module-cache")" ]; then
+if [ "$(ls -A "${SWIFT_MODULE_CACHE}")" ]; then
   echo "Module cache not empty! Aborting."
   exit 1
 fi
@@ -90,8 +216,8 @@ fi
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
-  mkdir -p "$WORKSPACE/llvm/build"
-  (cd "$WORKSPACE/llvm/build" &&
+  mkdir -p "${LLVM_BUILD_DIR}"
+  (cd "${LLVM_BUILD_DIR}" &&
     "$CMAKE" -G "Unix Makefiles" \
       -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
       -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
@@ -102,62 +228,62 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
       -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
-      .. &&
+      "$WORKSPACE/llvm" &&
     make -j8) || exit 1
 fi
 
 # Build Swift.
 if [ \! "$SKIP_BUILD_SWIFT" ]; then
   echo "--- Building Swift ---"
-  mkdir -p "$WORKSPACE/swift/build"
-  (cd "$WORKSPACE/swift/build" &&
+  mkdir -p "${SWIFT_BUILD_DIR}"
+  (cd "${SWIFT_BUILD_DIR}" &&
     "$CMAKE" -G "Unix Makefiles" \
       -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
       -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
       -DSWIFT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
-      -DSWIFT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
+      -DSWIFT_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
-      -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
-      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
+      -DSWIFT_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+      -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE}" \
       -DSWIFT_RUN_LONG_TESTS="ON" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
-      .. &&
+      "$WORKSPACE/swift" &&
     make -j8) || exit 1
 fi
 
 # Build SourceKit.
 if [ \! "$SKIP_BUILD_SOURCEKIT" ]; then
   echo "--- Building SourceKit ---"
-  mkdir -p "$WORKSPACE/SourceKit/build"
-  (cd "$WORKSPACE/SourceKit/build" &&
+  mkdir -p "${SOURCEKIT_BUILD_DIR}"
+  (cd "${SOURCEKIT_BUILD_DIR}" &&
     "$CMAKE" -G "Unix Makefiles" \
       -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
       -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
       -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift" \
-      -DSOURCEKIT_PATH_TO_SWIFT_BUILD="$WORKSPACE/swift/build" \
+      -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}" \
       -DSOURCEKIT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
-      -DSOURCEKIT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
+      -DSOURCEKIT_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
       -DSOURCEKIT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
-      -DSOURCEKIT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
-      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
+      -DSOURCEKIT_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+      -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE}" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
-      .. &&
+      "$WORKSPACE/SourceKit" &&
     make -j8) || exit 1
 fi
 
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
-  export SWIFT="$WORKSPACE/swift/build/bin/swift"
-  export SIL_OPT="$WORKSPACE/swift/build/bin/sil-opt"
-  export SWIFT_IDE_TEST="$WORKSPACE/swift/build/bin/swift-ide-test"
-  export SWIFT_DEMANGLE="$WORKSPACE/swift/build/bin/swift-demangle"
-  export LLDB_MODULEIMPORT_TEST="$WORKSPACE/swift/build/bin/lldb-moduleimport-test"
+  export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
+  export SIL_OPT="${SWIFT_BUILD_DIR}/bin/sil-opt"
+  export SWIFT_IDE_TEST="${SWIFT_BUILD_DIR}/bin/swift-ide-test"
+  export SWIFT_DEMANGLE="${SWIFT_BUILD_DIR}/bin/swift-demangle"
+  export LLDB_MODULEIMPORT_TEST="${SWIFT_BUILD_DIR}/bin/lldb-moduleimport-test"
   echo "--- Running Swift Tests ---"
-  (cd "$WORKSPACE/swift/build" &&
+  (cd "${SWIFT_BUILD_DIR}" &&
     make check-swift) || exit 1
 fi
 
@@ -170,9 +296,9 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   # are testing.
   echo "--- Running Swift Performance Tests ---"
   export CLANG="$TOOLCHAIN/usr/bin/clang"
-  export SWIFT="$WORKSPACE/swift/build/bin/swift"
-  if (cd "$WORKSPACE/swift/build" &&
-          "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
+  export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
+  if (cd "${SWIFT_BUILD_DIR}" &&
+          "${LLVM_BUILD_DIR}/bin/llvm-lit" -v benchmark \
               -j1 --output benchmark/results.json); then
       PERFORMANCE_TESTS_PASSED=1
   else
@@ -180,7 +306,7 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   fi
   echo "--- Submitting Swift Performance Tests ---"
   swift_source_revision="$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")"
-  (cd "$WORKSPACE/swift/build" &&
+  (cd "${SWIFT_BUILD_DIR}" &&
     "$WORKSPACE/swift/utils/submit-benchmark-results" benchmark/results.json \
         --output benchmark/lnt_results.json \
         --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
@@ -196,11 +322,11 @@ fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
-  (cd "$WORKSPACE/swift/build" &&
+  (cd "${SWIFT_BUILD_DIR}" &&
     make -j8 package) || exit 1
 
   saw_package=
-  for package in "$WORKSPACE/swift/build"/swift-*.tar.gz; do
+  for package in "${SWIFT_BUILD_DIR}"/swift-*.tar.gz; do
     if [ "$saw_package" ]; then
       echo "More than one package file built!"
       exit 1
@@ -301,20 +427,20 @@ fi
 
 # Run the SourceKit tests.
 if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
-  export SWIFT="$WORKSPACE/swift/build/bin/swift"
-  export SOURCEKITD_TEST="$WORKSPACE/SourceKit/build/bin/sourcekitd-test"
+  export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
+  export SOURCEKITD_TEST="${SOURCEKIT_BUILD_DIR}/bin/sourcekitd-test"
   echo "--- Running SourceKit Tests ---"
-  (cd "$WORKSPACE/SourceKit/build" &&
-    "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
+  (cd "${SOURCEKIT_BUILD_DIR}" &&
+    "${LLVM_BUILD_DIR}/bin/llvm-lit" -sv test) || exit 1
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
   echo "--- Building SourceKit Package ---"
-  (cd "$WORKSPACE/SourceKit/build" &&
+  (cd "${SOURCEKIT_BUILD_DIR}" &&
     /bin/sh -ex "$WORKSPACE/SourceKit/utils/buildbot-package-sourcekit.sh") || exit 1
 
   saw_package=
-  for package in "$WORKSPACE/SourceKit/build"/SourceKit-*.tar.gz; do
+  for package in "${SOURCEKIT_BUILD_DIR}"/SourceKit-*.tar.gz; do
     if [ "$saw_package" ]; then
       echo "More than one package file built!"
       exit 1
