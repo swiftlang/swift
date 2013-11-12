@@ -765,11 +765,12 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                     (Size)TargetInfo.getPointerWidth(0),
                     (Alignment)TargetInfo.getPointerAlign(0),
                     IGF.getDebugScope());
-  emitVariableDeclaration(IGF.Builder, Metadata, DTI,
-                          TName, llvm::dwarf::DW_TAG_auto_variable,
-                          0, DirectValue, ArtificialValue,
-                          isa<llvm::AllocaInst>(Metadata) ? Declare :
-                          Value);
+  emitVariableDeclaration
+    (IGF.Builder, Metadata, DTI,
+     TName, llvm::dwarf::DW_TAG_auto_variable, 0,
+     isa<llvm::AllocaInst>(Metadata) ? IndirectValue : DirectValue,
+     ArtificialValue,
+     isa<llvm::AllocaInst>(Metadata) ? Declare : Value);
 }
 
 

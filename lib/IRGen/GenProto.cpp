@@ -34,6 +34,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/IRGen/Options.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1260,9 +1261,19 @@ static void setMetadataRef(IRGenFunction &IGF,
                                LocalTypeData::Metatype,
                                metadata);
 
+  // Create a shadow copy of the metadata in an alloca for the debug info.
+  StringRef Name = metadata->getName();
+  if (IGF.IGM.Opts.OptLevel == 0) {
+    auto Alloca = IGF.createAlloca(metadata->getType(),
+                                   IGF.IGM.getPointerAlignment(), Name);
+    IGF.Builder.CreateAlignedStore(metadata, Alloca.getAddress(),
+                                   IGF.IGM.getPointerAlignment().getValue());
+    metadata = Alloca.getAddress();
+  }
+
   // Emit debug info for the metadata.
   if (IGF.IGM.DebugInfo)
-    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, metadata, metadata->getName());
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, metadata, Name);
 }
 
 static void setWitnessTable(IRGenFunction &IGF,
