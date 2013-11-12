@@ -15,17 +15,18 @@ could let people write algorithms the way they do with arrays:
 .. parsed-literal::
 
   extension Indexable {
-  def find<Seq: Indexable where Seq.Element: Equatable>(
-    s: Seq, findme: Seq.Element) -> Seq.Index
-  {
-    for var i = s.start; i != s.end; **++i** {
-      if **s[i]** == findme {
-        return i
+    def find<Seq: Indexable where Seq.Element: Equatable>(
+      s: Seq, findme: Seq.Element) -> Seq.Index
+    {
+      for var i = s.start; i != s.end; **++i** {
+        if **s[i]** == findme {
+          return i
+        }
       }
+      return s.end
     }
-    return s.end
   }
-  }
+   
 The problem is that in order to move some indices, like those for
 ``String`` (which stores variable-length grapheme clusters) and
 ``Dictionary`` (which uses open addressing and therefore contains
