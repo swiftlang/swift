@@ -1545,7 +1545,7 @@ class NodePrinter
 public:
   
   NodePrinter (NodePointer root, DemangleOptions options) :
-    Printer(), Root (root), Options(options)
+  Printer(), Root (root), Options(options)
   {
   }
   
@@ -1720,8 +1720,6 @@ private:
           }
         }
       }
-      
-
       return (is_slice ? SugarType::Slice : SugarType::None);
     }
 
@@ -1744,7 +1742,7 @@ private:
       toStringBoundGenericNoSugar(pointer);
       return;
     }
-    
+
     SugarType sugarType = findSugar(pointer);
     
     switch (sugarType)
@@ -1824,15 +1822,8 @@ private:
         case swift::Demangle::Node::Kind::Identifier:
           Printer << pointer->getText();
           break;
-        case swift::Demangle::Node::Kind::FunctionName:
-          break;
         case swift::Demangle::Node::Kind::FunctionType:
           toStringChildren(pointer);
-          break;
-        case swift::Demangle::Node::Kind::DeclarationName:
-          break;
-        case swift::Demangle::Node::Kind::DeclarationType:
-          toStringChildren(pointer, ".");
           break;
         case swift::Demangle::Node::Kind::UncurriedFunctionType: {
           NodePointer metatype = pointer->child_at(0);
@@ -1920,7 +1911,6 @@ private:
           Printer << "[objc] ";
           pointer = pointer->getNextNode(); continue;
         case swift::Demangle::Node::Kind::BuiltinTypeName:
-        case swift::Demangle::Node::Kind::BaseName:
         case swift::Demangle::Node::Kind::Number:
           Printer << pointer->getText();
           break;
@@ -2115,8 +2105,6 @@ private:
         case swift::Demangle::Node::Kind::TypeList:
           toStringChildren(pointer);
           break;
-        case swift::Demangle::Node::Kind::Substitution:
-        case swift::Demangle::Node::Kind::TypeName:
         case swift::Demangle::Node::Kind::ArchetypeAndProtocol: {
           NodePointer child0 = pointer->child_at(0);
           NodePointer child1 = pointer->child_at(1);
