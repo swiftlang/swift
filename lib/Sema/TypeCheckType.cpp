@@ -991,6 +991,18 @@ static bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
   return false;
 }
 
+static Type getFunctionParamType(const Pattern *P) {
+  if (auto *TP = dyn_cast<TypedPattern>(P))
+    return TP->getType();
+  return {};
+}
+
+static SourceRange getFunctionParamTypeSourceRange(const Pattern *P) {
+  if (auto *TP = dyn_cast<TypedPattern>(P))
+    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
+  return {};
+}
+
 static bool isParamRepresentableInObjC(TypeChecker &TC,
                                        const DeclContext *DC,
                                        const Pattern *P) {
@@ -1019,6 +1031,11 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
         }
         TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
                     ParamIndex);
+        if (Type ParamTy = getFunctionParamType(TupleElt.getPattern())) {
+          SourceRange SR =
+              getFunctionParamTypeSourceRange(TupleElt.getPattern());
+          TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
+        }
       }
       ParamIndex++;
     }
