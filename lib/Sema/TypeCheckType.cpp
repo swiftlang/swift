@@ -1042,7 +1042,18 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     return IsObjC;
   }
   auto *PP = cast<ParenPattern>(P);
-  return isParamRepresentableInObjC(TC, AFD, PP->getSubPattern());
+  if (!isParamRepresentableInObjC(TC, AFD, PP->getSubPattern())) {
+    if (!Diagnose) {
+      // Return as soon as possible if we are not producing diagnostics.
+      return false;
+    }
+  }
+  TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type);
+  if (Type ParamTy = getFunctionParamType(PP->getSubPattern())) {
+    SourceRange SR = getFunctionParamTypeSourceRange(PP->getSubPattern());
+    TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
+  }
+  return false;
 }
 
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
