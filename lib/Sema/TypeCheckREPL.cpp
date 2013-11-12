@@ -206,7 +206,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // first walk through the loop and initialize it to "true".
   VarDecl *firstVar = nullptr;
   if (boolTy && trueDecl && falseDecl) {
-    firstVar = new (context) VarDecl(Loc,
+    firstVar = new (context) VarDecl(/*static*/ false,
+                                     Loc,
                                      context.getIdentifier("first"),
                                      boolTy, DC);
     Pattern *pattern = new (context) NamedPattern(firstVar);
@@ -215,7 +216,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     pattern->setType(boolTy);
 
     Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc, /*Implicit=*/true);
-    BodyContent.push_back(new (context) PatternBindingDecl(Loc, pattern, init,
+    BodyContent.push_back(new (context) PatternBindingDecl(SourceLoc(),
+                                                           Loc, pattern, init,
                                                            DC));
   }
 
@@ -224,7 +226,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
   // Create the "value" variable and its pattern.
   auto valueId = context.getIdentifier("value");
-  VarDecl *valueVar = new (context) VarDecl(Loc, valueId, ValueTy, DC);
+  VarDecl *valueVar = new (context) VarDecl(/*static*/ false,
+                                            Loc, valueId, ValueTy, DC);
   Pattern *valuePattern = new (context) NamedPattern(valueVar);
   valuePattern->setType(ValueTy);
   valuePattern = new (context) TypedPattern(valuePattern,
@@ -239,7 +242,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     // Form the key variable and its pattern.
     auto keyId = context.getIdentifier("key");
-    keyVar = new (context) VarDecl(Loc, keyId, KeyTy, DC);
+    keyVar = new (context) VarDecl(/*static*/ false,
+                                   Loc, keyId, KeyTy, DC);
     Pattern *keyPattern = new (context) NamedPattern(keyVar);
     keyPattern->setType(KeyTy);
     keyPattern = new (context) TypedPattern(keyPattern,
@@ -519,7 +523,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
     PrintDecls.push_back(Result.getValueDecl());
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (C) VarDecl(Loc,
+  VarDecl *Arg = new (C) VarDecl(/*static*/ false,
+                                 Loc,
                                  TC->Context.getIdentifier("arg"),
                                  E->getType(), nullptr);
   Pattern *ParamPat = new (C) NamedPattern(Arg);
@@ -604,7 +609,8 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(&SF.TU);
-  VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(), name,
+  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
+                                          E->getStartLoc(), name,
                                           E->getType(), &SF);
   SF.Decls.push_back(vd);
 
@@ -612,7 +618,8 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
+    = new (TC->Context) PatternBindingDecl(SourceLoc(),
+                                           E->getStartLoc(), metavarPat, E,
                                            &SF);
   SF.Decls.push_back(metavarBinding);
 
@@ -663,7 +670,8 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(&SF.TU);
-  VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(), name,
+  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
+                                          PBD->getStartLoc(), name,
                                           PBD->getPattern()->getType(), &SF);
   SF.Decls.push_back(vd);
 
@@ -672,7 +680,8 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
+    = new (TC->Context) PatternBindingDecl(SourceLoc(),
+                                           PBD->getStartLoc(), metavarPat,
                                            PBD->getInit(), &SF);
 
   auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),

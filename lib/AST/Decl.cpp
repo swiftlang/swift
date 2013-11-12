@@ -219,12 +219,13 @@ void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
+  SourceLoc startLoc = getStartLoc();
   if (auto init = getInit()) {
     SourceLoc EndLoc = init->getSourceRange().End;
     if (EndLoc.isValid())
-      return { VarLoc, EndLoc };
+      return { startLoc, EndLoc };
   }
-  return { VarLoc, Pat->getSourceRange().End };
+  return { startLoc, Pat->getSourceRange().End };
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -322,9 +323,8 @@ bool ValueDecl::isInstanceMember() const {
     return true;
 
   case DeclKind::Var:
-    // Variables are always instance variables.
-    // FIXME: Until we get static variables.
-    return true;
+    // Non-static variables are instance members.
+    return !cast<VarDecl>(this)->isStatic();
   }
 }
 

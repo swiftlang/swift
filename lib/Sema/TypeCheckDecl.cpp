@@ -2309,7 +2309,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       auto varType = tc.getTypeOfRValue(var);
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(Loc,
+      auto *arg = new (context) VarDecl(/*static*/ false,
+                                        Loc,
                                         var->getName(),
                                         varType, decl);
       allArgs.push_back(arg);
@@ -2323,7 +2324,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   auto constructorID = context.getIdentifier("init");
   VarDecl *selfDecl
-    = new (context) VarDecl(Loc,
+    = new (context) VarDecl(/*static*/ false,
+                            Loc,
                             context.getIdentifier("self"),
                             Type(), decl);
   ConstructorDecl *ctor
@@ -2423,7 +2425,8 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
     return;
 
   VarDecl *SelfDecl = new (Context)
-      VarDecl(SourceLoc(), Context.getIdentifier("self"), Type(), CD);
+    VarDecl(/*static*/ false,
+            SourceLoc(), Context.getIdentifier("self"), Type(), CD);
   DestructorDecl *DD =
       new (Context) DestructorDecl(Context.getIdentifier("destructor"),
                                    CD->getLoc(), SelfDecl, CD);

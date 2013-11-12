@@ -482,8 +482,9 @@ public:
 
   /// \brief Add the variables in the given pattern to the current scope,
   /// collecting the variables in the vector \c Decls and applying
-  /// \c Attributes to each one.
+  /// \c Attributes and \c Static to each one.
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
+                      bool IsStatic,
                       DeclAttributes &Attributes,
                       PatternBindingDecl *PBD = nullptr);
   
@@ -522,10 +523,12 @@ public:
   parseDeclClass(unsigned Flags, DeclAttributes &Attributes);
   ParserStatus parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
-                            bool IsStatic);
+                            SourceLoc StaticLoc);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
-                   FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
-  void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
+                   FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
+                   bool IsStatic);
+  void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType,
+                          bool IsStatic);
   
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,

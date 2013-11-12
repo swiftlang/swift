@@ -1253,6 +1253,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isObjC(),
                           var->getAttrs().isIBOutlet(),
                           var->getAttrs().isOptional(),
+                          var->isStatic(),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),

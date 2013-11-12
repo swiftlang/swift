@@ -1135,7 +1135,8 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     SmallVector<TuplePatternElt, 4> elements;
     do {
       if (Tok.is(tok::identifier)) {
-        auto var = new (Context) VarDecl(Tok.getLoc(),
+        auto var = new (Context) VarDecl(/*static*/ false,
+                                         Tok.getLoc(),
                                          Context.getIdentifier(Tok.getText()),
                                          Type(), nullptr);
         elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
@@ -1335,7 +1336,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = Loc;
-    VarDecl *var = new (Context) VarDecl(varLoc, ident, Type(), closure);
+    VarDecl *var = new (Context) VarDecl(/*static*/ false,
+                                         varLoc, ident, Type(), closure);
     decls.push_back(var);
   }
 

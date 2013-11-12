@@ -536,8 +536,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
       UnhandledStatic = false;
     }
-    Status = parseDeclVar(Flags, Attributes, Entries,
-                          /*isStatic*/ StaticLoc.isValid());
+    Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc);
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
@@ -987,6 +986,7 @@ namespace {
     ASTContext &Context;
     DeclContext *CurDeclContext;
     SmallVectorImpl<Decl*> &Decls;
+    bool IsStatic;
     DeclAttributes &Attributes;
     PatternBindingDecl *PBD;
     
@@ -994,12 +994,14 @@ namespace {
                    ASTContext &Context,
                    DeclContext *CurDeclContext,
                    SmallVectorImpl<Decl*> &Decls,
+                   bool IsStatic,
                    DeclAttributes &Attributes,
                    PatternBindingDecl *PBD)
       : TheParser(P),
         Context(Context),
         CurDeclContext(CurDeclContext),
         Decls(Decls),
+        IsStatic(IsStatic),
         Attributes(Attributes),
         PBD(PBD)
     {}
@@ -1009,6 +1011,7 @@ namespace {
       if (auto *Named = dyn_cast<NamedPattern>(P)) {
         VarDecl *VD = Named->getDecl();
         VD->setDeclContext(CurDeclContext);
+        VD->setStatic(IsStatic);
         VD->setParentPattern(PBD);
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
@@ -1039,10 +1042,11 @@ namespace {
 
 void Parser::addVarsToScope(Pattern *Pat,
                             SmallVectorImpl<Decl*> &Decls,
+                            bool IsStatic,
                             DeclAttributes &Attributes,
                             PatternBindingDecl *PBD) {
   Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
-                           Decls, Attributes, PBD));
+                           Decls, IsStatic, Attributes, PBD));
 }
 
 /// \brief Parse a get-set clause, containing a getter and (optionally)
@@ -1064,7 +1068,8 @@ void Parser::addVarsToScope(Pattern *Pat,
 /// \endverbatim
 bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
-                         SourceLoc &LastValidLoc) {
+                         SourceLoc &LastValidLoc,
+                         bool IsStatic) {
   bool Invalid = false;
   Get = nullptr;
   Set = nullptr;
@@ -1216,7 +1221,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
 
     {
-      VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName,
+      VarDecl *Value = new (Context) VarDecl(IsStatic,
+                                             SetNameLoc, SetName,
                                              Type(), CurDeclContext);
       if (IsNameImplicit)
         Value->setImplicit();
@@ -1274,7 +1280,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///   decl-var:
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
-void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
+void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
+                                bool IsStatic) {
   bool Invalid = false;
     
   // The grammar syntactically requires a simple identifier for the variable
@@ -1310,7 +1317,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc,
-                  Get, Set, LastValidLoc))
+                  Get, Set, LastValidLoc, IsStatic))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1347,7 +1354,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
-                                  bool IsStatic) {
+                                  SourceLoc StaticLoc) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
 
   SmallVector<PatternBindingDecl*, 4> PBDs;
@@ -1366,7 +1373,8 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
-      parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType);
+      parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType,
+                         StaticLoc.isValid());
       HasGetSet = true;
     }
 
@@ -1400,12 +1408,13 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     }
 
     // In the normal case, just add PatternBindingDecls to our DeclContext.
-    auto PBD = new (Context) PatternBindingDecl(VarLoc, pattern.get(),
+    auto PBD = new (Context) PatternBindingDecl(StaticLoc, VarLoc,
+                                                pattern.get(),
                                                 Init.getPtrOrNull(),
                                                 CurDeclContext);
     Decls.push_back(PBD);
 
-    addVarsToScope(pattern.get(), Decls, Attributes, PBD);
+    addVarsToScope(pattern.get(), Decls, StaticLoc.isValid(), Attributes, PBD);
 
     // Propagate back types for simple patterns, like "var A, B : T".
     if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
@@ -1439,7 +1448,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       diagnose(VarLoc, diag::disallowed_computed_var_decl);
       Status.setIsParseError();
     }
-  } else if (!IsStatic && (Flags & PD_DisallowStoredInstanceVar)) {
+  } else if (!StaticLoc.isValid() && (Flags & PD_DisallowStoredInstanceVar)) {
     diagnose(VarLoc, diag::disallowed_stored_var_decl);
     Status.setIsParseError();
     return Status;
@@ -1491,7 +1500,8 @@ static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
 /// \brief Build an implicit 'self' parameter for the current DeclContext.
 Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
   VarDecl *D
-    = new (Context) VarDecl(Loc, Context.getIdentifier("self"),
+    = new (Context) VarDecl(/*static*/ false,
+                            Loc, Context.getIdentifier("self"),
                             Type(), CurDeclContext);
   D->setImplicit();
   Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
@@ -2294,7 +2304,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     
     SourceLoc LastValidLoc = LBLoc;
     if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
-                    Get, Set, LastValidLoc))
+                    Get, Set, LastValidLoc, /*IsStatic*/ false))
       Status.setIsParseError();
 
     // Parse the final '}'.
@@ -2399,7 +2409,8 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
   }
 
   VarDecl *SelfDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
+    = new (Context) VarDecl(/*static*/ false,
+                            SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
@@ -2514,8 +2525,9 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   }
 
   VarDecl *SelfDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
-                          Type(), CurDeclContext);
+    = new (Context) VarDecl(/*static*/ false,
+                            SourceLoc(), Context.getIdentifier("self"),
+                            Type(), CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD

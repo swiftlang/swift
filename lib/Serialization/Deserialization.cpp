@@ -1052,21 +1052,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBOutlet, isOptional;
+    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isIBOutlet, isOptional, typeID,
-                                       interfaceTypeID,
+                                       isObjC, isIBOutlet, isOptional, isStatic,
+                                       typeID, interfaceTypeID,
                                        getterID, setterID, overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       break;
 
-    auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
+    auto var = new (ctx) VarDecl(isStatic, SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), DC);
 
     declOrOffset = var;
@@ -1209,7 +1209,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     Pattern *pattern = maybeReadPattern();
     assert(pattern);
 
-    auto binding = new (ctx) PatternBindingDecl(SourceLoc(), pattern,
+    auto binding = new (ctx) PatternBindingDecl(SourceLoc(),
+                                                SourceLoc(), pattern,
                                                 /*init=*/nullptr,
                                                 getDeclContext(contextID));
     declOrOffset = binding;

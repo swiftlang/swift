@@ -269,7 +269,8 @@ public:
       if (!GetGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
-      Generator = new (TC.Context) VarDecl(S->getInLoc(),
+      Generator = new (TC.Context) VarDecl(/*static*/ false,
+                                           S->getInLoc(),
                                      TC.Context.getIdentifier("$generator"),
                                      GeneratorTy, DC);
       Generator->setImplicit();
@@ -277,7 +278,8 @@ public:
       // Create a pattern binding to initialize the generator.
       auto GenPat = new (TC.Context) NamedPattern(Generator);
       GenPat->setImplicit();
-      auto GenBinding = new (TC.Context) PatternBindingDecl(S->getForLoc(),
+      auto GenBinding = new (TC.Context) PatternBindingDecl(SourceLoc(),
+                                                            S->getForLoc(),
                                                           GenPat, GetGenerator,
                                                           DC);
       GenBinding->setImplicit();

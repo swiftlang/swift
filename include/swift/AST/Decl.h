@@ -116,6 +116,17 @@ class alignas(8) Decl {
   enum { NumValueDeclBits = NumDeclBits + 1 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
+  class VarDeclBitfields {
+    friend class VarDecl;
+    unsigned : NumValueDeclBits;
+    
+    /// \brief Whether this property is a type property (currently unfortunately
+    /// called 'static').
+    unsigned Static : 1;
+  };
+  enum { NumVarDeclBits = NumValueDeclBits + 1 };
+  static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
+  
   class AbstractFunctionDeclBitfields {
     friend class AbstractFunctionDecl;
     unsigned : NumValueDeclBits;
@@ -245,6 +256,7 @@ protected:
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
+    VarDeclBitfields VarDeclBits;
     FuncDeclBitfields FuncDeclBits;
     TypeDeclBitfields TypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
@@ -971,8 +983,9 @@ public:
 // "var (a,b) = foo()", this contains the pattern "(a,b)" and the intializer
 // "foo()".  The same applies to simpler declarations like "var a = foo()".)
 class PatternBindingDecl : public Decl {
-  SourceLoc VarLoc; // Location of the 'var' keyword
-  Pattern *Pat; // The pattern which this decl binds
+  SourceLoc StaticLoc; ///< Location of the 'static' keyword, if present.
+  SourceLoc VarLoc; ///< Location of the 'var' keyword.
+  Pattern *Pat; ///< The pattern this decl binds.
 
   /// The initializer, and whether it's been type-checked already.
   llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
@@ -980,13 +993,17 @@ class PatternBindingDecl : public Decl {
   friend class Decl;
   
 public:
-  PatternBindingDecl(SourceLoc VarLoc, Pattern *Pat, Expr *E,
+  PatternBindingDecl(SourceLoc StaticLoc,
+                     SourceLoc VarLoc, Pattern *Pat, Expr *E,
                      DeclContext *Parent)
-    : Decl(DeclKind::PatternBinding, Parent), VarLoc(VarLoc), Pat(Pat),
+    : Decl(DeclKind::PatternBinding, Parent),
+      StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
   }
 
-  SourceLoc getStartLoc() const { return VarLoc; }
+  SourceLoc getStartLoc() const {
+    return StaticLoc.isValid() ? StaticLoc : VarLoc;
+  }
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
@@ -2012,8 +2029,11 @@ private:
   VarDecl *OverriddenDecl = nullptr;
 
 public:
-  VarDecl(SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, NameLoc) {
+  VarDecl(bool IsStatic,
+          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, NameLoc)
+  {
+    VarDeclBits.Static = IsStatic;
     setType(Ty);
   }
 
@@ -2077,6 +2097,10 @@ public:
   /// its setter selector in the given buffer (as UTF-8).
   StringRef getObjCSetterSelector(SmallVectorImpl<char> &buffer) const;
   
+  /// Is this a type ('static') variable?
+  bool isStatic() const { return VarDeclBits.Static; }
+  void setStatic(bool IsStatic) { VarDeclBits.Static = IsStatic; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
 };

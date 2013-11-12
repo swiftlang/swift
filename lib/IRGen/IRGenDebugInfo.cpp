@@ -418,7 +418,8 @@ createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
                     llvm::DIDescriptor Scope,
                     DeclContext* DeclCtx) {
   if (DeclCtx) {
-    VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
+    VarDecl VD(/*static*/ false,
+               SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
     DebugTypeInfo DTy(&VD, Types.getCompleteTypeInfo(CanTy));
     Parameters.push_back(getOrCreateType(DTy, Scope));
   } else {
@@ -926,7 +927,8 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
-    VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), ElemTy, DeclContext);
+    VarDecl VD(/*static*/ false,
+               SourceLoc(), Identifier::getEmptyKey(), ElemTy, DeclContext);
     DebugTypeInfo DTI(&VD, Types.getCompleteTypeInfo(ElemTy->getCanonicalType()));
     Elements.push_back(createMemberType(DTI, OffsetInBits, Scope, File, Flags));
   }
@@ -1029,7 +1031,8 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                       llvm::DIDescriptor Scope)
 {
   if (auto Decl = DbgTy.getDecl()) {
-    VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
+    VarDecl VD(/*static*/ false,
+               SourceLoc(), Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
     return getOrCreateType(DebugTypeInfo(&VD, DbgTy.size, DbgTy.align), Scope);
   }
   return getOrCreateType(DebugTypeInfo(Ty, DbgTy.size, DbgTy.align), Scope);
@@ -1384,7 +1387,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto File = getOrCreateFile(L.Filename);
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
-      VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), AliasedTy,
+      VarDecl VD(/*static*/ false,
+                 SourceLoc(), Identifier::getEmptyKey(), AliasedTy,
                  Decl->getDeclContext());
       DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);
       return DBuilder.createTypedef(getOrCreateType(DTI, Scope),

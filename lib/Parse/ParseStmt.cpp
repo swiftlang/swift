@@ -662,7 +662,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls,
-                                              /*isStatic*/ false);
+                                              SourceLoc());
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {
@@ -847,7 +847,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   Scope S(this, ScopeKind::ForeachVars);
   SmallVector<Decl *, 2> Decls;
   DeclAttributes Attributes;
-  addVarsToScope(Pattern.get(), Decls, Attributes);
+  addVarsToScope(Pattern.get(), Decls, /*static*/ false, Attributes);
 
   ParserStatus Status;
 
@@ -1002,7 +1002,8 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
         if (pattern.isNonNull()) {
           // Add variable bindings from the pattern to the case scope.
           DeclAttributes defaultAttributes;
-          addVarsToScope(pattern.get(), boundDecls, defaultAttributes);
+          addVarsToScope(pattern.get(), boundDecls,
+                         /*static*/ false, defaultAttributes);
           patterns.push_back(pattern.get());
         }
       } while (consumeIf(tok::comma));

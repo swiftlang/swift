@@ -4681,7 +4681,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
   // Create a variable to stand in for the RHS value.
-  auto *matchVar = new (Context) VarDecl(EP->getLoc(),
+  auto *matchVar = new (Context) VarDecl(/*static*/ false,
+                                         EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);

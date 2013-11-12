@@ -343,7 +343,8 @@ namespace {
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetaType = MetaTypeType::get(selfType, context);
       auto selfName = context.getIdentifier("self");
-      auto selfDecl = new (context) VarDecl(SourceLoc(), selfName, selfType,
+      auto selfDecl = new (context) VarDecl(/*static*/ false,
+                                            SourceLoc(), selfName, selfType,
                                             structDecl);
 
       // Construct the set of parameters from the list of members.
@@ -356,7 +357,8 @@ namespace {
           if (var->isComputed())
             continue;
           
-          auto param = new (context) VarDecl(SourceLoc(), var->getName(),
+          auto param = new (context) VarDecl(/*static*/ false,
+                                             SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
           params.push_back(param);
           Pattern *pattern = new (context) NamedPattern(param);
@@ -533,9 +535,10 @@ namespace {
 
         // Create a variable to store the underlying value.
         auto varName = Impl.SwiftContext.getIdentifier("value");
-        auto var = new (Impl.SwiftContext) VarDecl(SourceLoc(), varName,
-                                                     underlyingType,
-                                                     structDecl);
+        auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                   SourceLoc(), varName,
+                                                   underlyingType,
+                                                   structDecl);
 
         // Create a pattern binding to describe the variable.
         Pattern * varPattern = new (Impl.SwiftContext) NamedPattern(var);
@@ -548,6 +551,7 @@ namespace {
         
         auto patternBinding
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
+                                                       SourceLoc(),
                                                        varPattern,
                                                        nullptr, structDecl);
 
@@ -878,7 +882,8 @@ namespace {
 
       // Map this indirect field to a Swift variable.
       return new (Impl.SwiftContext)
-               VarDecl(Impl.importSourceLoc(decl->getLocStart()),
+               VarDecl(/*static*/ false,
+                       Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
     }
 
@@ -949,7 +954,8 @@ namespace {
         return nullptr;
 
       auto result = new (Impl.SwiftContext)
-                      VarDecl(Impl.importSourceLoc(decl->getLocation()),
+                      VarDecl(/*static*/ false,
+                              Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
       // Handle attributes.
@@ -990,7 +996,8 @@ namespace {
         return nullptr;
 
       return new (Impl.SwiftContext)
-               VarDecl(Impl.importSourceLoc(decl->getLocation()),
+               VarDecl(/*static*/ false,
+                       Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
     }
 
@@ -1059,7 +1066,8 @@ namespace {
       if (decl->isClassMethod())
         selfTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.getIdentifier("self");
-      auto selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+      auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                     SourceLoc(), selfName,
                                                      selfTy,
                                                      Impl.firstClangModule);
       Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
@@ -1334,7 +1342,8 @@ namespace {
       auto selfTy = getSelfTypeForContext(dc);
       auto selfMetaTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.getIdentifier("self");
-      auto selfMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+      auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                         SourceLoc(), selfName,
                                                          selfMetaTy,
                                                          Impl.firstClangModule);
       Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfMetaVar);
@@ -1371,8 +1380,9 @@ namespace {
       Type allocType = FunctionType::get(selfMetaTy, type, Impl.SwiftContext);
       Type initType = FunctionType::get(selfTy, type, Impl.SwiftContext);
 
-      VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
-                                                          selfName, selfTy, dc);
+      VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                         SourceLoc(),
+                                                         selfName, selfTy, dc);
       selfVar->isImplicit();
 
       // Create the actual constructor.
@@ -1422,7 +1432,8 @@ namespace {
     VarDecl *addImplicitSelfParameter(Type selfTy,
                                       SmallVectorImpl<Pattern *> &args) {
       auto selfName = Impl.SwiftContext.getIdentifier("self");
-      auto selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+      auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                     SourceLoc(), selfName,
                                                      selfTy,
                                                      Impl.firstClangModule);
       Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
@@ -2333,7 +2344,8 @@ namespace {
         return nullptr;
       
       auto result = new (Impl.SwiftContext)
-                      VarDecl(Impl.importSourceLoc(decl->getLocation()),
+      VarDecl(/*static*/ false,
+              Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
       // Build thunks.
@@ -2562,7 +2574,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ConstantConvertKind convertKind) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(SourceLoc(), name, type, dc);
+  auto var = new (context) VarDecl(/*static*/ false,
+                                   SourceLoc(), name, type, dc);
 
   // Form the argument patterns.
   SmallVector<Pattern *, 3> getterArgs;
