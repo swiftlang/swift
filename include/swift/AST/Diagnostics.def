@@ -1063,7 +1063,7 @@ ERROR(transparent_in_classes_not_supported,sema_tcd,none,
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_objc_decl,sema_tcd,none,
-      "only classes and their methods can be declared 'objc'", ())
+      "only classes, methods, and properties can be declared 'objc'", ())
 ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
       "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(invalid_iboutlet,sema_tcd,none,
