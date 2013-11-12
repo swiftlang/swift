@@ -2377,7 +2377,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isComputed())
+      if (!var->isComputed() && !var->isStatic())
         FoundInstanceVar = true;
     }
   }
