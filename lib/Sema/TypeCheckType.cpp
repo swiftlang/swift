@@ -1054,13 +1054,11 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
   }
   auto *PP = cast<ParenPattern>(P);
   if (!isParamRepresentableInObjC(TC, AFD, PP->getSubPattern())) {
-    if (!Diagnose) {
-      // Return as soon as possible if we are not producing diagnostics.
-      return false;
-    }
+    if (Diagnose)
+      diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern());
+    return false;
   }
-  diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern());
-  return false;
+  return true;
 }
 
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
