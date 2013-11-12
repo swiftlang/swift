@@ -1015,29 +1015,40 @@ static bool isParamRepresentableInObjC(TypeChecker &TC,
   return isa<NamedPattern>(SubPattern) || isa<AnyPattern>(SubPattern);
 }
 
+static void diagnoseFunctionParamNotRepresentable(
+    TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
+    unsigned ParamIndex, const Pattern *P) {
+  if (NumParams == 1) {
+    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type);
+  } else {
+    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
+                ParamIndex + 1);
+  }
+  if (Type ParamTy = getFunctionParamType(P)) {
+    SourceRange SR = getFunctionParamTypeSourceRange(P);
+    TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
+  }
+}
+
 static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
                                               const AbstractFunctionDecl *AFD,
                                               const Pattern *P,
                                               bool Diagnose) {
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
     bool IsObjC = true;
-    unsigned ParamIndex = 1;
-    for (auto TupleElt : TP->getFields()) {
+    auto Fields = TP->getFields();
+    for (unsigned ParamIndex = 0, NumParams = Fields.size();
+         ParamIndex != NumParams; ParamIndex++) {
+      auto &TupleElt = Fields[ParamIndex];
       if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
         IsObjC = false;
         if (!Diagnose) {
           // Return as soon as possible if we are not producing diagnostics.
           return IsObjC;
         }
-        TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
-                    ParamIndex);
-        if (Type ParamTy = getFunctionParamType(TupleElt.getPattern())) {
-          SourceRange SR =
-              getFunctionParamTypeSourceRange(TupleElt.getPattern());
-          TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
-        }
+        diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
+                                              TupleElt.getPattern());
       }
-      ParamIndex++;
     }
     return IsObjC;
   }
@@ -1048,11 +1059,7 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
       return false;
     }
   }
-  TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type);
-  if (Type ParamTy = getFunctionParamType(PP->getSubPattern())) {
-    SourceRange SR = getFunctionParamTypeSourceRange(PP->getSubPattern());
-    TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
-  }
+  diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern());
   return false;
 }
 
