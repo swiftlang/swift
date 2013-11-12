@@ -3070,7 +3070,7 @@ inline bool ValueDecl::isSettable() const {
 }
 
 inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
-  return !vd->isComputed();
+  return !vd->isStatic() && !vd->isComputed();
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
