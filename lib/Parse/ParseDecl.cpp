@@ -536,7 +536,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
       UnhandledStatic = false;
     }
-    Status = parseDeclVar(Flags, Attributes, Entries);
+    Status = parseDeclVar(Flags, Attributes, Entries,
+                          /*isStatic*/ StaticLoc.isValid());
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
@@ -885,7 +886,9 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
         parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
                   /*AllowSepAfterLast=*/false, diag::expected_rbrace_extension,
                   [&]() -> ParserStatus {
-      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowStoredVar);
+      return parseDecl(MemberDecls,
+                       PD_HasContainerType
+                       | PD_DisallowStoredInstanceVar);
     });
     // Don't propagate the code completion bit from members: we can not help
     // code completion inside a member decl, and our callers can not do
@@ -1343,7 +1346,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
-                                  SmallVectorImpl<Decl *> &Decls) {
+                                  SmallVectorImpl<Decl *> &Decls,
+                                  bool IsStatic) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
 
   SmallVector<PatternBindingDecl*, 4> PBDs;
@@ -1435,7 +1439,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       diagnose(VarLoc, diag::disallowed_computed_var_decl);
       Status.setIsParseError();
     }
-  } else if (Flags & PD_DisallowStoredVar) {
+  } else if (!IsStatic && (Flags & PD_DisallowStoredInstanceVar)) {
     diagnose(VarLoc, diag::disallowed_stored_var_decl);
     Status.setIsParseError();
     return Status;
@@ -1801,7 +1805,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_enum,
                                 PD_HasContainerType | PD_AllowEnumElement |
-                                PD_DisallowStoredVar))
+                                PD_DisallowStoredInstanceVar))
       Status.setIsParseError();
   }
 

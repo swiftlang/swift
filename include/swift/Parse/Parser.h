@@ -464,7 +464,7 @@ public:
   enum {
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
-    PD_DisallowStoredVar    = 1 << 2,
+    PD_DisallowStoredInstanceVar = 1 << 2,
     PD_HasContainerType     = 1 << 3,
     PD_DisallowComputedVar  = 1 << 4,
     PD_DisallowNominalTypes = 1 << 5,
@@ -521,7 +521,8 @@ public:
   ParserResult<ClassDecl>
   parseDeclClass(unsigned Flags, DeclAttributes &Attributes);
   ParserStatus parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
-                            SmallVectorImpl<Decl *> &Decls);
+                            SmallVectorImpl<Decl *> &Decls,
+                            bool IsStatic);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
