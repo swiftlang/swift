@@ -10,7 +10,7 @@
 //
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Intrinsics.h"
 
 using namespace swift;
@@ -82,10 +82,10 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
   // Delete this instruction and others that become dead after it's deleted.
   SmallVector<SILInstruction*, 16> DeadInsts;
   DeadInsts.push_back(I);
-  llvm::DenseSet<SILInstruction*> ErasedInsts;
+  llvm::SmallPtrSet<SILInstruction*, 8> ErasedInsts;
   do {
     I = DeadInsts.pop_back_val();
-    if (ErasedInsts.find(I) != ErasedInsts.end())
+    if (ErasedInsts.count(I) > 0)
       continue;
 
     // Check if any of the operands will become dead as well.
