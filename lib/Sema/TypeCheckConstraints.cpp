@@ -2608,10 +2608,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
-    // If we aren't looking in a metatype, ignore static functions and
-    // variables.
+    // If we aren't looking in a metatype, ignore static functions, static
+    // variables, and enum elements.
     if (!isMetatype && !baseObjTy->is<ModuleType>()
-        && (isa<FuncDecl>(result) || isa<VarDecl>(result))
+        && (isa<FuncDecl>(result) || isa<VarDecl>(result) ||
+            isa<EnumElementDecl>(result))
         && !result->isInstanceMember())
       continue;
 
