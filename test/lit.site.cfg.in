@@ -10,6 +10,7 @@ config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
 config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
+config.targets_to_build = "@TARGETS_TO_BUILD@"
 
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
@@ -38,3 +39,7 @@ if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
 if platform.system() != 'Linux':
   config.available_features.add('swift_interpreter')
   config.available_features.add('swift_repl')
+
+# Add each available target as a feature.
+for target in config.targets_to_build:
+  config.available_features.add(target)

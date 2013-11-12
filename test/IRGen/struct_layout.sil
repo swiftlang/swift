@@ -11,6 +11,7 @@ import swift
 // INTEL: @_TWVV13struct_layout14Rdar15410780_A = constant {{.*}} (i64 257
 // INTEL: @_TWVV13struct_layout14Rdar15410780_B = constant {{.*}} (i64 258
 
+// REQUIRES: ARM
 // ARM32: %V13struct_layout14Rdar15410780_C = type <{ %Sq.0 }>
 // ARM32: %Sq.0 = type <{ [20 x i8], [1 x i8] }>
 // ARM32: %SS = type <{ %VSs14StringByteData }>
