@@ -823,10 +823,13 @@ public:
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
 
-  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD);
+  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD, bool Diagnose);
   bool isRepresentableInObjC(const VarDecl *VD, bool Diagnose);
   bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const DeclContext *DC, Type T);
+
+  void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
+                                          Type T, SourceRange TypeRange);
 
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
 };

@@ -1756,7 +1756,8 @@ public:
         isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
       }
 
-      if (isObjC && !TC.isRepresentableInObjC(FD))
+      if (isObjC &&
+          !TC.isRepresentableInObjC(FD, /*Diagnose=*/FD->getAttrs().isObjC()))
         isObjC = false;
       FD->setIsObjC(isObjC);
     }

@@ -1457,22 +1457,32 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property can not be marked @objc because its type can not be "
       "represented in Objective-C", ())
-NOTE(empty_protocol_composition_not_objc,sema_objc,none,
+NOTE(not_objc_empty_protocol_composition,sema_objc,none,
      "'protocol<>' is not considered '@objc'; use 'DynamicLookup' instead", ())
-NOTE(protocol_not_objc,sema_objc,none,
+NOTE(not_objc_protocol,sema_objc,none,
      "protocol %0 is not '@objc'", (Type))
-ERROR(objc_invalid_on_var_empty_tuple,sema_objc,none,
-      "property can not be marked @objc because empty tuple type can not be "
+NOTE(not_objc_empty_tuple,sema_objc,none,
+      "empty tuple type can not be represented in Objective-C", ())
+NOTE(not_objc_tuple,sema_objc,none,
+      "tuples can not be represented in Objective-C", ())
+NOTE(not_objc_swift_struct,sema_objc,none,
+      "Swift structs can not be represented in Objective-C", ())
+NOTE(not_objc_swift_enum,sema_objc,none,
+      "Swift enums can not be represented in Objective-C", ())
+
+ERROR(objc_invalid_on_func_curried,sema_objc,none,
+      "method can not be marked @objc because curried functions can not be "
       "represented in Objective-C", ())
-ERROR(objc_invalid_on_var_tuple,sema_objc,none,
-      "property can not be marked @objc because tuples can not be "
+ERROR(objc_invalid_on_func_param_type,sema_objc,none,
+      "method can not be marked @objc because the type of the parameter %0 "
+      "can not be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
+      "method can not be marked @objc because the type of the parameter "
+      "can not be represented in Objective-C", ())
+ERROR(objc_invalid_on_func_result_type,sema_objc,none,
+      "method can not be marked @objc because its result type can not be "
       "represented in Objective-C", ())
-ERROR(objc_invalid_on_var_struct,sema_objc,none,
-      "property can not be marked @objc because Swift structs can not be "
-      "represented in Objective-C", ())
-ERROR(objc_invalid_on_var_enum,sema_objc,none,
-      "property can not be marked @objc because Swift enums can not be "
-      "represented in Objective-C", ())
+
 
 //==============================================================================
 // SIL Generation Diagnostics

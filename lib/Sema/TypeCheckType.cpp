@@ -1004,98 +1004,81 @@ static bool isParamRepresentableInObjC(TypeChecker &TC,
 }
 
 static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
-                                              const DeclContext *DC,
-                                              const Pattern *P) {
+                                              const AbstractFunctionDecl *AFD,
+                                              const Pattern *P,
+                                              bool Diagnose) {
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
+    bool IsObjC = true;
+    unsigned ParamIndex = 1;
     for (auto TupleElt : TP->getFields()) {
-      if (!isParamRepresentableInObjC(TC, DC, TupleElt.getPattern()))
-        return false;
+      if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
+        IsObjC = false;
+        if (!Diagnose) {
+          // Return as soon as possible if we are not producing diagnostics.
+          return IsObjC;
+        }
+        TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
+                    ParamIndex);
+      }
+      ParamIndex++;
     }
-    return true;
+    return IsObjC;
   }
   auto *PP = cast<ParenPattern>(P);
-  return isParamRepresentableInObjC(TC, DC, PP->getSubPattern());
+  return isParamRepresentableInObjC(TC, AFD, PP->getSubPattern());
 }
 
-bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD) {
+bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
+                                        bool Diagnose) {
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (!FD->getGetterOrSetterDecl()) {
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;
-      if (FD->getArgParamPatterns().size() != ExpectedParamPatterns)
+      if (FD->getArgParamPatterns().size() != ExpectedParamPatterns) {
+        if (Diagnose)
+          diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried);
         return false;
+      }
     }
   }
 
   if (!isParamPatternRepresentableInObjC(*this, AFD,
-                                         AFD->getArgParamPatterns()[1]))
-    return false;
+                                         AFD->getArgParamPatterns()[1],
+                                         Diagnose)) {
+    if (!Diagnose) {
+      // Return as soon as possible if we are not producing diagnostics.
+      return false;
+    }
+  }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type Result = FD->getResultType();
-    if (!Result->isVoid() && !isRepresentableInObjC(FD, Result))
+    Type ResultType = FD->getResultType();
+    if (!ResultType->isVoid() && !isRepresentableInObjC(FD, ResultType)) {
+      if (Diagnose) {
+        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_result_type);
+        SourceRange Range =
+            FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
+        diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
+      }
       return false;
+    }
   }
 
   return true;
 }
 
 bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
-  Type T = VD->getType();
   bool Result = isRepresentableInObjC(VD->getDeclContext(), VD->getType());
   if (!Diagnose || Result)
     return Result;
 
-  // TODO: everywhere below: highlight variable type.
-
-  // Special diagnostic for tuples.
-  if (T->is<TupleType>()) {
-    if (T->isVoid())
-      diagnose(VD->getLoc(), diag::objc_invalid_on_var_empty_tuple)
-          .highlight(VD->getTypeSourceRangeForDiagnostics());
-    else
-      diagnose(VD->getLoc(), diag::objc_invalid_on_var_tuple)
-          .highlight(VD->getTypeSourceRangeForDiagnostics());
-    return Result;
-  }
-
-  // Special diagnostic for structs.
-  if (T->is<StructType>()) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var_struct)
-        .highlight(VD->getTypeSourceRangeForDiagnostics());
-    return Result;
-  }
-
-  // Special diagnostic for enums.
-  if (T->is<EnumType>()) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var_enum)
-        .highlight(VD->getTypeSourceRangeForDiagnostics());
-    return Result;
-  }
-
-  // Special diagnostic for protocols and protocol compositions.
-  SmallVector<ProtocolDecl *, 4> Protocols;
-  if (T->isExistentialType(Protocols)) {
-    diagnose(VD->getLoc(), diag::objc_invalid_on_var)
-        .highlight(VD->getTypeSourceRangeForDiagnostics());
-    if (Protocols.empty()) {
-      // protocol<> is not @objc.
-      diagnose(VD->getLoc(), diag::empty_protocol_composition_not_objc);
-      return Result;
-    }
-    // Find a protocol that is not @objc.
-    for (auto PD : Protocols) {
-      if (!PD->getAttrs().isObjC()) {
-        diagnose(VD->getLoc(), diag::protocol_not_objc, PD->getDeclaredType());
-        return Result;
-      }
-    }
-    return Result;
-  }
-
+  SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
   diagnose(VD->getLoc(), diag::objc_invalid_on_var)
-      .highlight(VD->getTypeSourceRangeForDiagnostics());
+      .highlight(TypeRange);
+  diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(), VD->getType(),
+                                     TypeRange);
+
   return Result;
 }
 
@@ -1166,6 +1149,54 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
 
   return false;
+}
+
+void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
+                                                     Type T,
+                                                     SourceRange TypeRange) {
+  // Special diagnostic for tuples.
+  if (T->is<TupleType>()) {
+    if (T->isVoid())
+      diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
+          .highlight(TypeRange);
+    else
+      diagnose(TypeRange.Start, diag::not_objc_tuple)
+          .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for structs.
+  if (T->is<StructType>()) {
+    diagnose(TypeRange.Start, diag::not_objc_swift_struct)
+        .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for enums.
+  if (T->is<EnumType>()) {
+    diagnose(TypeRange.Start, diag::not_objc_swift_enum)
+        .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for protocols and protocol compositions.
+  SmallVector<ProtocolDecl *, 4> Protocols;
+  if (T->isExistentialType(Protocols)) {
+    if (Protocols.empty()) {
+      // protocol<> is not @objc.
+      diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
+      return;
+    }
+    // Find a protocol that is not @objc.
+    for (auto PD : Protocols) {
+      if (!PD->getAttrs().isObjC()) {
+        diagnose(TypeRange.Start, diag::not_objc_protocol,
+                 PD->getDeclaredType());
+        return;
+      }
+    }
+    return;
+  }
 }
 
 void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
