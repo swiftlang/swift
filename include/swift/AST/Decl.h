@@ -1011,8 +1011,7 @@ public:
     : Decl(DeclKind::PatternBinding, Parent),
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
-    if (StaticLoc.isValid())
-      PatternBindingDeclBits.IsStatic = true;
+    PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
   }
 
   SourceLoc getStartLoc() const {

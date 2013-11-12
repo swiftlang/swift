@@ -1203,9 +1203,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::PATTERN_BINDING_DECL: {
     DeclID contextID;
     bool isImplicit;
+    bool isStatic;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
-                                                  isImplicit);
+                                                  isImplicit,
+                                                  isStatic);
     Pattern *pattern = maybeReadPattern();
     assert(pattern);
 
@@ -1213,6 +1215,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                 SourceLoc(), pattern,
                                                 /*init=*/nullptr,
                                                 getDeclContext(contextID));
+    binding->setStatic(isStatic);
     declOrOffset = binding;
 
     if (isImplicit)

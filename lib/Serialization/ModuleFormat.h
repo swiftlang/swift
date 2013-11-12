@@ -681,7 +681,8 @@ namespace decls_block {
   using PatternBindingLayout = BCRecordLayout<
     PATTERN_BINDING_DECL,
     DeclIDField, // context decl
-    BCFixed<1>   // implicit flag
+    BCFixed<1>,  // implicit flag
+    BCFixed<1>   // static?
     // The pattern trails the record.
   >;
 

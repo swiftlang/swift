@@ -1025,7 +1025,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
     PatternBindingLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addDeclRef(DC), binding->isImplicit());
+                                     addDeclRef(DC), binding->isImplicit(),
+                                     binding->isStatic());
 
     writePattern(binding->getPattern());
     // Ignore initializer; external clients don't need to know about it.
