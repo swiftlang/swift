@@ -1197,6 +1197,11 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     }
     return;
   }
+
+  if (T->is<ArchetypeType>()) {
+    diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
+        .highlight(TypeRange);
+  }
 }
 
 void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
