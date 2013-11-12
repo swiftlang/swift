@@ -1009,10 +1009,41 @@ public:
     SGM.emitEnumConstructor(ued);
   }
   
-  // no-op. We don't deal with the layout of types here.
-  void visitPatternBindingDecl(PatternBindingDecl *) {}
+  void visitPatternBindingDecl(PatternBindingDecl *pd) {
+    // Emit initializers for static variables.
+    // FIXME: This has to happen lazily for generic properties.
+    // (We want it to happen lazily for all globals, really.)
+    
+    // FIXME: Global initialization order?!
+    if (pd->isStatic()) {
+      assert(!theType->getGenericParams()
+             && "generic static properties not implemented");
+      assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
+             && "only value type static properties are implemented");
+
+      if (SGM.TopLevelSGF) {
+        if (!SGM.TopLevelSGF->B.hasValidInsertionPoint())
+          return;
+        
+        SGM.TopLevelSGF->visit(pd);
+      }
+    }
+  }
   
   void visitVarDecl(VarDecl *vd) {
+    // Collect global variables for static properties.
+    // FIXME: We can't statically emit a global variable for generic properties.
+    if (vd->isStatic() && !vd->isComputed()) {
+      assert(!theType->getGenericParams()
+             && "generic static properties not implemented");
+      assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
+             && "only value type static properties are implemented");
+      
+      SGM.addGlobalVariable(vd);
+      
+      return;
+    }
+    
     // FIXME: Default implementations in protocols.
     if (SGM.requiresObjCPropertyEntryPoints(vd) &&
         !isa<ProtocolDecl>(vd->getDeclContext()))
