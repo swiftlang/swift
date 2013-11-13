@@ -1349,11 +1349,15 @@ private:
       NodePointer unboundType = demangleType();
       if (!unboundType)
         return nullptr;
+      if (Mangled.isEmpty())
+        return nullptr;
       while (Mangled.peek() != '_') {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
         type_list->push_back_child(type);
+        if (Mangled.isEmpty())
+          return nullptr;
       }
       Mangled.next();
       Node::Kind bound_type_kind = Node::Kind::Unknown;
