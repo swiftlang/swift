@@ -102,6 +102,12 @@ A tuple-style declaration matches a named application if:
     foo(1, "two", '3', x: 4)    // doesn't match; 'x' already given positionally
     foo(1, "two", z: '3', z: '4') // doesn't match; multiple 'z'
 
+  As an exception, a trailing closure argument always positionally matches
+  the last declared parameter, and can appear after keyword arguments::
+
+    def foo(x: Int, y: String, f: () -> ()
+    foo(y: "two", x: 1) { } // matches
+
 - If the final declared keyword parameter takes a variadic argument, the keyword
   in the argument list may be followed by multiple
   non-keyworded arguments. All arguments up to either the next keyword or
@@ -156,6 +162,24 @@ A selector-style declaration matches a named application if:
     def foo(x: Int) bar(y: String...) {}
 
     foo(1, bar: "two", "three", "four") // matches, y = ["two", "three", "four"]
+
+- If the final selector piece declares a function parameter, then the function
+  can be called using trailing closure syntax omitting the keyword. The keyword
+  is still required when trailing closure syntax is not used. For example::
+
+    def foo(x: Int) withBlock(f: () -> ())
+
+    foo(1, withBlock: { }) // matches
+    foo(1, { }) // doesn't match
+    foo(1) { } // matches
+
+  Trailing closure syntax can introduce ambiguities when selector-style
+  functions differ only in their final closure selector piece::
+
+    def foo(x: Int) onCompletion(f: () -> ())
+    def foo(x: Int) onError(f: () -> ())
+
+    foo(1) { } // error: ambiguous
 
 Duplicate Definitions
 ---------------------
