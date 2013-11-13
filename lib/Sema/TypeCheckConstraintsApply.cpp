@@ -970,7 +970,9 @@ namespace {
           type = defaultType;
       }
       
-      // FIXME: 32-bit platforms should use 32-bit size here?
+      // Note: We always use 64-bits here, even on 32-bit platforms to keep the
+      // AST consistent across different architectures.  LLVM optimizers will
+      // handily slice off the top bits for 32-bit targets.
       TupleTypeElt elements[3] = {
         TupleTypeElt(tc.Context.TheRawPointerType),
         TupleTypeElt(BuiltinIntegerType::get(64, tc.Context)),
@@ -981,10 +983,10 @@ namespace {
                             expr->getType(),
                             protocol,
                             tc.Context.getIdentifier("StringLiteralType"),
-                            tc.Context.getIdentifier("convertFromStringLiteral"),
+                           tc.Context.getIdentifier("convertFromStringLiteral"),
                             builtinProtocol,
                             TupleType::get(elements, tc.Context),
-                            tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
+                  tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
                             nullptr,
                             diag::string_literal_broken_proto,
                             diag::builtin_string_literal_broken_proto);
