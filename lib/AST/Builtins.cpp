@@ -623,7 +623,7 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getTruncWithOverflowOperation(ASTContext &Context,
+static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
                                                 Identifier Id,
                                                 Type InputTy,
                                                 Type OutputTy) {
@@ -1068,10 +1068,12 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getStaticReportOperation(Context, Id);
 
-  case BuiltinValueKind::STruncWithOverflow:
-  case BuiltinValueKind::UTruncWithOverflow:
+  case BuiltinValueKind::UToSCheckedTrunc:
+  case BuiltinValueKind::SToSCheckedTrunc:
+  case BuiltinValueKind::SToUCheckedTrunc:
+  case BuiltinValueKind::UToUCheckedTrunc:
     if (Types.size() != 2) return nullptr;
-    return getTruncWithOverflowOperation(Context, Id, Types[0], Types[1]);
+    return getCheckedTruncOperation(Context, Id, Types[0], Types[1]);
 
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;

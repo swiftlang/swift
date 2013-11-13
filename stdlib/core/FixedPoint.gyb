@@ -68,7 +68,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
   @@transparent
   static def _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
-    return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val).0)
+    return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_Int${bits}(val).0)
   }
 
   @@transparent
@@ -176,15 +176,20 @@ extension ${Self} : SignedNumber {
 extension ${Self} {
 @ for (srcBits, srcSigned) in allInts():
 @    That = intName(srcBits, srcSigned)
+@    srcSign = 's' if srcSigned else 'u'
 @    if Self != That:
   init(v: ${That}) {
 @      if bits == srcBits:
     value = v.value
-@      else:
+@      end
+@      if srcBits > bits:
+    var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(v.value)
+    Builtin.condfail(tmp.1)
+    value = tmp.0
+@      end
+@      if srcBits < bits:
     value = Builtin.${
-    ('trunc' if srcBits > bits
-    else 'sext' if srcSigned
-    else 'zext')
+    ('sext' if srcSigned else 'zext')
     }_Int${srcBits}_Int${bits}(v.value)
 @      end
   }

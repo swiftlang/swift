@@ -1148,26 +1148,75 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
-  // which will call the builtin and pass it a non-compile-time-const parameter.
-  if (Builtin.ID == BuiltinValueKind::STruncWithOverflow ||
-      Builtin.ID == BuiltinValueKind::UTruncWithOverflow) {
+  if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
+      Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
+      Builtin.ID == BuiltinValueKind::SToUCheckedTrunc) {
     const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
-    using namespace llvm;
+    auto FromTy =
+      IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType());
+    auto ToTy =
+      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
+
+    // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
+    //   Res = trunc_IntTo(Arg)
+    //   Ext = sext_IntFrom(Res)
+    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   return (resultVal, OverflowFlag)
+    //
+    // Compute the result for UToUCheckedTrunc_IntFrom_IntTo(Arg)
+    // and SToUCheckedTrunc_IntFrom_IntTo(Arg):
+    //   Res = trunc_IntTo(Arg)
+    //   Ext = zext_IntFrom(Res)
+    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   return (Res, OverflowFlag)
     llvm::Value *Arg = args.claimNext();
-    llvm::Value *V = IGF.Builder.CreateTrunc(Arg, ToTy);
-    out->add(V);
-    // FIXME: This is a hack. It should be replaced before we start using
-    // implementation of this builtin.
-    return out->add(IGF.Builder.getInt1(false));
+    llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
+    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
+    llvm::Value *Ext = Signed ? IGF.Builder.CreateSExt(Res, FromTy) :
+                                IGF.Builder.CreateZExt(Res, FromTy);
+    llvm::Value *OverflowCond = IGF.Builder.CreateICmpEQ(Arg, Ext);
+    llvm::Value *OverflowFlag = IGF.Builder.CreateSelect(OverflowCond,
+                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0),
+                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
+    // Return the tuple - the result + the overflow flag.
+    out->add(Res);
+    return out->add(OverflowFlag);
+  }
+
+  if (Builtin.ID == BuiltinValueKind::UToSCheckedTrunc) {
+    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
+    auto FromTy =
+      IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType());
+    auto ToTy =
+      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
+    llvm::Type *ToMinusOneTy =
+      llvm::Type::getIntNTy(ToTy->getContext(), ToTy->getIntegerBitWidth() - 1);
+
+    // Compute the result for UToSCheckedTrunc_IntFrom_IntTo(Arg):
+    //   Trunc = trunc_IntFrom_'IntTo-1bit'(Arg)
+    //   Res = trunc_IntTo(Arg)
+    //   Ext = zext_IntFrom(Trunc)
+    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   return (Res, OverflowFlag)
+    llvm::Value *Arg = args.claimNext();
+    llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
+    llvm::Value *Trunc = IGF.Builder.CreateTrunc(Arg, ToMinusOneTy);
+    llvm::Value *Ext = IGF.Builder.CreateZExt(Trunc, FromTy);
+    llvm::Value *OverflowCond = IGF.Builder.CreateICmpEQ(Arg, Ext);
+    llvm::Value *OverflowFlag = IGF.Builder.CreateSelect(OverflowCond,
+                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0),
+                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
+    // Return the tuple - the result + the overflow flag.
+    out->add(Res);
+    return out->add(OverflowFlag);
   }
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
     auto TruncTy = IGF.IGM.Int32Ty;
     const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
-    auto ToTy = IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
+    auto ToTy =
+      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
     using namespace llvm;
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);

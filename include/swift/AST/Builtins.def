@@ -237,11 +237,17 @@ BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 
-/// STruncWithOverflow has type (Integer) -> Integer
-BUILTIN_MISC_OPERATION(STruncWithOverflow, "strunc_with_overflow", "n", Special)
 
-/// UTruncWithOverflow has type (Integer) -> Integer
-BUILTIN_MISC_OPERATION(UTruncWithOverflow, "utrunc_with_overflow", "n", Special)
+/// Special truncation builtins that check for sign and overflow errors. These
+/// take an integer as an input and return a tuple of the truncated result and 
+/// an error bit. The name of each builtin is extended with the "from"
+/// (sign-agnostic) builtin integer type and the "to" integer type.
+/// We require the source type size to be larger than the destination type size 
+/// (number of bits).
+BUILTIN_MISC_OPERATION(UToSCheckedTrunc, "u_to_s_checked_trunc", "n", Special)
+BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
+BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
+BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)

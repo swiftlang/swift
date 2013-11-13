@@ -494,7 +494,7 @@ bb0(%0 : $Bool, %1 : $Bool):
 
 sil [transparent] @convertFromBultinIntegerLiteral : $@thin ((val: Builtin.Int2048), Int64.metatype) -> Int64 {
 bb0(%0 : $Builtin.Int2048, %1 : $Int64.metatype):
-  %2 = builtin_function_ref #Builtin.strunc_with_overflow_Int2048_Int64 : $@thin Builtin.Int2048 -> (Builtin.Int64, Builtin.Int1)
+  %2 = builtin_function_ref #Builtin.s_to_s_checked_trunc_Int2048_Int64 : $@thin Builtin.Int2048 -> (Builtin.Int64, Builtin.Int1)
   %3 = apply %2(%0) : $@thin Builtin.Int2048 -> (Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   %5 = struct $Int64 (%4 : $Builtin.Int64)

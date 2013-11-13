@@ -358,8 +358,8 @@ case BuiltinValueKind::id:
 
   // Deal with special builtins that are designed to check overflows on
   // integer literals.
-  case BuiltinValueKind::STruncWithOverflow:
-  case BuiltinValueKind::UTruncWithOverflow: {
+  case BuiltinValueKind::SToSCheckedTrunc:
+  case BuiltinValueKind::SToUCheckedTrunc: {
     // Get the value. It should be a constant in most cases.
     // Note, this will not always be a constant, for example, when analyzing
     // _convertFromBuiltinIntegerLiteral function itself.
@@ -369,7 +369,7 @@ case BuiltinValueKind::id:
     APInt SrcVal = V->getValue();
 
     // Get the signedness of the destination.
-    bool Signed = (Builtin.ID == BuiltinValueKind::STruncWithOverflow);
+    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
 
     // Get the source and destination bit width.
     assert(Builtin.Types.size() == 2);
@@ -379,7 +379,7 @@ case BuiltinValueKind::id:
     uint32_t DestBitWidth =
       DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
 
-    // Compute the destination:
+    // Compute the destination (for SrcBitWidth < DestBitWidth):
     //   truncVal = trunc_IntFrom_IntTo(val)
     //   strunc_IntFrom_IntTo(val) =
     //     sext_IntFrom(truncVal) == val ? truncVal : overflow_error
