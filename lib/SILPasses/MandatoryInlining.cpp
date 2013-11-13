@@ -87,10 +87,10 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
                    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
-    SILInstruction *I = dyn_cast<SILInstruction>(V.getDef());
-    if (I && isInstructionTriviallyDead(I) &&
-        !(I == CalleeValue.getDef()))
-      InstsToDelete.push_back(I);
+    if (SILInstruction *I = dyn_cast<SILInstruction>(V.getDef()))
+      if (I != CalleeValue.getDef() &&
+          isInstructionTriviallyDead(I))
+        InstsToDelete.push_back(I);
   }
   recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
 
