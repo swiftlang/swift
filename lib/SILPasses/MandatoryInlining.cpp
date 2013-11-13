@@ -49,7 +49,7 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
     return;
 
   // Either release the callee (which the apply would have done) or remove a
-  // retain that happens to be the immediately preceding instruction
+  // retain that happens to be the immediately preceding instruction.
   SILBasicBlock::iterator Prev = I;
   StrongRetainInst *RetainToErase;
   if (I != I->getParent()->begin() &&
@@ -63,12 +63,12 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
       B.createStrongReleaseInst(Loc, CalleeValue);
     // Important: we move the insertion point before this new release, just in
     // case this inserted release would have caused the deallocation of the
-    // closure and its contained capture arguments
+    // closure and its contained capture arguments.
     B.setInsertionPoint(InsertedRelease);
   }
 
   // Add a retain of each non-address type capture argument, because it will be
-  // consumed by the closure body
+  // consumed by the closure body.
   SILModule &M = B.getFunction().getModule();
   for (auto &CaptureArg : CaptureArgs) {
     if (!CaptureArg.getType().isAddress()) {
@@ -80,9 +80,8 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
 
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void
-cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
-                   ArrayRef<SILValue> CaptureArgs) {
+static void cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
+                               ArrayRef<SILValue> CaptureArgs) {
   // Handle the case where the callee of the apply is a load instruction.
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -118,7 +117,7 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     }
 
     // If we found a strong release, replace it with a strong release of the
-    // source of the store and erase it
+    // source of the store and erase it.
     if (SRI) {
       if (CalleeValue.isValid()) {
         B.setInsertionPoint(SRI);
@@ -133,12 +132,11 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
       return;
   }
 
-  if (PartialApplyInst *PAI =
-        dyn_cast<PartialApplyInst>(CalleeValue.getDef())) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
 
     // Look through remaining uses of the partial apply inst to find at most one
-    // strong release instruction
+    // strong release instruction.
     StrongReleaseInst *SRI = nullptr;
     for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ++UI) {
       if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
@@ -149,7 +147,7 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     }
 
     // If there is a strong release of the partial apply, then replace it with
-    // releases of the captured arguments
+    // releases of the captured arguments.
     if (SRI) {
       B.setInsertionPoint(SRI);
       SILModule &M = B.getFunction().getModule();
@@ -165,12 +163,12 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     CalleeValue = PAI->getCallee();
     assert(PAI->use_empty());
     PAI->eraseFromParent();
-  } else if (ThinToThickFunctionInst *TTTFI =
+  } else if (auto *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
 
     // Look through remaining uses of the thin-to-thick inst to find at most one
-    // strong release instruction
+    // strong release instruction.
     StrongReleaseInst *SRI = nullptr;
     for (auto UI = TTTFI->use_begin(), UE = TTTFI->use_end(); UI != UE; ++UI) {
       if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
@@ -180,7 +178,7 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
         return;
     }
 
-    // If there is a strong release of the thin-to-thick function, erase it
+    // If there is a strong release of the thin-to-thick function, erase it.
     if (SRI)
       SRI->eraseFromParent();
 
@@ -379,15 +377,14 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
                          << " into @" << InnerAI->getFunction()->getName()
                          << "\n");
-      
-      
-      // Decrement our iterator (carefully to avoid going off the front) so it
+
+      // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can
       // introduce multiple new basic blocks.
-      if (I != FI->begin())
+      if (I != ApplyBlock->begin())
         --I;
       else
-        I = FI->end();
+        I = ApplyBlock->end();
       if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
                                   InnerAI->getSubstitutions(), FullArgs)) {
         I = InnerAI;
@@ -397,7 +394,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
       // Reestablish our iterator if it wrapped.
       if (I == ApplyBlock->end())
-        I = FI->begin();
+        I = ApplyBlock->begin();
       fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
       cleanupCalleeValue(Builder, CalleeValue, CaptureArgs);
 
