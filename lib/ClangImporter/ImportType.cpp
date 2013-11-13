@@ -359,7 +359,7 @@ namespace {
         return Impl.importType(clangDecl->getIntegerType(), kind);
 
       case ClangImporter::Implementation::EnumKind::Enum:
-      case ClangImporter::Implementation::EnumKind::Options: {
+      case ClangImporter::Implementation::EnumKind::Unknown: {
         auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl));
         if (!decl)
           return nullptr;

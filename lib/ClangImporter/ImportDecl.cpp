@@ -522,7 +522,7 @@ namespace {
         return nullptr;
       }
 
-      case EnumKind::Options: {
+      case EnumKind::Unknown: {
         auto structDecl = new (Impl.SwiftContext)
           StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
         structDecl->computeType();
@@ -626,7 +626,7 @@ namespace {
         Decl *ood;
         switch (enumKind) {
         case EnumKind::Constants:
-        case EnumKind::Options:
+        case EnumKind::Unknown:
           ood = Impl.importDecl(*ec);
           break;
         case EnumKind::Enum:
@@ -806,7 +806,7 @@ namespace {
         return result;
       }
           
-      case EnumKind::Options: {
+      case EnumKind::Unknown: {
         // The enumeration was mapped to a struct containining the integral
         // type. Create a constant with that struct type.
 
@@ -2482,9 +2482,8 @@ classifyEnum(const clang::EnumDecl *decl) {
     }
   }
   
-  // FIXME: Fall back to the 'Options' path, which isn't really implemented
-  // and makes an int typealias with constants.
-  return EnumKind::Options;
+  // Fall back to the 'Unknown' path.
+  return EnumKind::Unknown;
 }
 
 Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {

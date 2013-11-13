@@ -121,12 +121,12 @@ struct ClangImporter::Implementation {
     /// \brief The enumeration type should map to an enum, which means that
     /// all of the options are independent.
     Enum,
-    /// \brief The enumeration type should map to a distinct type that acts
-    /// as a bitset, for which each of the possible values represents a
-    /// specific bit.
-    Options,
-    /// \brief The enumeration type should simply map to the appropriate
-    /// integer
+    /// \brief The enumeration type should map to a distinct type, but we don't
+    /// know the intended semantics of the enum constants, so conservatively
+    /// map them to independent constants.
+    Unknown,
+    /// \brief The enumeration constants should simply map to the appropriate
+    /// integer values.
     Constants
   };
 
