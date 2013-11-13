@@ -3457,10 +3457,11 @@ def map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-c-style    ::= 'for'     stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-basic?     <a href="#brace-item-list">brace-item-list</a>
-    stmt-for-c-style    ::= 'for' '(' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-basic? ')' <a href="#brace-item-list">brace-item-list</a>
+    stmt-for-c-style    ::= 'for'     stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' stmt-for-c-style-inc? <a href="#brace-item-list">brace-item-list</a>
+    stmt-for-c-style    ::= 'for' '(' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' stmt-for-c-style-inc? ')' <a href="#brace-item-list">brace-item-list</a>
     stmt-for-c-style-init ::= <a href="#decl-var">decl-var</a>
     stmt-for-c-style-init ::= expr
+    stmt-for-c-style-inc ::= expr-basic (',' expr-basic)*
   </pre>
   
   <p>C-Style 'for' statements provide simple loop construct which evaluates the
