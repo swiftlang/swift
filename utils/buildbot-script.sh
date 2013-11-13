@@ -258,6 +258,7 @@ SWIFT_CMAKE_OPTIONS=(
 
 SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift"
+    -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
 )
 
 # Build each one. Note: in this block, names beginning with underscore
