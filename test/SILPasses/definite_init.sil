@@ -470,9 +470,8 @@ bb0(%0 : $Int64):               // CHECK: bb0(%0 : $Int64):
 
 // rdar://15170149
 // CHECK-LABEL: sil @store_to_copyaddr
-sil @store_to_copyaddr : $() -> Bool {
-bb0:
-  %0 = enum $Bool, #Bool.true!enumelt  // CHECK: %0 = enum $Bool
+sil @store_to_copyaddr : $(b : Bool) -> Bool {
+bb0(%0 : $Bool):  // CHECK: bb0(%0 :
   %1 = alloc_stack $Bool
   store %0 to %1#1 : $*Bool
   %3 = alloc_stack $Bool

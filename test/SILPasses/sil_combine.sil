@@ -220,6 +220,8 @@ bb2(%3 : $Builtin.Int1):
   return %3 : $Builtin.Int1
 }
 
+enum BoolLike { case true, false }
+
 // CHECK-LABEL: sil @fold_enum
 // CHECK: bb
 // CHECK: switch_enum
@@ -229,20 +231,20 @@ bb2(%3 : $Builtin.Int1):
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
 // CHECK-NEXT: br
-sil @fold_enum : $@thin (x: Bool) -> Bool {
-bb0(%0 : $Bool):
-  switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+sil @fold_enum : $@thin (x: BoolLike) -> BoolLike {
+bb0(%0 : $BoolLike):
+  switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 
 bb1:
-  %1 = enum $Bool, #Bool.true!enumelt
-  br bb3(%1 : $Bool)
+  %1 = enum $BoolLike, #BoolLike.true!enumelt
+  br bb3(%1 : $BoolLike)
 
 bb2:
-  %2 = enum $Bool, #Bool.false!enumelt
-  br bb3(%2 : $Bool)
+  %2 = enum $BoolLike, #BoolLike.false!enumelt
+  br bb3(%2 : $BoolLike)
 
-bb3(%3 : $Bool):
-  return %3 : $Bool
+bb3(%3 : $BoolLike):
+  return %3 : $BoolLike
 }
 
 // CHECK-LABEL: sil @do_not_fold_enum
@@ -254,18 +256,18 @@ bb3(%3 : $Bool):
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
 // CHECK-NEXT: br
-sil @do_not_fold_enum : $@thin (x: Bool) -> Bool {
-bb0(%0 : $Bool):
-  switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+sil @do_not_fold_enum : $@thin (x: BoolLike) -> BoolLike {
+bb0(%0 : $BoolLike):
+  switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 
 bb1:
-  %1 = enum $Bool, #Bool.false!enumelt
-  br bb3(%1 : $Bool)
+  %1 = enum $BoolLike, #BoolLike.false!enumelt
+  br bb3(%1 : $BoolLike)
 
 bb2:
-  %2 = enum $Bool, #Bool.true!enumelt
-  br bb3(%2 : $Bool)
+  %2 = enum $BoolLike, #BoolLike.true!enumelt
+  br bb3(%2 : $BoolLike)
 
-bb3(%3 : $Bool):
-  return %3 : $Bool
+bb3(%3 : $BoolLike):
+  return %3 : $BoolLike
 }

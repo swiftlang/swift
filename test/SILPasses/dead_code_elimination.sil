@@ -254,10 +254,12 @@ bb0:
 // CHECK: dealloc_stack
 // CHECK: }
 
+enum BoolLike { case true, false }
+
 sil @constant_fold_switch_enum : $@thin (i : Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %6 = enum $Bool, #Bool.false!enumelt          // user: %9
-  switch_enum %6 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+  %6 = enum $BoolLike, #BoolLike.false!enumelt          // user: %9
+  switch_enum %6 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 
 bb1:
   br bb3

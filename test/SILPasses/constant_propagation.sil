@@ -110,15 +110,17 @@ bb0:
 sil @test_struct_extract_folding_third : $() -> Bool {
 bb0:
   %0 = integer_literal $Builtin.Int64, 200
-  %1 = enum $Bool, #Bool.true!enumelt
+  %a = integer_literal $Builtin.Int1, 1
+  %1 = struct $Bool (%a : $Builtin.Int1)
   %2 = tuple (%0 : $Builtin.Int64, %1 : $Bool)
   %3 = tuple_extract %2 : $(Builtin.Int64, Bool), 1
   return %3 : $Bool
 
 // CHECK-LABEL: sil @test_struct_extract_folding_third
 // CHECK: bb0:
-// CHECK-NEXT: %0 = enum $Bool, #Bool.true!enumelt
-// CHECK-NEXT: return %0 : $Bool
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 : $Bool
 // CHECK-NEXT: }
 }
 
