@@ -1014,6 +1014,39 @@ RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
   return SGF.emitLValueAsRValue(E);
 }
 
+/// Retrieve the outer substitutions 
+static ArrayRef<Substitution> 
+getOuterSubstitutions(Type type, Module *module,
+                      SmallVectorImpl<Substitution> &allSubstitutions) {
+  if (!type)
+    return { };
+
+  // For a (non-generic) nominal type, just get the outer substitutions.
+  if (auto nominal = type->getAs<NominalType>())
+    return getOuterSubstitutions(nominal->getParent(), module, 
+                                 allSubstitutions);
+
+  // If we don't have a bound generic type, there are no substitutions.
+  auto bound = type->getAs<BoundGenericType>();
+  if (!bound)
+    return { };
+
+  // Retrieve the parent's substitutions.
+  auto outer = getOuterSubstitutions(bound->getParent(), 
+                                     module, allSubstitutions);
+
+  // If the parent had no substitutions, just use our substitutions.
+  auto subs = bound->getSubstitutions(module, nullptr);
+  if (outer.empty())
+    return subs;
+
+  // If the parent had substitutions, add our own substitutions to it.
+  if (allSubstitutions.empty())
+    allSubstitutions.append(outer.begin(), outer.end());
+  allSubstitutions.append(subs.begin(), subs.end());
+  return allSubstitutions;
+}
+
 std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
@@ -1022,42 +1055,36 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   SILValue methodValue = B.createFunctionRef(loc,
                                              SGM.getFunction(methodConstant));
 
-  /// If the 'self' type is a bound generic, specialize the method ref with
-  /// its forwarding substitutions.
-  ArrayRef<Substitution> outerSubs;
-  if (BoundGenericType *bgt = selfValue.getType().getAs<BoundGenericType>())
-    outerSubs = bgt->getSubstitutions(F.getDeclContext()->getParentModule(),
-                                      nullptr);
+  /// Collect substitutions from a generic 'self' type, so we can
+  /// specialize the method with its forwarding substitutions.
+  SmallVector<Substitution, 4> allSubsVec;
+  auto subs = getOuterSubstitutions(selfValue.getType().getSwiftType(),
+                                    F.getDeclContext()->getParentModule(),
+                                    allSubsVec);
+
+  // Add the inner substitutions, if we have any.
+  if (!innerSubs.empty()) {
+    if (subs.empty())
+      subs = innerSubs;
+    else {
+      if (allSubsVec.empty())
+        allSubsVec.append(subs.begin(), subs.end());
+      allSubsVec.append(innerSubs.begin(), innerSubs.end());
+      subs = F.getASTContext().AllocateCopy(allSubsVec);
+    }
+  }
 
   SILType methodTy = methodValue.getType();
   
-  ArrayRef<Substitution> allSubs;
-  if (!innerSubs.empty() || !outerSubs.empty()) {
+  if (!subs.empty()) {
     // Specialize the generic method.
-    if (outerSubs.empty())
-      allSubs = innerSubs;
-    else if (innerSubs.empty())
-      allSubs = outerSubs;
-    else {
-      Substitution *allSubsBuf
-        = F.getASTContext().Allocate<Substitution>(outerSubs.size()
-                                                  + innerSubs.size());
-      static_assert(IsTriviallyCopyable<Substitution>::value,
-                    "assuming Substitution is trivially copyable");
-      std::memcpy(allSubsBuf,
-                  outerSubs.data(), outerSubs.size() * sizeof(Substitution));
-      std::memcpy(allSubsBuf + outerSubs.size(),
-                  innerSubs.data(), innerSubs.size() * sizeof(Substitution));
-      allSubs = {allSubsBuf, outerSubs.size()+innerSubs.size()};
-    }
-    
     methodTy = getLoweredLoadableType(
                     methodTy.castTo<PolymorphicFunctionType>()
-                      ->substGenericArgs(SGM.SwiftModule, allSubs));
+                      ->substGenericArgs(SGM.SwiftModule, subs));
   }
   
   return std::make_tuple(ManagedValue(methodValue, ManagedValue::Unmanaged),
-                         methodTy, allSubs);
+                         methodTy, subs);
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
