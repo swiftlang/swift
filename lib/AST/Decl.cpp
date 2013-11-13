@@ -239,6 +239,7 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
 bool ValueDecl::isSettableOnBase(Type baseType) const {
   if (!isSettable()) return false;
   if (!baseType) return true;
+  if (!isInstanceMember() && baseType->is<MetaTypeType>()) return true;
   return (baseType->isSettableLValue() ||
           baseType->getRValueType()->hasReferenceSemantics());
 }
