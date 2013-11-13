@@ -2601,19 +2601,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If we are looking for a metatype member, don't include members that can
     // only be accessed on an instance of the object.
     // FIXME: Mark as 'unavailable' somehow.
-    if (isMetatype &&
-        !(isa<FuncDecl>(result) ||
-          isa<EnumElementDecl>(result) ||
-          !result->isInstanceMember())) {
+    if (isMetatype && !(isa<FuncDecl>(result) || !result->isInstanceMember())) {
       continue;
     }
 
     // If we aren't looking in a metatype, ignore static functions, static
     // variables, and enum elements.
-    if (!isMetatype && !baseObjTy->is<ModuleType>()
-        && (isa<FuncDecl>(result) || isa<VarDecl>(result) ||
-            isa<EnumElementDecl>(result))
-        && !result->isInstanceMember())
+    if (!isMetatype && !baseObjTy->is<ModuleType>() &&
+        !result->isInstanceMember())
       continue;
 
     // If we're doing dynamic lookup into a metatype of DynamicLookup and we've
