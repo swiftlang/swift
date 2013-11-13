@@ -186,10 +186,6 @@ for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
 done
 
 SWIFT_MODULE_CACHE="${BUILD_DIR:-${WORKSPACE}}/swift-module-cache"
-echo SWIFT_MODULE_CACHE="${SWIFT_MODULE_CACHE}"
-
-echo "LLVM_BUILD_DIR=${LLVM_BUILD_DIR}"
-echo "SWIFT_BUILD_DIR=${SWIFT_BUILD_DIR}"
 
 if [[ "$PACKAGE" ]]; then
   # Make sure install-test-script.sh is available alongside us.
