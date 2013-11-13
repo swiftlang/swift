@@ -1126,6 +1126,11 @@ existentialConformsToItself(TypeChecker &tc,
   // Check whether this protocol conforms to itself.
   auto selfType = proto->getSelf()->getArchetype();
   for (auto member : proto->getMembers()) {
+    if (auto vd = dyn_cast<ValueDecl>(member))
+      tc.validateDecl(vd, true);
+    if (member->isInvalid())
+      continue;
+
     // Check for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       // A protocol cannot conform to itself if it has an associated type.
