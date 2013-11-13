@@ -100,12 +100,9 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     // FIXME: static variables
     return false;
   }
-  if (LS.isQualified() && !LS.isOnMetatype() &&
-      (isa<TypeAliasDecl>(Member) || isa<AssociatedTypeDecl>(Member) ||
-       isa<GenericTypeParamDecl>(Member))) {
-    // Can only access nested typealiases with unqualified lookup or on
-    // metatypes.
-    // FIXME: other nominal types?  rdar://14489286
+  if (LS.isQualified() && !LS.isOnMetatype() && isa<TypeDecl>(Member)) {
+    // Nested type declarations can be accessed only with unqualified lookup or
+    // on metatypes.
     return false;
   }
 
