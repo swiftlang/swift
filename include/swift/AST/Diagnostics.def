@@ -1476,6 +1476,9 @@ NOTE(not_objc_generic_type_param,sema_objc,none,
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
       "method can not be marked @objc because curried functions can not be "
       "represented in Objective-C", ())
+ERROR(objc_invalid_on_tuple_style,sema_objc,none,
+      "method can not be marked @objc because it is not using selector-style "
+      "declaration syntax", ())
 ERROR(objc_invalid_on_func_param_type,sema_objc,none,
       "method can not be marked @objc because the type of the parameter %0 "
       "can not be represented in Objective-C", (unsigned))

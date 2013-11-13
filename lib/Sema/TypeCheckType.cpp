@@ -1035,10 +1035,22 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
                                               const Pattern *P,
                                               bool Diagnose) {
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
-    bool IsObjC = true;
     auto Fields = TP->getFields();
-    for (unsigned ParamIndex = 0, NumParams = Fields.size();
-         ParamIndex != NumParams; ParamIndex++) {
+    unsigned NumParams = Fields.size();
+
+    if (NumParams == 0)
+      return true;
+
+    if (NumParams != 1 && !AFD->hasSelectorStyleSignature()) {
+      // If the function has two or more parameters, it should have a
+      // selector-style declaration.
+      if (Diagnose)
+        TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_tuple_style);
+      return false;
+    }
+
+    bool IsObjC = true;
+    for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
       auto &TupleElt = Fields[ParamIndex];
       if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
         IsObjC = false;
