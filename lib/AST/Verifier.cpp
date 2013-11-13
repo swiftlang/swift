@@ -1215,6 +1215,12 @@ namespace {
           Out << "only variables and subscript can have getters and setters";
           abort();
         }
+        
+        if (isa<VarDecl>(VD)
+            && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
+          Out << "getter or setter static-ness must match static-ness of var";
+          abort();
+        }
       }
 
       return verifyParsed(cast<AbstractFunctionDecl>(FD));

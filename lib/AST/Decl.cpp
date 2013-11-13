@@ -856,7 +856,7 @@ Type VarDecl::getGetterType() const {
 
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
                                                        /*isConstructor=*/false,
                                                        &outerParams);
 
@@ -883,7 +883,7 @@ Type VarDecl::getSetterType() const {
 
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
                                                        /*isConstructor=*/false,
                                                        &outerParams);
 

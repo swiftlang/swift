@@ -526,9 +526,9 @@ public:
                             SourceLoc StaticLoc);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
-                   bool IsStatic);
+                   SourceLoc StaticLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType,
-                          bool IsStatic);
+                          SourceLoc StaticLoc);
   
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,

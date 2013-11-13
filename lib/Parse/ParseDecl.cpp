@@ -1069,7 +1069,7 @@ void Parser::addVarsToScope(Pattern *Pat,
 bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc,
-                         bool IsStatic) {
+                         SourceLoc StaticLoc) {
   bool Invalid = false;
   Get = nullptr;
   Set = nullptr;
@@ -1135,6 +1135,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
                              Type(), Params, Params, ElementTy,
                              CurDeclContext);
+      if (StaticLoc.isValid())
+        Get->setStatic(true);
       addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
 
       // Establish the new context.
@@ -1221,7 +1223,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
 
     {
-      VarDecl *Value = new (Context) VarDecl(IsStatic,
+      VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
                                              SetNameLoc, SetName,
                                              Type(), CurDeclContext);
       if (IsNameImplicit)
@@ -1253,6 +1255,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                            Identifier(), SetLoc, /*generic=*/nullptr, Type(),
                            Params, Params, TypeLoc::withoutLoc(SetterRetTy),
                            CurDeclContext);
+    if (StaticLoc.isValid())
+      Set->setStatic(true);
+
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
     // Establish the new context.
@@ -1281,7 +1286,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
-                                bool IsStatic) {
+                                SourceLoc StaticLoc) {
   bool Invalid = false;
     
   // The grammar syntactically requires a simple identifier for the variable
@@ -1317,7 +1322,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
   FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc,
-                  Get, Set, LastValidLoc, IsStatic))
+                  Get, Set, LastValidLoc, StaticLoc))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1374,7 +1379,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
       parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType,
-                         StaticLoc.isValid());
+                         StaticLoc);
       HasGetSet = true;
     }
 
@@ -2304,7 +2309,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     
     SourceLoc LastValidLoc = LBLoc;
     if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
-                    Get, Set, LastValidLoc, /*IsStatic*/ false))
+                    Get, Set, LastValidLoc, /*StaticLoc*/ SourceLoc()))
       Status.setIsParseError();
 
     // Parse the final '}'.
