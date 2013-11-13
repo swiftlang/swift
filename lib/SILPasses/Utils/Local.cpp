@@ -74,7 +74,9 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
   llvm::SmallPtrSet<SILInstruction*, 8> ErasedInsts;
   do {
     I = DeadInsts.pop_back_val();
-    if (ErasedInsts.count(I) > 0)
+    // If we have already seen and erased this instruction, then do not try to
+    // process it again.
+    if (ErasedInsts.count(I))
       continue;
 
     // Check if any of the operands will become dead as well.
