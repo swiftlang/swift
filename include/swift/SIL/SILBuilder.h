@@ -295,66 +295,55 @@ public:
   
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-    return insert(new (F.getModule())
-                    ConvertFunctionInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) ConvertFunctionInst(Loc, Op, Ty));
   }
 
   CoerceInst *createCoerce(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    CoerceInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) CoerceInst(Loc, Op, Ty));
   }
   
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    UpcastInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) UpcastInst(Loc, Op, Ty));
   }
   
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
                                                SILType Ty) {
-    return insert(new (F.getModule())
-                    AddressToPointerInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) AddressToPointerInst(Loc, Op, Ty));
   }
   
   PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
                                                SILType Ty) {
-    return insert(new (F.getModule())
-                    PointerToAddressInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) PointerToAddressInst(Loc, Op, Ty));
   }
   
   RefToObjectPointerInst *createRefToObjectPointer(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
-    return insert(new (F.getModule())
-                    RefToObjectPointerInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) RefToObjectPointerInst(Loc, Op, Ty));
   }
   
   ObjectPointerToRefInst *createObjectPointerToRef(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
-    return insert(new (F.getModule())
-                    ObjectPointerToRefInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) ObjectPointerToRefInst(Loc, Op, Ty));
   }
   
   RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-    return insert(new (F.getModule())
-                    RefToRawPointerInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) RefToRawPointerInst(Loc, Op, Ty));
   }
   
   RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-    return insert(new (F.getModule())
-                    RawPointerToRefInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) RawPointerToRefInst(Loc, Op, Ty));
   }
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    ThinToThickFunctionInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) ThinToThickFunctionInst(Loc, Op, Ty));
   }
 
   BridgeToBlockInst *createBridgeToBlock(SILLocation Loc,
                                          SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    BridgeToBlockInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) BridgeToBlockInst(Loc, Op, Ty));
   }
 
   UnownedToRefInst *createUnownedToRef(SILLocation loc,
@@ -408,12 +397,12 @@ public:
   }
   
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
-                         EnumElementDecl *Element, SILType Ty) {
+                       EnumElementDecl *Element, SILType Ty) {
     return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
   
   EnumDataAddrInst *createEnumDataAddr(SILLocation Loc, SILValue Operand,
-                                         EnumElementDecl *Element, SILType Ty){
+                                       EnumElementDecl *Element, SILType Ty){
     return insert(
               new (F.getModule()) EnumDataAddrInst(Loc, Operand, Element, Ty));
   }
@@ -484,8 +473,7 @@ public:
   }
   
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member,
-                                     SILType MethodTy,
+                                     SILDeclRef Member, SILType MethodTy,
                                      bool Volatile = false)
   {
     return insert(new (F.getModule())
@@ -493,16 +481,13 @@ public:
   }
   
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member,
-                                     SILType MethodTy,
-                                     bool Volatile = false)
-  {
+                                     SILDeclRef Member, SILType MethodTy,
+                                     bool Volatile = false) {
     return insert(new (F.getModule())
                     SuperMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
   
-  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc,
-                                             SILType LookupTy,
+  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, SILType LookupTy,
                                              SILDeclRef Member,
                                              SILType MethodTy,
                                              bool Volatile = false)
@@ -512,20 +497,16 @@ public:
                                         Volatile));
   }
   
-  ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
-                                           SILValue Operand,
-                                           SILDeclRef Member,
-                                           SILType MethodTy,
+  ProtocolMethodInst *createProtocolMethod(SILLocation Loc, SILValue Operand,
+                                           SILDeclRef Member, SILType MethodTy,
                                            bool Volatile = false) {
     return insert(new (F.getModule())
                     ProtocolMethodInst(Loc, Operand, Member, MethodTy,
                                        Volatile));
   }
 
-  DynamicMethodInst *createDynamicMethod(SILLocation Loc,
-                                         SILValue Operand,
-                                         SILDeclRef Member,
-                                         SILType MethodTy,
+  DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
+                                         SILDeclRef Member, SILType MethodTy,
                                          bool Volatile = false) {
     return insert(new (F.getModule())
                   DynamicMethodInst(Loc, Operand, Member, MethodTy,
@@ -562,9 +543,7 @@ public:
                                  SILValue Concrete,
                                  ArrayRef<ProtocolConformance*> Conformances) {
     return insert(new (F.getModule())
-                    InitExistentialRefInst(Loc,
-                                           ExistentialType,
-                                           Concrete,
+                    InitExistentialRefInst(Loc, ExistentialType, Concrete,
                                            Conformances));
   }
   
@@ -573,9 +552,7 @@ public:
                                  SILValue DestExistential,
                                  IsTake_t isTakeOfSrc) {
     return insert(new (F.getModule())
-                    UpcastExistentialInst(Loc,
-                                          SrcExistential,
-                                          DestExistential,
+                    UpcastExistentialInst(Loc, SrcExistential, DestExistential,
                                           isTakeOfSrc));
   }
   
@@ -588,24 +565,20 @@ public:
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
                                                  SILValue Existential) {
-    return insert(new (F.getModule())
-                    DeinitExistentialInst(Loc, Existential));
+    return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));
   }
   
   BuiltinZeroInst *createBuiltinZero(SILLocation Loc, SILType Type) {
-    return insert(new (F.getModule())
-                    BuiltinZeroInst(Loc, Type));
+    return insert(new (F.getModule()) BuiltinZeroInst(Loc, Type));
   }
   
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
-    return insert(new (F.getModule())
-                    MetatypeInst(Loc, Metatype));
+    return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }
 
   ClassMetatypeInst *createClassMetatype(SILLocation Loc, SILType Metatype,
                                          SILValue Base) {
-    return insert(new (F.getModule())
-                    ClassMetatypeInst(Loc, Metatype, Base));
+    return insert(new (F.getModule()) ClassMetatypeInst(Loc, Metatype, Base));
   }
 
   ArchetypeMetatypeInst *createArchetypeMetatype(SILLocation Loc,
@@ -618,13 +591,11 @@ public:
   ProtocolMetatypeInst *createProtocolMetatype(SILLocation Loc,
                                                SILType Metatype,
                                                SILValue Base) {
-    return insert(new (F.getModule())
-                    ProtocolMetatypeInst(Loc, Metatype, Base));
+    return insert(new (F.getModule()) ProtocolMetatypeInst(Loc, Metatype,Base));
   }
   
   ModuleInst *createModule(SILLocation Loc, SILType ModuleType) {
-    return insert(new (F.getModule())
-                    ModuleInst(Loc, ModuleType));
+    return insert(new (F.getModule()) ModuleInst(Loc, ModuleType));
   }
   
   void createStrongRetain(SILLocation Loc, SILValue Operand) {
