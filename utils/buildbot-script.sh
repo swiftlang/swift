@@ -228,9 +228,14 @@ COMMON_CMAKE_OPTIONS=(
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
 
-if [[ ! "${BUILD_ARGS}" && "${CMAKE_GENERATOR}" == "Unix Makefiles" ]] ; then
-    BUILD_ARGS=-j8
-fi
+case "${CMAKE_GENERATOR}" in
+    'Unix Makefiles')
+        BUILD_ARGS="${BUILD_ARGS:--j8}"
+        ;;
+    Xcode)
+        BUILD_TARGET_FLAG=-target
+        ;;
+esac
 
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
@@ -289,8 +294,21 @@ done
 
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
-  echo "--- Running Swift Tests ---"
-  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} check-swift
+    echo "--- Running Swift Tests ---"
+    
+    build_cmd=("$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS})
+    
+    if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
+        # Ninja buffers command output to avoid scrambling the output
+        # of parallel jobs, which is awesome... except that it
+        # interferes with the progress meter when testing.  Instead of
+        # executing ninja directly, have it dump the commands it would
+        # run, strip Ninja's progress prefix with sed, and tell the
+        # shell to execute that.
+        sh -c "$("${build_cmd[@]}" -n -v check-swift | sed -e 's/[^]]*] //')"
+    else
+        "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-swift
+    fi
 fi
 
 # Run the Swift performance tests.
@@ -328,7 +346,7 @@ fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
-  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} package
+  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} ${BUILD_TARGET_FLAG} package
 
   saw_package=
   for package in "${SWIFT_BUILD_DIR}"/swift-*.tar.gz; do
