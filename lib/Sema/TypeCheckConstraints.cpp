@@ -2492,6 +2492,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // If the constructor is invalid, skip it.
       // FIXME: Note this as invalid, in case we don't find a solution,
       // so we don't let errors cascade further.
+      TC.validateDecl(constructor, true);
       if (constructor->isInvalid())
         continue;
 
@@ -2541,6 +2542,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // If the result is invalid, skip it.
       // FIXME: Note this as invalid, in case we don't find a solution,
       // so we don't let errors cascade further.
+      TC.validateDecl(result.first, true);
       if (result.first->isInvalid())
         continue;
 
@@ -2589,6 +2591,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If the result is invalid, skip it.
     // FIXME: Note this as invalid, in case we don't find a solution,
     // so we don't let errors cascade further.
+    TC.validateDecl(result, true);
     if (result->isInvalid())
       continue;
 

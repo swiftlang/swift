@@ -98,6 +98,7 @@ namespace {
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
       // If we're referring to an invalid declaration, fail.
+      CS.getTypeChecker().validateDecl(decl, true);
       if (decl->isInvalid())
         return nullptr;
 
@@ -204,6 +205,7 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
+      CS.getTypeChecker().validateDecl(E->getDecl(), true);
       if (E->getDecl()->isInvalid())
         return nullptr;
 
@@ -289,6 +291,7 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
+        CS.getTypeChecker().validateDecl(decls[i], true);
         if (decls[i]->isInvalid())
           continue;
 
@@ -318,6 +321,7 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
+        CS.getTypeChecker().validateDecl(decls[i], true);
         if (decls[i]->isInvalid())
           continue;
 

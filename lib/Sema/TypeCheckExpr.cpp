@@ -386,6 +386,9 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   if (!value->hasType())
     typeCheckDecl(value, true);
   
+  if (value->isInvalid())
+    return ErrorType::get(Context);
+
   if (value->isReferencedAsLValue()) {
     // Determine the qualifiers we want.
     LValueType::Qual quals =
