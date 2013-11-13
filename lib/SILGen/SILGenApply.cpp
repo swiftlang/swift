@@ -1724,6 +1724,28 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   return callee;
 }
 
+// Emit a static metatype reference for a static accessor.
+// FIXME: dynamic or generic static properties require a real base metatype
+// value.
+static void addStaticAccessorSelfArgument(SILGenFunction &gen,
+                                          CallEmission &emission,
+                                          SILLocation loc,
+                                          Type selfTy,
+                                          Type methodTy) {
+  assert(!selfTy->is<BoundGenericType>()
+         && "generic static properties not implemented");
+  assert((selfTy->getStructOrBoundGenericStruct()
+          || selfTy->getEnumOrBoundGenericEnum())
+         && "non-value-type static properties not implemented");
+  Type metaty = MetaTypeType::get(selfTy, gen.getASTContext());
+  SILValue metatyVal
+    = gen.B.createMetatype(loc, gen.getLoweredLoadableType(metaty));
+  
+  emission.addCallSite(loc,
+             RValue(gen, ManagedValue(metatyVal, ManagedValue::Unmanaged), loc),
+             methodTy);
+}
+
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
                                              SILDeclRef get,
@@ -1734,11 +1756,13 @@ ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
                                              SGFContext c) {
   // Compute the type of the accessor.
   Type accessType;
+  bool isStatic = false;
   if (auto subscript = dyn_cast<SubscriptDecl>(get.getDecl())) {
     accessType = subscript->getGetterType();
   } else {
     auto var = cast<VarDecl>(get.getDecl());
     accessType = var->getGetterType();
+    isStatic = var->isStatic();
   }
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
@@ -1750,6 +1774,11 @@ ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
+  } else if (isStatic) {
+    addStaticAccessorSelfArgument(*this, emission, loc,
+                    get.getDecl()->getDeclContext()->getDeclaredTypeInContext(),
+                    accessFnTy->getResult());
     accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->
@@ -1771,11 +1800,13 @@ void SILGenFunction::emitSetAccessor(SILLocation loc,
                                      RValue &&setValue) {
   // Compute the type of the accessor.
   Type accessType;
+  bool isStatic = false;
   if (auto subscript = dyn_cast<SubscriptDecl>(set.getDecl())) {
     accessType = subscript->getSetterType();
   } else {
     auto var = cast<VarDecl>(set.getDecl());
     accessType = var->getSetterType();
+    isStatic = var->isStatic();
   }
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
@@ -1787,6 +1818,11 @@ void SILGenFunction::emitSetAccessor(SILLocation loc,
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
+  } else if (isStatic) {
+    addStaticAccessorSelfArgument(*this, emission, loc,
+                    set.getDecl()->getDeclContext()->getDeclaredTypeInContext(),
+                    accessFnTy->getResult());
     accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->
