@@ -128,10 +128,10 @@ else:
 @@transparent
 extension ${Self} : RandomAccessIndex {
   def __equal__(rhs: ${Self}) -> Bool {
-    return _getBool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
+    return Bool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
   }
   def __less__(rhs: ${Self}) -> Bool {
-    return _getBool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
+    return Bool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
   }
   def succ() -> ${Self} {
     return self + 1
@@ -141,16 +141,16 @@ extension ${Self} : RandomAccessIndex {
   }
   typealias DistanceType = ${Self}
   static def sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
-    var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
-    return (${Self}(tmp.0), _getBool(tmp.1))
+    var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    return (${Self}(tmp.0), Bool(tmp.1))
   }
   static def add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
-    return (${Self}(tmp.0), _getBool(tmp.1))
+    var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    return (${Self}(tmp.0), Bool(tmp.1))
   }
   static def mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow._getBuiltinLogicValue())
-    return (${Self}(tmp.0), _getBool(tmp.1))
+    var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    return (${Self}(tmp.0), Bool(tmp.1))
   }
 
   static def sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
@@ -210,7 +210,7 @@ def &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 @@transparent
 def ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   var tmp = ${Self}.${method}(lhs, rhs)
-  Builtin.condfail(tmp.1._getBuiltinLogicValue())
+  Builtin.condfail(tmp.1.value)
   return tmp.0
 }
 @ end
@@ -230,7 +230,7 @@ def ~(rhs: ${Self}) -> ${Self} {
 @  ('>',sign+'gt'), ('>=',sign+'ge')):
 @@transparent
 def ${op}(lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return _getBool(Builtin.cmp_${name}_Int${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_${name}_Int${bits}(lhs.value, rhs.value))
 }
 @ end
 
