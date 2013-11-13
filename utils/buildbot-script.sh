@@ -31,12 +31,8 @@ KNOWN_SETTINGS=(
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
 )
 
-function toupper() {
-    echo "$@" | tr '[:lower:]' '[:upper:]'    
-}
-
 function to_varname() {
-    toupper "${1//-/_}"
+    echo "${1//-/_}" | tr '[:lower:]' '[:upper:]'
 }
 
 # Set up an "associative array" of settings for error checking, and set
@@ -168,15 +164,9 @@ test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
 test -d "$WORKSPACE/SourceKit"
 
-# Swift-project products, in the order they must be built
-SWIFT_BUILD_PRODUCTS=(swift SourceKit)
-
-# All build products, in the order they must be built
-ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}")
-
 # Calculate build directories for each product
-for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
-    varname="$(toupper "${product}")"_BUILD_DIR
+for product in swift llvm SourceKit ; do
+    varname="$(echo "${product}" | tr '[:lower:]' '[:upper:]')"_BUILD_DIR
     if [[ "${BUILD_DIR}" ]] ; then
         product_build_dir="${BUILD_DIR}/${product}"
     else
@@ -222,67 +212,66 @@ if [ "$(ls -A "${SWIFT_MODULE_CACHE}")" ]; then
   exit 1
 fi
 
-# CMake options used for all targets, including LLVM/Clang
-COMMON_CMAKE_OPTIONS=(
-    -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang"
-    -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++"
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-    -DLLVM_ENABLE_ASSERTIONS="ON" 
-)
-
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
   mkdir -p "${LLVM_BUILD_DIR}"
   (cd "${LLVM_BUILD_DIR}" &&
-    "$CMAKE" -G "Unix Makefiles" "${COMMON_CMAKE_OPTIONS[@]}" \
+    "$CMAKE" -G "Unix Makefiles" \
+      -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
+      -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
       -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
       -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
       -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
       -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
-      "$WORKSPACE/llvm" && make -j8 || exit 1)
-  "$CMAKE" --build "${LLVM_BUILD_DIR}" -- -j8
+      "$WORKSPACE/llvm" &&
+    make -j8) || exit 1
 fi
 
-#
-# Now build all the Swift products
-#
+# Build Swift.
+if [ \! "$SKIP_BUILD_SWIFT" ]; then
+  echo "--- Building Swift ---"
+  mkdir -p "${SWIFT_BUILD_DIR}"
+  (cd "${SWIFT_BUILD_DIR}" &&
+    "$CMAKE" -G "Unix Makefiles" \
+      -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
+      -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+      -DSWIFT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
+      -DSWIFT_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
+      -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
+      -DSWIFT_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+      -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE}" \
+      -DSWIFT_RUN_LONG_TESTS="ON" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
+      "$WORKSPACE/swift" &&
+    make -j8) || exit 1
+fi
 
-SWIFT_CMAKE_OPTIONS=(
-    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE}" \
-    -DSWIFT_RUN_LONG_TESTS="ON" \
-)
-
-SOURCEKIT_CMAKE_OPTIONS=(
-    -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift"
-)
-
-# Build each one. Note: in this block, names beginning with underscore
-# are used indirectly to access product-specific variables.
-for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
-    PRODUCT=$(toupper "${product}")
-    
-    _SKIP_BUILD_PRODUCT=SKIP_BUILD_${PRODUCT}
-    if [[ ! "${!_SKIP_BUILD_PRODUCT}" ]]; then
-        
-        echo "--- Building ${product} ---"
-        _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
-        mkdir -p "${!_PRODUCT_BUILD_DIR}"
-
-        _PRODUCT_CMAKE_OPTIONS=${PRODUCT}_CMAKE_OPTIONS[@]
-        (cd "${!_PRODUCT_BUILD_DIR}" &&
-            "$CMAKE" -G "Unix Makefiles" "${COMMON_CMAKE_OPTIONS[@]}" \
-                "${!_PRODUCT_CMAKE_OPTIONS}" \
-                -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-                -D${PRODUCT}_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
-                -D${PRODUCT}_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
-                -D${PRODUCT}_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
-                -D${PRODUCT}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
-                "$WORKSPACE/${product}"  && make -j8 || exit 1)
-        "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- -j8
-    fi
-done
+# Build SourceKit.
+if [ \! "$SKIP_BUILD_SOURCEKIT" ]; then
+  echo "--- Building SourceKit ---"
+  mkdir -p "${SOURCEKIT_BUILD_DIR}"
+  (cd "${SOURCEKIT_BUILD_DIR}" &&
+    "$CMAKE" -G "Unix Makefiles" \
+      -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
+      -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+      -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift" \
+      -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}" \
+      -DSOURCEKIT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
+      -DSOURCEKIT_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
+      -DSOURCEKIT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
+      -DSOURCEKIT_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
+      "$WORKSPACE/SourceKit" &&
+    make -j8) || exit 1
+fi
 
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
