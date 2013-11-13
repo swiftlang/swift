@@ -78,6 +78,18 @@
       println("descending")
     }
 
+* Work has begun on implementing static properties. Currently they are supported
+  for nongeneric structs and enums.
+
+    struct Foo {
+      static var foo: Int = 2
+    }
+    enum Bar {
+      static var bar: Int = 3
+    }
+    println(Foo.foo)
+    println(Bar.bar)
+
 2013-11-06
 ----------
 
