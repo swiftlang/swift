@@ -289,8 +289,7 @@ done
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
   echo "--- Running Swift Tests ---"
-  (cd "${SWIFT_BUILD_DIR}" &&
-    make check-swift) || exit 1
+  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} check-swift
 fi
 
 # Run the Swift performance tests.
@@ -328,8 +327,7 @@ fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
-  (cd "${SWIFT_BUILD_DIR}" &&
-    make -j8 package) || exit 1
+  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} package
 
   saw_package=
   for package in "${SWIFT_BUILD_DIR}"/swift-*.tar.gz; do
