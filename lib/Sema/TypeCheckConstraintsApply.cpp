@@ -978,15 +978,19 @@ namespace {
         TupleTypeElt(BuiltinIntegerType::get(64, tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
+      
+      auto CFSLID = tc.Context.getIdentifier("convertFromStringLiteral");
+      auto CFBSLID=tc.Context.getIdentifier("_convertFromBuiltinStringLiteral");
+      
       return convertLiteral(expr,
                             type,
                             expr->getType(),
                             protocol,
                             tc.Context.getIdentifier("StringLiteralType"),
-                           tc.Context.getIdentifier("convertFromStringLiteral"),
+                            CFSLID,
                             builtinProtocol,
                             TupleType::get(elements, tc.Context),
-                  tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
+                            CFBSLID,
                             nullptr,
                             diag::string_literal_broken_proto,
                             diag::builtin_string_literal_broken_proto);
