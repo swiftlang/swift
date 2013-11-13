@@ -1385,7 +1385,8 @@ namespace {
     assert(substitutions.size() == 1 && "cast should have a type substitution");
     
     // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].Replacement->mayHaveSuperclass()) {
+    if (!substitutions[0].Replacement->mayHaveSuperclass() &&
+        !substitutions[0].Replacement->isClassExistentialType()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castToObjectPointer source must be a class");
       // FIXME: Recovery?
@@ -1398,8 +1399,22 @@ namespace {
     
     // Take the reference type argument and cast it to ObjectPointer.
     SILType objPointerType = SILType::getObjectPointerType(gen.F.getASTContext());
-    SILValue result = gen.B.createRefToObjectPointer(loc, args[0].getValue(),
-                                                     objPointerType);
+    SILValue arg = args[0].getValue();
+
+    // If the argument is existential, project it.
+    if (substitutions[0].Replacement->isClassExistentialType()) {
+      SmallVector<ProtocolDecl *, 4> protocols;
+      substitutions[0].Replacement->isExistentialType(protocols);
+      ProtocolDecl *proto = *std::find_if(protocols.begin(), protocols.end(),
+                                          [](ProtocolDecl *proto) {
+                                            return proto->requiresClass();
+                                          });
+      SILType protoSelfTy = gen.getLoweredType(
+                              proto->getSelf()->getArchetype());
+      arg = gen.B.createProjectExistentialRef(loc, arg, protoSelfTy);
+    }
+
+    SILValue result = gen.B.createRefToObjectPointer(loc, arg, objPointerType);
     // Return the cast result with the original cleanup.
     return ManagedValue(result, cleanup);
   }
