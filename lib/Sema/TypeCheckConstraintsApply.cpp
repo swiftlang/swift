@@ -1251,14 +1251,15 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // Dig out the type of the 'enum', which will either be the result
-      // type of this expression (for unit EnumElements) or the result of
-      // the function type of this expression (for non-unit EnumElements).
-      Type enumTy = simplifyType(expr->getType());
-      if (auto funcTy = enumTy->getAs<FunctionType>())
-        enumTy = funcTy->getResult();
+      // Dig out the type of the base, which will either be the result
+      // type of this expression (for unit enum cases or static properties)
+      // or the result of the function type of this expression (for non-unit
+      // enum cases or static methods).
+      Type baseTy = simplifyType(expr->getType());
+      if (auto funcTy = baseTy->getAs<FunctionType>())
+        baseTy = funcTy->getResult();
       auto &tc = cs.getTypeChecker();
-      auto enumMetaTy = MetaTypeType::get(enumTy, tc.Context);
+      auto baseMetaTy = MetaTypeType::get(baseTy, tc.Context);
 
       // Find the selected member.
       auto selected = getOverloadChoice(
@@ -1266,10 +1267,10 @@ namespace {
                           expr, ConstraintLocator::UnresolvedMember));
       auto member = selected.choice.getDecl();
 
-      // The base expression is simply the metatype of an enum type.
+      // The base expression is simply the metatype of the base type.
       auto base = new (tc.Context) MetatypeExpr(nullptr,
                                                 expr->getDotLoc(),
-                                                enumMetaTy);
+                                                baseMetaTy);
 
       // Build the member reference.
       return buildMemberRef(base,

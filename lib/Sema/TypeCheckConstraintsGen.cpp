@@ -366,12 +366,12 @@ namespace {
     }
     
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      auto enumLocator = CS.getConstraintLocator(
+      auto baseLocator = CS.getConstraintLocator(
                             expr,
                             ConstraintLocator::MemberRefBase);
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto enumTy = CS.createTypeVariable(enumLocator, /*options=*/0);
+      auto baseTy = CS.createTypeVariable(baseLocator, /*options=*/0);
       auto memberTy = CS.createTypeVariable(memberLocator, /*options=*/0);
 
       // An unresolved member expression '.member' is modeled as a value member
@@ -387,15 +387,15 @@ namespace {
       // form (T2 -> T0) until T0 has been deduced, we cannot model this
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
-      auto enumMetaTy = MetaTypeType::get(enumTy, CS.getASTContext());
-      CS.addValueMemberConstraint(enumMetaTy, expr->getName(), memberTy,
+      auto baseMetaTy = MetaTypeType::get(baseTy, CS.getASTContext());
+      CS.addValueMemberConstraint(baseMetaTy, expr->getName(), memberTy,
                                   memberLocator);
 
       OverloadChoice choices[2] = {
-        OverloadChoice(enumTy, OverloadChoiceKind::BaseType),
-        OverloadChoice(enumTy, OverloadChoiceKind::FunctionReturningBaseType),
+        OverloadChoice(baseTy, OverloadChoiceKind::BaseType),
+        OverloadChoice(baseTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
-      CS.addOverloadSet(memberTy, choices, enumLocator);
+      CS.addOverloadSet(memberTy, choices, baseLocator);
       return memberTy;
     }
 
