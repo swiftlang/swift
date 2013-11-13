@@ -395,6 +395,8 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       // Reestablish our iterator if it wrapped.
       if (I == ApplyBlock->end())
         I = ApplyBlock->begin();
+      else
+        ++I;
       fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
       cleanupCalleeValue(Builder, CalleeValue, CaptureArgs);
 
