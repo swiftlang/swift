@@ -17,6 +17,16 @@
 
 namespace swift {
 
+  /// \brief For each of the given instructions, if they are dead delete them
+  /// along with their dead operands.
+  ///
+  /// \param I The instruction to be deleted.
+  /// \param Force If Force is set, don't check if the top level instructions
+  ///        are considered dead - delete them regardless.
+  /// \return Returns true if any instructions were deleted.
+  bool recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> I,
+                                                  bool Force = false);
+
   /// \brief If the given instruction is dead, delete it along with its dead
   /// operands.
   ///

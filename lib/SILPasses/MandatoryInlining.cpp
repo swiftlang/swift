@@ -14,6 +14,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -80,8 +81,19 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
 
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
-                               ArrayRef<SILValue> CaptureArgs) {
+static void
+cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
+                   ArrayRef<SILValue> CaptureArgs,
+                   ArrayRef<SILValue> FullArgs) {
+  SmallVector<SILInstruction*, 16> InstsToDelete;
+  for (SILValue V : FullArgs) {
+    SILInstruction *I = dyn_cast<SILInstruction>(V.getDef());
+    if (I && isInstructionTriviallyDead(I) &&
+        !(I == CalleeValue.getDef()))
+      InstsToDelete.push_back(I);
+  }
+  recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
+
   // Handle the case where the callee of the apply is a load instruction.
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -163,7 +175,7 @@ static void cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     CalleeValue = PAI->getCallee();
     assert(PAI->use_empty());
     PAI->eraseFromParent();
-  } else if (auto *TTTFI =
+  } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
 
@@ -398,7 +410,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       else
         ++I;
       fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
-      cleanupCalleeValue(Builder, CalleeValue, CaptureArgs);
+      cleanupCalleeValue(Builder, CalleeValue, CaptureArgs, FullArgs);
 
       // Reposition iterators possibly invalidated by mutation.
       FI = SILFunction::iterator(ApplyBlock);

@@ -15,7 +15,8 @@
 
 using namespace swift;
 
-static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
+static bool
+isSideEffectFree(BuiltinFunctionRefInst *FR) {
 
   // First, check if we are dealing with a swift builtin.
   const BuiltinInfo &BInfo = FR->getBuiltinInfo();
@@ -37,7 +38,8 @@ static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
-bool swift::isInstructionTriviallyDead(SILInstruction *I) {
+bool
+swift::isInstructionTriviallyDead(SILInstruction *I) {
   if (!I->use_empty() || isa<TermInst>(I))
     return false;
 
@@ -55,25 +57,26 @@ bool swift::isInstructionTriviallyDead(SILInstruction *I) {
   return false;
 }
 
-/// \brief If the given instruction is dead, delete it along with its dead
-/// operands.
+/// \brief For each of the given instructions, if they are dead delete them
+/// along with their dead operands.
 ///
-/// \param I The instruction to be deleted.
-/// \param Force If Force is set, don't check if the top level instruction is
-///        considered dead - delete it regardless.
-/// \return Returns true if any instructions were deleted.
-bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force) {
-  // If the instruction is not dead, there is nothing to do.
-  if (!I || (!Force && !isInstructionTriviallyDead(I)))
-    return false;
-
-  // Delete this instruction and others that become dead after it's deleted.
+/// \param IA The instruction to be deleted.
+/// \param Force If Force is set, don't check if the top level instructions
+///        are considered dead - delete them regardless.
+bool
+swift::recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> IA,
+                                                  bool Force) {
+  // Delete these instruction and others that become dead after it's deleted.
   SmallVector<SILInstruction*, 16> DeadInsts;
-  DeadInsts.push_back(I);
+
+  for (auto I : IA) {
+    // If the instruction is not dead or force is false, there is nothing to do.
+    if (Force || isInstructionTriviallyDead(I))
+      DeadInsts.push_back(I);
+  }
   llvm::SmallPtrSet<SILInstruction*, 8> ErasedInsts;
-  do {
-    I = DeadInsts.pop_back_val();
+  while (!DeadInsts.empty()) {
+    SILInstruction *I = DeadInsts.pop_back_val();
     // If we have already seen and erased this instruction, then do not try to
     // process it again.
     if (ErasedInsts.count(I))
@@ -99,7 +102,21 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
     // This will remove this instruction and all its uses.
     I->eraseFromParent();
     ErasedInsts.insert(I);
-  } while (!DeadInsts.empty());
-  
+  }
+
   return true;
+}
+
+/// \brief If the given instruction is dead, delete it along with its dead
+/// operands.
+///
+/// \param I The instruction to be deleted.
+/// \param Force If Force is set, don't check if the top level instruction is
+///        considered dead - delete it regardless.
+/// \return Returns true if any instructions were deleted.
+bool
+swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force) {
+  return recursivelyDeleteTriviallyDeadInstructions(
+           ArrayRef<SILInstruction*>(I), Force);
 }
