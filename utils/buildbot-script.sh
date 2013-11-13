@@ -101,6 +101,14 @@ while [[ "$1" ]] ; do
             exit
             ;;
 
+        # The --release flag enables a release build, which will additionally build
+        # a package if the build-and-test succeeds.
+        --release)
+            BUILD_TYPE=RelWithDebInfo
+            PACKAGE=1
+            # Include a custom name to avoid picking up stale module files.
+            CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
+            ;;
         
         --* )
             dashless="${1:2}"
@@ -133,14 +141,6 @@ while [[ "$1" ]] ; do
             eval ${varname}=$\value
             ;;
 
-        # The --release flag enables a release build, which will additionally build
-        # a package if the build-and-test succeeds.
-        --release | -release )
-            BUILD_TYPE=RelWithDebInfo
-            PACKAGE=1
-            # Include a custom name to avoid picking up stale module files.
-            CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
-            ;;
         *)
             usage
             exit 1
