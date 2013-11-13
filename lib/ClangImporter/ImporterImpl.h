@@ -119,8 +119,11 @@ struct ClangImporter::Implementation {
   /// representation, but can be used in different ways.
   enum class EnumKind {
     /// \brief The enumeration type should map to an enum, which means that
-    /// all of the options are independent.
+    /// all of the cases are independent.
     Enum,
+    /// \brief The enumeration type should map to an option set, which means that
+    /// the constants represent combinations of independent flags.
+    Options,
     /// \brief The enumeration type should map to a distinct type, but we don't
     /// know the intended semantics of the enum constants, so conservatively
     /// map them to independent constants.
@@ -343,7 +346,8 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, const clang::APValue &value,
-                            ConstantConvertKind convertKind);
+                            ConstantConvertKind convertKind,
+                            bool isStatic);
 
   /// \brief Retrieve the 'swift' module.
   ///

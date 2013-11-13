@@ -52,6 +52,7 @@ void *allocate(NSZone *zone);
 @end
 
 #define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 
 typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
@@ -91,6 +92,12 @@ typedef NS_ENUM(unsigned char, NSEnumWithAliases) {
   NSAliasesByEquivalentValue = -127,
   NSAliasesByName = NSAliasesOriginal,
 };
+
+typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
+  NSRuncingEnableMince,
+  NSRuncingEnableQuince
+};
+
 
 @protocol NSWobbling
 -(void)wobble;

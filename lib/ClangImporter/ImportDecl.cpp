@@ -442,7 +442,28 @@ namespace {
       return Impl.importName(decl->getDeclName(), /*suffix*/ "", enumPrefix);
     }
     
-    /// Import an enum constant as a case of a Swift enum.
+    /// Determine the common prefix to remove from the element names of an
+    /// enum. We'll elide this prefix from then names in
+    /// the Swift interface because Swift enum cases are naturally namespaced
+    /// by the enum type.
+    void computeEnumCommonWordPrefix(const clang::EnumDecl *decl) {
+      auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
+      if (ec != ecEnd) {
+        StringRef commonPrefix = (*ec)->getName();
+        ++ec;
+        // If there's only one enum constant, we can't come up with any
+        // reasonable prefix automatically, so bail.
+        if (ec == ecEnd) {
+          commonPrefix = "";
+        } else {
+          for (; ec != ecEnd; ++ec)
+            commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
+          Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
+        }
+      }
+    }
+    
+    /// Import an NS_ENUM constant as a case of a Swift enum.
     Decl *importEnumCase(const clang::EnumConstantDecl *decl,
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
@@ -490,6 +511,22 @@ namespace {
                                                context));
       return element;
     }
+    
+    /// Import an NS_OPTIONS constant as a static property of a Swift struct.
+    Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
+                               const clang::EnumDecl *clangEnum,
+                               StructDecl *theStruct) {
+      auto name = getEnumConstantName(decl, clangEnum);
+      if (name.empty())
+        return nullptr;
+      
+      // Create the constant.
+      return Impl.createConstant(name, theStruct,
+                                 theStruct->getDeclaredTypeInContext(),
+                                 clang::APValue(decl->getInitVal()),
+                                 ConstantConvertKind::Construction,
+                                 /*isStatic*/ true);
+    }
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
@@ -513,7 +550,6 @@ namespace {
 
       // Create the enum declaration and record it.
       Decl *result;
-      EnumDecl *enumDecl = nullptr;
       auto enumKind = Impl.classifyEnum(decl);
       switch (enumKind) {
       case EnumKind::Constants: {
@@ -577,7 +613,7 @@ namespace {
         if (!underlyingType)
           return nullptr;
         
-        enumDecl = new (Impl.SwiftContext)
+        auto enumDecl = new (Impl.SwiftContext)
           EnumDecl(Impl.importSourceLoc(decl->getLocStart()),
                    name, Impl.importSourceLoc(decl->getLocation()),
                    {}, nullptr, dc);
@@ -593,25 +629,59 @@ namespace {
         enumDecl->setProtocols(protoList);
         
         result = enumDecl;
+        computeEnumCommonWordPrefix(decl);
         
-        // Find the common prefix of the enumerator names. We'll elide this from
-        // the Swift interface because Swift enum cases are naturally namespaced
-        // by the enum type.
-        auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-        if (ec != ecEnd) {
-          StringRef commonPrefix = (*ec)->getName();
-          ++ec;
-          // If there's only one enum constant, we can't come up with any
-          // reasonable prefix automatically, so bail.
-          if (ec == ecEnd) {
-            commonPrefix = "";
-          } else {
-            for (; ec != ecEnd; ++ec)
-              commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
-            Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
-          }
-        }
+        break;
+      }
+          
+      case EnumKind::Options: {
+        // Compute the underlying type.
+        auto underlyingType = Impl.importType(decl->getIntegerType(),
+                                              ImportTypeKind::Normal);
+        if (!underlyingType)
+          return nullptr;
         
+        // Create a struct with the underlying type as a field.
+        auto structDecl = new (Impl.SwiftContext)
+          StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
+        structDecl->computeType();
+        
+        // Create a field to store the underlying value.
+        auto varName = Impl.SwiftContext.getIdentifier("value");
+        auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                   SourceLoc(), varName,
+                                                   underlyingType,
+                                                   structDecl);
+
+        // Create a pattern binding to describe the variable.
+        Pattern * varPattern = new (Impl.SwiftContext) NamedPattern(var);
+        varPattern->setType(var->getType());
+        varPattern
+          = new (Impl.SwiftContext) TypedPattern(
+                                      varPattern,
+                                      TypeLoc::withoutLoc(var->getType()));
+        varPattern->setType(var->getType());
+        
+        auto patternBinding
+          = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
+                                                       SourceLoc(),
+                                                       varPattern,
+                                                       nullptr, structDecl);
+
+        // Create a constructor to initialize that value from a value of the
+        // underlying type.
+        Decl *varDecl = var;
+        auto constructor = createValueConstructor(structDecl, {&varDecl, 1});
+
+        // Set the members of the struct.
+        Decl *members[3] = { constructor, patternBinding, var };
+        structDecl->setMembers(
+          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members, 3)),
+          SourceRange());
+
+        result = structDecl;
+        computeEnumCommonWordPrefix(decl);
+
         break;
       }
       }
@@ -620,31 +690,48 @@ namespace {
 
       // Import each of the enumerators.
       
-      SmallVector<Decl *, 4> members;
+      SmallVector<Decl *, 4> enumeratorDecls;
+      bool addEnumeratorsAsMembers;
+      switch (enumKind) {
+      case EnumKind::Constants:
+      case EnumKind::Unknown:
+        addEnumeratorsAsMembers = false;
+        break;
+      case EnumKind::Options:
+      case EnumKind::Enum:
+        addEnumeratorsAsMembers = true;
+        break;
+      }
+      
       for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
            ec != ecEnd; ++ec) {
-        Decl *ood;
+        Decl *enumeratorDecl;
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
-          ood = Impl.importDecl(*ec);
+          enumeratorDecl = Impl.importDecl(*ec);
+          break;
+        case EnumKind::Options:
+          enumeratorDecl = importOptionConstant(*ec, decl,
+                                                cast<StructDecl>(result));
           break;
         case EnumKind::Enum:
-          ood = importEnumCase(*ec, decl, enumDecl);
+          enumeratorDecl = importEnumCase(*ec, decl, cast<EnumDecl>(result));
           break;
         }
-        if (!ood)
+        if (!enumeratorDecl)
           continue;
 
-        members.push_back(ood);
+        enumeratorDecls.push_back(enumeratorDecl);
       }
 
       // FIXME: Source range isn't totally accurate because Clang lacks the
       // location of the '{'.
-      // FIXME: Eventually, we'd like to be able to do this for structs as well,
-      // but we need static variables first.
-      if (enumDecl) {
-        enumDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
+      if (addEnumeratorsAsMembers) {
+        auto nomResult = cast<NominalTypeDecl>(result);
+        enumeratorDecls.append(nomResult->getMembers().begin(),
+                               nomResult->getMembers().end());
+        nomResult->setMembers(Impl.SwiftContext.AllocateCopy(enumeratorDecls),
                                 Impl.importSourceRange(clang::SourceRange(
                                                        decl->getLocation(),
                                                        decl->getRBraceLoc())));
@@ -801,7 +888,8 @@ namespace {
         // Create the global constant.
         auto result = Impl.createConstant(name, dc, type,
                                           clang::APValue(decl->getInitVal()),
-                                          ConstantConvertKind::Coerce);
+                                          ConstantConvertKind::Coerce,
+                                          /*static*/ false);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
@@ -836,14 +924,16 @@ namespace {
         // Create the global constant.
         auto result = Impl.createConstant(name, dc, enumType,
                                           clang::APValue(decl->getInitVal()),
-                                          ConstantConvertKind::Construction);
+                                          ConstantConvertKind::Construction,
+                                          /*static*/ false);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
 
-      case EnumKind::Enum: {
-        // The enumeration was mapped to a Swift enum, so its elements were
-        // created as children of that enum. They aren't available
+      case EnumKind::Enum:
+      case EnumKind::Options: {
+        // The enumeration was mapped to a high-level Swift type, and its
+        // elements were created as children of that enum. They aren't available
         // independently.
         return nullptr;
       }
@@ -2456,8 +2546,7 @@ classifyEnum(const clang::EnumDecl *decl) {
   if (name.empty())
     return EnumKind::Constants;
   
-  // Was the enum declared using NS_ENUM?
-  // TODO: Or NS_OPTIONS?
+  // Was the enum declared using NS_ENUM or NS_OPTIONS?
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
   auto &ClangSM = getClangASTContext().getSourceManager();
   auto loc = decl->getLocStart();
@@ -2475,10 +2564,12 @@ classifyEnum(const clang::EnumDecl *decl) {
                      expansionBuffer->getBufferEnd());
     clang::Token token;
     lex.LexFromRawLexer(token);
-    if (token.is(clang::tok::raw_identifier) &&
-        StringRef(token.getRawIdentifierData(), token.getLength()) == "NS_ENUM")
-    {
-      return EnumKind::Enum;
+    if (token.is(clang::tok::raw_identifier)) {
+      StringRef ident(token.getRawIdentifierData(), token.getLength());
+      if (ident == "NS_ENUM")
+        return EnumKind::Enum;
+      if (SwiftContext.LangOpts.ImportNSOptions && ident == "NS_OPTIONS")
+        return EnumKind::Options;
     }
   }
   
@@ -2570,15 +2661,26 @@ ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
                                               const clang::APValue &value,
-                                              ConstantConvertKind convertKind) {
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(/*static*/ false,
+  auto var = new (context) VarDecl(isStatic,
                                    SourceLoc(), name, type, dc);
 
   // Form the argument patterns.
   SmallVector<Pattern *, 3> getterArgs;
 
+  // 'self'
+  if (dc->isTypeContext()) {
+    auto selfTy = dc->getDeclaredTypeInContext();
+    if (isStatic)
+      selfTy = MetaTypeType::get(selfTy, context);
+    Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
+    anyP->setType(selfTy);
+    getterArgs.push_back(anyP);
+  }
+  
   // empty tuple
   getterArgs.push_back(TuplePattern::create(context, SourceLoc(), { },
                                             SourceLoc()));
@@ -2597,6 +2699,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto func = FuncDecl::create(context, SourceLoc(), SourceLoc(), Identifier(),
                                SourceLoc(), nullptr, getterType, getterArgs,
                                getterArgs, TypeLoc::withoutLoc(type), dc);
+  func->setStatic(isStatic);
   func->setBodyResultType(type);
 
   setVarDeclContexts(getterArgs, func);
