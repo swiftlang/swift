@@ -34,12 +34,11 @@ static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
   llvm_unreachable("All cases are covered.");
 }
 
-/// \brief Perform a fast local check to see if the instruction is dead if all
-/// its uses were dead.
+/// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
-bool swift::isInstructionTriviallyDeadWithoutUses(SILInstruction *I) {
-  if (isa<TermInst>(I))
+bool swift::isInstructionTriviallyDead(SILInstruction *I) {
+  if (!I->use_empty() || isa<TermInst>(I))
     return false;
 
   // We know that some calls do not have side effects.
@@ -54,16 +53,6 @@ bool swift::isInstructionTriviallyDeadWithoutUses(SILInstruction *I) {
     return true;
 
   return false;
-}
-
-/// \brief Perform a fast local check to see if the instruction is dead.
-///
-/// This routine only examines the state of the instruction at hand.
-bool swift::isInstructionTriviallyDead(SILInstruction *I) {
-  if (!I->use_empty())
-    return false;
-
-  return isInstructionTriviallyDeadWithoutUses(I);
 }
 
 /// \brief If the given instruction is dead, delete it along with its dead
@@ -109,6 +98,6 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
     I->eraseFromParent();
     ErasedInsts.insert(I);
   } while (!DeadInsts.empty());
-
+  
   return true;
 }
