@@ -629,10 +629,10 @@ ParserResult<Stmt> Parser::parseStmtFor() {
 }
 
 ///   stmt-for-c-style:
-///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign-basic?
-///           stmt-brace
+///     'for' stmt-for-c-style-init? ';' expr? ';'
+///           (expr-basic (',' expr-basic)*)? stmt-brace
 ///     'for' '(' stmt-for-c-style-init? ';' expr? ';'
-///           expr-or-stmt-assign-basic? ')' stmt-brace
+///           (expr-basic (',' expr-basic)*)? ')' stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
 ///     expr-basic-or-stmt-assign
@@ -774,8 +774,34 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     Status.setIsParseError();
 
   if (Tok.isNot(tok::l_brace)) {
+    SmallVector<Expr *, 1> ThirdExprs;
+
+    // Parse the first expression.
     Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
     Status |= Third;
+    if (Third.isNonNull())
+      ThirdExprs.push_back(Third.get());
+
+    // Parse additional expressions.
+    while (Tok.is(tok::comma)) {
+      consumeToken(tok::comma);
+
+      Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
+      Status |= Third;
+
+      if (Third.isNonNull())
+        ThirdExprs.push_back(Third.get());
+    }
+
+    // If we had more than one expression, form a tuple.
+    if (ThirdExprs.size() > 1) {
+      Third = makeParserResult(new (Context) TupleExpr(
+                                               SourceLoc(),
+                                               Context.AllocateCopy(ThirdExprs),
+                                               nullptr, SourceLoc(),
+                                               /*hasTrailingClosure=*/false,
+                                               /*Implicit=*/true));
+    }
   }
 
   InCStyleForExpr.finished();
