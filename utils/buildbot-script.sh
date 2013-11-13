@@ -1,4 +1,4 @@
-#!/bin/bash -ex -o pipefail
+#!/bin/bash -o pipefail -o errexit
 #
 # Note: Jenkins is set up to restore the repositories to pristine
 # state before building, so we rebuild from scratch every time.  If
@@ -234,6 +234,12 @@ case "${CMAKE_GENERATOR}" in
         ;;
     Xcode)
         BUILD_TARGET_FLAG=-target
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}"
+            -DCMAKE_XCODE_ATTRIBUTE_GCC_VERSION:STRING=com.apple.compilers.llvm.clang.1_0
+            -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY:STRING=libc++
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8
+        )
         ;;
 esac
 
