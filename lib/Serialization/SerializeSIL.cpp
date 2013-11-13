@@ -599,11 +599,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand2), operand2.getResultNumber());
     break;
   }
-  case ValueKind::FloatLiteralInst:
-  case ValueKind::IntegerLiteralInst:
   case ValueKind::StringLiteralInst: {
+    StringRef Str = cast<StringLiteralInst>(&SI)->getValue();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    (unsigned)SI.getKind(), 0, 0, 0,
+                                    S.addIdentifierRef(Ctx.getIdentifier(Str)),
+                                    0);
+    break;
+  }
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::IntegerLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
-    StringRef Str;
+    std::string Str;
     SILType Ty;
     switch (SI.getKind()) {
     default: assert(0 && "Out of sync with parent switch");
@@ -615,10 +623,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Str = cast<FloatLiteralInst>(&SI)->getBits().toString(16,
                                                             /*Signed*/false);
       Ty = cast<FloatLiteralInst>(&SI)->getType();
-      break;
-    case ValueKind::StringLiteralInst:
-      Str = cast<StringLiteralInst>(&SI)->getValue();
-      Ty = cast<StringLiteralInst>(&SI)->getType();
       break;
     }
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];

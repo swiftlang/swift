@@ -1209,11 +1209,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::StringLiteralInst: {
-    SILType Ty;
-    if (parseSILType(Ty) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-    
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
       return true;
@@ -1225,8 +1220,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
       return true;
     }
-    ResultVal = B.createStringLiteral(InstLoc, Ty,
-                                      Str.substr(1, Str.size()-2));
+    ResultVal = B.createStringLiteral(InstLoc, Str.substr(1, Str.size()-2));
     P.consumeToken(tok::string_literal);
     break;
   }

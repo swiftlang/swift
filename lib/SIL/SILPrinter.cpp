@@ -577,8 +577,7 @@ public:
     OS << " // " << decimal;
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal " << SLI->getType()
-       << ", \"" << SLI->getValue() << "\"";
+    OS << "string_literal \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getIDAndType(LI->getOperand());

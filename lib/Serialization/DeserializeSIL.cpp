@@ -728,11 +728,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::StringLiteralInst: {
-    auto Ty = MF->getType(TyID);
     Identifier StringVal = MF->getIdentifier(ValID);
-    ResultVal = Builder.createStringLiteral(Loc,
-        getSILType(Ty, (SILValueCategory)TyCategory),
-        StringVal.str());
+    ResultVal = Builder.createStringLiteral(Loc, StringVal.str());
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {

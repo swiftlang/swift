@@ -452,8 +452,8 @@ APFloat FloatLiteralInst::getValue() const {
                  getBits());
 }
 
-StringLiteralInst::StringLiteralInst(SILLocation Loc, SILType Ty,
-                                     StringRef Text)
+StringLiteralInst::StringLiteralInst(SILLocation Loc, StringRef Text,
+                                     SILTypeList *Ty)
   : SILInstruction(ValueKind::StringLiteralInst, Loc, Ty),
     length(Text.size())
 {
@@ -461,16 +461,20 @@ StringLiteralInst::StringLiteralInst(SILLocation Loc, SILType Ty,
 }
 
 StringLiteralInst *
-StringLiteralInst::create(SILLocation Loc, SILType Ty, StringRef Text,
-                          SILFunction &B) {
+StringLiteralInst::create(SILLocation Loc, StringRef Text, SILFunction &F) {
   void *buf
-    = allocateLiteralInstWithTextSize<StringLiteralInst>(B, Text.size());
-  return ::new (buf) StringLiteralInst(Loc, Ty, Text);
-}
-
-StringLiteralInst *
-StringLiteralInst::create(StringLiteralExpr *E, SILType ty, SILFunction &B) {
-  return create(E, ty, E->getValue(), B);
+    = allocateLiteralInstWithTextSize<StringLiteralInst>(F, Text.size());
+  
+  const ASTContext &Ctx = F.getModule().getASTContext();
+  SILType ResTys[] = {
+    SILType::getRawPointerType(Ctx),
+    SILType::getBuiltinIntegerType(64, Ctx),
+    SILType::getBuiltinIntegerType(1, Ctx)
+  };
+  
+  SILTypeList *Ty = F.getModule().getSILTypeList(ResTys);
+  
+  return ::new (buf) StringLiteralInst(Loc, Text, Ty);
 }
 
 StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)

@@ -1591,18 +1591,15 @@ string_literal
 ``````````````
 ::
 
-  sil-instruction ::= 'string_literal' sil-type ',' string-literal
+  sil-instruction ::= 'string_literal' string-literal
 
-  %1 = string_literal $T, "asdf"
-  // $T must be either $Builtin.RawPointer,
-  //   or $(Builtin.RawPointer, Builtin.Int64)
-  // %1 has type $T
+  %1 = string_literal "asdf"
+  // %1 has type $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1)
 
-Creates a reference to a string in the global string table. The value can be
-either a lone ``Builtin.RawPointer`` referencing the start of the string, or
-a ``(Builtin.RawPointer, Builtin.Int64)`` pair of both the start of
-the string and its length. In either case, the referenced string is
-null-terminated. The string literal value is specified using Swift's string
+Creates a reference to a string in the global string table. The result has three
+values: a pointer to the data, a length, and a bit that indicates whether
+the string contains only ASCII characters.  In any case, the referenced string
+is null-terminated. The string literal value is specified using Swift's string
 literal syntax (though ``\()`` interpolations are not allowed).
 
 builtin_zero

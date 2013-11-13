@@ -506,14 +506,11 @@ bb0:
   %7 = alloc_stack $String                 // CHECK: alloc_stack $String
   %8 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
   %9 = metatype $String.metatype
-  // CHECK: string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
-  %10 = string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
+  // CHECK: string_literal "foo"
+  %10 = string_literal "foo"
   // CHECK-NOT: "bar""
-  %11 = string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "bar"
-  %12 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 0
-  %13 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 1
-  %14 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 2
-  %15 = apply %8(%12, %13, %14, %9) : $@thin ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
+  %11 = string_literal "bar"
+  %15 = apply %8(%11#0, %11#1, %11#2, %9) : $@thin ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
   %16 = store %15 to %7#1 : $*String
   %17 = load %7#1 : $*String                        // CHECK: load {{%.*}} : $*String
   %18 = struct_extract %17 : $String, #str_value  // CHECK: struct_extract

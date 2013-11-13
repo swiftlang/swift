@@ -1597,11 +1597,17 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
 }
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
-  Explosion e(ExplosionKind::Maximal);
-
-  e.add(IGM.getAddrOfGlobalString(i->getValue()));
-  e.add(Builder.getInt64(i->getValue().size()));
-
+  {
+    Explosion e(ExplosionKind::Maximal);
+    e.add(IGM.getAddrOfGlobalString(i->getValue()));
+    setLoweredExplosion(SILValue(i, 0), e);
+  }
+  {
+    Explosion e(ExplosionKind::Maximal);
+    e.add(Builder.getInt64(i->getValue().size()));
+    setLoweredExplosion(SILValue(i, 1), e);
+  }
+  
   // Determine whether this is an ASCII string.
   bool isASCII = true;
   for (unsigned char c : i->getValue()) {
@@ -1610,9 +1616,10 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
       break;
     }
   }
-  e.add(Builder.getInt1(isASCII));
 
-  setLoweredExplosion(SILValue(i, 0), e);
+  Explosion e(ExplosionKind::Maximal);
+  e.add(Builder.getInt1(isASCII));
+  setLoweredExplosion(SILValue(i, 2), e);
 }
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
@@ -2122,8 +2129,6 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
-  SILValue boxValue(i, 0);
-  SILValue ptrValue(i, 1);
   const TypeInfo &type = getTypeInfo(i->getElementType());
 
   // Derive name from SIL location.
@@ -2140,8 +2145,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   
   Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());
-  setLoweredExplosion(boxValue, box);
-  setLoweredAddress(ptrValue, addr.getAddress());
+  setLoweredExplosion(SILValue(i, 0), box);
+  setLoweredAddress(SILValue(i, 1), addr.getAddress());
 
   if (IGM.DebugInfo) {
     auto Indirection = IndirectValue;

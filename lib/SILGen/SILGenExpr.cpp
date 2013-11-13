@@ -154,6 +154,9 @@ namespace {
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
     RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
+        
+    RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C);
+        
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
     RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
@@ -428,16 +431,29 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                   ManagedValue::Unmanaged), E);
 }
 RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
-                                                 SGFContext C)
-{
+                                                 SGFContext C) {
   return RValue(SGF, ManagedValue(SGF.B.createIntegerLiteral(E),
                                   ManagedValue::Unmanaged), E);
 }
+
+RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
+                                        SGFContext C) {
+  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str);
+  CanType ty = E->getType()->getCanonicalType();
+  
+  ManagedValue Elts[] = {
+    ManagedValue(SILValue(string, 0), ManagedValue::Unmanaged),
+    ManagedValue(SILValue(string, 1), ManagedValue::Unmanaged),
+    ManagedValue(SILValue(string, 2), ManagedValue::Unmanaged)
+  };
+  
+  return RValue(Elts, ty);
+}
+
+
 RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
                                              SGFContext C) {
-  SILType ty = SGF.getLoweredLoadableType(E->getType());
-  SILValue string = SGF.B.createStringLiteral(E, ty);
-  return RValue(SGF, ManagedValue(string, ManagedValue::Unmanaged), E);
+  return emitStringLiteral(E, E->getValue(), C);
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -2411,10 +2427,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
     StringRef Value =
       Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
-    
-    return RValue(SGF, ManagedValue(SGF.B.createStringLiteral(E, Ty, Value),
-                                    ManagedValue::Unmanaged),
-                  E);
+
+    return emitStringLiteral(E, Value, C);
   }
   case MagicIdentifierLiteralExpr::Line: {
     unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;

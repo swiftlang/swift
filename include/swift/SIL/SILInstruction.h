@@ -84,10 +84,10 @@ protected:
   SILLocation Loc;
 
   SILInstruction(ValueKind Kind, SILLocation Loc, SILType Ty,
-                 SILDebugScope *DS=0)
+                 SILDebugScope *DS = nullptr)
     : ValueBase(Kind, Ty), ParentBB(0), DebugScope(DS), Loc(Loc) {}
-  SILInstruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
-                 SILDebugScope *DS=0)
+  SILInstruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList=nullptr,
+                 SILDebugScope *DS = nullptr)
     : ValueBase(Kind, TypeList), ParentBB(0), DebugScope(DS), Loc(Loc) {}
 
 public:
@@ -631,21 +631,17 @@ public:
 class StringLiteralInst : public SILInstruction {
   unsigned length;
   
-  StringLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  StringLiteralInst(SILLocation Loc, StringRef Text, SILTypeList *Ty);
   
 public:
-  static StringLiteralInst *create(StringLiteralExpr *E, SILType ty,
-                                   SILFunction &B);
-  static StringLiteralInst *create(SILLocation Loc, SILType ty,
-                                   StringRef Text, SILFunction &B);
+  static StringLiteralInst *create(StringLiteralExpr *E, SILFunction &F);
+  static StringLiteralInst *create(SILLocation Loc, StringRef Text,
+                                   SILFunction &F);
 
   /// getValue - Return the string data for the literal.
   StringRef getValue() const {
     return {reinterpret_cast<char const *>(this + 1), length};
   }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

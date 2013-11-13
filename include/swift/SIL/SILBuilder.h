@@ -240,12 +240,8 @@ public:
     return insert(FloatLiteralInst::create(Loc, Ty, Value, F));
   }
   
-  StringLiteralInst *createStringLiteral(StringLiteralExpr *E, SILType Ty) {
-    return insert(StringLiteralInst::create(E, Ty, F));
-  }
-  StringLiteralInst *createStringLiteral(SILLocation Loc, SILType Ty,
-                                         StringRef Text) {
-    return insert(StringLiteralInst::create(Loc, Ty, Text, F));
+  StringLiteralInst *createStringLiteral(SILLocation Loc, StringRef Text) {
+    return insert(StringLiteralInst::create(Loc, Text, F));
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
