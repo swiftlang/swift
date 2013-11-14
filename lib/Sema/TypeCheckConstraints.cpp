@@ -2756,23 +2756,23 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     return SolutionKind::Unsolved;
   }
 
-  // Bind the inputs and outputs.
+  // Strip the 'ApplyFunction' off the locator.
+  // FIXME: Perhaps ApplyFunction can go away entirely?
   ConstraintLocatorBuilder locator = constraint.getLocator();
+  SmallVector<LocatorPathElt, 2> parts;
+  Expr *anchor = locator.getLocatorParts(parts);
+  assert(!parts.empty() && "Nonsensical applicable-function locator");
+  assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
+  parts.pop_back();
+  ConstraintLocatorBuilder outerLocator = getConstraintLocator(anchor, parts);
+
+  // For a function, bind the output and convert the argument to the input.
+  auto func1 = type1->castTo<FunctionType>();
   if (desugar2->getKind() == TypeKind::Function) {
-    auto func1 = type1->castTo<FunctionType>();
     auto func2 = cast<FunctionType>(desugar2);
 
     assert(func1->getResult()->is<TypeVariableType>() &&
            "the output of funct1 is a free variable by construction");
-
-    // Strip the 'ApplyFunction' off the locator.
-    // FIXME: Perhaps ApplyFunction can go away entirely?
-    SmallVector<LocatorPathElt, 2> parts;
-    Expr *anchor = locator.getLocatorParts(parts);
-    assert(!parts.empty() && "Nonsensical applicable-function locator");
-    assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
-    parts.pop_back();
-    ConstraintLocatorBuilder outerLocator = getConstraintLocator(anchor, parts);
 
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
@@ -2789,6 +2789,25 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
                    locator.withPathElement(ConstraintLocator::FunctionResult))
           == SolutionKind::Error)
       return SolutionKind::Error;
+    return SolutionKind::Solved;
+  }
+
+  // For a metatype, perform a construction.
+  if (desugar2->getKind() == TypeKind::MetaType) {
+    auto meta2 = cast<MetaTypeType>(desugar2);
+    auto instanceTy2 = meta2->getInstanceType();
+
+    // Bind the result type to the instance type.
+    if (matchTypes(func1->getResult(), instanceTy2,
+                   TypeMatchKind::BindType,
+                   flags,
+                   locator.withPathElement(ConstraintLocator::FunctionResult))
+        == SolutionKind::Error)
+      return SolutionKind::Error;
+
+    // Construct the instance from the input arguments.
+    addConstraint(ConstraintKind::Construction, func1->getInput(), instanceTy2,
+                  getConstraintLocator(outerLocator));
     return SolutionKind::Solved;
   }
 
@@ -3537,6 +3556,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (isDeclAsSpecializedAs(tc, cs.DC,
                                 choice2.getDecl(), choice1.getDecl()))
         ++score2;
+
+      // If both declarations come from Clang, and one is a type and the other
+      // is a function, prefer the function.
+      if (choice1.getDecl()->hasClangNode() &&
+          choice2.getDecl()->hasClangNode() &&
+          ((isa<TypeDecl>(choice1.getDecl()) &&
+            isa<AbstractFunctionDecl>(choice2.getDecl())) ||
+           (isa<AbstractFunctionDecl>(choice1.getDecl()) &&
+            isa<TypeDecl>(choice2.getDecl())))) {
+        if (isa<TypeDecl>(choice1.getDecl()))
+          ++score2;
+        else
+          ++score1;
+      }
+
       break;
     }
   }

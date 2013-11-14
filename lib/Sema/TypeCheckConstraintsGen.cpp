@@ -840,24 +840,6 @@ namespace {
     Type visitApplyExpr(ApplyExpr *expr) {
       ASTContext &Context = CS.getASTContext();
 
-      // If the function subexpression has metatype type, this is a type
-      // construction.
-      // Note that matching the metatype type here, within constraint
-      // generation, naturally restricts the use of metatypes to whatever
-      // the constraint generator can eagerly evaluate.
-      // FIXME: Specify this as a syntactic restriction on the form that one
-      // can use for a coercion or type construction.
-      if (isa<CallExpr>(expr)) {
-        auto fnTy = CS.simplifyType(expr->getFn()->getType());
-        if (auto metaTy = fnTy->getAs<MetaTypeType>()) {
-          auto instanceTy = metaTy->getInstanceType();
-          CS.addConstraint(ConstraintKind::Construction,
-                           expr->getArg()->getType(), instanceTy,
-                           CS.getConstraintLocator(expr, { }));
-          return instanceTy;
-        }
-      }
-
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
       auto outputTy

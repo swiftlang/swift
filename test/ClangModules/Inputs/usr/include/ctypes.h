@@ -52,7 +52,7 @@ typedef void MyVoid;
 MyVoid returnsMyVoid(void);
 
 // Function and struct with same name.
-void funcOrStruct(void);
+int funcOrStruct(void);
 struct funcOrStruct { int i; };
 
 // Names from MacTypes.h that conflict with swift's library types.
