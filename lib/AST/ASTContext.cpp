@@ -125,7 +125,7 @@ struct ASTContext::Implementation {
     GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
-  llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
+  llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   
@@ -373,7 +373,7 @@ static bool isNonGenericIntrinsic(FuncDecl *fn, CanType &input,
 /// Check whether the given type is Builtin.Int1.
 static bool isBuiltinInt1Type(CanType type) {
   if (auto intType = dyn_cast<BuiltinIntegerType>(type))
-    return intType->getBitWidth() == 1;
+    return intType->isFixedWidth() && intType->getFixedWidth() == 1;
   return false;
 }
 
@@ -787,7 +787,7 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
-BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth,
+BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
   BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];
   if (Result == 0)

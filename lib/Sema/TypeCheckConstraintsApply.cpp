@@ -945,7 +945,7 @@ namespace {
                tc.Context.getIdentifier("_convertFromBuiltinCharacterLiteral"),
                [] (Type type) -> bool {
                  if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
-                   return builtinInt->getBitWidth() == 21;
+                   return builtinInt->isFixedWidth(21);
                  }
                  return false;
                },

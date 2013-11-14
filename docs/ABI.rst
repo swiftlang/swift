@@ -739,6 +739,7 @@ Types
   type ::= 'Bo'                              // Builtin.ObjectPointer
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
+  type ::= 'Bw'                              // Builtin.Word
   type ::= nominal-type
   type ::= associated-type
   type ::= 'b' type type                     // objc block function type

@@ -743,7 +743,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     }
     llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
-    unsigned BitWidth = cast<BuiltinIntegerType>(ty)->getBitWidth();
+    unsigned BitWidth = IGM.getBuiltinIntegerWidth(cast<BuiltinIntegerType>(ty));
     unsigned ByteSize = (BitWidth+7U)/8U;
     // Round up the memory size and alignment to a power of 2.
     if (!llvm::isPowerOf2_32(ByteSize))
@@ -1241,4 +1241,16 @@ llvm::BitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {
 no_spare_bits:
   SpareBitsForTypes[scalarTy] = {};
   return {};
+}
+
+unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerType *t) {
+  return getBuiltinIntegerWidth(t->getWidth());
+}
+
+unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
+  if (w.isFixedWidth())
+    return w.getFixedWidth();
+  if (w.isPointerWidth())
+    return getPointerSize().getValueInBits();
+  llvm_unreachable("impossible width value");
 }

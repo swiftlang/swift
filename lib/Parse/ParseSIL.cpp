@@ -1162,15 +1162,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
-    APInt value(intTy->getBitWidth(), 0);
+    APInt value(intTy->getGreatestWidth(), 0);
     bool error = P.Tok.getText().getAsInteger(0, value);
     assert(!error && "integer_literal token did not parse as APInt?!");
     (void)error;
     
     if (Negative)
       value = -value; 
-    if (value.getBitWidth() != intTy->getBitWidth())
-      value = value.zextOrTrunc(intTy->getBitWidth());
+    if (value.getBitWidth() != intTy->getGreatestWidth())
+      value = value.zextOrTrunc(intTy->getGreatestWidth());
     
     ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
     P.consumeToken(tok::integer_literal);
@@ -2046,13 +2046,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
           return true;
         }
 
-        APInt value(intTy->getBitWidth(), 0);
+        APInt value(intTy->getGreatestWidth(), 0);
         bool error = P.Tok.getText().getAsInteger(0, value);
         assert(!error && "integer_literal token did not parse as APInt?!");
         (void)error;
 
-        if (value.getBitWidth() != intTy->getBitWidth())
-          value = value.zextOrTrunc(intTy->getBitWidth());
+        if (value.getBitWidth() != intTy->getGreatestWidth())
+          value = value.zextOrTrunc(intTy->getGreatestWidth());
         P.consumeToken(tok::integer_literal);
 
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");

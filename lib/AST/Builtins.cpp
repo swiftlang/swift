@@ -46,11 +46,6 @@ bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
   return (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex, Kind));
 }
 
-static Type getPointerSizeType(ASTContext &Context) {
-  // FIXME: Size of a pointer here?
-  return BuiltinIntegerType::get(64, Context);
-}
-
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
@@ -85,7 +80,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIEEE64Type;
 
   if (Name == "Word")
-    return getPointerSizeType(Context);
+    return BuiltinIntegerType::getWordType(Context);
 
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "Int") {
@@ -284,16 +279,16 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <=
-        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+        CheckInput->castTo<BuiltinIntegerType>()->getLeastWidth() <=
+          CheckOutput->castTo<BuiltinIntegerType>()->getGreatestWidth())
       return nullptr;
     break;
   case BuiltinValueKind::TruncOrBitCast:
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <
-        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+        CheckInput->castTo<BuiltinIntegerType>()->getLeastWidth() <
+          CheckOutput->castTo<BuiltinIntegerType>()->getGreatestWidth())
       return nullptr;
     break;
       
@@ -302,8 +297,8 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >=
-        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+        CheckInput->castTo<BuiltinIntegerType>()->getGreatestWidth() >=
+          CheckOutput->castTo<BuiltinIntegerType>()->getLeastWidth())
       return nullptr;
     break;
   }
@@ -312,8 +307,8 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     if (CheckOutput.isNull() ||
         !CheckInput->is<BuiltinIntegerType>() ||
         !CheckOutput->is<BuiltinIntegerType>() ||
-        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >
-        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
+        CheckInput->castTo<BuiltinIntegerType>()->getGreatestWidth() >
+          CheckOutput->castTo<BuiltinIntegerType>()->getLeastWidth())
       return nullptr;
     break;
   }
@@ -370,11 +365,11 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     // Support float <-> int bitcast where the types are the same widths.
     if (auto *BIT = CheckInput->getAs<BuiltinIntegerType>())
       if (auto *BFT = CheckOutput->getAs<BuiltinFloatType>())
-        if (BIT->getBitWidth() == BFT->getBitWidth())
+        if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
             break;
     if (auto *BFT = CheckInput->getAs<BuiltinFloatType>())
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
-        if (BIT->getBitWidth() == BFT->getBitWidth())
+        if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
 
     // FIXME: Implement bitcast typechecking.
@@ -463,13 +458,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
 
   TupleTypeElt ArgParamElts[] = { MetaTypeType::get(GenericTy, Context) };
   TupleTypeElt ArgBodyElts[] = { MetaTypeType::get(ArchetypeTy, Context) };
-  Type ResultTy = getPointerSizeType(Context);
+  Type ResultTy = BuiltinIntegerType::getWordType(Context);
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
 
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
-  Type PtrSizeTy = getPointerSizeType(Context);
+  Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   TupleTypeElt ArgElts[] = { PtrSizeTy, PtrSizeTy };
   Type ResultTy = Context.TheRawPointerType;
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
@@ -477,7 +472,7 @@ static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType,
-                             getPointerSizeType(Context) };
+                             BuiltinIntegerType::getWordType(Context) };
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
@@ -584,7 +579,7 @@ static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
     return nullptr;
 
   auto IndexTy = SecondTy->getAs<BuiltinIntegerType>();
-  if (!IndexTy || IndexTy->getBitWidth() != 32)
+  if (!IndexTy || !IndexTy->isFixedWidth() || IndexTy->getFixedWidth() != 32)
     return nullptr;
 
   TupleTypeElt ArgElts[] = { VecTy, IndexTy };
@@ -605,7 +600,7 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
     return nullptr;
 
   auto IndexTy = ThirdTy->getAs<BuiltinIntegerType>();
-  if (!IndexTy || IndexTy->getBitWidth() != 32)
+  if (!IndexTy || !IndexTy->isFixedWidth() || IndexTy->getFixedWidth() != 32)
     return nullptr;
 
   TupleTypeElt ArgElts[] = { VecTy, ElementTy, IndexTy };
@@ -631,7 +626,7 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
   auto OutTy = OutputTy->getAs<BuiltinIntegerType>();
   if (!InTy || !OutTy)
     return nullptr;
-  if (InTy->getBitWidth() < OutTy->getBitWidth())
+  if (InTy->getLeastWidth() < OutTy->getGreatestWidth())
     return nullptr;
 
   TupleTypeElt ArgElts[] = { InTy };

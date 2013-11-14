@@ -1081,14 +1081,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto IntegerTy = BaseTy->castTo<BuiltinIntegerType>();
     // FIXME: Translate this into the actually allocated number of
     // bits using TargetInfo.
-    SizeInBits = IntegerTy->getBitWidth();
-    switch (SizeInBits) {
-    case   8: Name = "Builtin.Int8";   break;
-    case  16: Name = "Builtin.Int16";  break;
-    case  32: Name = "Builtin.Int32";  break;
-    case  64: Name = "Builtin.Int64";  break;
-    case 128: Name = "Builtin.Int128"; break;
-    default:  Name = "Builtin.Int";
+    if (IntegerTy->isFixedWidth()) {
+      SizeInBits = IntegerTy->getFixedWidth();
+      switch (SizeInBits) {
+      case   8: Name = "Builtin.Int8";   break;
+      case  16: Name = "Builtin.Int16";  break;
+      case  32: Name = "Builtin.Int32";  break;
+      case  64: Name = "Builtin.Int64";  break;
+      case 128: Name = "Builtin.Int128"; break;
+      default:  Name = "Builtin.Int";
+      }
+    } else if (IntegerTy->getWidth().isPointerWidth()) {
+      Name = "Builtin.Word";
+    } else {
+      llvm_unreachable("impossible width value");
     }
     Encoding = llvm::dwarf::DW_ATE_unsigned;
     break;

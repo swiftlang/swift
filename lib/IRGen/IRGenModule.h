@@ -158,6 +158,10 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
+  /// Get the bit width of an integer type for the target platform.
+  unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
+  unsigned getBuiltinIntegerWidth(BuiltinIntegerWidth w);
+  
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
     // We always use the pointer's width as its swift ABI alignment.

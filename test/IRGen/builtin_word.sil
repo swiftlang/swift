@@ -1,0 +1,69 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -o - | FileCheck %s -check-prefix=INTEL
+// REQUIRES: ARM
+// RUN: %swift -triple armv7-apple-ios7 %s -emit-llvm -o - | FileCheck %s -check-prefix=ARM32
+
+sil_stage canonical
+import Builtin
+
+// INTEL: define i64 @word_literal() {
+// INTEL: entry:
+// INTEL:   ret i64 12345
+// INTEL: }
+// ARM32: define i32 @word_literal() {
+// ARM32: entry:
+// ARM32:   ret i32 12345
+// ARM32: }
+sil @word_literal : $() -> Builtin.Word {
+entry:
+  %w = integer_literal $Builtin.Word, 12345
+  return %w : $Builtin.Word
+}
+
+// INTEL: define { i64, i64 } @word_zextOrBitCast(i32, i64) {
+// INTEL: entry:
+// INTEL:   %2 = zext i32 %0 to i64
+// INTEL:   %3 = insertvalue { i64, i64 } undef, i64 %2, 0
+// INTEL:   %4 = insertvalue { i64, i64 } %3, i64 %1, 1
+// INTEL:   ret { i64, i64 } %4
+// INTEL: }
+// ARM32: define { i32, i64 } @word_zextOrBitCast(i32, i32) {
+// ARM32: entry:
+// ARM32:   %2 = zext i32 %1 to i64
+// ARM32:   %3 = insertvalue { i32, i64 } undef, i32 %0, 0
+// ARM32:   %4 = insertvalue { i32, i64 } %3, i64 %2, 1
+// ARM32:   ret { i32, i64 } %4
+// ARM32: }
+sil @word_zextOrBitCast : $(Builtin.Int32, Builtin.Word) -> (Builtin.Word, Builtin.Int64) {
+entry(%i : $Builtin.Int32, %w : $Builtin.Word):
+  %a = builtin_function_ref #Builtin.zextOrBitCast_Int32_Word : $@thin (Builtin.Int32) -> Builtin.Word
+  %b = builtin_function_ref #Builtin.zextOrBitCast_Word_Int64 : $@thin (Builtin.Word) -> Builtin.Int64
+  %j = apply %a(%i) : $@thin (Builtin.Int32) -> Builtin.Word
+  %v = apply %b(%w) : $@thin (Builtin.Word) -> Builtin.Int64
+  %t = tuple (%j : $Builtin.Word, %v : $Builtin.Int64)
+  return %t : $(Builtin.Word, Builtin.Int64)
+}
+
+// INTEL: define { i32, i64 } @word_truncOrBitCast(i64, i64) {
+// INTEL: entry:
+// INTEL:   %2 = trunc i64 %0 to i32
+// INTEL:   %3 = insertvalue { i32, i64 } undef, i32 %2, 0
+// INTEL:   %4 = insertvalue { i32, i64 } %3, i64 %1, 1
+// INTEL:   ret { i32, i64 } %4
+// INTEL: }
+// ARM32: define { i32, i32 } @word_truncOrBitCast(i32, i64) {
+// ARM32: entry:
+// ARM32:   %2 = trunc i64 %1 to i32
+// ARM32:   %3 = insertvalue { i32, i32 } undef, i32 %0, 0
+// ARM32:   %4 = insertvalue { i32, i32 } %3, i32 %2, 1
+// ARM32:   ret { i32, i32 } %4
+// ARM32: }
+sil @word_truncOrBitCast : $(Builtin.Word, Builtin.Int64) -> (Builtin.Int32, Builtin.Word) {
+entry(%w : $Builtin.Word, %i : $Builtin.Int64):
+  %a = builtin_function_ref #Builtin.truncOrBitCast_Word_Int32 : $@thin (Builtin.Word) -> Builtin.Int32
+  %b = builtin_function_ref #Builtin.truncOrBitCast_Int64_Word : $@thin (Builtin.Int64) -> Builtin.Word
+  %v = apply %a(%w) : $@thin (Builtin.Word) -> Builtin.Int32
+  %j = apply %b(%i) : $@thin (Builtin.Int64) -> Builtin.Word
+  %t = tuple (%v : $Builtin.Int32, %j : $Builtin.Word)
+  return %t : $(Builtin.Int32, Builtin.Word)
+}
+

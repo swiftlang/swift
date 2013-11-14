@@ -1581,8 +1581,25 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
-  llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext,
-                                                 i->getValue());
+  APInt value = i->getValue();
+  BuiltinIntegerWidth width
+    = i->getType().castTo<BuiltinIntegerType>()->getWidth();
+  
+  // The value may need truncation if its type had an abstract size.
+  if (width.isFixedWidth()) {
+    // nothing to do
+  } else if (width.isPointerWidth()) {
+    unsigned pointerWidth = IGM.getPointerSize().getValueInBits();
+    assert(pointerWidth <= value.getBitWidth()
+           && "lost precision at AST/SIL level?!");
+    if (pointerWidth < value.getBitWidth())
+      value = value.trunc(pointerWidth);
+  } else {
+    llvm_unreachable("impossible width value");
+  }
+  
+  llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext, value);
+  
   Explosion e(ExplosionKind::Maximal);
   e.add(constant);
   setLoweredExplosion(SILValue(i, 0), e);

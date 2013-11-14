@@ -784,7 +784,7 @@ namespace {
     void verifyChecked(IfExpr *expr) {
       auto condTy
         = expr->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
-      if (!condTy || condTy->getBitWidth() != 1) {
+      if (!condTy || !condTy->isFixedWidth() || condTy->getFixedWidth() != 1) {
         Out << "IfExpr condition is not an i1\n";
         abort();
       }

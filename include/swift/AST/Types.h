@@ -27,6 +27,7 @@
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -496,21 +497,137 @@ BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
 END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 
-/// BuiltinIntegerType - The builtin integer types.  These directly correspond
+/// Size descriptor for a builtin integer type. This is either a fixed bit
+/// width or an abstract target-dependent value such as "size of a pointer".
+class BuiltinIntegerWidth {
+  /// Tag values for abstract integer sizes.
+  enum : unsigned {
+    Least_SpecialValue = ~2U,
+    /// The size of a pointer on the target system.
+    PointerWidth = ~0U,
+    
+    /// Inhabitants stolen for use as DenseMap special values.
+    DenseMapEmpty = ~1U,
+    DenseMapTombstone = ~2U,
+  };
+  
+  unsigned RawValue;
+  
+  friend struct llvm::DenseMapInfo<swift::BuiltinIntegerWidth>;
+  
+  /// Private constructor from a raw symbolic value.
+  explicit BuiltinIntegerWidth(unsigned RawValue) : RawValue(RawValue) {}
+public:
+  BuiltinIntegerWidth() : RawValue(0) {}
+  
+  static BuiltinIntegerWidth fixed(unsigned bitWidth) {
+    assert(bitWidth < Least_SpecialValue && "invalid bit width");
+    return BuiltinIntegerWidth(bitWidth);
+  }
+  
+  static BuiltinIntegerWidth pointer() {
+    return BuiltinIntegerWidth(PointerWidth);
+  }
+  
+  /// Is this a fixed width?
+  bool isFixedWidth() const { return RawValue < Least_SpecialValue; }
+
+  /// Get the fixed width value. Fails if the width is abstract.
+  unsigned getFixedWidth() const {
+    assert(isFixedWidth() && "not fixed-width");
+    return RawValue;
+  }
+  
+  /// Is this the abstract target pointer width?
+  bool isPointerWidth() const { return RawValue == PointerWidth; }
+  
+  /// Get the least supported value for the width.
+  ///
+  /// FIXME: This should be build-configuration-dependent.
+  unsigned getLeastWidth() const {
+    if (isFixedWidth())
+      return getFixedWidth();
+    if (isPointerWidth())
+      return 32;
+    llvm_unreachable("impossible width value");
+  }
+  
+  /// Get the greatest supported value for the width.
+  ///
+  /// FIXME: This should be build-configuration-dependent.
+  unsigned getGreatestWidth() const {
+    if (isFixedWidth())
+      return getFixedWidth();
+    if (isPointerWidth())
+      return 64;
+    llvm_unreachable("impossible width value");
+  }
+  
+  friend bool operator==(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
+    return a.RawValue == b.RawValue;
+  }
+  friend bool operator!=(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
+    return a.RawValue != b.RawValue;
+  }
+};
+
+/// The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
 class BuiltinIntegerType : public BuiltinType {
   friend class ASTContext;
-  unsigned BitWidth;
-  BuiltinIntegerType(unsigned BitWidth, const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
+private:
+  BuiltinIntegerWidth Width;
+  BuiltinIntegerType(BuiltinIntegerWidth BitWidth, const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
+  
 public:
+  /// Get a builtin integer type.
+  static BuiltinIntegerType *get(BuiltinIntegerWidth BitWidth,
+                                 const ASTContext &C);
   
-  static BuiltinIntegerType *get(unsigned BitWidth, const ASTContext &C);
+  /// Get a builtin integer type of fixed width.
+  static BuiltinIntegerType *get(unsigned BitWidth, const ASTContext &C) {
+    return get(BuiltinIntegerWidth::fixed(BitWidth), C);
+  }
   
-  /// getBitWidth - Return the bitwidth of the integer.
-  unsigned getBitWidth() const {
-    return BitWidth;
+  /// Get the target-pointer-width builtin integer type.
+  static BuiltinIntegerType *getWordType(const ASTContext &C) {
+    return get(BuiltinIntegerWidth::pointer(), C);
+  }
+  
+  /// Return the bit width of the integer.
+  BuiltinIntegerWidth getWidth() const {
+    return Width;
+  }
+  
+  /// Is the integer fixed-width?
+  bool isFixedWidth() const {
+    return Width.isFixedWidth();
+  }
+  
+  /// Is the integer fixed-width with the given width?
+  bool isFixedWidth(unsigned width) const {
+    return Width.isFixedWidth() && Width.getFixedWidth() == width;
+  }
+  
+  /// Get the fixed integer width. Fails if the integer has abstract width.
+  unsigned getFixedWidth() const {
+    return Width.getFixedWidth();
+  }
+  
+  /// Return the least supported width of the integer.
+  ///
+  /// FIXME: This should be build-configuration-dependent.
+  unsigned getLeastWidth() const {
+    return Width.getLeastWidth();
+  }
+  
+  /// Return the greatest supported width of the integer.
+  ///
+  /// FIXME: This should be build-configuration-dependent.
+  unsigned getGreatestWidth() const {
+    return Width.getGreatestWidth();
   }
 
   static bool classof(const TypeBase *T) {
@@ -3181,7 +3298,8 @@ inline bool TypeBase::isClassExistentialType() {
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
-    return intTy->getBitWidth() == n;
+    return intTy->getWidth().isFixedWidth()
+      && intTy->getWidth().getFixedWidth() == n;
   return false;
 }
 
@@ -3291,4 +3409,30 @@ inline unsigned SubstitutableType::getPrimaryIndex() const {
 
 } // end namespace swift
 
+namespace llvm {
+
+// DenseMapInfo for BuiltinIntegerWidth.
+template<>
+struct DenseMapInfo<swift::BuiltinIntegerWidth> {
+  using BuiltinIntegerWidth = swift::BuiltinIntegerWidth;
+  
+  static inline BuiltinIntegerWidth getEmptyKey() {
+    return BuiltinIntegerWidth(BuiltinIntegerWidth::DenseMapEmpty);
+  }
+  
+  static inline BuiltinIntegerWidth getTombstoneKey() {
+    return BuiltinIntegerWidth(BuiltinIntegerWidth::DenseMapTombstone);
+  }
+  
+  static unsigned getHashValue(BuiltinIntegerWidth w) {
+    return DenseMapInfo<unsigned>::getHashValue(w.RawValue);
+  }
+  
+  static bool isEqual(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
+    return a == b;
+  }
+};
+
+}
+  
 #endif

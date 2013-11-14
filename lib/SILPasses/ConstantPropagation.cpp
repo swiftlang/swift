@@ -238,9 +238,9 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
   Type SrcTy = Builtin.Types[0];
   Type DstTy = Builtin.Types[1];
   uint32_t SrcBitWidth =
-    SrcTy->castTo<BuiltinIntegerType>()->getBitWidth();
+    SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
   uint32_t DstBitWidth =
-    DstTy->castTo<BuiltinIntegerType>()->getBitWidth();
+    DstTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
   // Compute the destination (for SrcBitWidth < DestBitWidth) and enough info
   // to check for overflow.
@@ -375,9 +375,9 @@ case BuiltinValueKind::id:
     Type SrcTy = Builtin.Types[0];
     Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
     uint32_t SrcBitWidth = 
-      SrcTy->castTo<BuiltinIntegerType>()->getBitWidth();
+      SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
     uint32_t DestBitWidth =
-      DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
+      DestTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
     APInt CastResV;
     if (SrcBitWidth == DestBitWidth) {

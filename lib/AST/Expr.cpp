@@ -123,7 +123,7 @@ APInt IntegerLiteralExpr::getValue() const {
   assert(!getType()->is<ErrorType>() && "Should have a valid type");
   return getIntegerLiteralValue(
       isNegative(), getDigitsText(),
-      getType()->castTo<BuiltinIntegerType>()->getBitWidth());
+      getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
 }
 
 APFloat FloatLiteralExpr::getValue(StringRef Text,

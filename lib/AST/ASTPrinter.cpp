@@ -1151,7 +1151,14 @@ public:
   }
 
   void visitBuiltinIntegerType(BuiltinIntegerType *T) {
-    OS << "Builtin.Int" << T->getBitWidth();
+    auto width = T->getWidth();
+    if (width.isFixedWidth()) {
+      OS << "Builtin.Int" << width.getFixedWidth();
+    } else if (width.isPointerWidth()) {
+      OS << "Builtin.Word";
+    } else {
+      llvm_unreachable("impossible bit width");
+    }
   }
 
   void visitBuiltinFloatType(BuiltinFloatType *T) {

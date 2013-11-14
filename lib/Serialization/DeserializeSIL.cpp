@@ -705,7 +705,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto intTy = Ty->getAs<BuiltinIntegerType>();
     Identifier StringVal = MF->getIdentifier(ValID);
     // Build APInt from string.
-    APInt value(intTy->getBitWidth(), StringVal.str(), 10);
+    APInt value(intTy->getGreatestWidth(), StringVal.str(), 10);
     ResultVal = Builder.createIntegerLiteral(Loc,
         getSILType(Ty, (SILValueCategory)TyCategory),
         value);
@@ -1029,7 +1029,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       auto intTy = Cond.getType().getAs<BuiltinIntegerType>();
       // Build APInt from string.
       Identifier StringVal = MF->getIdentifier(ListOfValues[I]);
-      APInt value(intTy->getBitWidth(), StringVal.str(), 10);
+      APInt value(intTy->getGreatestWidth(), StringVal.str(), 10);
       CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+1])} );
     }
     ResultVal = Builder.createSwitchInt(Loc, Cond, DefaultBB, CaseBBs);

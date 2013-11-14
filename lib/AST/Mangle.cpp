@@ -483,9 +483,16 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     case BuiltinFloatType::PPC128: llvm_unreachable("ppc128 not supported");
     }
     llvm_unreachable("bad floating-point kind");
-  case TypeKind::BuiltinInteger:
-    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth() << '_';
+  case TypeKind::BuiltinInteger: {
+    auto width = cast<BuiltinIntegerType>(type)->getWidth();
+    if (width.isFixedWidth())
+      Buffer << "Bi" << width.getFixedWidth() << '_';
+    else if (width.isPointerWidth())
+      Buffer << "Bw";
+    else
+      llvm_unreachable("impossible width value");
     return;
+  }
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";
     return;

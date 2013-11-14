@@ -55,7 +55,7 @@ static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
     FullExpr Scope(gen.Cleanups, CleanupLocation(E));
     V = gen.emitRValue(E).forwardAsSingleValue(gen, E);
   }
-  assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+  assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
   return V;
 }

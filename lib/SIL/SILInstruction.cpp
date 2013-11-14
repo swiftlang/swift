@@ -365,7 +365,7 @@ IntegerLiteralInst *
 IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
                            SILFunction &B) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
-  assert(intTy->getBitWidth() == Value.getBitWidth() &&
+  assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
   (void)intTy;
   
@@ -379,14 +379,15 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty,
                            intmax_t Value, SILFunction &B) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   return create(Loc, Ty,
-                APInt(intTy->getBitWidth(), Value), B);
+                APInt(intTy->getGreatestWidth(), Value), B);
 }
 
 IntegerLiteralInst *
 IntegerLiteralInst::create(IntegerLiteralExpr *E, SILFunction &F) {
   return create(E,
                 SILType::getBuiltinIntegerType(
-                     E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
+                     E->getType()->castTo<BuiltinIntegerType>()
+                      ->getGreatestWidth(),
                      F.getASTContext()),
                 E->getValue(), F);
 }
@@ -394,10 +395,8 @@ IntegerLiteralInst::create(IntegerLiteralExpr *E, SILFunction &F) {
 IntegerLiteralInst *
 IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &F) {
   return create(E,
-                SILType::getBuiltinIntegerType(
-                     E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
-                     F.getASTContext()),
-                E->getValue(), F);
+              SILType::getPrimitiveObjectType(E->getType()->getCanonicalType()),
+              E->getValue(), F);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
@@ -655,7 +654,7 @@ SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
     NumCases(CaseBBs.size()),
     HasDefault(bool(DefaultBB)),
     BitWidthForCase(Operand.getType().castTo<BuiltinIntegerType>()
-                                                               ->getBitWidth())
+                                                           ->getGreatestWidth())
 {
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();
@@ -694,7 +693,8 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
   
-  unsigned bits = Operand.getType().castTo<BuiltinIntegerType>()->getBitWidth();
+  unsigned bits = Operand.getType().castTo<BuiltinIntegerType>()
+    ->getGreatestWidth();
   unsigned words = (bits + llvm::integerPartWidth - 1) / llvm::integerPartWidth;
   
   void *buf = F.getModule().allocate(sizeof(SwitchIntInst)
