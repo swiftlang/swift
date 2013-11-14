@@ -82,54 +82,6 @@ public:
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
-
-/// \brief Deletes the instrcutions in the set and any instructions that could
-/// become dead after their removal.
-///
-/// Returns true if more instructions were determined to be dead and deleted.
-static bool eraseAndCleanup(const llvm::DenseSet<SILInstruction*> &ToBeDeleted){
-  bool AdditionalChanged = false;
-
-  // First, drop references that keep other instructions live.
-  llvm::DenseSet<SILInstruction*> PossiblyDead;
-  for (auto II = ToBeDeleted.begin(), EI = ToBeDeleted.end(); II != EI; ++II) {
-
-    // Deleting instructions might make their operands dead, let's collect them.
-    SILInstruction *DI = *II;
-    ArrayRef<Operand> Ops = DI->getAllOperands();
-    for (auto OpI = Ops.begin(), OpE = Ops.end(); OpI != OpE; ++OpI) {
-      SILInstruction *V = dyn_cast_or_null<SILInstruction>(OpI->get().getDef());
-      // If the instruction will be deleted, no need to check if it is dead.
-      if (V && !ToBeDeleted.count(V))
-        PossiblyDead.insert(V);
-    }
-
-    // Drop references for all the instructions that will be deleted.
-    DI->dropAllReferences();
-  }
-
-  // Delete the "possibly dead" instructions if they are dead.
-  for (auto II = PossiblyDead.begin(),
-       EI = PossiblyDead.end(); II != EI; ++II)
-    AdditionalChanged &= recursivelyDeleteTriviallyDeadInstructions(*II);
-
-  // Delete the unreachable instructions.
-  for (auto II = ToBeDeleted.begin(),
-            EI = ToBeDeleted.end(); II != EI; ++II) {
-    (*II)->eraseFromParent();
-  }
-
-  return AdditionalChanged;
-}
-
-/// \brief Deletes the instruction and any instructions that could become dead
-/// after its removal.
-static bool eraseAndCleanup(SILInstruction *I) {
-  llvm::DenseSet<SILInstruction*> Set;
-  Set.insert(I);
-  return eraseAndCleanup(Set);
-}
-
 /// \brief Propagate/remove basic block input values when all predecessors
 /// supply the same arguments.
 static void propagateBasicBlockArgs(SILBasicBlock &BB) {
@@ -192,14 +144,14 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
   // Drop the arguments from the branch instructions by creating a new branch
   // instruction and deleting the old one.
-  llvm::DenseSet<SILInstruction*> ToBeDeleted;
+  llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
   for (SILBasicBlock::pred_iterator PI = BB.pred_begin(), PE = BB.pred_end();
        PI != PE; ++PI) {
     SILBasicBlock *PredB = *PI;
     BranchInst *BI = cast<BranchInst>(PredB->getTerminator());
     SILBuilder Bldr(PredB);
     Bldr.createBranch(BI->getLoc(), BI->getDestBB());
-    ToBeDeleted.insert(BI);
+    ToBeDeleted.push_back(BI);
   }
 
   // Drop the paranters from basic blocks and replace all uses with the passed
@@ -222,7 +174,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   }
 
   // The old branch instructions are no longer used, erase them.
-  eraseAndCleanup(ToBeDeleted);
+  recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
 }
 
 static bool constantFoldTerminator(SILBasicBlock &BB,
@@ -255,7 +207,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         UnreachableBlock = CBI->getFalseBB();
         CondIsTrue = true;
       }
-      eraseAndCleanup(TI);
+      recursivelyDeleteTriviallyDeadInstructions(TI, true);
 
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
@@ -356,7 +308,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         }
       }
 
-      eraseAndCleanup(TI);
+      recursivelyDeleteTriviallyDeadInstructions(TI, true);
       return true;
     }
   }
@@ -386,7 +338,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       if (TheSuccessorBlock) {
         SILBuilder B(&BB);
         B.createBranch(TI->getLoc(), TheSuccessorBlock);
-        eraseAndCleanup(TI);
+        recursivelyDeleteTriviallyDeadInstructions(TI, true);
         return true;
       }
       
@@ -429,7 +381,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   const ApplyInst *NoReturnCall = nullptr;
 
   // Collection of all instructions that should be deleted.
-  llvm::DenseSet<SILInstruction*> ToBeDeleted;
+  llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
 
   // Does this block conatin a call to a noreturn function?
   while (I != E) {
@@ -442,7 +394,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     if (NoReturnCall) {
 
       // We will need to delete the instruction later on.
-      ToBeDeleted.insert(CurrentInst);
+      ToBeDeleted.push_back(CurrentInst);
 
       // Diagnose the unreachable code within the same block as the call to
       // noreturn.
@@ -489,7 +441,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   }
 
 
-  eraseAndCleanup(ToBeDeleted);
+  recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
 
   // Add an unreachable terminator. The terminator has an invalid source
   // location to signal to the DataflowDiagnostic pass that this code does
@@ -635,17 +587,17 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
       continue;
 
     // Drop references to other blocks.
-    eraseAndCleanup(BB->getTerminator());
+    recursivelyDeleteTriviallyDeadInstructions(BB->getTerminator(), true);
   }
 
   // Delete dead instrcutions and everything that could become dead after
   // their deletion.
-  llvm::DenseSet<SILInstruction*> ToBeDeleted;
+  llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
   for (auto BI = F.begin(), BE = F.end(); BI != BE; ++BI)
     if (!Reachable.count(BI))
       for (auto I = BI->begin(), E = BI->end(); I != E; ++I)
-        ToBeDeleted.insert(&*I);
-  eraseAndCleanup(ToBeDeleted);
+        ToBeDeleted.push_back(&*I);
+  recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
 
   // Delete the dead blocks.
   for (auto I = F.begin(), E = F.end(); I != E;)

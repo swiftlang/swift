@@ -12,6 +12,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Intrinsics.h"
+#include <deque>
 
 using namespace swift;
 
@@ -67,41 +68,41 @@ bool
 swift::recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> IA,
                                                   bool Force) {
   // Delete these instruction and others that become dead after it's deleted.
-  SmallVector<SILInstruction*, 16> DeadInsts;
-
+  llvm::SmallPtrSet<SILInstruction*, 8> DeadInsts;
   for (auto I : IA) {
     // If the instruction is not dead or force is false, there is nothing to do.
     if (Force || isInstructionTriviallyDead(I))
-      DeadInsts.push_back(I);
+      DeadInsts.insert(I);
   }
-  llvm::SmallPtrSet<SILInstruction*, 8> ErasedInsts;
+  llvm::SmallPtrSet<SILInstruction*, 8> NextInsts;
   while (!DeadInsts.empty()) {
-    SILInstruction *I = DeadInsts.pop_back_val();
-    // If we have already seen and erased this instruction, then do not try to
-    // process it again.
-    if (ErasedInsts.count(I))
-      continue;
+    for (auto I : DeadInsts) {
+      // Check if any of the operands will become dead as well.
+      MutableArrayRef<Operand> Ops = I->getAllOperands();
+      for (Operand &Op : Ops) {
+        SILValue OpVal = Op.get();
+        if (!OpVal) continue;
 
-    // Check if any of the operands will become dead as well.
-    MutableArrayRef<Operand> Ops = I->getAllOperands();
-    for (Operand &Op : Ops) {
-      SILValue OpVal = Op.get();
-      if (!OpVal) continue;
+        // Remove the reference from the instruction being deleted to this
+        // operand.
+        Op.drop();
 
-      // Remove the reference from the instruction being deleted to this
-      // operand.
-      Op.drop();
-
-      // If the operand is an instruction that is only used by the instruction
-      // being deleted, delete it.
-      if (SILInstruction *OpValInst = dyn_cast<SILInstruction>(OpVal))
-        if (isInstructionTriviallyDead(OpValInst))
-          DeadInsts.push_back(OpValInst);
+        // If the operand is an instruction that is only used by the instruction
+        // being deleted, delete it.
+        if (SILInstruction *OpValInst = dyn_cast<SILInstruction>(OpVal))
+          if (!DeadInsts.count(OpValInst) &&
+             isInstructionTriviallyDead(OpValInst))
+            NextInsts.insert(OpValInst);
+      }
     }
 
-    // This will remove this instruction and all its uses.
-    I->eraseFromParent();
-    ErasedInsts.insert(I);
+    for (auto I : DeadInsts) {
+      // This will remove this instruction and all its uses.
+      I->eraseFromParent();
+    }
+
+    NextInsts.swap(DeadInsts);
+    NextInsts.clear();
   }
 
   return true;
