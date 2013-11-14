@@ -46,20 +46,14 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
                                  SmallVectorImpl<SILValue> &CaptureArgs) {
   // Either release the callee (which the apply would have done) or remove a
   // retain that happens to be the immediately preceding instruction.
-  StrongRetainInst *RetainToErase;
-
   SILBuilder B(I);
-  if (I != I->getParent()->begin() &&
-      (RetainToErase = dyn_cast<StrongRetainInst>(std::prev(I))) &&
-      RetainToErase->getOperand() == CalleeValue) {
-    RetainToErase->eraseFromParent();
-  } else {
-    auto *InsertedRelease = B.createStrongReleaseInst(Loc, CalleeValue);
-    // Important: we move the insertion point before this new release, just in
-    // case this inserted release would have caused the deallocation of the
-    // closure and its contained capture arguments.
-    B.setInsertionPoint(InsertedRelease);
-  }
+  auto *NewRelease = B.emitStrongRelease(Loc, CalleeValue);
+
+  // Important: we move the insertion point before this new release, just in
+  // case this inserted release would have caused the deallocation of the
+  // closure and its contained capture arguments.
+  if (NewRelease)
+    B.setInsertionPoint(NewRelease);
 
   // Add a retain of each non-address type capture argument, because it will be
   // consumed by the closure body.
@@ -390,8 +384,14 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         I = ApplyBlock->begin();
       else
         ++I;
+
+      // If the inlined apply was a thick function, then we need to balance the
+      // reference counts for correctness.
       if (IsThick)
         fixupReferenceCounts(I, Loc, CalleeValue, CaptureArgs);
+
+      // Now that the IR is correct, see if we can remove dead callee
+      // computations (e.g. dead partial_apply closures).
       cleanupCalleeValue(CalleeValue, CaptureArgs, FullArgs);
 
       // Reposition iterators possibly invalidated by mutation.

@@ -157,4 +157,33 @@ void SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   createDestroyAddr(Loc, Operand);
 }
 
+/// Perform a strong_release instruction at the current location, attempting
+/// to fold it locally into nearby retain instructions or emitting an explicit
+/// strong release if necessary.  If this inserts a new instruction, it
+/// returns it, otherwise it returns null.
+StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
+                                                 SILValue Operand) {
+  // Check to see if the instruction immediately before the insertion point is a
+  // strong_retain of the specified operand.  If so, we can zap the pair.
+  auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
+  while (I != BBStart) {
+    auto *Inst = &*--I;
+
+    if (auto SRA = dyn_cast<StrongRetainInst>(Inst)) {
+      if (SRA->getOperand() == Operand) {
+        SRA->eraseFromParent();
+        return nullptr;
+      }
+    }
+
+    // This code doesn't try to prove tricky validity constraints about whether
+    // it is safe to push the release past interesting instructions.
+    if (Inst->mayHaveSideEffects())
+      break;
+  }
+
+  // If we didn't find a retain to fold this into, emit the release.
+  return createStrongReleaseInst(Loc, Operand);
+}
+
 

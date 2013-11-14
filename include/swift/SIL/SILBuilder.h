@@ -764,6 +764,12 @@ public:
   /// generate an explicit one if that fails.
   void emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
+  /// Perform a strong_release instruction at the current location, attempting
+  /// to fold it locally into nearby retain instructions or emitting an explicit
+  /// strong release if necessary.  If this inserts a new instruction, it
+  /// returns it, otherwise it returns null.
+  StrongReleaseInst *emitStrongRelease(SILLocation Loc, SILValue Operand);
+
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
   SILValue emitCopyValueOperation(SILLocation loc, SILValue v) {
