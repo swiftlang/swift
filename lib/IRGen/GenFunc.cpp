@@ -1160,14 +1160,14 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
     //   Ext = sext_IntFrom(Res)
-    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   OverflowFlag = (Arg == Ext) ? 0 : 1
     //   return (resultVal, OverflowFlag)
     //
     // Compute the result for UToUCheckedTrunc_IntFrom_IntTo(Arg)
     // and SToUCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
     //   Ext = zext_IntFrom(Res)
-    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   OverflowFlag = (Arg == Ext) ? 0 : 1
     //   return (Res, OverflowFlag)
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
@@ -1193,10 +1193,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       llvm::Type::getIntNTy(ToTy->getContext(), ToTy->getIntegerBitWidth() - 1);
 
     // Compute the result for UToSCheckedTrunc_IntFrom_IntTo(Arg):
-    //   Trunc = trunc_IntFrom_'IntTo-1bit'(Arg)
     //   Res = trunc_IntTo(Arg)
+    //   Trunc = trunc_'IntTo-1bit'(Arg)
     //   Ext = zext_IntFrom(Trunc)
-    //   OverflowFlag = (Arg == Ext) ? 1 : 0
+    //   OverflowFlag = (Arg == Ext) ? 0 : 1
     //   return (Res, OverflowFlag)
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
