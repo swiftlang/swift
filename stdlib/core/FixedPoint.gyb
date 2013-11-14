@@ -76,6 +76,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
     return value
   }
 @ if ArrayBound:
+  @@transparent
   def _getBuiltinArrayBoundValue() -> Builtin.Int${bits} {
     return value
   }
