@@ -2568,7 +2568,7 @@ classifyEnum(const clang::EnumDecl *decl) {
       StringRef ident(token.getRawIdentifierData(), token.getLength());
       if (ident == "NS_ENUM")
         return EnumKind::Enum;
-      if (SwiftContext.LangOpts.ImportNSOptions && ident == "NS_OPTIONS")
+      if (ident == "NS_OPTIONS")
         return EnumKind::Options;
     }
   }
