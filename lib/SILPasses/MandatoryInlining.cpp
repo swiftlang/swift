@@ -41,24 +41,19 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// applications: namely, that an apply of a thick function consumes the callee
 /// and that the function implementing the closure consumes its capture
 /// arguments.
-static void
-fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
-                     SILValue CalleeValue, bool IsThick,
-                     SmallVectorImpl<SILValue>& CaptureArgs) {
-  if (!IsThick)
-    return;
-
+static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
+                                 SILValue CalleeValue,
+                                 SmallVectorImpl<SILValue> &CaptureArgs) {
   // Either release the callee (which the apply would have done) or remove a
   // retain that happens to be the immediately preceding instruction.
-  SILBasicBlock::iterator Prev = I;
   StrongRetainInst *RetainToErase;
+
+  SILBuilder B(I);
   if (I != I->getParent()->begin() &&
-      (RetainToErase = dyn_cast<StrongRetainInst>(--Prev)) &&
+      (RetainToErase = dyn_cast<StrongRetainInst>(std::prev(I))) &&
       RetainToErase->getOperand() == CalleeValue) {
     RetainToErase->eraseFromParent();
-    B.setInsertionPoint(I);
   } else {
-    B.setInsertionPoint(I);
     auto *InsertedRelease = B.createStrongReleaseInst(Loc, CalleeValue);
     // Important: we move the insertion point before this new release, just in
     // case this inserted release would have caused the deallocation of the
@@ -76,8 +71,7 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void
-cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
-                   ArrayRef<SILValue> CaptureArgs,
+cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
                    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
@@ -125,10 +119,8 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     // If we found a strong release, replace it with a strong release of the
     // source of the store and erase it.
     if (SRI) {
-      if (CalleeValue.isValid()) {
-        B.setInsertionPoint(SRI);
-        B.createStrongRelease(SRI->getLoc(), CalleeValue);
-      }
+      if (CalleeValue.isValid())
+        SILBuilder(SRI).createStrongRelease(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
     }
 
@@ -155,21 +147,17 @@ cleanupCalleeValue(SILBuilder &B,  SILValue CalleeValue,
     // If there is a strong release of the partial apply, then replace it with
     // releases of the captured arguments.
     if (SRI) {
-      B.setInsertionPoint(SRI);
-      SILModule &M = B.getFunction().getModule();
-      for (auto &CaptureArg : CaptureArgs) {
-        if (!CaptureArg.getType().isAddress()) {
-          auto &typeLowering = M.getTypeLowering(CaptureArg.getType());
-          typeLowering.emitDestroyValue(B, SRI->getLoc(), CaptureArg);
-        }
-      }
+      SILBuilder B(SRI);
+      for (auto &CaptureArg : CaptureArgs)
+        if (!CaptureArg.getType().isAddress())
+          B.emitDestroyValueOperation(SRI->getLoc(), CaptureArg);
       SRI->eraseFromParent();
     }
 
     CalleeValue = PAI->getCallee();
     assert(PAI->use_empty());
     PAI->eraseFromParent();
-  } else if (ThinToThickFunctionInst *TTTFI =
+  } else if (auto *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
     assert(CalleeValue.getResultNumber() == 0);
 
@@ -336,7 +324,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
   SILInliner Inliner(*F);
-  SILBuilder Builder(*F);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     auto I = FI->begin(), E = FI->end();
     while (I != E) {
@@ -403,8 +390,9 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         I = ApplyBlock->begin();
       else
         ++I;
-      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick,CaptureArgs);
-      cleanupCalleeValue(Builder, CalleeValue, CaptureArgs, FullArgs);
+      if (IsThick)
+        fixupReferenceCounts(I, Loc, CalleeValue, CaptureArgs);
+      cleanupCalleeValue(CalleeValue, CaptureArgs, FullArgs);
 
       // Reposition iterators possibly invalidated by mutation.
       FI = SILFunction::iterator(ApplyBlock);
