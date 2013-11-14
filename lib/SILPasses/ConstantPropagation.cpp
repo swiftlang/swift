@@ -217,6 +217,117 @@ static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
   return nullptr;
 }
 
+static SILInstruction *
+constantFoldAndCheckIntegerConversions(ApplyInst *AI,
+                                       const BuiltinInfo &Builtin,
+                                       bool &ResultsInError) {
+  assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
+         Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
+         Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
+         Builtin.ID == BuiltinValueKind::UToSCheckedTrunc);
+
+  // Check if the value is a constant.
+  OperandValueArrayRef Args = AI->getArguments();
+  IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+  if (!V)
+    return nullptr;
+  APInt SrcVal = V->getValue();
+
+  // Get the source and destination bit width.
+  assert(Builtin.Types.size() == 2);
+  Type SrcTy = Builtin.Types[0];
+  Type DstTy = Builtin.Types[1];
+  uint32_t SrcBitWidth =
+    SrcTy->castTo<BuiltinIntegerType>()->getBitWidth();
+  uint32_t DstBitWidth =
+    DstTy->castTo<BuiltinIntegerType>()->getBitWidth();
+
+  // Compute the destination (for SrcBitWidth < DestBitWidth) and enough info
+  // to check for overflow.
+  APInt Result;
+  bool OverflowError;
+
+  if (Builtin.ID != BuiltinValueKind::UToSCheckedTrunc) {
+    //     Result = trunc_IntFrom_IntTo(Val)
+    //   For signed destination:
+    //     sext_IntFrom(Result) == Val ? Result : overflow_error
+    //   For signed destination:
+    //     zext_IntFrom(Result) == Val ? Result : overflow_error
+    Result = SrcVal.trunc(DstBitWidth);
+    // Get the signedness of the destination.
+    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
+    APInt Ext = Signed ? Result.sext(SrcBitWidth) : Result.zext(SrcBitWidth);
+    OverflowError = (SrcVal != Ext);
+
+  } else {
+    // Compute the destination (for SrcBitWidth < DestBitWidth):
+    //   Result = trunc_IntTo(Val)
+    //   Trunc  = trunc_'IntTo-1bit'(Val)
+    //   zext_IntFrom(Trunc) == Val ? Result : overflow_error
+    Result = SrcVal.trunc(DstBitWidth);
+    APInt TruncVal = SrcVal.trunc(DstBitWidth - 1);
+    OverflowError = (SrcVal != TruncVal.zext(SrcBitWidth));
+  }
+
+  // Check for overflow.
+  if (OverflowError) {
+    SILLocation Loc = AI->getLoc();
+    SILModule &M = AI->getModule();
+    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+    Type UserSrcTy;
+    Type UserDstTy;
+    // Primitive heuristics to get the user-written type.
+    // Eventually we might be able to use SILLocatuion (when it contains info
+    // about inlined call chains).
+    if (CE)
+      if (const TupleType *RTy = CE->getArg()->getType()->getAs<TupleType>()) {
+        if (RTy->getNumElements() == 1) {
+          UserSrcTy = RTy->getElementType(0);
+          UserDstTy = CE->getType();
+        }
+      }
+
+    // Assume that we are converting from a literal if the Source size is
+    // 2048. Is there a better way to identify conversions from literals?
+    bool Literal = (SrcBitWidth == 2048);
+
+    // FIXME: This will prevent hard error in cases the error is comming
+    // from ObjC interoperability code. Currently, we treat NSUInteger as
+    // Int.
+    if (Loc.getSourceLoc().isInvalid()) {
+      if (Literal)
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow_warn,
+                 UserDstTy.isNull() ? DstTy : UserDstTy);
+      else
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_conversion_overflow_warn,
+                 UserSrcTy.isNull() ? SrcTy : UserSrcTy,
+                 UserDstTy.isNull() ? DstTy : UserDstTy);
+
+      ResultsInError = true;
+      return nullptr;
+    }
+
+    // Report the overflow error.
+    if (Literal)
+      diagnose(M.getASTContext(), Loc.getSourceLoc(),
+               diag::integer_literal_overflow,
+               UserDstTy.isNull() ? DstTy : UserDstTy);
+    else
+      diagnose(M.getASTContext(), Loc.getSourceLoc(),
+               diag::integer_conversion_overflow,
+               UserSrcTy.isNull() ? SrcTy : UserSrcTy,
+               UserDstTy.isNull() ? DstTy : UserDstTy);
+    ResultsInError = true;
+    return nullptr;
+  }
+
+  // The call to the builtin should be replaced with the constant value.
+  return constructResultWithOverflowTuple(AI, Result, false);
+
+}
+
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                            BuiltinFunctionRefInst *FR,
                                            bool &ResultsInError) {
@@ -356,62 +467,13 @@ case BuiltinValueKind::id:
     return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
   }
 
-  // Deal with special builtins that are designed to check overflows on
-  // integer literals.
+  // Process special builtins that are designed to check for overflows in
+  // integer conversions.
   case BuiltinValueKind::SToSCheckedTrunc:
-  case BuiltinValueKind::SToUCheckedTrunc: {
-    // Get the value. It should be a constant in most cases.
-    // Note, this will not always be a constant, for example, when analyzing
-    // _convertFromBuiltinIntegerLiteral function itself.
-    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
-    if (!V)
-      return nullptr;
-    APInt SrcVal = V->getValue();
-
-    // Get the signedness of the destination.
-    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
-
-    // Get the source and destination bit width.
-    assert(Builtin.Types.size() == 2);
-    uint32_t SrcBitWidth =
-      Builtin.Types[0]->castTo<BuiltinIntegerType>()->getBitWidth();
-    Type DestTy = Builtin.Types[1];
-    uint32_t DestBitWidth =
-      DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
-
-    // Compute the destination (for SrcBitWidth < DestBitWidth):
-    //   truncVal = trunc_IntFrom_IntTo(val)
-    //   strunc_IntFrom_IntTo(val) =
-    //     sext_IntFrom(truncVal) == val ? truncVal : overflow_error
-    //   utrunc_IntFrom_IntTo(val) =
-    //     zext_IntFrom(truncVal) == val ? truncVal : overflow_error
-    APInt TruncVal = SrcVal.trunc(DestBitWidth);
-    APInt T = Signed ? TruncVal.sext(SrcBitWidth) : TruncVal.zext(SrcBitWidth);
-
-    SILLocation Loc = AI->getLoc();
-    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
-
-    // Check for overflow.
-    if (SrcVal != T) {
-      // FIXME: This will prevent hard error in cases the error is comming
-      // from ObjC interoperability code. Currently, we treat NSUInteger as
-      // Int.
-      if (Loc.getSourceLoc().isInvalid()) {
-        diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_literal_overflow_warn,
-                 CE ? CE->getType() : DestTy);
-        ResultsInError = true;
-        return nullptr;
-      }
-      diagnose(M.getASTContext(), Loc.getSourceLoc(),
-               diag::integer_literal_overflow,
-               CE ? CE->getType() : DestTy);
-      ResultsInError = true;
-      return nullptr;
-    }
-
-    // The call to the builtin should be replaced with the constant value.
-    return constructResultWithOverflowTuple(AI, TruncVal, false);
+  case BuiltinValueKind::UToUCheckedTrunc:
+  case BuiltinValueKind::SToUCheckedTrunc:
+  case BuiltinValueKind::UToSCheckedTrunc: {
+    return constantFoldAndCheckIntegerConversions(AI, Builtin, ResultsInError);
   }
 
   case BuiltinValueKind::IntToFPWithOverflow: {

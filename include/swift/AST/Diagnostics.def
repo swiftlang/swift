@@ -1572,6 +1572,12 @@ NOTE(note_while_inlining,sil_analysis,none,
      "while inlining here", ())
 
 // Arithmetic diagnostics.
+ERROR(integer_conversion_overflow,sil_analysis,none,
+      "integer overflows when converted from %0 to %1",
+      (Type, Type))
+WARNING(integer_conversion_overflow_warn,sil_analysis,none,
+      "integer overflows when converted from %0 to %1",
+      (Type, Type))
 ERROR(integer_literal_overflow,sil_analysis,none,
       "integer literal overflows when stored into %0",
       (Type))
