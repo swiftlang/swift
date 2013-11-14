@@ -434,16 +434,6 @@ problems. Here are some of the most commonly encountered issues:
   reporting a problem. Moreover, such errors are not trapped in the REPL, and
   will cause the REPL itself to crash.
 
-* Run-time safety: The compiler does not yet check for many error conditions
-  and instead compiles and executes code with undefined behavior. In
-  particular, functions can fall off the end without returning a value, and
-  uninitialized variables will be zero-initialized instead of using a default
-  constructor or raising an error.
-
-* Generics support is limited: only basic generic types and functions
-  currently work. For example, one cannot create a type that has an instance
-  variable whose type is that of a type parameter.
-
 .
 EOM
   done
