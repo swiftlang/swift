@@ -31,9 +31,8 @@ STATISTIC(NumMandatoryInlines,
 
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-              U &&...args) {
-  Context.Diags.diagnose(loc,
-                         diag, std::forward<U>(args)...);
+                     U &&...args) {
+  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
 /// \brief Fixup reference counts after inlining a function call (which is a
@@ -60,8 +59,7 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
     B.setInsertionPoint(I);
   } else {
     B.setInsertionPoint(I);
-    StrongReleaseInst *InsertedRelease =
-      B.createStrongReleaseInst(Loc, CalleeValue);
+    auto *InsertedRelease = B.createStrongReleaseInst(Loc, CalleeValue);
     // Important: we move the insertion point before this new release, just in
     // case this inserted release would have caused the deallocation of the
     // closure and its contained capture arguments.
@@ -70,13 +68,9 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
 
   // Add a retain of each non-address type capture argument, because it will be
   // consumed by the closure body.
-  SILModule &M = B.getFunction().getModule();
-  for (auto &CaptureArg : CaptureArgs) {
-    if (!CaptureArg.getType().isAddress()) {
-      auto &typeLowering = M.getTypeLowering(CaptureArg.getType());
-      typeLowering.emitCopyValue(B, Loc, CaptureArg);
-    }
-  }
+  for (auto &CaptureArg : CaptureArgs)
+    if (!CaptureArg.getType().isAddress())
+      B.emitCopyValueOperation(Loc, CaptureArg);
 }
 
 /// \brief Removes instructions that create the callee value if they are no
