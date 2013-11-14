@@ -94,10 +94,13 @@ typedef NS_ENUM(unsigned char, NSEnumWithAliases) {
 };
 
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
-  NSRuncingEnableMince,
-  NSRuncingEnableQuince
+  NSRuncingEnableMince = 1,
+  NSRuncingEnableQuince = 2,
 };
 
+typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
+  NSSingleValue = 1,
+};
 
 @protocol NSWobbling
 -(void)wobble;

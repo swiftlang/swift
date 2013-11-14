@@ -451,15 +451,15 @@ namespace {
       if (ec != ecEnd) {
         StringRef commonPrefix = (*ec)->getName();
         ++ec;
-        // If there's only one enum constant, we can't come up with any
-        // reasonable prefix automatically, so bail.
         if (ec == ecEnd) {
-          commonPrefix = "";
+          // If there's only one enum constant, try to find a common prefix
+          // between the type name and the constant.
+          commonPrefix = getCommonWordPrefix(commonPrefix, decl->getName());
         } else {
           for (; ec != ecEnd; ++ec)
             commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
-          Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
         }
+        Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
       }
     }
     
