@@ -1253,6 +1253,10 @@ NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
 ERROR(broken_raw_representable_requirement,sema_tcd,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 
+// Duplicate declarations
+ERROR(duplicate_enum_element,sema_tcd,none,
+      "duplicate definition of enum element",())
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

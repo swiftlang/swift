@@ -1273,6 +1273,24 @@ public:
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
+      {
+        // Check for duplicate enum members.
+        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        for (auto *EED : ED->getAllElements()) {
+          auto Res = Elements.insert({ EED->getName(), EED });
+          if (!Res.second) {
+            EED->overwriteType(ErrorType::get(TC.Context));
+            EED->setInvalid();
+            if (auto *RawValueExpr = EED->getRawValueExpr())
+              RawValueExpr->setType(ErrorType::get(TC.Context));
+
+            auto PreviousEED = Res.first->second;
+            TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
+            TC.diagnose(PreviousEED->getLoc(),
+                        diag::previous_decldef, true, EED->getName());
+          }
+        }
+      }
     }
 
     for (Decl *member : ED->getMembers())
@@ -1316,6 +1334,9 @@ public:
         llvm::DenseMap<RawValueKey, RawValueSource> uniqueRawValues;
         
         for (auto elt : ED->getAllElements()) {
+          if (elt->isInvalid())
+            continue;
+
           // We don't yet support raw values on payload cases.
           if (elt->hasArgumentType()) {
             TC.diagnose(elt->getLoc(),
