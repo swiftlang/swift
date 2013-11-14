@@ -215,7 +215,27 @@ bool DeclContext::isGenericContext() const {
       break;
     }
   }
+  llvm_unreachable("illegal declcontext hierarchy");
 }
+
+/// Determine whether the innermost context is generic.
+bool DeclContext::isInnermostContextGeneric() const {
+  switch (getContextKind()) {
+    case DeclContextKind::AbstractFunctionDecl:
+      if (cast<AbstractFunctionDecl>(this)->getGenericParams())
+        return true;
+      return false;
+
+    case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::NominalTypeDecl:
+      if (getDeclaredTypeOfContext()->getAnyNominal()->getGenericParams())
+        return true;
+      return false;
+  default:
+    return false;
+  }
+}
+
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {

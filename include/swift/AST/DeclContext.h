@@ -201,6 +201,9 @@ public:
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
 
+  /// Determine whether the innermost context is generic.
+  bool isInnermostContextGeneric() const;
+
   /// getASTContext - Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext();

@@ -410,9 +410,13 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
   // Bind the contextual archetypes if requested.
   llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
   if (result.second) {
-    auto genericParams = decl->getDeclContext()->getGenericParamsOfContext();
+    auto genericParams = DeclCtx->getGenericParamsOfContext();
     if (genericParams) {
       bindGenericParameters(genericParams);
+
+      // Let DeclCtx point to the parent innermost generic context.
+      while (!DeclCtx->isInnermostContextGeneric())
+        DeclCtx = DeclCtx->getParent();
     }
   }
 
