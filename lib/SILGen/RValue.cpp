@@ -473,3 +473,33 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
   gen.emitSemanticStore(loc, getValue(), address, addrTL,
                         IsNotInitialization);
 }
+
+RValue &RValueSource::forceAndPeekRValue(SILGenFunction &gen) & {
+  if (isRValue()) {
+    return Storage.TheRV.Value;
+  }
+
+  auto expr = asKnownExpr();
+  IsRValue = true;
+  new (&Storage.TheRV.Value) RValue(gen.emitRValue(expr));
+  Storage.TheRV.Loc = expr;
+  return Storage.TheRV.Value;
+}
+
+RValue RValueSource::getAsRValue(SILGenFunction &gen) && {
+  if (isRValue()) {
+    return std::move(*this).asKnownRValue();
+  } else {
+    return gen.emitRValue(std::move(*this).asKnownExpr());
+  }
+}
+
+ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen) && {
+  if (isRValue()) {
+    auto loc = getKnownRValueLocation();
+    return std::move(*this).asKnownRValue().getAsSingleValue(gen, loc);
+  }
+
+  auto e = std::move(*this).asKnownExpr();
+  return gen.emitRValue(e).getAsSingleValue(gen, e);
+}

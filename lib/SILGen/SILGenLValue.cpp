@@ -115,7 +115,8 @@ WritebackScope::~WritebackScope() {
   WritebackStack.begin() + savedDepth;
   while (i-- > deepest) {
     ManagedValue mv = i->temp.claim(*gen, i->loc);
-    i->component->set(*gen, i->loc, RValue(*gen, mv, i->loc), i->base);
+    i->component->set(*gen, i->loc,
+                      RValueSource(i->loc, RValue(*gen, mv, i->loc)), i->base);
   }
   
   gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
@@ -262,8 +263,8 @@ namespace {
     Type substType;
     
     struct AccessorArgs {
-      RValue base;
-      RValue subscripts;
+      RValueSource base;
+      RValueSource subscripts;
     };
     
     /// Returns a tuple of RValues holding the accessor value, base (retained if
@@ -283,18 +284,20 @@ namespace {
         if (base.getType().hasReferenceSemantics()) {
           if (!isa<FunctionRefInst>(base))
             gen.B.createStrongRetain(loc, base);
-          result.base = RValue(gen,
-                               gen.emitManagedRValueWithCleanup(base), loc);
+          result.base = RValueSource(loc, RValue(gen,
+                               gen.emitManagedRValueWithCleanup(base), loc));
         } else {
-          result.base = RValue(gen,
-                               ManagedValue(base, ManagedValue::LValue), loc);
+          result.base = RValueSource(loc, RValue(gen,
+                               ManagedValue(base, ManagedValue::LValue), loc));
         }
       }
       
       if (subscriptExpr) {
         if (!origSubscripts)
           origSubscripts = gen.emitRValue(subscriptExpr);
-        result.subscripts = origSubscripts.copy(gen, loc);
+        // TODO: use the subscript expression as the source if we're
+        // only using this l-value once.
+        result.subscripts = RValueSource(loc, origSubscripts.copy(gen, loc));
       }
       
       return result;
@@ -345,7 +348,7 @@ namespace {
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&rvalue, SILValue base) const override
+             RValueSource &&rvalue, SILValue base) const override
     {
       assert(!setter.isNull() && "not settable!");      
       auto args = prepareAccessorArgs(gen, loc, base);
@@ -731,7 +734,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
-                                                     RValue &&value,
+                                                     RValueSource &&value,
                                                const TypeLowering &optTL) {
   assert(!optTL.isAddressOnly() &&
          "use emitInjectOptionalValueInto to emit address-only optionals");
@@ -744,7 +747,7 @@ ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
   SmallVector<ManagedValue, 4> args;
-  std::move(value).getAll(args);
+  std::move(value).getAsRValue(*this).getAll(args);
 
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
                                      optType.getSwiftRValueType(),
@@ -752,7 +755,7 @@ ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
 }
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
-                                                 RValue &&value,
+                                                 RValueSource &&value,
                                                  SILValue dest,
                                                  const TypeLowering &optTL) {
   if (!optTL.isAddressOnly()) {
@@ -769,7 +772,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
   SmallVector<ManagedValue, 4> args;
-  std::move(value).getAll(args);
+  std::move(value).getAsRValue(*this).getAll(args);
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
   emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
@@ -1109,7 +1112,8 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
-                                        RValue &&src, const LValue &dest) {
+                                        RValueSource &&src,
+                                        const LValue &dest) {
   WritebackScope scope(*this);
   
   // Resolve all components up to the last, keeping track of value-type logical
@@ -1122,7 +1126,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
     SILValue finalDestAddr
       = component.asPhysical().offset(*this, loc, destAddr);
     
-    std::move(src).getAsSingleValue(*this, loc)
+    std::move(src).getAsSingleValue(*this)
       .assignInto(*this, loc, finalDestAddr);
   } else {
     component.asLogical().set(*this, loc, std::move(src), destAddr);

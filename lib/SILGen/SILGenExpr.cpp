@@ -851,13 +851,15 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   RValue castRV(SGF, SGF.emitManagedRValueWithCleanup(castResult, castTL), E);
   // Wrap it in an Optional.
   if (isIndirect) {
-    SGF.emitInjectOptionalValueInto(E, std::move(castRV), result, resultTL);
+    SGF.emitInjectOptionalValueInto(E, { E->getSubExpr(), std::move(castRV) },
+                                    result, resultTL);
     if (copyBuf)
       SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
     SGF.B.createBranch(E, contBB);
   } else {
     SILValue someResult =
-      SGF.emitInjectOptionalValue(E, std::move(castRV), resultTL).forward(SGF);
+      SGF.emitInjectOptionalValue(E, {E->getSubExpr(), std::move(castRV)},
+                                  resultTL).forward(SGF);
     if (copyBuf)
       SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
     SGF.B.createBranch(E, contBB, someResult);
@@ -2518,9 +2520,6 @@ RValue RValueEmitter::visitExistentialSubscriptExpr(
 
 RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
                                                   SGFContext C) {
-  // Emit the sub-expression.
-  RValue valueRV = visit(E->getSubExpr());
-
   // Create a buffer for the result.  Abstraction difference will
   // force this to be returned indirectly from
   // _injectValueIntoOptional anyway, so there's not much point
@@ -2529,7 +2528,7 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   SILValue optAddr =
     SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
 
-  SGF.emitInjectOptionalValueInto(E, std::move(valueRV), optAddr, optTL);
+  SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
 
   ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
   if (!result) return RValue();
@@ -2790,8 +2789,8 @@ RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
 
 /// Destructure (potentially) recursive assignments into tuple expressions
 /// down to their scalar stores.
-static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
-                                    SILGenFunction &Gen) {
+static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
+                                    Expr *Dest, SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (auto *TE = dyn_cast<TupleExpr>(Dest)) {
     SmallVector<RValue, 4> elements;
@@ -2811,7 +2810,7 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
   
   // Otherwise, emit the scalar assignment.
   LValue DstLV = Gen.emitLValue(Dest);
-  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
+  Gen.emitAssignToLValue(S, {S, std::move(Src)}, DstLV);
 }
 
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {

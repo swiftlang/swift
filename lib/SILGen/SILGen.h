@@ -37,6 +37,7 @@ namespace Lowering {
   class LogicalPathComponent;
   class LValue;
   class RValue;
+  class RValueSource;
   class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
@@ -730,16 +731,16 @@ public:
   ManagedValue emitGetAccessor(SILLocation loc,
                                SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
-                               RValue &&optionalSelfValue,
-                               RValue &&optionalSubscripts,
+                               RValueSource &&optionalSelfValue,
+                               RValueSource &&optionalSubscripts,
                                Type resultType,
                                SGFContext C);
   void emitSetAccessor(SILLocation loc,
                        SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
-                       RValue &&optionalSelfValue,
-                       RValue &&optionalSubscripts,
-                       RValue &&value);
+                       RValueSource &&optionalSelfValue,
+                       RValueSource &&optionalSubscripts,
+                       RValueSource &&value);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
@@ -772,7 +773,7 @@ public:
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake);
   
-  void emitAssignToLValue(SILLocation loc, RValue &&src,
+  void emitAssignToLValue(SILLocation loc, RValueSource &&src,
                           const LValue &dest);
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
@@ -902,7 +903,7 @@ public:
   ///
   /// \returns an optional that wraps the given value
   ManagedValue emitInjectOptionalValue(SILLocation loc,
-                                       RValue &&value,
+                                       RValueSource &&value,
                                        const TypeLowering &optTL);
 
   /// Create a loadable optional with a "nothing" value.
@@ -922,7 +923,7 @@ public:
   /// \param dest  The uninitialized memory in which to store the result value.
   /// \param optTL Type lowering information for the optional to create.
   void emitInjectOptionalValueInto(SILLocation loc,
-                                   RValue &&value,
+                                   RValueSource &&value,
                                    SILValue dest,
                                    const TypeLowering &optTL);
 

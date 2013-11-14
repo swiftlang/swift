@@ -1039,76 +1039,34 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 namespace {
   class CallSite {
   public:
-    enum class Kind {
-      Expr,
-      Value
-    };
-
-    const Kind kind;
-    SILLocation loc;
-    CanType resultType;
+    SILLocation Loc;
+    CanType SubstResultType;
 
   private:
-    union {
-      Expr *expr;
-      RValue value;
-    };
-    
+    RValueSource ArgValue;
+
   public:
     CallSite(ApplyExpr *apply)
-      : kind(Kind::Expr), loc(apply),
-        resultType(apply->getType()->getCanonicalType()),
-        expr(apply->getArg()) {
-      assert(resultType);
+      : Loc(apply), SubstResultType(apply->getType()->getCanonicalType()),
+        ArgValue(apply->getArg()) {
+      assert(ArgValue && "created already-emitted call site?");
     }
   
     CallSite(SILLocation loc, Expr *expr, Type resultType)
-      : kind(Kind::Expr), loc(loc),
-        resultType(resultType->getCanonicalType()),
-        expr(expr) {
-      assert(resultType);
+      : Loc(loc), SubstResultType(resultType->getCanonicalType()),
+        ArgValue(expr) {
+      assert(ArgValue && "created already-emitted call site?");
     }
   
-    CallSite(SILLocation loc, RValue &&value, Type resultType)
-      : kind(Kind::Value), loc(loc),
-        resultType(resultType->getCanonicalType()),
-        value(std::move(value)) {
-      assert(resultType);
+    CallSite(SILLocation loc, RValueSource &&value, Type resultType)
+      : Loc(loc), SubstResultType(resultType->getCanonicalType()),
+        ArgValue(std::move(value)) {
+      assert(ArgValue && "created already-emitted call site?");
     }
   
-    ~CallSite() {
-      switch (kind) {
-      case Kind::Expr:
-        return;
-      case Kind::Value:
-        value.~RValue();
-        return;
-      }
-    }
-    
-    CallSite(CallSite &&o)
-      : kind(o.kind), loc(o.loc), resultType(o.resultType)
-    {
-      switch (kind) {
-      case Kind::Expr:
-        expr = o.expr;
-        return;
-      case Kind::Value:
-        ::new (&value) RValue(std::move(o.value));
-        return;
-      }
-    }
-    
     void emit(SILGenFunction &gen, SmallVectorImpl<ManagedValue> &args) && {
-      switch (kind) {
-      case Kind::Expr:
-        gen.emitRValue(expr).getAll(args);
-        return;
-
-      case Kind::Value:
-        std::move(value).getAll(args);
-        return;
-      }
+      assert(ArgValue && "already emitted this call site?");
+      std::move(ArgValue).getAsRValue(gen).getAll(args);
     }
   };
   
@@ -1184,8 +1142,8 @@ namespace {
       Optional<SILLocation> uncurriedLoc;
       CanType uncurriedResultTy;
       for (auto &site : uncurriedSites) {
-        uncurriedLoc = site.loc;
-        uncurriedResultTy = site.resultType;
+        uncurriedLoc = site.Loc;
+        uncurriedResultTy = site.SubstResultType;
         args.push_back({});
         std::move(site).emit(gen, args.back());
       }
@@ -1226,12 +1184,12 @@ namespace {
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
         WritebackScope scope(gen);
         uncurriedArgs.clear();
-        SILLocation loc = extraSites[i].loc;
+        SILLocation loc = extraSites[i].Loc;
         std::move(extraSites[i]).emit(gen, uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
         result = gen.emitApply(loc, result, {},
                                uncurriedArgs,
-                               extraSites[i].resultType,
+                               extraSites[i].SubstResultType,
                                result.getType().getFunctionTypeInfo(gen.SGM.M),
                                false, context);
       }
@@ -1595,7 +1553,9 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   
   // Apply 'self' if provided.
   if (apply.selfParam)
-    emission.addCallSite(RegularLocation(e), std::move(apply.selfParam),
+    emission.addCallSite(RegularLocation(e),
+                         RValueSource(apply.SelfApplyExpr,
+                                      std::move(apply.selfParam)),
                          apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
@@ -1665,7 +1625,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
                                 ManagedValue(Length, ManagedValue::Unmanaged),
                                 Loc));
   
-  emission.addCallSite(Loc, std::move(InjectionArgs),
+  emission.addCallSite(Loc, RValueSource(Loc, std::move(InjectionArgs)),
                        injectionFnTy->getResult());
   return emission.apply();
 }
@@ -1673,7 +1633,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
 static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILLocation loc,
                                          SILDeclRef constant,
-                                         RValue &selfValue) {
+                                         RValueSource &selfValue) {
   ValueDecl *decl = constant.getDecl();
 
   // FIXME: Have a nicely-abstracted way to figure out which kind of
@@ -1682,8 +1642,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   // IRGen doesn't yet have the machinery for handling class_method on
   // getters and setters.
   if (gen.SGM.requiresObjCDispatch(decl)) {
-    return Callee::forClassMethod(gen, selfValue.peekScalarValue(), constant,
-                                  loc);
+    auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
+    return Callee::forClassMethod(gen, self, constant, loc);
   }
 
   return Callee::forDirect(gen, constant, loc);
@@ -1694,7 +1654,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILLocation loc,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
-                                   RValue &selfValue,
+                                   RValueSource &selfValue,
                                    Type accessorType)
 {
   // If the accessor is a local constant, use it.
@@ -1741,8 +1701,8 @@ static void addStaticAccessorSelfArgument(SILGenFunction &gen,
   SILValue metatyVal
     = gen.B.createMetatype(loc, gen.getLoweredLoadableType(metaty));
   
-  emission.addCallSite(loc,
-             RValue(gen, ManagedValue(metatyVal, ManagedValue::Unmanaged), loc),
+  emission.addCallSite(loc, RValueSource(loc,
+             RValue(gen, ManagedValue(metatyVal, ManagedValue::Unmanaged), loc)),
              methodTy);
 }
 
@@ -1750,8 +1710,8 @@ static void addStaticAccessorSelfArgument(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
                                              SILDeclRef get,
                                              ArrayRef<Substitution> substitutions,
-                                             RValue &&selfValue,
-                                             RValue &&subscripts,
+                                             RValueSource &&selfValue,
+                                             RValueSource &&subscripts,
                                              Type resultType,
                                              SGFContext c) {
   // Compute the type of the accessor.
@@ -1787,7 +1747,8 @@ ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
     accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // () ->
-  emission.addCallSite(loc, emitEmptyTupleRValue(loc), accessFnTy->getResult());
+  emission.addCallSite(loc, RValueSource(loc, emitEmptyTupleRValue(loc)),
+                       accessFnTy->getResult());
   // T
   return emission.apply(c);
 }
@@ -1795,9 +1756,9 @@ ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
 void SILGenFunction::emitSetAccessor(SILLocation loc,
                                      SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
-                                     RValue &&selfValue,
-                                     RValue &&subscripts,
-                                     RValue &&setValue) {
+                                     RValueSource &&selfValue,
+                                     RValueSource &&subscripts,
+                                     RValueSource &&setValue) {
   // Compute the type of the accessor.
   Type accessType;
   bool isStatic = false;
@@ -1906,7 +1867,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Package up the result in an optional.
     RValue resultRV = RValue(*this, emitManagedRValueWithCleanup(result), e);
     SILValue optResult =
-      emitInjectOptionalValue(e, std::move(resultRV), optTL).forward(*this);
+      emitInjectOptionalValue(e, {e, std::move(resultRV)}, optTL).forward(*this);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
@@ -1996,7 +1957,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     RValue resultRV =
       RValue(*this, emitManagedRValueWithCleanup(result, valueTL), e);
     SILValue optResult =
-      emitInjectOptionalValue(e, std::move(resultRV), optTL).forward(*this);
+      emitInjectOptionalValue(e, {e, std::move(resultRV)}, optTL).forward(*this);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
