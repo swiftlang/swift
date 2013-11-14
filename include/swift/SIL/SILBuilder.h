@@ -594,11 +594,10 @@ public:
     return insert(new (F.getModule()) ModuleInst(Loc, ModuleType));
   }
   
-  StrongRetainInst *createStrongRetainInst(SILLocation Loc, SILValue Operand) {
-    // Retaining a function_ref is a no-op.
+  StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) StrongRetainInst(Loc, Operand));
   }
-  StrongReleaseInst *createStrongReleaseInst(SILLocation Loc, SILValue Operand) {
+  StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) StrongReleaseInst(Loc, Operand));
   }
   StrongRetainAutoreleasedInst *

@@ -1263,14 +1263,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createProjectExistentialRef(InstLoc, Val, Ty);
     break;
   }
-#define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
+#define UNARY_INSTRUCTION(ID) \
   case ValueKind::ID##Inst:                   \
     if (parseTypedValueRef(Val)) return true; \
-    ResultVal = B.CREATOR(InstLoc, Val);      \
+    ResultVal = B.create##ID(InstLoc, Val);   \
     break;
-#define UNARY_INSTRUCTION(ID) UNARY_INSTRUCTION_HELPER(ID, create##ID)
-  UNARY_INSTRUCTION_HELPER(StrongRetain, createStrongRetainInst)
-  UNARY_INSTRUCTION_HELPER(StrongRelease, createStrongReleaseInst)
+  UNARY_INSTRUCTION(StrongRetain)
+  UNARY_INSTRUCTION(StrongRelease)
   UNARY_INSTRUCTION(StrongRetainAutoreleased)
   UNARY_INSTRUCTION(AutoreleaseReturn)
   UNARY_INSTRUCTION(StrongRetainUnowned)
@@ -1282,7 +1281,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(CondFail)
 #undef UNARY_INSTRUCTION
-#undef UNARY_INSTRUCTION_HELPER
 
   case ValueKind::LoadWeakInst: {
     bool isTake = false;

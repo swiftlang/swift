@@ -795,8 +795,8 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {
   doPostProcess(Inst,
-    Builder.createStrongRetainInst(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand())));
+    Builder.createStrongRetain(getOpLocation(Inst->getLoc()),
+                               getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>
@@ -812,8 +812,8 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   doPostProcess(Inst,
-    Builder.createStrongReleaseInst(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand())));
+    Builder.createStrongRelease(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

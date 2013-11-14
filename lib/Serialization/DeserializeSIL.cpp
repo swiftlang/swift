@@ -775,15 +775,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
       
-#define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
+#define UNARY_INSTRUCTION(ID) \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_OPERAND &&            \
            "Layout should be OneOperand.");            \
-    ResultVal = Builder.CREATOR(Loc, getLocalValue(ValID, ValResNum,  \
-                    getSILType(MF->getType(TyID),                     \
-                               (SILValueCategory)TyCategory)));       \
+    ResultVal = Builder.create##ID(Loc, getLocalValue(ValID, ValResNum,  \
+                    getSILType(MF->getType(TyID),                        \
+                               (SILValueCategory)TyCategory)));          \
     break;
-#define UNARY_INSTRUCTION(ID) UNARY_INSTRUCTION_HELPER(ID, create##ID)
   UNARY_INSTRUCTION(CondFail)
   UNARY_INSTRUCTION(CopyValue)
   UNARY_INSTRUCTION(DestroyValue)
@@ -793,15 +792,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(MarkUninitialized)
   UNARY_INSTRUCTION(Return)
-  UNARY_INSTRUCTION_HELPER(StrongRetain, createStrongRetainInst)
-  UNARY_INSTRUCTION_HELPER(StrongRelease, createStrongReleaseInst)
+  UNARY_INSTRUCTION(StrongRetain)
+  UNARY_INSTRUCTION(StrongRelease)
   UNARY_INSTRUCTION(StrongRetainAutoreleased)
   UNARY_INSTRUCTION(AutoreleaseReturn)
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
 #undef UNARY_INSTRUCTION
-#undef UNARY_INSTRUCTION_HELPER
 
   case ValueKind::LoadWeakInst: {
     auto Ty = MF->getType(TyID);

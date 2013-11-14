@@ -100,7 +100,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createStrongReleaseInst(l, closure);
+      gen.B.emitStrongRelease(l, closure);
     }
   };
 }
@@ -585,7 +585,7 @@ class CleanupCaptureBox : public Cleanup {
 public:
   CleanupCaptureBox(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createStrongReleaseInst(l, box);
+    gen.B.emitStrongRelease(l, box);
   }
 };
   
@@ -1242,7 +1242,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   assert(loc.box && "captured var should have been given a box");
-  B.createStrongReleaseInst(silLoc, loc.box);
+  B.emitStrongRelease(silLoc, loc.box);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
@@ -1437,7 +1437,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     emitSemanticLoadInto(loc, fieldAddr, fieldLowering,
                          indirectReturn, resultLowering,
                          IsNotTake, IsInitialization);
-    B.createStrongReleaseInst(loc, selfValue);
+    B.emitStrongRelease(loc, selfValue);
     B.createReturn(loc, emitEmptyTuple(loc));
     return;
   }
@@ -1447,7 +1447,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
                                      resultLowering, IsNotTake);
 
   // FIXME: This should have artificial location.
-  B.createStrongReleaseInst(loc, selfValue);
+  B.emitStrongRelease(loc, selfValue);
   return emitObjCReturnValue(*this, loc, result, objcResultTy);
 }
 
@@ -1483,7 +1483,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   emitSemanticStore(loc, setValue, addr, varTI, IsNotInitialization);
   
   // FIXME: This should have artificial location.
-  B.createStrongReleaseInst(loc, selfValue);
+  B.emitStrongRelease(loc, selfValue);
   B.createReturn(loc, emitEmptyTuple(loc));
 }
 

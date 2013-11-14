@@ -1500,7 +1500,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       VarLoc const &vl = VarLocs[capture];
       assert(vl.box && "no box for captured var!");
       assert(vl.address && "no address for captured var!");
-      B.createStrongRetainInst(loc, vl.box);
+      B.createStrongRetain(loc, vl.box);
       capturedArgs.push_back(vl.box);
       capturedArgs.push_back(vl.address);
       break;
@@ -1959,7 +1959,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(ctor, selfLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
-    B.createStrongReleaseInst(ctor, selfBox);
+    B.emitStrongRelease(ctor, selfBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
     return;
   }
@@ -1973,7 +1973,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   selfValue = lowering.emitCopyValue(B, ctor, selfValue);
 
   // Release the box.
-  B.createStrongReleaseInst(ctor, selfBox);
+  B.emitStrongRelease(ctor, selfBox);
 
   B.createReturn(ctor, selfValue);
 }
@@ -2252,7 +2252,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // We have to do a retain because someone else may be using the box.
   selfValue = B.emitCopyValueOperation(ctor, selfValue);
-  B.createStrongReleaseInst(ctor, selfBox);
+  B.emitStrongRelease(ctor, selfBox);
 
   B.createReturn(ctor, selfValue);
 }

@@ -33,7 +33,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   }
 
   Type argTy = TupleType::get(newArgTypes, M.getASTContext());
-  Type resTy = FunctionType::get(argTy, origTy.getAs<AnyFunctionType>().getResult(),
+  Type resTy = FunctionType::get(argTy,
+                                 origTy.getAs<AnyFunctionType>().getResult(),
                                  M.getASTContext());
   return M.Types.getLoweredType(resTy);
 }
@@ -163,6 +164,10 @@ void SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
 /// returns it, otherwise it returns null.
 StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
                                                  SILValue Operand) {
+  // Release on a functionref is a noop.
+  if (isa<FunctionRefInst>(Operand))
+    return nullptr;
+
   // Check to see if the instruction immediately before the insertion point is a
   // strong_retain of the specified operand.  If so, we can zap the pair.
   auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
@@ -174,7 +179,14 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
         SRA->eraseFromParent();
         return nullptr;
       }
+      // Skip past unrelated retains.
+      continue;
     }
+
+    // Scan past simple memory accesses.
+    if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
+        isa<CopyValueInst>(Inst))
+      continue;
 
     // This code doesn't try to prove tricky validity constraints about whether
     // it is safe to push the release past interesting instructions.
@@ -183,7 +195,7 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongReleaseInst(Loc, Operand);
+  return createStrongRelease(Loc, Operand);
 }
 
 

@@ -639,29 +639,6 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   return true;
 }
 
-/// \brief Erase a retain of BoxValue preceding a partial_apply instruction if
-/// one is easily found; return true if so and false otherwise.
-static bool
-eraseRetainIfPresent(PartialApplyInst *PAI, SILValue BoxValue) {
-  auto I = SILBasicBlock::iterator(PAI), B = PAI->getParent()->begin();
-  while (I != B) {
-    --I;
-    if (auto *SRI = dyn_cast<StrongRetainInst>(I)) {
-      if (SRI->getOperand() == BoxValue) {
-        I->eraseFromParent();
-        return true;
-      }
-      continue;
-    }
-
-    // FIXME: Can this be (I->getMemoryBehavior() == MayHaveSideEffects)?
-    if (!isa<FunctionRefInst>(I) && !isa<LoadInst>(I) &&
-        !isa<CopyValueInst>(I))
-      break;
-  }
-  return false;
-}
-
 /// \brief Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
@@ -706,10 +683,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
              BoxValue.getResultNumber() == 0 &&
              AddrValue.getResultNumber() == 1);
 
-      // Try to net out (i.e. erase) a retain of the box value.
-      if (!eraseRetainIfPresent(PAI, BoxValue))
-        // Otherwise, add a new release of the box value.
-        B.createStrongReleaseInst(PAI->getLoc(), BoxValue);
+      // Emit a strong release, zapping a retain if we can.
+      B.emitStrongRelease(PAI->getLoc(), BoxValue);
 
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
