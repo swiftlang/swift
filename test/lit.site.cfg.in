@@ -41,5 +41,5 @@ if platform.system() != 'Linux':
   config.available_features.add('swift_repl')
 
 # Add each available target as a feature.
-for target in config.targets_to_build:
+for target in config.targets_to_build.split():
   config.available_features.add(target)
