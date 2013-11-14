@@ -712,13 +712,15 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      B.createStrongRetain(loc, value);
+      if (!isa<FunctionRefInst>(value))
+        B.createStrongRetainInst(loc, value);
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      B.createStrongRelease(loc, value);
+      if (!isa<FunctionRefInst>(value))
+        B.createStrongReleaseInst(loc, value);
     }
   };
 

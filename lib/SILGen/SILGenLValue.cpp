@@ -281,7 +281,8 @@ namespace {
       AccessorArgs result;      
       if (base) {
         if (base.getType().hasReferenceSemantics()) {
-          gen.B.createStrongRetain(loc, base);
+          if (!isa<FunctionRefInst>(base))
+            gen.B.createStrongRetainInst(loc, base);
           result.base = RValue(gen,
                                gen.emitManagedRValueWithCleanup(base), loc);
         } else {
@@ -922,7 +923,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     gen.B.createStoreWeak(loc, refValue, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.createStrongRelease(loc, refValue);
+    gen.B.createStrongReleaseInst(loc, refValue);
 
     return;
   }
@@ -934,7 +935,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
-    gen.B.createStrongRelease(loc, value);
+    gen.B.createStrongReleaseInst(loc, value);
     return;
   }
 
@@ -1026,7 +1027,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   if (storageType.is<UnownedStorageType>()) {
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
     B.createUnownedRetain(loc, unowned);
-    B.createStrongRelease(loc, semanticValue);
+    B.createStrongReleaseInst(loc, semanticValue);
     return unowned;
   }
   

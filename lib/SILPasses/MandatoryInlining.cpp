@@ -114,7 +114,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // source of the store and erase it.
     if (SRI) {
       if (CalleeValue.isValid())
-        SILBuilder(SRI).createStrongRelease(SRI->getLoc(), CalleeValue);
+        SILBuilder(SRI).createStrongReleaseInst(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
     }
 
