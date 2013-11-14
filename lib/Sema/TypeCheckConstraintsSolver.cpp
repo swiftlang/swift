@@ -576,6 +576,12 @@ static bool tryTypeVariableBindings(
     bool sawFirstLiteralConstraint = false;
     for (auto binding : bindings) {
       auto type = binding.first;
+
+      // If the type variable can't bind to an lvalue, make sure the
+      // type we pick isn't an lvalue.
+      if (!typeVar->getImpl().canBindToLValue())
+        type = type->getRValueType();
+
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
         log.indent(depth * 2)

@@ -71,8 +71,11 @@ enum class ConstraintKind : char {
   /// existential, even if it doesn't conform to that protocol (e.g., due to
   /// the use of associated types).
   SelfObjectOfProtocol,
-  /// \brief Both types are function types with the same input and output types.
-  /// Note, we do not require the function type attributes to match.
+  /// \brief Both types are function types. The first function type's
+  /// input is the value being passed to the function and its output
+  /// is a type variable that describes the output. The second
+  /// function type is expected to become a function type. Note, we
+  /// do not require the function type attributes to match.
   ApplicableFunction,
   /// \brief Binds the left-hand type to a particular overload choice.
   BindOverload,

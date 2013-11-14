@@ -860,25 +860,17 @@ namespace {
 
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
-      auto argumentLocator
-        = CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument);
-      auto inputTy = CS.createTypeVariable(
-                       argumentLocator,
-                       TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
       auto outputTy
         = CS.createTypeVariable(
             CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
             /*options=*/0);
 
-      auto funcTy = FunctionType::get(inputTy, outputTy, Context);
+      auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy, 
+                                      Context);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-
-      // The argument type must be convertible to the input type.
-      CS.addConstraint(ConstraintKind::Conversion, expr->getArg()->getType(),
-                       inputTy, argumentLocator);
 
       return outputTy;
     }

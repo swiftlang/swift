@@ -2762,18 +2762,27 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     auto func1 = type1->castTo<FunctionType>();
     auto func2 = cast<FunctionType>(desugar2);
 
-    assert(func1->getInput()->is<TypeVariableType>() &&
-           "the input of funct1 is a free variable by construction");
     assert(func1->getResult()->is<TypeVariableType>() &&
            "the output of funct1 is a free variable by construction");
 
+    // Strip the 'ApplyFunction' off the locator.
+    // FIXME: Perhaps ApplyFunction can go away entirely?
+    SmallVector<LocatorPathElt, 2> parts;
+    Expr *anchor = locator.getLocatorParts(parts);
+    assert(!parts.empty() && "Nonsensical applicable-function locator");
+    assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
+    parts.pop_back();
+    ConstraintLocatorBuilder outerLocator = getConstraintLocator(anchor, parts);
+
+    // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
-                   TypeMatchKind::BindType, flags,
-                   locator.withPathElement(
-                     ConstraintLocator::FunctionArgument))
+                   TypeMatchKind::Conversion, flags,
+                   outerLocator.withPathElement(
+                     ConstraintLocator::ApplyArgument))
           == SolutionKind::Error)
       return SolutionKind::Error;
 
+    // The result types are equivalent.
     if (matchTypes(func1->getResult(), func2->getResult(),
                    TypeMatchKind::BindType,
                    flags,
