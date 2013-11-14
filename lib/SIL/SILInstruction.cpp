@@ -96,7 +96,7 @@ void SILInstruction::removeFromParent() {
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
-  assert(use_empty() && "There are no uses of instruction being deleted.");
+  assert(use_empty() && "There are uses of instruction being deleted.");
   getParent()->getInstList().erase(this);
 }
 
