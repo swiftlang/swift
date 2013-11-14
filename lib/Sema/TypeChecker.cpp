@@ -306,10 +306,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
     auto& CurDecls = FoundDecls[MemberVD->getName()];
     ValueDecl *OverriddenDecl = nullptr;
     for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
-      if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
-        // We ignore sub-typing on the same class.
-        continue;
-      }
+      assert(CurDecls[i]->getDeclContext() != MemberVD->getDeclContext() &&
+             "decls should come from different classes");
       if (ExactOverriddenDecls.count(CurDecls[i]))
         continue;
       if (MemberVD->getKind() != CurDecls[i]->getKind())
