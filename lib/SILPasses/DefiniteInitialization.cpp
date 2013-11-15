@@ -118,8 +118,8 @@ static CanType getTupleElementType(CanType T, unsigned EltNo) {
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static void getPathStringToElement(CanType T, unsigned Element,
-                                   std::string &Result) {
+static void getPathStringToTupleElement(CanType T, unsigned Element,
+                                        std::string &Result) {
   TupleType *TT = T->getAs<TupleType>();
   if (!TT) return;
 
@@ -134,8 +134,8 @@ static void getPathStringToElement(CanType T, unsigned Element,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElement(Field.getType()->getCanonicalType(),
-                                    Element, Result);
+      return getPathStringToTupleElement(Field.getType()->getCanonicalType(),
+                                         Element, Result);
     }
     
     Element -= ElementsForField;
@@ -435,6 +435,9 @@ namespace {
     /// mark_uninitialized instruction.  This represents the start of the
     /// lifetime of the value being analyzed.
     SILInstruction *TheMemory;
+
+    /// ElementNumber - This indicates what element of an outer-level tuple that
+    /// this corresponds to.
     unsigned ElementNumber;
 
     /// The number of primitive subelements across all elements of this memory
@@ -571,7 +574,7 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
   CanType AllocTy = getTheMemoryType().getSwiftRValueType();
-  getPathStringToElement(AllocTy, ElementNumber, Name);
+  getPathStringToTupleElement(AllocTy, ElementNumber, Name);
   
   diagnose(Use->getModule(), Use->getLoc(), DiagMessage, Name);
 
@@ -1755,14 +1758,15 @@ static void removeDeadAllocation(SILInstruction *Alloc,
   eraseUsesOfInstruction(Alloc);
 }
 
-static void processAllocation(SILInstruction *I, SILType EltTy) {
+static void processAllocation(SILInstruction *I) {
   assert(isa<AllocBoxInst>(I) || isa<AllocStackInst>(I));
   DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
 
-  // Set up the datastructure used to collect the uses of the alloc_box.  The
+  // Set up the datastructure used to collect the uses of the allocation.  The
   // uses are bucketed up into the elements of the allocation that are being
-  // used.  This matters for element-wise tuples and fragile structs.
+  // used.  This matters for element-wise tuples.
   SmallVector<ElementUses, 1> Uses;
+  SILType EltTy = I->getType(1).getObjectType();
   Uses.resize(getTupleElementCount(EltTy.getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
@@ -1804,31 +1808,20 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
   for (auto &BB : Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
-      if (auto *ABI = dyn_cast<AllocBoxInst>(I)) {
-        processAllocation(ABI, ABI->getElementType());
+      SILInstruction *Inst = I;
+      if (isa<AllocBoxInst>(Inst) || isa<AllocStackInst>(Inst)) {
+        processAllocation(Inst);
         
         // Carefully move iterator to avoid invalidation problems.
         ++I;
-        if (ABI->use_empty()) {
-          ABI->eraseFromParent();
+        if (Inst->use_empty()) {
+          Inst->eraseFromParent();
           ++NumAllocRemoved;
         }
         continue;
       }
 
-      if (auto *ASI = dyn_cast<AllocStackInst>(I)) {
-        processAllocation(ASI, ASI->getElementType());
-
-        // Carefully move iterator to avoid invalidation problems.
-        ++I;
-        if (ASI->use_empty()) {
-          ASI->eraseFromParent();
-          ++NumAllocRemoved;
-        }
-        continue;
-      }
-
-      if (auto *MUI = dyn_cast<MarkUninitializedInst>(I))
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst))
         processMarkUninitialized(MUI);
 
       ++I;
