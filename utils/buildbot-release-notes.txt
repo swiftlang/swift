@@ -12,7 +12,12 @@
   dealing with constants, at compile time:
 
     var i: Int = -129
-    var i8 = Int8(i) // error: integer overflows when converted from 'Int' to 'Int8'
+    var i8 = Int8(i) 
+    // error: integer overflows when converted from 'Int' to 'Int8'
+
+    var si = Int8(-1)
+    var ui = UInt8(si) 
+    // error: negative integer cannot be converted to unsigned type 'UInt8'
 
 2013-11-13
 ----------
