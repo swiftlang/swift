@@ -1084,6 +1084,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (IntegerTy->isFixedWidth()) {
       SizeInBits = IntegerTy->getFixedWidth();
       switch (SizeInBits) {
+      case   1: Name = "Builtin.Int1";   break;
       case   8: Name = "Builtin.Int8";   break;
       case  16: Name = "Builtin.Int16";  break;
       case  32: Name = "Builtin.Int32";  break;
