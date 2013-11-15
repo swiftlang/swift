@@ -249,7 +249,6 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
   // Process conversions signed <-> unsigned for same size integers.
   if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
       Builtin.ID == BuiltinValueKind::USCheckedConversion) {
-    Type DstTy = SrcTy;
     Result = SrcVal;
     // Report an error if the sign bit is set.
     OverflowError = SrcVal.isNegative();
