@@ -1166,6 +1166,23 @@ private:
         return nullptr;
       return demangleArchetypeRef(depth + 1, index);
     }
+    if (Mangled.nextIf('q')) {
+      size_t index;
+      if (!demangleIndex(index))
+        return nullptr;
+      DemanglerPrinter printer;
+      printer << index;
+      NodePointer index_node = Node::makeNodePointer(Node::Kind::Number,printer.str());
+      NodePointer decl_ctx = Node::makeNodePointer(Node::Kind::DeclContext);
+      NodePointer ctx = demangleContext();
+      if (!ctx)
+        return nullptr;
+      decl_ctx->push_back_child(ctx);
+      NodePointer qual_atype = Node::makeNodePointer(Node::Kind::QualifiedArchetype);
+      qual_atype->push_back_child(index_node);
+      qual_atype->push_back_child(decl_ctx);
+      return qual_atype;
+    }
     size_t index;
     if (!demangleIndex(index))
       return nullptr;
@@ -1807,6 +1824,11 @@ private:
           toString(type);
           break;
         }
+        case swift::Demangle::Node::Kind::DeclContext:
+        {
+          toString(pointer->child_at(0));
+          break;
+        }
         case swift::Demangle::Node::Kind::Path:
         {
           toStringChildren(pointer, ".");
@@ -2060,6 +2082,15 @@ private:
           Printer << "<";
           toStringChildren(pointer, ", ");
           Printer << ">";
+          break;
+        }
+        case swift::Demangle::Node::Kind::QualifiedArchetype: {
+          if (pointer->size() < 2)
+            break;
+          NodePointer number = pointer->child_at(0);
+          NodePointer decl_ctx = pointer->child_at(1);
+          Printer << "archetype " << number->getText() << " of ";
+          toString(decl_ctx);
           break;
         }
         case swift::Demangle::Node::Kind::GenericType: {
