@@ -1879,6 +1879,8 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
                                 tok::kw_case, tok::colon, tok::r_brace,
                                 diag::invalid_diagnostic).isError()) {
+      NameLoc = CaseLoc;
+
       // Handle the likely case someone typed 'case X, case Y'.
       if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
