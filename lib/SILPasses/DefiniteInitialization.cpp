@@ -1345,11 +1345,30 @@ namespace {
       }
     }
 
+    void collectFromMarkUninitialized(MarkUninitializedInst *MUI) {
+      collectUses(SILValue(MUI, 0), 0);
+    }
 
-    /// This is the main entry point for the use walker.
-    void collectUses(SILValue Pointer, unsigned BaseElt);
-    
+    /// This is the main entry point for the use walker.  It collects uses from
+    /// the address and the refcount result of the allocation.
+    void collectFromAllocation(SILInstruction *I) {
+      collectUses(SILValue(I, 1), 0);
+
+      // Collect information about the retain count result as well.
+      for (auto UI : SILValue(I, 0).getUses()) {
+        auto *User = UI->getUser();
+
+        // If this is a release or dealloc_stack, then remember it as such.
+        if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User)) {
+          for (auto &UseArray : Uses)
+            UseArray.push_back({ User, UseKind::Release });
+        }
+      }
+    }
+
   private:
+    void collectUses(SILValue Pointer, unsigned BaseElt);
+
     void addElementUses(unsigned BaseElt, SILType UseTy,
                         SILInstruction *User, UseKind Kind);
     void collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt);
@@ -1736,66 +1755,25 @@ static void removeDeadAllocation(SILInstruction *Alloc,
   eraseUsesOfInstruction(Alloc);
 }
 
-static void processAllocBox(AllocBoxInst *ABI) {
-  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *ABI << "\n");
+static void processAllocation(SILInstruction *I, SILType EltTy) {
+  assert(isa<AllocBoxInst>(I) || isa<AllocStackInst>(I));
+  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
 
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getTupleElementCount(ABI->getElementType().getSwiftRValueType()));
+  Uses.resize(getTupleElementCount(EltTy.getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  ElementUseCollector(Uses).collectUses(SILValue(ABI, 1), 0);
-
-  // Collect information about the retain count result as well.
-  for (auto UI : SILValue(ABI, 0).getUses()) {
-    auto *User = UI->getUser();
-
-    // If this is a release, then remember it as such.
-    if (isa<StrongReleaseInst>(User)) {
-      for (auto &UseArray : Uses)
-        UseArray.push_back({ User, UseKind::Release });
-    }
-  }
+  ElementUseCollector(Uses).collectFromAllocation(I);
 
   // Process each scalar value in the uses array individually.
   unsigned EltNo = 0;
   for (auto &Elt : Uses)
-    ElementPromotion(ABI, EltNo++, Elt).doIt();
+    ElementPromotion(I, EltNo++, Elt).doIt();
 
-  removeDeadAllocation(ABI, Uses);
-}
-
-static void processAllocStack(AllocStackInst *ASI) {
-  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *ASI << "\n");
-
-  // Set up the datastructure used to collect the uses of the alloc_box.  The
-  // uses are bucketed up into the elements of the allocation that are being
-  // used.  This matters for element-wise tuples and fragile structs.
-  SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getTupleElementCount(ASI->getElementType().getSwiftRValueType()));
-  
-  // Walk the use list of the pointer, collecting them into the Uses array.
-  ElementUseCollector(Uses).collectUses(SILValue(ASI, 1), 0);
-  
-  // Collect information about the retain count result as well.
-  for (auto UI : SILValue(ASI, 0).getUses()) {
-    auto *User = UI->getUser();
-    
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User)) {
-      for (auto &UseArray : Uses)
-        UseArray.push_back({ User, UseKind::Release });
-    }
-  }
-  
-  // Process each scalar value in the uses array individually.
-  unsigned EltNo = 0;
-  for (auto &Elt : Uses)
-    ElementPromotion(ASI, EltNo++, Elt).doIt();
-
-  removeDeadAllocation(ASI, Uses);
+  removeDeadAllocation(I, Uses);
 }
 
 static void processMarkUninitialized(MarkUninitializedInst *MUI) {
@@ -1810,7 +1788,7 @@ static void processMarkUninitialized(MarkUninitializedInst *MUI) {
                                      .getSwiftRValueType()));
   
   // Walk the use list of the pointer, collecting them into the Uses array.
-  ElementUseCollector(Uses).collectUses(SILValue(MUI, 0), 0);
+  ElementUseCollector(Uses).collectFromMarkUninitialized(MUI);
   
   // Process each scalar value in the uses array individually.
   unsigned EltNo = 0;
@@ -1827,7 +1805,7 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
       if (auto *ABI = dyn_cast<AllocBoxInst>(I)) {
-        processAllocBox(ABI);
+        processAllocation(ABI, ABI->getElementType());
         
         // Carefully move iterator to avoid invalidation problems.
         ++I;
@@ -1839,7 +1817,7 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
       }
 
       if (auto *ASI = dyn_cast<AllocStackInst>(I)) {
-        processAllocStack(ASI);
+        processAllocation(ASI, ASI->getElementType());
 
         // Carefully move iterator to avoid invalidation problems.
         ++I;
