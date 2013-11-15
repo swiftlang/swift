@@ -1,3 +1,19 @@
+2013-11-20
+----------
+* Unreachable code warning has been added:
+
+    var y: Int = 1
+    if y == 1 { // note: condition always evaluates to true
+      return y
+    } 
+    return 1 // warning: will never be executed
+
+* Overflows on integer type conversions are now detected at runtime and, when 
+  dealing with constants, at compile time:
+
+    var i: Int = -129
+    var i8 = Int8(i) // error: integer overflows when converted from 'Int' to 'Int8'
+
 2013-11-13
 ----------
 
