@@ -637,6 +637,21 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
+                                                Identifier Id,
+                                                Type Ty) {
+  auto BuiltinTy = Ty->getAs<BuiltinIntegerType>();
+  if (!BuiltinTy)
+    return nullptr;
+
+  TupleTypeElt ArgElts[] = { BuiltinTy };
+  Type SignErrorBitTy = BuiltinIntegerType::get(1, Context);
+  TupleTypeElt ResultElts[] = { BuiltinTy, SignErrorBitTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
+
+  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+}
+
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
                                                   Identifier Id, Type InputTy,
                                                   Type OutputTy) {
@@ -1069,6 +1084,11 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::UToUCheckedTrunc:
     if (Types.size() != 2) return nullptr;
     return getCheckedTruncOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::SUCheckedConversion:
+  case BuiltinValueKind::USCheckedConversion:
+    if (Types.size() != 1) return nullptr;
+    return getCheckedConversionOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;

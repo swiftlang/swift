@@ -181,7 +181,9 @@ extension ${Self} {
 @    if Self != That:
   init(v: ${That}) {
 @      if bits == srcBits:
-    value = v.value
+    var tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${bits}(v.value)
+    Builtin.condfail(tmp.1)
+    value = tmp.0
 @      end
 @      if srcBits > bits:
     var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(v.value)
@@ -196,6 +198,9 @@ extension ${Self} {
   }
 @    end
 @ end
+  def as${'Unsigned' if signed else 'Signed'}() -> ${'U' if signed else ''}Int${bits} {
+    return ${'U' if signed else ''}Int${bits}(value)
+  }
 }
 
 // Unary plus
