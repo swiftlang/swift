@@ -305,7 +305,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   Location L = getLocation(SM, DS->Loc).LocForLinetable;
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
-  if (Parent == 0)
+  if (!Parent)
     Parent = File;
 
   llvm::DILexicalBlock DScope =
@@ -499,7 +499,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   // This placeholder scope gets RAUW'd when the namespaces are
   // created after we are finished with the entire translation unit.
   auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
-                                          LinkageName, MainFile, MainFile, 0);
+                                          LinkageName, File, File, 0);
   auto Line = L.Line;
 
   // We know that top_level_code always comes from MainFile.
@@ -834,7 +834,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     return;
 
   llvm::DIFile Unit = getFile(Scope);
-  llvm::DIType DTy = getOrCreateType(Ty, Scope);
+  // FIXME: this should be the scope of the type's declaration.
+  llvm::DIType DTy = getOrCreateType(Ty, TheCU);
 
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
