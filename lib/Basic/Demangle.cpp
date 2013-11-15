@@ -1311,6 +1311,9 @@ private:
       if (c == 'p')
         return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");
+      if (c == 'w')
+        return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
+                                     "Builtin.Word");
       return nullptr;
     }
     if (c == 'b') {
