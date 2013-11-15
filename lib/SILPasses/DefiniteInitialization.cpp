@@ -403,11 +403,11 @@ namespace {
   struct LiveOutBlockState {
     /// For this block, keep track of whether there is a path from the entry
     /// of the function to the end of the block that crosses an escape site.
-    EscapeKind EscapeInfo = EscapeKind::Unknown;
+    EscapeKind EscapeInfo : 2;
 
     /// Keep track of whether there is a Store, InOutUse, or Escape locally in
     /// this block.
-    bool HasNonLoadUse = false;
+    bool HasNonLoadUse : 2;
 
     /// Keep track of whether the element is live out of this block or not.
     ///
@@ -416,7 +416,12 @@ namespace {
       IsLiveOut,
       IsComputingLiveOut,
       IsUnknown
-    } Availability = IsUnknown;
+    } Availability : 3;
+
+    LiveOutBlockState()
+      : EscapeInfo(EscapeKind::Unknown), HasNonLoadUse(false),
+        Availability(IsUnknown) {
+    }
   };
 } // end anonymous namespace
 
@@ -542,8 +547,9 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
   NonLoadUses.insert(TheMemory);
   PerBlockInfo[TheMemory->getParent()].HasNonLoadUse = true;
 
-  // If there was not another store in the memory definition block, then it is
-  // known to be not live out.
+  // If there was no store in the memory definition block, then it is known to
+  // be not live out.  Make sure to set this so that the upward scan of the CFG
+  // terminates at the allocation.
   auto &BBInfo = PerBlockInfo[TheMemory->getParent()];
   if (BBInfo.Availability == LiveOutBlockState::IsUnknown)
     BBInfo.Availability = LiveOutBlockState::IsNotLiveOut;
@@ -764,8 +770,8 @@ bool ElementPromotion::isLiveOut(SILBasicBlock *BB) {
 
   // Recursively processes all of our predecessor blocks.  If any of them is
   // not live out, then we aren't either.
-  for (auto PI = BB->pred_begin(), E = BB->pred_end(); PI != E; ++PI) {
-    if (!isLiveOut(*PI)) {
+  for (auto P : BB->getPreds()) {
+    if (!isLiveOut(P)) {
       // If any predecessor fails, then we're not live out either.
       PerBlockInfo[BB].Availability = LiveOutBlockState::IsNotLiveOut;
       return false;
