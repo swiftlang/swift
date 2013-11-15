@@ -769,6 +769,7 @@ enum class TokenProperty {
 static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
                                             SourceLoc &Loc, tok ResyncT1,
                                             tok ResyncT2, tok ResyncT3,
+                                            tok ResyncT4,
                                             TokenProperty ResyncP1,
                                             const Diagnostic &D) {
   switch (P.Tok.getKind()) {
@@ -783,7 +784,7 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
       P.diagnose(P.Tok, D);
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
-         P.peekToken().is(ResyncT3) ||
+         P.peekToken().is(ResyncT3) || P.peekToken().is(ResyncT4) ||
          (ResyncP1 != TokenProperty::None &&
           P.startsWithLess(P.peekToken())))) {
       llvm::SmallString<32> Name(P.Tok.getText());
@@ -805,7 +806,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
                         ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
-                                 tok::unknown, TokenProperty::None,
+                                 tok::unknown, tok::unknown,
+                                 TokenProperty::None,
                                  Diagnostic(ID, Args...));
 }
 
@@ -815,8 +817,20 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, tok ResyncT3,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 TokenProperty::None, Diagnostic(ID, Args...));
+                                 tok::unknown, TokenProperty::None,
+                                 Diagnostic(ID, Args...));
 }
+
+template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
+                        tok ResyncT1, tok ResyncT2, tok ResyncT3, tok ResyncT4,
+                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
+                                 ResyncT4, TokenProperty::None,
+                                 Diagnostic(ID, Args...));
+}
+
 
 template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
@@ -824,6 +838,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, TokenProperty ResyncP1,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, tok::unknown,
+                                 tok::unknown,
                                  ResyncP1, Diagnostic(ID, Args...));
 }
 
@@ -1862,7 +1877,7 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
 
     const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
-                                tok::kw_case, tok::colon,
+                                tok::kw_case, tok::colon, tok::r_brace,
                                 diag::invalid_diagnostic).isError()) {
       // Handle the likely case someone typed 'case X, case Y'.
       if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
