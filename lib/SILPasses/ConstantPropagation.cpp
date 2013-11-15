@@ -224,30 +224,42 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
   assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
-         Builtin.ID == BuiltinValueKind::UToSCheckedTrunc);
+         Builtin.ID == BuiltinValueKind::UToSCheckedTrunc ||
+         Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
+         Builtin.ID == BuiltinValueKind::USCheckedConversion);
 
-  // Check if the value is a constant.
+  // Check if we are converting a constant integer.
   OperandValueArrayRef Args = AI->getArguments();
   IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
   if (!V)
     return nullptr;
   APInt SrcVal = V->getValue();
 
-  // Get the source and destination bit width.
-  assert(Builtin.Types.size() == 2);
+  // Get source type and bit width.
   Type SrcTy = Builtin.Types[0];
-  Type DstTy = Builtin.Types[1];
   uint32_t SrcBitWidth =
-    SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
-  uint32_t DstBitWidth =
-    DstTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
+    Builtin.Types[0]->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
   // Compute the destination (for SrcBitWidth < DestBitWidth) and enough info
   // to check for overflow.
   APInt Result;
   bool OverflowError;
+  Type DstTy;
 
-  if (Builtin.ID != BuiltinValueKind::UToSCheckedTrunc) {
+  // Process conversions signed <-> unsigned for same size integers.
+  if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
+      Builtin.ID == BuiltinValueKind::USCheckedConversion) {
+    Type DstTy = SrcTy;
+    Result = SrcVal;
+    // Report an error if the sign bit is set.
+    OverflowError = SrcVal.isNegative();
+
+  // Process truncation from unsigned to signed.
+  } else if (Builtin.ID != BuiltinValueKind::UToSCheckedTrunc) {
+    assert(Builtin.Types.size() == 2);
+    DstTy = Builtin.Types[1];
+    uint32_t DstBitWidth =
+      DstTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
     //     Result = trunc_IntFrom_IntTo(Val)
     //   For signed destination:
     //     sext_IntFrom(Result) == Val ? Result : overflow_error
@@ -259,7 +271,12 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
     APInt Ext = Signed ? Result.sext(SrcBitWidth) : Result.zext(SrcBitWidth);
     OverflowError = (SrcVal != Ext);
 
+  // Process the rest of truncations.
   } else {
+    assert(Builtin.Types.size() == 2);
+    DstTy = Builtin.Types[1];
+    uint32_t DstBitWidth =
+      Builtin.Types[1]->castTo<BuiltinIntegerType>()->getGreatestWidth();
     // Compute the destination (for SrcBitWidth < DestBitWidth):
     //   Result = trunc_IntTo(Val)
     //   Trunc  = trunc_'IntTo-1bit'(Val)
@@ -315,10 +332,16 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                diag::integer_literal_overflow,
                UserDstTy.isNull() ? DstTy : UserDstTy);
     else
-      diagnose(M.getASTContext(), Loc.getSourceLoc(),
-               diag::integer_conversion_overflow,
-               UserSrcTy.isNull() ? SrcTy : UserSrcTy,
-               UserDstTy.isNull() ? DstTy : UserDstTy);
+      if (Builtin.ID == BuiltinValueKind::SUCheckedConversion) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_conversion_sign_error,
+                 UserDstTy.isNull() ? DstTy : UserDstTy);
+      } else {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_conversion_overflow,
+                 UserSrcTy.isNull() ? SrcTy : UserSrcTy,
+                 UserDstTy.isNull() ? DstTy : UserDstTy);
+      }
     ResultsInError = true;
     return nullptr;
   }
@@ -472,7 +495,9 @@ case BuiltinValueKind::id:
   case BuiltinValueKind::SToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
-  case BuiltinValueKind::UToSCheckedTrunc: {
+  case BuiltinValueKind::UToSCheckedTrunc:
+  case BuiltinValueKind::SUCheckedConversion:
+  case BuiltinValueKind::USCheckedConversion: {
     return constantFoldAndCheckIntegerConversions(AI, Builtin, ResultsInError);
   }
 
