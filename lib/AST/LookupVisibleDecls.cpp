@@ -87,6 +87,17 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     if (!(LS.isQualified() && LS.isOnMetatype()) && FD->isStatic())
       return false;
   }
+  if (auto *VD = dyn_cast<VarDecl>(Member)) {
+    // Can not use static properties on non-metatypes.
+    if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
+      return false;
+
+    // Can not use instance properties on metatypes.
+    if (LS.isQualified() && LS.isOnMetatype() && !VD->isStatic())
+      return false;
+
+    return true;
+  }
   if (isa<EnumElementDecl>(Member)) {
     // Can not reference enum elements on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()))
@@ -94,10 +105,6 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
   }
   if (LS.isQualified() && LS.isOnSuperclass() && isa<ConstructorDecl>(Member)) {
     // Can not call constructors from a superclass.
-    return false;
-  }
-  if (LS.isQualified() && LS.isOnMetatype() && isa<VarDecl>(Member)) {
-    // FIXME: static variables
     return false;
   }
   if (LS.isQualified() && !LS.isOnMetatype() && isa<TypeDecl>(Member)) {

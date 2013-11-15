@@ -192,10 +192,10 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Var: {
     auto DC = D->getDeclContext();
     if (DC->isTypeContext()) {
-      // FIXME: Uncomment when static variables are implemented.
-      // if (D->isStatic())
-      //   return CodeCompletionDeclKind::StaticVar;
-      return CodeCompletionDeclKind::InstanceVar;
+      if (cast<VarDecl>(D)->isStatic())
+        return CodeCompletionDeclKind::StaticVar;
+      else
+        return CodeCompletionDeclKind::InstanceVar;
     }
     if (DC->isLocalContext())
       return CodeCompletionDeclKind::LocalVar;
@@ -896,11 +896,11 @@ public:
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
-    assert(!(InsideStaticMethod &&
+    assert(VD->isStatic() ||
+           !(InsideStaticMethod &&
             VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
            "name lookup bug -- can not see an instance variable "
            "in a static function");
-    // FIXME: static variables.
 
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -1220,9 +1220,6 @@ public:
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        // Swift does not have class variables.
-        // FIXME: add code completion results when class variables are added.
-        assert(!ExprType->is<MetaTypeType>() && "name lookup bug");
         addVarDeclRef(VD, Reason);
         return;
       }
