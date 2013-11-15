@@ -502,6 +502,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       if (var->isStatic()) {
         auto baseMeta = e->getBase()->getType()->castTo<MetaTypeType>()
           ->getInstanceType();
+        (void)baseMeta;
         assert(!baseMeta->is<BoundGenericType>()
                && "generic static stored properties not implemented");
         assert((baseMeta->getStructOrBoundGenericStruct()
