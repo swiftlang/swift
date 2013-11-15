@@ -221,6 +221,7 @@ NodePointer Node::makeNodePointer(Kind k, std::string t) {
 
 class Demangler {
 public:
+  
   Demangler(llvm::StringRef mangled)
       : Substitutions(), ArchetypeCounts(), ArchetypeCount(), Mangled(mangled),
         RootNode(), CurrentNode() {}
@@ -274,7 +275,7 @@ public:
   }
 
   NodePointer getDemangled() { return RootNode; }
-
+  
 private:
 
   enum class IsProtocol {
@@ -879,13 +880,33 @@ private:
     return nullptr;
   }
   
-  NodePointer demangleContextImpl(Node::Kind *inferred_context_type = nullptr) {
+  NodePointer demangleContextGreedy (NodePointer first) {
+    NodePointer decl_ctx = Node::makeNodePointer(Node::Kind::DeclContext);
+    NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+    path->push_back_child(first);
+    decl_ctx->push_back_child(path);
+    while (Mangled.hasAtLeast(1) && isStartOfIdentifier(Mangled.peek())) {
+      path->push_back_child(demangleIdentifier());
+    }
+    MangledNameSource::Snapshot snapshot = Mangled.getSnapshot();
+    NodePointer type = demangleType();
+    if (!type)
+      Mangled.resetToSnapshot(snapshot);
+    else
+      decl_ctx->push_back_child(type);
+    return decl_ctx;
+  }
+  
+  NodePointer demangleContextImpl(Node::Kind *inferred_context_type = nullptr,
+                                  bool allow_greedy = false) {
     if (!Mangled)
       return nullptr;
     NodePointer demangled_ctx(nullptr);
     char c = Mangled.peek();
     if (isStartOfIdentifier(c) || c == 'S') {
       demangled_ctx = demangleModule();
+      if (allow_greedy && Mangled.hasAtLeast(1) && isStartOfIdentifier(Mangled.peek()))
+        return demangleContextGreedy(demangled_ctx);
     }
     if (isStartOfNominalType(c)) {
       if (inferred_context_type) {
@@ -900,7 +921,7 @@ private:
     return demangled_ctx;
   }
   
-  void straightenNestedDeclContext (NodePointer src, NodePointer& dest) {
+  bool straightenNestedDeclContext (NodePointer src, NodePointer& dest) {
     Node::Kind srcKind = src->getKind();
     switch (srcKind) {
       case swift::Demangle::Node::Kind::Class:
@@ -908,6 +929,7 @@ private:
       case swift::Demangle::Node::Kind::Enum:
       case swift::Demangle::Node::Kind::Module:
       case swift::Demangle::Node::Kind::Protocol:
+      case swift::Demangle::Node::Kind::Identifier: // should only happen for greedy context demanglings
         dest->push_back_child(Node::makeNodePointer(srcKind,src->getText()));
         break;
       case swift::Demangle::Node::Kind::Path:
@@ -916,19 +938,23 @@ private:
         }
         break;
       default:
-        break;
+        return false;
     }
+    return true;
   }
   
-  NodePointer demangleContext(Node::Kind *inferred_context_type = nullptr) {
+  NodePointer demangleContext(Node::Kind *inferred_context_type = nullptr,
+                              bool allow_greedy = false) {
     if (!Mangled)
       return nullptr;
-    NodePointer demangled_ctx(demangleContextImpl(inferred_context_type));
+    NodePointer demangled_ctx(demangleContextImpl(inferred_context_type,allow_greedy));
     if (!demangled_ctx)
       return nullptr;
     NodePointer ret(Node::makeNodePointer(Node::Kind::Path));
-    straightenNestedDeclContext(demangled_ctx, ret);
-    return ret;
+    if (straightenNestedDeclContext(demangled_ctx, ret))
+      return ret;
+    else
+      return demangled_ctx;
   }
 
   std::pair<NodePointer,NodePointer> demangleDecl() {
@@ -1174,7 +1200,7 @@ private:
       printer << index;
       NodePointer index_node = Node::makeNodePointer(Node::Kind::Number,printer.str());
       NodePointer decl_ctx = Node::makeNodePointer(Node::Kind::DeclContext);
-      NodePointer ctx = demangleContext();
+      NodePointer ctx = demangleContext(nullptr,true);
       if (!ctx)
         return nullptr;
       decl_ctx->push_back_child(ctx);
@@ -1474,6 +1500,9 @@ private:
 
   class MangledNameSource {
   public:
+    
+    typedef void* Snapshot;
+    
     MangledNameSource(StringRef mangled);
 
     char peek();
@@ -1498,6 +1527,10 @@ private:
 
     void advanceOffset(size_t by);
 
+    Snapshot getSnapshot();
+    
+    void resetToSnapshot(Snapshot snap);
+    
   private:
     StringRef Mangled;
     size_t Offset;
@@ -1556,6 +1589,14 @@ bool Demangler::MangledNameSource::hasAtLeast(size_t n) {
 void Demangler::MangledNameSource::advanceOffset(size_t by) {
   Offset += by;
   Mangled = Mangled.substr(by);
+}
+
+Demangler::MangledNameSource::Snapshot Demangler::MangledNameSource::getSnapshot() {
+  return (void*)Offset;
+}
+
+void Demangler::MangledNameSource::resetToSnapshot(Snapshot snap) {
+  Offset = reinterpret_cast<size_t>(snap);
 }
 
 NodePointer swift::Demangle::demangleSymbolAsNode(llvm::StringRef mangled, const DemangleOptions& options) {
