@@ -242,7 +242,7 @@ namespace {
     SILValue value;
   public:
     RefComponent(ManagedValue value) :
-      PhysicalPathComponent(value.getValue().getType()), value(value.getValue()) {
+      PhysicalPathComponent(value.getType()), value(value.getValue()) {
       assert(value.getType().hasReferenceSemantics() &&
              "ref component must be of reference type");
     }
@@ -250,6 +250,23 @@ namespace {
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
       assert(!base && "ref component must be root of lvalue path");
+      return value;
+    }
+  };
+  
+  class MetatypeComponent : public PhysicalPathComponent {
+    SILValue value;
+  public:
+    MetatypeComponent(SILValue metatype) :
+      PhysicalPathComponent(metatype.getType()), value(metatype) {
+      
+      assert(metatype.getType().is<MetaTypeType>()
+             && "metatype component must be of metatype type");
+    }
+    
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                    SILValue base) const override {
+      assert(!base && "metatype component must be root of lvalue path");
       return value;
     }
   };
@@ -274,10 +291,12 @@ namespace {
                         SILLocation loc,
                         SILValue base) const
     {
-      assert((!base || (base.getType().isAddress() ^
-                        base.getType().hasReferenceSemantics())) &&
-             "base of getter/setter component must be invalid, lvalue, or "
-             "of reference type");
+      assert((!base
+              || base.getType().isAddress()
+              || base.getType().is<MetaTypeType>()
+              || base.getType().hasReferenceSemantics())
+             && "base of getter/setter component must be invalid, lvalue, or "
+                "of reference type");
       
       AccessorArgs result;      
       if (base) {
@@ -379,11 +398,17 @@ namespace {
 }
 
 LValue SILGenLValue::visitRec(Expr *e) {
+  // Reference type or metatype expressions can form the root of a logical
+  // lvalue.
   if (e->getType()->hasReferenceSemantics()) {
-    // Any reference type expression can form the root of a logical lvalue.
     LValue lv;
     lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
-    return ::std::move(lv);
+    return lv;
+  } else if (e->getType()->is<MetaTypeType>()) {
+    LValue lv;
+    lv.add<MetatypeComponent>(
+                            gen.emitRValue(e).getUnmanagedSingleValue(gen, e));
+    return lv;
   } else {
     return visit(e);
   }
@@ -469,6 +494,24 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       // Find the substituted storage type.
       SILType varStorageType =
         gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+      
+      // For static variables, emit a reference to the global variable backing
+      // them.
+      // FIXME: This has to be dynamically looked up for classes, and
+      // dynamically instantiated for generics.
+      if (var->isStatic()) {
+        auto baseMeta = e->getBase()->getType()->castTo<MetaTypeType>()
+          ->getInstanceType();
+        assert(!baseMeta->is<BoundGenericType>()
+               && "generic static stored properties not implemented");
+        assert((baseMeta->getStructOrBoundGenericStruct()
+                || baseMeta->getEnumOrBoundGenericEnum())
+           && "static stored properties for classes/protocols not implemented");
+        
+        return emitLValueForDecl(*this, e, e->getMember().getDecl(),
+                                 e->getType());
+      }
+      
       if (!isa<LValueType>(baseTy)) {
         assert(baseTy.hasReferenceSemantics());
         lv.add<RefElementComponent>(var, varStorageType, substTypeOfRValue);
@@ -1044,6 +1087,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
                                    SILValue base) {
   assert(!base ||
          base.getType().isAddress() ||
+         base.getType().is<MetaTypeType>() ||
          base.getType().hasReferenceSemantics());
 
   SILValue addr;
@@ -1056,6 +1100,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
   }
 
   assert(addr.getType().isAddress() ||
+         addr.getType().is<MetaTypeType>() ||
          addr.getType().hasReferenceSemantics());
   return addr;
 }

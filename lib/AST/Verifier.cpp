@@ -607,8 +607,9 @@ namespace {
 
     void verifyChecked(MemberRefExpr *E) {
       if (!E->getBase()->getType()->is<LValueType>() &&
+          !E->getBase()->getType()->is<MetaTypeType>() &&
           !E->getBase()->getType()->hasReferenceSemantics()) {
-        Out << "Member reference base type is not an lvalue:\n";
+        Out << "Member reference base type is not an lvalue, class, or metatype:\n";
         E->dump(Out);
         abort();
       }
