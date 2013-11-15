@@ -441,7 +441,6 @@ namespace {
     unsigned NumMemorySubElements;
 
     ElementUses &Uses;
-    std::vector<SILInstruction*> &Releases;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
@@ -457,9 +456,18 @@ namespace {
     bool HadError = false;
   public:
     ElementPromotion(SILInstruction *TheMemory, unsigned ElementNumber,
-                     ElementUses &Uses, std::vector<SILInstruction*> &Releases);
+                     ElementUses &Uses);
 
-    void doIt();
+    bool doIt();
+
+    void processReleases(SmallVectorImpl<SILInstruction*> &Releases) {
+      // If all uses are ok, check releases to make sure we only destroy values in
+      // places where they are actually constructed.
+      for (auto I : Releases) {
+        processRelease(I);
+        if (HadError) return;
+      }
+    }
 
   private:
     SILType getTheMemoryType() const {
@@ -480,6 +488,7 @@ namespace {
 
     void handleStoreUse(std::pair<SILInstruction*, UseKind> &InstInfo,
                         DIKind Kind);
+
     void processRelease(SILInstruction *Inst);
 
     bool promoteLoad(SILInstruction *Inst);
@@ -511,10 +520,9 @@ namespace {
 
 
 ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
-                                   unsigned ElementNumber, ElementUses &Uses,
-                                   std::vector<SILInstruction*> &Releases)
+                                   unsigned ElementNumber, ElementUses &Uses)
   : M(TheMemory->getModule()), TheMemory(TheMemory),
-    ElementNumber(ElementNumber), Uses(Uses), Releases(Releases) {
+    ElementNumber(ElementNumber), Uses(Uses) {
 
   NumMemorySubElements = getNumSubElements(getTheMemoryType(), M);
 
@@ -608,8 +616,8 @@ static bool isStoreObviouslyAnInitialization(SILInstruction *Inst) {
   return false;
 }
 
-
-void ElementPromotion::doIt() {
+/// doIt - returns true on error.
+bool ElementPromotion::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
   // for definitive initialization, promoting loads, rewriting assigns, and
   // performing other tasks.
@@ -668,14 +676,7 @@ void ElementPromotion::doIt() {
       break;
     }
 
-    if (HadError) return;
-  }
-
-  // If all uses are ok, check releases to make sure we only destroy values in
-  // places where they are actually constructed.
-  for (auto I : Releases) {
-    processRelease(I);
-    if (HadError) return;
+    if (HadError) return true;
   }
 
   // If we've successfully checked all of the definitive initialization
@@ -687,6 +688,8 @@ void ElementPromotion::doIt() {
       if (promoteLoad(Use.first))
         Uses[i].first = nullptr;  // remove entry if load got deleted.
   }
+
+  return false;
 }
 
 void ElementPromotion::
@@ -747,6 +750,14 @@ handleStoreUse(std::pair<SILInstruction*, UseKind> &InstInfo, DIKind DI) {
   }
 }
 
+/// processRelease - We handle two kinds of release instructions here:
+/// destroy_addr for alloc_stack's and strong_release/dealloc_box for
+/// alloc_box's.  By the  time that DI gets here, we've validated that all uses
+/// of the memory location are valid.  Unfortunately, the uses being valid
+/// doesn't mean that the memory is actually initialized on all paths leading to
+/// a release.  As such, we have to push the releases up the CFG to where the
+/// value is initialized.
+///
 void ElementPromotion::processRelease(SILInstruction *Inst) {
   DIKind DI = checkDefinitelyInit(Inst);
 
@@ -1331,7 +1342,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
 namespace {
   class ElementUseCollector {
     SmallVectorImpl<ElementUses> &Uses;
-    SmallVectorImpl<std::vector<SILInstruction*>> &Releases;
+    SmallVectorImpl<SILInstruction*> &Releases;
 
     /// When walking the use list, if we index into a struct element, keep track
     /// of this, so that any indexes into tuple subelements don't affect the
@@ -1343,7 +1354,7 @@ namespace {
     bool InEnumSubElement = false;
   public:
     ElementUseCollector(SmallVectorImpl<ElementUses> &Uses,
-                        SmallVectorImpl<std::vector<SILInstruction*>> &Releases)
+                        SmallVectorImpl<SILInstruction*> &Releases)
       : Uses(Uses), Releases(Releases) {
     }
 
@@ -1361,9 +1372,9 @@ namespace {
         auto *User = UI->getUser();
 
         // If this is a release or dealloc_stack, then remember it as such.
-        if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User)) {
-          for (auto &ReleaseArray : Releases)
-            ReleaseArray.push_back(User);
+        if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
+            isa<DeallocBoxInst>(User)) {
+          Releases.push_back(User);
         }
       }
     }
@@ -1596,8 +1607,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      for (auto &ReleaseArray : Releases)
-        ReleaseArray.push_back(User);
+      Releases.push_back(User);
       continue;
     }
 
@@ -1764,18 +1774,23 @@ static void processAllocation(SILInstruction *I) {
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples.
   SmallVector<ElementUses, 1> Uses;
-  SmallVector<std::vector<SILInstruction*>, 1> Releases;
-
   SILType EltTy = I->getType(1).getObjectType();
   Uses.resize(getTupleElementCount(EltTy.getSwiftRValueType()));
-  Releases.resize(Uses.size());
+
+  SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
   ElementUseCollector(Uses, Releases).collectFromAllocation(I);
 
+  bool HadError = false;
+
   // Process each scalar value in the uses array individually.
-  for (unsigned i = 0, e = Uses.size(); i != e; ++i)
-    ElementPromotion(I, i, Uses[i], Releases[i]).doIt();
+  for (unsigned i = 0, e = Uses.size(); i != e; ++i) {
+    ElementPromotion EP(I, i, Uses[i]);
+    HadError |= EP.doIt();
+
+    if (!HadError) EP.processReleases(Releases);
+  }
 
   removeDeadAllocation(I, Uses);
 }
@@ -1787,18 +1802,19 @@ static void processMarkUninitialized(MarkUninitializedInst *MUI) {
   // mark_uninitialized.  The uses are bucketed up into the elements of the
   // allocation that are being used.  This matters for element-wise tuples.
   SmallVector<ElementUses, 1> Uses;
-  SmallVector<std::vector<SILInstruction*>, 1> Releases;
-
   SILType EltTy = MUI->getType().getObjectType();
   Uses.resize(getTupleElementCount(EltTy.getSwiftRValueType()));
-  Releases.resize(Uses.size());
+
+  SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
   ElementUseCollector(Uses, Releases).collectFromMarkUninitialized(MUI);
-  
+
+  assert(Releases.empty() && "Shouldn't have releases of MUIs");
+
   // Process each scalar value in the uses array individually.
   for (unsigned i = 0, e = Uses.size(); i != e; ++i)
-    ElementPromotion(MUI, i, Uses[i], Releases[i]).doIt();
+    ElementPromotion(MUI, i, Uses[i]).doIt();
 }
 
 
