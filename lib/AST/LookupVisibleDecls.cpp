@@ -86,6 +86,9 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     // Can not call static functions on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()) && FD->isStatic())
       return false;
+
+    // Otherwise, either call a function or curry it.
+    return true;
   }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
     // Can not use static properties on non-metatypes.
