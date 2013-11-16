@@ -1056,11 +1056,10 @@ Type TypeConverter::getMethodSelfType(Type selfType) const {
   }
 }
 
-/// Get the type of a global variable accessor function, () -> [inout] T.
+/// Get the type of a global variable accessor function, () -> RawPointer.
 static Type getGlobalAccessorType(Type varType, ASTContext &C) {
   return FunctionType::get(TupleType::getEmpty(C),
-                           LValueType::get(varType,
-                                           LValueType::Qual::DefaultForType, C),
+                           C.TheRawPointerType,
                            C);
 }
 

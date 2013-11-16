@@ -2431,6 +2431,53 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   emitEpilog(Loc);
 }
 
+void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding) {
+  {
+    Scope scope(Cleanups, binding);
+
+    // Emit the initialization sequence.
+    visit(binding);
+  }
+  
+  // Return void.
+  auto ret = emitEmptyTuple(binding);
+  B.createReturn(binding, ret);
+}
+
+void SILGenFunction::emitGlobalAccessor(VarDecl *global,
+                                        FuncDecl *builtinOnceDecl,
+                                        SILGlobalVariable *onceToken,
+                                        SILFunction *onceFunc) {
+  // Invoke the initializer, once.
+  auto builtinOnceTy = getThinFunctionType(builtinOnceDecl->getType());
+  auto builtinOnceSILTy = getLoweredLoadableType(builtinOnceTy);
+  auto builtinOnce = B.createBuiltinFunctionRef(global, builtinOnceDecl,
+                                                builtinOnceSILTy);
+  auto rawPointerSILTy = getLoweredLoadableType(getASTContext().TheRawPointerType);
+  SILValue onceTokenAddr = B.createSILGlobalAddr(global, onceToken);
+  onceTokenAddr = B.createAddressToPointer(global, onceTokenAddr,
+                                           rawPointerSILTy);
+  
+  SILValue onceFuncRef = B.createFunctionRef(global, onceFunc);
+  auto onceFuncThickTy
+    = getThickFunctionType(onceFuncRef.getType().getSwiftRValueType());
+  auto onceFuncThickSILTy = getLoweredLoadableType(onceFuncThickTy);
+  onceFuncRef = B.createThinToThickFunction(global, onceFuncRef,
+                                            onceFuncThickSILTy);
+  
+  SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
+  B.createApply(global, builtinOnce, builtinOnce->getType(),
+          SILType::getPrimitiveObjectType(TupleType::getEmpty(getASTContext())),
+          {}, onceArgs);
+  
+  // Return the address.
+  // FIXME: It'd be nice to be able to return a SIL address directly.
+  SILValue addr = B.createGlobalAddr(global, global,
+                           getLoweredType(global->getType()).getAddressType());
+  addr = B.createAddressToPointer(global, addr, rawPointerSILTy);
+  B.createReturn(global, addr);
+}
+
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {

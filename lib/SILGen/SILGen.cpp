@@ -452,6 +452,39 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
     .emitGeneratorFunction(constant, arg);
   postEmitFunction(constant, f);
 }
+
+SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
+                                                 PatternBindingDecl *binding) {
+  ASTContext &C = M.getASTContext();
+  Type initType = FunctionType::get(TupleType::getEmpty(C),
+                                    TupleType::getEmpty(C),
+                                    FunctionType::ExtInfo()
+                                      .withIsThin(true),
+                                    C);
+  SILType initSILType = getLoweredType(initType);
+  
+  auto *f = new (M) SILFunction(M, SILLinkage::Internal, funcName,
+                                initSILType, binding, IsNotTransparent);
+  // TODO: Debug scope? Decl context?
+  
+  SILGenFunction(*this, *f)
+    .emitLazyGlobalInitializer(binding);
+  
+  f->verify();
+  
+  return f;
+}
+
+void SILGenModule::emitGlobalAccessor(VarDecl *global,
+                                      FuncDecl *builtinOnceDecl,
+                                      SILGlobalVariable *onceToken,
+                                      SILFunction *onceFunc) {
+  SILDeclRef accessor(global, SILDeclRef::Kind::GlobalAccessor);
+  SILFunction *f = preEmitFunction(accessor, global, global);
+  SILGenFunction(*this, *f)
+    .emitGlobalAccessor(global, builtinOnceDecl, onceToken, onceFunc);
+  postEmitFunction(accessor, f);
+}
   
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ArrayRef<Pattern*> patterns) {
@@ -558,15 +591,7 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   // Emit initializers for variables in top-level code.
-  // FIXME: Global initialization order?!
-  if (TopLevelSGF) {
-    if (!TopLevelSGF->B.hasValidInsertionPoint())
-      return;
-    
-    TopLevelSGF->visit(pd);
-  }
-  
-  // FIXME: generate accessor functions for global variables
+  emitGlobalInitialization(pd);
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {

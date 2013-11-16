@@ -66,7 +66,7 @@ public:
   
   SILFunction *emitTopLevelFunction(SILLocation Loc);
   
-  size_t anonymousFunctionCounter = 0;
+  size_t anonymousSymbolCounter = 0;
   
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
@@ -181,6 +181,20 @@ public:
   /// declaration.
   void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
 
+  /// Emit the lazy initializer function for a global pattern binding
+  /// declaration.
+  SILFunction *emitLazyGlobalInitializer(StringRef funcName,
+                                         PatternBindingDecl *binding);
+  
+  /// Emit the accessor for a global variable or stored static property.
+  ///
+  /// This ensures the lazy initializer has been run before returning the
+  /// address of the variable.
+  void emitGlobalAccessor(VarDecl *global,
+                          FuncDecl *builtinOnceDecl,
+                          SILGlobalVariable *onceToken,
+                          SILFunction *onceFunc);
+  
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);
@@ -204,6 +218,9 @@ public:
   /// dispatch.
   bool requiresObjCSuperDispatch(ValueDecl *vd);
 
+  /// Emit a global initialization.
+  void emitGlobalInitialization(PatternBindingDecl *initializer);
+  
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
@@ -532,6 +549,16 @@ public:
   /// Generate an ObjC-compatible setter for a subscript.
   void emitObjCSubscriptSetter(SILDeclRef setter);
 
+  /// Generate a lazy global initializer.
+  void emitLazyGlobalInitializer(PatternBindingDecl *binding);
+  
+  /// Generate a global accessor, using the given initializer token and
+  /// function
+  void emitGlobalAccessor(VarDecl *global,
+                          FuncDecl *builtinOnceDecl,
+                          SILGlobalVariable *onceToken,
+                          SILFunction *onceFunc);
+  
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//

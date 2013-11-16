@@ -18,6 +18,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Basic/Fallthrough.h"
 #include <iterator>
 using namespace swift;
@@ -446,7 +447,7 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
 
 namespace {
 
-/// ArgumentInitVisitor - A visitor for traversing a pattern, creating
+/// A visitor for traversing a pattern, creating
 /// SILArguments, and initializing the local value for each pattern variable
 /// in a function argument list.
 struct ArgumentInitVisitor :
@@ -1011,22 +1012,8 @@ public:
   
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    // FIXME: This has to happen lazily for generic properties.
-    // (We want it to happen lazily for all globals, really.)
-    
-    // FIXME: Global initialization order?!
     if (pd->isStatic()) {
-      assert(!theType->getGenericParams()
-             && "generic static properties not implemented");
-      assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
-             && "only value type static properties are implemented");
-
-      if (SGM.TopLevelSGF) {
-        if (!SGM.TopLevelSGF->B.hasValidInsertionPoint())
-          return;
-        
-        SGM.TopLevelSGF->visit(pd);
-      }
+      SGM.emitGlobalInitialization(pd);
     }
   }
   
@@ -1519,4 +1506,126 @@ void SILGenFunction::emitObjCSubscriptSetter(SILDeclRef setter) {
                                   setter.isTransparent());
   // Result should be void.
   B.createReturn(loc, result);
+}
+
+//===----------------------------------------------------------------------===//
+// Global initialization
+//===----------------------------------------------------------------------===//
+
+namespace {
+  
+/// A visitor for traversing a pattern, creating
+/// global accessor functions for all of the global variables declared inside.
+struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
+{
+  /// The module generator.
+  SILGenModule &SGM;
+  /// The Builtin.once token guarding the global initialization.
+  SILGlobalVariable *OnceToken;
+  /// The function containing the initialization code.
+  SILFunction *OnceFunc;
+  
+  /// A reference to the Builtin.once declaration.
+  FuncDecl *BuiltinOnceDecl;
+  
+  GenGlobalAccessors(SILGenModule &SGM,
+                     SILGlobalVariable *OnceToken,
+                     SILFunction *OnceFunc)
+    : SGM(SGM), OnceToken(OnceToken), OnceFunc(OnceFunc)
+  {
+    // Find Builtin.once.
+    auto &C = SGM.M.getASTContext();
+    SmallVector<ValueDecl*, 2> found;
+    C.TheBuiltinModule
+      ->lookupValue({}, C.getIdentifier("once"),
+                    NLKind::QualifiedLookup, found);
+    
+    assert(found.size() == 1 && "didn't find Builtin.once?!");
+    
+    BuiltinOnceDecl = cast<FuncDecl>(found[0]);
+  }
+  
+  // Walk through non-binding patterns.
+  void visitParenPattern(ParenPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  void visitTypedPattern(TypedPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  void visitTuplePattern(TuplePattern *P) {
+    for (auto &elt : P->getFields())
+      visit(elt.getPattern());
+  }
+  void visitAnyPattern(AnyPattern *P) {}
+  
+  // When we see a variable binding, emit its global accessor.
+  void visitNamedPattern(NamedPattern *P) {
+    SGM.emitGlobalAccessor(P->getDecl(), BuiltinOnceDecl, OnceToken, OnceFunc);
+  }
+  
+#define INVALID_PATTERN(Id, Parent) \
+  void visit##Id##Pattern(Id##Pattern *) { \
+    llvm_unreachable("pattern not valid in argument or var binding"); \
+  }
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+#undef INVALID_PATTERN
+};
+  
+} // end anonymous namespace
+
+/// Emit a global initialization.
+void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
+  // Generic and dynamic static properties require lazy initialization, which
+  // isn't implemented yet.
+  if (pd->isStatic()) {
+    auto theType = pd->getDeclContext()->getDeclaredTypeInContext();
+    assert(!theType->is<BoundGenericType>()
+           && "generic static properties not implemented");
+    assert((theType->getStructOrBoundGenericStruct()
+            || theType->getEnumOrBoundGenericEnum())
+           && "only value type static properties are implemented");
+  }
+  
+  // FIXME: Emit static initialization code into the global constructor.
+  // This should be removed when global references go through lazy accessors.
+  if (TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint())
+    TopLevelSGF->visit(pd);
+  
+  if (!M.getASTContext().LangOpts.EmitLazyGlobalInitializers)
+    return;
+  
+  // Emit the lazy initialization token for the initialization expression.
+  auto counter = anonymousSymbolCounter++;
+  
+  llvm::SmallString<20> onceTokenName;
+  {
+    llvm::raw_svector_ostream os(onceTokenName);
+    os << "globalinit_token" << counter;
+    os.flush();
+  }
+  
+  auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
+  auto onceSILTy = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
+  
+  auto onceToken = new (M) SILGlobalVariable(M, SILLinkage::Internal,
+                                             onceTokenName,
+                                             onceSILTy, /*isDefinition*/ true);
+  
+  // Emit the initialization code into a function.
+  llvm::SmallString<20> onceFuncName;
+  {
+    llvm::raw_svector_ostream os(onceFuncName);
+    os << "globalinit_func" << counter;
+    os.flush();
+  }
+  
+  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncName, pd);
+  
+  // Generate accessor functions for all of the declared variables, which
+  // Builtin.once the lazy global initializer we just generated then return
+  // the address of the individual variable.
+  GenGlobalAccessors(*this, onceToken, onceFunc)
+    .visit(pd->getPattern());
 }

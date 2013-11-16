@@ -60,7 +60,7 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
   case SILDeclRef::Kind::Func:
     if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
       // FIXME: Generate a more descriptive name for closures.
-      buffer << "closure" << anonymousFunctionCounter++;
+      buffer << "closure" << anonymousSymbolCounter++;
       return;
     }
     // As a special case, functions can have external asm names.
