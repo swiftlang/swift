@@ -217,6 +217,20 @@ static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
   return nullptr;
 }
 
+static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
+  bool SrcTySigned =
+  (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
+   Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
+   Builtin.ID == BuiltinValueKind::SUCheckedConversion);
+
+  bool DstTySigned =
+  (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
+   Builtin.ID == BuiltinValueKind::UToSCheckedTrunc ||
+   Builtin.ID == BuiltinValueKind::USCheckedConversion);
+
+  return std::pair<bool, bool>(SrcTySigned, DstTySigned);
+}
+
 static SILInstruction *
 constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                                        const BuiltinInfo &Builtin,
@@ -249,6 +263,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
   // Process conversions signed <-> unsigned for same size integers.
   if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
       Builtin.ID == BuiltinValueKind::USCheckedConversion) {
+    DstTy = SrcTy;
     Result = SrcVal;
     // Report an error if the sign bit is set.
     OverflowError = SrcVal.isNegative();
@@ -326,20 +341,41 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
     }
 
     // Report the overflow error.
-    if (Literal)
-      diagnose(M.getASTContext(), Loc.getSourceLoc(),
-               diag::integer_literal_overflow,
-               UserDstTy.isNull() ? DstTy : UserDstTy);
-    else
+    if (Literal) {
+      // Try to print user-visible types if they are available.
+      if (!UserDstTy.isNull()) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow, UserDstTy);
+      // Otherwise, print the Builtin Types.
+      } else {
+        bool SrcTySigned, DstTySigned;
+        llvm::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow_builtin_types,
+                 DstTySigned, DstTy);
+      }
+    } else
       if (Builtin.ID == BuiltinValueKind::SUCheckedConversion) {
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_conversion_sign_error,
                  UserDstTy.isNull() ? DstTy : UserDstTy);
       } else {
-        diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_conversion_overflow,
-                 UserSrcTy.isNull() ? SrcTy : UserSrcTy,
-                 UserDstTy.isNull() ? DstTy : UserDstTy);
+        // Try to print user-visible types if they are available.
+        if (!UserSrcTy.isNull()) {
+          diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                   diag::integer_conversion_overflow,
+                   UserSrcTy, UserDstTy);
+
+        // Otherwise, print the Builtin Types.
+        } else {
+          // Since builtin types are sign-agnostic, print the signdness
+          // separately.
+          bool SrcTySigned, DstTySigned;
+          llvm::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+          diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                   diag::integer_conversion_overflow_builtin_types,
+                   SrcTySigned, SrcTy, DstTySigned, DstTy);
+        }
       }
     ResultsInError = true;
     return nullptr;

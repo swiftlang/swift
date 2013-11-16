@@ -1579,6 +1579,10 @@ NOTE(note_while_inlining,sil_analysis,none,
 ERROR(integer_conversion_overflow,sil_analysis,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
+ERROR(integer_conversion_overflow_builtin_types,sil_analysis,none,
+      "integer overflows when converted from %select{unsigned|signed}0 "
+      "%1 to %select{unsigned|signed}2 %3",
+      (bool, Type, bool, Type))
 WARNING(integer_conversion_overflow_warn,sil_analysis,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
@@ -1588,6 +1592,9 @@ ERROR(integer_conversion_sign_error,sil_analysis,none,
 ERROR(integer_literal_overflow,sil_analysis,none,
       "integer literal overflows when stored into %0",
       (Type))
+ERROR(integer_literal_overflow_builtin_types,sil_analysis,none,
+      "integer literal overflows when stored into %select{unsigned|signed}0 %1",
+      (bool, Type))
 WARNING(integer_literal_overflow_warn,sil_analysis,none,
       "integer literal overflows when stored into %0",
       (Type))
