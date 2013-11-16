@@ -1091,11 +1091,8 @@ void SILFunction::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
 }
 
-/// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "// " << demangleSymbolAsString(getName()) << '\n';
-  OS << "sil ";
-  switch (getLinkage()) {
+static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage) {
+  switch (linkage) {
   case SILLinkage::Internal:
     OS << "internal ";
     break;
@@ -1108,6 +1105,13 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "deserialized ";
     break;
   }
+}
+
+/// Pretty-print the SILFunction to the designated stream.
+void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
+  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  OS << "sil ";
+  printLinkage(OS, getLinkage());
 
   if (isTransparent())
     OS << "[transparent] ";
@@ -1128,6 +1132,36 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
   OS << "@" << Name;  
+}
+
+/// Pretty-print a global variable to the designated stream.
+void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  
+  // FIXME: Parsing support for sil_global.
+  OS << "/* ";
+
+  OS << "sil_global ";
+  printLinkage(OS, getLinkage());
+
+  printName(OS);
+  OS << " : " << LoweredType;
+  
+  if (isExternalDeclaration())
+    OS << "external";
+  
+  // FIXME: Parsing support for sil_global.
+  OS << " */";
+  
+  OS << "\n\n";
+}
+
+void SILGlobalVariable::dump(bool Verbose) const {
+  print(llvm::errs(), Verbose);
+}
+
+void SILGlobalVariable::printName(raw_ostream &OS) const {
+  OS << "@" << Name;
 }
       
 /// Pretty-print the SILModule to errs.
@@ -1178,6 +1212,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     }
   }
 
+  for (const SILGlobalVariable &g : getSILGlobals())
+    g.print(OS, Verbose);
+    
   for (const SILFunction &f : *this)
     f.print(OS, Verbose);
 

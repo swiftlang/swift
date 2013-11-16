@@ -24,6 +24,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/TypeLowering.h"
@@ -39,8 +40,6 @@ namespace swift {
   class ASTContext;
   class FuncDecl;
   class SILExternalSource;
-  class SILFunction;
-  class SILVTable;
   class SILTypeList;
   class SILUndef;
   class SourceFile;
@@ -73,11 +72,13 @@ enum class SILStage {
 class SILModule {
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
+  using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
   
 private:
   friend class SILBasicBlock;
   friend class SILFunction;
+  friend class SILGlobalVariable;
   friend class SILType;
   friend class SILVTable;
   friend class SILUndef;
@@ -97,7 +98,12 @@ private:
   /// The list of SILVTables in the module.
   VTableListType vtables;
   
+  /// The list of SILGlobalVariables in the module.
+  /// FIXME: Merge with 'globals'.
+  GlobalListType silGlobals;
+  
   /// The collection of global variables used in the module.
+  /// FIXME: Remove this when SILGlobalVariable is ready.
   llvm::SetVector<VarDecl*> globals;
 
   /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
@@ -160,6 +166,8 @@ public:
   /// Get the AST context used for type uniquing etc. by this SIL module.
   ASTContext &getASTContext() const { return TheSwiftModule->Ctx; }
   
+  // FIXME: Remove these when SILGlobalVariable is ready to take over.
+  
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;
   
@@ -176,27 +184,48 @@ public:
   
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
-
   FunctionListType &getFunctionList() { return functions; }
   iterator begin() { return functions.begin(); }
   iterator end() { return functions.end(); }
   const_iterator begin() const { return functions.begin(); }
   const_iterator end() const { return functions.end(); }
-
+  Range<iterator> getFunctions() {
+    return {functions.begin(), functions.end()};
+  }
+  Range<const_iterator> getFunctions() const {
+    return {functions.begin(), functions.end()};
+  }
+  
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
-  
+  VTableListType &getVTableList() { return vtables; }
   vtable_iterator vtable_begin() { return vtables.begin(); }
   vtable_iterator vtable_end() { return vtables.end(); }
-
   vtable_const_iterator vtable_begin() const { return vtables.begin(); }
   vtable_const_iterator vtable_end() const { return vtables.end(); }
-  
   Range<vtable_iterator> getVTables() {
     return {vtables.begin(), vtables.end()};
   }
   Range<vtable_const_iterator> getVTables() const {
     return {vtables.begin(), vtables.end()};
+  }
+  
+  using sil_global_iterator = GlobalListType::iterator;
+  using sil_global_const_iterator = GlobalListType::const_iterator;
+  GlobalListType &getSILGlobalList() { return silGlobals; }
+  sil_global_iterator sil_global_begin() { return silGlobals.begin(); }
+  sil_global_iterator sil_global_end() { return silGlobals.end(); }
+  sil_global_const_iterator sil_global_begin() const {
+    return silGlobals.begin();
+  }
+  sil_global_const_iterator sil_global_end() const {
+    return silGlobals.end();
+  }
+  Range<sil_global_iterator> getSILGlobals() {
+    return {silGlobals.begin(), silGlobals.end()};
+  }
+  Range<sil_global_const_iterator> getSILGlobals() const {
+    return {silGlobals.begin(), silGlobals.end()};
   }
 
   SILFunction *lookup(StringRef Name) {

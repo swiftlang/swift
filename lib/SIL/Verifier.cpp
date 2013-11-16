@@ -1707,17 +1707,36 @@ void SILVTable::verify(const SILModule &M) const {
 #endif
 }
 
+/// Verify that a global variable follows invariants.
+void SILGlobalVariable::verify() const {
+#ifndef DEBUG
+  assert(getLoweredType().isObject()
+         && "global variable cannot have address type");
+#endif
+}
+
 /// Verify the module.
 void SILModule::verify() const {
 #ifndef NDEBUG
+  // Uniquing set to catch symbol name collisions.
+  llvm::StringSet<> symbolNames;
+
   // Check all functions.
-  llvm::StringSet<> functionNames;
   for (const SILFunction &f : *this) {
-    if (!functionNames.insert(f.getName())) {
-      llvm::errs() << "Function redefined: " << f.getName() << "!\n";
+    if (!symbolNames.insert(f.getName())) {
+      llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     f.verify();
+  }
+  
+  // Check all globals.
+  for (const SILGlobalVariable &g : getSILGlobals()) {
+    if (!symbolNames.insert(g.getName())) {
+      llvm::errs() << "Symbol redefined: " << g.getName() << "!\n";
+      assert(false && "triggering standard assertion failure routine");
+    }
+    g.verify();
   }
   
   // Check all vtables.
