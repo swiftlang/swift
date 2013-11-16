@@ -666,6 +666,20 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getOnceOperation(ASTContext &Context,
+                                   Identifier Id) {
+  // (RawPointer, () -> ()) -> ()
+  
+  auto HandleTy = Context.TheRawPointerType;
+  auto VoidTy = Context.TheEmptyTupleType;
+  auto BlockTy = FunctionType::get(VoidTy, VoidTy, Context);
+  
+  TupleTypeElt InFields[] = {HandleTy, BlockTy};
+  auto OutTy = VoidTy;
+  
+  return getBuiltinFunction(Context, Id, InFields, OutTy);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -1066,6 +1080,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
 
+  case BuiltinValueKind::Once:
+    return getOnceOperation(Context, Id);
+      
   case BuiltinValueKind::ExtractElement:
     if (Types.size() != 2) return nullptr;
     return getExtractElementOperation(Context, Id, Types[0], Types[1]);

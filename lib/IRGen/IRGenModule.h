@@ -120,6 +120,7 @@ public:
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
     llvm::IntegerType *IntPtrTy;
     llvm::IntegerType *MetadataKindTy;
+    llvm::IntegerType *OnceTy;
   };
   union {
     llvm::PointerType *Int8PtrTy;      /// i8*

@@ -468,6 +468,14 @@ FUNCTION(ConditionalFailure, swift_conditionalFailure, RuntimeCC,
          ARGS(Int1Ty),
          ATTRS())
 
+// void swift_once(swift_once_t *predicate,
+//                 void (*function_code)(RefCounted*),
+//                 RefCounted *context);
+FUNCTION(Once, swift_once, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy, RefCountedPtrTy),
+         ATTRS())
+
 FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,

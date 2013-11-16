@@ -1242,6 +1242,21 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out->add(V);
   }
 
+  if (Builtin.ID == BuiltinValueKind::Once) {
+    // The input type is statically (Builtin.RawPointer, () -> ()).
+    llvm::Value *Pred = args.claimNext();
+    // Cast the predicate to a OnceTy pointer.
+    Pred = IGF.Builder.CreateBitCast(Pred, IGF.IGM.OnceTy->getPointerTo());
+    llvm::Value *FnCode = args.claimNext();
+    llvm::Value *FnContext = args.claimNext();
+    
+    auto call
+      = IGF.Builder.CreateCall3(IGF.IGM.getOnceFn(), Pred, FnCode, FnContext);
+    call->setCallingConv(IGF.IGM.RuntimeCC);
+    // No return value.
+    return;
+  }
+  
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
