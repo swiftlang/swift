@@ -308,16 +308,37 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
   return ManagedValue(c, ManagedValue::Unmanaged);
 }
 
-static ManagedValue emitGlobalVariable(SILGenFunction &gen,
-                                       SILLocation loc, VarDecl *var) {
+/// True if the global stored property requires lazy initialization.
+static bool isGlobalLazilyInitialized(VarDecl *var) {
   assert(!var->getDeclContext()->isLocalContext() &&
          "not a global variable!");
   assert(!var->isComputed() &&
          "not a stored global variable!");
+
+  return !isa<SourceFile>(var->getDeclContext())
+    || cast<SourceFile>(var->getDeclContext())->Kind != SourceFile::Main;
+}
+
+static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
+                                          SILLocation loc, VarDecl *var) {
+  if (isGlobalLazilyInitialized(var)
+      && gen.getASTContext().LangOpts.EmitLazyGlobalInitializers) {
+    // Call the global accessor to get the variable's address.
+    SILFunction *accessorFn = gen.SGM.getFunction(
+                            SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor));
+    SILValue accessor = gen.B.createFunctionRef(loc, accessorFn);
+    SILValue addr = gen.B.createApply(loc, accessor, accessor.getType(),
+                              accessor.getType().getFunctionTypeInfo(gen.SGM.M)
+                                      ->getResult().getSILType(),
+                              {}, {});
+    // FIXME: It'd be nice if the result of the accessor was natively an address.
+    addr = gen.B.createPointerToAddress(loc, addr,
+                          gen.getLoweredType(var->getType()).getAddressType());
+    return ManagedValue(addr, ManagedValue::LValue);
+  }
   
-  // FIXME: Always emit global variables directly. Eventually we want "true"
-  // global variables to be indirectly accessed so that they can be initialized
-  // on demand.
+  // Global variables in main source files can be accessed directly.
+  // FIXME: And all global variables when lazy initialization is disabled.
   SILValue addr = gen.B.createGlobalAddr(loc, var,
                           gen.getLoweredType(var->getType()).getAddressType());
   return ManagedValue(addr, ManagedValue::LValue);
@@ -361,7 +382,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
 
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    return emitGlobalVariable(*this, loc, var);
+    return emitGlobalVariableRef(*this, loc, var);
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
@@ -2453,7 +2474,8 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   auto builtinOnceSILTy = getLoweredLoadableType(builtinOnceTy);
   auto builtinOnce = B.createBuiltinFunctionRef(global, builtinOnceDecl,
                                                 builtinOnceSILTy);
-  auto rawPointerSILTy = getLoweredLoadableType(getASTContext().TheRawPointerType);
+  auto rawPointerSILTy
+    = getLoweredLoadableType(getASTContext().TheRawPointerType);
   SILValue onceTokenAddr = B.createSILGlobalAddr(global, onceToken);
   onceTokenAddr = B.createAddressToPointer(global, onceTokenAddr,
                                            rawPointerSILTy);

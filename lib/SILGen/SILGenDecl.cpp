@@ -1588,44 +1588,45 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
            && "only value type static properties are implemented");
   }
   
-  // FIXME: Emit static initialization code into the global constructor.
-  // This should be removed when global references go through lazy accessors.
-  if (TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint())
-    TopLevelSGF->visit(pd);
-  
-  if (!M.getASTContext().LangOpts.EmitLazyGlobalInitializers)
-    return;
-  
-  // Emit the lazy initialization token for the initialization expression.
-  auto counter = anonymousSymbolCounter++;
-  
-  llvm::SmallString<20> onceTokenName;
-  {
-    llvm::raw_svector_ostream os(onceTokenName);
-    os << "globalinit_token" << counter;
-    os.flush();
-  }
-  
-  auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
-  auto onceSILTy = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
-  
-  auto onceToken = new (M) SILGlobalVariable(M, SILLinkage::Internal,
+  if (M.getASTContext().LangOpts.EmitLazyGlobalInitializers) {
+    // Emit the lazy initialization token for the initialization expression.
+    auto counter = anonymousSymbolCounter++;
+    
+    llvm::SmallString<20> onceTokenName;
+    {
+      llvm::raw_svector_ostream os(onceTokenName);
+      os << "globalinit_token" << counter;
+      os.flush();
+    }
+    
+    auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
+    auto onceSILTy
+      = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
+    
+    auto onceToken = new (M) SILGlobalVariable(M, SILLinkage::Internal,
                                              onceTokenName,
                                              onceSILTy, /*isDefinition*/ true);
-  
-  // Emit the initialization code into a function.
-  llvm::SmallString<20> onceFuncName;
-  {
-    llvm::raw_svector_ostream os(onceFuncName);
-    os << "globalinit_func" << counter;
-    os.flush();
+    
+    // Emit the initialization code into a function.
+    llvm::SmallString<20> onceFuncName;
+    {
+      llvm::raw_svector_ostream os(onceFuncName);
+      os << "globalinit_func" << counter;
+      os.flush();
+    }
+    
+    SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncName, pd);
+    
+    // Generate accessor functions for all of the declared variables, which
+    // Builtin.once the lazy global initializer we just generated then return
+    // the address of the individual variable.
+    GenGlobalAccessors(*this, onceToken, onceFunc)
+      .visit(pd->getPattern());
+  } else {
+    // FIXME: Emit static initialization code into the global constructor.
+    // This should be removed when lazy global initialization is ready to be
+    // turned on.
+    if (TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint())
+      TopLevelSGF->visit(pd);
   }
-  
-  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncName, pd);
-  
-  // Generate accessor functions for all of the declared variables, which
-  // Builtin.once the lazy global initializer we just generated then return
-  // the address of the individual variable.
-  GenGlobalAccessors(*this, onceToken, onceFunc)
-    .visit(pd->getPattern());
 }
