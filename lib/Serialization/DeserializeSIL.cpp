@@ -645,6 +645,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
+  case ValueKind::SILGlobalAddrInst: {
+    llvm_unreachable("not implemented");
+  }
   case ValueKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(Loc,

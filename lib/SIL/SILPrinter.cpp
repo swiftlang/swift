@@ -564,6 +564,12 @@ public:
        << " : " << GAI->getType();
   }
 
+  void visitSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
+    OS << "sil_global_addr ";
+    GAI->getReferencedGlobal()->printName(OS);
+    OS << " : " << GAI->getType();
+  }
+
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     OS << "integer_literal " << ILI->getType() << ", " << lit;

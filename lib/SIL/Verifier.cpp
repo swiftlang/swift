@@ -381,6 +381,15 @@ public:
     require(!GAI->getGlobal()->getDeclContext()->isLocalContext(),
             "GlobalAddr cannot take the address of a local var");
   }
+  
+  void checkSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
+    require(GAI->getType().isAddress(),
+            "SILGlobalAddr must have an address result type");
+    require(GAI->getType().getObjectType() ==
+              GAI->getReferencedGlobal()->getLoweredType(),
+            "SILGlobalAddr must be the address type of the variable it "
+            "references");
+  }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
     require(ILI->getType().is<BuiltinIntegerType>(),

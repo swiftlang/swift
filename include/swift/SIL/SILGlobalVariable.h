@@ -20,11 +20,6 @@
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
-
-class ASTContext;
-class SILInstruction;
-class SILModule;
-enum class SILLinkage : unsigned char;
   
 /// A global variable that has been referenced in SIL.
 class SILGlobalVariable

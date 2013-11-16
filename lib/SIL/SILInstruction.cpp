@@ -327,6 +327,11 @@ FunctionRefInst::~FunctionRefInst() {
   Function->RefCount--;
 }
 
+SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
+  : SILInstruction(ValueKind::SILGlobalAddrInst, Loc,
+                   Global->getLoweredType().getAddressType()),
+    Global(Global)
+{}
 
 const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
   return getModule().getIntrinsicInfo(Function);

@@ -1977,6 +1977,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
+  case ValueKind::SILGlobalAddrInst:
+    llvm_unreachable("not implemented");
+
   case ValueKind::SwitchEnumInst:
   case ValueKind::DestructiveSwitchEnumAddrInst: {
     if (parseTypedValueRef(Val))

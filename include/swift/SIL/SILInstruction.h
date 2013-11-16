@@ -17,15 +17,16 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
-#include "swift/SIL/SILLocation.h"
-#include "swift/AST/Builtins.h"
-#include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "swift/AST/Builtins.h"
+#include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILSuccessor.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
 
@@ -37,6 +38,7 @@ class IntegerLiteralExpr;
 class SILBasicBlock;
 class SILDebugScope;
 class SILFunction;
+class SILGlobalVariable;
 class SILType;
 class Stmt;
 class StringLiteralExpr;
@@ -546,7 +548,9 @@ public:
   }
 };
   
-/// GlobalAddrInst - Gives the address of a global variable.
+/// \brief Gives the address of a global variable.
+///
+/// TODO: Fold into SILGlobalAddrInst.
 class GlobalAddrInst : public SILInstruction {
   VarDecl *Global;
 public:
@@ -568,6 +572,27 @@ public:
   }
 };
 
+/// Gives the address of a SIL global variable.
+class SILGlobalAddrInst : public SILInstruction {
+  SILGlobalVariable *Global;
+  
+public:
+  SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global);
+  
+  /// Return the referenced global variable.
+  SILGlobalVariable *getReferencedGlobal() const { return Global; }
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SILGlobalAddrInst;
+  }
+};
+  
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public SILInstruction {

@@ -408,6 +408,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addDeclRef(GAI->getGlobal()), 0);
     break;
   }
+  case ValueKind::SILGlobalAddrInst: {
+    llvm_unreachable("not implemented");
+  }
   case ValueKind::BranchInst: {
     // Format: destination basic block ID, a list of arguments. Use
     // SILOneTypeValuesLayout.

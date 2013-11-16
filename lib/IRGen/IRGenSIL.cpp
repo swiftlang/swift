@@ -503,6 +503,7 @@ public:
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
+  void visitSILGlobalAddrInst(SILGlobalAddrInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -1142,6 +1143,10 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   }
   
   setLoweredAddress(SILValue(i, 0), addr);
+}
+
+void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {
+  llvm_unreachable("not implemented");
 }
 
 /// Determine whether a metatype value is used as a Swift metatype, ObjC class,

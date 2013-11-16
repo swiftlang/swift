@@ -216,6 +216,10 @@ public:
     return insert(new (F.getModule())
                     GlobalAddrInst(loc, g, ty));
   }
+  SILGlobalAddrInst *createSILGlobalAddr(SILLocation loc,
+                                         SILGlobalVariable *g) {
+    return insert(new (F.getModule()) SILGlobalAddrInst(loc, g));
+  }
 
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
     return insert(IntegerLiteralInst::create(E, F));
