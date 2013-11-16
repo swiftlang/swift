@@ -191,9 +191,15 @@ extension ${Self} {
     value = tmp.0
 @      end
 @      if srcBits < bits:
+@         if srcSigned and not signed:
+    var tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(v.value)
+    Builtin.condfail(tmp.1)
+    value = Builtin.zext_Int${srcBits}_Int${bits}(tmp.0)
+@         else:
     value = Builtin.${
     ('sext' if srcSigned else 'zext')
     }_Int${srcBits}_Int${bits}(v.value)
+@         end
 @      end
   }
 @    end
