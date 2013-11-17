@@ -29,9 +29,11 @@ static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
 
 void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
                        HeapObject *ctx) {
-  // Swift convention passes ctx in here at +1, but 'fn' should also consume
-  // its argument at +1, so calling it exactly once should perfectly balance
-  // the retain count without any additional work.
-  dispatch_once_f(predicate, reinterpret_cast<void*>(ctx),
-                  reinterpret_cast<dispatch_function_t>(fn));
+  // Swift convention passes ctx +1, but 'fn' may or may not be called.
+  __block HeapObject *ctx2 = ctx;
+  dispatch_once(predicate, ^{
+    fn(ctx);
+    ctx2 = nullptr;
+  });
+  if (ctx2) swift_release(ctx);
 }
