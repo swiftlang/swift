@@ -132,14 +132,14 @@ bb0:
 // CHECK-LABEL: sil @tuple_elements1
 sil @tuple_elements1 : $@thin (a : Int64) -> () {
 bb0(%0 : $Int64):
-  %3 = alloc_box $(Int64, Int64)     // expected-note 2 {{variable defined here}}
+  %3 = alloc_box $(Int64, Int64)     // expected-note 1 {{variable defined here}}
   %4 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
   %5 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
   %14 = function_ref @takes_Int_inout : $@thin (a : @inout Int64) -> ()
   %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
   %16 = apply %14(%15) : $@thin (a : @inout Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
-  strong_release %3#0 : $Builtin.ObjectPointer   // expected-error {{variable '<unknown>.0' destroyed without being fully initialized on all paths}}
+  strong_release %3#0 : $Builtin.ObjectPointer
   %99 = tuple ()
   return %99 : $()
 }
