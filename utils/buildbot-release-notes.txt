@@ -19,6 +19,8 @@
     var ui = UInt8(si) 
     // error: negative integer cannot be converted to unsigned type 'UInt8'
 
+* 'def' keyword was changed back to 'func'.
+
 2013-11-13
 ----------
 
