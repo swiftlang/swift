@@ -95,8 +95,8 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   }
 
 @ max = maskBits((bits - 1) if signed else bits)
-  static var max: ${Self} { return ${max} }
-  static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
+  static var max: ${Self} { @@transparent get: return ${max} }
+  static var min: ${Self} { @@transparent get: return ${'-%s-1' % max if signed else '0'} }
 }
 
 extension ${Self} : Hashable {
