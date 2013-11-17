@@ -19,6 +19,7 @@ add_swift_library(swift_runtime INSTALL
   Enum.cpp
   Failure.cpp
   Once.cpp
+  Init.cpp
   BlockShims.mm)
 
 add_swift_optimization_flags(swift_runtime)
