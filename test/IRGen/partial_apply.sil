@@ -13,7 +13,7 @@ entry:
 }
 
 @objc class ObjCClass {
-  def method(x: Int64) {}
+  func method(x: Int64) {}
 }
 
 sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin ((), ObjCClass) -> ObjCClass {

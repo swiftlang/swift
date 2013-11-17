@@ -62,7 +62,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_subscript:
   case tok::kw_init:
   case tok::kw_destructor:
-  case tok::kw_def:
+  case tok::kw_func:
     return true;
   case tok::kw_protocol:
     return !(Tok2.isAnyOperator() && Tok2.getText().equals("<"));

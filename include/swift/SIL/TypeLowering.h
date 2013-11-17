@@ -30,14 +30,14 @@ namespace Lowering {
 
 /// Given a function type or polymorphic function type, returns the same type
 /// with [thin] and calling convention attributes added.
-/// FIXME: The thinness of function decls should be checked by the Swift
+/// FIXME: The thinness of func decls should be checked by the Swift
 /// typechecker.
 Type getThinFunctionType(Type t, AbstractCC cc);
 Type getThinFunctionType(Type t);
 
 /// Given a function type or polymorphic function type, returns the same type
 /// with the [thin] attribute removed and a calling convention attribute added.
-/// FIXME: The thinness of function decls should be checked by the Swift
+/// FIXME: The thinness of func decls should be checked by the Swift
 /// typechecker.
 Type getThickFunctionType(Type t, AbstractCC cc);
 Type getThickFunctionType(Type t);

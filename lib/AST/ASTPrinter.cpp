@@ -470,7 +470,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
     OS << "var ";
     break;
   case ImportKind::Func:
-    OS << "def ";
+    OS << "func ";
     break;
   }
   recordDeclLoc(decl);
@@ -698,7 +698,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printImplicitObjCNote(decl);
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
-    OS << "def ";
+    OS << "func ";
     recordDeclLoc(decl);
     if (decl->getName().empty())
       OS << "<anonymous>";
@@ -1377,7 +1377,7 @@ public:
   }
 
   void visitSILFunctionType(SILFunctionType *T) {
-    OS << "def ";
+    OS << "func ";
     printFunctionExtInfo(T->getExtInfo());
     if (auto generics = T->getGenericParams())
       printGenericParams(generics);

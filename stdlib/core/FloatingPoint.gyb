@@ -66,25 +66,25 @@ struct ${Self} : ReplPrintable {
     value = v
   }
 
-  def replPrint() {
+  func replPrint() {
     print(Double(self))
   }
 }
 
 @@transparent
 extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
-  static def _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(val))
   }
 
-  static def convertFromIntegerLiteral(value: Int${intBits}) -> ${Self} {
+  static func convertFromIntegerLiteral(value: Int${intBits}) -> ${Self} {
     return ${Self}(Builtin.uitofp_Int${intBits}_FPIEEE${bits}(value.value))
   }
 }
 
 @@transparent
 extension ${Self} : BuiltinFloatLiteralConvertible {
-  static def _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
 @   if bits == builtinFloatLiteralBits:
     return ${Self}(value)
 @   elif bits < builtinFloatLiteralBits:
@@ -98,22 +98,22 @@ extension ${Self} : BuiltinFloatLiteralConvertible {
 
 @@transparent
 extension ${Self} : FloatLiteralConvertible {
-  static def convertFromFloatLiteral(value: ${Self}) -> ${Self} {
+  static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 }
 
 @@transparent
 extension ${Self} : Comparable {
-  def __equal__(rhs: ${Self}) -> Bool {
+  func __equal__(rhs: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(value, rhs.value))
   }
-  def __less__(rhs: ${Self}) -> Bool {
+  func __less__(rhs: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_olt_FPIEEE${bits}(value, rhs.value))
   }
 }
 extension ${Self} : Hashable {
-  def hashValue() -> Int {
+  func hashValue() -> Int {
 @   if bits > intBits:
     var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
     return Int(Builtin.trunc_Int${bits}_Int${intBits}(asBuiltinInt))
@@ -124,10 +124,10 @@ extension ${Self} : Hashable {
 }
 
 extension ${Self} : SignedNumber {
-  static def negate(rhs: ${Self}) -> (${Self}, Bool) {
+  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.fneg_FPIEEE${bits}(rhs.value)), false)
   }
-  def isNegative() -> Bool { return self < 0 }
+  func isNegative() -> Bool { return self < 0 }
 }
 
 //===----------------------------------------------------------------------===//
@@ -169,11 +169,11 @@ extension ${Self} {
 
 // Unary plus
 @@transparent @@prefix
-def +(rhs: ${Self}) -> ${Self} { return rhs }
+func + (rhs: ${Self}) -> ${Self} { return rhs }
 
 @ for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @@transparent
-def ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
 @ end
@@ -184,7 +184,7 @@ def ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
 @@asmname="fmod${cFuncSuffix(bits)}"
-def % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
+func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||
 // In C, 120 is &&
@@ -195,15 +195,15 @@ def % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 @ for op in '+', '-', '*', '/', '%':
 @@transparent @@assignment
-def ${op}= (lhs: @@inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
+func ${op}= (lhs: @@inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 @ end
 
-@@asmname="sin${cFuncSuffix(bits)}"   def  sin(x: ${Self}) -> ${Self}
-@@asmname="cos${cFuncSuffix(bits)}"   def  cos(x: ${Self}) -> ${Self}
-@@asmname="tan${cFuncSuffix(bits)}"   def  tan(x: ${Self}) -> ${Self}
-@@asmname="atan${cFuncSuffix(bits)}"  def atan(x: ${Self}) -> ${Self}
-@@asmname="atan2${cFuncSuffix(bits)}" def atan(y: ${Self}, x: ${Self}) -> ${Self}
-@@asmname="sqrt${cFuncSuffix(bits)}"  def sqrt(x: ${Self}) -> ${Self}
+@@asmname="sin${cFuncSuffix(bits)}"   func  sin(x: ${Self}) -> ${Self}
+@@asmname="cos${cFuncSuffix(bits)}"   func  cos(x: ${Self}) -> ${Self}
+@@asmname="tan${cFuncSuffix(bits)}"   func  tan(x: ${Self}) -> ${Self}
+@@asmname="atan${cFuncSuffix(bits)}"  func atan(x: ${Self}) -> ${Self}
+@@asmname="atan2${cFuncSuffix(bits)}" func atan(y: ${Self}, x: ${Self}) -> ${Self}
+@@asmname="sqrt${cFuncSuffix(bits)}"  func sqrt(x: ${Self}) -> ${Self}
 
 @ end # for bits in allFloatBits
 

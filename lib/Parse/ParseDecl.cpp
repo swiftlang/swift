@@ -571,7 +571,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
 
-  case tok::kw_def:
+  case tok::kw_func:
     DeclResult = parseDeclFunc(StaticLoc, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
@@ -709,7 +709,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
     case tok::kw_var:
       Kind = ImportKind::Var;
       break;
-    case tok::kw_def:
+    case tok::kw_func:
       Kind = ImportKind::Func;
       break;
     default:
@@ -1036,7 +1036,7 @@ namespace {
           FuncDecl* Accessors[2] = {VD->getGetter(), VD->getSetter()};
           if (Accessors[0] && Accessors[1] &&
               !Context.SourceMgr.isBeforeInBuffer(
-                  Accessors[0]->getDefLoc(), Accessors[1]->getDefLoc())) {
+                  Accessors[0]->getFuncLoc(), Accessors[1]->getFuncLoc())) {
             std::swap(Accessors[0], Accessors[1]);
           }
           for (auto FD : Accessors) {
@@ -1595,7 +1595,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     StaticLoc = SourceLoc();
   }
   
-  SourceLoc DefLoc = consumeToken(tok::kw_def);
+  SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
@@ -1666,7 +1666,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     Scope S(this, ScopeKind::FunctionBody);
 
     // Create the decl for the func and add it to the parent scope.
-    FD = FuncDecl::create(Context, StaticLoc, DefLoc, Name, NameLoc,
+    FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
                           FuncRetTy, CurDeclContext);
 
@@ -2384,8 +2384,8 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     // Add get/set in source order.
     FuncDecl* Accessors[2] = {Get, Set};
     if (Accessors[0] && Accessors[1] &&
-        !SourceMgr.isBeforeInBuffer(Accessors[0]->getDefLoc(),
-                                    Accessors[1]->getDefLoc())) {
+        !SourceMgr.isBeforeInBuffer(Accessors[0]->getFuncLoc(),
+                                    Accessors[1]->getFuncLoc())) {
       std::swap(Accessors[0], Accessors[1]);
     }
     for (auto FD : Accessors) {

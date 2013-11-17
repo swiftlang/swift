@@ -79,7 +79,7 @@ C::
 
   enum Foo { case A, B, C, D }
   
-  def use(x:Foo) {
+  func use(x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -93,7 +93,7 @@ together::
 
   enum Foo { case A, B, C, D, Other(String) }
   
-  def use(x:Foo) {
+  func use(x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -210,7 +210,7 @@ structs, including nested types, methods, constructors, and properties::
       this = .Int(0)
     }
 
-    def min(x:IntOrInfinity) -> IntOrInfinity {
+    func min(x:IntOrInfinity) -> IntOrInfinity {
       switch (self, x) {
       case (.NegInfinity, _):
       case (_, .NegInfinity):
@@ -254,13 +254,13 @@ models the traditional relationship between a C enum and its raw type::
     /// Convert the conforming type to its raw type.
     /// Every valid value of the conforming type should map to a unique
     /// raw value.
-    def toRaw() -> RawType
+    func toRaw() -> RawType
 
     /// Convert a value of raw type to the corresponding value of the
     /// conforming type.
     /// Returns None if the raw value has no corresponding conforming type
     /// value.
-    static def fromRaw(_:RawType) -> Self?
+    static func fromRaw(_:RawType) -> Self?
   }
 
 Any type may manually conform to the RawRepresentable protocol following the above
@@ -317,7 +317,7 @@ methods. The NSChangeDictionaryKey definition behaves as if defined::
     case NSKeyValueChangeNewKey
     case NSKeyValueChangeOldKey
 
-    def toRaw() -> String {
+    func toRaw() -> String {
       switch self {
       case .NSKeyValueChangeKindKey:
         return "NSKeyValueChangeKindKey"
@@ -328,7 +328,7 @@ methods. The NSChangeDictionaryKey definition behaves as if defined::
       }
     }
 
-    static def fromRaw(s:String) -> NSChangeDictionaryKey? {
+    static func fromRaw(s:String) -> NSChangeDictionaryKey? {
       switch s {
       case "NSKeyValueChangeKindKey":
         return .NSKeyValueChangeKindKey

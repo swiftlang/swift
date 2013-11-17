@@ -56,7 +56,7 @@ protocols they may implement.
 ::
 
   class AppController : NSApplicationDelegate {
-    def applicationDidFinishLaunching(notification : NSNotification) {
+    func applicationDidFinishLaunching(notification : NSNotification) {
       // do stuff
     }
   }
@@ -142,7 +142,7 @@ Guidelines:
    include the ``[objc]`` attribute::
    
      // Note: This syntax is not final!
-     def [API, objc] accessibilityDescription {
+     func [API, objc] accessibilityDescription {
        return "\(self.givenName) \(self.familyName)"
      }
 
@@ -473,16 +473,16 @@ Overloading
   name, unless using the "selector syntax" for defining methods::
 
     // 1. foo:baz:
-    def foo(Int bar, Int baz);
+    func foo(Int bar, Int baz);
   
     // 2. foo:qux:
-    def foo(Int bar, Int qux);
+    func foo(Int bar, Int qux);
   
     // 3. foo:qux: (same as above)
-    def foo(Int bar) qux(Int quux);
+    func foo(Int bar) qux(Int quux);
   
     // 4. foo:baz: (but different type!)
-    def foo(Int bar, Char baz);
+    func foo(Int bar, Char baz);
   
     a.foo(1, 2)      // ambiguous in Swift (#1 or #2?)
     a.foo(1, baz=2)  // calls #1

@@ -2731,7 +2731,7 @@ SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue str) {
-  // def convertStringToNSString([inout] String) -> NSString
+  // func convertStringToNSString([inout] String) -> NSString
   SILValue stringToNSStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
   
@@ -2752,7 +2752,7 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
 static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue nsstr) {
-  // def convertNSStringToString(NSString, [inout] String) -> ()
+  // func convertNSStringToString(NSString, [inout] String) -> ()
   SILValue nsstringToStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
   
@@ -2776,7 +2776,7 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue swiftBool) {
-  // def convertBoolToObjCBool(Bool) -> ObjCBool
+  // func convertBoolToObjCBool(Bool) -> ObjCBool
   SILValue boolToObjCBoolFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getBoolToObjCBoolFn());
   
@@ -2791,7 +2791,7 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
 static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue objcBool) {
-  // def convertObjCBoolToBool(ObjCBool) -> Bool
+  // func convertObjCBoolToBool(ObjCBool) -> Bool
   SILValue objcBoolToBoolFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getObjCBoolToBoolFn());
   

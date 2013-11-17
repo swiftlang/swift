@@ -176,7 +176,7 @@ Strings are **Mutable**
             
 .. parsed-literal::
   |swift| extension String {
-            def addEcho() { 
+            func addEcho() { 
               self += self
             }
           }
@@ -197,7 +197,7 @@ passes you a string *you own it*.  Nobody can change a string value
 .. parsed-literal::
   |swift| class Cave {
             // Utter something in the cave
-            def say(msg: String) -> String {
+            func say(msg: String) -> String {
               :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because the callee sees a copy of the argument`
               self.lastSound = msg
               :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller sees a copy of the value`
@@ -728,7 +728,7 @@ Indexing
 :Swift: 
   .. parsed-literal::
     typealias IndexType = ...
-    def **indices**\ () -> Range<IndexType>
+    func **indices**\ () -> Range<IndexType>
     **subscript**\ (i: IndexType) -> Character
 
   .. Admonition:: Usage
@@ -794,12 +794,12 @@ Comparison
 
 :Swift:
   .. parsed-literal::
-     def **==** (lhs: String, rhs: String) -> Bool
-     def **!=** (lhs: String, rhs: String) -> Bool
-     def **<**  (lhs: String, rhs: String) -> Bool
-     def **>**  (lhs: String, rhs: String) -> Bool
-     def **<=** (lhs: String, rhs: String) -> Bool
-     def **>=** (lhs: String, rhs: String) -> Bool
+     func **==** (lhs: String, rhs: String) -> Bool
+     func **!=** (lhs: String, rhs: String) -> Bool
+     func **<**  (lhs: String, rhs: String) -> Bool
+     func **>**  (lhs: String, rhs: String) -> Bool
+     func **<=** (lhs: String, rhs: String) -> Bool
+     func **>=** (lhs: String, rhs: String) -> Bool
 
 ``NSString`` comparison is “literal” by default.  As the documentation
 says of ``isEqualToString``,
@@ -902,8 +902,8 @@ Searching
 
 :Swift: 
   .. parsed-literal::
-     def **startsWith**\ (prefix: String)
-     def **endsWith**\ (suffix: String)
+     func **startsWith**\ (prefix: String)
+     func **endsWith**\ (suffix: String)
 
 ----
 
@@ -913,7 +913,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       def **find**\ (sought: String) -> Range<String.IndexType>
+       func **find**\ (sought: String) -> Range<String.IndexType>
 
   .. Note:: Most other languages provide something like
             ``s1.indexOf(s2)``, which returns only the starting index of
@@ -935,7 +935,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       def **find**\ (match: (Character)->Bool) -> Range<String.IndexType>
+       func **find**\ (match: (Character)->Bool) -> Range<String.IndexType>
 
   .. Admonition:: Usage Example
 
@@ -975,9 +975,9 @@ Building
 
 :Swift:
   .. parsed-literal::
-        def **+** (lhs: String, rhs: String) -> String
-        def [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
-        def **append**\ (suffix: String)
+        func **+** (lhs: String, rhs: String) -> String
+        func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
+        func **append**\ (suffix: String)
 
 
 Dynamic Formatting
@@ -1016,8 +1016,8 @@ Splitting
 
 :Swift:
   .. parsed-literal::
-     def split(maxSplit: Int = Int.max()) -> String[]
-     def split(separator: Character, maxSplit: Int = Int.max()) -> String[]
+     func split(maxSplit: Int = Int.max()) -> String[]
+     func split(separator: Character, maxSplit: Int = Int.max()) -> String[]
 
   The semantics of these functions were taken from Python, which seems
   to be a fairly good representative of what modern languages are
@@ -1030,7 +1030,7 @@ Splitting
 
   .. parsed-literal::
 
-    def **split**\ <Seq: Sliceable, IsSeparator: Predicate 
+    func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
         where IsSeparator.Arguments == Seq.Element
     >(seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
       allowEmptySlices: Bool = false  ) -> Seq[]
@@ -1044,7 +1044,7 @@ Splitting
 
 :Swift:
   .. parsed-literal::
-     def **commonPrefix**\ (other: String) -> String
+     func **commonPrefix**\ (other: String) -> String
 
 Upper/Lowercase
 ~~~~~~~~~~~~~~~
@@ -1063,8 +1063,8 @@ Upper/Lowercase
 
 :Swift:
   .. parsed-literal::
-     def **toUpper**\ () -> String
-     def **toLower**\ () -> String
+     func **toUpper**\ () -> String
+     func **toLower**\ () -> String
      
 Capitalization
 ~~~~~~~~~~~~~~

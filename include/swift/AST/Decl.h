@@ -440,7 +440,7 @@ public:
 /// the list of generic parameters, e.g., the T and U in:
 ///
 /// \code
-///   def f<T : Range, U>(t: T, u: U) { /* ... */ }
+/// func f<T : Range, U>(t : T, u : U) { /* ... */ }
 /// \endcode
 class GenericParam {
   GenericTypeParamDecl *TypeParam;
@@ -1365,7 +1365,7 @@ public:
 /// requirement that the type argument conform to the 'Comparable' protocol.
 ///
 /// \code
-///   def min<T : Comparable>(x: T, y: T) -> T { ... }
+/// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
   unsigned Depth : 16;
@@ -1388,7 +1388,7 @@ public:
   ///
   /// \code
   /// struct X<T> {
-  ///   def f<U>() { }
+  ///   func f<U>() { }
   /// }
   /// \endcode
   ///
@@ -1405,7 +1405,7 @@ public:
   ///
   /// \code
   /// struct X<T, U> {
-  ///   def f<V>() { }
+  ///   func f<V>() { }
   /// }
   /// \endcode
   ///
@@ -1434,7 +1434,7 @@ public:
 /// \code
 /// protocol Enumerator {
 ///   typealias Element
-///   def getNext() -> Element?
+///   func getNext() -> Element?
 /// }
 /// \endcode
 ///
@@ -1917,7 +1917,7 @@ public:
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
-///     def draw()
+///     func draw()
 ///   }
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
@@ -2286,7 +2286,7 @@ public:
   /// Typically, this is the same as \c getArgParamPatterns, unless the
   /// function was defined with selector-style syntax such as:
   /// \code
-  ///   def foo(a: A) bar(b: B) {}
+  ///   func foo(a:A) bar(b:B) {}
   /// \endcode
   ///
   /// For a selector-style definition, \c getArgParamPatterns will return the
@@ -2350,12 +2350,12 @@ public:
 
 class OperatorDecl;
 
-/// Function declaration, introduced with \c def keyword.
+/// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
-  SourceLoc DefLoc;     // Location of the 'def' token.
+  SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
 
@@ -2368,12 +2368,12 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
-  FuncDecl(SourceLoc StaticLoc, SourceLoc DefLoc, Identifier Name,
+  FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc, nullptr,
                            GenericParams),
-      StaticLoc(StaticLoc), DefLoc(DefLoc),
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
     assert(NumParamPatterns > 0);
@@ -2390,14 +2390,14 @@ class FuncDecl : public AbstractFunctionDecl {
 public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
-                                      SourceLoc DefLoc, Identifier Name,
+                                      SourceLoc FuncLoc, Identifier Name,
                                       SourceLoc NameLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
-                          SourceLoc DefLoc, Identifier Name, SourceLoc NameLoc,
+                          SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
@@ -2420,30 +2420,30 @@ public:
   ///
   /// For example, this function:
   /// \code
-  ///   def negate(x: Int) -> Int { return -x }
+  ///   func negate(x : Int) -> Int { return -x }
   /// \endcode
   /// has a natural argument count of 1 if it is freestanding.  If it is
   /// a method, it has a natural argument count of 2, as does this
   /// curried function:
   /// \code
-  ///   def add(x: Int)(y: Int) -> Int { return x + y }
+  ///   func add(x : Int)(y : Int) -> Int { return x + y }
   /// \endcode
   ///
   /// This value never exceeds the number of chained function types
   /// in the function's type, but it can be less for functions which
   /// return a value of function type:
   /// \code
-  ///   def const(x: Int) -> () -> Int { return { x } } // NAC==1
+  ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
   /// \endcode
   unsigned getNaturalArgumentCount() const {
     return getNumParamPatternsImpl();
   }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
-  SourceLoc getDefLoc() const { return DefLoc; }
+  SourceLoc getFuncLoc() const { return FuncLoc; }
 
   SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : DefLoc;
+    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   SourceRange getSourceRange() const;
 
@@ -2484,11 +2484,9 @@ public:
   /// and the argument list consists syntactically of a single-element tuple
   /// pattern. This check is syntactic rather than type-based in order to allow
   /// for the definition of unary operators on tuples, as in:
-  /// \code
-  ///   def [prefix] + (_: (a: Int, b: Int))
-  /// \endcode
-  /// This also allows the unary-operator-ness of a function decl to be
-  /// determined prior to type checking.
+  ///   func [prefix] + (_:(a:Int, b:Int))
+  /// This also allows the unary-operator-ness of a func decl to be determined
+  /// prior to type checking.
   bool isUnaryOperator() const;
   
   /// isBinaryOperator - Determine whether this is a binary operator
@@ -2496,12 +2494,10 @@ public:
   /// and the argument list consists syntactically of a two-element tuple
   /// pattern. This check is syntactic rather than type-based in order to
   /// distinguish a binary operator from a unary operator on tuples, as in:
-  /// \code
-  ///   def [prefix] + (_: (a: Int, b: Int)) // unary operator +(1,2)
-  ///   def [infix]  + (a: Int, b: Int)     // binary operator 1 + 2
-  /// \endcode
-  /// This also allows the binary-operator-ness of a function decl to be
-  /// determined prior to type checking.
+  ///   func [prefix] + (_:(a:Int, b:Int)) // unary operator +(1,2)
+  ///   func [infix]  + (a:Int, b:Int)     // binary operator 1 + 2
+  /// This also allows the binary-operator-ness of a func decl to be determined
+  /// prior to type checking.
   bool isBinaryOperator() const;
   
   /// makeGetter - Note that this function is the getter for the given

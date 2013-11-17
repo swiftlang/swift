@@ -157,9 +157,9 @@ public:
 /// nominal types and extensions. For example:
 ///
 /// \code
-/// protocol P { def foo() }
-/// struct A : P { def foo() { } }
-/// class B<T> : P { def foo() { } }
+/// protocol P { func foo() }
+/// struct A : P { func foo() { } }
+/// class B<T> : P { func foo() { } }
 /// \endcode
 ///
 /// Here, there is a normal protocol conformance for both \c A and \c B<T>,
@@ -253,8 +253,8 @@ public:
 ///
 /// For example:
 /// \code
-/// protocol P { def foo() }
-/// class A<T> : P { def foo() { } }
+/// protocol P { func foo() }
+/// class A<T> : P { func foo() { } }
 /// \endcode
 ///
 /// \c A<T> conforms to \c P via normal protocol conformance. Any specialization
@@ -359,8 +359,8 @@ public:
 ///
 /// An example:
 /// \code
-/// protocol P { def foo() }
-/// class A : P { def foo() { } }
+/// protocol P { func foo() }
+/// class A : P { func foo() { } }
 /// class B : A { }
 /// \endcode
 ///

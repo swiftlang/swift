@@ -47,7 +47,7 @@ bb4(%8 : $Int64):
 
 enum BoolLike { case true, false }
 
-// def testThread(a : BoolLike) -> Int {
+// func testThread(a : BoolLike) -> Int {
 //   if a { return 42 } else { return 17 } }
 //
 /// CHECK-LABEL: sil @testThread

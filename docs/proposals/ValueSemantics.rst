@@ -29,32 +29,32 @@ create an *independently modifiable copy* of the source value that is
 
 If `T` has value semantics, the `f`\ s below are all equivalent::
 
-  def f1() -> T {
+  func f1() -> T {
      var x : T
      return x
   }
 
-  def f2() -> T {
+  func f2() -> T {
      var x : T
      var y = x
      return y  // a copy of x is equivalent to x
   }
 
-  def f2a() -> T {
+  func f2a() -> T {
      var x : T
      var y : T
      y = x
      return y  // a copy of x is equivalent to x
   }
 
-  def f3() -> T {
+  func f3() -> T {
      var x : T
      var y = x
      y.mutate() // a copy of x is modifiable
      return x   // without affecting x
   }
 
-  def f3a() -> T {
+  func f3a() -> T {
      var x : T
      var y : T
      y = x;
@@ -62,9 +62,9 @@ If `T` has value semantics, the `f`\ s below are all equivalent::
      return x   // without affecting x
   }
 
-  def g(x : T) { x.mutate() }
+  func g(x : T) { x.mutate() }
 
-  def f4() -> T {
+  func f4() -> T {
      var x : T
      g(x)         // when x is passed by-value the copy
      return x     // is modifiable without affecting x
@@ -92,27 +92,27 @@ the others.
 If `T` has reference semantics, the `f`\ s below are all
 equivalent::
 
-  def f1(T x) {
+  func f1(T x) {
      x.mutate()
      return x
   }
 
-  def f2(T x) -> T {
+  func f2(T x) -> T {
      var y = x
      y.mutate()  // mutation through a copy of x
      return x    // is visible through x
   }
 
-  def f2a(T x) -> T {
+  func f2a(T x) -> T {
      var y : T
      y = x
      y.mutate()  // mutation through a copy of x
      return x    // is visible through x
   }
 
-  def g(x : T) { x.mutate() }
+  func g(x : T) { x.mutate() }
 
-  def f3(T x) -> T {
+  func f3(T x) -> T {
      g(x)        // when x is passed to a function, mutation
      return x    // through the parameter is visible through x
   }
@@ -176,7 +176,7 @@ replacement via assignment, which might be expensive.
 Here’s a version of cycle_length that works when state is a mutable
 value type::
 
- def cycle_length<State>(
+ func cycle_length<State>(
    s : State, mutate : ( [inout] State )->() 
  ) -> Int
    requires State : EqualityComparable
@@ -205,10 +205,10 @@ classes:
  abstract class RandomNumberGenerator
    : Clonable, Equalable
  {
-   def nextValue() -> Int
+   func nextValue() -> Int
  }
 
- def cycle_length<State>(
+ func cycle_length<State>(
    s : State, mutate : ( [inout] State )->() 
  ) -> Int
    requires State : EqualityComparable, **Clonable**
@@ -229,7 +229,7 @@ clonable classes:
 
 .. parsed-literal::
 
- def cycle_length<State>(
+ func cycle_length<State>(
    s : State, 
    **next : (x : State)->State,**
    **equal : ([inout] x : State, [inout] y : State)->Bool**
@@ -262,7 +262,7 @@ linked list::
      constructor(Int) { next = this; prev = this }
      
      // link two circular lists into one big cycle.
-     def join(otherNode : Node) -> () { ... }
+     func join(otherNode : Node) -> () { ... }
 
      var next : WeakRef<Node> // identity of next node
      var prev : WeakRef<Node> // identity of previous node
@@ -293,7 +293,7 @@ to observe a difference in behavior:
 Take, for example, `swap`, which uses variable initialization and
 assignment to exchange two values::
 
-  def swap<T>(lhs : [inout] T, rhs : [inout] T)
+  func swap<T>(lhs : [inout] T, rhs : [inout] T)
   {
       var tmp = lhs   // big 3: initialization - ref copy in tmp
       lhs = rhs       // big 3: assignment     - ref copy in lhs

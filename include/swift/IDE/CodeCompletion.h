@@ -220,8 +220,8 @@ enum class SemanticContextKind {
   ///   class Base {
   ///     init() {}
   ///     init(a: Int) {}
-  ///     def foo() {}
-  ///     def bar() {}
+  ///     func foo() {}
+  ///     func bar() {}
   ///   }
   ///   class Derived {
   ///     init() {
@@ -229,7 +229,7 @@ enum class SemanticContextKind {
   ///              // init(a: Int) -- Super
   ///     }
   ///
-  ///     def foo() {
+  ///     func foo() {
   ///       super. // foo() -- ExpressionSpecific
   ///              // bar() -- Super
   ///     }
@@ -260,7 +260,7 @@ enum class SemanticContextKind {
   ///   struct A {
   ///     typealias Foo = Int
   ///     struct B {
-  ///       def foo() {
+  ///       func foo() {
   ///         // (1)
   ///       }
   ///     }

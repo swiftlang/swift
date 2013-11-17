@@ -96,28 +96,28 @@ protocol::
   // Swift
   protocol OptionSet : Equatable {
     // Set intersection
-    @infix def &(_:Self, _:Self) -> Self
-    @infix def &=(@inout _:Self, _:Self)
+    @infix func &(_:Self, _:Self) -> Self
+    @infix func &=(@inout _:Self, _:Self)
 
     // Set union
-    @infix def |(_:Self, _:Self) -> Self
-    @infix def |=(@inout _:Self, _:Self)
+    @infix func |(_:Self, _:Self) -> Self
+    @infix func |=(@inout _:Self, _:Self)
 
     // Set xor
-    @infix def ^(_:Self, _:Self) -> Self
-    @infix def ^=(@inout _:Self, _:Self)
+    @infix func ^(_:Self, _:Self) -> Self
+    @infix func ^=(@inout _:Self, _:Self)
 
     // Set negation
-    @prefix def ~(_:Self) -> Self
+    @prefix func ~(_:Self) -> Self
 
     // Are any options set?
-    def any() -> Bool
+    func any() -> Bool
 
     // Are all options set?
-    def all() -> Bool
+    func all() -> Bool
 
     // Are no options set?
-    def none() -> Bool
+    func none() -> Bool
   }
 
 The compiler can derive a default conformance for a struct whose instance stored
@@ -168,7 +168,7 @@ For example::
         AlignHeightInward : Bool = false
 
     // convenience combinations
-    static def NSAlignAllEdgesInward() {
+    static func NSAlignAllEdgesInward() {
       return NSAlignmentOptions(AlignMinXInward: true,
                                 AlignMaxXInward: true,
                                 AlignMinYInward: true,
@@ -263,7 +263,7 @@ bitwise operations can be applied to them.
   struct MyOptions : OptionSet {
     var Foo, Bar, Bas : Bool = false
     
-    static def Foobar() -> MyOptions {
+    static func Foobar() -> MyOptions {
       return MyOptions(Foo: true, Bar: true)
     }
   }
@@ -279,14 +279,14 @@ individual option::
     // Stored properties of instances
     var Foo, Bar, Bas : Bool = false
 
-    static def Foobar() -> MyOptions {
+    static func Foobar() -> MyOptions {
       return MyOptions(Foo: true, Bar: true)
     }
 
     // Implicitly-generated static properties?
-    static def Foo() -> MyOptions { return MyOptions(Foo: true) }
-    static def Bar() -> MyOptions { return MyOptions(Bar: true) }
-    static def Bas() -> MyOptions { return MyOptions(Bas: true) }
+    static func Foo() -> MyOptions { return MyOptions(Foo: true) }
+    static func Bar() -> MyOptions { return MyOptions(Bar: true) }
+    static func Bas() -> MyOptions { return MyOptions(Bas: true) }
   }
 
   var x: MyOptions = .Foobar() | .Bas()

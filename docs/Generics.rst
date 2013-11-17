@@ -92,8 +92,8 @@ Polymorphism allows one to use different data types with a uniform
 interface. Overloading already allows a form of polymorphism ( ad hoc
 polymorphism) in Swift. For example, given::
 
-  def +(x : Int, y : Int) -> Int { add... }
-  def +(x : String, y : String) -> String { concat... }
+  func +(x : Int, y : Int) -> Int { add... }
+  func +(x : String, y : String) -> String { concat... }
 
 .. @example.replace('add...','return 1')
    example.replace('concat...','return ""')
@@ -130,7 +130,7 @@ users know Scala.
 In its most basic form, a protocol is a collection of function signatures::
 
   protocol Document {
-    def title() -> String
+    func title() -> String
   }
 
 Document describes types that have a title() operation that accepts no arguments
@@ -149,14 +149,14 @@ protocols. For example, we could extend our Document protocol to cover documents
 that support versioning::
 
   protocol VersionedDocument : Document {
-    def version() -> Int
+    func version() -> Int
   }
 
 Multiple inheritance is permitted, allowing us to form a directed acyclic graph
 of protocols::
 
   protocol PersistentDocument : VersionedDocument, Serializable {
-    def saveToFile(filename : path)
+    func saveToFile(filename : path)
   }
 
 .. @example.prepend('struct path {} ; protocol Serializable {}')
@@ -173,7 +173,7 @@ operations. For example, let's try to write a Comparable protocol that could be
 used to search for a generic find() operation::
 
   protocol Comparable {
-    def isEqual(other : ???) -> bool
+    func isEqual(other : ???) -> bool
   }
 
 Our options for filling in ??? are currently very poor. We could use the syntax
@@ -216,7 +216,7 @@ allows one to refer to the eventual type of 'self' (which we call
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    def isEqual(other : Self) -> bool
+    func isEqual(other : Self) -> bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
@@ -242,8 +242,8 @@ us to cleanly describe a protocol for collections::
 
   protocol Collection {
     typealias Element
-    def forEach(callback : (value : Element) -> void)
-    def add(value : Element)
+    func forEach(callback : (value : Element) -> void)
+    func add(value : Element)
   }
 
 It is important here that a generic function that refers to a given type T,
@@ -262,7 +262,7 @@ operators::
   
   protocol RandomAccessContainer : Collection {
     var length : Int
-    def ==(lhs : Self, rhs : Self)
+    func ==(lhs : Self, rhs : Self)
     subscript (i : Int) -> Element
   }
 
@@ -280,7 +280,7 @@ to a protocol if it meets the syntactic requirements of the protocol. For
 example, given::
 
   protocol Shape {
-    def draw()
+    func draw()
   }
 
 One could write a Circle struct such as::
@@ -289,7 +289,7 @@ One could write a Circle struct such as::
     var center : Point
     var radius : Int
     
-    def draw() {
+    func draw() {
       // draw it
     }
   }
@@ -305,7 +305,7 @@ also know how to "draw!"::
   struct Cowboy {
     var gun : SixShooter
   
-    def draw() {
+    func draw() {
       // draw!
     }
   }
@@ -330,8 +330,8 @@ type::
 
   struct EmployeeList : Collection { // EmployeeList is a collection
     typealias Element = T
-    def forEach(callback : (value : Element) -> void) { /* Implement this */ }
-    def add(value : Element) { /* Implement this */ }
+    func forEach(callback : (value : Element) -> void) { /* Implement this */ }
+    func add(value : Element) { /* Implement this */ }
   }
 
 This explicit protocol conformance declaration forces the compiler to check that
@@ -367,8 +367,8 @@ extensions, e.g.,::
 
   extension String : Collection {
     typealias Element = char
-    def forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
-    def add(value : Element) { self += value /* append character */ }
+    func forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
+    func add(value : Element) { self += value /* append character */ }
   }
 
 Once an extension is defined, the extension now conforms to the Collection
@@ -384,10 +384,10 @@ and smaller protocols that make it easier to write conforming types. For
 example, should a Numeric protocol implement all operations, e.g.,::
   
   protocol Numeric {
-    def +(lhs : Self, rhs : Self) -> Self
-    def -(lhs : Self, rhs : Self) -> Self
-    def +(x : Self) -> Self
-    def -(x : Self) -> Self
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(lhs : Self, rhs : Self) -> Self
+    func +(x : Self) -> Self
+    func -(x : Self) -> Self
   }
 
 which would make it easy to write general numeric algorithms, but requires the
@@ -395,8 +395,8 @@ author of some BigInt class to implement a lot of functionality, or should the
 numeric protocol implement just the core operations::
 
   protocol Numeric {
-    def +(lhs : Self, rhs : Self) -> Self
-    def -(x : Self) -> Self
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(x : Self) -> Self
   }
 
 to make it easier to adopt the protocol (but harder to write numeric
@@ -406,10 +406,10 @@ other algorithms. However, it's far easier to allow the protocol itself to
 provide default implementations::
   
   protocol Numeric {
-    def +(lhs : Self, rhs : Self) -> Self
-    def -(lhs : Self, rhs : Self) -> Self { return lhs + -rhs }
-    def +(x : Self) -> Self { return x }
-    def -(x : Self) -> Self
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(lhs : Self, rhs : Self) -> Self { return lhs + -rhs }
+    func +(x : Self) -> Self { return x }
+    func -(x : Self) -> Self
   }
 
 This makes it easier both to implement generic algorithms (which can use the
@@ -417,8 +417,8 @@ most natural syntax) and to make a new type conform to the protocol. For
 example, if we were to define only the core algorithms in our BigNum type::
 
   struct BigNum : Numeric {
-    def +(lhs : BigNum, rhs : BigNum) -> BigNum { ... }
-    def -(x : BigNum) -> BigNum { ... }
+    func +(lhs : BigNum, rhs : BigNum) -> BigNum { ... }
+    func -(x : BigNum) -> BigNum { ... }
   }
 
 the compiler will automatically synthesize the other operations needed for the
@@ -525,7 +525,7 @@ in Swift. For example, one could define a generic linked list as::
 This list works on any type T. One could then add a generic function that
 inserts at the beginning of the list::
 
-  def insertAtBeginning<T>(list : List<T>, value : T) {
+  func insertAtBeginning<T>(list : List<T>, value : T) {
     list.First = ListNode<T>(value, list.First)
   }
 
@@ -539,7 +539,7 @@ conform. Within the body of the generic type or function, any of the functions
 or types described by the constraints are available. For example, let's
 implement a find() operation on lists::
 
-  def find<T : Comparable>(list : List<T>, value : T) -> Int {
+  func find<T : Comparable>(list : List<T>, value : T) -> Int {
     var index = 0
     var current
     for (current = list.First; current is Node; current = current.Next) {
@@ -558,11 +558,11 @@ function. For example, let's generalize our find algorithm to work on any
 ordered collection::
   
   protocol OrderedCollection : Collection {
-    def size() -> Int
-    def getAt(index : Int) -> Element // Element is an associated type
+    func size() -> Int
+    func getAt(index : Int) -> Element // Element is an associated type
   }
   
-  def find<C : OrderedCollection where C.Element : Comparable>(
+  func find<C : OrderedCollection where C.Element : Comparable>(
          collection : C, value : C.Element) -> Int
   {
     for index in 0..collection.size() {
@@ -578,7 +578,7 @@ and the constraints expressed in the angle brackets (e.g., <C :
 OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
-  def find<C where C : OrderedCollection, C.Element : Comparable>(
+  func find<C where C : OrderedCollection, C.Element : Comparable>(
          collection : C, value : C.Element)-> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
@@ -590,8 +590,8 @@ lets us describe an iteration of values of some given value type::
 
   protocol Enumerator {
     typealias Element
-    def isEmpty() -> Bool
-    def next() -> Element
+    func isEmpty() -> Bool
+    func next() -> Element
   }
 
 Now, we want to express the notion of an enumerable collection, which provides a
@@ -600,7 +600,7 @@ iteration, which we do by adding requirements into the protocol::
   protocol EnumerableCollection : Collection {
     typealias EnumeratorType : Enumerator
     where EnumeratorType.Element == Element
-    def getEnumeratorType() -> EnumeratorType
+    func getEnumeratorType() -> EnumeratorType
   }
 
 Here, we are specifying constraints on an associated type (EnumeratorType must
@@ -626,7 +626,7 @@ Comparable::
 Naturally, one any generic operation on a SortedDictionary<K,V> would also require
 that K be Comparable, e.g.,::
 
-  def forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>,
                                            f : (Key) -> Void) { /* ... */ }
 
 However, explicitly requiring that Key conform to Comparable is redundant: one
@@ -636,7 +636,7 @@ itself could not be formed. Constraint inference infers these additional
 constraints within a generic function from the parameter and return types of the
 function, simplifying the specification of forEachKey::
 
-  def forEachKey<Key, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key, Value>(c : SortedDictionary<Key, Value>,
                               f : (Key) -> Void) { /* ... */ }
 
 Type Parameter Deduction
@@ -651,7 +651,7 @@ generic function::
 Since Swift already has top-down type inference (as well as the C++-like
 bottom-up inference), we can also deduce type arguments from the result type::
 
-  def cast<T, U>(value : T) -> U { ... }
+  func cast<T, U>(value : T) -> U { ... }
   var x : Any
   var y : Int = cast(x) // deduces T = Any, U = Int
 
@@ -680,7 +680,7 @@ language (generic functions can be "virtual").
 The translation model is fairly simple. Consider the generic find() we
 implemented for lists, above::
   
-  def find<T : Comparable>(list : List<T>, value : T) -> Int {
+  func find<T : Comparable>(list : List<T>, value : T) -> Int {
     var index = 0
     var current = list.First
     while current is ListNode<T> { // now I'm just making stuff up
@@ -739,7 +739,7 @@ Overloading
 Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
   
-   def binarySearch<
+   func binarySearch<
       C : EnumerableCollection where C.Element : Comparable
    >(collection : C, value : C.Element) 
      -> C.EnumeratorType
@@ -750,10 +750,10 @@ consider a binary search algorithm::
 
    protocol RandomAccessEnumerator : Enumerator {
      // splits a range in half, returning both halves
-     def split() -> (Enumerator, Enumerator) 
+     func split() -> (Enumerator, Enumerator) 
    }
 
-   def binarySearch<
+   func binarySearch<
       C : EnumerableCollection 
        where C.Element : Comparable, 
                  C.EnumeratorType: RandomAccessEnumerator
@@ -774,7 +774,7 @@ There is a question as to when this overloading occurs. For example,
 binarySearch might be called as a subroutine of another generic function with
 minimal requirements::
 
-  def doSomethingWithSearch<
+  func doSomethingWithSearch<
     C : EnumerableCollection where C.Element : Ordered
   >(
     collection : C, value : C.Element

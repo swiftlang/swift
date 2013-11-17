@@ -11,7 +11,7 @@ import Builtin
 import swift
 
 class Foo {
-  def foo() -> Int
+  func foo() -> Int
 }
 
 class Bar {

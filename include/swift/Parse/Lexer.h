@@ -200,7 +200,7 @@ public:
   ///
   /// Due to the parser splitting tokens the adjustment may be incorrect, e.g:
   /// \code
-  ///   def +<T>(a: T, b: T)
+  ///   func +<T>(a : T, b : T)
   /// \endcode
   /// The start of the '<' token is '<', but the lexer will produce "+<" before
   /// the parser splits it up.

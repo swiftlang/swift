@@ -87,10 +87,10 @@ Otherwise, it is considered **read-only**.
    struct Number {
      init(x: Int) { name = x.toString() }
 
-     def getValue() {              // read-only method
+     func getValue() {              // read-only method
        return Int(name)
      }
-     **@inout** def increment() {  // mutating method
+     **@inout** func increment() {  // mutating method
        name = (Int(name)+1).toString()
      }
      var name: String
@@ -239,7 +239,7 @@ unless the method is attributed with ``@inout``:
 
 .. parsed-literal::
 
-  def f(x: Int, y: @inout Int) {
+  func f(x: Int, y: @inout Int) {
     y = x         // ok, y is an @inout parameter
     x = y         // **Error:** function parameter 'x' is immutable
   }

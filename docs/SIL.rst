@@ -109,7 +109,7 @@ Syntax
 SIL is reliant on Swift's type system and declarations, so SIL syntax
 is an extension of Swift's. A ``.sil`` file is a Swift source file
 with added SIL definitions. The Swift source is parsed only for its
-declarations; Swift function bodies (except for nested declarations)
+declarations; Swift ``func`` bodies (except for nested declarations)
 and top-level code are ignored by the SIL parser. In a ``.sil`` file,
 there are no implicit imports; the ``swift`` and/or ``Builtin``
 standard modules must be imported explicitly if used.
@@ -128,13 +128,13 @@ Here is an example of a ``.sil`` file::
   }
 
   class Button {
-    def onClick()
-    def onMouseDown()
-    def onMouseUp()
+    func onClick()
+    func onMouseDown()
+    func onMouseUp()
   }
 
   // Declare a Swift function. The body is ignored by SIL.
-  def taxicabNorm(a:Point) -> Double {
+  func taxicabNorm(a:Point) -> Double {
     return a.x + a.y
   }
 
@@ -143,7 +143,7 @@ Here is an example of a ``.sil`` file::
   // of the taxicabNorm Swift function.
   sil @_T5norms11taxicabNormfT1aV5norms5Point_Sd : $(Point) -> Double {
   bb0(%0 : $Point):
-    // def swift.+(Double, Double) -> Double
+    // func swift.+(Double, Double) -> Double
     %1 = function_ref @_TSsoi1pfTSdSd_Sd
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
@@ -325,7 +325,7 @@ types. Function types are transformed in order to encode additional attributes:
 
 - The **fully uncurried representation** of the function type, with
   all of the curried argument clauses flattened into a single argument
-  clause. For instance, a curried function ``def foo(x:A)(y:B) -> C``
+  clause. For instance, a curried function ``func foo(x:A)(y:B) -> C``
   might be emitted as a function of type ``((y:B), (x:A)) -> C``.  The
   exact representation depends on the function's `calling
   convention`_, which determines the exact ordering of currying
@@ -481,7 +481,7 @@ entity discriminators:
 - ``destroyer``: a class's deallocating destructor
 - ``globalaccessor``: the addressor function for a global variable
 - ``defaultarg.``\ *n*: the default argument-generating function for
-  the *n*\ -th argument of a Swift function ``def``
+  the *n*\ -th argument of a Swift ``func``
 - ``foreign``: a specific entry point for C/objective-C interoperability
 
 Methods and curried function definitions in Swift also have multiple
@@ -489,7 +489,7 @@ Methods and curried function definitions in Swift also have multiple
 partial application level. For a curried function declaration::
 
   // Module example
-  def foo(x:A)(y:B)(z:C) -> D
+  func foo(x:A)(y:B)(z:C) -> D
 
 The declaration references and types for the different uncurry levels are as
 follows::
@@ -528,9 +528,9 @@ class (including those inherited from its base class) to the SIL function that
 implements the method for that class::
 
   class A {
-    def foo()
-    def bar()
-    def bas()
+    func foo()
+    func bar()
+    func bas()
   }
 
   sil @A_foo : $((), A) -> ()
@@ -544,7 +544,7 @@ implements the method for that class::
   }
 
   class B : A {
-    def bar()
+    func bar()
   }
 
   sil @B_bar : $((), B) -> ()
@@ -556,7 +556,7 @@ implements the method for that class::
   }
 
   class C : B {
-    def bas()
+    func bas()
   }
 
   sil @C_bas : $((), C) -> ()
@@ -655,21 +655,21 @@ Tuples in the input type of the function are recursively destructured into
 separate arguments, both in the entry point basic block of the callee, and
 in the ``apply`` instructions used by callers::
 
-  def foo(x:Int, y:Int)
+  func foo(x:Int, y:Int)
   
   sil @foo : $(x:Int, y:Int) -> () {
   entry(%x : $Int, %y : $Int):
     ...
   }
 
-  def bar(x:Int, y:(Int, Int))
+  func bar(x:Int, y:(Int, Int))
 
   sil @bar : $(x:Int, y:(Int, Int)) -> () {
   entry(%x : $Int, %y0 : $Int, %y1 : $Int):
     ...
   }
 
-  def call_foo_and_bar() {
+  func call_foo_and_bar() {
     foo(1, 2)
     bar(4, (5, 6))
   }
@@ -687,7 +687,7 @@ in the ``apply`` instructions used by callers::
 Calling a function with trivial value types as inputs and outputs
 simply passes the arguments by value. This Swift function::
 
-  def foo(x:Int, y:Float) -> Char
+  func foo(x:Int, y:Float) -> Char
 
   foo(x, y)
 
@@ -706,7 +706,7 @@ type components each retained and released the same way. This Swift function::
 
   class A {}
 
-  def bar(x:A) -> (Int, A) { ... }
+  func bar(x:A) -> (Int, A) { ... }
 
   bar(x)
 
@@ -735,7 +735,7 @@ returning. This Swift function::
 
   struct [API] A {}
 
-  def bas(x:A, y:Int) -> A { return x }
+  func bas(x:A, y:Int) -> A { return x }
 
   var z = bas(x, y)
   // ... use z ...
@@ -761,7 +761,7 @@ individually according to the above convention. This Swift function::
 
   struct [API] A {}
 
-  def zim(x:Int, y:A, (z:Int, w:(A, Int)))
+  func zim(x:Int, y:A, (z:Int, w:(A, Int)))
 
   zim(x, y, (z, w))
 
@@ -785,7 +785,7 @@ Variadic Arguments
 Variadic arguments and tuple elements are packaged into an array and passed as
 a single array argument. This Swift function::
 
-  def zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
+  func zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
 
   zang(x, (y, z0, z1), v, w0, w1, w2)
 
@@ -804,7 +804,7 @@ each "uncurry level" of the function. When a function is uncurried, its
 outermost argument clauses are combined into a tuple in right-to-left order.
 For the following declaration::
 
-  def curried(x:A)(y:B)(z:C)(w:D) -> Int {}
+  func curried(x:A)(y:B)(z:C)(w:D) -> Int {}
 
 The types of the SIL entry points are as follows::
 
@@ -827,7 +827,7 @@ getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
 value. This Swift function::
 
-  def inout(x:@inout Int) {
+  func inout(x:@inout Int) {
     x = 1
   }
 
@@ -850,7 +850,7 @@ as the inner argument clause(s). When uncurried, the "self" argument is thus
 passed last::
 
   struct Foo {
-    def method(x:Int) -> Int {}
+    func method(x:Int) -> Int {}
   }
 
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
@@ -886,7 +886,7 @@ In SIL, the "self" argument of an Objective-C method is uncurried to the last
 argument of the uncurried type, just like a native Swift method::
 
   @objc class NSString {
-    def stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
+    func stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
   }
 
   sil @NSString_stringByPaddingToLength_withString_startingAtIndex \
@@ -1899,33 +1899,33 @@ to register arguments. This should be fixed.
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::
 
-  def foo(a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
+  func foo(a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
 
 emits curry thunks in SIL as follows (retains and releases omitted for
 clarity)::
 
-  def @foo : $@thin A -> B -> C -> D -> E {
+  func @foo : $@thin A -> B -> C -> D -> E {
   entry(%a : $A):
     %foo_1 = function_ref @foo_1 : $@thin (B, A) -> C -> D -> E
     %thunk = partial_apply %foo_1(%a) : $@thin (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
-  def @foo_1 : $@thin (B, A) -> C -> D -> E {
+  func @foo_1 : $@thin (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
     %foo_2 = function_ref @foo_2 : $@thin (C, B, A) -> D -> E
     %thunk = partial_apply %foo_2(%b, %a) : $@thin (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
-  def @foo_2 : $@thin (C, B, A) -> D -> E {
+  func @foo_2 : $@thin (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
     %foo_3 = function_ref @foo_3 : $@thin (D, C, B, A) -> E
     %thunk = partial_apply %foo_3(%c, %b, %a) : $@thin (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
-  def @foo_3 : $@thin (D, C, B, A) -> E {
+  func @foo_3 : $@thin (D, C, B, A) -> E {
   entry(%d : $D, %c : $C, %b : $B, %a : $A):
     // ... body of foo ...
   }
@@ -1933,8 +1933,8 @@ clarity)::
 A local function in Swift that captures context, such as ``bar`` in the
 following example::
 
-  def foo(x:Int) -> Int {
-    def bar(y:Int) -> Int {
+  func foo(x:Int) -> Int {
+    func bar(y:Int) -> Int {
       return x + y
     }
     return bar(1)
@@ -1942,12 +1942,12 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  def @bar : $@thin (Int, Builtin.ObjectPointer, *Int) -> Int {
+  func @bar : $@thin (Int, Builtin.ObjectPointer, *Int) -> Int {
   entry(%y : $Int, %x_box : $Builtin.ObjectPointer, %x_address : $*Int):
     // ... body of bar ...
   }
 
-  def @foo : $@thin Int -> Int {
+  func @foo : $@thin Int -> Int {
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
@@ -2387,7 +2387,7 @@ protocol instance methods obtained by ``protocol_method`` from the same
 existential container. A method call on a protocol-type value in Swift::
 
   protocol Foo {
-    def bar(x:Int)
+    func bar(x:Int)
   }
 
   var foo:Foo
@@ -2454,7 +2454,7 @@ This value can be passed to protocol instance methods obtained by
 class-protocol-type value in Swift::
 
   @class_protocol protocol Foo {
-    def bar(x:Int)
+    func bar(x:Int)
   }
 
   var foo:Foo

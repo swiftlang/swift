@@ -999,7 +999,7 @@ VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
 }
 
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
-                                       SourceLoc StaticLoc, SourceLoc DefLoc,
+                                       SourceLoc StaticLoc, SourceLoc FuncLoc,
                                        Identifier Name, SourceLoc NameLoc,
                                        GenericParamList *GenericParams,
                                        Type Ty, unsigned NumParamPatterns,
@@ -1009,12 +1009,12 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
       sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
       alignof(FuncDecl));
   return ::new (Mem)
-      FuncDecl(StaticLoc, DefLoc, Name, NameLoc, NumParamPatterns,
+      FuncDecl(StaticLoc, FuncLoc, Name, NameLoc, NumParamPatterns,
                GenericParams, Ty, Parent);
 }
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
-                           SourceLoc DefLoc, Identifier Name,
+                           SourceLoc FuncLoc, Identifier Name,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
                            ArrayRef<Pattern *> BodyParams,
@@ -1022,7 +1022,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   assert(ArgParams.size() == BodyParams.size());
   const unsigned NumParamPatterns = ArgParams.size();
   auto *FD = FuncDecl::createDeserialized(
-      Context, StaticLoc, DefLoc, Name, NameLoc, GenericParams, Ty,
+      Context, StaticLoc, FuncLoc, Name, NameLoc, GenericParams, Ty,
       NumParamPatterns, Parent);
   FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
   return FD;
@@ -1159,14 +1159,14 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 SourceRange FuncDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { DefLoc, BodyEndLoc };
+    return { FuncLoc, BodyEndLoc };
 
   if (auto *B = getBody())
-    return { DefLoc, B->getEndLoc() };
+    return { FuncLoc, B->getEndLoc() };
   if (getBodyResultTypeLoc().hasLocation())
-    return { DefLoc, getBodyResultTypeLoc().getSourceRange().End };
+    return { FuncLoc, getBodyResultTypeLoc().getSourceRange().End };
   const Pattern *LastPat = getArgParamPatterns().back();
-  return { DefLoc, LastPat->getEndLoc() };
+  return { FuncLoc, LastPat->getEndLoc() };
 }
 
 /// Determine whether the given type is (or bridges to) an

@@ -6,7 +6,7 @@ import Builtin
 import swift
 
 protocol P {
-  def foo()
+  func foo()
 }
 
 sil @takeInt : $@cc(method) @thin ((), @inout Int64) -> ()
@@ -52,7 +52,7 @@ class C {
 struct NontrivialStruct {
   var a: Int
   var b: C
-  def foo()
+  func foo()
 }
 
 

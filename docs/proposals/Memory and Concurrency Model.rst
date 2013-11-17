@@ -109,12 +109,12 @@ definition. These kinds are:
    multithreaded mandelbrot example, that does each pixel in "parallel", to
    illustrate some ideas::
 
-     def do_mandelbrot(x : float, y : float) -> int {
+     func do_mandelbrot(x : float, y : float) -> int {
        // details elided
      }
      
      actor MandelbrotCalculator {
-       def compute(x : float, y : float, Driver D) {
+       func compute(x : float, y : float, Driver D) {
          var num_iters = do_mandelbrot(x, y)
          D.collect_point(x, y, num_iters)
        }
@@ -123,7 +123,7 @@ definition. These kinds are:
      actor Driver {
        var result : image; // result and numpoints are mutable per-actor data.
        var numpoints : int;
-       def main() {
+       func main() {
          result = new image()
          foreach i in -2.0 .. 2.0 by 0.001 {
            // Arbitrarily, create one MandelbrotCalculator for each row.
@@ -135,7 +135,7 @@ definition. These kinds are:
          }
        }
      
-       def collect_point(x : float, y : float, num_iters : int) {
+       func collect_point(x : float, y : float, num_iters : int) {
          result.setPoint(x, y, Color(num_iters, num_iters, num_iters))
          if (--numpoints == 0)
          draw(result)
@@ -171,9 +171,9 @@ With the basic approach above, you can only perform actions on actors that are
 built into the actor. For example, if you had an actor with two methods::
 
   actor MyActor {
-    def foo() {…}
-    def bar() {…}
-    def getvalue() -> double {… }
+    func foo() {…}
+    func bar() {…}
+    func getvalue() -> double {… }
   }
 
 Then there is no way to perform a composite operation that needs to "atomically"

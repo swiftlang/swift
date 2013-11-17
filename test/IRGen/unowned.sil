@@ -9,7 +9,7 @@
 
 class C {}
 @class_protocol protocol P {
-  def explode()
+  func explode()
 }
 
 struct A {

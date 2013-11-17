@@ -228,7 +228,7 @@ enum class DeclVisibilityKind {
   /// \code
   ///   struct A {
   ///     typealias Foo = Int
-  ///     def f() {
+  ///     func f() {
   ///       // (1)
   ///     }
   ///   }
@@ -246,7 +246,7 @@ enum class DeclVisibilityKind {
   ///   struct A {
   ///     typealias Foo = Int
   ///     struct B {
-  ///       def foo() {
+  ///       func foo() {
   ///         // (1)
   ///       }
   ///     }

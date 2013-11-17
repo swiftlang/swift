@@ -28,7 +28,7 @@ Default arguments, named arguments, and named argument reordering are
 supported (Note: these features “fall out” of our ability to pass
 argument sets as tuples).  For example, given::
 
-  def foo(a : int = 4, b : int = 5, c : int = 6) { ... }
+  func foo(a : int = 4, b : int = 5, c : int = 6) { ... }
 
 The following calls to foo are allowed::
 

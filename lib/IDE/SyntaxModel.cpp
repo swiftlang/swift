@@ -154,7 +154,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isGetterOrSetter()) {
       // Pass get / set context sensitive keyword token.
-      SourceLoc SL = FD->getDefLoc();
+      SourceLoc SL = FD->getFuncLoc();
       if (!passNonTokenNode({ SyntaxNodeKind::Keyword, CharSourceRange(SL, 3)}))
         return false;
     }

@@ -242,7 +242,7 @@ Function Parameters
 
 Function parameters can be explicitly declared ``val``, or ``ref``::
 
-  def baz(
+  func baz(
       x: Int      // x is passed by-value
     , val y: Int  // just like "y: Int"
     , ref z: Int  // allocate z on the heap
@@ -288,7 +288,7 @@ type parameter, as follows::
 parameters::
 
   // Fill an array with independent copies of x
-  def fill<T:val>(array:T[], x:T) {
+  func fill<T:val>(array:T[], x:T) {
     for i in 0..array.length {
       array[i] = x
     }
@@ -298,7 +298,7 @@ Protocols similarly can inherit from ``val`` or ``ref`` constraints, to require
 conforming types to have the specified semantics::
 
   protocol Disposable : ref {
-    def dispose()
+    func dispose()
   }
 
 The ability to explicitly declare ``val`` and ``ref`` allow us to
@@ -514,7 +514,7 @@ as follows::
   val x : SomeClass
 
   extension SomeClass {
-    def get_ref() { return this }
+    func get_ref() { return this }
   }
 
   ref y : x.get_ref()

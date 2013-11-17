@@ -15,7 +15,7 @@ could let people write algorithms the way they do with arrays:
 .. parsed-literal::
 
   extension Indexable {
-    def find<Seq: Indexable where Seq.Element: Equatable>(
+    func find<Seq: Indexable where Seq.Element: Equatable>(
       s: Seq, findme: Seq.Element) -> Seq.Index
     {
       for var i = s.start; i != s.end; **++i** {
@@ -46,7 +46,7 @@ indices:
 
 .. parsed-literal::
 
-  def find<Seq: Indexable where Seq.Element: Equatable>(
+  func find<Seq: Indexable where Seq.Element: Equatable>(
     s: Seq, findme: Seq.Element) -> Seq.Index
   {
     for var i = s.start; i != s.end; i = **s.succ(i)** {
@@ -65,7 +65,7 @@ becomes implicit:
 .. parsed-literal::
 
   extension Indexable where Self.Element: Equatable {
-    def find(findme: Seq.Element) -> Seq.Index
+    func find(findme: Seq.Element) -> Seq.Index
     {
       for var i = **start**; i != **end**; **i = succ(i)** {
         if **self[i]** == findme {
@@ -85,12 +85,12 @@ completely natural syntax:
   protocol Indexable {
     typealias Index
     typealias Element
-    **@method, @assignment, @prefix def ++(_: @inout Index)**
-    def subscript(_:Index) -> Element
+    **@method, @assignment, @prefix func ++(_: @inout Index)**
+    func subscript(_:Index) -> Element
   }
 
   extension Indexable where Self.Element: Equatable {
-    def find(findme: Seq.Element) -> Seq.Index
+    func find(findme: Seq.Element) -> Seq.Index
     {
       for var i = start; i != end; **++i** {
         if **self[i]** == findme {

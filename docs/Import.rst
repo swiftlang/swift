@@ -12,7 +12,7 @@ IMPORT SYNTAX
 
   import-kind ::= 'class'
   import-kind ::= 'enum'
-  import-kind ::= 'def'
+  import-kind ::= 'func'
   import-kind ::= 'protocol'
   import-kind ::= 'struct'
   import-kind ::= 'typealias'
@@ -61,7 +61,7 @@ Importing Individual Declarations
 
 Instead of importing the entire contents of a module, individual declarations
 may be imported. This is done by naming the kind of declaration being imported
-before the qualified name, such as ``def``, ``var``, or ``class``. The module
+before the qualified name, such as ``func``, ``var``, or ``class``. The module
 name is still imported for qualified lookup of other symbols::
 
   // Import only the Cocoa.NSWindow class
@@ -73,9 +73,9 @@ name is still imported for qualified lookup of other symbols::
 As with modules, multiple declarations may be imported in a comma-separated
 list, or imported out of a common parent module with a parenthesized list::
 
-  import def OpenGL.GL3.glDrawArrays, def OpenGL.GL3.Ext.glTextureRangeAPPLE
+  import func OpenGL.GL3.glDrawArrays, func OpenGL.GL3.Ext.glTextureRangeAPPLE
   // Equivalent
-  import OpenGL.GL3.(def glDrawArrays, def Ext.glTextureRangeAPPLE)
+  import OpenGL.GL3.(func glDrawArrays, func Ext.glTextureRangeAPPLE)
 
 RESOLVING NAME CLASHES
 ======================
@@ -144,7 +144,7 @@ fails, we fall back to qualified lookup into the module::
   import Foo // exports bas
 
   class Foo {
-    static def bar()
+    static func bar()
   }
 
   Foo.bar() // bar method from Foo class

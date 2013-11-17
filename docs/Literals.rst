@@ -39,7 +39,7 @@ library's Policy.swift::
   // NOTE: the compiler has builtin knowledge of this protocol
   protocol StringLiteralConvertible {
     typealias StringLiteralType : BuiltinStringLiteralConvertible
-    static def convertFromStringLiteral(value: StringLiteralType) -> Self
+    static func convertFromStringLiteral(value : StringLiteralType) -> Self
   }
 
 Curiously, the protocol is not defined in terms of primitive types, but in
@@ -60,9 +60,9 @@ Policy.swift contains a second protocol::
 
   // NOTE: the compiler has builtin knowledge of this protocol
   protocol BuiltinStringLiteralConvertible {
-    static def _convertFromBuiltinStringLiteral(value: Builtin.RawPointer,
-                                                byteSize: Builtin.Int64,
-                                                isASCII: Builtin.Int1) -> Self
+    static func _convertFromBuiltinStringLiteral(value : Builtin.RawPointer,
+                                                 byteSize : Builtin.Int64,
+                                                 isASCII: Builtin.Int1) -> Self
   }
 
 The use of builtin types makes it clear that this is *only* for use in the

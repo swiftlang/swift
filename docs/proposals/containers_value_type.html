@@ -65,7 +65,7 @@ simpler (default) syntax is by value:
 </p>
 
 <blockquote><pre>
-def foo(c : Character, i : Int)  <font color="#C80000">// define foo</font>
+func foo(c : Character, i : Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -79,7 +79,7 @@ individual parameter:
 </p>
 
 <blockquote><pre>
-def foo(c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
+func foo(c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -101,7 +101,7 @@ at the call site:
 </p>
 
 <blockquote><pre>
-def doWork() {
+func doWork() {
   <font color="#C80000">// ...</font>
   foo(c, i)
   bar(i)
@@ -118,7 +118,7 @@ to modify its last argument:
 </p>
 
 <blockquote><pre>
-def foo(c : Character, i : <b>[inout]</b> Int)
+func foo(c : Character, i : <b>[inout]</b> Int)
 </pre></blockquote>
 
 <p>
@@ -135,7 +135,7 @@ reference:
 </p>
 
 <blockquote><pre>
-def foo(c : Character, i : Int)
+func foo(c : Character, i : Int)
 </pre></blockquote>
 
 <p>
@@ -143,7 +143,7 @@ Now in <code>doWork</code>:
 </p>
 
 <blockquote><pre>
-def doWork() {
+func doWork() {
   <font color="#C80000">// ...</font>
   foo(c, i)
   bar(i)
@@ -177,14 +177,14 @@ a modified value or not:
 </p>
 
 <blockquote><pre>
-def doWork() {
+func doWork() {
   <font color="#C80000">// ...</font>
   foo(c, i)
   bar(i)  <font color="#C80000">// i is unchanged by foo</font>
   <font color="#C80000">// ...</font>
 }
 
-def doOtherWork() {
+func doOtherWork() {
   <font color="#C80000">// ...</font>
   foo(c, &amp;i)
   bar(i)  <font color="#C80000">// i is most likely modified by foo</font>
@@ -212,9 +212,9 @@ will compile this code:
 </p>
 
 <blockquote><pre>
-def foo(v : Array, i : Int)  <font color="#C80000">// define foo</font>
+func foo(v : Array, i : Int)  <font color="#C80000">// define foo</font>
 
-def doWork() {
+func doWork() {
   <font color="#C80000">// ...</font>
   foo(v, i)
   bar(v)
@@ -386,7 +386,7 @@ passed, semantically, <i>by-value</i>.
 </p>
 
 <blockquote><pre>
-def _backgroundSortNewFilteredMessages(messages : Array) -&gt; _FilteredListInfo {
+func _backgroundSortNewFilteredMessages(messages : Array) -&gt; _FilteredListInfo {
     // ...
     res.filteredMessages = messages;  <font color="#C80000">// copy here!</font>
     // ...

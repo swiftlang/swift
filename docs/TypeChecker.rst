@@ -13,11 +13,11 @@ Approach
 
 The Swift language and its type system incorporate a number of popular language features, including object-oriented programming via classes, function and operator overloading, subtyping, and constrained parametric polymorphism. Swift makes extensive use of type inference, allowing one to omit the types of many variables and expressions. For example::
 
-  def round(x : Double) -> Int { /* ... */ }
+  func round(x : Double) -> Int { /* ... */ }
   var pi : Double = 3.14159
   var three = round(pi) // 'three' has type 'Int'
 
-  def identity<T>(x : T) -> T { return x }
+  func identity<T>(x : T) -> T { return x }
   var eFloat : Float = -identity(2.71828)  // numeric literal gets type 'Float'
 
 Swift's type inference allows type information to flow in two directions. As in most mainstream languages, type information can flow from the leaves of the expression tree (e.g., the expression 'pi', which refers to a double) up to the root (the type of the variable 'three'). However, Swift also allows type information to flow from the context (e.g., the fixed type of the variable 'eFloat') at the root of the expression tree down to the leaves (the type of the numeric literal 2.71828). This bi-directional type inference is common in languages that use ML-like type systems, but is not present in mainstream languages like C++, Java, C#, or Objective-C.
@@ -225,7 +225,7 @@ and types generated from the primary expression kinds are:
   kind of literal, e.g., "``T0`` is an integer literal."
 
 **Function expressions**
-  A function expression ``def (params) -> result { body }`` is
+  A function expression ``func (params) -> result { body }`` is
   assigned a function type based on the specified parameters and
   result type. The parameter pattern is walked to construct the
   parameter type of the function: wherever types are omitted for a
@@ -269,8 +269,8 @@ Overloading is the process of giving multiple, different definitions
 to the same name. For example, we might overload a ``negate`` function
 to work on both ``Int`` and ``Double`` types, e.g.::
 
-  def negate(x : Int) -> Int { return -x }
-  def negate(x : Double) -> Double { return -x }
+  func negate(x : Int) -> Int { return -x }
+  func negate(x : Double) -> Double { return -x }
 
 Given that there are two definitions of ``negate``, what is the type of
 the declaration reference expression ``negate``? If one selects the
@@ -328,7 +328,7 @@ parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
 
-  def min<T : Comparable>(x : T, y : T) -> T {
+  func min<T : Comparable>(x : T, y : T) -> T {
     if y < x { return y }
     return x
   }
@@ -669,11 +669,11 @@ checking problem::
 
   struct X {
     // user-defined conversions
-    def [conversion] __conversion () -> String { /* ... */ }
-    def [conversion] __conversion () -> Int { /* ... */ }
+    func [conversion] __conversion () -> String { /* ... */ }
+    func [conversion] __conversion () -> Int { /* ... */ }
   }
 
-  def f(i : Int, s : String) { }
+  func f(i : Int, s : String) { }
 
   var x : X
   f(10.5, x)
@@ -779,8 +779,8 @@ consider a slight modification to our example, so that the argument to
 ``f`` is provided by another call, we get a different result
 entirely::
 
-  def f(i : Int, s : String) { }
-  def g() -> (f : Float, x : X) { }
+  func f(i : Int, s : String) { }
+  func g() -> (f : Float, x : X) { }
 
   f(g())
 

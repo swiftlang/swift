@@ -155,15 +155,15 @@ class RootGeneric<T> {
 
   // Test that declaration order doesn't cause the field offset vector to end
   // up interleaved with the vtable.
-  def foo()
+  func foo()
 
   var y : T
 
-  def bar()
+  func bar()
 
   var z : UInt8
 
-  def bas()
+  func bas()
 }
 
 class RootGenericFixedLayout<T> {
@@ -181,16 +181,16 @@ class RootNonGeneric {
 class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
   var w : Int
 
-  def zim()
-  def zang()
+  func zim()
+  func zang()
 }
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
 
-  def zippity()
-  def doo()
-  def dah()
+  func zippity()
+  func doo()
+  func dah()
 }
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {

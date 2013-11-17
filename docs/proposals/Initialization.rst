@@ -121,7 +121,7 @@ statically know the type of the complete object being initialized. For
 example, this permits the construction ``A(5)`` but not the
 following::
 
-  def createAnA(aClass: A.metatype) -> A {
+  func createAnA(aClass: A.metatype) -> A {
     return aClass(5) // error: no complete initializer accepting an ``Int``
   }
 
