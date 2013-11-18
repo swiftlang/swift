@@ -310,7 +310,8 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   // so that testcases are easier to write.  This can be done by creating the
   // function then using the splice method on the module's ilist of functions.
   return new (M) SILFunction(M, SILLinkage::Internal, ClonedName,
-                             M.Types.getLoweredType(ClonedTy));
+                             M.Types.getLoweredType(ClonedTy),
+                             Orig->getLocation());
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
