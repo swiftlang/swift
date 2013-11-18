@@ -4277,18 +4277,25 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
 /// Emit a projection from an existential container to its concrete value
 /// buffer with the type metadata for the contained value.
 static std::pair<Address, llvm::Value*>
-emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
+emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
                                             Address base,
                                             SILType baseTy) {
   assert(baseTy.isExistentialType());
-  assert(!baseTy.isClassExistentialType());
-  auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
-  auto layout = baseTI.getLayout();
-
-  llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
-  Address buffer = layout.projectExistentialBuffer(IGF, base);
-  llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
-  return {Address(object, Alignment(1)), metadata};
+  if (baseTy.isClassExistentialType()) {
+    auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
+    auto valueAddr = baseTI.projectValue(IGF, base);
+    auto value = IGF.Builder.CreateLoad(valueAddr);
+    auto metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
+    return {valueAddr, metadata};
+  } else {
+    auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
+    auto layout = baseTI.getLayout();
+    
+    llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
+    Address buffer = layout.projectExistentialBuffer(IGF, base);
+    llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
+    return {Address(object, Alignment(1)), metadata};
+  }
 }
 
 /// Emit a projection from an existential container to its concrete value
@@ -4296,7 +4303,7 @@ emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
 Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                                Address base,
                                                SILType baseTy) {
-  return emitOpaqueExistentialProjectionWithMetadata(IGF, base, baseTy)
+  return emitIndirectExistentialProjectionWithMetadata(IGF, base, baseTy)
     .first;
 }
 
@@ -4356,20 +4363,19 @@ Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
 
 /// Emit a checked unconditional cast of an opaque existential container's
 /// contained value.
-Address irgen::emitOpaqueExistentialDowncast(IRGenFunction &IGF,
-                                             Address container,
-                                             SILType srcType,
-                                             SILType destType,
-                                             CheckedCastMode mode) {
+Address irgen::emitIndirectExistentialDowncast(IRGenFunction &IGF,
+                                               Address container,
+                                               SILType srcType,
+                                               SILType destType,
+                                               CheckedCastMode mode) {
   assert(srcType.isExistentialType());
-  assert(!srcType.isClassExistentialType());
   
   // Project the value pointer and source type metadata out of the existential
   // container.
   Address value;
   llvm::Value *srcMetadata;
   std::tie(value, srcMetadata)
-    = emitOpaqueExistentialProjectionWithMetadata(IGF, container, srcType);
+    = emitIndirectExistentialProjectionWithMetadata(IGF, container, srcType);
 
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }

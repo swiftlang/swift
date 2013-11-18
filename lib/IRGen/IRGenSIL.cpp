@@ -2402,10 +2402,10 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   case CheckedCastKind::ExistentialToConcrete: {
     if (operand.getType().isAddress()) {
       Address existential = IGF.getLoweredAddress(operand);
-      return emitOpaqueExistentialDowncast(IGF, existential,
-                                           operand.getType(),
-                                           destTy,
-                                           mode);
+      return emitIndirectExistentialDowncast(IGF, existential,
+                                             operand.getType(),
+                                             destTy,
+                                             mode);
     } else {
       Explosion existential = IGF.getLoweredExplosion(operand);
       llvm::Value *instance

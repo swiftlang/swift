@@ -197,13 +197,13 @@ namespace irgen {
                                       SILType destType,
                                       CheckedCastMode mode);
   
-  /// Emit a checked cast of an opaque existential container's
+  /// Emit a checked cast of an existential container's
   /// contained value.
-  Address emitOpaqueExistentialDowncast(IRGenFunction &IGF,
-                                        Address value,
-                                        SILType srcType,
-                                        SILType destType,
-                                        CheckedCastMode mode);
+  Address emitIndirectExistentialDowncast(IRGenFunction &IGF,
+                                          Address value,
+                                          SILType srcType,
+                                          SILType destType,
+                                          CheckedCastMode mode);
   
   /// Emit a checked cast to an Objective-C protocol or protocol composition.
   llvm::Value *emitObjCExistentialDowncast(IRGenFunction &IGF,
