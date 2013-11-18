@@ -1344,23 +1344,6 @@ public:
     : UnaryInstructionBase(Loc, Base, Metatype) {}
 };
 
-/// ModuleInst - Represents a reference to a module as a value.
-class ModuleInst : public SILInstruction {
-public:
-  
-  ModuleInst(SILLocation Loc, SILType ModuleType);
-  
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ModuleInst;
-  }
-};
-  
 /// Extract a numbered element out of a value of tuple type.
 class TupleExtractInst
   : public UnaryInstructionBase<ValueKind::TupleExtractInst>

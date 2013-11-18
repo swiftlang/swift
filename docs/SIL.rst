@@ -1624,18 +1624,6 @@ TODO: ``builtin_zero`` is a temporary hack to support our current AST-level
 default initialization implementation. Definitive assignment analysis in SIL
 will supersede this.
 
-module
-``````
-::
-
-  sil-instruction ::= 'module' sil-decl-ref
-
-  %1 = module #M
-  // #M must be a module name
-  // %1 has type $module<M>
-
-Creates a module value for the module ``M``.
-
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 

@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1167,8 +1168,9 @@ RValue RValueEmitter::visitDotSyntaxBaseIgnoredExpr(
 }
 
 RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
-  SILValue module =
-    SGF.B.createModule(E, SGF.getLoweredLoadableType(E->getType()));
+  // Produce an undef value. The module value should never actually be used.
+  SILValue module = SILUndef::get(SGF.getLoweredLoadableType(E->getType()),
+                                  SGF.SGM.M);
   return RValue(SGF, ManagedValue(module, ManagedValue::Unmanaged), E);
 }
 

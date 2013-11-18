@@ -550,9 +550,6 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : SILInstruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
-ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
-  : SILInstruction(ValueKind::ModuleInst, Loc, ModuleType) {}
-
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
                                                SILValue Operand,
                                                SILType SelfTy)

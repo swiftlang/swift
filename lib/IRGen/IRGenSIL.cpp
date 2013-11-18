@@ -539,7 +539,6 @@ public:
   void visitStructExtractInst(StructExtractInst *i);
   void visitStructElementAddrInst(StructElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
-  void visitModuleInst(ModuleInst *i);
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
@@ -2042,12 +2041,6 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
                                                     i->getField())
     .getAddress();
   setLoweredAddress(SILValue(i, 0), field);
-}
-
-void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
-  // Currently, module values are always empty.
-  Explosion empty(ExplosionKind::Maximal);
-  setLoweredExplosion(SILValue(i, 0), empty);
 }
 
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {

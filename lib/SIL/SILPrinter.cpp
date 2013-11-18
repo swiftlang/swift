@@ -893,9 +893,6 @@ public:
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype " << MI->getType();
   }
-  void visitModuleInst(ModuleInst *MI) {
-    OS << "module #" << MI->getType().castTo<ModuleType>()->getModule()->Name;
-  }
   
   void visitStrongRetainInst(StrongRetainInst *RI) {
     OS << "strong_retain " << getIDAndType(RI->getOperand());

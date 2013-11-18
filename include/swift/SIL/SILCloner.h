@@ -623,14 +623,6 @@ SILCloner<ImplClass>::visitProtocolMetatypeInst(ProtocolMetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitModuleInst(ModuleInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createModule(getOpLocation(Inst->getLoc()),
-                         getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   doPostProcess(Inst,
     Builder.createTupleExtract(getOpLocation(Inst->getLoc()),

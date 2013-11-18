@@ -748,13 +748,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createMarkFunctionEscape(Loc, OpList);
     break;
   }
-  case ValueKind::ModuleInst: {
-    // Has IdentifierID for the module reference. Use SILOneTypeLayout.
-    auto Mod = MF->getModule(MF->getIdentifier(TyID));
-    ResultVal = Builder.createModule(Loc,
-                    getSILType(ModuleType::get(Mod), SILValueCategory::Object));
-    break;
-  }
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst: {
     SILValue Val = getLocalValue(ValID, ValResNum,

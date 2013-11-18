@@ -528,7 +528,6 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int64                   // CHECK: alloc_box
   %4 = store %0 to %2#1 : $*Builtin.RawPointer
   %5 = store %1 to %3#1 : $*Builtin.Int64
-  // %6 = module #Builtin
   %7 = load %2#1 : $*Builtin.RawPointer           // CHECK: load
   %8 = load %3#1 : $*Builtin.Int64                // CHECK: load
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Int64
@@ -672,7 +671,6 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %3 = alloc_box $Builtin.Int1
   store %0 to %2#1 : $*Builtin.Int1
   store %1 to %3#1 : $*Builtin.Int1
-  %6 = module #Builtin              // CHECK: module #Builtin
   // CHECK: builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %7 = builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %8 = load %2#1 : $*Builtin.Int1
@@ -988,7 +986,6 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   %8 = alloc_stack $Foo  // var self              // users: %15, %14, %9
   store %2 to %8#1 : $*Foo
   %10 = metatype $Int64.metatype
-  %11 = module #Builtin
   %12 = integer_literal $Builtin.Int64, 0         // user: %13
   %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %18
   destroy_addr %8#1 : $*Foo

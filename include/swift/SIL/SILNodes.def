@@ -106,7 +106,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(FloatLiteralInst, SILInstruction, None)
   INST(StringLiteralInst, SILInstruction, None)
   INST(BuiltinZeroInst, SILInstruction, None)
-  INST(ModuleInst, SILInstruction, None)
 
   // Dynamic Dispatch
   ABSTRACT_VALUE(MethodInst, SILInstruction)

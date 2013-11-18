@@ -586,10 +586,6 @@ public:
             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "protocol_metatype result must be metatype of operand type");
   }
-  void checkModuleInst(ModuleInst *MI) {
-    require(MI->getType(0).is<ModuleType>(),
-            "module instruction must be of module type");
-  }
   
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");

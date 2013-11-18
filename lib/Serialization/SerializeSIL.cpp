@@ -663,16 +663,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)MI->getType().getCategory());
     break;
   }
-  case ValueKind::ModuleInst: {
-    // Has IdentifierID for the module reference. Use SILOneTypeLayout.
-    const ModuleInst *MI = cast<ModuleInst>(&SI);
-    ModuleType *MT = MI->getType().castTo<ModuleType>();
-    SILOneTypeLayout::emitRecord(Out, ScratchRecord,
-                      SILAbbrCodes[SILOneTypeLayout::Code],
-                      (unsigned)SI.getKind(),
-                      S.addModuleRef(MT->getModule()), 0);
-    break;
-  }
   case ValueKind::ProjectExistentialInst: {
     const ProjectExistentialInst *PEI = cast<ProjectExistentialInst>(&SI);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,

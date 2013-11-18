@@ -594,10 +594,6 @@ public:
     return insert(new (F.getModule()) ProtocolMetatypeInst(Loc, Metatype,Base));
   }
   
-  ModuleInst *createModule(SILLocation Loc, SILType ModuleType) {
-    return insert(new (F.getModule()) ModuleInst(Loc, ModuleType));
-  }
-  
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) StrongRetainInst(Loc, Operand));
   }
