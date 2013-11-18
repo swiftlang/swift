@@ -467,8 +467,6 @@ namespace {
   /// ElementPromotion - This is the main heavy lifting for processing the uses
   /// of an element of an allocation.
   class ElementPromotion {
-    SILModule &M;
-
     /// TheMemory - This is either an alloc_box instruction or a
     /// mark_uninitialized instruction.  This represents the start of the
     /// lifetime of the value being analyzed.
@@ -482,6 +480,7 @@ namespace {
     unsigned NumMemorySubElements;
 
     SmallVectorImpl<MemoryUse> &Uses;
+    SmallVectorImpl<SILInstruction*> &Releases;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
@@ -497,20 +496,10 @@ namespace {
     std::vector<SILLocation> EmittedErrorLocs;
   public:
     ElementPromotion(SILInstruction *TheMemory,
-                     SmallVectorImpl<MemoryUse> &Uses);
+                     SmallVectorImpl<MemoryUse> &Uses,
+                     SmallVectorImpl<SILInstruction*> &Releases);
 
     bool doIt();
-
-    void processReleases(SmallVectorImpl<SILInstruction*> &Releases) {
-      // If all uses are ok, check releases to make sure we only destroy values
-      // in places where they are actually constructed.
-      for (auto I : Releases) {
-        processRelease(I);
-        
-        // FIXME: processRelease shouldn't generate diagnostics.
-        if (!EmittedErrorLocs.empty()) return;
-      }
-    }
 
   private:
     
@@ -569,12 +558,13 @@ namespace {
 
 
 ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
-                                   SmallVectorImpl<MemoryUse> &Uses)
-  : M(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses) {
+                                   SmallVectorImpl<MemoryUse> &Uses,
+                                   SmallVectorImpl<SILInstruction*> &Releases)
+  : TheMemory(TheMemory), Uses(Uses), Releases(Releases) {
 
   auto MemTy = getTheMemoryType();
   NumTupleElements = getTupleElementCount(MemTy.getSwiftRValueType());
-  NumMemorySubElements = getNumSubElements(MemTy, M);
+  NumMemorySubElements = getNumSubElements(MemTy, TheMemory->getModule());
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -756,6 +746,15 @@ bool ElementPromotion::doIt() {
     if (Use.Inst && Use.Kind == UseKind::Load)
       if (promoteLoad(Use.Inst))
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
+  }
+
+  // If all uses are ok, check releases to make sure we only destroy values
+  // in places where they are actually constructed.
+  for (auto I : Releases) {
+    processRelease(I);
+
+    // FIXME: processRelease shouldn't generate diagnostics.
+    if (!EmittedErrorLocs.empty()) return true;
   }
 
   return false;
@@ -1349,7 +1348,8 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, M);
+  unsigned NumLoadSubElements =
+    getNumSubElements(LoadTy, TheMemory->getModule());
   
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
@@ -1943,9 +1943,7 @@ static void processAllocation(SILInstruction *I) {
 
   // Promote each tuple element individually, since they have individual
   // lifetimes and DI properties.
-  ElementPromotion EP(I, Uses);
-  if (!EP.doIt())
-    EP.processReleases(Releases);
+  ElementPromotion(I, Uses, Releases).doIt();
 
   removeDeadAllocation(I, Uses);
 }
@@ -1962,8 +1960,7 @@ static void processMarkUninitialized(MarkUninitializedInst *MUI) {
   ElementUseCollector(Uses, Releases).collectFromMarkUninitialized(MUI);
 
   assert(Releases.empty() && "Shouldn't have releases of MUIs");
-
-  ElementPromotion(MUI, Uses).doIt();
+  ElementPromotion(MUI, Uses, Releases).doIt();
 }
 
 
