@@ -892,9 +892,13 @@ public:
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
     if (auto overridden = member.getOverridden()) {
-      // If we overrode an ObjC decl, it won't be in a vtable; create a new
-      // entry.
+      // If we overrode an ObjC decl, or a decl from an extension, it won't be
+      // in a vtable; create a new entry.
       if (overridden.getDecl()->hasClangNode())
+        goto not_overridden;
+      // If we overrode a decl from an extension, it won't be in a vtable
+      // either. This can occur for extensions to ObjC classes.
+      if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
         goto not_overridden;
 
       for (SILVTable::Pair &entry : vtableEntries) {
