@@ -24,6 +24,7 @@
 using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
+STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 
@@ -510,6 +511,7 @@ namespace {
     void processNonTrivialRelease(SILInstruction *Inst);
 
     bool promoteLoad(SILInstruction *Inst);
+    bool promoteDestroyAddr(DestroyAddrInst *DAI);
 
     bool isLiveOut1(SILBasicBlock *BB);
     llvm::SmallBitVector isLiveOutN(SILBasicBlock *BB);
@@ -534,6 +536,7 @@ namespace {
 
     void explodeCopyAddr(CopyAddrInst *CAI);
 
+    void tryToRemoveDeadAllocation();
   };
 } // end anonymous namespace
 
@@ -728,8 +731,23 @@ bool ElementPromotion::doIt() {
   // If we emitted an error, there is no reason to proceed with load promotion.
   if (!EmittedErrorLocs.empty()) return true;
 
+  // If the memory object has nontrivial type, then any destroy/release of the
+  // memory object will destruct the memory.  If the memory (or some element
+  // thereof) is not initialized on some path, the bad things happen.  Process
+  // releases to adjust for this.
+  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
+    for (auto I : Releases) {
+      processNonTrivialRelease(I);
+
+      // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
+      if (!EmittedErrorLocs.empty()) return true;
+    }
+  }
+
+
   // If we've successfully checked all of the definitive initialization
-  // requirements, try to promote loads.
+  // requirements, try to promote loads.  This can explode copy_addrs, so the
+  // use list may change size.
   for (unsigned i = 0; i != Uses.size(); ++i) {
     auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
@@ -738,18 +756,21 @@ bool ElementPromotion::doIt() {
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
   }
 
-  // If the memory object has nontrivial type, then any destroy/release of the
-  // memory object will destruct the memory.  If the memory (or some element
-  // thereof) is not initialized on some path, the bad things happen.  Process
-  // releases to adjust for this.
-  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
-    for (auto I : Releases) {
-      processNonTrivialRelease(I);
-      
-      // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
-      if (!EmittedErrorLocs.empty()) return true;
-    }
+  // destroy_addr(p) is strong_release(load(p)), try to promote it too.
+  for (unsigned i = 0; i != Releases.size(); ++i) {
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(Releases[i]))
+      if (promoteDestroyAddr(DAI)) {
+        // remove entry if destroy_addr got deleted.
+        Releases[i] = Releases.back();
+        Releases.pop_back();
+        --i;
+      }
   }
+
+
+  // If this is an allocation, try to remove it completely.
+  if (!isa<MarkUninitializedInst>(TheMemory))
+    tryToRemoveDeadAllocation();
 
   return false;
 }
@@ -825,14 +846,19 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 /// value is initialized.
 ///
 void ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
+  // If the memory object is completely initialized, then nothing needs to be
+  // done at this release point.
+  DIKind DI =
+    checkDefinitelyInit(MemoryUse(Inst, UseKind::Escape, 0, NumTupleElements));
+  if (DI == DI_Yes) return;
 
-  // Empty tuples (and tuples thereof) can cause a memory object to be nothing,
-  // and empty tuples have no
-  if (NumTupleElements == 0) return;
-  
-  // FIXME: This should not form a hacky use.
-  auto Use = MemoryUse(Inst, UseKind::Escape, 0, NumTupleElements);
-  DIKind DI = checkDefinitelyInit(Use);
+  // DI_No -> dealloc.
+
+  // Okay, the release is conditionally live.  We have to force it up the CFG to
+  // a place where we have unconditional liveness, and if the memory object is a
+  // tuple, we have to do so for each element individually.
+
+
 
   /// TODO: We could make this more powerful to directly support these
   /// cases, at least when the value doesn't escape.
@@ -1391,7 +1417,7 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
 
   ++NumLoadPromoted;
 
-  // If the load access is a LoadInst, simply replace the load.
+  // Simply replace the load.
   assert(isa<LoadInst>(Inst));
   DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
   DEBUG(llvm::errs() << "      To value: " << *NewVal.getDef() << "\n");
@@ -1402,6 +1428,69 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   RemoveDeadAddressingInstructions(Addr);
   return true;
 }
+
+/// promoteDestroyAddr - DestroyAddr is a composed operation merging
+/// load+strong_release.  If the implicit load's value is available, explode it.
+///
+/// Note that we handle the general case of a destroy_addr of a piece of the
+/// memory object, not just destroy_addrs of the entire thing.
+///
+bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
+  SILValue Address = DAI->getOperand();
+
+  // We cannot promote destroys of address-only types, because we can't expose
+  // the load.
+  SILType LoadTy = Address.getType().getObjectType();
+  if (LoadTy.isAddressOnly(DAI->getModule()))
+    return false;
+
+  // If the box has escaped at this instruction, we can't safely promote the
+  // load.
+  if (hasEscapedAt(DAI))
+    return false;
+
+  // Compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned FirstElt = ComputeAccessPath(Address, TheMemory);
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, DAI->getModule());
+
+  // Set up the bitvector of elements being demanded by the load.
+  llvm::SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
+
+  SmallVector<std::pair<SILValue, unsigned>, 8> AvailableValues;
+  AvailableValues.resize(NumMemorySubElements);
+
+  // Find out if we have any available values.  If no bits are demanded, we
+  // trivially succeed. This can happen when there is a load of an empty struct.
+  if (NumLoadSubElements != 0) {
+    computeAvailableValues(DAI, RequiredElts, AvailableValues);
+
+    // If some value is not available at this load point, then we fail.
+    for (unsigned i = 0, e = AvailableValues.size(); i != e; ++i)
+      if (!AvailableValues[i].first.isValid())
+        return false;
+  }
+
+  // Aggregate together all of the subelements into something that has the same
+  // type as the load did, and emit smaller) loads for any subelements that were
+  // not available.
+  auto NewVal =
+    AggregateAvailableValues(DAI, LoadTy, Address, AvailableValues, FirstElt);
+
+  ++NumDestroyAddrPromoted;
+
+  DEBUG(llvm::errs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
+  DEBUG(llvm::errs() << "      To value: " << *NewVal.getDef() << "\n");
+
+  auto &TL = DAI->getModule().getTypeLowering(MemoryType);
+  SILBuilder B(DAI);
+  TL.emitDestroyValue(B, DAI->getLoc(), NewVal);
+
+  DAI->eraseFromParent();
+  return true;
+}
+
 
 
 /// Explode a copy_addr instruction of a loadable type into lower level
@@ -1853,7 +1942,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           Top Level Driver
+//                         Dead Allocation Elimination
 //===----------------------------------------------------------------------===//
 
 static void eraseUsesOfInstruction(SILInstruction *Inst) {
@@ -1881,20 +1970,22 @@ static void eraseUsesOfInstruction(SILInstruction *Inst) {
   }
 }
 
-/// removeDeadAllocation - If the allocation is an autogenerated allocation that
-/// is only stored to (after load promotion) then remove it completely.
-static void removeDeadAllocation(SILInstruction *Alloc,
-                                 SmallVectorImpl<MemoryUse> &Uses) {
+/// tryToRemoveDeadAllocation - If the allocation is an autogenerated allocation
+/// that is only stored to (after load promotion) then remove it completely.
+void ElementPromotion::tryToRemoveDeadAllocation() {
+  assert((isa<AllocBoxInst>(TheMemory) || isa<AllocStackInst>(TheMemory)) &&
+         "Unhandled allocation case");
+
   // We don't want to remove allocations that are required for useful debug
   // information at -O0.  As such, we only remove allocations if:
   //
   // 1. They are in a transparent function.
   // 2. They are in a normal function, but didn't come from a VarDecl, or came
   //    from one that was autogenerated or inlined from a transparent function.
-  if (!Alloc->getFunction()->isTransparent() &&
-      Alloc->getLoc().getAsASTNode<VarDecl>() &&
-      !Alloc->getLoc().isAutoGenerated() &&
-      !Alloc->getLoc().is<MandatoryInlinedLocation>())
+  SILLocation Loc = TheMemory->getLoc();
+  if (!TheMemory->getFunction()->isTransparent() &&
+      Loc.getAsASTNode<VarDecl>() && !Loc.isAutoGenerated() &&
+      !Loc.is<MandatoryInlinedLocation>())
     return;
 
 
@@ -1918,13 +2009,30 @@ static void removeDeadAllocation(SILInstruction *Alloc,
     }
   }
 
-  DEBUG(llvm::errs() << "*** Removing autogenerated alloc_stack: " << *Alloc);
+  // If the memory object has non-trivial type, then removing the deallocation
+  // will drop any releases.  Check that there is nothing preventing removal.
+  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
+    for (auto *R : Releases) {
+      if (isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
+        continue;
+
+      DEBUG(llvm::errs() << "*** Failed to remove autogenerated alloc: "
+            "kept alive by release: " << *R);
+      return;
+    }
+  }
+
+  DEBUG(llvm::errs() << "*** Removing autogenerated alloc_stack: "<<*TheMemory);
 
   // If it is safe to remove, do it.  Recursively remove all instructions
   // hanging off the allocation instruction, then return success.  Let the
   // caller remove the allocation itself to avoid iterator invalidation.
-  eraseUsesOfInstruction(Alloc);
+  eraseUsesOfInstruction(TheMemory);
 }
+
+//===----------------------------------------------------------------------===//
+//                           Top Level Driver
+//===----------------------------------------------------------------------===//
 
 static void processAllocation(SILInstruction *I) {
   assert(isa<AllocBoxInst>(I) || isa<AllocStackInst>(I));
@@ -1940,8 +2048,6 @@ static void processAllocation(SILInstruction *I) {
   // Promote each tuple element individually, since they have individual
   // lifetimes and DI properties.
   ElementPromotion(I, Uses, Releases).doIt();
-
-  removeDeadAllocation(I, Uses);
 }
 
 static void processMarkUninitialized(MarkUninitializedInst *MUI) {

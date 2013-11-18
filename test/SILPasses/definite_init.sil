@@ -265,8 +265,8 @@ bb0:
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c#1 : $*SomeClass
-
-  strong_release %c#0 : $Builtin.ObjectPointer
+  destroy_addr %c#1 : $*SomeClass
+  dealloc_box $SomeClass, %c#0 : $Builtin.ObjectPointer
   // CHECK-NEXT: strong_release [[C1]]
 
   %11 = tuple ()
@@ -372,7 +372,8 @@ bb0:
   // CHECK-NEXT: unowned_release [[C1u]]
   // CHECK-NEXT: strong_release [[C2]]
 
-  strong_release %c#0 : $Builtin.ObjectPointer
+  destroy_addr %c#1 : $*@sil_unowned SomeClass
+  dealloc_box $SomeClass, %c#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -610,5 +611,52 @@ entry(%a : $*C):
   dealloc_stack %p#0 : $*@local_storage P
   %z = tuple ()
   return %z : $()
+}
+
+
+// rdar://15492647
+// CHECK-LABEL: sil @destroy_addr_removed
+sil @destroy_addr_removed : $@thin () -> () {
+bb0:
+  %3 = alloc_stack $SomeClass
+  %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
+  %m = metatype $SomeClass.metatype
+  %9 = apply %f(%m) : $@thin ((), SomeClass.metatype) -> SomeClass
+  // CHECK: [[CVAL:%[0-9]+]] = apply
+
+  assign %9 to %3#1 : $*SomeClass
+  destroy_addr %3#1 : $*SomeClass
+  dealloc_stack %3#0 : $*@local_storage SomeClass
+  %15 = tuple ()
+  return %15 : $()
+// CHECK-NEXT: strong_release [[CVAL]]
+}
+
+
+
+
+// This is a class value that is only initialized one path.  Instead of
+// bothering with conditional deallocation, just emit an initializer that sets
+// the pointer to null.
+// rdar://15209088
+sil @release_partially_constructed : $@thin (cond: Bool) -> () {
+bb0(%0 : $Bool):
+  %3 = alloc_stack $SomeClass
+  %5 = struct_extract %0 : $Bool, #value
+//  cond_br %5, bb1, bb2
+  br bb1
+
+bb1:                                              // Preds: bb0
+  %f = function_ref @getSomeClass : $@thin ((), SomeClass.metatype) -> SomeClass
+  %m = metatype $SomeClass.metatype
+  %9 = apply %f(%m) : $@thin ((), SomeClass.metatype) -> SomeClass
+  assign %9 to %3#1 : $*SomeClass
+  br bb2
+
+bb2:
+  destroy_addr %3#1 : $*SomeClass
+  dealloc_stack %3#0 : $*@local_storage SomeClass
+  %15 = tuple ()
+  return %15 : $()
 }
 
