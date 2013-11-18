@@ -1097,6 +1097,11 @@ void SILFunction::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
 }
 
+// This is out of line so the debugger can find it.
+void SILFunction::dump() const {
+  dump(false);
+}
+
 static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Internal:

@@ -179,7 +179,7 @@ public:
   
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
-  void dump() const { dump(false); }
+  void dump() const;
 
   /// Pretty-print the SILFunction with the designated stream as a 'sil'
   /// definition.
