@@ -459,6 +459,9 @@ namespace {
     /// lifetime of the value being analyzed.
     SILInstruction *TheMemory;
 
+    /// This is the SILType of the memory object.
+    SILType MemoryType;
+
     /// The number of tuple elements in this memory object.
     unsigned NumTupleElements;
     
@@ -489,16 +492,7 @@ namespace {
     bool doIt();
 
   private:
-    
-    SILType getTheMemoryType() const {
-      if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-        return ABI->getElementType();
-      if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
-        return ASI->getElementType();
-      // mark_uninitialized.
-      return TheMemory->getType(0).getObjectType();
-    }
-    
+
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
                         LiveOutBlockState(NumTupleElements)}).first->second;
@@ -513,7 +507,7 @@ namespace {
 
     void handleStoreUse(MemoryUse &InstInfo, DIKind Kind);
 
-    void processRelease(SILInstruction *Inst);
+    void processNonTrivialRelease(SILInstruction *Inst);
 
     bool promoteLoad(SILInstruction *Inst);
 
@@ -549,9 +543,18 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
                                    SmallVectorImpl<SILInstruction*> &Releases)
   : TheMemory(TheMemory), Uses(Uses), Releases(Releases) {
 
-  auto MemTy = getTheMemoryType();
-  NumTupleElements = getTupleElementCount(MemTy.getSwiftRValueType());
-  NumMemorySubElements = getNumSubElements(MemTy, TheMemory->getModule());
+  // Compute the type of the memory object.
+  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
+    MemoryType = ABI->getElementType();
+  else if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
+    MemoryType = ASI->getElementType();
+  else {
+    assert(isa<MarkUninitializedInst>(TheMemory) && "Unknown memory object");
+    MemoryType = TheMemory->getType(0).getObjectType();
+  }
+
+  NumTupleElements = getTupleElementCount(MemoryType.getSwiftRValueType());
+  NumMemorySubElements = getNumSubElements(MemoryType, TheMemory->getModule());
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -620,7 +623,7 @@ void ElementPromotion::diagnoseInitError(const MemoryUse &Use,
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy = getTheMemoryType().getSwiftRValueType();
+  CanType AllocTy = MemoryType.getSwiftRValueType();
 
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
@@ -735,13 +738,17 @@ bool ElementPromotion::doIt() {
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
   }
 
-  // If all uses are ok, check releases to make sure we only destroy values
-  // in places where they are actually constructed.
-  for (auto I : Releases) {
-    processRelease(I);
-
-    // FIXME: processRelease shouldn't generate diagnostics.
-    if (!EmittedErrorLocs.empty()) return true;
+  // If the memory object has nontrivial type, then any destroy/release of the
+  // memory object will destruct the memory.  If the memory (or some element
+  // thereof) is not initialized on some path, the bad things happen.  Process
+  // releases to adjust for this.
+  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
+    for (auto I : Releases) {
+      processNonTrivialRelease(I);
+      
+      // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
+      if (!EmittedErrorLocs.empty()) return true;
+    }
   }
 
   return false;
@@ -809,7 +816,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
   }
 }
 
-/// processRelease - We handle two kinds of release instructions here:
+/// processNonTrivialRelease - We handle two kinds of release instructions here:
 /// destroy_addr for alloc_stack's and strong_release/dealloc_box for
 /// alloc_box's.  By the  time that DI gets here, we've validated that all uses
 /// of the memory location are valid.  Unfortunately, the uses being valid
@@ -817,8 +824,10 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 /// a release.  As such, we have to push the releases up the CFG to where the
 /// value is initialized.
 ///
-void ElementPromotion::processRelease(SILInstruction *Inst) {
-  // Empty tuples (and tuples thereof) can cause a memory object to be nothing.
+void ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
+
+  // Empty tuples (and tuples thereof) can cause a memory object to be nothing,
+  // and empty tuples have no
   if (NumTupleElements == 0) return;
   
   // FIXME: This should not form a hacky use.
