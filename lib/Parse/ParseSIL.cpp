@@ -2444,7 +2444,7 @@ bool Parser::parseDeclSILStage() {
 /// decl-sil-vtable: [[only in SIL mode]]
 ///   'sil_vtable' ClassName decl-sil-vtable-body
 /// decl-sil-vtable-body:
-///   '{' sil-vtable-entry+ '}'
+///   '{' sil-vtable-entry* '}'
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
 bool Parser::parseSILVTable() {
@@ -2473,11 +2473,13 @@ bool Parser::parseSILVTable() {
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  if (consumeIf(tok::l_brace)) {
-    // We need to turn on InSILBody to parse SILDeclRef.
-    Lexer::SILBodyRAII Tmp(*L);
-    // Parse the entry list.
-    std::vector<SILVTable::Pair> vtableEntries;
+  consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII Tmp(*L);
+  // Parse the entry list.
+  std::vector<SILVTable::Pair> vtableEntries;
+  if (Tok.isNot(tok::r_brace)) {
     do {
       SILDeclRef Ref;
       Identifier FuncName;
@@ -2494,12 +2496,12 @@ bool Parser::parseSILVTable() {
       }
       vtableEntries.emplace_back(Ref, Func);
     } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
-
-    SourceLoc RBraceLoc;
-    parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
-                       LBraceLoc);
-
-    SILVTable::create(*SIL->M, theClass, vtableEntries);
   }
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+
+  SILVTable::create(*SIL->M, theClass, vtableEntries);
   return false;
 }
