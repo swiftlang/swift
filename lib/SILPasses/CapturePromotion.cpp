@@ -704,20 +704,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, FnTy, {}, Args,
                                       PAI->getType());
   SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
-  auto OrigCallee = PAI->getCallee();
   PAI->eraseFromParent();
-  // FIXME: is this safe?  This isn't checking what kind of instruction the
-  // original callee is.  If we know it is a function_ref (which seems to be
-  // the case according to the check done by "isNonmutatingCapture"), then we
-  // should use "cast", otherwise we should dyn_cast to something more specific
-  // than SILInstruction.
-  if (auto *OrigCalleeInst = dyn_cast<SILInstruction>(OrigCallee.getDef()))
-    if (OrigCalleeInst->use_empty()) {
-      OrigCalleeInst->eraseFromParent();
-
-      // TODO: If this is the last use of the closure, and if it has internal
-      // linkage, we should remove it from the SILModule now.
-    }
+  if (!FRI->use_empty()) {
+    FRI->eraseFromParent();
+    // TODO: If this is the last use of the closure, and if it has internal
+    // linkage, we should remove it from the SILModule now.
+  }
 }
 
 static void
