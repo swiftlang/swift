@@ -18,6 +18,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/AST/Pattern.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/IR/GlobalVariable.h"
 
 #include "ASTVisitor.h"
@@ -31,8 +32,28 @@
 using namespace swift;
 using namespace irgen;
 
+/// Emit a global variable.
+Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
+  auto &type = getTypeInfo(var->getLoweredType());
+  
+  // If the variable is empty, don't actually emit it; just return undef.
+  if (type.isKnownEmpty()) {
+    return type.getUndefAddress();
+  }
+  
+  /// Get the global variable.
+  Address addr = getAddrOfSILGlobalVariable(var);
+  
+  /// Add a zero initializer.
+  auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
+  gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
+  
+  return addr;
+}
 
 /// Emit a global variable.
+///
+/// FIXME: Combine into emitSILGlobalVariable.
 Address IRGenModule::emitGlobalVariable(VarDecl *var,
                                         const TypeInfo &type) {
   // If the variable is empty, don't actually emit it; just return undef.

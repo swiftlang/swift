@@ -17,6 +17,7 @@
 #include "Linking.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/AST/Mangle.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -281,9 +282,10 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
     return;
   case Kind::SILFunction:
-    assert(!getSILFunction()->getName().empty() &&
-           "Direct SILFunction references should be premangled");
     buffer << getSILFunction()->getName();
+    return;
+  case Kind::SILGlobalVariable:
+    buffer << getSILGlobalVariable()->getName();
     return;
   }
   llvm_unreachable("bad entity kind!");

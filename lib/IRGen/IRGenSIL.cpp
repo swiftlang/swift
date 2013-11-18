@@ -1108,6 +1108,32 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   return fn;
 }
 
+Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var) {
+  // Check whether we've created the global variable already.
+  // FIXME: We should integrate this into the LinkEntity cache more cleanly.
+  auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
+  if (gvar) return Address(gvar, Alignment(gvar->getAlignment()));
+
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
+  LinkInfo link = LinkInfo::get(*this, entity);
+  auto &ti = getTypeInfo(var->getLoweredType());
+  // TODO: Debug info needs to be able to use a SILGlobalVariable.
+  // We also ought to have a better debug name.
+  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
+                      ti);
+  Optional<SILLocation> loc;
+  if (var->hasLocation())
+    loc = var->getLocation();
+  gvar = link.createVariable(*this, ti.StorageType, DbgTy,
+                             loc, var->getName());
+  
+  // Set the alignment from the TypeInfo.
+  Address gvarAddr = ti.getAddressForPointer(gvar);
+  gvar->setAlignment(gvarAddr.getAlignment().getValue());
+  
+  return gvarAddr;
+}
+
 void IRGenSILFunction::visitBuiltinFunctionRefInst(
                                              swift::BuiltinFunctionRefInst *i) {
   setLoweredBuiltinValue(SILValue(i, 0),
@@ -1146,7 +1172,17 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
 }
 
 void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {
-  llvm_unreachable("not implemented");
+  auto &ti = getTypeInfo(i->getType());
+  
+  Address addr;
+  // If the variable is empty, don't actually emit it; just return undef.
+  if (ti.isKnownEmpty()) {
+    addr = ti.getUndefAddress();
+  } else {
+    addr = IGM.getAddrOfSILGlobalVariable(i->getReferencedGlobal());
+  }
+  
+  setLoweredAddress(SILValue(i, 0), addr);
 }
 
 /// Determine whether a metatype value is used as a Swift metatype, ObjC class,

@@ -144,6 +144,9 @@ class LinkEntity {
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
+    
+    /// A SIL global variable. The pointer is a SILGlobalVariable*.
+    SILGlobalVariable,
 
     /// A direct protocol witness table. The pointer is a ProtocolConformance*.
     DirectProtocolWitnessTable,
@@ -414,6 +417,13 @@ public:
                 | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(level));
     return entity;
   }
+  
+  static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
+    LinkEntity entity;
+    entity.Pointer = G;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
+    return entity;
+  }
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
@@ -434,6 +444,11 @@ public:
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
+  }
+  
+  SILGlobalVariable *getSILGlobalVariable() const {
+    assert(getKind() == Kind::SILGlobalVariable);
+    return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
   
   ProtocolConformance *getProtocolConformance() const {

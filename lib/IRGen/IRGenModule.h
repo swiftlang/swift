@@ -61,6 +61,7 @@ namespace swift {
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
+  class SILGlobalVariable;
   class SILModule;
   class SILType;
   class SourceLoc;
@@ -313,6 +314,7 @@ public:
   void emitExtension(ExtensionDecl *D);
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
+  Address emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitSILFunction(SILFunction *f);
   
   /// Generate local decls in the given function body. This skips VarDecls and
@@ -369,6 +371,7 @@ public:
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ExplosionKind level);
+  Address getAddrOfSILGlobalVariable(SILGlobalVariable *var);
   llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType);
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);

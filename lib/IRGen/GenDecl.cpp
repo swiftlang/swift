@@ -506,6 +506,10 @@ void IRGenModule::emitGlobalTopLevel() {
     emitGlobalVariable(global, ti);
   }
   
+  for (SILGlobalVariable &v : SILMod->getSILGlobals()) {
+    emitSILGlobalVariable(&v);
+  }
+  
   // Emit SIL functions.
   for (SILFunction &f : *SILMod) {
     emitSILFunction(&f);
@@ -618,6 +622,9 @@ bool LinkEntity::isLocalLinkage() const {
 
   case Kind::SILFunction:
     return getSILFunction()->getLinkage() == SILLinkage::Internal;
+      
+  case Kind::SILGlobalVariable:
+    return getSILGlobalVariable()->getLinkage() == SILLinkage::Internal;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -627,6 +634,8 @@ bool LinkEntity::isThunk() const {
   // mapping to Clang modules are local.
   if (getKind() == Kind::SILFunction)
     return getSILFunction()->getLinkage() == SILLinkage::Thunk;
+  if (getKind() == Kind::SILGlobalVariable)
+    return getSILGlobalVariable()->getLinkage() == SILLinkage::Thunk;
 
   if (isDeclKind(getKind())) {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);
@@ -656,6 +665,8 @@ bool LinkEntity::isThunk() const {
 bool LinkEntity::isDeserialized() const {
   if (getKind() == Kind::SILFunction)
     return getSILFunction()->getLinkage() == SILLinkage::Deserialized;
+  if (getKind() == Kind::SILGlobalVariable)
+    return getSILGlobalVariable()->getLinkage() == SILLinkage::Deserialized;
   return false;
 }
 
