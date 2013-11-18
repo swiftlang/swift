@@ -4218,6 +4218,7 @@ bool TypeChecker::typeCheckExpression(
   if (cs.solve(viable, allowFreeTypeVariables)) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
+      performExprDiagnostics(*this, expr);
       return true;
     }
 
@@ -4225,6 +4226,7 @@ bool TypeChecker::typeCheckExpression(
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
 
+    performExprDiagnostics(*this, expr);
     return true;
   }
 
@@ -4238,6 +4240,7 @@ bool TypeChecker::typeCheckExpression(
   // Apply the solution to the expression.
   auto result = cs.applySolution(solution, expr);
   if (!result) {
+    performExprDiagnostics(*this, expr);
     // Failure already diagnosed, above, as part of applying the solution.
    return true;
   }
@@ -4248,6 +4251,7 @@ bool TypeChecker::typeCheckExpression(
     result = solution.coerceToType(result, convertType,
                                    cs.getConstraintLocator(expr, { }));
     if (!result) {
+      performExprDiagnostics(*this, expr);
       return true;
     }
   } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
@@ -4411,6 +4415,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   if (cs.solve(viable)) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
+      performExprDiagnostics(*this, init);
       return true;
     }
 
@@ -4418,6 +4423,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
     diagnose(init->getLoc(), diag::constraint_type_check_fail)
       .highlight(init->getSourceRange());
 
+    performExprDiagnostics(*this, init);
     return true;
   }
 
@@ -4447,9 +4453,9 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   // Force the initializer to be materializable.
   // FIXME: work this into the constraint system
   init = coerceToMaterializable(init);
-  if (!init) {
-    return true;
-  }
+  assert(init && "should never fail");
+
+  performExprDiagnostics(*this, init);
 
   // Apply the solution to the pattern as well.
   if (coerceToType(pattern, dc, init->getType(), /*allowOverride=*/true)) {

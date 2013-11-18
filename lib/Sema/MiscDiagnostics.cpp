@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/ASTWalker.h"
 
 using namespace swift;
 
@@ -95,7 +96,39 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
     return;
   }
   return;
+}
 
+//===--------------------------------------------------------------------===//
+// Diagnose use of module values outside of dot expressions.
+//===--------------------------------------------------------------------===//
+
+static void diagModuleValue(TypeChecker &TC, const Expr *E) {
+  class DiagnoseWalker : public ASTWalker {
+  public:
+    TypeChecker &TC;
+
+    DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *ME = dyn_cast<ModuleExpr>(E)) {
+        bool Diagnose = true;
+        if (auto *ParentExpr = Parent.getAsExpr()) {
+          // Allow module values as a part of:
+          // - ignored base expressions;
+          // - expressions that failed to type check.
+          if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
+              isa<UnresolvedDotExpr>(ParentExpr))
+            Diagnose = false;
+        }
+        if (Diagnose)
+          TC.diagnose(ME->getStartLoc(), diag::value_of_module_type);
+      }
+      return { true, E };
+    }
+  };
+
+  DiagnoseWalker Walker(TC);
+  const_cast<Expr *>(E)->walk(Walker);
 }
 
 //===--------------------------------------------------------------------===//
@@ -104,6 +137,7 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 
 void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E) {
   diagSelfAssignment(TC, E);
+  diagModuleValue(TC, E);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {

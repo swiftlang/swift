@@ -1374,6 +1374,9 @@ WARNING(unindented_code_after_return,tce_sema,none,
 NOTE(indent_expression_to_silence,tce_sema,none,
      "indent the expression to silence this warning", ())
 
+ERROR(value_of_module_type,tce_sema,none,
+      "expected module member name after module name", ())
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------
