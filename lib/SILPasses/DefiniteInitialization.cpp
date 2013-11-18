@@ -243,44 +243,6 @@ static unsigned getNumSubElements(SILType T, SILModule &M) {
   return 1;
 }
 
-/// Given a pointer that is known to be derived from an alloc_box, chase up to
-/// the alloc box, computing the access path.  This returns true if the access
-/// path to the specified RootInst was successfully computed, false otherwise.
-static bool TryComputingAccessPath(SILValue Pointer, unsigned &SubEltNumber,
-                                   SILInstruction *RootInst) {
-  SubEltNumber = 0;
-  while (1) {
-    // If we got to the root, we're done.
-    if (RootInst == Pointer.getDef())
-      return true;
-
-    SILModule &M = RootInst->getModule();
-
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
-      SILType TT = TEAI->getOperand().getType();
-
-      // Keep track of what subelement is being referenced.
-      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
-        SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
-      }
-      Pointer = TEAI->getOperand();
-    } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
-      SILType ST = SEAI->getOperand().getType();
-
-      // Keep track of what subelement is being referenced.
-      StructDecl *SD = SEAI->getStructDecl();
-      for (auto *D : SD->getStoredProperties()) {
-        if (D == SEAI->getField()) break;
-        SubEltNumber += getNumSubElements(ST.getFieldType(D, M), M);
-      }
-
-      Pointer = SEAI->getOperand();
-    } else {
-      return false;
-    }
-  }
-}
-
 /// Compute the access path indicated by the specified pointer (which is derived
 /// from the root by a series of tuple/struct element addresses) and return
 /// the first subelement addressed by the address.  For example, given:
@@ -293,13 +255,38 @@ static bool TryComputingAccessPath(SILValue Pointer, unsigned &SubEltNumber,
 /// element of 2.
 ///
 static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
-  unsigned FirstSubElement = 0;
-  bool Result = TryComputingAccessPath(Pointer, FirstSubElement, RootInst);
-  assert(Result && "Failed to compute an access path to our root?");
-  (void)Result;
+  unsigned SubEltNumber = 0;
+  SILModule &M = RootInst->getModule();
 
-  return FirstSubElement;
+  while (1) {
+    // If we got to the root, we're done.
+    if (RootInst == Pointer.getDef())
+      return SubEltNumber;
+
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+      SILType TT = TEAI->getOperand().getType();
+
+      // Keep track of what subelement is being referenced.
+      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
+        SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
+      }
+      Pointer = TEAI->getOperand();
+    } else {
+      auto *SEAI = cast<StructElementAddrInst>(Pointer);
+      SILType ST = SEAI->getOperand().getType();
+
+      // Keep track of what subelement is being referenced.
+      StructDecl *SD = SEAI->getStructDecl();
+      for (auto *D : SD->getStoredProperties()) {
+        if (D == SEAI->getField()) break;
+        SubEltNumber += getNumSubElements(ST.getFieldType(D, M), M);
+      }
+
+      Pointer = SEAI->getOperand();
+    }
+  }
 }
+
 
 
 /// Given an aggregate value and an access path, extract the value indicated by
