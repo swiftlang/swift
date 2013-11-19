@@ -84,7 +84,8 @@ public:
   SILFunction(SILModule &Module, SILLinkage Linkage,
               StringRef MangledName, SILType LoweredType,
               Optional<SILLocation> Loc = Nothing,
-              IsTransparent_t isTrans = IsNotTransparent);
+              IsTransparent_t isTrans = IsNotTransparent,
+              SILFunction *InsertBefore = nullptr);
 
   ~SILFunction();
 

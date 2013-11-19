@@ -18,7 +18,8 @@ using namespace swift;
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, SILType LoweredType,
                          Optional<SILLocation> Loc,
-                         IsTransparent_t isTrans)
+                         IsTransparent_t isTrans,
+                         SILFunction *InsertBefore)
   : ModuleAndLinkage(&Module, Linkage),
     Name(Name),
     LoweredType(LoweredType),
@@ -26,7 +27,10 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     DeclCtx(nullptr),
     DebugScope(nullptr),
     Transparent(isTrans) {
-  Module.functions.push_back(this);
+  if (InsertBefore)
+    Module.functions.insert(SILModule::iterator(InsertBefore), this);
+  else
+    Module.functions.push_back(this);
 }
 
 SILFunction::~SILFunction() {

@@ -305,13 +305,10 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
                       OrigLoweredTy.getAs<AnyFunctionType>().getResult(),
                       M.getASTContext()));
 
-  // FIXME: This should insert the cloned function right before the existing
-  // SILFunction for the closure, so that these naturally clump together and
-  // so that testcases are easier to write.  This can be done by creating the
-  // function then using the splice method on the module's ilist of functions.
+  // This inserts the new cloned function before the original function.
   return new (M) SILFunction(M, SILLinkage::Internal, ClonedName,
                              M.Types.getLoweredType(ClonedTy),
-                             Orig->getLocation());
+                             Orig->getLocation(), IsNotTransparent, Orig);
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
