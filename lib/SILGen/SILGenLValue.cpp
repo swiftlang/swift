@@ -1147,3 +1147,35 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc,
   B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
   dest->finishInitialization(*this);
 }
+
+void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
+                                              const LValue &src,
+                                              const LValue &dest) {
+  auto skipPeephole = [&]{
+    ManagedValue loaded = emitLoadOfLValue(loc, src, SGFContext());
+    emitAssignToLValue(loc, RValueSource(loc, RValue(*this, loc,
+                                                     src.getSubstFormalType(),
+                                                     loaded)),
+                       dest);
+  };
+  
+  // Only perform the peephole if both operands are physical and there's no
+  // semantic conversion necessary.
+  if (!src.isPhysical())
+    return skipPeephole();
+  if (!dest.isPhysical())
+    return skipPeephole();
+  
+  auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
+  auto destAddr = emitAddressOfLValue(loc, dest).getUnmanagedValue();
+
+  if (srcAddr.getType() == destAddr.getType()) {
+    B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);
+  } else {
+    // If there's a semantic conversion necessary, do a load then assign.
+    auto loaded = emitLoad(loc, srcAddr, getTypeLowering(src.getTypeOfRValue()),
+                           SGFContext(),
+                           IsNotTake);
+    loaded.assignInto(*this, loc, destAddr);
+  }
+}

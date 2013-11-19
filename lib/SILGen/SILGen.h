@@ -877,6 +877,8 @@ public:
   
   void emitAssignToLValue(SILLocation loc, RValueSource &&src,
                           const LValue &dest);
+  void emitAssignLValueToLValue(SILLocation loc,
+                                const LValue &src, const LValue &dest);
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);

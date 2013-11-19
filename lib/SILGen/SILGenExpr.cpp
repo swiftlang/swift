@@ -2947,8 +2947,19 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   FullExpr scope(SGF.Cleanups, CleanupLocation(E));
 
-  // Handle tuple destinations by destructuring them if present.
-  emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
+  // Handle lvalue-to-lvalue assignments with a high-level copy_addr instruction
+  // if possible.
+  if (!isa<TupleExpr>(E->getDest())
+      && isa<LoadExpr>(E->getSrc())
+      && E->getDest()->getType()
+        ->isEqual(cast<LoadExpr>(E->getSrc())->getSubExpr()->getType())) {
+    SGF.emitAssignLValueToLValue(E,
+                   SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr()),
+                   SGF.emitLValue(E->getDest()));
+  } else {
+    // Handle tuple destinations by destructuring them if present.
+    emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
+  }
   
   return SGF.emitEmptyTupleRValue(E);
 }
