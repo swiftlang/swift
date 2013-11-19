@@ -79,7 +79,7 @@ public:
     while (!List.empty()) {
       SILInstruction *I = List.back();
       List = List.slice(0, List.size()-1);
-      
+
       WorklistMap.insert(std::make_pair(I, Worklist.size()));
       Worklist.push_back(I);
     }
@@ -326,19 +326,19 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
       DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
                          << "    New = " << *Result.getDef() << '\n');
-        
+
       // Everything uses the new instruction now.
       replaceInstUsesWith(*I, Result.getDef());
-        
+
       // Push the new instruction and any users onto the worklist.
       Worklist.addUsersToWorklist(Result.getDef());
-      
+
       eraseInstFromFunction(*I);
       MadeChange = true;
       continue;
     }
-    
-    
+
+
 #ifndef NDEBUG
     std::string OrigI;
 #endif
@@ -408,7 +408,7 @@ void swift::performSILCombine(SILModule *M) {
     // If F is just a declaration without any basic blocks, skip it.
     if (F.empty())
       continue;
-    
+
     // Clear the combiner just in case.
     Combiner.clear();
     // Record if we made any changes.
