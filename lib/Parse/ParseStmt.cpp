@@ -304,10 +304,12 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
-      if (Result.is<Expr*>()) {
-        Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
-      } else {
-        Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
+      if (Result) {
+        if (Result.is<Expr*>()) {
+          Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
+        } else {
+          Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
+        }
       }
       PreviousHadSemi = true;
     }
