@@ -244,6 +244,19 @@ static unsigned getNumSubElements(SILType T, SILModule &M) {
   return 1;
 }
 
+/// getAccessPathRoot - Given an address, dive through any tuple/struct element
+/// addresses to get the underlying value.
+static SILValue getAccessPathRoot(SILValue Pointer) {
+  while (1) {
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer))
+      Pointer = TEAI->getOperand();
+    else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
+      Pointer = SEAI->getOperand();
+    else
+      return Pointer;
+  }
+}
+
 /// Compute the access path indicated by the specified pointer (which is derived
 /// from the root by a series of tuple/struct element addresses) and return
 /// the first subelement addressed by the address.  For example, given:
@@ -1367,8 +1380,9 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
 
   SILType LoadTy = Inst->getOperand(0).getType().getObjectType();
 
-  // If this is a load from a struct field that we want to promote, compute the
-  // access path down to the field so we can determine precise def/use behavior.
+  // If this is a load/copy_addr from a struct field that we want to promote,
+  // compute the access path down to the field so we can determine precise
+  // def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
   unsigned NumLoadSubElements =
     getNumSubElements(LoadTy, TheMemory->getModule());
@@ -1503,7 +1517,6 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
   SmallVector<SILInstruction*, 4> NewInsts;
   SILBuilder B(CAI, &NewInsts);
 
-
   // Use type lowering to lower the copyaddr into a load sequence + store
   // sequence appropriate for the type.
   SILValue StoredValue = TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(),
@@ -1568,8 +1581,12 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
 
     case ValueKind::LoadInst:
       // If it is a load from the memory object (as oppose to a load from
-      // something else), track it as an access.
-      if (LoadUse.isValid()) {
+      // something else), track it as an access.  We need to explictly check to
+      // see if the load accesses "TheMemory" because it could either be a load
+      // for the copy_addr source, or it could be a load corresponding to the
+      // "assign" operation on the destination of the copyaddr.
+      if (LoadUse.isValid() &&
+          getAccessPathRoot(NewInst->getOperand(0)).getDef() == TheMemory) {
         LoadUse.Inst = NewInst;
         Uses.push_back(LoadUse);
       }
