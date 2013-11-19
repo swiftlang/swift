@@ -152,6 +152,7 @@ namespace {
 
   public:
     Transform(SILGenFunction &SGF, SILLocation loc) : SGF(SGF), Loc(loc) {}
+    virtual ~Transform() = default;
 
     /// Transform an arbitrary value.
     ManagedValue transform(ManagedValue input,
