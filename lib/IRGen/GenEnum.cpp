@@ -34,6 +34,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 
+// @@@@
+#include "llvm/Support/raw_ostream.h"
+
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NonFixedTypeInfo.h"
@@ -72,7 +75,8 @@ protected:
   TypeInfoKind TIK;
   unsigned NumElements;
   
-  EnumImplStrategy(TypeInfoKind tik,
+  EnumImplStrategy(IRGenModule &IGM,
+                   TypeInfoKind tik,
                     unsigned NumElements,
                     std::vector<Element> &&ElementsWithPayload,
                     std::vector<Element> &&ElementsWithRecursivePayload,
@@ -277,14 +281,15 @@ public:
     }
     
   public:
-    SingletonEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
-                           std::vector<Element> &&WithPayload,
-                           std::vector<Element> &&WithRecursivePayload,
-                           std::vector<Element> &&WithNoPayload)
-      : EnumImplStrategy(tik, NumElements,
-                          std::move(WithPayload),
-                          std::move(WithRecursivePayload),
-                          std::move(WithNoPayload))
+    SingletonEnumImplStrategy(IRGenModule &IGM,
+                              TypeInfoKind tik, unsigned NumElements,
+                              std::vector<Element> &&WithPayload,
+                              std::vector<Element> &&WithRecursivePayload,
+                              std::vector<Element> &&WithNoPayload)
+      : EnumImplStrategy(IGM, tik, NumElements,
+                         std::move(WithPayload),
+                         std::move(WithRecursivePayload),
+                         std::move(WithNoPayload))
     {
       assert(NumElements <= 1);
       assert(ElementsWithPayload.size() <= 1);
@@ -585,11 +590,12 @@ public:
       const = 0;
     
   public:
-    NoPayloadEnumImplStrategyBase(TypeInfoKind tik, unsigned NumElements,
+    NoPayloadEnumImplStrategyBase(IRGenModule &IGM,
+                                  TypeInfoKind tik, unsigned NumElements,
                            std::vector<Element> &&WithPayload,
                            std::vector<Element> &&WithRecursivePayload,
                            std::vector<Element> &&WithNoPayload)
-      : SingleScalarTypeInfo(tik, NumElements,
+      : SingleScalarTypeInfo(IGM, tik, NumElements,
                              std::move(WithPayload),
                              std::move(WithRecursivePayload),
                              std::move(WithNoPayload))
@@ -717,11 +723,12 @@ public:
     }
     
   public:
-    NoPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+    NoPayloadEnumImplStrategy(IRGenModule &IGM,
+                              TypeInfoKind tik, unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithRecursivePayload,
                               std::vector<Element> &&WithNoPayload)
-      : NoPayloadEnumImplStrategyBase(tik, NumElements,
+      : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                       std::move(WithPayload),
                                       std::move(WithRecursivePayload),
                                       std::move(WithNoPayload))
@@ -825,11 +832,12 @@ public:
     }
     
   public:
-    CCompatibleEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+    CCompatibleEnumImplStrategy(IRGenModule &IGM,
+                                TypeInfoKind tik, unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
                                 std::vector<Element> &&WithRecursivePayload,
                                 std::vector<Element> &&WithNoPayload)
-      : NoPayloadEnumImplStrategyBase(tik, NumElements,
+      : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                       std::move(WithPayload),
                                       std::move(WithRecursivePayload),
                                       std::move(WithNoPayload))
@@ -923,14 +931,15 @@ public:
     }
     
   public:
-    PayloadEnumImplStrategyBase(TypeInfoKind tik, unsigned NumElements,
-                                 std::vector<Element> &&WithPayload,
-                                 std::vector<Element> &&WithRecursivePayload,
-                                 std::vector<Element> &&WithNoPayload)
-      : EnumImplStrategy(tik, NumElements,
-                          std::move(WithPayload),
-                          std::move(WithRecursivePayload),
-                          std::move(WithNoPayload))
+    PayloadEnumImplStrategyBase(IRGenModule &IGM,
+                                TypeInfoKind tik, unsigned NumElements,
+                                std::vector<Element> &&WithPayload,
+                                std::vector<Element> &&WithRecursivePayload,
+                                std::vector<Element> &&WithNoPayload)
+      : EnumImplStrategy(IGM, tik, NumElements,
+                         std::move(WithPayload),
+                         std::move(WithRecursivePayload),
+                         std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.size() >= 1);
     }
@@ -1088,17 +1097,56 @@ public:
       return IGF.emitTypeMetadataRef(PayloadTy);
     }
     
+    /// More efficient value semantics implementations for certain enum layouts.
+    enum CopyDestroyStrategy {
+      /// No special behavior.
+      Normal,
+      /// The payload is POD, so copying is bitwise, and destruction is a noop.
+      POD,
+      /// The payload is a single Swift reference-counted value, and we have
+      /// a single no-payload case which uses the null extra inhabitant, so
+      /// copy and destroy can pass through to swift_retain/swift_release.
+      NullableSwiftRefcounted,
+      /// The payload is a single unknown-reference-counted value, and we have
+      /// a single no-payload case which uses the null extra inhabitant, so
+      /// copy and destroy can pass through to swift_retain/swift_release.
+      ///TODO: NullableUnknownRefcounted,
+    };
+    
+    CopyDestroyStrategy CopyDestroyKind;
+    
   public:
-    SinglePayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+    SinglePayloadEnumImplStrategy(IRGenModule &IGM,
+                                  TypeInfoKind tik, unsigned NumElements,
                                    std::vector<Element> &&WithPayload,
                                    std::vector<Element> &&WithRecursivePayload,
                                    std::vector<Element> &&WithNoPayload)
-      : PayloadEnumImplStrategyBase(tik, NumElements,
+      : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                      std::move(WithPayload),
                                      std::move(WithRecursivePayload),
-                                     std::move(WithNoPayload))
+                                     std::move(WithNoPayload)),
+        CopyDestroyKind(Normal)
     {
       assert(ElementsWithPayload.size() == 1);
+      
+      // If the payload is POD, then we can use POD value semantics.
+      if (ElementsWithPayload[0].ti->isPOD(ResilienceScope::Component))
+        CopyDestroyKind = POD;
+      // If the payload is a single refcounted pointer and we have a single
+      // empty case, then the layout will be a nullable pointer, and we can
+      // pass enum values directly into swift_retain/swift_release as-is.
+      else if (tik >= TypeInfoKind::Loadable
+          && ElementsWithPayload[0].ti->isSingleRetainablePointer(
+                                                   ResilienceScope::Component)
+          && ElementsWithNoPayload.size() == 1
+          // FIXME: All single-retainable-pointer types should eventually have
+          // extra inhabitants.
+          && cast<FixedTypeInfo>(ElementsWithPayload[0].ti)
+            ->getFixedExtraInhabitantCount(IGM) > 0) {
+        CopyDestroyKind = NullableSwiftRefcounted;
+      }
+      
+      // TODO: Same for single unknown-refcounted pointers.
     }
     
     /// The payload for a single-payload enum is always placed in front and
@@ -1602,74 +1650,118 @@ public:
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
       assert(TIK >= Loadable);
-      if (isPOD(ResilienceScope::Local)) {
+      
+      switch (CopyDestroyKind) {
+      case POD:
         reexplode(IGF, src, dest);
+        return;
+
+      case Normal: {
+        // Copy the payload, if we have it.
+        llvm::Value *payload, *extraTag;
+        std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
+        
+        llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
+        
+        if (payload) {
+          Explosion payloadValue(ExplosionKind::Minimal);
+          Explosion payloadCopy(ExplosionKind::Minimal);
+          auto &loadableTI = getLoadablePayloadTypeInfo();
+          loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
+          loadableTI.copy(IGF, payloadValue, payloadCopy);
+          payloadCopy.claimAll(); // FIXME: repack if not bit-identical
+        }
+        
+        IGF.Builder.CreateBr(endBB);
+        IGF.Builder.emitBlock(endBB);
+        
+        // Copy to the new explosion.
+        if (payload)
+          dest.add(payload);
+        if (extraTag) dest.add(extraTag);
         return;
       }
       
-      // Copy the payload, if we have it.
-      llvm::Value *payload, *extraTag;
-      std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
-      
-      llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
-      
-      if (payload) {
-        Explosion payloadValue(ExplosionKind::Minimal);
-        Explosion payloadCopy(ExplosionKind::Minimal);
-        auto &loadableTI = getLoadablePayloadTypeInfo();
-        loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
-        loadableTI.copy(IGF, payloadValue, payloadCopy);
-        payloadCopy.claimAll(); // FIXME: repack if not bit-identical
+      case NullableSwiftRefcounted: {
+        // Bitcast to swift.refcounted*, and hand to swift_retain.
+        llvm::Value *val = src.claimNext();
+        llvm::Value *ptr
+          = IGF.Builder.CreateIntToPtr(val, IGF.IGM.RefCountedPtrTy);
+        IGF.emitRetainCall(ptr);
+        dest.add(val);
+        return;
       }
-      
-      IGF.Builder.CreateBr(endBB);
-      IGF.Builder.emitBlock(endBB);
-      
-      // Copy to the new explosion.
-      if (payload)
-        dest.add(payload);
-      if (extraTag) dest.add(extraTag);
+      }
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       assert(TIK >= Loadable);
 
-      if (isPOD(ResilienceScope::Local)) {
+      switch (CopyDestroyKind) {
+      case POD:
         src.claim(getExplosionSize(src.getKind()));
         return;
+
+      case Normal: {
+        // Check that we have a payload.
+        llvm::Value *payload, *extraTag;
+        std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
+        
+        llvm::BasicBlock *endBB
+          = testFixedEnumContainsPayload(IGF, payload, extraTag);
+        
+        // If we did, consume it.
+        if (payload) {
+          Explosion payloadValue(ExplosionKind::Minimal);
+          auto &loadableTI = getLoadablePayloadTypeInfo();
+          loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
+          loadableTI.consume(IGF, payloadValue);
+        }
+        
+        IGF.Builder.CreateBr(endBB);
+        IGF.Builder.emitBlock(endBB);
+        return;
+      }
+
+      case NullableSwiftRefcounted: {
+        // Bitcast to swift.refcounted*, and hand to swift_release.
+        llvm::Value *val = src.claimNext();
+        llvm::Value *ptr
+          = IGF.Builder.CreateIntToPtr(val, IGF.IGM.RefCountedPtrTy);
+        IGF.emitRelease(ptr);
+        return;
+      }
       }
       
-      // Check that we have a payload.
-      llvm::Value *payload, *extraTag;
-      std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
-      
-      llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
-      
-      // If we did, consume it.
-      if (payload) {
-        Explosion payloadValue(ExplosionKind::Minimal);
-        auto &loadableTI = getLoadablePayloadTypeInfo();
-        loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
-        loadableTI.consume(IGF, payloadValue);
-      }
-      
-      IGF.Builder.CreateBr(endBB);
-      IGF.Builder.emitBlock(endBB);
     }
 
     void destroy(IRGenFunction &IGF, Address addr) const override {
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return;
-      
-      // Check that there is a payload at the address.
-      llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr);
-      
-      // If there is, project and destroy it.
-      Address payloadAddr = projectPayloadData(IGF, addr);
-      getPayloadTypeInfo().destroy(IGF, payloadAddr);
-      
-      IGF.Builder.CreateBr(endBB);
-      IGF.Builder.emitBlock(endBB);
+          
+      case Normal: {
+        // Check that there is a payload at the address.
+        llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr);
+        
+        // If there is, project and destroy it.
+        Address payloadAddr = projectPayloadData(IGF, addr);
+        getPayloadTypeInfo().destroy(IGF, payloadAddr);
+        
+        IGF.Builder.CreateBr(endBB);
+        IGF.Builder.emitBlock(endBB);
+        return;
+      }
+          
+      case NullableSwiftRefcounted: {
+        // Load the value as swift.refcounted, then hand to swift_release.
+        addr = IGF.Builder.CreateBitCast(addr,
+                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
+        llvm::Value *ptr = IGF.Builder.CreateLoad(addr);
+        IGF.emitRelease(ptr);
+        return;
+      }
+      }
     }
     
   private:
@@ -1707,121 +1799,165 @@ public:
     /// Emit an reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
        Address dest, Address src,
-       void (TypeInfo::*assignData)(IRGenFunction&, Address, Address) const,
-       void (TypeInfo::*initializeData)(IRGenFunction&, Address, Address) const)
+       IsTake_t isTake)
     const {
       auto &C = IGF.IGM.getLLVMContext();
       
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return emitPrimitiveCopy(IGF, dest, src);
+          
+      case Normal: {
+        llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
 
-      llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
+        Address destData = projectPayloadData(IGF, dest);
+        Address srcData = projectPayloadData(IGF, src);
+        // See whether the current value at the destination has a payload.
 
-      Address destData = projectPayloadData(IGF, dest);
-      Address srcData = projectPayloadData(IGF, src);
-      // See whether the current value at the destination has a payload.
+        llvm::BasicBlock *noDestPayloadBB
+          = testEnumContainsPayload(IGF, dest);
+        
+        // Here, the destination has a payload. Now see if the source also has
+        // one.
+        llvm::BasicBlock *destNoSrcPayloadBB
+          = testEnumContainsPayload(IGF, src);
+        
+        // Here, both source and destination have payloads. Do the reassignment
+        // of the payload in-place.
+        if (isTake)
+          getPayloadTypeInfo().assignWithTake(IGF, destData, srcData);
+        else
+          getPayloadTypeInfo().assignWithCopy(IGF, destData, srcData);
+        IGF.Builder.CreateBr(endBB);
+        
+        // If the destination has a payload but the source doesn't, we can destroy
+        // the payload and primitive-store the new no-payload value.
+        IGF.Builder.emitBlock(destNoSrcPayloadBB);
+        getPayloadTypeInfo().destroy(IGF, destData);
+        emitPrimitiveCopy(IGF, dest, src);
+        IGF.Builder.CreateBr(endBB);
+        
+        // Now, if the destination has no payload, check if the source has one.
+        IGF.Builder.emitBlock(noDestPayloadBB);
+        llvm::BasicBlock *noDestNoSrcPayloadBB
+          = testEnumContainsPayload(IGF, src);
 
-      llvm::BasicBlock *noDestPayloadBB
-        = testEnumContainsPayload(IGF, dest);
+        // Here, the source has a payload but the destination doesn't. We can
+        // copy-initialize the source over the destination, then primitive-store
+        // the zero extra tag (if any).
+        if (isTake)
+          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData);
+        else
+          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData);
+        emitInitializeExtraTagBitsForPayload(IGF, dest);
+        IGF.Builder.CreateBr(endBB);
+        
+        // If neither destination nor source have payloads, we can just primitive-
+        // store the new empty-case value.
+        IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
+        emitPrimitiveCopy(IGF, dest, src);
+        IGF.Builder.CreateBr(endBB);
+        
+        IGF.Builder.emitBlock(endBB);
+        return;
+      }
       
-      // Here, the destination has a payload. Now see if the source also has
-      // one.
-      llvm::BasicBlock *destNoSrcPayloadBB
-        = testEnumContainsPayload(IGF, src);
+      case NullableSwiftRefcounted: {
+        // Do the assignment as for a refcounted pointer.
+        Address destAddr = IGF.Builder.CreateBitCast(dest,
+                                      IGF.IGM.RefCountedPtrTy->getPointerTo());
+        Address srcAddr = IGF.Builder.CreateBitCast(src,
+                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
+        // Load the old pointer at the destination.
+        llvm::Value *oldPtr = IGF.Builder.CreateLoad(destAddr);
+        // Store the new pointer.
+        llvm::Value *srcPtr = IGF.Builder.CreateLoad(srcAddr);
+        if (!isTake)
+          IGF.emitRetainCall(srcPtr);
+        IGF.Builder.CreateStore(srcPtr, destAddr);
+        // Release the old value.
+        IGF.emitRelease(oldPtr);
+        return;
+      }
+      }
       
-      // Here, both source and destination have payloads. Do the reassignment
-      // of the payload in-place.
-      (getPayloadTypeInfo().*assignData)(IGF, destData, srcData);
-      IGF.Builder.CreateBr(endBB);
-      
-      // If the destination has a payload but the source doesn't, we can destroy
-      // the payload and primitive-store the new no-payload value.
-      IGF.Builder.emitBlock(destNoSrcPayloadBB);
-      getPayloadTypeInfo().destroy(IGF, destData);
-      emitPrimitiveCopy(IGF, dest, src);
-      IGF.Builder.CreateBr(endBB);
-      
-      // Now, if the destination has no payload, check if the source has one.
-      IGF.Builder.emitBlock(noDestPayloadBB);
-      llvm::BasicBlock *noDestNoSrcPayloadBB
-        = testEnumContainsPayload(IGF, src);
-
-      // Here, the source has a payload but the destination doesn't. We can
-      // copy-initialize the source over the destination, then primitive-store
-      // the zero extra tag (if any).
-      (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
-      emitInitializeExtraTagBitsForPayload(IGF, dest);
-      IGF.Builder.CreateBr(endBB);
-      
-      // If neither destination nor source have payloads, we can just primitive-
-      // store the new empty-case value.
-      IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
-      emitPrimitiveCopy(IGF, dest, src);
-      IGF.Builder.CreateBr(endBB);
-      
-      IGF.Builder.emitBlock(endBB);
     }
     
     /// Emit an initialization sequence, initializing an enum at one address
     /// with another at a different address.
     void emitIndirectInitialize(IRGenFunction &IGF,
-      Address dest, Address src,
-      void (TypeInfo::*initializeData)(IRGenFunction&, Address, Address) const)
+                                Address dest, Address src, IsTake_t isTake)
     const {
       auto &C = IGF.IGM.getLLVMContext();
       
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return emitPrimitiveCopy(IGF, dest, src);
-      
-      llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
 
-      Address destData = projectPayloadData(IGF, dest);
-      Address srcData = projectPayloadData(IGF, src);
+      case Normal: {
+        llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
+        
+        Address destData = projectPayloadData(IGF, dest);
+        Address srcData = projectPayloadData(IGF, src);
+        
+        // See whether the source value has a payload.
+        llvm::BasicBlock *noSrcPayloadBB
+          = testEnumContainsPayload(IGF, src);
+        
+        // Here, the source value has a payload. Initialize the destination with
+        // it, and set the extra tag if any to zero.
+        if (isTake)
+          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData);
+        else
+          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData);
+        emitInitializeExtraTagBitsForPayload(IGF, dest);
+        IGF.Builder.CreateBr(endBB);
+        
+        // If the source value has no payload, we can primitive-store the
+        // empty-case value.
+        IGF.Builder.emitBlock(noSrcPayloadBB);
+        emitPrimitiveCopy(IGF, dest, src);
+        IGF.Builder.CreateBr(endBB);
+        
+        IGF.Builder.emitBlock(endBB);
+        return;
+      }
+          
+      case NullableSwiftRefcounted: {
+        // Do the initialization as for a refcounted pointer.
+        Address destAddr = IGF.Builder.CreateBitCast(dest,
+                                      IGF.IGM.RefCountedPtrTy->getPointerTo());
+        Address srcAddr = IGF.Builder.CreateBitCast(src,
+                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
 
-      // See whether the source value has a payload.
-      llvm::BasicBlock *noSrcPayloadBB
-        = testEnumContainsPayload(IGF, src);
-      
-      // Here, the source value has a payload. Initialize the destination with
-      // it, and set the extra tag if any to zero.
-      (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
-      emitInitializeExtraTagBitsForPayload(IGF, dest);
-      IGF.Builder.CreateBr(endBB);
-
-      // If the source value has no payload, we can primitive-store the
-      // empty-case value.
-      IGF.Builder.emitBlock(noSrcPayloadBB);
-      emitPrimitiveCopy(IGF, dest, src);
-      IGF.Builder.CreateBr(endBB);
-      
-      IGF.Builder.emitBlock(endBB);
+        llvm::Value *srcPtr = IGF.Builder.CreateLoad(srcAddr);
+        if (!isTake)
+          IGF.emitRetainCall(srcPtr);
+        IGF.Builder.CreateStore(srcPtr, destAddr);
+        return;
+      }
+      }
     }
     
   public:
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src)
     const override {
-      emitIndirectAssign(IGF, dest, src,
-                         &TypeInfo::assignWithCopy,
-                         &TypeInfo::initializeWithCopy);
+      emitIndirectAssign(IGF, dest, src, IsNotTake);
     }
     
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src)
     const override {
-      emitIndirectAssign(IGF, dest, src,
-                         &TypeInfo::assignWithTake,
-                         &TypeInfo::initializeWithTake);
+      emitIndirectAssign(IGF, dest, src, IsTake);
     }
     
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src)
     const override {
-      emitIndirectInitialize(IGF, dest, src,
-                             &TypeInfo::initializeWithCopy);
+      emitIndirectInitialize(IGF, dest, src, IsNotTake);
     }
     
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src)
     const override {
-      emitIndirectInitialize(IGF, dest, src,
-                             &TypeInfo::initializeWithTake);
+      emitIndirectInitialize(IGF, dest, src, IsTake);
     }
     
     void storeTag(IRGenFunction &IGF,
@@ -1971,11 +2107,12 @@ public:
     unsigned NumEmptyElementTags = ~0u;
 
   public:
-    MultiPayloadEnumImplStrategy(TypeInfoKind tik, unsigned NumElements,
+    MultiPayloadEnumImplStrategy(IRGenModule &IGM,
+                                 TypeInfoKind tik, unsigned NumElements,
                                   std::vector<Element> &&WithPayload,
                                   std::vector<Element> &&WithRecursivePayload,
                                   std::vector<Element> &&WithNoPayload)
-      : PayloadEnumImplStrategyBase(tik, NumElements,
+      : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                      std::move(WithPayload),
                                      std::move(WithRecursivePayload),
                                      std::move(WithNoPayload))
@@ -2790,29 +2927,29 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   // Enums from Clang use C-compatible layout.
   if (theEnum->hasClangNode()) {
     assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
-    return new CCompatibleEnumImplStrategy(tik, numElements,
+    return new CCompatibleEnumImplStrategy(TC.IGM, tik, numElements,
                                        std::move(elementsWithPayload),
                                        std::move(elementsWithRecursivePayload),
                                        std::move(elementsWithNoPayload));
   }
   
   if (numElements <= 1)
-    return new SingletonEnumImplStrategy(tik, numElements,
+    return new SingletonEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
                                     std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() > 1)
-    return new MultiPayloadEnumImplStrategy(tik, numElements,
+    return new MultiPayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
                                     std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() == 1)
-    return new SinglePayloadEnumImplStrategy(tik, numElements,
+    return new SinglePayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
                                     std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload));
 
-  return new NoPayloadEnumImplStrategy(tik, numElements,
+  return new NoPayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                       std::move(elementsWithPayload),
                                       std::move(elementsWithRecursivePayload),
                                       std::move(elementsWithNoPayload));

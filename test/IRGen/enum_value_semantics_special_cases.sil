@@ -1,0 +1,86 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+
+import Builtin
+
+// Enums consisting of a retainable pointer and a single empty case use nullable
+// pointer value semantics.
+enum NullableRefcounted {
+  case Ref(Builtin.ObjectPointer)
+  case None
+}
+
+// CHECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases18NullableRefcounted(%swift.opaque* %object, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
+// CHECK:   %2 = load %swift.refcounted** %1, align 8
+// CHECK:   call void @swift_release(%swift.refcounted* %2) #0
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK: define linkonce_odr hidden %swift.opaque* @_TwcpO34enum_value_semantics_special_cases18NullableRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
+// CHECK:   %4 = load %swift.refcounted** %3, align 8
+// CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
+// CHECK:   store %swift.refcounted* %4, %swift.refcounted** %2, align 8
+// CHECK:   %5 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %5
+// CHECK: }
+
+// CHECK: define linkonce_odr hidden %swift.opaque* @_TwcaO34enum_value_semantics_special_cases18NullableRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
+// CHECK:   %4 = load %swift.refcounted** %2, align 8
+// CHECK:   %5 = load %swift.refcounted** %3, align 8
+// CHECK:   call void @swift_retain_noresult(%swift.refcounted* %5) #0
+// CHECK:   store %swift.refcounted* %5, %swift.refcounted** %2, align 8
+// CHECK:   call void @swift_release(%swift.refcounted* %4) #0
+// CHECK:   %6 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %6
+// CHECK: }
+
+// CHECK: define linkonce_odr hidden %swift.opaque* @_TwtaO34enum_value_semantics_special_cases18NullableRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases18NullableRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.refcounted**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %1 to %swift.refcounted**
+// CHECK:   %4 = load %swift.refcounted** %2, align 8
+// CHECK:   %5 = load %swift.refcounted** %3, align 8
+// CHECK:   store %swift.refcounted* %5, %swift.refcounted** %2, align 8
+// CHECK:   call void @swift_release(%swift.refcounted* %4) #0
+// CHECK:   %6 = bitcast %O34enum_value_semantics_special_cases18NullableRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %6
+// CHECK: }
+
+// With multiple empty cases, the nullable pointer semantics aren't used.
+enum MultipleEmptyRefcounted {
+  case Ref(Builtin.ObjectPointer)
+  case A
+  case B
+}
+
+// CHECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases23MultipleEmptyRefcounted(%swift.opaque* %object, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted*
+// CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted* %0 to i64*
+// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   switch i64 %2, label %3 [
+// CHECK:     i64 0, label %5
+// CHECK:     i64 2, label %5
+// CHECK:   ]
+// CHECK: ; <label>:3                                       ; preds = %entry
+// CHECK:   %4 = bitcast %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted* %0 to %swift.refcounted**
+// CHECK:   %toDestroy = load %swift.refcounted** %4, align 8
+// CHECK:   call void @swift_release(%swift.refcounted* %toDestroy) #0
+// CHECK:   br label %5
+// CHECK: ; <label>:5                                       ; preds = %3, %entry, %entry
+// CHECK:   ret void
+// CHECK: }
