@@ -705,7 +705,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                                       PAI->getType());
   SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
-  if (!FRI->use_empty()) {
+  if (FRI->use_empty()) {
     FRI->eraseFromParent();
     // TODO: If this is the last use of the closure, and if it has internal
     // linkage, we should remove it from the SILModule now.

@@ -48,7 +48,10 @@ bb0:
   %15 = apply [transparent] %12(%14, %13) : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
   store %15 to %11#1 : $*Int64
 
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @closure0_promote0
+// CHECK-NOT: function_ref @closure0 :
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @closure0_promote
+// CHECK-NOT: function_ref @closure0 :
+
 // The three strong retains are removed
 
 // The Foo variable is loaded from and retained, because it is a reference type
