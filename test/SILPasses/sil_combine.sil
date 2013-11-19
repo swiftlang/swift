@@ -111,7 +111,7 @@ bb0:
 // CHECK: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NOT: object_pointer_to_ref
-sil @removeTriviallyDeadInstructions : $@thin (b : B) -> () {
+sil @removeTriviallyDeadInstructions : $@thin (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
@@ -132,7 +132,7 @@ bb0(%0 : $B):
 // CHECK: cond_br
 // CHECK-NOT: object_pointer_to_ref
 // CHECK: }
-sil @removeTriviallyDeadCrossBasicBlocks : $@thin (b : B, m : Builtin.Int1) -> () {
+sil @removeTriviallyDeadCrossBasicBlocks : $@thin (@owned B, Builtin.Int1) -> () {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer
   %13 = cond_br %1, bb1, bb2
@@ -163,7 +163,7 @@ bb0:
 // CHECK-LABEL: sil @tuple_extract
 // CHECK: bb
 // CHECK-NEXT: return %0
-sil @tuple_extract : $@thin (a : Int64) -> Int64 {
+sil @tuple_extract : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = tuple (%0 : $Int64, %0 : $Int64)
   %2 = tuple_extract %1 : $(Int64, Int64), 0
@@ -179,7 +179,7 @@ bb0(%0 : $Int64):
 // CHECK: {{^bb}}
 // CHECK-NOT: integer_literal
 // CHECK-NEXT: br
-sil @fold_integer_literal : $@thin (x: Builtin.Int1) -> Builtin.Int1 {
+sil @fold_integer_literal : $@thin (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
 
@@ -204,7 +204,7 @@ bb2(%3 : $Builtin.Int1):
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: br
-sil @do_not_fold_integer_literal : $@thin (x: Builtin.Int1) -> Builtin.Int1 {
+sil @do_not_fold_integer_literal : $@thin (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
 
@@ -231,7 +231,7 @@ enum BoolLike { case true, false }
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
 // CHECK-NEXT: br
-sil @fold_enum : $@thin (x: BoolLike) -> BoolLike {
+sil @fold_enum : $@thin (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 
@@ -256,7 +256,7 @@ bb3(%3 : $BoolLike):
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
 // CHECK-NEXT: br
-sil @do_not_fold_enum : $@thin (x: BoolLike) -> BoolLike {
+sil @do_not_fold_enum : $@thin (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 

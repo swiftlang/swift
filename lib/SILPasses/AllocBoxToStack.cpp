@@ -154,12 +154,12 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through [inout] arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
-      if (apply->getFunctionTypeInfo()
+      if (apply->getSubstCalleeType()
             ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
-      if (partialApply->getFunctionTypeInfo()
+      if (partialApply->getSubstCalleeType()
             ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
       

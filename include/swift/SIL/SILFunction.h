@@ -56,7 +56,7 @@ private:
   std::string Name;
 
   /// The lowered type of the function.
-  SILType LoweredType;
+  CanSILFunctionType LoweredType;
   
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
@@ -82,7 +82,7 @@ private:
 public:
 
   SILFunction(SILModule &Module, SILLinkage Linkage,
-              StringRef MangledName, SILType LoweredType,
+              StringRef MangledName, CanSILFunctionType LoweredType,
               Optional<SILLocation> Loc = Nothing,
               IsTransparent_t isTrans = IsNotTransparent,
               SILFunction *InsertBefore = nullptr);
@@ -91,9 +91,11 @@ public:
 
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
 
-  SILType getLoweredType() const { return LoweredType; }
-  SILFunctionType *getFunctionTypeInfo() const {
-    return LoweredType.getFunctionTypeInfo(getModule());
+  SILType getLoweredType() const {
+    return SILType::getPrimitiveObjectType(LoweredType);
+  }
+  CanSILFunctionType getLoweredFunctionType() const {
+    return LoweredType;
   }
     
   /// Return the number of function_ref instructions that refer to this
@@ -102,7 +104,7 @@ public:
   
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
-    return getLoweredType().getAbstractCC();
+    return getLoweredFunctionType()->getAbstractCC();
   }
 
   StringRef getName() const { return Name; }

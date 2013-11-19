@@ -188,6 +188,9 @@ public:
   
   void replaceAllUsesWith(SILValue V);
 
+  void dump() const;
+  void print(raw_ostream &os) const;
+
   // Check validity.
   bool isValid() const { return getDef() != nullptr; }
   explicit operator bool() const { return getDef() != nullptr; }

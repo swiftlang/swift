@@ -81,7 +81,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                            llvm::Function::InternalLinkage,
                            "objectdestroy", &IGM.Module);
 
-  IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -111,7 +111,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
                            llvm::Function::InternalLinkage,
                            "objectsize", &IGM.Module);
 
-  IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -307,7 +307,7 @@ createArrayDtorFn(IRGenModule &IGM,
                            llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);
 
-  IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 

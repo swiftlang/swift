@@ -25,7 +25,7 @@ bb2:
 // CHECK-LABEL: @test_single_pred_block
 // CHECK: struct $Int64
 // CHECK-NEXT: return
-sil @test_single_pred_block : $@thin (v: Builtin.Int1) -> Int64 {
+sil @test_single_pred_block : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
 
@@ -51,7 +51,7 @@ enum BoolLike { case true, false }
 //   if a { return 42 } else { return 17 } }
 //
 /// CHECK-LABEL: sil @testThread
-sil @testThread : $@thin (a: BoolLike) -> Int64 {
+sil @testThread : $@thin (BoolLike) -> Int64 {
 bb0(%0 : $BoolLike):
   // CHECK: switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
   switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb3 // id: %3
@@ -89,7 +89,7 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 /// CHECK-LABEL: sil @testCondBrFold
 /// CHECK-NEXT: bb0(
 /// CHECK-NEXT: return %1 : $Int64
-sil @testCondBrFold : $@thin (a: Int64, b: Int64) -> Int64 {
+sil @testCondBrFold : $@thin (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   %8 = integer_literal $Builtin.Int1, 0
   cond_br %8, bb1, bb2
@@ -102,7 +102,7 @@ bb2:
 /// CHECK-LABEL: sil @testSwitchEnumFold
 /// CHECK-NEXT: bb0(
 /// CHECK-NEXT: return %0 : $Int64
-sil @testSwitchEnumFold : $@thin (a: Int64) -> Int64 {
+sil @testSwitchEnumFold : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = enum $BoolLike, #BoolLike.true!enumelt
   switch_enum %1 : $BoolLike, case #BoolLike.true!enumelt: bb2, case #BoolLike.false!enumelt: bb1

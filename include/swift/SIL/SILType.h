@@ -70,9 +70,9 @@ private:
   SILType(CanType ty, SILValueCategory category)
       : value(ty.getPointer(), unsigned(category)) {
     if (!ty) return;
-
-    assert(!isa<LValueType>(ty) &&
-           "LValueTypes should be eliminated by SIL lowering");
+    assert(ty->isLegalSILType() &&
+           "constructing SILType with type that should have been "
+           "eliminated by SIL lowering");
   }
   
   SILType(ValueType value) : value(value) {
@@ -82,7 +82,7 @@ private:
   friend struct llvm::DenseMapInfo<SILType>;
 public:
   SILType() = default;
-  
+
   /// getPrimitiveType - Form a SILType for a primitive type that does not
   /// require any special handling (i.e., not a function or aggregate type).
   static SILType getPrimitiveType(CanType T, SILValueCategory category) {
@@ -152,20 +152,16 @@ public:
     return rvalueTy;
   }
   
-  /// Gives the SILFunctionType for a function type. The type must be
-  /// derived from a Swift FunctionType or PolymorphicFunctionType.
-  SILFunctionType *getFunctionTypeInfo(SILModule &M) const;
-  
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
-  CanType getFunctionResultType() const {
-    return castTo<AnyFunctionType>().getResult();
+  SILType getFunctionResultType() const {
+    return castTo<SILFunctionType>()->getSemanticResultSILType();
   }
   
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
   AbstractCC getAbstractCC() const {
-    return castTo<AnyFunctionType>()->getAbstractCC();
+    return castTo<SILFunctionType>()->getAbstractCC();
   }
 
   /// Cast the Swift type referenced by this SIL type, or return null if the
@@ -184,7 +180,7 @@ public:
   /// specified subtype.
   template<typename TYPE>
   bool is() const { return isa<TYPE>(getSwiftRValueType()); }
-  
+
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
@@ -220,7 +216,26 @@ public:
   /// isAddressOnly - True if the type, or the referenced type of an address
   /// type, is address-only.  For example, it could be a resilient struct or
   /// something of unknown size.
+  ///
+  /// This is equivalent to, but possibly faster than, calling
+  /// M.Types.getTypeLowering(type).isAddressOnly().
   static bool isAddressOnly(CanType T, SILModule &M);
+
+  /// Return true if this type must be returned indirectly.
+  ///
+  /// This is equivalent to, but possibly faster than, calling
+  /// M.Types.getTypeLowering(type).isReturnedIndirectly().
+  static bool isReturnedIndirectly(CanType type, SILModule &M) {
+    return isAddressOnly(type, M);
+  }
+
+  /// Return true if this type must be passed indirectly.
+  ///
+  /// This is equivalent to, but possibly faster than, calling
+  /// M.Types.getTypeLowering(type).isPassedIndirectly().
+  static bool isPassedIndirectly(CanType type, SILModule &M) {
+    return isAddressOnly(type, M);
+  }
 
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
@@ -257,11 +272,24 @@ public:
   /// type or a class.
   SILType getFieldType(VarDecl *field, SILModule &M) const;
 
+  /// Given that this is an enum type, return the lowered type of the
+  /// data for the given element.  Applies substitutions as necessary.
+  /// The result will have the same value category as the base type.
+  SILType getEnumElementType(EnumElementDecl *elt, SILModule &M) const;
+
   /// Given that this is a tuple type, return the lowered type of the
   /// given tuple element.  The result will have the same value
   /// category as the base type.
   SILType getTupleElementType(unsigned index) const {
     return SILType(castTo<TupleType>().getElementType(index), getCategory());
+  }
+
+  /// Return the immediate superclass type of this type, or null if
+  /// it's the most-derived type.
+  SILType getSuperclass(LazyResolver *resolver) const {
+    auto superclass = getSwiftRValueType()->getSuperclass(resolver);
+    if (!superclass) return SILType();
+    return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   //
@@ -302,9 +330,21 @@ public:
   void print(raw_ostream &OS) const;
 };
 
-SILFunctionType *substituteSILFunctionType(SILModule &M, SILFunctionType *orig,
-                                           SILType origFnType,
-                                           SILType substFnType);
+// Statically prevent SILTypes from being directly cast to a type
+// that's not legal as a SIL value.
+#define NON_SIL_TYPE(ID)                                             \
+template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
+template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
+template<> bool SILType::is<ID##Type>() const = delete;
+NON_SIL_TYPE(Function)
+NON_SIL_TYPE(PolymorphicFunction)
+NON_SIL_TYPE(AnyFunction)
+NON_SIL_TYPE(LValue)
+#undef NON_SIL_TYPE
+
+CanSILFunctionType getNativeSILFunctionType(SILModule &M,
+                                            CanType orig,
+                                            CanAnyFunctionType subst);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);
@@ -339,7 +379,7 @@ inline SILType SILResultInfo::getSILType() const {
 inline SILType SILFunctionType::getSemanticResultSILType() const {
   return (hasIndirectResult() ? getIndirectResult().getSILType()
                               : getResult().getSILType());
-}
+}  
   
 } // end swift namespace
 

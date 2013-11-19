@@ -171,7 +171,6 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     RValue resultRValue = emitRValue(ret);
     if (!resultRValue.getType()->isVoid()) {
       result = std::move(resultRValue).forwardAsSingleValue(*this, ret);
-      result = emitGeneralizedValue(ret, result);
     }
   }
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc,
@@ -380,7 +379,9 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // This will be initialized on every entry into the loop header and consumed
   // by the loop body. On loop exit, the terminating value will be in the
   // buffer.
-  auto &optTL = getTypeLowering(S->getGeneratorNext()->getType());
+  auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
+  auto valTy = CanType(optTy->getOptionalObjectType(getASTContext()));
+  auto &optTL = getTypeLowering(optTy);
   SILValue nextBuf = emitTemporaryAllocation(S, optTL.getLoweredType());
   
   // Create a new basic block and jump into it.
@@ -420,7 +421,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
                                optTL,
                                SGFContext(initLoopVars.get()));
       if (val)
-        RValue(*this, val, S).forwardInto(*this, initLoopVars.get(), S);
+        RValue(*this, S, valTy, val).forwardInto(*this, initLoopVars.get(), S);
       visit(S->getBody());
     }
     

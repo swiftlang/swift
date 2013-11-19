@@ -2,7 +2,7 @@
 import Builtin
 
 // test_static_report
-sil @sil_test_static_report : $@thin (x: Builtin.RawPointer) -> Builtin.RawPointer {
+sil @sil_test_static_report : $@thin (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Int1, 1
   %2 = builtin_function_ref #Builtin.staticReport : $@thin (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()

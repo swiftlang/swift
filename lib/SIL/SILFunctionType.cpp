@@ -14,12 +14,48 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstTypeVisitor.h"
+#include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace swift::Lowering;
+
+/// Adjust a function type to have a slightly different type.
+CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
+                                          AnyFunctionType::ExtInfo extInfo) {
+  if (t->getExtInfo() == extInfo)
+    return t;
+
+  if (auto ft = dyn_cast<FunctionType>(t))
+    return CanFunctionType::get(ft.getInput(), ft.getResult(),
+                                extInfo, ft->getASTContext());
+  
+  if (auto pft = dyn_cast<PolymorphicFunctionType>(t))
+    return CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
+                                           &pft->getGenericParams(),
+                                           extInfo,
+                                           pft->getASTContext());
+
+  llvm_unreachable("bad type to pass to adjustFunctionType");
+}
+
+/// Adjust a function type to have a slightly different type.
+CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
+                                             SILFunctionType::ExtInfo extInfo,
+                                                ParameterConvention callee) {
+  if (type->getExtInfo() == extInfo &&
+      type->getCalleeConvention() == callee)
+    return type;
+
+  return SILFunctionType::get(type->getGenericParams(),
+                              extInfo,
+                              callee,
+                              type->getParameters(),
+                              type->getResult(),
+                              type->getASTContext());
+}
 
 namespace {
   class Conventions {
@@ -56,71 +92,259 @@ namespace {
   void visitDestructuredArgumentTypes(const F &fn, CanType type) {
     DestructuredArgumentTypeVisitor<F>(fn).visit(type);
   }
+
+  /// A visitor for turning formal input types into SILParameterInfos,
+  /// matching the abstraction patterns of the original type.
+  class DestructureInputs : public SubstTypeVisitor<DestructureInputs> {
+    SILModule &M;
+    const Conventions &Convs;
+    SmallVectorImpl<SILParameterInfo> &Inputs;
+    unsigned NextOrigParamIndex = 0;
+  public:
+    DestructureInputs(SILModule &M, const Conventions &conventions,
+                      SmallVectorImpl<SILParameterInfo> &inputs)
+      : M(M), Convs(conventions), Inputs(inputs) {}
+
+    /// Expand tuples.
+    void visitTupleType(CanTupleType origType, CanTupleType substType) {
+      assert(origType->getNumElements() == substType->getNumElements());
+      for (auto i : indices(substType.getElementTypes())) {
+        visit(origType.getElementType(i), substType.getElementType(i));
+      }
+    }
+
+    /// Query whether the original type is address-only given complete
+    /// lowering information about its substitution.
+    bool isPassedIndirectly(CanType origType, CanType substType,
+                            const TypeLowering &substTL) {
+      // If the substituted type is passed indirectly, so must the
+      // unsubstituted type.
+      if (substTL.isPassedIndirectly()) {
+        return true;
+
+      // If the substitution didn't change the type, then a negative
+      // response to the above is determinative as well.
+      } else if (origType == substType) {
+        return false;
+
+      // Otherwise, query specifically for the original type.
+      } else {
+        return SILType::isPassedIndirectly(origType, M);
+      }
+    }
+
+    void visitType(CanType origType, CanType substType) {
+      unsigned origParamIndex = NextOrigParamIndex++;
+
+      auto &substTL = M.Types.getTypeLowering(origType, substType);
+      ParameterConvention convention;
+      if (isa<LValueType>(origType)) {
+        convention = ParameterConvention::Indirect_Inout;
+      } else if (isPassedIndirectly(origType, substType, substTL)) {
+        convention = Convs.getIndirectParameter(origParamIndex, origType);
+        assert(isIndirectParameter(convention));
+      } else if (substTL.isTrivial()) {
+        convention = ParameterConvention::Direct_Unowned;
+      } else {
+        convention = Convs.getDirectParameter(origParamIndex, origType);
+        assert(!isIndirectParameter(convention));
+      }
+      auto loweredType = substTL.getLoweredType().getSwiftRValueType();
+      Inputs.push_back(SILParameterInfo(loweredType, convention));
+    }
+  };
+
+  /// A visitor for generating the most general possible input types for
+  /// the given function signature.
+  ///
+  /// That is, passing the function's inputs as if the original type
+  /// were the most general function signature (expressed entirely in
+  /// type variables) which can be substituted to equal the given
+  /// signature.
+  ///
+  /// The goal of the most general type is to be (1) unambiguous to
+  /// compute from the substituted type and (2) the same for every
+  /// possible generalization of that type.  For example, suppose we
+  /// have a Vector<(Int,Int)->Bool>.  Obviously, we would prefer to
+  /// store optimal function pointers directly in this array; and if
+  /// all uses of it are ungeneralized, we'd get away with that.  But
+  /// suppose the vector is passed to a function like this:
+  ///   func satisfiesAll<T>(v : Vector<(T,T)->Bool>, x : T, y : T) -> Bool
+  /// That function will expect to be able to pull values out with the
+  /// proper abstraction.  The only type we can possibly expect to agree
+  /// upon is the most general form.
+  ///
+  /// The precise way this works is that Vector's subscript operation
+  /// (assuming that's how it's being accessed) has this signature:
+  ///   <X> Vector<X> -> Int -> X
+  /// which 'satisfiesAll' is calling with this substitution:
+  ///   X := (T, T) -> Bool
+  /// Since 'satisfiesAll' has a function type substituting for an
+  /// unrestricted archetype, it expects the value returned to have the
+  /// most general possible form 'A -> B', which it will need to
+  /// de-generalize (by thunking) if it needs to pass it around as
+  /// a '(T, T) -> Bool' value.
+  ///
+  /// It is only this sort of direct substitution in types that forces
+  /// the most general possible type to be selected; declarations will
+  /// generally provide a target generalization level.  For example,
+  /// in a Vector<IntPredicate>, where IntPredicate is a struct (not a
+  /// tuple) with one field of type (Int, Int) -> Bool, all the
+  /// function pointers will be stored ungeneralized.  Of course, such
+  /// a vector couldn't be passed to 'satisfiesAll'.
+  ///
+  /// For most types, the most general type is simply a fresh,
+  /// unrestricted type variable.  But unmaterializable types are not
+  /// valid results of substitutions, so this does not apply.  The
+  /// most general form of an unmaterializable type preserves the
+  /// basic structure of the unmaterializable components, replacing
+  /// any materializable components with fresh type variables.
+  ///
+  /// That is, if we have a substituted function type:
+  ///   (Char, (Int, Float), Double) -> Bool
+  /// then its most general form is
+  ///   A -> B
+  ///
+  /// because there is a valid substitution
+  ///   A := (Char, (Int, Float), Double)
+  ///   B := Bool
+  ///
+  /// But if we have a substituted function type:
+  ///   (Char, (Int, Float), @inout Double) -> Bool
+  /// then its most general form is
+  ///   (A, B, @inout C) -> D
+  /// because the substitution
+  ///   X := (Char, (Int, Float), @inout Double)
+  /// is invalid substitution, ultimately because '@inout Double'
+  /// is not materializable.
+  class DestructureGeneralizedInputs
+      : public CanTypeVisitor<DestructureGeneralizedInputs> {
+    SILModule &M;
+    AbstractionPattern OrigType;
+    SmallVectorImpl<SILParameterInfo> &Inputs;
+  public:
+    DestructureGeneralizedInputs(SILModule &M,
+                                 AbstractionPattern origType,
+                                 SmallVectorImpl<SILParameterInfo> &inputs)
+      : M(M), OrigType(origType), Inputs(inputs) {
+      assert(origType.isOpaque());
+    }
+
+    void visitTupleType(CanTupleType type) {
+      // If a tuple type is not materializable -- if it contains an l-value
+      // type -- then it's not a valid target for substitution and we should
+      // destructure it.
+      if (!type->isMaterializable()) {
+        for (auto elt : type.getElementTypes())
+          visit(elt);
+        return;
+      }
+
+      // Otherwise, it's a valid target for substitution, so the most
+      // general form is to pass it indirectly.
+      addInput(type, ParameterConvention::Indirect_In);
+    }
+
+    void visitLValueType(CanLValueType type) {
+      // L-value types aren't valid targets for substitution.
+      addInput(type.getObjectType(), ParameterConvention::Indirect_Inout);
+    }
+
+    void visitType(CanType type) {
+      // Every other type is materializable.
+      assert(type->isMaterializable());
+      addInput(type, ParameterConvention::Indirect_In);
+    }
+
+    void addInput(CanType unlowered, ParameterConvention convention) {
+      auto lowered = M.Types.getLoweredType(OrigType.getAsType(), unlowered);
+      Inputs.push_back(SILParameterInfo(lowered.getSwiftRValueType(),
+                                        convention));
+    }
+  };
 }
 
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
-static SILFunctionType *getSILFunctionType(SILModule &M,
-                                           CanAnyFunctionType formalType,
-                                           const Conventions &conventions) {
+///
+/// \param conventions - conventions as expressed for the original type
+static CanSILFunctionType getSILFunctionType(SILModule &M,
+                                             CanType origType,
+                                             CanAnyFunctionType substFnType,
+                                             AnyFunctionType::ExtInfo extInfo,
+                                             const Conventions &conventions) {
   SmallVector<SILParameterInfo, 8> inputs;
-  
-  // If the result type lowers to an address-only type, add it as an indirect
-  // return argument.
-  CanType formalResultType = formalType.getResult();
-  auto &resultTL = M.Types.getTypeLowering(formalResultType);
-  bool hasIndirectReturn = resultTL.isAddressOnly();
-  CanType resultType = resultTL.getLoweredType().getSwiftRValueType();
+
+  // If the original type is an archetype, we'll want the most general type.
+  auto origFnType = dyn_cast<AnyFunctionType>(origType);
+  assert(origFnType || isa<ArchetypeType>(origType));
+
+  CanType substFormalResultType = substFnType.getResult();
+  auto &substResultTL = M.Types.getTypeLowering(substFormalResultType);
+  bool hasIndirectResult;
+
+  // If the substituted result type is returned indirectly, then the
+  // original type must be as well.
+  if (substResultTL.isReturnedIndirectly()) {
+    hasIndirectResult = true;
+
+  // If the unsubstituted type is an archetype, then we use the most
+  // general type for the function, which involves an indirect result.
+  } else if (!origFnType) {
+    hasIndirectResult = true;
+
+  // If the substitution didn't change the result type, we can use the
+  // lowering that we already fetched.
+  } else if (origFnType.getResult() == substFormalResultType) {
+    assert(!substResultTL.isReturnedIndirectly());
+    hasIndirectResult = false;
+
+  // Otherwise, ask whether the original result type was address-only.
+  } else {
+    hasIndirectResult = SILType::isReturnedIndirectly(origFnType.getResult(), M);
+  }
+
+  // Okay, with that we can actually construct the result type.
+  CanType loweredResultType = substResultTL.getLoweredType().getSwiftRValueType();
   SILResultInfo result;
-  if (hasIndirectReturn) {
-    inputs.push_back(SILParameterInfo(resultType,
-                                   ParameterConvention::Indirect_Out));
-    resultType = TupleType::getEmpty(M.getASTContext());    
-    result = SILResultInfo(resultType, ResultConvention::Unowned);
+  if (hasIndirectResult) {
+    inputs.push_back(SILParameterInfo(loweredResultType,
+                                      ParameterConvention::Indirect_Out));
+    result = SILResultInfo(TupleType::getEmpty(M.getASTContext()),
+                           ResultConvention::Unowned);
   } else {
     ResultConvention convention;
-    if (resultTL.isTrivial()) {
+    if (substResultTL.isTrivial()) {
       convention = ResultConvention::Unowned;
     } else {
-      convention = conventions.getResult(formalResultType);
+      convention = conventions.getResult(loweredResultType);
     }
-    result = SILResultInfo(resultType, convention);
+    result = SILResultInfo(loweredResultType, convention);
   }
   
   // Destructure the input tuple type.
-  unsigned nextParamIndex = 0;
-  auto visitFn = [&](CanType type) {
-    unsigned paramIndex = nextParamIndex++;
-
-    auto &paramTL = M.Types.getTypeLowering(type);
-    ParameterConvention convention;
-    if (isa<LValueType>(type)) {
-      convention = ParameterConvention::Indirect_Inout;
-    } else if (paramTL.isAddressOnly()) {
-      convention = conventions.getIndirectParameter(paramIndex, type);
-      assert(isIndirectParameter(convention));
-    } else if (paramTL.isTrivial()) {
-      convention = ParameterConvention::Direct_Unowned;
-    } else {
-      convention = conventions.getDirectParameter(paramIndex, type);
-      assert(!isIndirectParameter(convention));
-    }
-    assert(isIndirectParameter(convention)
-             == paramTL.getLoweredType().isAddress());
-    auto loweredType = paramTL.getLoweredType().getSwiftRValueType();
-    inputs.push_back(SILParameterInfo(loweredType, convention));
-  };
-  visitDestructuredArgumentTypes(visitFn, formalType.getInput());
+  if (origFnType) {
+    DestructureInputs(M, conventions, inputs).visit(origFnType.getInput(),
+                                                    substFnType.getInput());
+  } else {
+    DestructureGeneralizedInputs(M, AbstractionPattern(origType), inputs)
+      .visit(substFnType.getInput());
+  }
 
   // Find the generic parameters.
   GenericParamList *genericParams = nullptr;
-  if (auto polyFnType = dyn_cast<PolymorphicFunctionType>(formalType)) {
+  if (auto polyFnType = dyn_cast<PolymorphicFunctionType>(substFnType)) {
     genericParams = &polyFnType->getGenericParams();
   }
 
-  return SILFunctionType::get(genericParams, formalType->getExtInfo(),
-                              conventions.getCallee(), inputs, result,
-                              M.getASTContext());  
+  auto calleeConvention = ParameterConvention::Direct_Unowned;
+  if (!extInfo.isThin()) calleeConvention = conventions.getCallee();
+
+  // Always strip the auto-closure bit.
+  extInfo = extInfo.withIsAutoClosure(false);
+
+  return SILFunctionType::get(genericParams, extInfo, calleeConvention,
+                              inputs, result, M.getASTContext());  
 }
 
 namespace {
@@ -135,7 +359,7 @@ namespace {
       return ParameterConvention::Direct_Owned;
     }
     ParameterConvention getCallee() const override {
-      return ParameterConvention::Direct_Owned;
+      return DefaultThickCalleeConvention;
     }
     ResultConvention getResult(CanType type) const override {
       return ResultConvention::Owned;
@@ -143,17 +367,28 @@ namespace {
   };
 }
 
-SILFunctionType *SILType::getFunctionTypeInfo(SILModule &M) const {
-  CanAnyFunctionType fnType = cast<AnyFunctionType>(getSwiftRValueType());
-  
-  auto found = M.FunctionTypeInfoCache.find(fnType);
-  if (found != M.FunctionTypeInfoCache.end())
-    return found->second;
+static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
+                                                   CanType origType,
+                                                   CanAnyFunctionType substType,
+                                                AnyFunctionType::ExtInfo extInfo) {
+  return getSILFunctionType(M, origType, substType,
+                            extInfo, DefaultConventions());
+}
 
-  auto silFnType = getSILFunctionType(M, fnType, DefaultConventions());
+CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
+                                                   CanType origType,
+                                                CanAnyFunctionType substType) {
+  AnyFunctionType::ExtInfo extInfo;
 
-  M.FunctionTypeInfoCache[fnType] = silFnType;
-  return silFnType;
+  // Preserve type information from the original type if possible.
+  if (auto origFnType = dyn_cast<AnyFunctionType>(origType)) {
+    extInfo = origFnType->getExtInfo();
+
+  // Otherwise, preserve function type attributes from the substituted type.
+  } else {
+    extInfo = substType->getExtInfo();
+  }
+  return ::getNativeSILFunctionType(M, origType, substType, extInfo);
 }
 
 /*****************************************************************************/
@@ -205,6 +440,9 @@ static ResultConvention getCResultConvention(clang::QualType type) {
   return ResultConvention::Unowned;
 }
 
+// FIXME: that should be Direct_Guaranteed
+const auto ObjCSelfConvention = ParameterConvention::Direct_Unowned;
+
 namespace {
   class ObjCMethodConventions : public Conventions {
     const clang::ObjCMethodDecl *Method;
@@ -232,7 +470,7 @@ namespace {
 
       // The caller is supposed to take responsibility for ensuring
       // that 'self' survives a method call.
-      return ParameterConvention::Direct_Guaranteed;
+      return ObjCSelfConvention;
     }
 
     ParameterConvention getCallee() const override {
@@ -279,16 +517,20 @@ namespace {
 
 /// Given that we have an imported Clang declaration, deduce the
 /// ownership conventions for calling it and build the SILFunctionType.
-static SILFunctionType *getSILFunctionTypeForClangDecl(SILModule &M,
-                                                       const clang::Decl *clangDecl,
-                                                       CanAnyFunctionType formalType) {
+static CanSILFunctionType
+getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
+                               CanAnyFunctionType origType,
+                               CanAnyFunctionType substType,
+                               AnyFunctionType::ExtInfo extInfo) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-    return getSILFunctionType(M, formalType, ObjCMethodConventions(method));
+    return getSILFunctionType(M, origType, substType, extInfo,
+                              ObjCMethodConventions(method));
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
     auto fnType = func->getType()->castAs<clang::FunctionProtoType>();
-    return getSILFunctionType(M, formalType, CFunctionTypeConventions(fnType));
+    return getSILFunctionType(M, origType, substType, extInfo,
+                              CFunctionTypeConventions(fnType));
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -410,7 +652,7 @@ namespace {
       if (isSelfParameter(index)) {
         if (Family == SelectorFamily::Init)
           return ParameterConvention::Direct_Owned;
-        return ParameterConvention::Direct_Guaranteed;
+        return ObjCSelfConvention;
       }
       return ParameterConvention::Direct_Unowned;
     }
@@ -430,21 +672,40 @@ namespace {
   };
 }
 
-static SILFunctionType *
+static CanSILFunctionType
 getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
-                                    CanAnyFunctionType formalType) {
+                                    CanAnyFunctionType origType,
+                                    CanAnyFunctionType substType,
+                                    AnyFunctionType::ExtInfo extInfo) {
   unsigned numParams = 0;
   visitDestructuredArgumentTypes([&](CanType type) { numParams++; },
-                                 formalType.getInput());
+                                 origType.getInput());
 
-  return getSILFunctionType(M, formalType,
+  return getSILFunctionType(M, origType, substType, extInfo,
                             SelectorFamilyConventions(family, numParams - 1));
 }
 
-SILFunctionType *SILDeclRef::getSILFunctionType(SILModule &M) const {
-  auto formalType = M.Types.getConstantType(*this);
-  if (!isForeign) {
-    return formalType.getFunctionTypeInfo(M);
+static CanSILFunctionType
+getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
+                                      CanAnyFunctionType origLoweredType,
+                                      CanAnyFunctionType substFormalType,
+                                      bool thin) {
+  assert(origLoweredType->isThin());
+
+  auto extInfo = origLoweredType->getExtInfo().withIsThin(thin);
+
+  CanAnyFunctionType substLoweredType;
+  if (substFormalType) {
+    substLoweredType = M.Types.getLoweredASTFunctionType(substFormalType,
+                                                         constant.uncurryLevel,
+                                                         extInfo);
+  } else {
+    substLoweredType = origLoweredType;
+  }
+
+  if (!constant.isForeign) {
+    return getNativeSILFunctionType(M, origLoweredType, substLoweredType,
+                                    extInfo);
   }
 
   // If we have a clang decl associated with the Swift decl, derive its
@@ -452,16 +713,18 @@ SILFunctionType *SILDeclRef::getSILFunctionType(SILModule &M) const {
   // FIXME: When we support calling ObjC blocks, we'll need to handle anonymous
   // SILDeclRefs here too.
 
-  auto formalFnType = formalType.castTo<AnyFunctionType>();
-  auto decl = loc.get<ValueDecl*>();
+  auto decl = constant.loc.get<ValueDecl*>();
 
   if (auto clangDecl = findClangMethod(decl))
-    return getSILFunctionTypeForClangDecl(M, clangDecl, formalFnType);
+    return getSILFunctionTypeForClangDecl(M, clangDecl,
+                                          origLoweredType, substLoweredType,
+                                          extInfo);
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
-  return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(*this),
-                                             formalFnType);
+  return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(constant),
+                                             origLoweredType, substLoweredType,
+                                             extInfo);
 }
 
 static bool isClassOrProtocolMethod(ValueDecl *vd) {
@@ -478,17 +741,17 @@ static AbstractCC getAbstractCC(SILDeclRef c) {
   // Currying thunks always have freestanding CC.
   if (c.isCurried)
     return AbstractCC::Freestanding;
-
+  
   // If this is an ObjC thunk, it always has ObjC calling convention.
   if (c.isForeign)
     return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
       ? AbstractCC::ObjCMethod
       : AbstractCC::C;
-
+  
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
     return AbstractCC::Freestanding;
-
+  
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
@@ -498,22 +761,58 @@ static AbstractCC getAbstractCC(SILDeclRef c) {
   return AbstractCC::Freestanding;
 }
 
-SILType TypeConverter::getConstantType(SILDeclRef constant) {
-  auto found = constantTypes.find(constant);
-  if (found != constantTypes.end())
+CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
+                                             CanAnyFunctionType substFormalType,
+                                                          bool thin) {
+  auto cachedInfo = getConstantInfo(constant);
+  if (!substFormalType || substFormalType == cachedInfo.FormalType) {
+    auto extInfo = cachedInfo.SILFnType->getExtInfo().withIsThin(thin);
+    return adjustFunctionType(cachedInfo.SILFnType, extInfo);
+  }
+
+  return getUncachedSILFunctionTypeForConstant(M, constant,
+                                               cachedInfo.LoweredType,
+                                               substFormalType,
+                                               thin);
+}
+
+SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
+  auto found = ConstantTypes.find(constant);
+  if (found != ConstantTypes.end())
     return found->second;
 
+  // First, get a function type for the constant.  This creates the
+  // right type for a getter or setter.
+  auto formalType = makeConstantType(constant, /*withCaptures*/ true);
+
+  // The formal type is just that with the right CC and thin-ness.
   AbstractCC cc = getAbstractCC(constant);
-  Type swiftTy = getThinFunctionType(makeConstantType(constant), cc);
-  SILType loweredTy
-    = getTypeLowering(swiftTy, constant.uncurryLevel).getLoweredType();
-  DEBUG(llvm::dbgs() << "constant ";
+  formalType = getThinFunctionType(formalType, cc);
+
+  // The lowered type is the formal type, but uncurried and with
+  // parameters automatically turned into their bridged equivalents.
+  auto loweredType =
+    getLoweredASTFunctionType(formalType, constant.uncurryLevel);
+
+  // The SIL type encodes conventions according to the original type.
+  CanSILFunctionType silFnType =
+    getUncachedSILFunctionTypeForConstant(M, constant, loweredType,
+                                          CanAnyFunctionType(),
+                                          /*thin*/ true);
+
+  DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
-        llvm::dbgs() << " has type ";
-        loweredTy.print(llvm::dbgs());
-        llvm::dbgs() << " cc " << unsigned(cc) << "\n");
-  constantTypes[constant] = loweredTy;
-  return loweredTy;
+        llvm::dbgs() << "\n  formal type: ";
+        formalType.print(llvm::dbgs());
+        llvm::dbgs() << "\n  lowered AST type: ";
+        loweredType.print(llvm::dbgs());
+        llvm::dbgs() << "\n  SIL type: ";
+        silFnType.print(llvm::dbgs());
+        llvm::dbgs() << "\n");
+
+  SILConstantInfo result = { formalType, loweredType, silFnType };
+  ConstantTypes[constant] = result;
+  return result;
 }
 
 /// Bridge the elements of an input tuple type.
@@ -532,12 +831,12 @@ static CanType getBridgedInputType(TypeConverter &tc,
         bridgedFields.push_back(elt);
       }
     }
-
+    
     if (!changed)
       return input;
     return CanType(TupleType::get(bridgedFields, input->getASTContext()));
   }
-
+  
   return tc.getLoweredBridgedType(input, cc)->getCanonicalType();
 }
 
@@ -550,44 +849,49 @@ static CanType getBridgedResultType(TypeConverter &tc,
 
 /// Fast path for bridging types in a function type without uncurrying.
 static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
-                                                 CanAnyFunctionType t) {
+                                                 CanAnyFunctionType t,
+                                              AnyFunctionType::ExtInfo extInfo) {
+  auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
+    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
+      return CanPolymorphicFunctionType::get(input, result,
+                                             &pft->getGenericParams(),
+                                             extInfo, tc.Context);
+    } else {
+      return CanFunctionType::get(input, result, extInfo, tc.Context);
+    }
+  };
+
   switch (t->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
     // No bridging needed for native functions.
-    return t;
+    if (t->getExtInfo() == extInfo)
+      return t;
+    return rebuild(t.getInput(), t.getResult());
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
-      return CanAnyFunctionType(PolymorphicFunctionType::get(
-                  getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
-                  getBridgedResultType(tc, t->getAbstractCC(), t.getResult()),
-                  &pft->getGenericParams(),
-                  t->getExtInfo(),
-                  t->getASTContext()));
-    }
-    return CanAnyFunctionType(FunctionType::get(
-                getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
-                getBridgedResultType(tc, t->getAbstractCC(), t.getResult()),
-                t->getExtInfo(),
-                t->getASTContext()));
+    return rebuild(getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
+                   getBridgedResultType(tc, t->getAbstractCC(), t.getResult()));
   }
+  llvm_unreachable("bad calling convention");
 }
 
-CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
-                                                        unsigned uncurryLevel) {
+CanAnyFunctionType
+TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
+                                         unsigned uncurryLevel,
+                                         AnyFunctionType::ExtInfo extInfo) {
+  // Fast path: no uncurrying required.
   if (uncurryLevel == 0)
-    return getBridgedFunctionType(*this, t);
+    return getBridgedFunctionType(*this, t, extInfo);
 
-  AnyFunctionType::ExtInfo outerInfo = t->getExtInfo();
-  AbstractCC outerCC = outerInfo.getCC();
-  assert(!outerInfo.isAutoClosure() && "auto_closures cannot be curried");
-  assert(!outerInfo.isBlock() && "objc blocks cannot be curried");
-
+  AbstractCC cc = extInfo.getCC();
+  assert(!extInfo.isAutoClosure() && "auto_closures cannot be curried");
+  assert(!extInfo.isBlock() && "objc blocks cannot be curried");
+  
   // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
-
+  
   // The uncurried generic parameter list components.
   bool isPolymorphic = false;
   SmallVector<GenericParam, 4> genericParams;
@@ -598,7 +902,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
     inputs.push_back(TupleTypeElt(t->getInput()));
-
+    
     if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
       isPolymorphic = true;
       GenericParamList &params = pft->getGenericParams();
@@ -606,7 +910,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
         if (!outerParameters)
           outerParameters = outer;
       }
-
+      
       genericParams.append(params.getParams().begin(),
                            params.getParams().end());
       requirements.append(params.getRequirements().begin(),
@@ -614,16 +918,16 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
       allArchetypes.append(params.getAllArchetypes().begin(),
                            params.getAllArchetypes().end());
     }
-
+    
     if (uncurryLevel-- == 0)
       break;
     t = cast<AnyFunctionType>(t.getResult());
   }
-
+  
   CanType resultType = t.getResult();
-
+  
   // Bridge input and result types.
-  switch (outerCC) {
+  switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
     // Native functions don't need bridging.
@@ -632,15 +936,15 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
   case AbstractCC::C:
     for (auto &input : inputs)
       input = input.getWithType(
-               getBridgedInputType(*this, outerCC, CanType(input.getType())));
-    resultType = getBridgedResultType(*this, outerCC, resultType);
+               getBridgedInputType(*this, cc, CanType(input.getType())));
+    resultType = getBridgedResultType(*this, cc, resultType);
     break;
   case AbstractCC::ObjCMethod:
     // The "self" parameter should not get bridged.
     for (auto &input : make_range(inputs.begin() + 1, inputs.end()))
       input = input.getWithType(
-                getBridgedInputType(*this, outerCC, CanType(input.getType())));
-    resultType = getBridgedResultType(*this, outerCC, resultType);
+                getBridgedInputType(*this, cc, CanType(input.getType())));
+    resultType = getBridgedResultType(*this, cc, resultType);
     break;
   }
   
@@ -648,103 +952,157 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
   std::reverse(inputs.begin(), inputs.end());
   
   // Create the new function type.
-  const ASTContext &C = t->getASTContext();
-  Type inputType = TupleType::get(inputs, C);
+  CanType inputType = CanType(TupleType::get(inputs, Context));
   if (isPolymorphic) {
-    auto *curriedGenericParams = GenericParamList::create(C,
+    auto *curriedGenericParams = GenericParamList::create(Context,
                                                           SourceLoc(),
                                                           genericParams,
                                                           SourceLoc(),
                                                           requirements,
                                                           SourceLoc());
-    curriedGenericParams->setAllArchetypes(C.AllocateCopy(allArchetypes));
+    curriedGenericParams->setAllArchetypes(Context.AllocateCopy(allArchetypes));
     curriedGenericParams->setOuterParameters(outerParameters);
     
-    return CanPolymorphicFunctionType(
-           PolymorphicFunctionType::get(inputType, resultType,
-                                        curriedGenericParams,
-                                        outerInfo, C));
+    return CanPolymorphicFunctionType::get(inputType, resultType,
+                                           curriedGenericParams,
+                                           extInfo, Context);
   } else {
-    return CanFunctionType(FunctionType::get(inputType, resultType,
-                                             outerInfo, C));
+    return CanFunctionType::get(inputType, resultType, extInfo, Context);
   }    
 }
 
 namespace {
-  struct SILFunctionTypeSubstituter :
+  class SILFunctionTypeSubstituter :
       SubstTypeVisitor<SILFunctionTypeSubstituter> {
-    SILModule &M;
-    ArrayRef<SILParameterInfo> OldParams;
-    SmallVector<SILParameterInfo, 8> NewParams;
+    TypeConverter &TC;
+    CanSILFunctionType OrigFnType;
+    ArrayRef<SILParameterInfo> OrigParams;
+    SmallVector<SILParameterInfo, 8> SubstParams;
 
-    SILFunctionTypeSubstituter(SILModule &M) : M(M) {}
+    friend class SubstTypeVisitor<SILFunctionTypeSubstituter>;
 
-    SILParameterInfo claimNext() {
-      assert(!OldParams.empty());
-      auto temp = OldParams[0];
-      OldParams = OldParams.slice(1);
+  public:
+    SILFunctionTypeSubstituter(TypeConverter &TC,
+                               CanSILFunctionType origFnType)
+      : TC(TC), OrigFnType(origFnType), OrigParams(origFnType->getParameters())
+    {}
+
+    SILResultInfo substResult(CanType origResultType,
+                              CanType substResultType) {
+      SILResultInfo origResult = OrigFnType->getResult();
+      bool origHasIndirectResult = OrigFnType->hasIndirectResult();
+
+      // Claim the implicit indirect result parameter.
+      SILParameterInfo origIndirectResult;
+      if (origHasIndirectResult) {
+        origIndirectResult = claimNextOrigParam();
+        assert(origIndirectResult.isIndirectResult());
+      }
+
+      // If the result type didn't change, we can just use the
+      // original result.
+      if (origResultType == substResultType) {
+        // That includes the implicit indirect result parameter.
+        if (origHasIndirectResult)
+          SubstParams.push_back(origIndirectResult);
+        return origResult;
+      }
+
+      // Otherwise, we'll need to SIL-lower the substituted result
+      // using the abstraction patterns of the original result.
+      auto &substResultTL = TC.getTypeLowering(origResultType, substResultType);
+      auto loweredResultTy = substResultTL.getLoweredType().getSwiftRValueType();
+
+      // If the original result was returned indirectly, we need to
+      // preserve that.
+      if (origHasIndirectResult) {
+        // We intentionally ignore origIndirectResult here.
+        addSubstParam(loweredResultTy, ParameterConvention::Indirect_Out);
+
+        assert(origResult == SILResultInfo(TupleType::getEmpty(TC.Context),
+                                           ResultConvention::Unowned));
+        return origResult;
+      }
+
+      assert(!substResultTL.isReturnedIndirectly() &&
+             "substitution yielded an indirect result when the "
+             "original function type didn't have one!");
+
+      // Otherwise, return the new type with the old conventions.
+      return SILResultInfo(loweredResultTy, origResult.getConvention());
+    }
+
+    void substInputs(CanType origInputType, CanType substInputType) {
+      visit(origInputType, substInputType);
+    }
+
+    ArrayRef<SILParameterInfo> getSubstParams() const {
+      assert(OrigParams.empty() && "didn't claim all parameters?!");
+      return SubstParams;
+    }
+
+  private:
+    /// Decompose tuples.
+    void visitTupleType(CanTupleType origTuple, CanTupleType substTuple) {
+      assert(origTuple->getNumElements() == substTuple->getNumElements());
+      for (auto i : indices(origTuple.getElementTypes()))
+        visit(origTuple.getElementType(i), substTuple.getElementType(i));
+    }
+
+    /// Every other type corresponds to a single parameter in the
+    /// original signature, since we're dealing with like-uncurried
+    /// types and thus don't have to worry about expanding archetypes
+    /// to unmaterializable parameter clauses in result function types.
+    void visitType(CanType origType, CanType substType) {
+      auto origParam = claimNextOrigParam();
+      assert(!origParam.isIndirectResult());
+
+      // If the type hasn't changed, just use the original parameter.
+      if (origType == substType) {
+        SubstParams.push_back(origParam);
+        return;
+      }
+
+      // Otherwise, lower the substituted type using the abstraction
+      // patterns of the original.
+      auto &substTL = TC.getTypeLowering(origType, substType);
+      auto substConvention = getSubstConvention(origParam.getConvention(),
+                                                substTL.isTrivial());
+      assert(isIndirectParameter(substConvention) ||
+             !substTL.isPassedIndirectly());
+      addSubstParam(substTL.getLoweredType().getSwiftRValueType(),
+                    substConvention);
+    }
+
+    SILParameterInfo claimNextOrigParam() {
+      assert(!OrigParams.empty());
+      auto temp = OrigParams[0];
+      OrigParams = OrigParams.slice(1);
       return temp;
     }
 
-    // Decompose tuples.
-    void visitTupleType(CanTupleType orig, CanTupleType subst) {
-      assert(orig->getNumElements() == subst->getNumElements());
-      for (unsigned i = 0, e = orig->getNumElements(); i != e; ++i) 
-        visit(orig.getElementType(i), subst.getElementType(i));
+    void addSubstParam(CanType type, ParameterConvention conv) {
+      SubstParams.push_back(SILParameterInfo(type, conv));
     }
 
-    void visitType(CanType orig, CanType subst) {
-      auto oldParam = claimNext();
-
-      if (orig == subst) {
-        NewParams.push_back(oldParam);
-        return;
-      }
-
-      switch (oldParam.getConvention()) {
+    ParameterConvention getSubstConvention(ParameterConvention orig,
+                                           bool isTrivial) {
+      // We use the original convention, except that we have an
+      // invariant that direct trivial parameters are always unowned.
+      switch (orig) {
       case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
-      case ParameterConvention::Indirect_Inout: {
-        auto &substTL = M.Types.getTypeLowering(subst);
-        auto loweredSubstType = substTL.getLoweredType().getSwiftRValueType();
-        NewParams.push_back(SILParameterInfo(loweredSubstType,
-                                             oldParam.getConvention()));
-        return;
-      }
-
+        if (isTrivial) return ParameterConvention::Direct_Unowned;
+        SWIFT_FALLTHROUGH;
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_In:
-        addOwnedTupleElements(subst);
-        return;
+        return orig;
 
       case ParameterConvention::Indirect_Out:
         llvm_unreachable("should've been filtered out before");
       }
       llvm_unreachable("bad parameter convention");
-    }
-
-    void addOwnedTupleElements(CanType type) {
-      if (auto tuple = dyn_cast<TupleType>(type)) {
-        for (auto elt : tuple.getElementTypes())
-          addOwnedTupleElements(elt);
-        return;
-      }
-
-      auto &paramTL = M.Types.getTypeLowering(type);
-      ParameterConvention convention;
-      if (isa<LValueType>(type)) {
-        convention = ParameterConvention::Indirect_Inout;
-      } else if (paramTL.isAddressOnly()) {
-        convention = ParameterConvention::Indirect_In;
-      } else if (paramTL.isTrivial()) {
-        convention = ParameterConvention::Direct_Unowned;
-      } else {
-        convention = ParameterConvention::Direct_Owned;
-      }
-      assert(isIndirectParameter(convention)
-               == paramTL.getLoweredType().isAddress());
-      auto loweredType = paramTL.getLoweredType().getSwiftRValueType();
-      NewParams.push_back(SILParameterInfo(loweredType, convention));
     }
   };
 }
@@ -753,38 +1111,178 @@ namespace {
 /// the form of the normal SILFunctionType for the substituted type,
 /// except using the original conventions.
 ///
-/// All of this code should disappear when we're tracking abstraction
-/// difference properly.
-SILFunctionType *swift::substituteSILFunctionType(SILModule &M,
-                                                  SILFunctionType *origInfo,
-                                                  SILType origType,
-                                                  SILType substType) {
-  SILFunctionTypeSubstituter substituter(M);
+/// This is equivalent to
+///    getLoweredType(origLoweredType,
+///                   substLoweredType).castTo<SILFunctionType>()
+/// except that origFnType's conventions may not correspond to the
+/// standard conventions of the lowered type.
+CanSILFunctionType
+TypeConverter::substFunctionType(CanSILFunctionType origFnType,
+                                 CanAnyFunctionType origLoweredType,
+                                 CanAnyFunctionType substLoweredType) {
+  if (origLoweredType == substLoweredType)
+    return origFnType;
 
-  auto origFnType = origType.castTo<AnyFunctionType>();
-  auto substFnType = substType.castTo<FunctionType>();
+  SILFunctionTypeSubstituter substituter(*this, origFnType);
 
-  // Handle the result.
-  auto &substResultTL = M.Types.getTypeLowering(substFnType.getResult());
-  auto substResultTy = substResultTL.getLoweredType().getSwiftRValueType();
-  SILResultInfo result;
-  if (origInfo->hasIndirectResult()) {
-    if (substResultTL.isAddressOnly()) {
-      result = origInfo->getResult();
-      SILParameterInfo param(substResultTy, ParameterConvention::Indirect_Out);
-      substituter.NewParams.push_back(param);
-    } else {
-      result = SILResultInfo(substResultTy, ResultConvention::Owned);
-    }
-  } else {
-    result = SILResultInfo(substResultTy, origInfo->getResult().getConvention());
-  }
+  // Map the result.
+  SILResultInfo substResult =
+    substituter.substResult(origLoweredType.getResult(),
+                            substLoweredType.getResult());
 
   // Map the inputs.
-  substituter.OldParams = origInfo->getNonReturnParameters();
-  substituter.visit(origFnType.getInput(), substFnType.getInput());
+  substituter.substInputs(origLoweredType.getInput(),
+                          substLoweredType.getInput());
 
-  return SILFunctionType::get(nullptr, origInfo->getExtInfo(),
-                              origInfo->getCalleeConvention(),
-                              substituter.NewParams, result, M.getASTContext());
+  // Use the generic parameters from the substituted type.
+  GenericParamList *genericParams = nullptr;
+  if (auto polySubstFn = dyn_cast<PolymorphicFunctionType>(substLoweredType))
+    genericParams = &polySubstFn->getGenericParams();
+
+  // Allow the substituted type to add thick-ness, but not remove it.
+  assert(origFnType->isThin() || !substLoweredType->isThin());
+
+  return SILFunctionType::get(genericParams,
+                              substLoweredType->getExtInfo(),
+                              origFnType->getCalleeConvention(),
+                              substituter.getSubstParams(),
+                              substResult,
+                              Context);
 }
+
+static void getReplacementTypes(GenericParamList &genericParams,
+                                ArrayRef<Substitution> subs,
+                                SmallVectorImpl<Type> &replacements) {
+  (void) genericParams;
+
+#ifndef NDEBUG
+  // FIXME: The AST sets up substitutions for secondary archetypes that are
+  // strictly unnecessary.
+  auto archetypes = genericParams.getAllArchetypes();
+  assert(subs.size() == archetypes.size() &&
+         "substitutions don't match archetypes");
+  auto ai = archetypes.begin();
+#endif
+  
+  for (auto &sub : subs) {
+    assert(*ai++ == sub.Archetype && "substitution doesn't match archetype");
+    replacements.push_back(sub.Replacement);
+  }  
+}
+
+/// Apply a substitution to this polymorphic SILFunctionType so that
+/// it has the form of the normal SILFunctionType for the substituted
+/// type, except using the original conventions.
+CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,
+                                                     Module *astModule,
+                                                  ArrayRef<Substitution> subs) {
+  assert(isPolymorphic());
+  auto &params = *getGenericParams();
+
+  SmallVector<Type, 4> replacements;
+  getReplacementTypes(params, subs, replacements);
+
+  // FIXME: Only substitute the primary archetypes.
+  return substGenericArgs(silModule, astModule,
+      llvm::makeArrayRef(replacements).slice(0, params.getParams().size()));
+}
+
+namespace {
+  /// Given a lowered SIL type, apply a substitution to it to produce another
+  /// lowered SIL type which uses the same abstraction conventions.
+  class SILTypeSubstituter :
+      public CanTypeVisitor<SILTypeSubstituter, CanType> {
+    SILModule &TheSILModule;
+    Module *TheASTModule;
+    TypeSubstitutionMap &Subs;
+
+    ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
+  public:
+    SILTypeSubstituter(SILModule &silModule, Module *astModule,
+                       TypeSubstitutionMap &subs)
+      : TheSILModule(silModule), TheASTModule(astModule), Subs(subs) {}
+
+    // SIL type lowering only does special things to tuples and functions.
+
+    /// Functions need to preserve their abstraction structure.
+    CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
+                                            bool dropGenerics = false) {
+      SILResultInfo substResult = subst(origType->getResult());
+
+      SmallVector<SILParameterInfo, 8> substParams;
+      substParams.reserve(origType->getParameters().size());
+      for (auto &origParam : origType->getParameters()) {
+        substParams.push_back(subst(origParam));
+      }
+
+      auto generics = (dropGenerics ? nullptr : origType->getGenericParams());
+      return SILFunctionType::get(generics, origType->getExtInfo(),
+                                  origType->getCalleeConvention(),
+                                  substParams, substResult, getASTContext());
+    }
+
+    SILResultInfo subst(SILResultInfo orig) {
+      return SILResultInfo(visit(orig.getType()), orig.getConvention());
+    }
+
+    SILParameterInfo subst(SILParameterInfo orig) {
+      return SILParameterInfo(visit(orig.getType()), orig.getConvention());
+    }
+
+    /// Tuples need to have their component types substituted by these
+    /// same rules.
+    CanType visitTupleType(CanTupleType origType) {
+      // Fast-path the empty tuple.
+      if (origType->getNumElements() == 0) return origType;
+
+      SmallVector<TupleTypeElt, 8> substElts;
+      substElts.reserve(origType->getNumElements());
+      for (auto &origElt : origType->getFields()) {
+        auto substEltType = visit(CanType(origElt.getType()));
+        substElts.push_back(origElt.getWithType(substEltType));
+      }
+      return CanType(TupleType::get(substElts, getASTContext()));
+    }
+
+    /// Any other type is would be a valid type in the AST.  Just
+    /// apply the substitution on the AST level and then lower that.
+    CanType visitType(CanType origType) {
+      assert(!isa<AnyFunctionType>(origType));
+      assert(!isa<LValueType>(origType));
+
+      assert(TheSILModule.Types.getLoweredType(origType).getSwiftRValueType()
+               == origType);
+
+      CanType substType =
+        origType.subst(TheASTModule, Subs, true, nullptr)->getCanonicalType();
+
+      // If the substitution didn't change anything, we know that the
+      // original type was a lowered type, so we're good.
+      if (origType == substType) {
+        return origType;
+      }
+
+      return TheSILModule.Types.getLoweredType(origType, substType)
+               .getSwiftRValueType();
+    }
+  };
+}
+
+CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,
+                                                     Module *astModule,
+                                                     ArrayRef<Type> args) {
+  assert(isPolymorphic());
+  auto genericParams = getGenericParams()->getParams();
+  assert(args.size() <= genericParams.size());
+
+  TypeSubstitutionMap subs;
+  for (size_t i = 0, e = args.size(); i != e; ++i) {
+    auto archetype = genericParams[i].getAsTypeParam()->getArchetype();
+    subs.insert(std::make_pair(archetype, args[i]));
+  }
+
+  SILTypeSubstituter substituter(silModule, astModule, subs);
+  return substituter.visitSILFunctionType(CanSILFunctionType(this),
+                                          /*dropGenerics*/ true);
+}
+

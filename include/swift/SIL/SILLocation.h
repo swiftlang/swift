@@ -194,7 +194,7 @@ public:
   /// (module-level) code.
   void markAsInTopLevel() { KindData |= (1 << IsInTopLevel); }
 
-  /// \brief Check is this location is accositated with the top level/module.
+  /// \brief Check is this location is associated with the top level/module.
   bool isInTopLevel() const { return KindData & (1 << IsInTopLevel); }
 
   /// \brief Mark this location as being part of the function
@@ -203,7 +203,7 @@ public:
   /// of the prologue.
   void markAsPrologue() { KindData |= (1 << IsInPrologue); }
 
-  /// \brief Check is this location is accositated with the top level/module.
+  /// \brief Check is this location is part of a function's implicit prologue.
   bool isInPrologue() const { return KindData & (1 << IsInPrologue); }
 
   bool hasASTLocation() const { return !ASTNode.isNull(); }

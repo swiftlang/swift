@@ -123,13 +123,13 @@ namespace irgen {
   /// Add the witness arguments necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,
-                                  PolymorphicFunctionType *type,
+                                  CanSILFunctionType type,
                                   SmallVectorImpl<llvm::Type*> &types);
 
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
   void emitPolymorphicParameters(IRGenFunction &IGF,
-                                 PolymorphicFunctionType *type,
+                                 CanSILFunctionType type,
                                  Explosion &args);
   
   /// Perform the metadata bindings necessary to emit a generic value witness.
@@ -140,8 +140,8 @@ namespace irgen {
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
-                                PolymorphicFunctionType *type,
-                                CanType substInputType,
+                                CanSILFunctionType origType,
+                                CanSILFunctionType substType,
                                 ArrayRef<Substitution> subs,
                                 Explosion &args);
 

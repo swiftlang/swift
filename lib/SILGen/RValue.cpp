@@ -220,6 +220,11 @@ public:
     case Initialization::Kind::Ignored:
       // Throw out the value without storing it.
       return;
+
+    case Initialization::Kind::Translating:
+      I->translateValue(gen, loc, result);
+      I->finishInitialization(gen);
+      return;
         
     case Initialization::Kind::SingleBuffer: {
       // If we didn't evaluate into the initialization buffer, do so now.
@@ -268,7 +273,7 @@ public:
     ManagedValue mv = isa<LValueType>(t)
       ? ManagedValue(arg, ManagedValue::LValue)
       : gen.emitManagedRValueWithCleanup(arg);
-    return RValue(gen, mv, loc);
+    return RValue(gen, loc, t, mv);
   }
   
   RValue visitTupleType(CanTupleType t) {
@@ -283,15 +288,36 @@ public:
   
 } // end anonymous namespace
 
+/// Return the number of rvalue elements in the given canonical type.
+static unsigned getRValueSize(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    unsigned count = 0;
+    for (auto eltType : tupleType.getElementTypes())
+      count += getRValueSize(eltType);
+    return count;
+  }
+
+  return 1;
+}
+
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0)
 {
 }
 
-RValue::RValue(SILGenFunction &gen, ManagedValue v, SILLocation l)
-  : type(v.getSwiftType()), elementsToBeAdded(0)
+RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
+               ManagedValue v)
+  : type(formalType), elementsToBeAdded(0)
 {
   ExplodeTupleValue(values, gen).visit(type, v, l);
+  assert(values.size() == getRValueSize(type));
+}
+
+RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
+  : type(expr->getType()->getCanonicalType()), elementsToBeAdded(0)
+{
+  ExplodeTupleValue(values, gen).visit(type, v, expr);
+  assert(values.size() == getRValueSize(type));
 }
 
 RValue::RValue(CanType type)
@@ -312,15 +338,19 @@ void RValue::addElement(RValue &&element) & {
   values.insert(values.end(),
                 element.values.begin(), element.values.end());
   element.makeUsed();
+
+  assert(!isComplete() || values.size() == getRValueSize(type));
 }
 
-void RValue::addElement(SILGenFunction &gen, ManagedValue element ,
-                        SILLocation l) & {
+void RValue::addElement(SILGenFunction &gen, ManagedValue element,
+                        CanType formalType, SILLocation l) & {
   assert(!isComplete() && "rvalue already complete");
   assert(!isUsed() && "rvalue already used");
   --elementsToBeAdded;
 
-  ExplodeTupleValue(values, gen).visit(element.getSwiftType(), element, l);
+  ExplodeTupleValue(values, gen).visit(formalType, element, l);
+
+  assert(!isComplete() || values.size() == getRValueSize(type));
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &gen, SILLocation l) && {
@@ -390,18 +420,6 @@ void RValue::getAllUnmanaged(SmallVectorImpl<SILValue> &dest) const & {
   
   for (auto value : values)
     dest.push_back(value.getUnmanagedValue());
-}
-
-/// Return the number of rvalue elements in the given canonical type.
-static unsigned getRValueSize(CanType type) {
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
-    unsigned count = 0;
-    for (auto eltType : tupleType.getElementTypes())
-      count += getRValueSize(eltType);
-    return count;
-  }
-
-  return 1;
 }
 
 /// Return the range of indexes for the given tuple type element.
@@ -474,6 +492,23 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
                         IsNotInitialization);
 }
 
+ManagedValue RValue::materialize(SILGenFunction &gen, SILLocation loc) && {
+  auto &paramTL = gen.getTypeLowering(getType());
+
+  // If we're already materialized, we're done.
+  if (values.size() == 1 &&
+      values[0].getType() == paramTL.getLoweredType().getAddressType()) {
+    auto value = values[0];
+    makeUsed();
+    return value;
+  }
+
+  // Otherwise, emit to a temporary.
+  auto temp = gen.emitTemporary(loc, paramTL);
+  std::move(*this).forwardInto(gen, temp.get(), loc);
+  return temp->getManagedAddress();
+}
+
 RValue &RValueSource::forceAndPeekRValue(SILGenFunction &gen) & {
   if (isRValue()) {
     return Storage.TheRV.Value;
@@ -484,6 +519,16 @@ RValue &RValueSource::forceAndPeekRValue(SILGenFunction &gen) & {
   new (&Storage.TheRV.Value) RValue(gen.emitRValue(expr));
   Storage.TheRV.Loc = expr;
   return Storage.TheRV.Value;
+}
+
+void RValueSource::rewriteType(CanType newType) & {
+  if (isRValue()) {
+    Storage.TheRV.Value.rewriteType(newType);
+  } else {
+    Expr *expr = Storage.TheExpr;
+    if (expr->getType()->isEqual(newType)) return;
+    assert(0 && "unimplemented! hope it doesn't happen");
+  }
 }
 
 RValue RValueSource::getAsRValue(SILGenFunction &gen) && {
@@ -502,4 +547,26 @@ ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen) && {
 
   auto e = std::move(*this).asKnownExpr();
   return gen.emitRValue(e).getAsSingleValue(gen, e);
+}
+
+void RValueSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {
+  if (isRValue()) {
+    auto loc = getKnownRValueLocation();
+    return std::move(*this).asKnownRValue().forwardInto(gen, dest, loc);
+  }
+
+  auto e = std::move(*this).asKnownExpr();
+  return gen.emitExprInto(e, dest);
+}
+
+ManagedValue RValueSource::materialize(SILGenFunction &gen) && {
+  if (isRValue()) {
+    auto loc = getKnownRValueLocation();
+    return std::move(*this).asKnownRValue().materialize(gen, loc);
+  }
+
+  auto expr = std::move(*this).asKnownExpr();
+  auto temp = gen.emitTemporary(expr, gen.getTypeLowering(expr->getType()));
+  gen.emitExprInto(expr, temp.get());
+  return temp->getManagedAddress();
 }

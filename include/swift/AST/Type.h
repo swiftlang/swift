@@ -170,6 +170,7 @@ template <> struct CanTypeWrapperTraits<Type> { typedef CanType type; };
 //     PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
 //   END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
 #define BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                          \
+typedef CanTypeWrapper<TYPE> Can##TYPE;                             \
 template <>                                                         \
 class CanTypeWrapper<TYPE> : public Can##BASE {                     \
 public:                                                             \
@@ -184,11 +185,10 @@ public:                                                             \
   operator bool() const { return getPointer() != nullptr; }         \
 
 #define PROXY_CAN_TYPE_SIMPLE_GETTER(METHOD)                        \
-  CanType METHOD() { return CanType(getPointer()->METHOD()); }
+  CanType METHOD() const { return CanType(getPointer()->METHOD()); }
 
 #define END_CAN_TYPE_WRAPPER(TYPE, BASE)                            \
 };                                                                  \
-typedef CanTypeWrapper<TYPE> Can##TYPE;                             \
 template <> struct CanTypeWrapperTraits<TYPE> {                     \
   typedef Can##TYPE type;                                           \
 };

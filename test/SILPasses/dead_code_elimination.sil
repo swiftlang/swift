@@ -136,7 +136,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
-sil @removeTriviallyDeadInstructions : $@thin (b : B) -> () {
+sil @removeTriviallyDeadInstructions : $@thin (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B                           
   %2 = store %0 to %1#1 : $*B                 // CHECK: store
@@ -153,7 +153,7 @@ bb0(%0 : $B):
 }                                             
 
 // CHECK-LABEL: sil @removeTriviallyDeadButUsedByUnreachableBlock
-sil @removeTriviallyDeadButUsedByUnreachableBlock : $@thin (b : B) -> () {
+sil @removeTriviallyDeadButUsedByUnreachableBlock : $@thin (@owned B) -> () {
 bb0(%0 : $B):
   %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer  // CHECK-NOT: ref_to_object_pointer
   %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
@@ -167,7 +167,7 @@ bb2:
 }                                                 // CHECK: }
 
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
-sil @removeTriviallyDeadCrossBasicBlocks : $@thin (b : B, m : Builtin.Int1) -> () {
+sil @removeTriviallyDeadCrossBasicBlocks : $@thin (@owned B, Builtin.Int1) -> () {
 bb0(%0:  $B, %1: $Builtin.Int1):
   %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer     // CHECK-NOT: ref_to_object_pointer
   %13 = cond_br %1, bb1, bb2                   // CHECK: cond_br
@@ -181,7 +181,7 @@ bb2:
   %33 = return %32 : $()
 }                                                 // CHECK: }
 
-sil @testCondBranchBBArgs : $@thin (i1 : Int64, i2 : Int64) -> Int64 {
+sil @testCondBranchBBArgs : $@thin (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   %2 = integer_literal $Builtin.Int1, 0
   cond_br %2, bb1(%0 : $Int64), bb2(%1 : $Int64)
@@ -201,7 +201,7 @@ bb3(%5 : $Int64):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @removePredecessorWithBBArgs : $@thin (i1: Int64, i2 :Int64) -> Int64 {
+sil @removePredecessorWithBBArgs : $@thin (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
  %2 = integer_literal $Builtin.Int1, 0
  %3 = cond_br %2, bb2(%0 : $Int64), bb3(%1 : $Int64)
@@ -221,7 +221,7 @@ bb4(%6 : $Int64):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @code_removed_after_a_call_to_noreturn : $@thin (i : Int64, b : Builtin.Int1) -> () {
+sil @code_removed_after_a_call_to_noreturn : $@thin (Int64, Builtin.Int1) -> () {
 bb0(%0 : $Int64, %1 : $Builtin.Int1):
   %6 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %7 = apply %6() : $@thin @noreturn () -> ()
@@ -256,7 +256,7 @@ bb0:
 
 enum BoolLike { case true, false }
 
-sil @constant_fold_switch_enum : $@thin (i : Int64) -> Int64 {
+sil @constant_fold_switch_enum : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %6 = enum $BoolLike, #BoolLike.false!enumelt          // user: %9
   switch_enum %6 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
@@ -279,7 +279,7 @@ bb3:
 enum Singleton {
   case x(Int, Char)
 };
-sil @constant_fold_switch_enum_with_payload : $@thin (i : Int64, c : Char) -> (Int64, Char) {
+sil @constant_fold_switch_enum_with_payload : $@thin (Int64, Char) -> (Int64, Char) {
 bb0(%6 : $Int64, %10 : $Char):
   %11 = tuple (%6 : $Int64, %10 : $Char)
   %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int64, Char)
@@ -299,7 +299,7 @@ b2:
 // CHECK:   return
 }
 
-sil @constant_fold_switch_int : $@thin (u : Int64) -> Int64 {
+sil @constant_fold_switch_int : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 2
   switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
@@ -318,7 +318,7 @@ bb3:
 // CHECK: }
 }
 
-sil @propagate_BB_args : $@thin (i : Int64) -> Int64 {
+sil @propagate_BB_args : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int1, 0
   br bb1(%1 : $Builtin.Int1)

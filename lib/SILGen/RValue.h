@@ -117,14 +117,14 @@ public:
   CleanupHandle getCleanup() const { return cleanup; }
 
   /// Disable the cleanup for this value.
-  void forwardCleanup(SILGenFunction &gen) {
+  void forwardCleanup(SILGenFunction &gen) const {
     assert(hasCleanup() && "value doesn't have cleanup!");
     gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
   }
   
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
-  SILValue forward(SILGenFunction &gen) {
+  SILValue forward(SILGenFunction &gen) const {
     if (hasCleanup())
       forwardCleanup(gen);
     return getValue();
@@ -132,17 +132,24 @@ public:
   
   /// Forward this value as an argument.
   SILValue forwardArgument(SILGenFunction &gen, SILLocation loc,
-                           AbstractCC cc, CanType bridgedTy) {
+                           AbstractCC cc, CanType origNativeTy,
+                           CanType substNativeTy, CanType bridgedTy) {
     // Bridge the value to the current calling convention.
-    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc, bridgedTy);
+    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc,
+                                                  origNativeTy, substNativeTy,
+                                                  bridgedTy);
     return v.forward(gen);
   }
   
   /// Get this value as an argument without consuming it.
   SILValue getArgumentValue(SILGenFunction &gen, SILLocation loc,
-                            AbstractCC cc, CanType bridgedTy) {
+                            AbstractCC cc,
+                            CanType origNativeTy, CanType substNativeTy,
+                            CanType bridgedTy) {
     // Bridge the value to the current calling convention.
-    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc, bridgedTy);
+    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc,
+                                                  origNativeTy, substNativeTy,
+                                                  bridgedTy);
     return v.getValue();
   }
   
@@ -217,7 +224,14 @@ public:
   
   /// Create a RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
-  RValue(SILGenFunction &gen, ManagedValue v, SILLocation l);
+  ///
+  /// \param expr - the expression which yielded this r-value; its type
+  ///   will become the substituted formal type of this r-value
+  RValue(SILGenFunction &gen, Expr *expr, ManagedValue v);
+
+  /// Create a RValue from a single value. If the value is of tuple type, it
+  /// will be exploded.
+  RValue(SILGenFunction &gen, SILLocation l, CanType type, ManagedValue v);
 
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
@@ -250,7 +264,8 @@ public:
   
   /// Add a ManagedValue element to the rvalue, exploding tuples if necessary.
   /// The rvalue must not yet be complete.
-  void addElement(SILGenFunction &gen, ManagedValue element, SILLocation l) &;
+  void addElement(SILGenFunction &gen, ManagedValue element,
+                  CanType formalType, SILLocation l) &;
   
   /// Forward an rvalue into a single value, imploding tuples if necessary.
   SILValue forwardAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
@@ -276,13 +291,22 @@ public:
     return values[0].getValue();
   }
 
+  ManagedValue getScalarValue() && {
+    assert(!isa<TupleType>(type) && "getScalarValue of a tuple rvalue");
+    assert(values.size() == 1);
+    auto value = values[0];
+    makeUsed();
+    return value;
+  }
+
   /// Use this rvalue to initialize an Initialization.
   void forwardInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) &&;
-  
+
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &gen,
                   SmallVectorImpl<SILValue> &values) &&;
 
+  ManagedValue materialize(SILGenFunction &gen, SILLocation loc) &&;
   
   /// Take the ManagedValues from this RValue into a SmallVector.
   void getAll(SmallVectorImpl<ManagedValue> &values) &&;
@@ -298,6 +322,16 @@ public:
   void extractElements(SmallVectorImpl<RValue> &elements) &&;
   
   CanType getType() const & { return type; }
+
+  /// Rewrite the type of this r-value.
+  void rewriteType(CanType newType) & {
+    // We only allow a very modest set of changes to a type.
+    assert(newType == type ||
+           (isa<TupleType>(newType) &&
+            cast<TupleType>(newType)->getNumElements() == 1 &&
+            cast<TupleType>(newType).getElementType(0) == type));
+    type = newType;
+  }
   
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &gen, SILLocation l) const & {
@@ -438,6 +472,24 @@ public:
 
   RValue getAsRValue(SILGenFunction &gen) &&;
   ManagedValue getAsSingleValue(SILGenFunction &gen) &&;
+
+  void forwardInto(SILGenFunction &gen, Initialization *dest) &&;
+  void forwardInto(SILGenFunction &gen, AbstractionPattern origFormalType,
+                   Initialization *dest, const TypeLowering &destTL) &&;
+
+  ManagedValue materialize(SILGenFunction &gen) &&;
+
+  /// Emit this value to memory so that it follows the abstraction
+  /// patterns of the original formal type.
+  ///
+  /// \param expectedType - the lowering of getSubstType() under the
+  ///   abstractions of origFormalType
+  ManagedValue materialize(SILGenFunction &gen,
+                           AbstractionPattern origFormalType,
+                           SILType expectedType = SILType()) &&;
+
+  // This is a hack and should be avoided.
+  void rewriteType(CanType newType) &;
 
 private:
   // Make the non-move accessors private to make it more difficult

@@ -60,8 +60,8 @@ public:
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
 
   SILType getLoweredType() const { return LoweredType; }
-  SILFunctionType *getFunctionTypeInfo() const {
-    return LoweredType.getFunctionTypeInfo(getModule());
+  CanSILFunctionType getLoweredFunctionType() const {
+    return LoweredType.castTo<SILFunctionType>();
   }
     
   StringRef getName() const { return Name; }

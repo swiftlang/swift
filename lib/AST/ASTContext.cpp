@@ -1332,10 +1332,11 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   result.profile(id);
 }
 
-SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
-                                      ExtInfo ext, ParameterConvention callee,
-                                      ArrayRef<SILParameterInfo> params,
-                                      SILResultInfo result, ASTContext &ctx) {
+CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
+                                        ExtInfo ext, ParameterConvention callee,
+                                        ArrayRef<SILParameterInfo> params,
+                                        SILResultInfo result,
+                                        const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericParams, ext, callee, params, result);
 
@@ -1343,7 +1344,7 @@ SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
   void *insertPos;
   if (auto result
         = ctx.Impl.SILFunctionTypes.FindNodeOrInsertPos(id, insertPos))
-    return result;
+    return CanSILFunctionType(result);
 
   // All SILFunctionTypes are canonical.
 
@@ -1355,7 +1356,7 @@ SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
   auto fnType =
     new (mem) SILFunctionType(genericParams, ext, callee, params, result, ctx);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
-  return fnType;
+  return CanSILFunctionType(fnType);
 }
 
 /// Return a uniqued array type with the specified base type and the

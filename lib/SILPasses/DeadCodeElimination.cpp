@@ -369,7 +369,7 @@ static bool isUserCode(const SILInstruction *I) {
 static const ApplyInst *getAsCallToNoReturn(const SILInstruction *I,
                                             SILBasicBlock &BB) {
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
-    if (AI->getCallee().getType().castTo<AnyFunctionType>()->isNoReturn())
+    if (AI->getOrigCalleeType()->isNoReturn())
       return AI;
   return nullptr;
 }

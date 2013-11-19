@@ -49,8 +49,8 @@ namespace irgen {
   ///
   /// Note that origTy and substTy must be canonical types.
   bool differsByAbstractionAsFunction(IRGenModule &IGM,
-                                      AnyFunctionType *origTy,
-                                      AnyFunctionType *substTy,
+                                      CanAnyFunctionType origTy,
+                                      CanAnyFunctionType substTy,
                                       Mangle::ExplosionKind explosionLevel,
                                       unsigned uncurryLevel);
 

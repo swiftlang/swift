@@ -268,6 +268,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, REFERENCE_STORAGE_TYPE);
   RECORD(decls_block, UNBOUND_GENERIC_TYPE);
   RECORD(decls_block, OPTIONAL_TYPE);
+  RECORD(decls_block, SIL_FUNCTION_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, GENERIC_TYPE_PARAM_DECL);
@@ -1860,6 +1861,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
     registerDeclTypeAbbr<GenericFunctionTypeLayout>();
+    registerDeclTypeAbbr<SILFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
     registerDeclTypeAbbr<ArrayTypeLayout>();
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();

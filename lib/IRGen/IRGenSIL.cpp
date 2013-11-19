@@ -43,6 +43,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPoly.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -330,6 +331,7 @@ public:
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
   SILFunction *CurSILFn;
+  ExplosionKind CurSILFnExplosionLevel;
   Address IndirectReturn;
   
   IRGenSILFunction(IRGenModule &IGM,
@@ -371,7 +373,7 @@ public:
                                 AbstractCC cc,
                                 ExplosionKind explosionLevel) {
     assert(v.getType().isObject() && "function for address value?!");
-    assert(v.getType().is<AnyFunctionType>() &&
+    assert(v.getType().is<SILFunctionType>() &&
            "function for non-function value?!");
     setLoweredValue(v, StaticFunction{f, cc, explosionLevel});
   }
@@ -379,7 +381,7 @@ public:
   void setLoweredObjCMethod(SILValue v, SILDeclRef method,
                             SILType superSearchType = SILType()) {
     assert(v.getType().isObject() && "function for address value?!");
-    assert(v.getType().is<AnyFunctionType>() &&
+    assert(v.getType().is<SILFunctionType>() &&
            "function for non-function value?!");
     setLoweredValue(v, ObjCMethod{method, superSearchType});
   }
@@ -667,10 +669,9 @@ ExplosionKind LoweredValue::getExplosionKind() const {
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f,
                                    ExplosionKind explosionLevel)
-  : IRGenFunction(IGM, explosionLevel,
-                  IGM.getAddrOfSILFunction(f, explosionLevel),
+  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, explosionLevel),
                   f->getDebugScope(), f->getLocation()),
-    CurSILFn(f)
+    CurSILFn(f), CurSILFnExplosionLevel(explosionLevel)
 {}
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -737,7 +738,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
                                  IRGenSILFunction &IGF,
                                  SILBasicBlock *entry,
                                  Explosion &params,
-                                 SILFunctionType *funcTy,
+                                 CanSILFunctionType funcTy,
                                  std::function<bool()> requiresIndirectResult) {
   // Map the indirect return if present.
   if (funcTy->hasIndirectResult()) {
@@ -763,15 +764,13 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
 static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                             SILBasicBlock *entry,
                                             Explosion &allParamValues,
-                                            SILType funcTy) {
-  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
-  
+                                            CanSILFunctionType funcTy) {
   // Map the indirect return if present.
   ArrayRef<SILArgument*> params
-    = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTI,
+    = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTy,
       [&]() -> bool {
-        auto retType = funcTI->getResult().getType();
-        return IGF.IGM.requiresIndirectResult(retType, IGF.CurExplosionLevel);
+        auto retType = funcTy->getResult().getSILType();
+        return IGF.IGM.requiresIndirectResult(retType, IGF.CurSILFnExplosionLevel);
       });
 
   // Map the remaining SIL parameters to LLVM parameters.
@@ -783,7 +782,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     // to an explosion.  Fortunately, in this case we have a guarantee
     // that it's passed directly in IR.
     if (param->getType().isObject()) {
-      Explosion paramValues(IGF.CurExplosionLevel);
+      Explosion paramValues(IGF.CurSILFnExplosionLevel);
       cast<LoadableTypeInfo>(paramTI).reexplode(IGF, allParamValues, paramValues);
       IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
       continue;
@@ -800,8 +799,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
   
   // Bind polymorphic arguments.
-  if (auto polyFn = funcTy.getAs<PolymorphicFunctionType>())
-    emitPolymorphicParameters(IGF, polyFn, allParamValues);
+  if (funcTy->isPolymorphic())
+    emitPolymorphicParameters(IGF, funcTy, allParamValues);
 }
 
 /// Emit entry point arguments for the parameters of a C function, or the
@@ -819,7 +818,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     }
 
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
-    Explosion argExplosion(IGF.CurExplosionLevel);
+    Explosion argExplosion(IGF.CurSILFnExplosionLevel);
 
     // Load and explode an argument that is 'byval' in the C calling convention.
     if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
@@ -840,20 +839,19 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
                                                 SILBasicBlock *entry,
                                                 Explosion &params,
-                                                SILType funcTy) {
-  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
-
+                                                CanSILFunctionType funcTy) {
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
-    = emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResult().getSILType());
+    = emitEntryPointIndirectReturn(IGF, entry, params, funcTy, [&] {
+      return requiresExternalIndirectResult(IGF.IGM, funcTy,
+                                            IGF.CurSILFnExplosionLevel);
     });
   
   // Map the self argument. This should always be an ObjC pointer type so
   // should never need to be loaded from a byval.
   SILArgument *selfArg = args.back();
   auto &selfType = IGF.getTypeInfo(selfArg->getType());
-  Explosion self(IGF.CurExplosionLevel);
+  Explosion self(IGF.CurSILFnExplosionLevel);
   cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
   IGF.setLoweredExplosion(selfArg, self);
   
@@ -870,13 +868,12 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
 static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
                                        SILBasicBlock *entry,
                                        Explosion &params,
-                                       SILType funcTy) {
-  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
-
+                                       CanSILFunctionType funcTy) {
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
-    = emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResult().getSILType());
+    = emitEntryPointIndirectReturn(IGF, entry, params, funcTy, [&] {
+      return requiresExternalIndirectResult(IGF.IGM, funcTy,
+                                            IGF.CurSILFnExplosionLevel);
     });
   emitEntryPointArgumentsCOrObjC(IGF, entry, params, args);
 }
@@ -917,8 +914,8 @@ void IRGenSILFunction::emitSILFunction() {
   Builder.SetInsertPoint(entry->second.bb);
 
   // Map the LLVM arguments to arguments on the entry point BB.
-  Explosion params = collectParameters();
-  SILType funcTy = CurSILFn->getLoweredType();
+  Explosion params = collectParameters(CurSILFnExplosionLevel);
+  auto funcTy = CurSILFn->getLoweredFunctionType();
 
   switch (CurSILFn->getAbstractCC()) {
   case AbstractCC::Freestanding:
@@ -1090,7 +1087,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   LinkEntity entity = LinkEntity::forSILFunction(f, level);
   
   llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType = getFunctionType(f->getLoweredType(),
+  llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                level,
                                                ExtraData::None,
                                                attrs);
@@ -1303,26 +1300,53 @@ void IRGenSILFunction::visitProtocolMetatypeInst(
 }
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
-                              Explosion &args,
-                              SILValue newArg) {
-  if (newArg.getType().isAddress()) {
-    args.add(IGF.getLoweredAddress(newArg).getAddress());
+                              SILValue arg,
+                              SILParameterInfo param,
+                              ArrayRef<Substitution> subs,
+                              Explosion &out) {
+  bool isSubstituted = (arg.getType() != param.getSILType());
+
+  // For indirect arguments, we just need to pass a pointer.
+  if (param.isIndirect()) {
+    // This address is of the substituted type.
+    auto addr = IGF.getLoweredAddress(arg);
+
+    // If a substitution is in play, just bitcast the address.
+    if (isSubstituted) {
+      auto origType = IGF.IGM.getStoragePointerType(param.getSILType());
+      addr = IGF.Builder.CreateBitCast(addr, origType);
+    }
+      
+    out.add(addr.getAddress());
     return;
   }
 
-  // Otherwise, it's an explosion, which we may need to translate.
-  if (args.getKind() == IGF.getExplosionKind(newArg)) {
-    IGF.getLoweredExplosion(newArg, args);
-  } else {
-    Explosion temp = IGF.getLoweredExplosion(newArg);
-    auto &newArgTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(newArg.getType()));
-    newArgTI.reexplode(IGF, temp, args);
+  // Otherwise, it's an explosion, which we may need to translate,
+  // both in terms of explosion level and substitution levels.
+  assert(arg.getType().isObject());
+
+  // Fast path: avoid an unnecessary temporary explosion.
+  if (!isSubstituted && out.getKind() == IGF.getExplosionKind(arg)) {
+    IGF.getLoweredExplosion(arg, out);
+    return;
   }
+
+  Explosion temp = IGF.getLoweredExplosion(arg);
+
+  // Handle the last unsubstituted case.
+  if (!isSubstituted) {
+    auto &substArgTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(arg.getType()));
+    substArgTI.reexplode(IGF, temp, out);
+    return;
+  }
+
+  reemitAsUnsubstituted(IGF, param.getType(), arg.getType().getSwiftRValueType(),
+                        subs, temp, out);
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
-                                         SILType origCalleeTy,
-                                         SILType resultTy,
+                                         CanSILFunctionType origCalleeType,
+                                         CanSILFunctionType substCalleeType,
                                          LoweredValue const &lv,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
@@ -1340,8 +1364,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod: {
     auto &objcMethod = lv.getObjCMethod();
     return prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
-                                     origCalleeTy,
-                                     resultTy,
+                                     origCalleeType,
+                                     substCalleeType,
                                      substitutions,
                                      ExplosionKind::Minimal,
                                      bool(objcMethod.getSuperSearchType()));
@@ -1351,7 +1375,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     Explosion calleeValues = lv.getExplosion(IGF);
     
     calleeFn = calleeValues.claimNext();
-    if (!origCalleeTy.castTo<AnyFunctionType>()->isThin())
+    if (!origCalleeType->isThin())
       calleeData = calleeValues.claimNext();
     else
       calleeData = nullptr;
@@ -1372,7 +1396,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
     // Cast the callee pointer to the right function type.
     llvm::AttributeSet attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(origCalleeTy, explosionLevel,
+    auto fnPtrTy = IGF.IGM.getFunctionType(origCalleeType, explosionLevel,
                                            extraData, attrs)->getPointerTo();
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
@@ -1388,8 +1412,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     llvm_unreachable("builtins should be handled before reaching here");
   }
   
-  Callee callee = Callee::forKnownFunction(origCalleeTy,
-                                           resultTy,
+  Callee callee = Callee::forKnownFunction(origCalleeType,
+                                           substCalleeType,
                                            substitutions, calleeFn, calleeData,
                                            explosionLevel);
   return CallEmission(IGF, callee);
@@ -1425,24 +1449,24 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
                                  FuncDecl *builtin,
                                  ApplyInst *i,
                                  ArrayRef<Substitution> substitutions) {
+  auto argValues = i->getArgumentsWithoutIndirectResult();
+  auto params = i->getOrigCalleeType()->getParametersWithoutIndirectResult();
+  assert(argValues.size() == params.size());
+  auto subs = i->getSubstitutions();
+  
   Explosion args(ExplosionKind::Maximal);
-  
-  auto argValues = i->getArguments();
-  
-  Address indirectResult;
-  if (i->hasIndirectReturn()) {
-    indirectResult = IGF.getLoweredAddress(i->getIndirectReturn());
-    argValues = argValues.slice(0, argValues.size() - 1);
+  for (auto index : indices(argValues)) {
+    emitApplyArgument(IGF, argValues[index], params[index], subs, args);
   }
   
-  for (SILValue arg : argValues)
-    emitApplyArgument(IGF, args, arg);
-  
-  if (indirectResult.isValid()) {
-    emitBuiltinCall(IGF, builtin, args, nullptr, indirectResult, substitutions);
+  if (i->hasIndirectResult()) {
+    Address indirectResult = IGF.getLoweredAddress(i->getIndirectResult());
+    emitBuiltinCall(IGF, builtin, i->getSubstCalleeType(),
+                    args, nullptr, indirectResult, substitutions);
   } else {
     Explosion result(ExplosionKind::Maximal);
-    emitBuiltinCall(IGF, builtin, args, &result, Address(), substitutions);
+    emitBuiltinCall(IGF, builtin, i->getSubstCalleeType(),
+                    args, &result, Address(), substitutions);
     IGF.setLoweredExplosion(SILValue(i,0), result);
   }
 }
@@ -1459,37 +1483,41 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                 i->getSubstitutions());
   }
 
-  SILType calleeTy = i->getSubstCalleeType();
-  SILType resultTy
-    = calleeTy.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultSILType();
+  auto origCalleeType = i->getOrigCalleeType();
+  auto substCalleeType = i->getSubstCalleeType();
   
-  CallEmission emission = getCallEmissionForLoweredValue(*this,
-                                                     i->getCallee().getType(),
-                                                     resultTy, calleeLV,
-                                                     i->getSubstitutions());
+  CallEmission emission =
+    getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
+                                   calleeLV, i->getSubstitutions());
   
+  auto params = origCalleeType->getParametersWithoutIndirectResult();
+  auto args = i->getArgumentsWithoutIndirectResult();
+  assert(params.size() == args.size());
+
+  // Save off the indirect return argument, if any.
+  SILValue indirectResult;
+  if (i->hasIndirectResult()) {
+    indirectResult = i->getIndirectResult();
+  }
+
   // Lower the SIL arguments to IR arguments.
   Explosion llArgs(emission.getCurExplosionLevel());
-  
-  // Save off the indirect return argument, if any.
-  OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn();
-  SILValue indirectReturn;
-  if (i->hasIndirectReturn())
-    indirectReturn = i->getIndirectReturn();
   
   // ObjC message sends need special handling for the 'self' argument, which in
   // SIL gets curried to the end of the argument list but in IR is passed as the
   // first argument. It additionally may need to be wrapped in an objc_super
   // struct, and the '_cmd' argument needs to be passed alongside it.
   if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
-    SILValue selfValue = i->getArguments().back();
+    SILValue selfValue = args.back();
+    args = args.slice(0, args.size() - 1);
+    params = params.slice(0, params.size() - 1);
+
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
     if (selfValue.getType().is<MetaTypeType>()) {
       selfArg = getObjCClassForValue(*this, selfValue);
     } else {
-      Explosion selfExplosion(getExplosionKind(selfValue));
-      getLoweredExplosion(selfValue, selfExplosion);
+      Explosion selfExplosion = getLoweredExplosion(selfValue);
       selfArg = selfExplosion.claimNext();
     }
 
@@ -1497,20 +1525,27 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                  calleeLV.getObjCMethod().getMethod(),
                                  selfArg,
                                  calleeLV.getObjCMethod().getSuperSearchType());
-    
-    args = args.slice(0, args.size() - 1);
   }
 
-  for (SILValue arg : args)
-    emitApplyArgument(*this, llArgs, arg);
+  // Turn the formal SIL parameters into IR-gen things.
+  for (auto index : indices(args)) {
+    emitApplyArgument(*this, args[index], params[index],
+                      i->getSubstitutions(), llArgs);
+  }
+
+  // Pass the generic arguments first.
+  if (origCalleeType->isPolymorphic()) {
+    emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
+                             i->getSubstitutions(), llArgs);
+  }
+
+  // Add all those arguments.
+  emission.addArg(llArgs);
   
-  emission.addSubstitutedArg(CanType(calleeTy.castTo<FunctionType>()->getInput()),
-                             llArgs);
-  
-  // If the function takes an indirect return argument, emit into it.
-  if (indirectReturn) {
-    Address a = getLoweredAddress(indirectReturn);
-    auto &retTI = getTypeInfo(indirectReturn.getType());
+  // If the SIL function takes an indirect-result argument, emit into it.
+  if (indirectResult) {
+    Address a = getLoweredAddress(indirectResult);
+    auto &retTI = getTypeInfo(indirectResult.getType());
     emission.emitToMemory(a, retTI);
     return;
   }
@@ -1525,7 +1560,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   setLoweredExplosion(SILValue(i, 0), result);
 }
 
-static std::tuple<llvm::Value*, llvm::Value*, SILType>
+static std::tuple<llvm::Value*, llvm::Value*, CanSILFunctionType>
 getPartialApplicationFunction(IRGenSILFunction &IGF,
                               SILValue v) {
   LoweredValue &lv = IGF.getLoweredValue(v);
@@ -1548,17 +1583,18 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
-                           nullptr, v.getType());
+                           nullptr, v.getType().castTo<SILFunctionType>());
   case LoweredValue::Kind::Explosion:
   case LoweredValue::Kind::MetatypeValue:
   case LoweredValue::Kind::BuiltinValue: {
     Explosion ex = lv.getExplosion(IGF);
     llvm::Value *fn = ex.claimNext();
     llvm::Value *context = nullptr;
-    if (!v.getType().castTo<AnyFunctionType>()->isThin())
+    auto fnType = v.getType().castTo<SILFunctionType>();
+    if (!fnType->isThin())
       context = ex.claimNext();
 
-    return std::make_tuple(fn, context, v.getType());
+    return std::make_tuple(fn, context, fnType);
   }
   }
 }
@@ -1568,14 +1604,21 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
+
+  // Note that we collect the arguments under the substituted type.
+  auto args = i->getArguments();
+  auto params = i->getSubstCalleeType()->getParameters();
+  params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs(ExplosionKind::Maximal);
   SmallVector<SILType, 8> argTypes;
-  for (SILValue arg : i->getArguments()) {
-    emitApplyArgument(*this, llArgs, arg);
+
+  for (auto index : indices(args)) {
+    assert(args[index].getType() = params[index].getSILType());
+    emitApplyArgument(*this, args[index], params[index], {}, llArgs);
     // FIXME: Need to carry the address-ness of each argument alongside
     // the object type's TypeInfo.
-    argTypes.push_back(arg.getType());
+    argTypes.push_back(args[index].getType());
   }
   
   auto &lv = getLoweredValue(i->getCallee());
@@ -1594,8 +1637,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     Explosion function(ExplosionKind::Maximal);
     emitObjCPartialApplication(*this,
                                objcMethod.getMethod(),
-                               i->getCallee().getType(),
-                               i->getType(),
+                               i->getOrigCalleeType(),
+                               i->getType().castTo<SILFunctionType>(),
                                selfVal,
                                i->getArguments()[0].getType(),
                                function);
@@ -1606,7 +1649,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // Get the function value.
   llvm::Value *calleeFn = nullptr;
   llvm::Value *innerContext = nullptr;
-  SILType origCalleeTy;
+  CanSILFunctionType origCalleeTy;
   
   std::tie(calleeFn, innerContext, origCalleeTy)
     = getPartialApplicationFunction(*this, i->getCallee());
@@ -1616,7 +1659,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   emitFunctionPartialApplication(*this, calleeFn, innerContext, llArgs,
                                  argTypes, i->getSubstitutions(),
                                  origCalleeTy, i->getSubstCalleeType(),
-                                 i->getType(), function);
+                                 i->getType().castTo<SILFunctionType>(),
+                                 function);
   setLoweredExplosion(v, function);
 }
 
@@ -2718,12 +2762,13 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   llvm::Value *baseValue = base.claimNext();
   
   SILDeclRef method = i->getMember();
-  
+  auto methodType = i->getType().castTo<SILFunctionType>();
+ 
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.
   llvm::Value *fnValue = emitVirtualMethodValue(*this, baseValue,
                                                 i->getOperand().getType(),
-                                                method, i->getType(),
+                                                method, methodType,
                                                 ExplosionKind::Minimal);
   fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
   Explosion e(ExplosionKind::Maximal);

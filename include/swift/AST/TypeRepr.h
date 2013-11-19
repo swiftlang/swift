@@ -223,14 +223,18 @@ private:
 ///   Foo -> Bar
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
+  GenericParamList *Generics;
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
 
 public:
-  FunctionTypeRepr(TypeRepr *ArgsTy, TypeRepr *RetTy)
-    : TypeRepr(TypeReprKind::Function), ArgsTy(ArgsTy), RetTy(RetTy) {
+  FunctionTypeRepr(GenericParamList *Generics, TypeRepr *ArgsTy,
+                   TypeRepr *RetTy)
+    : TypeRepr(TypeReprKind::Function),
+      Generics(Generics), ArgsTy(ArgsTy), RetTy(RetTy) {
   }
 
+  GenericParamList *getGenericParams() const { return Generics; }
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
 

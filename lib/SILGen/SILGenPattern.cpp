@@ -185,22 +185,29 @@ static SILValue emitGetStoredPropertyFromValueTypeRValue(SILGenFunction &gen,
                                                          SILLocation loc,
                                                          SILValue aggregate,
                                                          VarDecl *property,
-                                                         CanType propTy) {
+                                                         CanType substPropTy) {
   assert(aggregate.getType().getStructOrBoundGenericStruct());
-  auto &propTL = gen.getTypeLowering(propTy);
+
+  auto origPropTy = AbstractionPattern(property->getType()->getCanonicalType());
+  auto &propTL = gen.getTypeLowering(origPropTy.getAsType(), substPropTy);
+
+  ManagedValue result;
   if (aggregate.getType().isAddress()) {
     // Load from an address-only struct.
     SILValue addr = gen.B.createStructElementAddr(loc, aggregate, property,
                                       propTL.getLoweredType().getAddressType());
-    return gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake)
-      .forward(gen);
+    result = gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake);
   } else {
     // Extract from a loadable struct.
     SILValue field = gen.B.createStructExtract(loc, aggregate, property,
                                                propTL.getLoweredType());
     // FIXME: Make unowned field strong.
-    return gen.B.createCopyValue(loc, field);
+    auto value = gen.B.createCopyValue(loc, field);
+    result = gen.emitManagedRValueWithCleanup(value, propTL);
   }
+
+  result = gen.emitOrigToSubstValue(loc, result, origPropTy, substPropTy);
+  return result.forward(gen);
 }
 
 /// Load a property from a struct or class rvalue as an independent rvalue.

@@ -123,8 +123,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    SILFunctionType *funcInfo
-      = SGM.getConstantType(c).getFunctionTypeInfo(SGM.M);
+    auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
     
     if (funcInfo->getParameters().size() != inputTypes.size()
         || !std::equal(funcInfo->getParameterSILTypes().begin(),
@@ -200,9 +199,11 @@ SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
+  auto extInfo = FunctionType::ExtInfo().withIsThin(true);
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
-                                        TupleType::getEmpty(C), C);
-  SILType loweredType = getLoweredType(topLevelType);
+                                        TupleType::getEmpty(C),
+                                        extInfo, C);
+  auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
   return new (M) SILFunction(M, SILLinkage::Internal,
                              "top_level_code", loweredType, Loc);
 }
@@ -249,7 +250,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   if (found != emittedFunctions.end())
     return found->second;
   
-  SILType constantType = getConstantType(constant);
+  auto constantType = getConstantType(constant).castTo<SILFunctionType>();
   SILLinkage linkage = getConstantLinkage(constant);
 
   IsTransparent_t IsTrans = constant.isTransparent()?
@@ -461,7 +462,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                     FunctionType::ExtInfo()
                                       .withIsThin(true),
                                     C);
-  SILType initSILType = getLoweredType(initType);
+  auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
   
   auto *f = new (M) SILFunction(M, SILLinkage::Internal, funcName,
                                 initSILType, binding, IsNotTransparent);

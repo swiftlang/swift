@@ -28,6 +28,13 @@ namespace Lowering {
 class PhysicalPathComponent;
 class LogicalPathComponent;
 
+/// Information about the type of an l-value.
+struct LValueTypeData {
+  CanType OrigFormalType;
+  CanType SubstFormalType;
+  SILType TypeOfRValue;
+};
+
 /// An l-value path component represents a chunk of the access path to
 /// an object.  Path components may be either "physical" or "logical".
 /// A physical path involves elementary address manipulations; these
@@ -46,7 +53,7 @@ class LogicalPathComponent;
 ///     still qualify for physical access if we are in a privileged
 ///     component.
 class PathComponent {
-  SILType TypeOfRValue;
+  LValueTypeData TypeData;
 
   friend class LValue;
   unsigned AllocatedSize : 31;
@@ -62,8 +69,8 @@ class PathComponent {
   PathComponent &operator=(const PathComponent &) = delete;
 
 protected:
-  PathComponent(SILType typeOfRValue, bool isPhysical)
-    : TypeOfRValue(typeOfRValue), IsPhysical(isPhysical) {}
+  PathComponent(LValueTypeData typeData, bool isPhysical)
+    : TypeData(typeData), IsPhysical(isPhysical) {}
 
   virtual ~PathComponent() {}
 
@@ -87,7 +94,11 @@ public:
   
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.
-  SILType getTypeOfRValue() const { return TypeOfRValue; }
+  SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
+  CanType getOrigFormalType() const { return TypeData.OrigFormalType; }
+  CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
+
+  const LValueTypeData &getTypeData() const { return TypeData; }
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -97,8 +108,8 @@ class PhysicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  PhysicalPathComponent(SILType typeOfRValue)
-    : PathComponent(typeOfRValue, true) {}
+  PhysicalPathComponent(LValueTypeData typeData)
+    : PathComponent(typeData, true) {}
 
 public:
   virtual SILValue offset(SILGenFunction &gen,
@@ -122,8 +133,8 @@ class LogicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  LogicalPathComponent(SILType typeOfRValue)
-    : PathComponent(typeOfRValue, false) {}
+  LogicalPathComponent(LValueTypeData typeData)
+    : PathComponent(typeData, false) {}
 
 public:
   /// Clone the path component onto the heap.
@@ -164,7 +175,7 @@ class LValue {
 
   /// Iterating to the end of the l-value is expensive, so we cache it
   /// here.
-  SILType TypeOfRValue;
+  LValueTypeData TypeData;
 
 public:
   LValue() = default;
@@ -187,7 +198,7 @@ public:
     T &component = Path.add<T>(std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T);
     assert(component.allocated_size() == sizeof(T));
-    TypeOfRValue = component.getTypeOfRValue();
+    TypeData = component.getTypeData();
     return component;
   }
 
@@ -196,7 +207,7 @@ public:
     T &component = Path.addWithExtra<T>(extraSize, std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T) + extraSize;
     assert(component.allocated_size() == sizeof(T) + extraSize);
-    TypeOfRValue = component.getTypeOfRValue();
+    TypeData = component.getTypeData();
     return component;
   }
 
@@ -211,7 +222,10 @@ public:
   /// Returns the type-of-rvalue of the logical object referenced by
   /// this l-value.  Note that this may differ significantly from the
   /// type of l-value.
-  SILType getTypeOfRValue() const { return TypeOfRValue; }
+  SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
+  CanType getOrigFormalType() const { return TypeData.OrigFormalType; }
+  CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
+  const LValueTypeData &getTypeData() const { return TypeData; }
 };
   
 /// RAII object to enable writebacks for logical lvalues evaluated within the

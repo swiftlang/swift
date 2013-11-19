@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
@@ -59,6 +60,7 @@ namespace {
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   Module *M;
   const SILFunction &F;
+  Lowering::TypeConverter &TC;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance;
 
@@ -86,13 +88,17 @@ public:
   _require(condition, complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
-  _requireObjectType(SILValue value, const Twine &valueDescription,
+  _requireObjectType(SILType type, const Twine &valueDescription,
                      const char *typeName) {
-    _require(value.getType().isObject(),
-             valueDescription + " must be an object");
-    auto result = dyn_cast<T>(value.getType().getSwiftRValueType());
+    _require(type.isObject(), valueDescription + " must be an object");
+    auto result = type.getAs<T>();
     _require(result, valueDescription + " must have type " + typeName);
     return result;
+  }
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireObjectType(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    return _requireObjectType<T>(value.getType(), valueDescription, typeName);
   }
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
@@ -110,7 +116,21 @@ public:
     });
   }
 
-  SILVerifier(const SILFunction &F) : M(F.getModule().getSwiftModule()), F(F) {
+  void requireSameFunctionComponents(CanSILFunctionType type1,
+                                     CanSILFunctionType type2,
+                                     const Twine &what) {
+    require(type1->getResult() == type2->getResult(),
+            "result types of " + what + " do not match");
+    require(type1->getParameters().size() == type2->getParameters().size(),
+            "inputs of " + what + " do not match in count");
+    for (auto i : indices(type1->getParameters())) {
+      require(type1->getParameters()[i] == type2->getParameters()[i],
+              "input " + Twine(i) + " of " + what + " do not match");
+    }
+  }
+
+  SILVerifier(const SILFunction &F)
+      : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types) {
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
@@ -226,7 +246,11 @@ public:
 
   /// Check that the given type is a legal SIL value.
   void checkLegalType(SILType type) {
-    require(!type.is<LValueType>(), "l-value types are not legal in SIL");
+    auto rvalueType = type.getSwiftRValueType();
+    require(!isa<LValueType>(rvalueType),
+            "l-value types are not legal in SIL");
+    require(!isa<AnyFunctionType>(rvalueType),
+            "AST function types are not legal in SIL");
   }
 
   /// Check that this operand appears in the use-chain of the value it uses.
@@ -252,45 +276,37 @@ public:
   }
   
   /// Check the substitutions passed to an apply or partial_apply.
-  SILType checkApplySubstitutions(ArrayRef<Substitution> subs,
-                                  SILType calleeTy) {
+  CanSILFunctionType checkApplySubstitutions(ArrayRef<Substitution> subs,
+                                             SILType calleeTy) {
+    auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
+
     // If there are substitutions, verify them and apply them to the callee.
-    auto polyTy = calleeTy.getAs<PolymorphicFunctionType>();
     if (subs.empty()) {
-      require(!polyTy,
+      require(!fnTy->getGenericParams(),
               "callee of apply without substitutions must not be polymorphic");
-      return calleeTy;
+      return fnTy;
     }
-    require(polyTy,
+    require(fnTy->getGenericParams(),
             "callee of apply with substitutions must be polymorphic");
-    require(polyTy->getAllArchetypes().size() == subs.size(),
+    require(fnTy->getGenericParams()->getAllArchetypes().size() == subs.size(),
             "number of apply substitutions must match number of archetypes "
             "in the function type");
     
     // Apply the substitutions.
-    // FIXME: Eventually we want this substitution to apply 1:1 to the
-    // SILFunctionType-level calling convention of the type, instead of
-    // hiding the abstraction difference behind the specialization.
-    auto substTy = polyTy->substGenericArgs(M, subs)->getCanonicalType();
-    
-    return SILType::getPrimitiveObjectType(substTy);
+    return fnTy->substGenericArgs(F.getModule(), M, subs);
   }
   
   void checkApplyInst(ApplyInst *AI) {
-    SILType calleeTy = AI->getCallee().getType();
-    require(calleeTy.isObject(), "callee of apply must be an object");
-    require(calleeTy.is<AnyFunctionType>(),
-            "callee of apply must have any function type");
-    
-    calleeTy = checkApplySubstitutions(AI->getSubstitutions(), calleeTy);
+    auto ti = checkApplySubstitutions(AI->getSubstitutions(),
+                                      AI->getCallee().getType());
+    require(AI->getOrigCalleeType()->getAbstractCC() ==
+            AI->getSubstCalleeType()->getAbstractCC(),
+            "calling convention difference between types");
     
     // FIXME: This doesn't work across TUs because of poly func type
     // canonicalization issues.
-    // require(calleeTy == AI->getSubstCalleeType(),
+    // require(ti == AI->getSubstCalleeType(),
     //         "substituted callee type does not match substitutions");
-    calleeTy = AI->getSubstCalleeType();
-    
-    SILFunctionType *ti = calleeTy.getFunctionTypeInfo(F.getModule());
     
     // Check that the arguments and result match.
     require(AI->getArguments().size() == ti->getParameters().size(),
@@ -305,29 +321,16 @@ public:
   }
   
   void checkPartialApplyInst(PartialApplyInst *PAI) {
-    SILType calleeTy = PAI->getCallee().getType();
-    require(calleeTy.isObject(), "callee of closure must be an object");
-    require(calleeTy.is<AnyFunctionType>(),
-            "callee of closure must have Any function type");
-
-    SILType appliedTy = PAI->getType();
-    require(appliedTy.isObject(), "result of closure must be an object");
-    require(appliedTy.is<FunctionType>(),
-            "result of closure must have concrete function type");
-    // FIXME: A "curry" with no arguments could remain thin.
-    require(!appliedTy.castTo<FunctionType>()->isThin(),
+    auto resultInfo = requireObjectType(SILFunctionType, PAI,
+                                        "result of partial_apply");
+    require(!resultInfo->isThin(),
             "result of closure cannot have a thin function type");
 
-    calleeTy = checkApplySubstitutions(PAI->getSubstitutions(), calleeTy);
-
-    require(calleeTy == PAI->getSubstCalleeType(),
+    auto info = checkApplySubstitutions(PAI->getSubstitutions(),
+                                        PAI->getCallee().getType());
+    require(info == PAI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
 
-    SILFunctionType *info
-      = calleeTy.getFunctionTypeInfo(F.getModule());
-    SILFunctionType *resultInfo
-      = appliedTy.getFunctionTypeInfo(F.getModule());
-    
     // The arguments must match the suffix of the original function's input
     // types.
     require(PAI->getArguments().size() + resultInfo->getParameters().size()
@@ -360,16 +363,15 @@ public:
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
     require(isa<BuiltinModule>(BFI->getReferencedFunction()->getDeclContext()),
          "builtin_function_ref must refer to a function in the Builtin module");
-    require(BFI->getType().is<AnyFunctionType>(),
-            "builtin_function_ref should have a function result");
-    require(BFI->getType().castTo<AnyFunctionType>()->isThin(),
+    auto fnType = requireObjectType(SILFunctionType, BFI,
+                                    "result of builtin_function_ref");
+    require(fnType->isThin(),
             "builtin_function_ref should have a thin function result");
   }
   
-  void checkFunctionRefInst(FunctionRefInst *CRI) {
-    require(CRI->getType().is<AnyFunctionType>(),
-            "function_ref should have a function result");
-    require(CRI->getType().castTo<AnyFunctionType>()->isThin(),
+  void checkFunctionRefInst(FunctionRefInst *FRI) {
+    auto fnType = requireObjectType(SILFunctionType, FRI, "result of function_ref");
+    require(fnType->isThin(),
             "function_ref should have a thin function result");
   }
   
@@ -468,15 +470,18 @@ public:
     require(SI->getType().isObject(),
             "StructInst must produce an object");
 
-    CanType structTy = SI->getType().getSwiftType();
+    CanType structTy = SI->getType().getSwiftRValueType();
     auto opi = SI->getElements().begin(), opEnd = SI->getElements().end();
     for (VarDecl *field : structDecl->getStoredProperties()) {
       require(opi != opEnd,
               "number of struct operands does not match number of stored "
               "member variables of struct");
+
+      Type origFormalType = field->getType();
+      Type substFormalType = structTy->getTypeOfMember(M, field, nullptr);
+      SILType loweredType = TC.getLoweredType(origFormalType, substFormalType);
       
-      Type fieldTy = structTy->getTypeOfMember(M, field, nullptr);
-      require(fieldTy->isEqual((*opi).getType().getSwiftType()),
+      require((*opi).getType() == loweredType,
               "struct operand type does not match field type");
       ++opi;
     }
@@ -515,11 +520,10 @@ public:
     require(UI->getType().isAddress(),
             "EnumDataAddrInst must produce an address");
     
-    Type caseTy = UI->getOperand().getType().getSwiftRValueType()
-      ->getTypeOfMember(M, UI->getElement(), nullptr,
-                        UI->getElement()->getArgumentType());
-    
-    require(caseTy->isEqual(UI->getType().getSwiftRValueType()),
+    SILType caseTy =
+      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+                                                    F.getModule());
+    require(caseTy == UI->getType(),
             "EnumDataAddrInst result does not match type of enum case");
   }
   
@@ -678,10 +682,12 @@ public:
 
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
-    
-    Type fieldTy = operandTy.getSwiftRValueType()
+
+    Type origFormalTy = EI->getField()->getType();
+    Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
-    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
+    require(loweredFieldTy == EI->getType(),
             "result of struct_extract does not match type of field");
   }
   
@@ -719,10 +725,12 @@ public:
 
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
-    
-    Type fieldTy = operandTy.getSwiftRValueType()
+
+    Type origFormalTy = EI->getField()->getType();
+    Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
-    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
+    require(loweredFieldTy.getAddressType() == EI->getType(),
             "result of struct_element_addr does not match type of field");
   }
 
@@ -740,53 +748,46 @@ public:
     
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
-    
-    Type fieldTy = operandTy.getSwiftRValueType()
+
+    Type origFormalTy = EI->getField()->getType();
+    Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
-    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
+    require(loweredFieldTy.getAddressType() == EI->getType(),
             "result of ref_element_addr does not match type of field");
   }
   
-  CanType getMethodSelfType(AnyFunctionType *ft) {
-    auto *inputTuple = ft->getInput()->getAs<TupleType>();
-    if (!inputTuple)
-      return ft->getInput()->getCanonicalType();    
-    return inputTuple->getFields().back().getType()->getCanonicalType();
+  SILType getMethodSelfType(CanSILFunctionType ft) {
+    return ft->getParameters().back().getSILType();
   }
-  
+
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-    DEBUG(llvm::dbgs() << "verifying";
-          AMI->print(llvm::dbgs()));
-    AnyFunctionType *methodType = AMI->getType(0).getAs<AnyFunctionType>();
-    DEBUG(llvm::dbgs() << "method type ";
-          methodType->print(llvm::dbgs());
-          llvm::dbgs() << "\n");
-    require(methodType,
-            "result method must be a function type");
+    auto methodType = requireObjectType(SILFunctionType, AMI,
+                                        "result of archetype_method");
     require(methodType->isThin()
               == AMI->getLookupArchetype().castTo<ArchetypeType>()
                   ->requiresClass(),
-            "result method must not be thin function type if class archetype, "
+            "result method must be thin function type if class archetype, "
             "thick if not class");
-    SILType operandType = AMI->getLookupArchetype();
+    CanType operandType = AMI->getLookupArchetype().getSwiftRValueType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
           llvm::dbgs() << "\n");
-    require(operandType.is<ArchetypeType>(),
+    require(isa<ArchetypeType>(operandType),
             "operand type must be an archetype");
     
-    CanType selfType = getMethodSelfType(methodType);
-    require(selfType == operandType.getSwiftType()
-            || selfType->isEqual(
-                            MetaTypeType::get(operandType.getSwiftRValueType(),
-                                              operandType.getASTContext())),
-            "result must be method of operand type");
-    if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
-      require(mt->getInstanceType()->is<ArchetypeType>(),
+    SILType selfType = getMethodSelfType(methodType);
+    if (auto selfMT = selfType.getAs<MetaTypeType>()) {
+      require(selfType.isObject(),
+              "archetype_method taking metatype must take it directly");
+      require(selfMT.getInstanceType() == operandType,
               "archetype_method must apply to an archetype metatype");
     } else {
-      require(operandType.is<ArchetypeType>(),
+      require(selfType.getSwiftRValueType() == operandType,
               "archetype_method must apply to an archetype or archetype metatype");
+      require(selfType.isObject() ==
+                selfType.castTo<ArchetypeType>()->requiresClass(),
+              "archetype_method should take class archetypes by value");
     }
   }
   
@@ -808,9 +809,8 @@ public:
   }
 
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
-    AnyFunctionType *methodType = EMI->getType(0).getAs<AnyFunctionType>();
-    require(methodType,
-            "result method must be a function type");
+    auto methodType = requireObjectType(SILFunctionType, EMI,
+                                        "result of protocol_method");
     SILType operandType = EMI->getOperand().getType();
     require(methodType->isThin()
               == operandType.isClassExistentialType(),
@@ -824,13 +824,13 @@ public:
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
-      CanType selfType = getMethodSelfType(methodType);
+      SILType selfType = getMethodSelfType(methodType);
       if (!operandType.isClassExistentialType()) {
-        require(isa<LValueType>(selfType),
+        require(selfType.isAddress(),
                 "protocol_method result must take its self parameter "
                 "by address");
       }
-      CanType selfObjType = selfType->getRValueType()->getCanonicalType();
+      CanType selfObjType = selfType.getSwiftRValueType();
       require(isSelfArchetype(selfObjType, proto),
               "result must be a method of protocol's Self archetype");
     } else {
@@ -841,16 +841,13 @@ public:
       require(operandType.castTo<MetaTypeType>()
                 ->getInstanceType()->isExistentialType(),
               "static protocol_method must apply to an existential metatype");
-      require(getMethodSelfType(methodType) ==
-                                  EMI->getOperand().getType().getSwiftType(),
+      require(getMethodSelfType(methodType) == EMI->getOperand().getType(),
               "result must be a method of the existential metatype");
     }
   }
 
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
-    AnyFunctionType *methodType = EMI->getType(0).getAs<AnyFunctionType>();
-    require(methodType,
-            "result method must be a function type");
+    requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
     SILType operandType = EMI->getOperand().getType();
 
     require(EMI->getMember().getDecl()->isObjC(), "method must be [objc]");
@@ -877,14 +874,16 @@ public:
       return bool(t->getClassOrBoundGenericClass());
     }
   }
+
+  static bool isClassOrClassMetatype(SILType t) {
+    return t.isObject() && isClassOrClassMetatype(t.getSwiftRValueType());
+  }
   
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    require(CMI->getType()
-              == F.getModule().Types.getConstantType(CMI->getMember()),
+    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
             "result type of class_method must match type of method");
-    auto methodType = CMI->getType().getAs<AnyFunctionType>();
-    require(methodType,
-            "result method must be of a function type");
+    auto methodType = requireObjectType(SILFunctionType, CMI,
+                                        "result of class_method");
     require(methodType->isThin(),
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
@@ -895,12 +894,10 @@ public:
   }
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    require(CMI->getType()
-              == F.getModule().Types.getConstantType(CMI->getMember()),
+    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
             "result type of class_method must match type of method");
-    auto methodType = CMI->getType(0).getAs<AnyFunctionType>();
-    require(methodType,
-            "result method must be of a function type");
+    auto methodType = requireObjectType(SILFunctionType, CMI,
+                                        "result of super_method");
     require(methodType->isThin(),
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
@@ -1109,75 +1106,42 @@ public:
   }
   
   void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {
-    SILType operandTy = BBI->getOperand().getType();
-    SILType resultTy = BBI->getType();
-    
-    require(operandTy.isObject(),
-            "bridge_to_block operand cannot be an address");
-    require(resultTy.isObject(),
-            "bridge_to_block result cannot be an address");
-    require(operandTy.is<FunctionType>(),
-            "bridge_to_block operand must be a function type");
-    require(resultTy.is<FunctionType>(),
-            "bridge_to_block result must be a function type");
-    
-    auto operandFTy = BBI->getOperand().getType().castTo<FunctionType>();
-    auto resultFTy = BBI->getType().castTo<FunctionType>();
-    
-    require(operandFTy.getInput() == resultFTy.getInput(),
-            "bridge_to_block operand and result types must differ only in "
-            "@objc_block-ness");
-    require(operandFTy.getResult() == resultFTy.getResult(),
-            "bridge_to_block operand and result types must differ only in "
-            "@objc_block-ness");
-    require(operandFTy->isAutoClosure() == resultFTy->isAutoClosure(),
-            "bridge_to_block operand and result types must differ only in "
-            "@objc_block-ness");
-    require(!operandFTy->isThin(), "bridge_to_block operand cannot be @thin");
-    require(!resultFTy->isThin(), "bridge_to_block result cannot be @thin");
+    auto operandFTy = requireObjectType(SILFunctionType, BBI->getOperand(),
+                                        "bridge_to_block operand");
+    auto resultFTy = requireObjectType(SILFunctionType, BBI,
+                                       "bridge_to_block result");
+
+    requireSameFunctionComponents(operandFTy, resultFTy,
+                                  "operand and result of bridge_to_block");
     require(!operandFTy->isBlock(),
             "bridge_to_block operand cannot be @objc_block");
     require(resultFTy->isBlock(),
             "bridge_to_block result must be @objc_block");
+    require(!operandFTy->isThin(), "bridge_to_block operand cannot be [thin]");
+    require(!resultFTy->isThin(), "bridge_to_block result cannot be [thin]");
+
+    auto adjustedOperandExtInfo = operandFTy->getExtInfo().withIsBlock(true);
+    require(adjustedOperandExtInfo == resultFTy->getExtInfo(),
+            "operand and result of bridge_to_block must agree in particulars");
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
-    requireObjectType(AnyFunctionType, TTFI->getOperand(),
-                      "thin_to_thick_function operand");
-    requireObjectType(AnyFunctionType, TTFI,
-                      "thin_to_thick_function result");
-    if (auto opFTy = dyn_cast<FunctionType>(
-                                 TTFI->getOperand().getType().getSwiftType())) {
-      auto resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
-      require(resFTy &&
-              opFTy->getInput()->isEqual(resFTy->getInput()) &&
-              opFTy->getResult()->isEqual(resFTy->getResult()) &&
-              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-              opFTy->isBlock() == resFTy->isBlock() &&
-              opFTy->getAbstractCC() == resFTy->getAbstractCC(),
-              "thin_to_thick_function operand and result type must differ only "
-              " in thinness");
-      require(!resFTy->isThin(),
-              "thin_to_thick_function result must not be thin");
-      require(opFTy->isThin(),
-              "thin_to_thick_function operand must be thin");
-    } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
-                                 TTFI->getOperand().getType().getSwiftType())) {
-      auto resPTy = dyn_cast<PolymorphicFunctionType>(
-                                               TTFI->getType().getSwiftType());
-      require(resPTy &&
-              opPTy->getInput()->isEqual(resPTy->getInput()) &&
-              opPTy->getResult()->isEqual(resPTy->getResult()) &&
-              opPTy->getAbstractCC() == opPTy->getAbstractCC(),
-              "thin_to_thick_function operand and result type must differ only "
-              " in thinness");
-      require(!resPTy->isThin(),
-              "thin_to_thick_function result must not be thin");
-      require(opPTy->isThin(),
-              "thin_to_thick_function operand must be thin");
-    } else {
-      llvm_unreachable("invalid AnyFunctionType?!");
-    }
+    auto opFTy = requireObjectType(SILFunctionType, TTFI->getOperand(),
+                                   "thin_to_thick_function operand");
+    auto resFTy = requireObjectType(SILFunctionType, TTFI,
+                                    "thin_to_thick_function result");
+    require(opFTy->isPolymorphic() == resFTy->isPolymorphic(),
+            "thin_to_thick_function operand and result type must differ only "
+            " in thinness");
+    requireSameFunctionComponents(opFTy, resFTy,
+                                  "thin_to_thick_function operand and result");
+
+    require(opFTy->isThin(), "operand of thin_to_thick_function must be thin");
+    require(!resFTy->isThin(), "result of thin_to_thick_function must be thick");
+
+    auto adjustedOperandExtInfo = opFTy->getExtInfo().withIsThin(false);
+    require(adjustedOperandExtInfo == resFTy->getExtInfo(),
+            "operand and result of thin_to_think_function must agree in particulars");
   }
   
   void checkRefToUnownedInst(RefToUnownedInst *I) {
@@ -1290,34 +1254,20 @@ public:
   }
   
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
-    require(ICI->getOperand().getType().isObject(),
-            "conversion operand cannot be an address");
-    require(ICI->getType().isObject(),
-            "conversion result cannot be an address");
-    
-    auto opFTy = ICI->getOperand().getType().getAs<AnyFunctionType>();
-    auto resFTy = ICI->getType().getAs<AnyFunctionType>();
+    auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
+                                  "convert_function operand");
+    auto resTI = requireObjectType(SILFunctionType, ICI,
+                                   "convert_function operand");
 
-    require(opFTy, "convert_function operand must be a function");
-    require(resFTy, "convert_function result must be a function");
-    require(opFTy->getAbstractCC() == resFTy->getAbstractCC(),
+    // convert_function is required to be a no-op conversion.
+
+    require(opTI->getAbstractCC() == resTI->getAbstractCC(),
             "convert_function cannot change function cc");
-    require(opFTy->isThin() == resFTy->isThin(),
+    require(opTI->isThin() == resTI->isThin(),
             "convert_function cannot change function thinness");
-    
-    SILFunctionType *opTI
-      = ICI->getOperand().getType().getFunctionTypeInfo(F.getModule());
-    SILFunctionType *resTI
-      = ICI->getType().getFunctionTypeInfo(F.getModule());
 
-    require(opTI->getResult() == resTI->getResult(),
-            "result types of convert_function operand and result do no match");
-    require(opTI->getParameters().size() == resTI->getParameters().size(),
-            "input types of convert_function operand and result do not match");
-    require(std::equal(opTI->getParameters().begin(),
-                       opTI->getParameters().end(),
-                      resTI->getParameters().begin()),
-            "input types of convert_function operand and result do not match");
+    requireSameFunctionComponents(opTI, resTI,
+                                  "convert_function operand and result");
   }
   
   void checkCondFailInst(CondFailInst *CFI) {
@@ -1329,8 +1279,7 @@ public:
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     
-    SILFunctionType *ti =
-      F.getLoweredType().getFunctionTypeInfo(F.getModule());
+    CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType = ti->getResult().getSILType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
@@ -1344,8 +1293,7 @@ public:
   void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     
-    SILFunctionType *ti =
-      F.getLoweredType().getFunctionTypeInfo(F.getModule());
+    CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType = ti->getResult().getSILType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
@@ -1361,8 +1309,8 @@ public:
   }
   
   void checkSwitchIntInst(SwitchIntInst *SII) {
-    require(SII->getOperand().getType().is<BuiltinIntegerType>(),
-            "switch_int operand is not a builtin int type");
+    requireObjectType(BuiltinIntegerType, SII->getOperand(),
+                      "switch_int operand");
     
     auto ult = [](const APInt &a, const APInt &b) { return a.ult(b); };
     std::set<APInt, decltype(ult)> cases(ult);
@@ -1566,14 +1514,13 @@ public:
   }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
-    SILType ty = F.getLoweredType();
-    SILFunctionType *ti = ty.getFunctionTypeInfo(F.getModule());
+    SILFunctionType *ti = F.getLoweredFunctionType();
     
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
             arg->getType().dump();
           llvm::dbgs() << "Input types for SIL function type ";
-          ty.print(llvm::dbgs());
+          ti->print(llvm::dbgs());
           llvm::dbgs() << ":\n";
           for (auto input : ti->getParameters())
             input.getSILType().dump(););
@@ -1645,6 +1592,8 @@ public:
   }
   
   void visitSILFunction(SILFunction *F) {
+    PrettyStackTraceSILFunction stackTrace("verifying", F);
+
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
     

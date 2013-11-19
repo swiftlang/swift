@@ -357,12 +357,18 @@ public:
                            SILFunction &F);
   
   SILValue getCallee() const { return Operands[Callee].get(); }
+
+  // Get the type of the callee without the applied substitutions.
+  CanSILFunctionType getOrigCalleeType() const {
+    return getCallee().getType().castTo<SILFunctionType>();
+  }
   
   // Get the type of the callee with the applied substitutions.
-  SILType getSubstCalleeType() const { return SubstCalleeType; }
-  
-  SILFunctionType *getFunctionTypeInfo() const {
-    return getSubstCalleeType().getFunctionTypeInfo(getModule());
+  CanSILFunctionType getSubstCalleeType() const {
+    return SubstCalleeType.castTo<SILFunctionType>();
+  }
+  SILType getSubstCalleeSILType() const {
+    return SubstCalleeType;
   }
   
   /// True if this application has generic substitutions.
@@ -388,17 +394,17 @@ public:
 
   bool isTransparent() const { return Transparent; }
 
-  bool hasIndirectReturn() const {
-    return getFunctionTypeInfo()->hasIndirectResult();
+  bool hasIndirectResult() const {
+    return getSubstCalleeType()->hasIndirectResult();
   }
 
-  SILValue getIndirectReturn() const {
-    assert(hasIndirectReturn() && "apply inst does not have indirect return!");
+  SILValue getIndirectResult() const {
+    assert(hasIndirectResult() && "apply inst does not have indirect result!");
     return getArguments().front();
   }
 
-  OperandValueArrayRef getArgumentsWithoutIndirectReturn() const {
-    if (hasIndirectReturn())
+  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
+    if (hasIndirectResult())
       return getArguments().slice(1);
     return getArguments();
   }
@@ -452,10 +458,17 @@ public:
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
+  // Get the type of the callee without the applied substitutions.
+  CanSILFunctionType getOrigCalleeType() const {
+    return getCallee().getType().castTo<SILFunctionType>();
+  }
+  
   // Get the type of the callee with the applied substitutions.
-  SILType getSubstCalleeType() const { return SubstCalleeType; }
-  SILFunctionType *getFunctionTypeInfo() const {
-    return getSubstCalleeType().getFunctionTypeInfo(getModule());
+  CanSILFunctionType getSubstCalleeType() const {
+    return SubstCalleeType.castTo<SILFunctionType>();
+  }
+  SILType getSubstCalleeSILType() const {
+    return SubstCalleeType;
   }
 
   /// True if this application has generic substitutions.

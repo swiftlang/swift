@@ -18,6 +18,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -39,12 +40,11 @@ enum class AbstractionDifference : bool {
   Explosion
 };
 
-
 /// Answer the differs-by-abstraction question for the given
 /// function types.  See the comment below.
 bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
-                                           AnyFunctionType *origTy,
-                                           AnyFunctionType *substTy,
+                                           CanAnyFunctionType origTy,
+                                           CanAnyFunctionType substTy,
                                            ExplosionKind explosionLevel,
                                            unsigned uncurryLevel) {
   assert(origTy->isCanonical());
@@ -77,10 +77,15 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
   CanType substResult = CanType(substTy->getResult());
   if (origResult == substResult) return false;
 
+  auto requiresIndirectResult = [&](CanType type) {
+    return IGM.requiresIndirectResult(SILType::getPrimitiveObjectType(type),
+                                      explosionLevel);
+  };
+
   // If the abstract type isn't passed indirectly, the substituted
   // type won't be, either.
-  if (!IGM.requiresIndirectResult(origResult, explosionLevel)) {
-    assert(!IGM.requiresIndirectResult(substResult, explosionLevel));
+  if (!requiresIndirectResult(origResult)) {
+    assert(!requiresIndirectResult(substResult));
     // In this case, we must consider whether the exploded difference
     // will matter.
     return differsByAbstractionInExplosion(IGM, origResult, substResult,
@@ -89,11 +94,72 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
 
   // Otherwise, if the substituted type isn't passed indirectly,
   // we've got a mismatch.
-  if (!IGM.requiresIndirectResult(substResult, explosionLevel))
+  if (!requiresIndirectResult(substResult))
     return true;
 
   // Otherwise, we're passing indirectly, so use memory rules.
   return differsByAbstractionInMemory(IGM, origResult, substResult);
+}
+
+/// If the given type is actually returned indirectly according to the
+/// ABI, is that semantically equivalent to an @out parameter?
+static bool isReturnedOwned(IRGenModule &IGM, SILResultInfo result) {
+  switch (result.getConvention()) {
+  case ResultConvention::Owned: return true;
+  case ResultConvention::Autoreleased: return false;
+  case ResultConvention::Unowned:
+    return IGM.SILMod->getTypeLowering(result.getSILType()).isTrivial();
+  }
+  llvm_unreachable("bad result convention");
+}
+
+static bool differsByAbstractionAsFunction(IRGenModule &IGM,
+                                           CanSILFunctionType origTy,
+                                           CanSILFunctionType substTy,
+                                           ExplosionKind explosionLevel) {
+  if (origTy->hasIndirectResult()) {
+    SILType substResultType = substTy->getSemanticResultSILType();
+    if (!substTy->hasIndirectResult()) {
+      if (!IGM.requiresIndirectResult(substResultType, explosionLevel))
+        return true;
+      if (!isReturnedOwned(IGM, substTy->getResult()))
+        return true;
+    }
+    if (differsByAbstractionInMemory(IGM, origTy->getIndirectResult().getType(),
+                                     substResultType.getSwiftRValueType()))
+      return true;
+  } else {
+    assert(!substTy->hasIndirectResult());
+    if (differsByAbstractionInExplosion(IGM, origTy->getResult().getType(),
+                                        substTy->getResult().getType(),
+                                        explosionLevel))
+      return true;
+  }
+
+  auto origParams = origTy->getParametersWithoutIndirectResult();
+  auto substParams = substTy->getParametersWithoutIndirectResult();
+  if (origParams.size() != substParams.size())
+    return true;
+  for (unsigned i : indices(origParams)) {
+    auto origParam = origParams[i];
+    auto substParam = origParams[i];
+
+    // FIXME: we might reasonably decide under the ABI to pass
+    // something indirectly despite the formal SIL convention.
+    if (origParam.getConvention() != substParam.getConvention())
+      return true;
+    if (origParam.isIndirect()) {
+      if (differsByAbstractionInMemory(IGM, origParam.getType(),
+                                       substParam.getType()))
+        return true;
+    } else {
+      if (differsByAbstractionInExplosion(IGM, origParam.getType(),
+                                          substParam.getType(), explosionLevel))
+        return true;
+    }
+  }
+
+  return false;
 }
 
 /// Does the representation of the first type "differ by abstraction"
@@ -231,10 +297,12 @@ namespace {
       // concrete type would be.
       if (DiffKind == AbstractionDifference::Memory) return false;
 
+      auto substType = SILType::getPrimitiveObjectType(substTy);
+
       // For function arguments, consider whether the substituted type
       // is passed indirectly under the abstract-call convention.
       // We only ever care about the abstract-call convention.
-      return !IGM.isSingleIndirectValue(substTy, ExplosionLevel);
+      return !IGM.isSingleIndirectValue(substType, ExplosionLevel);
     }
 
     bool visitArrayType(CanArrayType origTy, CanArrayType substTy) {
@@ -411,12 +479,16 @@ namespace {
     ReemitAsUnsubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
                           Explosion &in, Explosion &out)
       : IGF(IGF), Subs(subs), In(in), Out(out) {
-      assert(in.getKind() == out.getKind());
     }
 
     void visitLeafType(CanType origTy, CanType substTy) {
       assert(origTy == substTy);
-      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
+      auto &ti = IGF.getTypeInfo(getLoweredType(origTy, origTy));
+      if (ti.isLoadable()) {
+        cast<LoadableTypeInfo>(ti).reexplode(IGF, In, Out);
+      } else {
+        Out.add(In.claimNext());
+      }
     }
 
     void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
@@ -431,10 +503,12 @@ namespace {
         Out.add(addr);
         return;
       }
+
+      auto loweredTy = getLoweredType(origTy, substTy);
       
       // Handle the not-unlikely case that the input is a single
       // indirect value.
-      if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
+      if (IGF.IGM.isSingleIndirectValue(loweredTy, In.getKind())) {
         llvm::Value *inValue = In.claimNext();
         auto addr = IGF.Builder.CreateBitCast(inValue,
                                               IGF.IGM.OpaquePtrTy,
@@ -445,7 +519,7 @@ namespace {
 
       // Otherwise, we need to make a temporary.
       // FIXME: this temporary has to get cleaned up!
-      auto &substTI = IGF.getTypeInfoForUnlowered(substTy);
+      auto &substTI = IGF.getTypeInfo(loweredTy);
       auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
 
       // Initialize into it.
@@ -498,11 +572,14 @@ namespace {
       if (origTy->hasReferenceSemantics())
         return In.transferInto(Out, 1);
 
+      auto origSILTy = getLoweredType(origTy, origTy);
+      auto substSILTy = getLoweredType(origTy, substTy);
+
       // Otherwise, this gets more complicated.
       // Handle the easy cases where one or both of the arguments are
       // represented using single indirect pointers
-      auto *origIndirect = IGF.IGM.isSingleIndirectValue(origTy, In.getKind());
-      auto *substIndirect = IGF.IGM.isSingleIndirectValue(substTy, In.getKind());
+      auto *origIndirect = IGF.IGM.isSingleIndirectValue(origSILTy, In.getKind());
+      auto *substIndirect = IGF.IGM.isSingleIndirectValue(substSILTy, In.getKind());
       
       // Bitcast between address-only instantiations.
       if (origIndirect && substIndirect) {
@@ -515,7 +592,7 @@ namespace {
       // Substitute a loadable instantiation for an address-only one by emitting
       // to a temporary.
       if (origIndirect && !substIndirect) {
-        auto &substTI = IGF.getTypeInfoForUnlowered(substTy);
+        auto &substTI = IGF.getTypeInfo(substSILTy);
         auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
         initIntoTemporary(substTy, substTI, addr);
         addr = IGF.Builder.CreateBitCast(addr, origIndirect);
@@ -529,7 +606,7 @@ namespace {
         IGF.unimplemented(SourceLoc(),
               "remapping bound generic value types with archetype members");
       
-      auto n = IGF.IGM.getExplosionSize(origTy, In.getKind());
+      auto n = IGF.IGM.getExplosionSize(origSILTy, In.getKind());
       In.transferInto(Out, n);
     }
 
@@ -544,7 +621,11 @@ namespace {
 
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
-      llvm_unreachable("unimplemented! will be subsumed anyway");
+      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
+                                         ExplosionKind::Minimal)) {
+        IGF.unimplemented(SourceLoc(), "remapping bound SIL function type");
+      }
+      In.transferInto(Out, 1 + (origTy->isThin() ? 0 : 1));
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
@@ -600,7 +681,14 @@ namespace {
 
     void visitReferenceStorageType(CanReferenceStorageType origTy,
                                    CanReferenceStorageType substTy) {
-      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
+      auto origLoweredTy = getLoweredType(origTy, origTy);
+      unsigned count = IGF.IGM.getExplosionSize(origLoweredTy, Out.getKind());
+      In.transferInto(Out, count);
+    }
+
+  private:
+    SILType getLoweredType(CanType orig, CanType subst) {
+      return IGF.IGM.SILMod->Types.getLoweredType(subst); // FIXME
     }
   };
 }
@@ -637,13 +725,15 @@ namespace {
 
     void visitLeafType(CanType origTy, CanType substTy) {
       assert(origTy == substTy);
-      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+      auto loweredTy = getLoweredType(origTy, origTy);
+      In.transferInto(Out, IGF.IGM.getExplosionSize(loweredTy, In.getKind()));
     }
 
     /// The unsubstituted type is an archetype.  In explosion terms,
     /// that makes it a single pointer-to-opaque.
     void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
-      auto &substTI = IGF.getTypeInfoForLowered(substTy);
+      auto loweredTy = getLoweredType(origTy, substTy);
+      auto &substTI = IGF.getTypeInfo(loweredTy);
 
       llvm::Value *inValue = In.claimNext();
       auto inAddr = IGF.Builder.CreateBitCast(inValue,
@@ -652,7 +742,7 @@ namespace {
 
       // If the substituted type is still a single indirect value,
       // just pass it on without reinterpretation.
-      if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
+      if (IGF.IGM.isSingleIndirectValue(loweredTy, In.getKind())) {
         Out.add(inAddr);
         return;
       }
@@ -682,7 +772,8 @@ namespace {
 
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
-      auto n = IGF.IGM.getExplosionSize(origTy, In.getKind());
+      auto loweredTy = getLoweredType(origTy, substTy);
+      auto n = IGF.IGM.getExplosionSize(loweredTy, In.getKind());
       In.transferInto(Out, n);
     }
 
@@ -752,7 +843,14 @@ namespace {
 
     void visitReferenceStorageType(CanReferenceStorageType origTy,
                                    CanReferenceStorageType substTy) {
-      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
+      auto loweredTy = getLoweredType(origTy, substTy);
+      auto count = IGF.IGM.getExplosionSize(loweredTy, Out.getKind());
+      In.transferInto(Out, count);
+    }
+
+  private:
+    SILType getLoweredType(CanType orig, CanType subst) {
+      return IGF.IGM.SILMod->Types.getLoweredType(subst); // FIXME
     }
   };
 }

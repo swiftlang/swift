@@ -559,23 +559,29 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   return *TypeMetadataPtrTI;
 }
 
-/// Get the fragile type information for the given unlowered type.
+/// Get the fragile type information for the given type, which may not
+/// have yet undergone SIL type lowering.  The type can serve as its own
+/// abstraction pattern.
 const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type subst) {
   return IGM.getTypeInfoForUnlowered(subst);
 }
 
-/// Get the fragile type information for the given unlowered type.
+/// Get the fragile type information for the given type, which may not
+/// have yet undergone SIL type lowering.
 const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type orig, Type subst) {
   return IGM.getTypeInfoForUnlowered(orig, subst);
 }
 
-/// Get the fragile type information for the given type.
+/// Get the fragile type information for the given type, which may not
+/// have yet undergone SIL type lowering.
 const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(CanType orig,
                                                        CanType subst) {
   return IGM.getTypeInfoForUnlowered(orig, subst);
 }
 
-/// Get the fragile type information for the given type.
+/// Get the fragile type information for the given type, which is known
+/// to have undergone SIL type lowering (or be one of the types for
+/// which that lowering is the identity function).
 const TypeInfo &IRGenFunction::getTypeInfoForLowered(CanType T) {
   return IGM.getTypeInfoForLowered(T);
 }
@@ -583,6 +589,11 @@ const TypeInfo &IRGenFunction::getTypeInfoForLowered(CanType T) {
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
   return IGM.getTypeInfo(T);
+}
+
+/// Return the SIL-lowering of the given type.
+SILType IRGenModule::getLoweredType(Type orig, Type subst) {
+  return SILMod->Types.getLoweredType(orig, subst);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -619,24 +630,30 @@ llvm::Type *IRGenModule::getStorageTypeForLowered(CanType T) {
   }
 }
 
-/// Get the fragile type information for the given type.
+/// Get the type information for the given type, which may not have
+/// yet undergone SIL type lowering.  The type can serve as its own
+/// abstraction pattern.
 const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type subst) {
   return getTypeInfoForUnlowered(subst, subst);
 }
 
-/// Get the fragile type information for the given type.
+/// Get the type information for the given type, which may not
+/// have yet undergone SIL type lowering.
 const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type orig, Type subst) {
   return getTypeInfoForUnlowered(orig->getCanonicalType(),
                                  subst->getCanonicalType());
 }
 
-/// Get the fragile type information for the given type.
+/// Get the type information for the given type, which may not
+/// have yet undergone SIL type lowering.
 const TypeInfo &IRGenModule::getTypeInfoForUnlowered(CanType orig,
                                                      CanType subst) {
-  return getTypeInfo(SILMod->Types.getLoweredType(subst)); // FIXME
+  return getTypeInfo(SILMod->Types.getLoweredType(orig, subst));
 }
 
-/// Get the fragile type information for the given type.
+/// Get the fragile type information for the given type, which is known
+/// to have undergone SIL type lowering (or be one of the types for
+/// which that lowering is the identity function).
 const TypeInfo &IRGenModule::getTypeInfo(SILType T) {
   return getTypeInfoForLowered(T.getSwiftRValueType());
 }
@@ -821,9 +838,9 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
-    return convertFunctionType(cast<AnyFunctionType>(ty));
+    llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
-    llvm_unreachable("not yet implemented!");
+    return convertFunctionType(cast<SILFunctionType>(ty));
   case TypeKind::Array:
     llvm_unreachable("array types should be lowered by SILGen");
   case TypeKind::Protocol:
@@ -896,7 +913,8 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   // witnesses successfully.)
   if (!decl->getGenericParams() ||
       (!isa<ClassDecl>(decl) && // fast path obvious case
-       IGM.classifyTypeSize(decl->getDeclaredTypeInContext()->getCanonicalType(),
+       IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
+                        decl->getDeclaredTypeInContext()->getCanonicalType()),
                             ResilienceScope::Local)
          != ObjectSize::Fixed)) {
     switch (decl->getKind()) {
@@ -1016,41 +1034,41 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 }
 
 /// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(CanType type, ExplosionKind kind) {
+ExplosionSchema IRGenModule::getSchema(SILType type, ExplosionKind kind) {
   ExplosionSchema schema(kind);
   getSchema(type, schema);
   return schema;
 }
 
 /// Compute the explosion schema for the given type.
-void IRGenModule::getSchema(CanType type, ExplosionSchema &schema) {
+void IRGenModule::getSchema(SILType type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
-  if (CanTupleType tuple = dyn_cast<TupleType>(type)) {
-    for (auto eltType : tuple.getElementTypes())
-      getSchema(eltType, schema);
+  if (CanTupleType tuple = type.getAs<TupleType>()) {
+    for (auto index : indices(tuple.getElementTypes()))
+      getSchema(type.getTupleElementType(index), schema);
     return;
   }
 
   // Okay, that didn't work;  just do the general thing.
-  getTypeInfoForLowered(type).getSchema(schema);
+  getTypeInfo(type).getSchema(schema);
 }
 
 /// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
+unsigned IRGenModule::getExplosionSize(SILType type, ExplosionKind kind) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
-  if (auto tuple = dyn_cast<TupleType>(type)) {
+  if (auto tuple = type.getAs<TupleType>()) {
     unsigned count = 0;
-    for (auto eltType : tuple.getElementTypes())
-      count += getExplosionSize(eltType, kind);
+    for (auto index : indices(tuple.getElementTypes()))
+      count += getExplosionSize(type.getTupleElementType(index), kind);
     return count;
   }
 
   // If the type isn't loadable, the explosion size is always 1.
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfoForLowered(type));
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfo(type));
   if (!loadableTI) return 1;
 
   // Okay, that didn't work;  just do the general thing.
@@ -1059,9 +1077,9 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
 
 /// Determine whether this type is a single value that is passed
 /// indirectly at the given level.
-llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
+llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type,
                                                       ExplosionKind kind) {
-  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+  if (auto archetype = type.getAs<ArchetypeType>()) {
     if (!archetype->requiresClass())
       return OpaquePtrTy;
   }
@@ -1074,9 +1092,9 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
 }
 
 /// Determine whether this type requires an indirect result.
-llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
+llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type,
                                                        ExplosionKind kind) {
-  auto &ti = getTypeInfoForLowered(type);
+  auto &ti = getTypeInfo(type);
   ExplosionSchema schema = ti.getSchema(kind);
   if (schema.requiresIndirectResult(*this))
     return ti.getStorageType()->getPointerTo();
@@ -1084,17 +1102,17 @@ llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
 }
 
 /// Determine whether this type is known to be POD.
-bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
-  if (isa<ArchetypeType>(type)) return false;
-  if (isa<ClassType>(type)) return false;
-  if (isa<BoundGenericClassType>(type)) return false;
-  if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto eltType : tuple.getElementTypes())
-      if (!isPOD(eltType, scope))
+bool IRGenModule::isPOD(SILType type, ResilienceScope scope) {
+  if (type.is<ArchetypeType>()) return false;
+  if (type.is<ClassType>()) return false;
+  if (type.is<BoundGenericClassType>()) return false;
+  if (auto tuple = type.getAs<TupleType>()) {
+    for (auto index : indices(tuple.getElementTypes()))
+      if (!isPOD(type.getTupleElementType(index), scope))
         return false;
     return true;
   }
-  return getTypeInfoForLowered(type).isPOD(scope);
+  return getTypeInfo(type).isPOD(scope);
 }
 
 
@@ -1109,7 +1127,7 @@ namespace {
     ObjectSize visit##KIND##Type(KIND##Type *t) { return ObjectSize::RESULT; }
 
     ALWAYS(Builtin, Fixed)
-    ALWAYS(AnyFunction, Fixed)
+    ALWAYS(SILFunction, Fixed)
     ALWAYS(Class, Fixed)
     ALWAYS(BoundGenericClass, Fixed)
     ALWAYS(Protocol, Fixed)
@@ -1136,7 +1154,7 @@ namespace {
     }
 
     ObjectSize visitStructType(CanStructType type) {
-      if (type->getDecl()->getGenericParams())
+      if (type->getDecl()->getGenericParamsOfContext())
         return visitGenericStructType(type, type->getDecl());
       if (IGM.isResilient(type->getDecl(), Scope))
         return ObjectSize::Resilient;
@@ -1148,24 +1166,25 @@ namespace {
     }
 
     ObjectSize visitGenericStructType(CanType type, StructDecl *D) {
-      assert(D->getGenericParams());
+      assert(D->getGenericParamsOfContext());
 
       // If a generic struct is resilient, we have to assume that any
       // unknown fields might be dependently-sized.
       if (IGM.isResilient(D, Scope))
         return ObjectSize::Dependent;
 
+      auto structType = SILType::getPrimitiveAddressType(type);
+
       ObjectSize result = ObjectSize::Fixed;
       for (auto field : D->getStoredProperties()) {
-        auto fieldType = type->getTypeOfMember(D->getModuleContext(),
-                                           field, nullptr)->getCanonicalType();
-        result = std::max(result, visit(fieldType));
+        auto fieldType = structType.getFieldType(field, *IGM.SILMod);
+        result = std::max(result, visitSILType(fieldType));
       }
       return result;
     }
 
     ObjectSize visitEnumType(CanEnumType type) {
-      if (type->getDecl()->getGenericParams())
+      if (type->getDecl()->getGenericParamsOfContext())
         return visitGenericEnumType(type, type->getDecl());
       if (IGM.isResilient(type->getDecl(), Scope))
         return ObjectSize::Resilient;
@@ -1177,20 +1196,20 @@ namespace {
     }
 
     ObjectSize visitGenericEnumType(CanType type, EnumDecl *D) {
-      assert(D->getGenericParams());
+      assert(D->getGenericParamsOfContext());
 
       // If a generic enum is resilient, we have to assume that any
       // unknown elements might be dependently-sized.
       if (IGM.isResilient(D, Scope))
         return ObjectSize::Dependent;
 
+      auto enumType = SILType::getPrimitiveAddressType(type);
+
       ObjectSize result = ObjectSize::Fixed;
       for (auto elt : D->getAllElements()) {
         if (!elt->hasArgumentType()) continue;
-        auto eltType = type->getTypeOfMember(D->getModuleContext(),
-                                   elt, nullptr,
-                                   elt->getArgumentType())->getCanonicalType();
-        result = std::max(result, visit(eltType));
+        auto eltType = enumType.getEnumElementType(elt, *IGM.SILMod);
+        result = std::max(result, visitSILType(eltType));
       }
       return result;
     }
@@ -1198,11 +1217,15 @@ namespace {
     ObjectSize visitType(CanType type) {
       return ObjectSize::Fixed;
     }
+
+    ObjectSize visitSILType(SILType type) {
+      return visit(type.getSwiftRValueType());
+    }
   };
 }
 
-ObjectSize IRGenModule::classifyTypeSize(CanType type, ResilienceScope scope) {
-  return ClassifyTypeSize(*this, scope).visit(type);
+ObjectSize IRGenModule::classifyTypeSize(SILType type, ResilienceScope scope) {
+  return ClassifyTypeSize(*this, scope).visitSILType(type);
 }
 
 llvm::BitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {

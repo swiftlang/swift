@@ -292,6 +292,22 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   }
 }
 
+static bool isLegalSILType(CanType type) {
+  if (isa<LValueType>(type)) return false;
+  if (isa<AnyFunctionType>(type)) return false;
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    for (auto eltType : tupleType.getElementTypes()) {
+      if (!isLegalSILType(eltType)) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+bool TypeBase::isLegalSILType() {
+  return ::isLegalSILType(getCanonicalType());
+}
+
 bool TypeBase::isVoid() {
   return isEqual(getASTContext().TheEmptyTupleType);
 }
@@ -1302,14 +1318,15 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
                            module->getASTContext());
 }
 
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                  ArrayRef<Substitution> subs) {
-  SmallVector<Type, 4> replacements;
-  
+static void getReplacementTypes(GenericParamList &genericParams,
+                                ArrayRef<Substitution> subs,
+                                SmallVectorImpl<Type> &replacements) {
+  (void) genericParams;
+
 #ifndef NDEBUG
   // FIXME: The AST sets up substitutions for secondary archetypes that are
   // strictly unnecessary.
-  auto archetypes = getAllArchetypes();
+  auto archetypes = genericParams.getAllArchetypes();
   assert(subs.size() == archetypes.size() &&
          "substitutions don't match archetypes");
   auto ai = archetypes.begin();
@@ -1318,7 +1335,13 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   for (auto &sub : subs) {
     assert(*ai++ == sub.Archetype && "substitution doesn't match archetype");
     replacements.push_back(sub.Replacement);
-  }
+  }  
+}
+
+FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
+                                                  ArrayRef<Substitution> subs) {
+  SmallVector<Type, 4> replacements;
+  getReplacementTypes(getGenericParams(), subs, replacements);
   
   // FIXME: Only substitute the primary archetypes.
   return substGenericArgs(module,

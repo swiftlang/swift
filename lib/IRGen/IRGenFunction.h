@@ -91,11 +91,9 @@ public:
   IRBuilder Builder;
 
   llvm::Function *CurFn;
-  Mangle::ExplosionKind CurExplosionLevel;
   llvm::Value *ContextPtr;
 
   IRGenFunction(IRGenModule &IGM,
-                Mangle::ExplosionKind explosion,
                 llvm::Function *fn,
                 SILDebugScope* DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = Nothing);
@@ -107,7 +105,7 @@ public:
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
-  Explosion collectParameters();
+  Explosion collectParameters(ExplosionKind explosionLevel);
   void emitScalarReturn(Explosion &scalars);
   
   void emitBBForReturn();

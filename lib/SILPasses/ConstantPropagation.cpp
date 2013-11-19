@@ -34,15 +34,10 @@ static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
                                                         APInt Res,
                                                         bool Overflow) {
   // Get the SIL subtypes of the returned tuple type.
-  SILType FuncResType = AI->getFunctionTypeInfo()->getResult().getSILType();
-  TupleType *T = FuncResType.castTo<TupleType>();
-  assert(T->getNumElements() == 2);
-  SILType ResTy1 =
-  SILType::getPrimitiveType(CanType(T->getElementType(0)),
-                            SILValueCategory::Object);
-  SILType ResTy2 =
-  SILType::getPrimitiveType(CanType(T->getElementType(1)),
-                            SILValueCategory::Object);
+  SILType FuncResType = AI->getSubstCalleeType()->getResult().getSILType();
+  assert(FuncResType.castTo<TupleType>()->getNumElements() == 2);
+  SILType ResTy1 = FuncResType.getTupleElementType(0);
+  SILType ResTy2 = FuncResType.getTupleElementType(1);
 
   // Construct the folded instruction - a tuple of two literals, the
   // result and overflow.
@@ -209,9 +204,7 @@ static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
     case BuiltinValueKind::ICMP_UGE: Res = V1.uge(V2); break;
     }
     SILBuilder B(AI);
-    SILLocation Loc = AI->getLoc();
-    SILType ResType = AI->getFunctionTypeInfo()->getResult().getSILType();
-    return B.createIntegerLiteral(Loc, ResType, Res);
+    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), Res);
   }
 
   return nullptr;

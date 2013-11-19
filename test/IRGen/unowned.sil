@@ -16,7 +16,7 @@ struct A {
   @unowned var x : C
 }
 
-sil @test_weak_rr_class : $@thin (ref : @sil_unowned C) -> () {
+sil @test_weak_rr_class : $@thin (@sil_unowned C) -> () {
 bb0(%0 : $@sil_unowned C):
   %1 = unowned_retain %0 : $@sil_unowned C
   %2 = unowned_release %0 : $@sil_unowned C
@@ -28,7 +28,7 @@ bb0(%0 : $@sil_unowned C):
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
 
-sil @test_weak_rr_proto : $@thin (ref : @sil_unowned P) -> () {
+sil @test_weak_rr_proto : $@thin (@sil_unowned P) -> () {
 bb0(%0 : $@sil_unowned P):
   %1 = unowned_retain %0 : $@sil_unowned P
   %2 = unowned_release %0 : $@sil_unowned P

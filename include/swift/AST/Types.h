@@ -47,6 +47,7 @@ namespace swift {
   class GenericParam;
   class GenericParamList;
   class Identifier;
+  class SILModule;
   class SILType;
   class TypeAliasDecl;
   class TypeDecl;
@@ -257,6 +258,14 @@ public:
   /// For example, the type Vector and Vector<Int>.InnerGeneric are both
   /// unspecialized generic, but the type Vector<Int> is not.
   bool isUnspecializedGeneric();
+
+  /// \brief Determine whether this type is a legal, lowered SIL type.
+  ///
+  /// A type is SIL-illegal if it is:
+  ///   - an l-value type,
+  ///   - an AST function type (i.e. subclasses of AnyFunctionType), or
+  ///   - a tuple type with a SIL-illegal element type.
+  bool isLegalSILType();
 
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
@@ -869,7 +878,7 @@ private:
             bool hasTypeVariable);
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
-  CanType getElementType(unsigned fieldNo) {
+  CanType getElementType(unsigned fieldNo) const {
     return CanType(getPointer()->getElementType(fieldNo));
   }
   CanTupleEltTypeArrayRef getElementTypes() const {
@@ -1451,6 +1460,7 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
+  typedef AnyFunctionType::ExtInfo ExtInfo;
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInput)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
@@ -1482,7 +1492,17 @@ private:
                bool HasTypeVariable,
                const ExtInfo &Info);
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
+BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
+  static CanFunctionType get(CanType input, CanType result,
+                             const ASTContext &C) {
+    return CanFunctionType(FunctionType::get(input, result, C));
+  }
+  static CanFunctionType get(CanType input, CanType result,
+                             const ExtInfo &info,
+                             const ASTContext &C) {
+    return CanFunctionType(FunctionType::get(input, result, info, C));
+  }
+END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   
 /// PolymorphicFunctionType - A polymorphic function type.
 class PolymorphicFunctionType : public AnyFunctionType {
@@ -1527,7 +1547,15 @@ private:
                           const ExtInfo &Info,
                           const ASTContext &C);
 };  
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
+BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
+  static CanPolymorphicFunctionType get(CanType input, CanType result,
+                                        GenericParamList *params,
+                                        const ExtInfo &info,
+                                        const ASTContext &C) {
+    return CanPolymorphicFunctionType(
+             PolymorphicFunctionType::get(input, result, params, info, C));
+  }
+END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
 
 /// Describes a generic function type.
 ///
@@ -1691,6 +1719,22 @@ public:
 
   SILType getSILType() const; // in SILType.h
 
+  /// Transform this SILParameterInfo by applying the user-provided
+  /// function to its type.
+  template<typename F>
+  SILParameterInfo transform(const F &fn) const {
+    return SILParameterInfo(fn(getType())->getCanonicalType(), getConvention());
+  }
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// The API is comparable to Type::subst.
+  SILParameterInfo subst(Module *module, TypeSubstitutionMap &substitutions,
+                         bool ignoreMissing, LazyResolver *resolver) const {
+    Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
+    return SILParameterInfo(type->getCanonicalType(), getConvention());
+  }
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
@@ -1754,6 +1798,23 @@ public:
   }
   SILType getSILType() const; // in SILType.h
 
+  /// Transform this SILResultInfo by applying the user-provided
+  /// function to its type.
+  template<typename F>
+  SILResultInfo transform(const F &fn) const {
+    return SILResultInfo(fn(getType())->getCanonicalType(), getConvention());
+  }
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// The API is comparable to Type::subst.
+  SILResultInfo subst(Module *module, TypeSubstitutionMap &substitutions,
+                      bool ignoreMissing, LazyResolver *resolver) const {
+    Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
+    return SILResultInfo(type->getCanonicalType(), getConvention());
+  }
+
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
   }
@@ -1774,6 +1835,9 @@ public:
     return !(*this == rhs);
   }
 };
+
+class SILFunctionType;
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
 /// SILFunctionType - The detailed type of a function value, suitable
 /// for use by SIL.
@@ -1815,10 +1879,10 @@ private:
   static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
 public:
-  static SILFunctionType *get(GenericParamList *genericParams,
-                              ExtInfo ext, ParameterConvention calleeConvention,
-                              ArrayRef<SILParameterInfo> params,
-                              SILResultInfo result, ASTContext &ctx);
+  static CanSILFunctionType get(GenericParamList *genericParams, ExtInfo ext,
+                                ParameterConvention calleeConvention,
+                                ArrayRef<SILParameterInfo> params,
+                                SILResultInfo result, const ASTContext &ctx);
 
   SILType getSILResult() const; // in SILType.h
   SILType getSILParameter(unsigned i) const; // in SILType.h
@@ -1851,8 +1915,8 @@ public:
   /// indirect result type, if there is one, otherwise the direct result.
   SILType getSemanticResultSILType() const; // in SILType.h
 
-  /// Get the parameters, ignoring any indirect-return parameter.
-  ArrayRef<SILParameterInfo> getNonReturnParameters() const {
+  /// Get the parameters, ignoring any indirect-result parameter.
+  ArrayRef<SILParameterInfo> getParametersWithoutIndirectResult() const {
     auto params = getParameters();
     if (hasIndirectResult()) params = params.slice(1);
     return params;
@@ -1863,16 +1927,23 @@ public:
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }
-  ParameterSILTypeArrayRef getNonReturnParameterSILTypes() const {
-    return ParameterSILTypeArrayRef(getNonReturnParameters());
+  ParameterSILTypeArrayRef getParameterSILTypesWithoutIndirectResult() const {
+    return ParameterSILTypeArrayRef(getParametersWithoutIndirectResult());
   }
 
-  ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
+  bool isPolymorphic() const { return GenericParams != nullptr; }
   GenericParamList *getGenericParams() const { return GenericParams; }
+
+  ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
   /// \brief Returns the calling conventions of the function.
   AbstractCC getAbstractCC() const {
     return getExtInfo().getCC();
+  }
+
+  /// \brief True if this type is an Objective-C-compatible block type.
+  bool isBlock() const {
+    return getExtInfo().isBlock();
   }
   
   /// \brief True if the function type is "thin", meaning values of the type can
@@ -1884,6 +1955,11 @@ public:
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }
+
+  CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
+                                      ArrayRef<Type> subs);
+  CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
+                                      ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getExtInfo(), getCalleeConvention(),
@@ -2239,6 +2315,10 @@ public:
 };
 BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
+  static CanLValueType get(CanType type, LValueType::Qual quals,
+                           const ASTContext &C) {
+    return CanLValueType(LValueType::get(type, quals, C));
+  }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
 
 /// SubstitutableType - A reference to a type that can be substituted, i.e.,

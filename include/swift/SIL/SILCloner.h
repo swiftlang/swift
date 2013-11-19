@@ -211,7 +211,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   doPostProcess(Inst,
     Builder.createApply(getOpLocation(Inst->getLoc()),
                         getOpValue(Inst->getCallee()),
-                        getOpType(Inst->getSubstCalleeType()),
+                        getOpType(Inst->getSubstCalleeSILType()),
                         getOpType(Inst->getType()),
                         Inst->getSubstitutions(), Args,
                         Inst->isTransparent()));
@@ -224,7 +224,7 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   doPostProcess(Inst,
     Builder.createPartialApply(getOpLocation(Inst->getLoc()),
                                getOpValue(Inst->getCallee()),
-                               getOpType(Inst->getSubstCalleeType()),
+                               getOpType(Inst->getSubstCalleeSILType()),
                                Inst->getSubstitutions(), Args,
                                getOpType(Inst->getType())));
 }

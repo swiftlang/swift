@@ -63,6 +63,7 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
                                const clang::TargetInfo &TargetInfo,
+                               IRGenModule &IGM,
                                TypeConverter &Types,
                                ASTContext &Context,
                                llvm::Module &M)
@@ -72,6 +73,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     SM(Context.SourceMgr),
     M(M),
     DBuilder(M),
+    IGM(IGM),
     Types(Types),
     LastFn(nullptr),
     MetadataTypeDecl(nullptr),
@@ -395,16 +397,14 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   return StringRef();
 }
 
-static AnyFunctionType* getFunctionType(SILType SILTy) {
-  TypeBase* Ty = SILTy.getSwiftType().getPointer();
-  if (!Ty)
-    return nullptr;
+static CanSILFunctionType getFunctionType(SILType SILTy) {
+  if (!SILTy) return CanSILFunctionType();
 
-  auto FnTy = dyn_cast<AnyFunctionType>(Ty);
+  auto FnTy = SILTy.getAs<SILFunctionType>();
   if (!FnTy) {
     DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
           llvm::dbgs() << "\n");
-    return nullptr;
+    return CanSILFunctionType();
   }
 
   return FnTy;
@@ -429,56 +429,32 @@ createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
 }
 
 /// Create the array of function parameters for FnTy. SIL Version.
-llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
-                                                   SILType SILTy,
+llvm::DIArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
                                                    llvm::DIDescriptor Scope,
                                                    DeclContext* DeclCtx) {
-  if (!SILTy.getSwiftType())
-    return llvm::DIArray();
+  if (!SILTy) return llvm::DIArray();
+  return createParameterTypes(SILTy.castTo<SILFunctionType>(), Scope, DeclCtx);
+}
 
-  SILFunctionType *TypeInfo = SILTy.getFunctionTypeInfo(SILMod);
-  if (!TypeInfo) return llvm::DIArray();
-
+/// Create the array of function parameters for FnTy. Swift Version.
+llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
+                                                   llvm::DIDescriptor Scope,
+                                                   DeclContext* DeclCtx) {
   SmallVector<llvm::Value *, 16> Parameters;
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, TypeInfo->getResult().getType(),
+  createParameterType(Parameters, FnTy->getResult().getType(),
                       Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto Param : TypeInfo->getParameters())
+  for (auto Param : FnTy->getParameters())
     createParameterType(Parameters, Param.getSILType().getSwiftType(),
                         Scope, DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);
 }
-
-/// Create the array of function parameters for FnTy. Swift Version.
-llvm::DIArray IRGenDebugInfo::createParameterTypes(AnyFunctionType *FnTy,
-                                                   llvm::DIDescriptor Scope,
-                                                   DeclContext* DeclCtx) {
-  SmallVector<llvm::Value *, 16> Parameters;
-
-  // The function return type is the first element in the list.
-  createParameterType(Parameters, FnTy->getResult()->getCanonicalType(),
-                      Scope, DeclCtx);
-
-  // The input type is either a single type or a tuple type. We
-  // currently represent a function with one n-tuple argument as an
-  // n-ary function.
-  auto Input = FnTy->getInput()->getCanonicalType();
-  if (auto Params = dyn_cast<TupleType>(Input)) {
-    for (auto Param : Params->getElementTypes()) {
-      CanType CanTy = Param->getCanonicalType();
-      createParameterType(Parameters, CanTy, Scope, DeclCtx);
-    }
-  } else createParameterType(Parameters, Input, Scope, DeclCtx);
-
-  return DBuilder.getOrCreateArray(Parameters);
-}
-
 
 void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                   llvm::Function *Fn,
@@ -508,8 +484,8 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
     Line = 1;
   }
 
-  AnyFunctionType* FnTy = getFunctionType(SILTy);
-  auto Params = createParameterTypes(SILMod, SILTy, Scope, DeclCtx);
+  CanSILFunctionType FnTy = getFunctionType(SILTy);
+  auto Params = createParameterTypes(SILTy, Scope, DeclCtx);
   llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
@@ -1318,10 +1294,17 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createQualifiedType(DW_TAG_meta_type, DITy);
   }
 
+  case TypeKind::SILFunction:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   {
-    auto FunctionTy = BaseTy->castTo<AnyFunctionType>();
+    CanSILFunctionType FunctionTy;
+    if (auto SILFnTy = dyn_cast<SILFunctionType>(BaseTy)) {
+      FunctionTy = CanSILFunctionType(SILFnTy);
+    } else {
+      FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
+                                    .castTo<SILFunctionType>();
+    }
     DeclContext *DC = nullptr;
     if (auto Decl = DbgTy.getDecl())
       DC = Decl->getDeclContext();

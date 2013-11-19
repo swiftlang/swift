@@ -185,7 +185,7 @@ namespace {
     LayoutClass(IRGenModule &IGM, ResilienceScope resilience,
                 ClassDecl *theClass, SILType type)
         : IGM(IGM), Resilience(resilience) {
-      layout(theClass, type.getSwiftRValueType());
+      layout(theClass, type);
     }
 
     /// The root class for purposes of metaclass objects.
@@ -212,12 +212,11 @@ namespace {
     }
 
   private:
-    void layout(ClassDecl *theClass, CanType type) {
+    void layout(ClassDecl *theClass, SILType type) {
       // First, collect information about the superclass.
       if (theClass->hasSuperclass()) {
-        CanType superclassType
-          = type->getSuperclass(nullptr)->getCanonicalType();
-        auto superclass = superclassType->getClassOrBoundGenericClass();
+        SILType superclassType = type.getSuperclass(nullptr);
+        auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
         layout(superclass, superclassType);
       } else {
@@ -269,13 +268,11 @@ namespace {
       }
     }
 
-    void adjustAccessAfterField(VarDecl *var, CanType classType) {
+    void adjustAccessAfterField(VarDecl *var, SILType classType) {
       if (var->isComputed()) return;
 
-      CanType type
-        = classType->getTypeOfMember(var->getModuleContext(),
-                                     var, nullptr)->getCanonicalType();
-      switch (IGM.classifyTypeSize(type, ResilienceScope::Local)) {
+      SILType fieldType = classType.getFieldType(var, *IGM.SILMod);
+      switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Local)) {
       case ObjectSize::Fixed:
         return;
       case ObjectSize::Resilient:
@@ -326,9 +323,7 @@ namespace {
       addHeapHeader();
 
       // Next, add the fields for the given class.
-      addFieldsForClass(theClass,
-                        theClass->getDeclaredTypeInContext()
-                                ->getCanonicalType());
+      addFieldsForClass(theClass, getSelfType(theClass));
       
       // Add these fields to the builder.
       addFields(Elements, LayoutStrategy::Universal);
@@ -350,13 +345,11 @@ namespace {
     }
   private:
     void addFieldsForClass(ClassDecl *theClass,
-                           CanType classType) {
+                           SILType classType) {
       if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
-        CanType superclassType = classType->getSuperclass(nullptr)
-          ->getCanonicalType();
-        auto superclass
-          = superclassType->getClassOrBoundGenericClass();
+        SILType superclassType = classType.getSuperclass(nullptr);
+        auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
         // Recur.
@@ -370,11 +363,9 @@ namespace {
     }
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
-                                  CanType classType) {
-      SILType baseType = SILType::getPrimitiveObjectType(classType);
-
+                                  SILType classType) {
       for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = baseType.getFieldType(var, *IGM.SILMod);
+        SILType type = classType.getFieldType(var, *IGM.SILMod);
         auto &eltType = IGM.getTypeInfo(type);
 
         // FIXME: Type-parameter-dependent field layout isn't fully
@@ -543,7 +534,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
                                        ClassDecl *theClass,
                                        llvm::Function *deallocator,
                                        llvm::Function *destroyer) {
-  IRGenFunction IGF(IGM, ExplosionKind::Minimal, deallocator);
+  IRGenFunction IGF(IGM, deallocator);
   if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, deallocator);
 
@@ -892,8 +883,8 @@ namespace {
       if (getClass()->hasClangNode())
         fields.push_back(IGM.getAddrOfObjCClass(getClass()));
       else {
-        llvm::Constant *metadata = tryEmitConstantHeapMetadataRef(IGM,
-                    getClass()->getDeclaredTypeOfContext()->getCanonicalType());
+        auto type = getSelfType(getClass()).getSwiftRValueType();
+        llvm::Constant *metadata = tryEmitConstantHeapMetadataRef(IGM, type);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.push_back(metadata);
@@ -1187,9 +1178,12 @@ namespace {
       if (!Layout && !FieldLayout)
         return;
 
-      Ivars.push_back(buildIvar(var));
-      if (!IGM.isPOD(var->getType()->getCanonicalType(),
-                     ResilienceScope::Local)) {
+      // For now, we never try to emit specialized versions of the
+      // metadata statically, so compute the field layout using the
+      // originally-declared type.
+      SILType fieldType = IGM.getLoweredType(var->getType(), var->getType());
+      Ivars.push_back(buildIvar(var, fieldType));
+      if (!IGM.isPOD(fieldType, ResilienceScope::Local)) {
         HasNonTrivialDestructor = true;
       }
 
@@ -1204,11 +1198,11 @@ namespace {
     ///   uint32_t alignment;
     ///   uint32_t size;
     /// };
-    llvm::Constant *buildIvar(VarDecl *ivar) {
+    llvm::Constant *buildIvar(VarDecl *ivar, SILType loweredType) {
       assert(Layout && FieldLayout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
       auto &elt = FieldLayout->getElements()[NextFieldIndex++];
-      auto &ivarTI = IGM.getTypeInfoForUnlowered(ivar->getType());
+      auto &ivarTI = IGM.getTypeInfo(loweredType);
       
       llvm::Constant *offsetPtr;
       if (elt.getKind() == ElementLayout::Kind::Fixed) {

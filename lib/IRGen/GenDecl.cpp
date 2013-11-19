@@ -69,7 +69,7 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "_swift_initObjCClasses", &IGM.Module);
 
-  IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
+  IRGenFunction initIGF(IGM, initFn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
 
@@ -245,7 +245,7 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "_swift_initObjCCategories", &IGM.Module);
   
-  IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
+  IRGenFunction initIGF(IGM, initFn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
   
@@ -280,14 +280,21 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
         llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
           llvm::GlobalValue::ExternalLinkage, "main", &Module);
 
-    IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
+    IRGenFunction mainIGF(*this, mainFn);
     if (DebugInfo) {
       // Emit at least the return type.
-      auto ArgTy = BuiltinIntegerType::get(32, Context);
-      auto RetTy = TupleType::getEmpty(Context);
-      auto FnTy = FunctionType::get(RetTy, ArgTy, Context)->getCanonicalType();
-      auto SILTy = SILType::getPrimitiveLocalStorageType(FnTy);
-      DebugInfo->emitArtificialFunction(mainIGF, mainFn, SILTy);
+      SILParameterInfo paramTy(CanType(BuiltinIntegerType::get(32, Context)),
+                               ParameterConvention::Direct_Unowned);
+      SILResultInfo retTy(TupleType::getEmpty(Context),
+                          ResultConvention::Unowned);
+      auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                              /*thin*/ true,
+                                              /*noreturn*/ false);
+      auto fnTy = SILFunctionType::get(nullptr, extInfo,
+                                       ParameterConvention::Direct_Unowned,
+                                       paramTy, retTy, Context);
+      auto silFnTy = SILType::getPrimitiveLocalStorageType(fnTy);
+      DebugInfo->emitArtificialFunction(mainIGF, mainFn, silFnTy);
     }
 
     // Poke argc and argv into variables declared in the Swift stdlib
@@ -356,18 +363,16 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   if (!topLevelCodeFn)
     return;
 
-  Type emptyTuple = TupleType::getEmpty(Context);
-  auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
-  Pattern *params[] = {
-    TuplePattern::create(Context, SourceLoc(),
-                         ArrayRef<TuplePatternElt>(), SourceLoc())
-  };
-  params[0]->setType(TupleType::getEmpty(Context));
-
+  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false);
+  SILResultInfo silResult(TupleType::getEmpty(Context), ResultConvention::Unowned);
+  auto silFnType = SILFunctionType::get(nullptr, extInfo,
+                                        ParameterConvention::Direct_Unowned,
+                                        {}, silResult, Context);
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-      getFunctionType(AbstractCC::Freestanding,
-                      unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
+      getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None,
                       attrs);
   llvm::Function *initFn = nullptr;
   if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
@@ -386,7 +391,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     initFn->setAttributes(attrs);
     
     // Insert a call to the top_level_code symbol from the SIL module.
-    IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
+    IRGenFunction initIGF(*this, initFn);
     if (DebugInfo)
       DebugInfo->emitArtificialFunction(initIGF, initFn);
 
@@ -502,7 +507,7 @@ void IRGenModule::emitGlobalLists() {
 void IRGenModule::emitGlobalTopLevel() {
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
-    TypeInfo const &ti = getTypeInfoForUnlowered(global->getType());
+    auto &ti = getTypeInfoForUnlowered(global->getType());
     emitGlobalVariable(global, ti);
   }
   
@@ -917,20 +922,20 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *fnType;
-  AbstractCC convention = fn.getAbstractCC();
+  SILDeclRef silFn = SILDeclRef(fn.getDecl(), SILDeclRef::Kind::Func,
+                                fn.getUncurryLevel(),
+                                /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
+
   // A bit of a hack here. SIL represents closure functions with their context
   // expanded out and uses a partial application function to construct the
   // context. IRGen previously set up local functions to expect their extraData
   // prepackaged.
   llvm::AttributeSet attrs;
-  fnType = getFunctionType(convention,
-                           fn.getDecl()->getType()->getCanonicalType(),
-                           fn.getExplosionLevel(), fn.getUncurryLevel(),
-                           extraData,
-                           attrs);
+  llvm::FunctionType *fnType =
+    getFunctionType(silFnType, fn.getExplosionLevel(), extraData, attrs);
 
-  auto cc = expandAbstractCC(*this, convention);
+  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
@@ -945,51 +950,55 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(EnumElementDecl *D) {
   unsigned uncurryLevel = D->hasArgumentType() ? 1 : 0;
 
   LinkEntity entity =
-    LinkEntity::forFunction(CodeRef::forEnumElement(D, ExplosionKind::Minimal,
+    LinkEntity::forFunction(CodeRef::forEnumElement(D, explosionLevel,
                                                      uncurryLevel));
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  CanType formalType = D->getType()->getCanonicalType();
+  SILDeclRef silFn = SILDeclRef(D, SILDeclRef::Kind::EnumElement,
+                                uncurryLevel, /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
 
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding);
+  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
 
   llvm::FunctionType *fnType =
-    getFunctionType(AbstractCC::Freestanding,
-                    formalType, explosionLevel, uncurryLevel, ExtraData::None,
-                    attrs);
+    getFunctionType(silFnType, explosionLevel, ExtraData::None, attrs);
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
 }
 
+static SILDeclRef::Kind getSILDeclRefKind(ConstructorKind ctorKind) {
+  switch (ctorKind) {
+  case ConstructorKind::Allocating: return SILDeclRef::Kind::Allocator;
+  case ConstructorKind::Initializing: return SILDeclRef::Kind::Initializer;
+  }
+  llvm_unreachable("bad constructor kind");
+}
+
 /// Fetch the declaration of the given known function.
-llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
+llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *ctor,
                                                   ConstructorKind ctorKind,
                                                   ExplosionKind explodeLevel) {
   unsigned uncurryLevel = 1;
-  auto codeRef = CodeRef::forConstructor(cons, explodeLevel, uncurryLevel);
+  auto codeRef = CodeRef::forConstructor(ctor, explodeLevel, uncurryLevel);
   LinkEntity entity = LinkEntity::forConstructor(codeRef, ctorKind);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  CanType formalType;
-  if (ctorKind == ConstructorKind::Initializing)
-    formalType = cons->getInitializerType()->getCanonicalType();
-  else
-    formalType = cons->getType()->getCanonicalType();
-  
+  SILDeclRef silFn = SILDeclRef(ctor, getSILDeclRefKind(ctorKind),
+                                uncurryLevel, /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
+
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-    getFunctionType(AbstractCC::Method,
-                    formalType, explodeLevel, uncurryLevel, ExtraData::None,
-                    attrs);
+    getFunctionType(silFnType, explodeLevel, ExtraData::None, attrs);
 
-  auto cc = expandAbstractCC(*this, AbstractCC::Method);
+  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
@@ -1223,7 +1232,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   if (kind == DestructorKind::Deallocating) {
     dtorTy = DeallocatingDtorTy;
   } else {
-    auto &info = getTypeInfoForUnlowered(cd->getDeclaredTypeInContext());
+    auto &info = getTypeInfoForLowered(CanType(cd->getDeclaredTypeInContext()));
     dtorTy = llvm::FunctionType::get(RefCountedPtrTy,
                                      info.getStorageType(),
                                      /*isVarArg*/ false);
@@ -1334,15 +1343,9 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   return FormalType(formalType, cc, uncurryLevel);
 }
 
-llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
-                                             ExplosionKind explosionLevel) {
-  return getAddrOfGetter(value, getTypeOfGetter(value), explosionLevel);
-}
-
 /// getAddrOfGetter - Get the address of the function which performs a
 /// get of a variable or subscripted object.
 llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
-                                             FormalType formal,
                                              ExplosionKind explosionLevel) {
   LinkEntity entity =
     LinkEntity::forFunction(CodeRef::forGetter(value, explosionLevel, 0));
@@ -1350,14 +1353,15 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  llvm::AttributeSet attrs;
-  auto convention = expandAbstractCC(*this, formal.getAbstractCC());
-  llvm::FunctionType *fnType =
-    getFunctionType(formal.getAbstractCC(),
-                    formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), ExtraData::None,
-                    attrs);
+  SILDeclRef silFn = SILDeclRef(value, SILDeclRef::Kind::Getter,
+                                SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
 
+  llvm::AttributeSet attrs;
+  auto convention = expandAbstractCC(*this, silFnType->getAbstractCC());
+  llvm::FunctionType *fnType =
+    getFunctionType(silFnType, explosionLevel, ExtraData::None, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
@@ -1383,15 +1387,9 @@ FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   return FormalType(formalType, cc, uncurryLevel);
 }
 
-llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
-                                             ExplosionKind explosionLevel) {
-  return getAddrOfSetter(value, getTypeOfSetter(value), explosionLevel);
-}
-
 /// getAddrOfSetter - Get the address of the function which performs a
 /// set of a variable or subscripted object.
 llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
-                                             FormalType formal,
                                              ExplosionKind explosionLevel) {
   LinkEntity entity =
     LinkEntity::forFunction(CodeRef::forSetter(value, explosionLevel, 0));
@@ -1399,13 +1397,16 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
+  SILDeclRef silFn = SILDeclRef(value, SILDeclRef::Kind::Setter,
+                                SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
+
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-    getFunctionType(formal.getAbstractCC(),
-                    formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), ExtraData::None, attrs);
+    getFunctionType(silFnType, explosionLevel, ExtraData::None, attrs);
 
-  auto convention = expandAbstractCC(*this, formal.getAbstractCC());
+  auto convention = expandAbstractCC(*this, silFnType->getAbstractCC());
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);

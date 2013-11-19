@@ -99,11 +99,13 @@ namespace {
 
     /// getGlobalNameForReference - Given a reference to a global name, look it
     /// up and return an appropriate SIL function.
-    SILFunction *getGlobalNameForReference(Identifier Name, SILType Ty,
+    SILFunction *getGlobalNameForReference(Identifier Name,
+                                           CanSILFunctionType Ty,
                                            SourceLoc Loc);
     /// getGlobalNameForDefinition - Given a definition of a global name, look
     /// it up and return an appropriate SIL function.
-    SILFunction *getGlobalNameForDefinition(Identifier Name, SILType Ty,
+    SILFunction *getGlobalNameForDefinition(Identifier Name,
+                                            CanSILFunctionType Ty,
                                             SourceLoc Loc);
 
     /// getBBForDefinition - Return the SILBasicBlock for a definition of the
@@ -240,7 +242,8 @@ bool SILParser::diagnoseProblems() {
 
 /// getGlobalNameForDefinition - Given a definition of a global name, look
 /// it up and return an appropriate SIL function.
-SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
+SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
+                                                   CanSILFunctionType Ty,
                                                    SourceLoc Loc) {
   // Check to see if a function of this name has been forward referenced.  If so
   // complete the forward reference.
@@ -249,9 +252,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
     SILFunction *Fn = It->second.first;
     
     // Verify that the types match up.
-    if (Fn->getLoweredType() != Ty) {
-      P.diagnose(Loc, diag::sil_value_use_type_mismatch,
-                 Ty.getAsString(), Fn->getLoweredType().getAsString());
+    if (Fn->getLoweredFunctionType() != Ty) {
+      P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
       Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
                                     SILFileLocation(Loc));
@@ -279,15 +281,16 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
 
 /// getGlobalNameForReference - Given a reference to a global name, look it
 /// up and return an appropriate SIL function.
-SILFunction *SILParser::getGlobalNameForReference(Identifier Name, SILType Ty,
+SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
+                                                  CanSILFunctionType Ty,
                                                   SourceLoc Loc) {
   
   // Check to see if we have a function by this name already.
   if (SILFunction *FnRef = SILMod.lookup(Name.str())) {
     // If so, check for matching types.
-    if (FnRef->getLoweredType() != Ty) {
+    if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
-                 Ty.getAsString(), FnRef->getLoweredType().getAsString());
+                 Name.str(), FnRef->getLoweredFunctionType());
       FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
                                        SILFileLocation(Loc));
     }
@@ -384,7 +387,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
     if (EntryTy != Type) {
       HadError = true;
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
-                 EntryTy.getAsString());
+                 EntryTy.getSwiftRValueType()); // FIXME: lost value type
       // Make sure to return something of the requested type.
       return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
     }
@@ -429,8 +432,9 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
     // If the forward reference was of the wrong type, diagnose this now.
     if (Entry->getTypes() != Value->getTypes()) {
+      // FIXME: report correct entry
       P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType(0).getAsString());
+                 Entry->getType(0).getSwiftRValueType());
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
@@ -458,7 +462,7 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
       // Verify that any forward-referenced values line up.
       if (Entries.size() > Value->getTypes().size()) {
         P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                   Entry->getType(0).getAsString());
+                   Entry->getType(0).getSwiftRValueType());
         HadError = true;
         return;
       }
@@ -470,7 +474,7 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
         if (Entries[i]->getType(0) != Value->getType(i)) {
           P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                     Entry->getType(0).getAsString());
+                     Entry->getType(0).getSwiftRValueType());
           HadError = true;
           return;
         }
@@ -639,41 +643,17 @@ bool SILParser::parseSILType(SILType &Result) {
     attrs.clearAttribute(TAK_local_storage);
   }
 
-  // Parse Generic Parameters. Generic Parameters are visible in the function
-  // body.
-  GenericParamList *PList = P.maybeParseGenericParams();
-
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
   if (TyR.isNull())
     return true;
+
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
+    if (auto generics = fnType->getGenericParams())
+      handleGenericParams(generics);
+  }
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
-
-  if (PList)
-    if (handleGenericParams(PList))
-      return true;
-  if (performTypeLocChecking(Ty))
-    return true;
-
-  // Build PolymorphicFunctionType if necessary.
-  FunctionType *FT = dyn_cast<FunctionType>(Ty.getType().getPointer());
-  if (FT && PList) {
-    auto Info = PolymorphicFunctionType::ExtInfo(attrs.hasCC()
-                                                   ? attrs.getAbstractCC()
-                                                   : AbstractCC::Freestanding,
-                                                 attrs.has(TAK_thin),
-                                                 attrs.has(TAK_noreturn));
-    Type resultType = PolymorphicFunctionType::get(FT->getInput(),
-                                             FT->getResult(), PList,
-                                             Info,
-                                             P.Context);
-    Ty.setType(resultType);
-    // Reset attributes that are applied.
-    attrs.clearAttribute(TAK_thin);
-    attrs.clearAttribute(TAK_cc);
-    attrs.cc = Nothing;
-  }
 
   if (performTypeLocChecking(Ty))
     return true;
@@ -1037,11 +1017,11 @@ bool parseApplySubstitutions(SILParser &SP,
 /// from a PolymorphicFunctionType.
 bool getApplySubstitutionsFromParsed(
                              SILParser &SP,
-                             PolymorphicFunctionType *pft,
+                             GenericParamList *params,
                              ArrayRef<ParsedSubstitution> parses,
                              SmallVectorImpl<Substitution> &subs) {
   // Find the corresponding ArchetypeType for ArcheId in PTy.
-  ArrayRef<ArchetypeType *> allArchetypes = pft->getAllArchetypes();
+  ArrayRef<ArchetypeType *> allArchetypes = params->getAllArchetypes();
   for (auto &parsed : parses) {
     Substitution sub{nullptr, nullptr, nullptr};
     for (auto archetype : allArchetypes)
@@ -2160,24 +2140,22 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       parseSILType(Ty, TypeLoc))
     return true;
 
-  CanType ShTy = Ty.getSwiftType();
-  if (!ShTy->is<FunctionType>() && !ShTy->is<PolymorphicFunctionType>()) {
+  auto FTI = Ty.getAs<SILFunctionType>();
+  if (!FTI) {
     P.diagnose(TypeLoc, diag::expected_sil_type_kind, "be a function");
     return true;
   }
 
-  SILFunctionType *FTI = Ty.getFunctionTypeInfo(SILMod);
-  
   auto ArgTys = FTI->getParameterSILTypes();
   
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
-    PolymorphicFunctionType *pft = Ty.getAs<PolymorphicFunctionType>();
-    if (!pft) {
+    auto generics = FTI->getGenericParams();
+    if (!generics) {
       P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
       return true;
     }
-    if (getApplySubstitutionsFromParsed(*this, pft, parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, generics, parsedSubs, subs))
       return true;
   }
   switch (Opcode) {
@@ -2197,9 +2175,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     SILType FnTy = FnVal.getType();
     if (!subs.empty()) {
+      auto silFnTy = FnTy.castTo<SILFunctionType>();
       FnTy = SILType::getPrimitiveObjectType(
-         FnTy.castTo<PolymorphicFunctionType>()
-           ->substGenericArgs(&P.SF.TU, subs)->getCanonicalType());
+           silFnTy->substGenericArgs(SILMod, &P.SF.TU, subs));
     }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
@@ -2224,9 +2202,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     SILType FnTy = FnVal.getType();
     if (!subs.empty()) {
+      auto silFnTy = FnTy.castTo<SILFunctionType>();
       FnTy = SILType::getPrimitiveObjectType(
-         FnTy.castTo<PolymorphicFunctionType>()
-           ->substGenericArgs(&P.SF.TU, subs)->getCanonicalType());
+           silFnTy->substGenericArgs(SILMod, &P.SF.TU, subs));
     }
     
     SILType closureTy =
@@ -2249,9 +2227,15 @@ bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
       parseSILType(Ty))
     return true;
+
+  auto FnTy = Ty.getAs<SILFunctionType>();
+  if (!FnTy || !Ty.isObject()) {
+    P.diagnose(Loc, diag::expected_sil_function_type);
+    return true;
+  }
   
   ResultVal = B.createFunctionRef(InstLoc,
-                                  getGlobalNameForReference(Name, Ty, Loc));
+                                  getGlobalNameForReference(Name, FnTy, Loc));
   return false;
 }
 
@@ -2360,11 +2344,14 @@ bool Parser::parseDeclSIL() {
     Scope Body(this, ScopeKind::FunctionBody);
     if (FunctionState.parseSILType(FnType))
       return true;
-
-    // TODO: Verify it is a function type.
+    auto SILFnType = FnType.getAs<SILFunctionType>();
+    if (!SILFnType || !FnType.isObject()) {
+      diagnose(FnNameLoc, diag::expected_sil_function_type);
+      return true;
+    }
   
     FunctionState.F =
-      FunctionState.getGlobalNameForDefinition(FnName, FnType, FnNameLoc);
+      FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setLinkage(FnLinkage);
 

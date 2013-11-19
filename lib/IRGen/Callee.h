@@ -98,18 +98,15 @@ namespace irgen {
     /// The explosion level to use for this function.
     ExplosionKind ExplosionLevel;
 
-    /// The abstract calling convention used by this function.
-    AbstractCC Convention;
-
     /// The number of function applications at which this function is
     /// being called.
     unsigned UncurryLevel;
 
     /// The unsubstituted function type being called.
-    CanType OrigFormalType;
+    CanSILFunctionType OrigFnType;
 
     /// The substituted result type of the function being called.
-    CanType SubstResultType;
+    CanSILFunctionType SubstFnType;
 
     /// The pointer to the actual function.
     llvm::Value *FnPtr;
@@ -127,49 +124,43 @@ namespace irgen {
 
     /// Prepare a callee for a known freestanding function that
     /// requires no data pointer.
-    static Callee forFreestandingFunction(AbstractCC cc,
-                                          CanType origFormalType,
-                                          CanType substResultType,
+    static Callee forFreestandingFunction(CanSILFunctionType origFnType,
+                                          CanSILFunctionType substFnType,
                                           ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
                                           ExplosionKind explosionLevel,
                                           unsigned uncurryLevel) {
-      return forKnownFunction(cc,
-                              origFormalType, substResultType, subs,
+      return forKnownFunction(origFnType, substFnType, subs,
                               fn, nullptr, explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known instance method.  Methods never
     /// require a data pointer.  The formal type here should
     /// include the 'self' clause.
-    static Callee forMethod(CanType origFormalType, CanType substResultType,
+    static Callee forMethod(CanSILFunctionType origFnType,
+                            CanSILFunctionType substFnType,
                             ArrayRef<Substitution> subs,
                             llvm::Constant *fn,
                             ExplosionKind explosionLevel,
                             unsigned uncurryLevel) {
-      return forKnownFunction(AbstractCC::Method,
-                              origFormalType, substResultType, subs,
+      return forKnownFunction(origFnType, substFnType, subs,
                               fn, nullptr, explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(SILType origSILType,
-                                   SILType substResultType,
+    static Callee forKnownFunction(CanSILFunctionType origFnType,
+                                   CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel) {
-      return forKnownFunction(origSILType.getAbstractCC(),
-                              origSILType.getSwiftType(),
-                              substResultType.getSwiftRValueType(),
-                              subs,
+      return forKnownFunction(origFnType, substFnType, subs,
                               fn, data, explosionLevel,
                               0);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(AbstractCC convention,
-                                   CanType origFormalType,
-                                   CanType substResultType,
+    static Callee forKnownFunction(CanSILFunctionType origFnType,
+                                   CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel,
@@ -180,27 +171,30 @@ namespace irgen {
 
       Callee result;
       result.ExplosionLevel = explosionLevel;
-      result.Convention = convention;
       result.UncurryLevel = uncurryLevel;
-      result.OrigFormalType = origFormalType;
-      result.SubstResultType = substResultType;
+      result.OrigFnType = origFnType;
+      result.SubstFnType = substFnType;
       result.FnPtr = fn;
       result.DataPtr = data;
       result.Substitutions = subs;
       return result;
     }
     
-    AbstractCC getAbstractCC() const { return Convention; }
+    AbstractCC getAbstractCC() const { return OrigFnType->getAbstractCC(); }
 
-    CanType getOrigFormalType() const { return OrigFormalType; }
-    CanType getSubstResultType() const { return SubstResultType; }
+    CanSILFunctionType getOrigFunctionType() const { return OrigFnType; }
+    CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }
 
     bool hasSubstitutions() const { return !Substitutions.empty(); }
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
     ExplosionKind getExplosionLevel() const { return ExplosionLevel; }
-    unsigned getUncurryLevel() const { return UncurryLevel; }
+    //unsigned getUncurryLevel() const { return UncurryLevel; }
     llvm::Value *getFunction() const { return FnPtr; }
+
+    llvm::FunctionType *getLLVMFunctionType() {
+      return cast<llvm::FunctionType>(FnPtr->getType()->getPointerElementType());
+    }
 
     /// Return the function pointer as an i8*.
     llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const;

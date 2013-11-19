@@ -38,6 +38,7 @@ namespace swift {
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
+  class SILFunctionType;
   class StructDecl;
   class TupleType;
   class TypeBase;
@@ -80,7 +81,7 @@ private:
   const TypeInfo *convertClassType(ClassDecl *D);
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
-  const TypeInfo *convertFunctionType(AnyFunctionType *T);
+  const TypeInfo *convertFunctionType(SILFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertLValueType(LValueType *T);
   const TypeInfo *convertMetaTypeType(MetaTypeType *T);

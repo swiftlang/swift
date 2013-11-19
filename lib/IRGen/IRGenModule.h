@@ -194,6 +194,7 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
+  SILType getLoweredType(Type orig, Type subst);
   const TypeInfo &getTypeInfoForUnlowered(CanType orig, CanType subst);
   const TypeInfo &getTypeInfoForUnlowered(Type orig, Type subst);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -209,14 +210,14 @@ public:
   llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
-  void getSchema(CanType T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(CanType T, Mangle::ExplosionKind kind);
-  unsigned getExplosionSize(CanType T, Mangle::ExplosionKind kind);
-  llvm::PointerType *isSingleIndirectValue(CanType T, Mangle::ExplosionKind kind);
-  llvm::PointerType *requiresIndirectResult(CanType T, Mangle::ExplosionKind kind);
+  void getSchema(SILType T, ExplosionSchema &schema);
+  ExplosionSchema getSchema(SILType T, Mangle::ExplosionKind kind);
+  unsigned getExplosionSize(SILType T, Mangle::ExplosionKind kind);
+  llvm::PointerType *isSingleIndirectValue(SILType T, Mangle::ExplosionKind kind);
+  llvm::PointerType *requiresIndirectResult(SILType T, Mangle::ExplosionKind kind);
   bool hasTrivialMetatype(CanType type);
-  bool isPOD(CanType type, ResilienceScope scope);
-  ObjectSize classifyTypeSize(CanType type, ResilienceScope scope);
+  bool isPOD(SILType type, ResilienceScope scope);
+  ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
 
   bool isResilient(Decl *decl, ResilienceScope scope);
 
@@ -324,13 +325,8 @@ public:
   void emitLocalDecls(ConstructorDecl *cd);
   void emitLocalDecls(DestructorDecl *dd);
 
-  llvm::FunctionType *getFunctionType(AbstractCC cc,
-                                      CanType fnType, Mangle::ExplosionKind kind,
-                                      unsigned uncurryLevel,
-                                      ExtraData data,
-                                      llvm::AttributeSet &attrs);
-                                      
-  llvm::FunctionType *getFunctionType(SILType type, ExplosionKind explosionKind,
+  llvm::FunctionType *getFunctionType(CanSILFunctionType type,
+                                      ExplosionKind explosionKind,
                                       ExtraData extraData,
                                       llvm::AttributeSet &attrs);
 
@@ -343,11 +339,7 @@ public:
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(EnumElementDecl *D);
-  llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
-                                  Mangle::ExplosionKind kind);
   llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind);
-  llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
-                                  Mangle::ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, Mangle::ExplosionKind kind);
   Address getAddrOfWitnessTableOffset(CodeRef code);
   Address getAddrOfWitnessTableOffset(VarDecl *field);

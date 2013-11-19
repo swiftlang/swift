@@ -147,9 +147,7 @@ namespace sil_block {
     BCFixed<1>,           // transparent
     BCFixed<31>,          // num substitutions
     TypeIDField,          // callee unsubstituted type
-    SILTypeCategoryField,
     TypeIDField,          // callee substituted type
-    SILTypeCategoryField,
     ValueIDField,         // callee value
     SILValueResultField,
     BCArray<ValueIDField> // a list of arguments

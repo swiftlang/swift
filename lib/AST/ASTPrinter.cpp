@@ -1376,11 +1376,31 @@ public:
     OS << " -> " << T->getResult();
   }
 
+  void printCalleeConvention(ParameterConvention conv) {
+    switch (conv) {
+    case ParameterConvention::Direct_Unowned:
+      return;
+    case ParameterConvention::Direct_Owned:
+      OS << "@callee_owned ";
+      return;
+    case ParameterConvention::Direct_Guaranteed:
+      OS << "@callee_guaranteed ";
+      return;
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Out:
+    case ParameterConvention::Indirect_Inout:
+      llvm_unreachable("callee convention cannot be indirect");
+    }
+    llvm_unreachable("bad convention");
+  }
+
   void visitSILFunctionType(SILFunctionType *T) {
-    OS << "func ";
     printFunctionExtInfo(T->getExtInfo());
-    if (auto generics = T->getGenericParams())
+    printCalleeConvention(T->getCalleeConvention());
+    if (auto generics = T->getGenericParams()) {
       printGenericParams(generics);
+      OS << ' ';
+    }
     OS << '(';
     bool first = true;
     for (auto param : T->getParameters()) {
@@ -1529,6 +1549,7 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
 
 void SILParameterInfo::dump() const {
   print(llvm::errs());
+  llvm::errs() << '\n';
 }
 void SILParameterInfo::print(raw_ostream &out, const PrintOptions &opts) const {
   out << getStringForParameterConvention(getConvention());
@@ -1546,6 +1567,7 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
 
 void SILResultInfo::dump() const {
   print(llvm::errs());
+  llvm::errs() << '\n';
 }
 void SILResultInfo::print(raw_ostream &out, const PrintOptions &opts) const {
   out << getStringForResultConvention(getConvention());

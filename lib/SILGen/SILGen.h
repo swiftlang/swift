@@ -42,6 +42,7 @@ namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
   class Initialization;
+  class RValueSource;
   class TemporaryInitialization;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
@@ -79,6 +80,8 @@ public:
   
   SILGenModule(SILGenModule const &) = delete;
   void operator=(SILGenModule const &) = delete;
+
+  ASTContext &getASTContext() { return M.getASTContext(); }
   
   /// Returns the type of a constant reference.
   SILType getConstantType(SILDeclRef constant);
@@ -105,6 +108,10 @@ public:
   /// Generate the mangled symbol name for a SILDeclRef.
   void mangleConstant(SILDeclRef constant,
                       SILFunction *f);
+
+  /// Generate the mangled symbol name for a reabstraction thunk.
+  /// TODO: pass meaningful information here.
+  void mangleThunk(SILFunction *f);
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
@@ -264,9 +271,21 @@ struct Materialize {
 /// ManagedValue).  Callers who propagate down an SGFContext that
 /// might have a emit-into buffer must be aware of this.
 struct SGFContext {
+public:
+  enum ChildOfLoad_t { ChildOfLoad };
+  enum Ignored_t { Ignored };
+  enum Ungeneralized_t { Ungeneralized };
+  
 private:
-  using State =
-    llvm::PointerIntPair<Initialization *, 1, bool>;
+  enum class Kind {
+    Normal,
+    Ignored,
+    ChildOfLoad,
+    Ungeneralized
+  };
+
+private:
+  using State = llvm::PointerIntPair<Initialization *, 2, Kind>;
   
   State state;
 public:
@@ -274,15 +293,27 @@ public:
   
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
-  SGFContext(Initialization *emitInto)
-    : state(emitInto, false)
+  explicit SGFContext(Initialization *emitInto)
+    : state(emitInto, Kind::Normal)
   {}
   
   /// Creates a load expr context, in which a temporary lvalue that would
   /// normally be materialized can be left as an rvalue to avoid a useless
   /// immediately-consumed allocation.
-  SGFContext(bool isChildOfLoadExpr)
-    : state(nullptr, isChildOfLoadExpr)
+  SGFContext(ChildOfLoad_t _)
+    : state(nullptr, Kind::ChildOfLoad)
+  {}
+
+  /// Creates an ignored context, in which the value of the
+  /// expression is being ignored.
+  SGFContext(Ignored_t _)
+    : state(nullptr, Kind::Ignored)
+  {}
+
+  /// Creates a context that is friendly to differences in abstraction.
+  /// This permits generalization to be suppressed.
+  SGFContext(Ungeneralized_t _)
+    : state(nullptr, Kind::Ungeneralized)
   {}
 
   /// Returns a pointer to the Initialization that the current expression should
@@ -291,11 +322,25 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
+
+  /// Does this context have a preferred address to emit into?
+  bool hasAddressToEmitInto() const; // in Initialization.h
   
   /// Returns true if the current expression is a child of a LoadExpr, and
   /// should thus avoid emitting a temporary materialization if possible.
   bool isChildOfLoadExpr() const {
-    return state.getInt();
+    return state.getInt() == Kind::ChildOfLoad;
+  }
+
+  /// Returns true if the current expression is in an ignored context.
+  bool isIgnored() const {
+    return state.getInt() == Kind::Ignored;
+  }
+
+  /// Returns true if the result of the expression does not need to
+  /// generalized to match the representation of its formal type.
+  bool isUngeneralized() const {
+    return state.getInt() == Kind::Ungeneralized;
   }
 };
 
@@ -452,17 +497,29 @@ public:
   SILFunction &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
+  const TypeLowering &getTypeLowering(Type orig, Type subst,
+                                      unsigned uncurryLevel = 0) {
+    return SGM.Types.getTypeLowering(orig, subst, uncurryLevel);
+  }
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
     return SGM.Types.getTypeLowering(t, uncurryLevel);
   }
+  SILType getLoweredType(Type orig, Type subst, unsigned uncurryLevel = 0) {
+    return SGM.Types.getLoweredType(orig, subst, uncurryLevel);
+  }
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(t, uncurryLevel).getLoweredType();
+    return SGM.Types.getLoweredType(t, uncurryLevel);
   }
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
     return SGM.Types.getLoweredLoadableType(t, uncurryLevel);
   }
+
   const TypeLowering &getTypeLowering(SILType type) {
     return SGM.Types.getTypeLowering(type);
+  }
+
+  SILConstantInfo getConstantInfo(SILDeclRef constant) {
+    return SGM.Types.getConstantInfo(constant);
   }
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
@@ -711,6 +768,13 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Emit an r-value that we're ignoring the result of.
+  void emitIgnoredRValue(Expr *E);
+
+  /// Emit an r-value, potentially suppressing conversion to a
+  /// generalized form.
+  RValue emitUngeneralizedRValue(Expr *E);
   
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
@@ -725,7 +789,12 @@ public:
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
-  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant);
+  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant) {
+    return emitGlobalFunctionRef(loc, constant, getConstantInfo(constant));
+  }
+  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
+                                 SILConstantInfo constantInfo);
+
   /// Returns a reference to a constant in local context. This will return a
   /// closure object reference if the constant refers to a local func decl.
   /// In rvalue contexts, emitFunctionRef should be used instead, which retains
@@ -735,6 +804,8 @@ public:
   /// retained closure object reference if the constant refers to a local func
   /// decl.
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
+  ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
+                               SILConstantInfo constantInfo);
 
   /// Emit a reference to the given declaration.
   ///
@@ -760,7 +831,7 @@ public:
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
                                RValueSource &&optionalSubscripts,
-                               Type resultType,
+                               CanType resultType,
                                SGFContext C);
   void emitSetAccessor(SILLocation loc,
                        SILDeclRef setter,
@@ -775,6 +846,10 @@ public:
   
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
+                                            const TypeLowering &lowering);
+
+  ManagedValue emitManagedBufferWithCleanup(SILValue addr);
+  ManagedValue emitManagedBufferWithCleanup(SILValue addr,
                                             const TypeLowering &lowering);
 
   void emitSemanticLoadInto(SILLocation loc, SILValue src,
@@ -819,18 +894,42 @@ public:
   SILValue emitMetatypeOfValue(SILLocation loc, SILValue base);
   
   void emitReturnExpr(SILLocation loc, Expr *ret);
-  
+
+  /// Convert a value with the abstraction patterns of the original type
+  /// to a value with the abstraction patterns of the substituted type.
+  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SGFContext ctx = SGFContext());
+
+  /// Convert a value with the abstraction patterns of the substituted
+  /// type to a value with the abstraction patterns of the original type.
+  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SGFContext ctx = SGFContext());
+
   /// Convert a value with a specialized representation (such as a thin function
   /// reference, or a function reference with a foreign calling convention) to
   /// the generalized representation of its Swift type, which can then be stored
   /// to a variable or passed as an argument or return value.
-  SILValue emitGeneralizedValue(SILLocation loc, SILValue thinFn);
+  ManagedValue emitGeneralizedValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SGFContext ctxt = SGFContext());
+
+  ManagedValue emitGeneralizedFunctionValue(SILLocation loc,
+                                            ManagedValue input,
+                                            AbstractionPattern origType,
+                                            CanAnyFunctionType resultType);
   
   /// Convert a native Swift value to a value that can be passed as an argument
   /// to or returned as the result of a function with the given calling
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         AbstractCC destCC,
+                                        CanType origNativeTy,
+                                        CanType substNativeTy,
                                         CanType bridgedTy);
   
   /// Convert a value received as the result or argument of a function with
@@ -845,19 +944,18 @@ public:
   
   RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
-  ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
-                         ArrayRef<Substitution> Subs,
-                         ArrayRef<ManagedValue> Args,
-                         CanType NativeResultTy,
-                         SILFunctionType *ownershipRules,
-                         bool ForceInline = false,
-                         SGFContext C = SGFContext());
+  /// A convenience method for emitApply that just handles monomorphic
+  /// applications.
+  ManagedValue emitMonomorphicApply(SILLocation loc,
+                                    ManagedValue fn,
+                                    ArrayRef<ManagedValue> args,
+                                    CanType resultType,
+                                    bool forceInline = false);
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,
                                            ArrayRef<Substitution> subs,
                                            ArrayRef<ManagedValue> args,
-                                           CanType resultType,
                                            SGFContext ctx);
 
   /// Emit a dynamic member reference.
@@ -921,28 +1019,6 @@ public:
                         const TypeLowering &castTL,
                         CheckedCastKind kind);
 
-  /// Inject a loadable value into an optional.
-  ///
-  /// \param loc   The location to use for the resulting optional.
-  /// \param value The value to inject into an optional, which must be of a
-  ///              loadable type.
-  /// \param optTL Type lowering information for the optional to create. 
-  ///
-  /// \returns an optional that wraps the given value
-  ManagedValue emitInjectOptionalValue(SILLocation loc,
-                                       RValueSource &&value,
-                                       const TypeLowering &optTL);
-
-  /// Create a loadable optional with a "nothing" value.
-  ///
-  /// \param loc The location to use for the resulting optional.
-  /// \param optTL Type lowering information for the optional to create, which
-  ///              must be for a loadable type.
-  ///
-  /// \returns An empty optional.
-  ManagedValue emitInjectOptionalNothing(SILLocation loc,
-                                         const TypeLowering &optTL);
-
   /// Initialize a memory location with an optional value.
   ///
   /// \param loc   The location to use for the resulting optional.
@@ -974,11 +1050,6 @@ public:
   ManagedValue emitGetOptionalValueFrom(SILLocation loc, ManagedValue addr,
                                         const TypeLowering &optTL,
                                         SGFContext C);
-
-  /// \brief Emit a call to the library intrinsic _getOptionalValue.
-  ManagedValue emitGetOptionalValue(SILLocation loc, ManagedValue value,
-                                    const TypeLowering &optTL,
-                                    SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -1025,6 +1096,11 @@ public:
   /// The initialization is guaranteed to be a single buffer.
   std::unique_ptr<TemporaryInitialization>
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
+
+  /// Enter a currently-dormant cleanup to destroy the value in the
+  /// given address.
+  CleanupHandle enterDormantTemporaryCleanup(SILValue temp,
+                                             const TypeLowering &tempTL);
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);

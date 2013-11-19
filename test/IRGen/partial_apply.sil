@@ -16,20 +16,20 @@ entry:
   func method(x: Int64) {}
 }
 
-sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin ((), ObjCClass) -> ObjCClass {
+sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin ((), ObjCClass) -> ObjCClass {
+sil @_TToCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.metatype)() -> ObjectiveC.ObjCClass
-  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin ((), ObjCClass) -> ObjCClass // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin ((), ObjCClass) -> ObjCClass // user: %3
+  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %3
   return %2 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin ((x: Int64), ObjCClass) -> () {
+sil @_TToCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin (Int64, ObjCClass) -> () {
 bb0(%0 : $Int64, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
@@ -62,10 +62,10 @@ bb0(%0 : $Int64, %1 : $ObjCClass):
 // CHECK:   ret void
 // CHECK: }
 
-sil @indirect_partial_apply : $@thin ((Builtin.Int64) -> (), Builtin.Int64) -> () -> () {
+sil @indirect_partial_apply : $@thin ((Builtin.Int64) -> (), Builtin.Int64) -> @callee_owned () -> () {
 entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
   %p = partial_apply %f(%x) : $(Builtin.Int64) -> ()
-  return %p : $() -> ()
+  return %p : $@callee_owned () -> ()
 }
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply(%CSo9ObjCClass*) {
@@ -87,11 +87,11 @@ entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
 // CHECK:   ret void
 // CHECK: }
 
-sil @objc_partial_apply : $@thin ObjCClass -> Int64 -> () {
+sil @objc_partial_apply : $@thin ObjCClass -> @callee_owned Int64 -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $@cc(objc_method) @thin ((x: Int64), ObjCClass) -> ()
-  %p = partial_apply %m(%c) : $@cc(objc_method) @thin ((x: Int64), ObjCClass) -> ()
-  return %p : $Int64 -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $@cc(objc_method) @thin (Int64, ObjCClass) -> ()
+  %p = partial_apply %m(%c) : $@cc(objc_method) @thin (Int64, ObjCClass) -> ()
+  return %p : $@callee_owned Int64 -> ()
 }
 
 sil @dummy : $@thin Int64 -> () {
@@ -105,21 +105,21 @@ entry(%x : $Int64):
 // CHECK: define internal void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
 // CHECK:   load i8** @"\01L_selector(method:)", align 8
 
-sil @dynamic_lookup_br_partial_apply : $@thin Builtin.ObjCPointer -> Int64 -> () {
+sil @dynamic_lookup_br_partial_apply : $@thin Builtin.ObjCPointer -> @callee_owned Int64 -> () {
 entry(%o : $Builtin.ObjCPointer):
   dynamic_method_br %o : $Builtin.ObjCPointer, #ObjCClass.method!1.foreign, yes, no
 
-yes(%m : $@cc(objc_method) @thin ((x: Int64), Builtin.ObjCPointer) -> ()):
-  %p = partial_apply %m(%o) : $@cc(objc_method) @thin ((x: Int64), Builtin.ObjCPointer) -> ()
-  br done(%p : $Int64 -> ())
+yes(%m : $@cc(objc_method) @thin (Int64, Builtin.ObjCPointer) -> ()):
+  %p = partial_apply %m(%o) : $@cc(objc_method) @thin (Int64, Builtin.ObjCPointer) -> ()
+  br done(%p : $@callee_owned Int64 -> ())
 
 no:
   %q = function_ref @dummy : $@thin Int64 -> ()
-  %r = thin_to_thick_function %q : $@thin Int64 -> () to $Int64 -> ()
-  br done(%r : $Int64 -> ())
+  %r = thin_to_thick_function %q : $@thin Int64 -> () to $@callee_owned Int64 -> ()
+  br done(%r : $@callee_owned Int64 -> ())
 
-done(%f : $Int64 -> ()):
-  return %f : $Int64 -> ()
+done(%f : $@callee_owned Int64 -> ()):
+  return %f : $@callee_owned Int64 -> ()
 }
 
 class SwiftClass {}
@@ -132,21 +132,21 @@ sil @partially_applyable_to_class : $@thin SwiftClass -> ()
 // CHECK:   %2 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%C13partial_apply10SwiftClass*)* @partially_applyable_to_class to i8*), %swift.refcounted* undef }, %swift.refcounted* %1, 1
 // CHECK:   ret { i8*, %swift.refcounted* } %2
 // CHECK: }
-sil @partial_apply_class : $@thin SwiftClass -> () -> () {
+sil @partial_apply_class : $@thin SwiftClass -> @callee_owned () -> () {
 entry(%c : $SwiftClass):
   %f = function_ref @partially_applyable_to_class : $@thin SwiftClass -> ()
   %g = partial_apply %f(%c) : $@thin SwiftClass -> ()
-  return %g : $() -> ()
+  return %g : $@callee_owned () -> ()
 }
 
 sil @partially_applyable_to_pure_objc : $@thin Gizmo -> ()
 
 // CHECK: define { i8*, %swift.refcounted* } @partial_apply_pure_objc
 // CHECK:   @swift_allocObject
-sil @partial_apply_pure_objc : $@thin Gizmo -> () -> () {
+sil @partial_apply_pure_objc : $@thin Gizmo -> @callee_owned () -> () {
 entry(%c : $Gizmo):
   %f = function_ref @partially_applyable_to_pure_objc : $@thin Gizmo -> ()
   %g = partial_apply %f(%c) : $@thin Gizmo -> ()
-  return %g : $() -> ()
+  return %g : $@callee_owned () -> ()
 }
 

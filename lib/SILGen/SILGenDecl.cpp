@@ -90,9 +90,14 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     finishInitialization(gen);
     return buf;
   }
+  case Kind::Translating:
+    // This could actually be done by collecting translated values, if
+    // we introduce new needs for translating initializations.
+    llvm_unreachable("cannot destructure a translating initialization");
   case Kind::AddressBinding:
     llvm_unreachable("cannot destructure an address binding initialization");
   }
+  llvm_unreachable("bad initialization kind");
 }
 
 namespace {
@@ -107,8 +112,10 @@ namespace {
 }
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
-  if (auto outerPFT = F.getLoweredType().getAs<PolymorphicFunctionType>()) {
-    return buildForwardingSubstitutions(outerPFT->getAllArchetypes());
+  auto outerFTy = F.getLoweredFunctionType();
+  if (outerFTy->isPolymorphic()) {
+    return buildForwardingSubstitutions(
+                            outerFTy->getGenericParams()->getAllArchetypes());
   }
   return {};
 }
@@ -331,6 +338,27 @@ public:
     gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
   }
 };
+
+/// Initialize a variable of reference-storage type.
+class ReferenceStorageInitialization : public Initialization {
+  InitializationPtr VarInit;
+public:
+  ReferenceStorageInitialization(InitializationPtr &&subInit)
+    : Initialization(Initialization::Kind::Translating),
+      VarInit(std::move(subInit)) {}
+
+  ArrayRef<InitializationPtr> getSubInitializations() override { return {}; }
+  SILValue getAddressOrNull() override { return SILValue(); }
+
+  void translateValue(SILGenFunction &gen, SILLocation loc,
+                      ManagedValue value) override {
+    value.forwardInto(gen, loc, VarInit->getAddress());
+  }
+
+  void finishInitialization(SILGenFunction &gen) override {
+    VarInit->finishInitialization(gen);
+  }
+};
   
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -367,11 +395,6 @@ struct InitializationForPattern
     if (vd->isComputed())
       return InitializationPtr(new BlackHoleInitialization());
 
-    // If this is a [inout] argument, bind the argument lvalue as our
-    // address.
-    if (vd->getType()->is<LValueType>())
-      return InitializationPtr(new InOutInitialization(vd));
-
     // If this is a global variable, initialize it without allocations or
     // cleanups.
     if (!vd->getDeclContext()->isLocalContext()) {
@@ -385,8 +408,24 @@ struct InitializationForPattern
       return InitializationPtr(new GlobalInitialization(addr));
     }
 
-    // Otherwise, this is a normal variable initialization.
-    return Gen.emitLocalVariableWithCleanup(vd);
+    CanType varType = vd->getType()->getCanonicalType();
+
+    // If this is an @inout parameter, set up the writeback variable.
+    if (isa<LValueType>(varType))
+      return InitializationPtr(new InOutInitialization(vd));
+
+    // Otherwise, we have a normal local-variable initialization.
+    auto varInit = Gen.emitLocalVariableWithCleanup(vd);
+
+    // Initializing a @weak or @unowned variable requires a change in type.
+    if (isa<ReferenceStorageType>(varType))
+      return InitializationPtr(new ReferenceStorageInitialization(
+                                                         std::move(varInit)));
+
+    // Otherwise, the pattern type should match the type of the variable.
+    // FIXME: why do we ever get patterns without types here?
+    assert(!P->hasType() || varType == P->getType()->getCanonicalType());
+    return varInit;
   }
   
   // Bind a tuple pattern by aggregating the component variables into a
@@ -480,6 +519,10 @@ struct ArgumentInitVisitor :
         gen.Cleanups.pushCleanup<DestroyAddr>(arg);
       break;
 
+    case Initialization::Kind::Translating:
+      I->translateValue(gen, loc, gen.emitManagedRValueWithCleanup(arg));
+      break;
+
     case Initialization::Kind::SingleBuffer:
       gen.emitSemanticStore(loc, arg, I->getAddress(),
                             gen.getTypeLowering(ty), IsInitialization);
@@ -533,6 +576,8 @@ struct ArgumentInitVisitor :
         break;
       case Initialization::Kind::AddressBinding:
         llvm_unreachable("empty tuple pattern with inout initializer?!");
+      case Initialization::Kind::Translating:
+        llvm_unreachable("empty tuple pattern with translating initializer?!");
         
       case Initialization::Kind::SingleBuffer:
         assert(I->getAddress().getType().getSwiftRValueType()
@@ -1211,13 +1256,20 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd) {
 std::unique_ptr<TemporaryInitialization>
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
-  CleanupsDepth cleanup = CleanupsDepth::invalid();
-  if (!tempTL.isTrivial()) {
-    Cleanups.pushCleanupInState<DestroyAddr>(CleanupState::Dormant, addr);
-    cleanup = Cleanups.getCleanupsDepth();
-  }
+  CleanupHandle cleanup = enterDormantTemporaryCleanup(addr, tempTL);
   return std::unique_ptr<TemporaryInitialization>(
                                    new TemporaryInitialization(addr, cleanup));
+}
+
+CleanupHandle
+SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
+                                             const TypeLowering &tempTL) {
+  if (tempTL.isTrivial()) {
+    return CleanupHandle::invalid();
+  }
+
+  Cleanups.pushCleanupInState<DestroyAddr>(CleanupState::Dormant, addr);
+  return Cleanups.getCleanupsDepth();
 }
 
 void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
@@ -1257,13 +1309,17 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
 static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
                                           SILLocation loc,
                                           SILValue result,
-                                          SILType resultTy) {
+                                          CanType origNativeTy,
+                                          CanType substNativeTy,
+                                          CanType bridgedTy) {
   Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
   
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
   ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
                                                       AbstractCC::ObjCMethod,
-                                                      resultTy.getSwiftType());
+                                                      origNativeTy,
+                                                      substNativeTy,
+                                                      bridgedTy);
   return bridged.forward(gen);
 }
 
@@ -1272,9 +1328,11 @@ static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
 static void emitObjCReturnValue(SILGenFunction &gen,
                                 SILLocation loc,
                                 SILValue result,
+                                CanType nativeTy,
                                 SILResultInfo resultInfo) {
   // Bridge the result.
-  result = emitBridgeObjCReturnValue(gen, loc, result, resultInfo.getSILType());
+  result = emitBridgeObjCReturnValue(gen, loc, result, nativeTy, nativeTy,
+                                     resultInfo.getType());
   
   // Autorelease the bridged result if necessary.
   switch (resultInfo.getConvention()) {
@@ -1309,9 +1367,8 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
 static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                                SILDeclRef thunk,
                                                SmallVectorImpl<SILValue> &args){
-  SILFunctionType *objcInfo = thunk.getSILFunctionType(gen.SGM.M);
-  SILFunctionType *swiftInfo =
-    thunk.asForeign(false).getSILFunctionType(gen.SGM.M);
+  auto objcInfo = gen.SGM.Types.getConstantFunctionType(thunk);
+  auto swiftInfo = gen.SGM.Types.getConstantFunctionType(thunk.asForeign(false));
 
   RegularLocation Loc(thunk.getDecl());
   Loc.markAutoGenerated();
@@ -1327,7 +1384,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   }
   
   // Emit the other arguments, taking ownership of arguments if necessary.
-  auto inputs = objcInfo->getNonReturnParameters();
+  auto inputs = objcInfo->getParametersWithoutIndirectResult();
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILValue arg = new(gen.F.getModule())
@@ -1367,25 +1424,28 @@ void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
   
   SmallVector<SILValue, 4> args;  
   auto objcFnTy = emitObjCThunkArguments(*this, thunk, args);
-  auto swiftResultTy = native.getSILFunctionType(SGM.M)->getResult();
+  auto nativeInfo = getConstantInfo(native);
+  auto swiftResultTy = nativeInfo.SILFnType->getResult();
   auto objcResultTy = objcFnTy->getResult();
   
   // Call the native entry point.
   RegularLocation loc(thunk.getDecl());
   loc.markAutoGenerated();
 
-  SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+  SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
   SILValue result = B.createApply(loc, nativeFn, nativeFn.getType(),
                                   swiftResultTy.getSILType(), {}, args,
                                   thunk.isTransparent());
-  emitObjCReturnValue(*this, loc, result, objcResultTy);
+  emitObjCReturnValue(*this, loc, result, nativeInfo.LoweredType.getResult(),
+                      objcResultTy);
 }
 
 void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   SmallVector<SILValue, 2> args;
   auto objcFnTy = emitObjCThunkArguments(*this, getter, args);
   SILDeclRef native = getter.asForeign(false);
-  auto swiftResultTy = native.getSILFunctionType(SGM.M)->getResult().getSILType();
+  auto nativeInfo = getConstantInfo(native);
+  SILResultInfo swiftResultTy = nativeInfo.SILFnType->getResult();
   SILResultInfo objcResultTy = objcFnTy->getResult();
 
   RegularLocation loc(getter.getDecl());
@@ -1394,11 +1454,12 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   // If the property is computed, forward to the native getter.
   auto *var = cast<VarDecl>(getter.getDecl());
   if (var->isComputed()) {
-    SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+    SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
     SILValue result = B.createApply(loc, nativeFn, nativeFn.getType(),
-                                    swiftResultTy, {}, args,
+                                    swiftResultTy.getSILType(), {}, args,
                                     getter.isTransparent());
-    emitObjCReturnValue(*this, loc, result, objcResultTy);
+    emitObjCReturnValue(*this, loc, result, nativeInfo.LoweredType.getResult(),
+                        objcResultTy);
     return;
   }
 
@@ -1416,8 +1477,8 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   auto fieldType = var->getType()->getCanonicalType();
   auto &fieldLowering = getTypeLowering(fieldType);
   auto &resultLowering =
-    (fieldType == swiftResultTy.getSwiftRValueType()
-       ? fieldLowering : getTypeLowering(swiftResultTy));
+    (fieldType == swiftResultTy.getType()
+       ? fieldLowering : getTypeLowering(swiftResultTy.getSILType()));
 
   SILValue fieldAddr = B.createRefElementAddr(loc, selfValue, var,
                              fieldLowering.getLoweredType().getAddressType());
@@ -1439,13 +1500,16 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
 
   // FIXME: This should have artificial location.
   B.emitStrongRelease(loc, selfValue);
-  return emitObjCReturnValue(*this, loc, result, objcResultTy);
+  return emitObjCReturnValue(*this, loc, result,
+                             nativeInfo.LoweredType.getResult(),
+                             objcResultTy);
 }
 
 void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   SmallVector<SILValue, 2> args;
   emitObjCThunkArguments(*this, setter, args);
   SILDeclRef native = setter.asForeign(false);
+  auto nativeInfo = getConstantInfo(native);
 
   RegularLocation loc(setter.getDecl());
   loc.markAutoGenerated();
@@ -1453,7 +1517,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   // If the native property is computed, store to the native setter.
   auto *var = cast<VarDecl>(setter.getDecl());
   if (var->isComputed()) {
-    SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+    SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
     SILValue result = B.createApply(loc, nativeFn, nativeFn.getType(),
                                     SGM.Types.getEmptyTupleType(),
                                     {}, args,
@@ -1482,29 +1546,32 @@ void SILGenFunction::emitObjCSubscriptGetter(SILDeclRef getter) {
   SmallVector<SILValue, 2> args;
   auto objcFnTy = emitObjCThunkArguments(*this, getter, args);
   SILDeclRef native = getter.asForeign(false);
-  auto swiftResultTy = native.getSILFunctionType(SGM.M)->getResult();
+  auto nativeInfo = getConstantInfo(native);
+  auto swiftResultTy = nativeInfo.SILFnType->getResult();
   auto objcResultTy = objcFnTy->getResult();
 
   RegularLocation loc(getter.getDecl());
   loc.markAutoGenerated();
 
-  SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+  SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
   SILValue result = B.createApply(loc, nativeFn, nativeFn.getType(),
                                   swiftResultTy.getSILType(), {}, args,
                                   getter.isTransparent());
-  emitObjCReturnValue(*this, loc, result, objcResultTy);
+  emitObjCReturnValue(*this, loc, result, nativeInfo.LoweredType.getResult(),
+                      objcResultTy);
 }
 
 void SILGenFunction::emitObjCSubscriptSetter(SILDeclRef setter) {
   SmallVector<SILValue, 2> args;
   emitObjCThunkArguments(*this, setter, args);
   SILDeclRef native = setter.asForeign(false);
+  auto nativeInfo = getConstantInfo(native);
 
   RegularLocation loc(setter.getDecl());
   loc.markAutoGenerated();
 
   // Store to the native setter.
-  SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+  SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
   SILValue result = B.createApply(loc, nativeFn, nativeFn.getType(),
                                   SGM.Types.getEmptyTupleType(), {}, args,
                                   setter.isTransparent());

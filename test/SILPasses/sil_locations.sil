@@ -3,48 +3,48 @@
 import Builtin
 import swift
 
-sil @plus : $@thin (lhs: Int64, rhs: Int64) -> Int64
-sil @fromLiteral : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
+sil @plus : $@thin (Int64, Int64) -> Int64
+sil @fromLiteral : $@thin (Builtin.Int128, Int64.metatype) -> Int64
 
-// CHECK-LABEL: sil @test_add : $@thin (x: Int64) -> Int64 {
-sil @test_add : $@thin (x: Int64) -> Int64 {
+// CHECK-LABEL: sil @test_add : $@thin (Int64) -> Int64 {
+sil @test_add : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = function_ref @plus : $@thin (lhs: Int64, rhs: Int64) -> Int64
+  %3 = function_ref @plus : $@thin (Int64, Int64) -> Int64
   %4 = load %1#1 : $*Int64
-  %5 = function_ref @fromLiteral : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %5 = function_ref @fromLiteral : $@thin (Builtin.Int128, Int64.metatype) -> Int64
   %6 = metatype $Int64.metatype
   %7 = integer_literal $Builtin.Int128, 20
-  %8 = apply %5(%7, %6) : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
-  %9 = apply %3(%4, %8) : $@thin (lhs: Int64, rhs: Int64) -> Int64
+  %8 = apply %5(%7, %6) : $@thin (Builtin.Int128, Int64.metatype) -> Int64
+  %9 = apply %3(%4, %8) : $@thin (Int64, Int64) -> Int64
   strong_release %1#0 : $Builtin.ObjectPointer
   return %9 : $Int64
 }
 
-sil @inline_test_add : $@thin (x: Int64) -> Int64 {
+sil @inline_test_add : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = function_ref @plus : $@thin (lhs: Int64, rhs: Int64) -> Int64
-  %4 = function_ref @test_add : $@thin (x: Int64) -> Int64
-  %5 = function_ref @plus : $@thin (lhs: Int64, rhs: Int64) -> Int64
+  %3 = function_ref @plus : $@thin (Int64, Int64) -> Int64
+  %4 = function_ref @test_add : $@thin (Int64) -> Int64
+  %5 = function_ref @plus : $@thin (Int64, Int64) -> Int64
   %6 = load %1#1 : $*Int64
-  %7 = function_ref @fromLiteral : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %7 = function_ref @fromLiteral : $@thin (Builtin.Int128, Int64.metatype) -> Int64
   %8 = metatype $Int64.metatype
   %9 = integer_literal $Builtin.Int128, 10
-  %10 = apply %7(%9, %8) : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
-  %11 = apply %5(%6, %10) : $@thin (lhs: Int64, rhs: Int64) -> Int64
-  %12 = apply [transparent] %4(%11) : $@thin (x: Int64) -> Int64
-  %13 = function_ref @fromLiteral : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %10 = apply %7(%9, %8) : $@thin (Builtin.Int128, Int64.metatype) -> Int64
+  %11 = apply %5(%6, %10) : $@thin (Int64, Int64) -> Int64
+  %12 = apply [transparent] %4(%11) : $@thin (Int64) -> Int64
+  %13 = function_ref @fromLiteral : $@thin (Builtin.Int128, Int64.metatype) -> Int64
   %14 = metatype $Int64.metatype
   %15 = integer_literal $Builtin.Int128, 30
-  %16 = apply %13(%15, %14) : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
-  %17 = apply %3(%12, %16) : $@thin (lhs: Int64, rhs: Int64) -> Int64
+  %16 = apply %13(%15, %14) : $@thin (Builtin.Int128, Int64.metatype) -> Int64
+  %17 = apply %3(%12, %16) : $@thin (Int64, Int64) -> Int64
   strong_release %1#0 : $Builtin.ObjectPointer
   return %17 : $Int64
 
-  // CHECK-LABEL: sil @inline_test_add : $@thin (x: Int64) -> Int64 {
+  // CHECK-LABEL: sil @inline_test_add : $@thin (Int64) -> Int64 {
   // CHECK: [[VAL9:%.*]] = apply                               {{.*}} line:36:9:sil
   // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:37:9:sil 
   // CHECK: [[VAL11:%.*]] = alloc_box $Int64              {{.*}} line:38:9:minlined

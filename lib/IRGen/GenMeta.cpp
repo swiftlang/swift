@@ -1036,13 +1036,13 @@ namespace {
                                            "fill_generic_metadata",
                                            &IGM.Module);
       
-      IRGenFunction IGF(IGM, ExplosionKind::Minimal, f);
+      IRGenFunction IGF(IGM, f);
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, f);
       
       // Execute the fill ops. Cast the parameters to word pointers because the
       // fill indexes are word-indexed.
-      Explosion params = IGF.collectParameters();
+      Explosion params = IGF.collectParameters(ExplosionKind::Minimal);
       llvm::Value *fullMeta = params.claimNext();
       llvm::Value *args = params.claimNext();
       
@@ -1830,15 +1830,20 @@ static bool isIncompatibleOverrideResult(IRGenModule &IGM,
 
   bool asExplosion;
 
+  auto requiresIndirectResult = [&](CanType type) {
+    return IGM.requiresIndirectResult(SILType::getPrimitiveObjectType(type),
+                                      explosionLevel);
+  };
+
   // If the overridden type isn't returned indirectly, the overriding
   // type won't be, either, and we need to check as an explosion.
-  if (!IGM.requiresIndirectResult(overriddenTy, explosionLevel)) {
-    assert(!IGM.requiresIndirectResult(overrideTy, explosionLevel));
+  if (!requiresIndirectResult(overriddenTy)) {
+    assert(!requiresIndirectResult(overrideTy));
     asExplosion = true;
 
   // Otherwise, if the overriding type isn't returned indirectly,
   // there's an abstration mismatch and the types are incompatible.
-  } else if (!IGM.requiresIndirectResult(overrideTy, explosionLevel)) {
+  } else if (!requiresIndirectResult(overrideTy)) {
     return true;
 
   // Otherwise, both are returning indirectly and we need to check as
@@ -2574,7 +2579,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
                                            SILType baseType,
                                            SILDeclRef method,
-                                           SILType methodType,
+                                           CanSILFunctionType methodType,
                                            ExplosionKind maxExplosion) {
   // TODO: maybe use better versions in the v-table sometimes?
   ExplosionKind bestExplosion = ExplosionKind::Minimal;
@@ -2738,7 +2743,7 @@ namespace {
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
       emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
-      IGM.getTypeInfoForUnlowered(Target->getDeclaredTypeInContext())
+      IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
         .initializeMetadata(IGF, metadata, vwtable);
     }
   };
@@ -2859,7 +2864,7 @@ public:
                               llvm::Value *metadata,
                               llvm::Value *vwtable) {
     emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
-    IGM.getTypeInfoForUnlowered(Target->getDeclaredTypeInContext())
+    IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
       .initializeMetadata(IGF, metadata, vwtable);
   }
 };

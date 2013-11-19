@@ -22,7 +22,7 @@ struct A {
   @weak var x : C?
 }
 
-sil @test_weak_load_store : $@thin (val : @inout A, v : C) -> () {
+sil @test_weak_load_store : $@thin (@inout A, C) -> () {
 bb0(%0 : $*A, %1 : $C):
   %2 = struct_element_addr %0 : $*A, #x
   %3 = load_weak %2 : $*@sil_weak C
@@ -31,7 +31,7 @@ bb0(%0 : $*A, %1 : $C):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store([[A]]*, [[C]]*) {
+// CHECK:    define void @test_weak_load_store([[A]]* noalias, [[C]]*) {
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[A]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
 // CHECK-NEXT: call void bitcast (void ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to void ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %1)
@@ -42,7 +42,7 @@ struct B {
   @weak var x : P?
 }
 
-sil @test_weak_load_store_proto : $@thin (val : @inout B, ref : P) -> () {
+sil @test_weak_load_store_proto : $@thin (@inout B, P) -> () {
 bb0(%0 : $*B, %1 : $P):
   %2 = struct_element_addr %0 : $*B, #x
   %3 = load_weak %2 : $*@sil_weak P
@@ -51,7 +51,7 @@ bb0(%0 : $*B, %1 : $P):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store_proto([[B]]*, i8**, [[UNKNOWN]]*)
+// CHECK:    define void @test_weak_load_store_proto([[B]]* noalias, i8**, [[UNKNOWN]]*)
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[B]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { i8**, [[WEAK]] }* [[X]], i32 0, i32 0
 // CHECK-NEXT: [[W:%.*]] = load i8*** [[T0]], align 8
@@ -64,7 +64,7 @@ bb0(%0 : $*B, %1 : $P):
 // CHECK-NEXT: call void @objc_release([[UNKNOWN]]* [[T1]])
 // CHECK-NEXT: ret void
 
-sil @test_weak_alloc_stack : $@thin (val : P) -> () {
+sil @test_weak_alloc_stack : $@thin (P) -> () {
 bb0(%0 : $P):
   %1 = alloc_stack $@sil_weak P
   store_weak %0 to [initialization] %1#1 : $*@sil_weak P

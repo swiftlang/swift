@@ -278,10 +278,11 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     buffer << Orig->getName() << "_promote" << Counter++;
   } while (M.lookup(ClonedName));
 
-  SILType OrigLoweredTy = Orig->getLoweredType();
-  SILFunctionType *OrigFTI = OrigLoweredTy.getFunctionTypeInfo(M);
-  SmallVector<TupleTypeElt, 4> ClonedArgTys;
+  SmallVector<SILParameterInfo, 4> ClonedArgTys;
+
+  SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   auto OrigParams = OrigFTI->getParameters();
+
   // Iterate over the argument types of the original function, collapsing each
   // pair of a promotable box argument and the address of its contents into a
   // single argument of the object (rather than address) type of the box's
@@ -289,25 +290,34 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   unsigned Index = 0;
   for (auto &param : OrigParams) {
     if (Index && PromotableIndices.count(Index - 1)) {
-      Type type = param.getSILType().getObjectType().getSwiftType();
-      ClonedArgTys.push_back(type);
+      assert(param.getConvention() == ParameterConvention::Indirect_Inout);
+      auto &paramTL = M.Types.getTypeLowering(param.getSILType());
+      ParameterConvention convention;
+      if (paramTL.isPassedIndirectly()) {
+        convention = ParameterConvention::Indirect_In;
+      } else if (paramTL.isTrivial()) {
+        convention = ParameterConvention::Direct_Unowned;
+      } else {
+        convention = ParameterConvention::Direct_Owned;
+      }
+      ClonedArgTys.push_back(SILParameterInfo(param.getType(), convention));
     } else if (!PromotableIndices.count(Index)) {
-      Type type = param.getType();
-      if (param.isIndirectInOut())
-        type = param.getSILType().getSwiftType();
-      ClonedArgTys.push_back(type);
+      ClonedArgTys.push_back(param);
     }
     ++Index;
   }
-  // Create the thin function type for the cloned closure
-  Type ClonedTy = Lowering::getThinFunctionType(
-    FunctionType::get(TupleType::get(ClonedArgTys, M.getASTContext()),
-                      OrigLoweredTy.getAs<AnyFunctionType>().getResult(),
-                      M.getASTContext()));
 
+  // Create the thin function type for the cloned closure
+  auto ClonedTy =
+    SILFunctionType::get(OrigFTI->getGenericParams(),
+                         OrigFTI->getExtInfo(),
+                         OrigFTI->getCalleeConvention(),
+                         ClonedArgTys,
+                         OrigFTI->getResult(),
+                         M.getASTContext());
+  
   // This inserts the new cloned function before the original function.
-  return new (M) SILFunction(M, SILLinkage::Internal, ClonedName,
-                             M.Types.getLoweredType(ClonedTy),
+  return new (M) SILFunction(M, SILLinkage::Internal, ClonedName, ClonedTy,
                              Orig->getLocation(), IsNotTransparent, Orig);
 }
 
@@ -518,7 +528,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // An apply is ok if the argument is used as an @inout parameter or an
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
-    if (AI->getFunctionTypeInfo()
+    if (AI->getSubstCalleeType()
           ->getParameters()[O->getOperandNumber()-1].isIndirect()) {
       Mutations.push_back(AI);
       return true;
@@ -544,8 +554,6 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     PartialApplyIndexMap &IM) {
-  SILModule &M = ABI->getFunction()->getModule();
-
   SmallVector<SILInstruction*, 32> Mutations;
 
   for (auto *O : ABI->getUses()) {
@@ -573,15 +581,16 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
           PAI->getOperand(OpNo + 1) != SILValue(ABI, 1))
         return false;
 
+      auto closureType = PAI->getType().castTo<SILFunctionType>();
+
       // TODO: We currently can only handle non-polymorphic closures.
-      if (PAI->hasSubstitutions() || !PAI->getType().is<FunctionType>())
+      if (PAI->hasSubstitutions() || closureType->isPolymorphic())
         return false;
 
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
-      unsigned Index = OpNo - 1 +
-        PAI->getType().getFunctionTypeInfo(M)->getParameters().size();
+      unsigned Index = OpNo - 1 + closureType->getParameters().size();
 
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
@@ -668,7 +677,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   unsigned FirstIndex =
-    PAI->getType().getFunctionTypeInfo(M)->getParameters().size();
+    PAI->getType().castTo<SILFunctionType>()->getParameters().size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
   while (OpNo != OpCount) {

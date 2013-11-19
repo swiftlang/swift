@@ -360,9 +360,9 @@ ERROR(sil_self_non_protocol, decl_parsing,none,
 ERROR(sil_value_redefinition, decl_parsing,none,
       "redefinition of value '%0'", (StringRef))
 ERROR(sil_value_use_type_mismatch, decl_parsing,none,
-      "value '%0' defined with mismatching type '%1'", (StringRef, StringRef))
+      "value '%0' defined with mismatching type %1", (StringRef, Type))
 ERROR(sil_value_def_type_mismatch, decl_parsing,none,
-      "value '%0' used with mismatching type '%1'", (StringRef, StringRef))
+      "value '%0' used with mismatching type %1", (StringRef, Type))
 ERROR(sil_use_of_undefined_value, decl_parsing,none,
       "use of undefined value '%0'", (StringRef))
 NOTE(sil_prior_reference,parsing,none,
@@ -423,6 +423,8 @@ ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_rbrace, decl_parsing,none,
       "expected '}' at the end of a sil body", ())
+ERROR(expected_sil_function_type, decl_parsing, none,
+      "sil function expected to have SIL function type", ())
 
 // SIL Stage
 ERROR(expected_sil_stage_name, decl_parsing, none,
@@ -461,6 +463,17 @@ ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
 // Function types
 ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
+ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
+      "only syntactic function types can be generic", ())
+ERROR(first_class_generic_function,type_parsing,PointsToFirstBadToken,
+      "generic types cannot be used as first-class types", ())
+ERROR(sil_function_repeat_convention,type_parsing,PointsToFirstBadToken,
+      "repeated %select{parameter|result|callee}0 convention attribute",
+      (unsigned))
+ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot be variadic", ())
+ERROR(sil_function_label,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot have labeled inputs", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,

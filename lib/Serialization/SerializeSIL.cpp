@@ -358,9 +358,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)AI->isTransparent(),
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
-        (unsigned)AI->getCallee().getType().getCategory(),
-        S.addTypeRef(AI->getSubstCalleeType().getSwiftRValueType()),
-        (unsigned)AI->getSubstCalleeType().getCategory(),
+        S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()), AI->getCallee().getResultNumber(),
         Args);
     S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
@@ -378,9 +376,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         0 /*IsTransparent*/,
         PAI->getSubstitutions().size(),
         S.addTypeRef(PAI->getCallee().getType().getSwiftRValueType()),
-        (unsigned)PAI->getCallee().getType().getCategory(),
-        S.addTypeRef(PAI->getSubstCalleeType().getSwiftRValueType()),
-        (unsigned)PAI->getSubstCalleeType().getCategory(),
+        S.addTypeRef(PAI->getSubstCalleeType()),
         addValueRef(PAI->getCallee()), PAI->getCallee().getResultNumber(),
         Args);
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);

@@ -250,10 +250,13 @@ static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
     // FIXME: check for matching types.
     return FnRef;
 
+  // FIXME: check that Ty is a SILFunctionType.
+
   // If we didn't find a function, create a new one.
   SourceLoc Loc;
   auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty, SILFileLocation(Loc));
+                                     Name.str(), Ty.castTo<SILFunctionType>(),
+                                     SILFileLocation(Loc));
   return Fn;
 }
 
@@ -459,8 +462,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SIL_INST_APPLY: {
     unsigned IsPartial;
     SILInstApplyLayout::readRecord(scratch, IsPartial, IsTransparent, NumSubs,
-                                   TyID, TyCategory, TyID2, TyCategory2,
-                                   ValID, ValResNum, ListOfValues);
+                                   TyID, TyID2, ValID, ValResNum, ListOfValues);
     OpCode = (unsigned)(IsPartial ? ValueKind::PartialApplyInst :
                                     ValueKind::ApplyInst);
     break;
@@ -560,9 +562,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // is represented with 2 IDs: ValueID and ValueResultNumber.
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory);
-    SILFunctionType *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object);
+    SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
+    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) == ListOfValues.size() &&
@@ -590,9 +592,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::PartialApplyInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory2);
-    SILFunctionType *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object);
+    SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
+    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) >= ListOfValues.size() &&

@@ -80,6 +80,7 @@ class IRGenDebugInfo {
   SourceManager &SM;
   llvm::Module &M;
   llvm::DIBuilder DBuilder;
+  IRGenModule &IGM;
   TypeConverter &Types;
 
   // Various caches.
@@ -114,6 +115,7 @@ class IRGenDebugInfo {
 public:
   IRGenDebugInfo(const Options &Opts,
                  const clang::TargetInfo &TargetInfo,
+                 IRGenModule &IGM,
                  TypeConverter &Types,
                  ASTContext &Context,
                  llvm::Module &M);
@@ -236,11 +238,10 @@ private:
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(DebugTypeInfo DTI);
-  llvm::DIArray createParameterTypes(AnyFunctionType *FnTy,
+  llvm::DIArray createParameterTypes(CanSILFunctionType FnTy,
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
-  llvm::DIArray createParameterTypes(SILModule &SILMod,
-                                     SILType SILTy,
+  llvm::DIArray createParameterTypes(SILType SILTy,
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,

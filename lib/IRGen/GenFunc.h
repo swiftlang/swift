@@ -51,18 +51,10 @@ namespace irgen {
                                       Explosion &args,
                                       ArrayRef<SILType> argTypes,
                                       ArrayRef<Substitution> subs,
-                                      SILType origType,
-                                      SILType substType,
-                                      SILType outType,
+                                      CanSILFunctionType origType,
+                                      CanSILFunctionType substType,
+                                      CanSILFunctionType outType,
                                       Explosion &out);
-  
-  /// Emit all the parameter clauses of the given function type.  This
-  /// is basically making sure that we have mappings for all the
-  /// VarDecls bound by the pattern.
-  void emitParameterClauses(IRGenFunction &IGF,
-                            Type type,
-                            ArrayRef<Pattern *> paramClauses,
-                            Explosion &args);
   
   /// Emit a call to convert a Swift closure to an Objective-C block via a
   /// shim function defined in Objective-C.
@@ -71,15 +63,14 @@ namespace irgen {
                          Explosion &swiftClosure,
                          Explosion &outBlock);
 
-  /// Does an ObjC method or C function returning the given type require an
-  /// sret indirect result?
+  /// Does an ObjC method or C function with the given signature
+  /// require an sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
-                                                    SILType type);
+                                                    CanSILFunctionType fnType,
+                                                    Mangle::ExplosionKind level);
   
   /// Does an argument of this type need to be passed by value on the stack to
   /// C or ObjC arguments?
-  llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
-                                                   CanType type);
   llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
                                                    SILType type);
   
@@ -96,6 +87,7 @@ namespace irgen {
   
   /// Emit a call to a builtin function.
   void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
+                       CanSILFunctionType substFnType,
                        Explosion &args, Explosion *result,
                        Address indirectResult,
                        ArrayRef<Substitution> substitutions);

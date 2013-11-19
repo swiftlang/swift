@@ -1071,6 +1071,14 @@ void swift::WriteAsOperand(raw_ostream &out, SILBasicBlock *BB,
 // Printing for SILInstruction, SILBasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
 
+void SILValue::dump() const {
+  print(llvm::errs());
+}
+
+void SILValue::print(raw_ostream &OS) const {
+  SILPrinter(OS).print(*this);
+}
+
 void ValueBase::dump() const {
   print(llvm::errs());
 }
@@ -1125,7 +1133,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[transparent] ";
   
   printName(OS);
-  OS << " : " << LoweredType;
+  OS << " : " << SILType::getPrimitiveObjectType(LoweredType);
   
   if (!isExternalDeclaration()) {
     OS << " {\n";

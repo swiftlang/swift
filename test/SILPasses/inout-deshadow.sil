@@ -9,14 +9,14 @@ protocol P {
   func foo()
 }
 
-sil @takeInt : $@cc(method) @thin ((), @inout Int64) -> ()
+sil @takeInt : $@cc(method) @thin (@inout Int64) -> ()
 
-sil @TrivialTest : $@thin (a: @inout Int64) -> () {
+sil @TrivialTest : $@thin (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = alloc_stack $Int64  // var a               // users: %6, %2, %4, %5
   copy_addr %0 to [initialization] %1#1 : $*Int64
-  %3 = function_ref @takeInt : $@cc(method) @thin ((), @inout Int64) -> () // user: %4
-  %4 = apply %3(%1#1) : $@cc(method) @thin ((), @inout Int64) -> ()
+  %3 = function_ref @takeInt : $@cc(method) @thin (@inout Int64) -> () // user: %4
+  %4 = apply %3(%1#1) : $@cc(method) @thin (@inout Int64) -> ()
   copy_addr %1#1 to %0 : $*Int64
   dealloc_stack %1#0 : $*@local_storage Int64
   %7 = tuple ()                                   // user: %8
@@ -25,17 +25,17 @@ bb0(%0 : $*Int64):
 
 
 // CHECK-LABEL: sil @AddressOnlyTest
-sil @AddressOnlyTest : $@thin (a: @inout P) -> () {
+sil @AddressOnlyTest : $@thin (@inout P) -> () {
 bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   %1 = alloc_stack $P
   copy_addr %0 to [initialization] %1#1 : $*P
   
   // CHECK-NEXT: project_existential %0 : $*P
   %3 = project_existential %1#1 : $*P to $*@sil_self P
-  %4 = protocol_method %1#1 : $*P, #P.foo!1 : $@cc(method) ((), @inout @sil_self P) -> ()
+  %4 = protocol_method %1#1 : $*P, #P.foo!1 : $@cc(method) @callee_owned (@inout @sil_self P) -> ()
   
   // CHECK: apply
-  %5 = apply %4(%3) : $@cc(method) ((), @inout @sil_self P) -> ()
+  %5 = apply %4(%3) : $@cc(method) @callee_owned (@inout @sil_self P) -> ()
   
   copy_addr [take] %1#1 to %0 : $*P
   dealloc_stack %1#0 : $*@local_storage P
@@ -56,10 +56,10 @@ struct NontrivialStruct {
 }
 
 
-sil @takeNontrivial : $@cc(method) @thin ((), @inout NontrivialStruct) -> ()
+sil @takeNontrivial : $@cc(method) @thin (@inout NontrivialStruct) -> ()
 
 // CHECK-LABEL: sil @NontrivialTest
-sil @NontrivialTest : $@thin (a: @inout NontrivialStruct) -> () {
+sil @NontrivialTest : $@thin (@inout NontrivialStruct) -> () {
 bb0(%0 : $*NontrivialStruct):
 // CHECK: bb0(%0 : $*NontrivialStruct):
 
@@ -68,10 +68,10 @@ bb0(%0 : $*NontrivialStruct):
 
   // CHECK-NEXT: // function_ref takeNontrivial
   // CHECK-NEXT: function_ref @takeNontrivial
-  %3 = function_ref @takeNontrivial : $@cc(method) @thin ((), @inout NontrivialStruct) -> () // user: %4
+  %3 = function_ref @takeNontrivial : $@cc(method) @thin (@inout NontrivialStruct) -> () // user: %4
 
   // CHECK-NEXT: apply
-  %4 = apply %3(%1#1) : $@cc(method) @thin ((), @inout NontrivialStruct) -> ()
+  %4 = apply %3(%1#1) : $@cc(method) @thin (@inout NontrivialStruct) -> ()
   copy_addr [take] %1#1 to %0 : $*NontrivialStruct
   dealloc_stack %1#0 : $*@local_storage NontrivialStruct
 

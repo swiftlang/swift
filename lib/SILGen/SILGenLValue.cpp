@@ -18,6 +18,7 @@
 #include "SILGen.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "Initialization.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
@@ -29,6 +30,59 @@
 
 using namespace swift;
 using namespace Lowering;
+
+static CanType getSubstFormalRValueType(Expr *expr) {
+  auto lv = cast<LValueType>(expr->getType()->getCanonicalType());
+  return lv.getObjectType();
+}
+
+static CanType getOrigFormalRValueType(ASTContext &ctx,
+                                       Type formalStorageType) {
+  auto type = formalStorageType->getCanonicalType();
+  if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
+    type = ref.getReferentType();
+    if (isa<WeakStorageType>(ref))
+      type = OptionalType::get(type, ctx)->getCanonicalType();
+  }
+  return type;
+}
+
+/// Return the LValueTypeData for the formal type of a declaration
+/// that needs no substitutions.
+static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
+                                               CanType formalRValueType) {
+  return {
+    formalRValueType,
+    formalRValueType,
+    gen.getLoweredType(formalRValueType),
+  };
+}
+
+/// Return the LValueTypeData for a value whose type is its own
+/// lowering.
+static LValueTypeData getValueTypeData(SILValue value) {
+  assert(value.getType().isObject());
+  assert(value.getType().hasReferenceSemantics() ||
+         value.getType().is<MetaTypeType>());
+  return {
+    value.getType().getSwiftRValueType(),
+    value.getType().getSwiftRValueType(),
+    value.getType()
+  };
+}
+
+static LValueTypeData getMemberTypeData(SILGenFunction &gen,
+                                        Type memberStorageType,
+                                        Expr *lvalueExpr) {
+  auto origFormalType = getOrigFormalRValueType(gen.getASTContext(),
+                                                memberStorageType);
+  auto substFormalType = getSubstFormalRValueType(lvalueExpr);
+  return {
+    origFormalType,
+      substFormalType,
+    gen.getLoweredType(origFormalType, substFormalType)
+  };
+}
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
@@ -58,7 +112,6 @@ public:
   // Expressions that wrap lvalues
   
   LValue visitAddressOfExpr(AddressOfExpr *e);
-  LValue visitParenExpr(ParenExpr *e);
   LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
@@ -111,12 +164,13 @@ WritebackScope::~WritebackScope() {
   
   gen->InWritebackScope = wasInWritebackScope;
   auto i = gen->WritebackStack.end(),
-       deepest = gen->
-  WritebackStack.begin() + savedDepth;
+       deepest = gen->WritebackStack.begin() + savedDepth;
   while (i-- > deepest) {
     ManagedValue mv = i->temp.claim(*gen, i->loc);
+    auto formalTy = i->component->getSubstFormalType();
     i->component->set(*gen, i->loc,
-                      RValueSource(i->loc, RValue(*gen, mv, i->loc)), i->base);
+                      RValueSource(i->loc, RValue(*gen, i->loc, formalTy, mv)),
+                      i->base);
   }
   
   gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
@@ -152,7 +206,7 @@ LValue SILGenFunction::emitLValue(Expr *e) {
 
 RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
   LValue lv = emitLValue(e);
-  return RValue(*this, emitAddressOfLValue(e, lv), e);
+  return RValue(*this, e, emitAddressOfLValue(e, lv));
 }
 
 void PathComponent::_anchor() {}
@@ -163,8 +217,8 @@ namespace {
   class AddressComponent : public PhysicalPathComponent {
     SILValue address;
   public:
-    AddressComponent(SILValue address, SILType typeOfRValue)
-      : PhysicalPathComponent(typeOfRValue), address(address) {
+    AddressComponent(SILValue address, LValueTypeData typeData)
+      : PhysicalPathComponent(typeData), address(address) {
       assert(address.getType().isAddress() &&
              "var component value must be an address");
     }
@@ -181,8 +235,8 @@ namespace {
     SILType SubstFieldType;
   public:
     RefElementComponent(VarDecl *field, SILType substFieldType,
-                        SILType typeOfRValue)
-      : PhysicalPathComponent(typeOfRValue),
+                        LValueTypeData typeData)
+      : PhysicalPathComponent(typeData),
         Field(field), SubstFieldType(substFieldType) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc, SILValue base)
@@ -199,8 +253,8 @@ namespace {
   class TupleElementComponent : public PhysicalPathComponent {
     unsigned ElementIndex;
   public:
-    TupleElementComponent(unsigned elementIndex, SILType typeOfRValue)
-      : PhysicalPathComponent(typeOfRValue), ElementIndex(elementIndex) {}
+    TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
+      : PhysicalPathComponent(typeData), ElementIndex(elementIndex) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
@@ -221,8 +275,8 @@ namespace {
     SILType SubstFieldType;
   public:
     StructElementComponent(VarDecl *field, SILType substFieldType,
-                           SILType typeOfRValue)
-      : PhysicalPathComponent(typeOfRValue),
+                           LValueTypeData typeData)
+      : PhysicalPathComponent(typeData),
         Field(field), SubstFieldType(substFieldType) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
@@ -239,10 +293,12 @@ namespace {
   };
 
   class RefComponent : public PhysicalPathComponent {
-    SILValue value;
+    SILValue Value;
   public:
     RefComponent(ManagedValue value) :
-      PhysicalPathComponent(value.getType()), value(value.getValue()) {
+      PhysicalPathComponent(getValueTypeData(value.getValue())),
+      Value(value.getValue()) {
+
       assert(value.getType().hasReferenceSemantics() &&
              "ref component must be of reference type");
     }
@@ -250,7 +306,7 @@ namespace {
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
       assert(!base && "ref component must be root of lvalue path");
-      return value;
+      return Value;
     }
   };
   
@@ -258,7 +314,7 @@ namespace {
     SILValue value;
   public:
     MetatypeComponent(SILValue metatype) :
-      PhysicalPathComponent(metatype.getType()), value(metatype) {
+      PhysicalPathComponent(getValueTypeData(metatype)), value(metatype) {
       
       assert(metatype.getType().is<MetaTypeType>()
              && "metatype component must be of metatype type");
@@ -277,7 +333,6 @@ namespace {
     std::vector<Substitution> substitutions;
     Expr *subscriptExpr;
     mutable RValue origSubscripts;
-    Type substType;
     
     struct AccessorArgs {
       RValueSource base;
@@ -303,11 +358,13 @@ namespace {
         if (base.getType().hasReferenceSemantics()) {
           if (!isa<FunctionRefInst>(base))
             gen.B.createStrongRetain(loc, base);
-          result.base = RValueSource(loc, RValue(gen,
-                               gen.emitManagedRValueWithCleanup(base), loc));
+          result.base = RValueSource(loc, RValue(gen, loc,
+                                                 base.getType().getSwiftType(),
+                                       gen.emitManagedRValueWithCleanup(base)));
         } else {
-          result.base = RValueSource(loc, RValue(gen,
-                               ManagedValue(base, ManagedValue::LValue), loc));
+          result.base = RValueSource(loc, RValue(gen, loc,
+                                                 base.getType().getSwiftType(),
+                                     ManagedValue(base, ManagedValue::LValue)));
         }
       }
       
@@ -325,16 +382,16 @@ namespace {
   public:
     GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
-                          SILType typeOfRValue)
-      : GetterSetterComponent(gen, decl, substitutions, nullptr, typeOfRValue)
+                          LValueTypeData typeData)
+      : GetterSetterComponent(gen, decl, substitutions, nullptr, typeData)
     {
     }
 
     GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           Expr *subscriptExpr,
-                          SILType typeOfRValue)
-      : LogicalPathComponent(typeOfRValue),
+                          LValueTypeData typeData)
+      : LogicalPathComponent(typeData),
         getter(SILDeclRef(decl, SILDeclRef::Kind::Getter,
                           SILDeclRef::ConstructAtNaturalUncurryLevel,
                           gen.SGM.requiresObjCDispatch(decl))),
@@ -344,21 +401,19 @@ namespace {
                               gen.SGM.requiresObjCDispatch(decl))
                  : SILDeclRef()),
         substitutions(substitutions.begin(), substitutions.end()),
-        subscriptExpr(subscriptExpr),
-        substType(typeOfRValue.getSwiftRValueType())
+        subscriptExpr(subscriptExpr)
     {
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
                           SILGenFunction &gen,
                           SILLocation loc)
-      : LogicalPathComponent(copied.getTypeOfRValue()),
+      : LogicalPathComponent(copied.getTypeData()),
         getter(copied.getter),
         setter(copied.setter),
         substitutions(copied.substitutions),
         subscriptExpr(copied.subscriptExpr),
-        origSubscripts(copied.origSubscripts.copy(gen, loc)),
-        substType(copied.substType)
+        origSubscripts(copied.origSubscripts.copy(gen, loc))
     {
     }
     
@@ -386,7 +441,7 @@ namespace {
       return gen.emitGetAccessor(loc, getter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
-                                 substType, c);
+                                 getSubstFormalType(), c);
     }
     
     std::unique_ptr<LogicalPathComponent>
@@ -419,16 +474,11 @@ LValue SILGenLValue::visitExpr(Expr *e) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-static SILType getSubstTypeOfRValue(SILGenFunction &gen, Type lvalue) {
-  auto objType = cast<LValueType>(lvalue->getCanonicalType()).getObjectType();
-  return gen.getLoweredType(objType);
-}
-
 static LValue emitLValueForDecl(SILGenLValue &sgl,
                                 SILLocation loc, ValueDecl *decl,
-                                Type substTypeOfReference) {
-  auto substTypeOfRValue = getSubstTypeOfRValue(sgl.gen, substTypeOfReference);
-  
+                                CanType formalRValueType) {
+  auto typeData = getUnsubstitutedTypeData(sgl.gen, formalRValueType);
+ 
   LValue lv;
 
   // If it's a computed variable, push a reference to the getter and setter.
@@ -437,7 +487,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
       lv.add<GetterSetterComponent>(sgl.gen, 
                                     var,
                                     ArrayRef<Substitution>{},
-                                    substTypeOfRValue);
+                                    typeData);
       return ::std::move(lv);
     }
   }
@@ -446,32 +496,31 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   SILValue address = sgl.gen.emitReferenceToDecl(loc, decl).getUnmanagedValue();
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
-  lv.add<AddressComponent>(address, substTypeOfRValue);
+  lv.add<AddressComponent>(address, typeData);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
-  return emitLValueForDecl(*this, e, e->getDecl(), e->getType());
+  return emitLValueForDecl(*this, e, e->getDecl(), getSubstFormalRValueType(e));
 }
 
 LValue SILGenLValue::visitSuperRefExpr(SuperRefExpr *e) {
-  // The type of reference here is a lie, but it works out given the
-  // syntactic constraint on 'super'.
   return emitLValueForDecl(*this, e, e->getSelf(),
-                           LValueType::get(e->getSelf()->getType(),
-                                           LValueType::Qual::DefaultForVar,
-                                           gen.getASTContext()));
+                           e->getSelf()->getType()->getCanonicalType());
 }
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
+
+  LValueTypeData typeData = getUnsubstitutedTypeData(gen,
+                               e->getSubExpr()->getType()->getCanonicalType());
 
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
   ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen,
                                                               e->getSubExpr());
   SILValue addr = gen.emitMaterialize(e, v).address;
-  lv.add<AddressComponent>(addr, getSubstTypeOfRValue(gen, e->getType()));
+  lv.add<AddressComponent>(addr, typeData);
   return ::std::move(lv);
 }
 
@@ -485,7 +534,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
   CanType baseTy = e->getBase()->getType()->getCanonicalType();
 
-  auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
+  LValueTypeData typeData =
+    getMemberTypeData(gen, e->getMember().getDecl()->getType(), e);
 
   // If this is a stored variable not reflected as an Objective-C
   // property, access with a fragile element reference.
@@ -510,14 +560,14 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
            && "static stored properties for classes/protocols not implemented");
         
         return emitLValueForDecl(*this, e, e->getMember().getDecl(),
-                                 e->getType());
+                                 getSubstFormalRValueType(e));
       }
       
       if (!isa<LValueType>(baseTy)) {
         assert(baseTy.hasReferenceSemantics());
-        lv.add<RefElementComponent>(var, varStorageType, substTypeOfRValue);
+        lv.add<RefElementComponent>(var, varStorageType, typeData);
       } else {
-        lv.add<StructElementComponent>(var, varStorageType, substTypeOfRValue);
+        lv.add<StructElementComponent>(var, varStorageType, typeData);
       }
       return ::std::move(lv);
     }
@@ -527,34 +577,45 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   lv.add<GetterSetterComponent>(gen,
                                 e->getMember().getDecl(),
                                 e->getMember().getSubstitutions(),
-                                substTypeOfRValue);
+                                typeData);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
+  auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
+  auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
 
   LValue lv = visitRec(e->getBase());
   lv.add<GetterSetterComponent>(gen, 
                                 e->getDecl().getDecl(),
                                 e->getDecl().getSubstitutions(),
                                 e->getIndex(),
-                                substTypeOfRValue);
+                                typeData);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
+  unsigned index = e->getFieldNumber();
   LValue lv = visitRec(e->getBase());
-  lv.add<TupleElementComponent>(e->getFieldNumber(),
-                                getSubstTypeOfRValue(gen, e->getType()));
+
+  auto baseTypeData = lv.getTypeData();
+  auto getElementType = [](CanType type, unsigned index) {
+    if (auto tuple = dyn_cast<TupleType>(type))
+      return tuple.getElementType(index);
+    assert(isa<ArchetypeType>(type));
+    return type;
+  };
+  LValueTypeData typeData = {
+    getElementType(baseTypeData.OrigFormalType, index),
+    cast<TupleType>(baseTypeData.SubstFormalType).getElementType(index),
+    baseTypeData.TypeOfRValue.getTupleElementType(index)
+  };
+
+  lv.add<TupleElementComponent>(index, typeData);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
-  return visitRec(e->getSubExpr());
-}
-
-LValue SILGenLValue::visitParenExpr(ParenExpr *e) {
   return visitRec(e->getSubExpr());
 }
 
@@ -609,45 +670,19 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 }
 #endif
 
-/// Create the correct substitution for calling a function with the
-/// given polymorphic type at the given type.
-static Substitution getSimpleSubstitution(PolymorphicFunctionType *fnType,
+static Substitution getSimpleSubstitution(GenericParamList &generics,
                                           CanType typeArg) {
-  assert(fnType->getGenericParameters().size() == 1);
-  auto typeParamDecl = fnType->getGenericParameters()[0].getAsTypeParam();
+  assert(generics.getParams().size() == 1);
+  auto typeParamDecl = generics.getParams()[0].getAsTypeParam();
   return Substitution{typeParamDecl->getArchetype(), typeArg, {}};
 }
 
 /// Create the correct substitution for calling the given function at
 /// the given type.
 static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
-  auto polyFnType = fn->getType()->castTo<PolymorphicFunctionType>();
-  return getSimpleSubstitution(polyFnType, typeArg);
-}
-
-/// Emit a reference to the given generic function and bind its type parameter.
-static std::tuple<SILValue, SILType, Substitution>
-emitSpecializedFunctionRef(SILGenFunction &gen,
-                           SILLocation loc,
-                           CanType typeArg,
-                           FuncDecl *fn) {
-  // Sema should have diagnosed this.
-  assert(fn && "couldn't find intrinsic function!");
-
-  // Build the reference to the function.
-  auto fnMV = gen.emitFunctionRef(loc, SILDeclRef(fn, SILDeclRef::Kind::Func));
-  assert(!fnMV.hasCleanup());
-  auto fnVal = fnMV.getValue();
-
-  auto polyFnType = fnVal.getType().castTo<PolymorphicFunctionType>();
-  auto substType = gen.getLoweredLoadableType(
-                    polyFnType->substGenericArgs(gen.SGM.SwiftModule, typeArg));
-  
-  // Make the substitution.  This is valid by the known constraints
-  // on these generic intrinsics.
-  auto sub = getSimpleSubstitution(polyFnType, typeArg);
-
-  return std::make_tuple(fnVal, substType, sub);
+  auto polyFnType =
+    cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  return getSimpleSubstitution(polyFnType->getGenericParams(), typeArg);
 }
 
 static CanType getOptionalValueType(SILType optType) {
@@ -666,8 +701,8 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
   auto isNonNullBB = gen.createBasicBlock();
   auto contBB = gen.createBasicBlock();
 
-  SILType optType = optTL.getLoweredType();
-  auto result = new (gen.SGM.M) SILArgument(optType, contBB);
+  SILValue resultAddr =
+    gen.emitTemporaryAllocation(loc, optTL.getLoweredType());
 
   CanType refType = ref.getType().getSwiftRValueType();
   assert(refType.hasReferenceSemantics());
@@ -676,32 +711,23 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
   auto isNonNull = gen.B.createIsNonnull(loc, ref);
   gen.B.createCondBranch(loc, isNonNull, isNonNullBB, isNullBB);
 
-  ASTContext &ctx = gen.getASTContext();
-
   // If it's non-null, use _injectValueIntoOptional.
   gen.B.emitBlock(isNonNullBB);
-  FuncDecl *injectDecl = ctx.getInjectValueIntoOptionalDecl(nullptr);
-  SILValue injectFn;
-  SILType injectFnTy;
-  Substitution injectSub;
-  std::tie(injectFn, injectFnTy, injectSub) =
-    emitSpecializedFunctionRef(gen, loc, refType, injectDecl);
-  
-  SILValue injectedValue = gen.B.createApply(loc, injectFn, injectFnTy,
-                                             optType, injectSub, ref);
-  gen.B.createBranch(loc, contBB, injectedValue);
+  {
+    FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+    RValueSource value(loc, RValue(ManagedValue::forUnmanaged(ref), refType));
+    gen.emitInjectOptionalValueInto(loc, std::move(value), resultAddr, optTL);
+  }
+  gen.B.createBranch(loc, contBB);
 
-  // If it's null, use _injectValueIntoNothing.
+  // If it's null, use _injectNothingIntoOptional.
   gen.B.emitBlock(isNullBB);
-  injectDecl = ctx.getInjectNothingIntoOptionalDecl(nullptr);
-  std::tie(injectFn, injectFnTy, injectSub) =
-    emitSpecializedFunctionRef(gen, loc, refType, injectDecl);
-  SILValue injectedNothing =
-    gen.B.createApply(loc, injectFn, injectFnTy, optType, injectSub, {});
-  gen.B.createBranch(loc, contBB, injectedNothing);
+  gen.emitInjectOptionalNothingInto(loc, resultAddr, optTL);
+  gen.B.createBranch(loc, contBB);
 
   // Continue.
   gen.B.emitBlock(contBB);
+  auto result = gen.B.createLoad(loc, resultAddr);
   return result;
 }
 
@@ -740,33 +766,27 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   auto optAddr = allocation->getAddressResult();
   gen.B.createStore(loc, opt, optAddr);
 
-  ASTContext &ctx = gen.getASTContext();
-
   // Ask whether the value is present.
-  SILValue fn;
-  SILType fnTy;
-  Substitution sub;
-  std::tie(fn, fnTy, sub) =
-    emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
-                               ctx.getDoesOptionalHaveValueDecl(nullptr));
-  auto i1Type = 
-    SILType::getPrimitiveObjectType(CanType(BuiltinIntegerType::get(1, ctx)));
-  auto isPresent = gen.B.createApply(loc, fn, fnTy, i1Type, sub, optAddr);
+  auto isPresent = gen.emitDoesOptionalHaveValue(loc, optAddr);
   gen.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
 
   // If it's present, use _getOptionalValue.
-  // Note that we pass 'opt' directly, not indirectly, thus consuming the value.
   gen.B.emitBlock(isPresentBB);
-  std::tie(fn, fnTy, sub) =
-    emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
-                               ctx.getGetOptionalValueDecl(nullptr));
-  SILValue refValue = gen.B.createApply(loc, fn, fnTy, refType, sub, opt);
+  SILValue refValue;
+  {
+    FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+
+    auto managedOptAddr = ManagedValue::forUnmanaged(optAddr);
+    refValue = gen.emitGetOptionalValueFrom(loc, managedOptAddr, optTL,
+                                            SGFContext()).forward(gen);
+    assert(refValue.getType().isObject());
+  }
   gen.B.createBranch(loc, contBB, refValue);
 
   // If it's not present, just create a null value.
   gen.B.emitBlock(isNotPresentBB);
   SILValue null = gen.B.createBuiltinZero(loc, refType);
-  optTL.emitDestroyValue(gen.B, loc, opt);
+  optTL.emitDestroyValue(gen.B, loc, opt); // destroy the nothing value
   gen.B.createBranch(loc, contBB, null);
 
   // Continue.
@@ -777,89 +797,40 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
-                                                     RValueSource &&value,
-                                               const TypeLowering &optTL) {
-  assert(!optTL.isAddressOnly() &&
-         "use emitInjectOptionalValueInto to emit address-only optionals");
-
-  SILType optType = optTL.getLoweredType();
-  CanType valueType = getOptionalValueType(optType);
-
-  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
-  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  Substitution sub = getSimpleSubstitution(fnType, valueType);
-
-  SmallVector<ManagedValue, 4> args;
-  std::move(value).getAsRValue(*this).getAll(args);
-
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
-                                     optType.getSwiftRValueType(),
-                                     SGFContext());
-}
-
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                                  RValueSource &&value,
                                                  SILValue dest,
                                                  const TypeLowering &optTL) {
-  if (!optTL.isAddressOnly()) {
-    auto result = emitInjectOptionalValue(loc, std::move(value), optTL);
-    result.forwardInto(*this, loc, dest);
-    return;
-  }
-
-  SILType optType = dest.getType().getObjectType();
-  CanType valueType = getOptionalValueType(optType);
-
-  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
-  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  Substitution sub = getSimpleSubstitution(fnType, valueType);
-
-  SmallVector<ManagedValue, 4> args;
-  std::move(value).getAsRValue(*this).getAll(args);
-
-  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
-                              optType.getSwiftRValueType(),
-                              SGFContext(&emitInto));
-}
-
-ManagedValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
-                                                 const TypeLowering &optTL) {
-  assert(!optTL.isAddressOnly() &&
-         "use emitInjectOptionalNothingInto to emit address-only optionals");
-
   SILType optType = optTL.getLoweredType();
   CanType valueType = getOptionalValueType(optType);
 
-  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl(nullptr);
-  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  Substitution sub = getSimpleSubstitution(fnType, valueType);
+  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
+  Substitution sub = getSimpleSubstitution(fn, valueType);
 
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, {},
-                                     optType.getSwiftRValueType(),
-                                     SGFContext());
+  // Materialize the r-value into a temporary.
+  FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));
+  auto valueAddr = std::move(value).materialize(*this,
+                                  AbstractionPattern(CanType(sub.Archetype)));
+
+  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
+  auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, valueAddr,
+                                            SGFContext(&emitInto));
+  assert(!result && "didn't emit directly into buffer?"); (void) result;
 }
 
 void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
-  if (!optTL.isAddressOnly()) {
-    auto result = emitInjectOptionalNothing(loc, optTL);
-    result.forwardInto(*this, loc, dest);
-    return;
-  }
-
-  SILType optType = dest.getType().getObjectType();
+  SILType optType = optTL.getLoweredType();
   CanType valueType = getOptionalValueType(optType);
 
   FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl(nullptr);
-  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  Substitution sub = getSimpleSubstitution(fnType, valueType);
+  Substitution sub = getSimpleSubstitution(fn, valueType);
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, optType.getSwiftRValueType(),
-                              SGFContext(&emitInto));
+  auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, {},
+                                            SGFContext(&emitInto));
+  assert(!result && "didn't emit directly into buffer?"); (void) result;
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc, 
@@ -868,30 +839,13 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   CanType valueType = getOptionalValueType(optType);
 
   FuncDecl *fn = getASTContext().getDoesOptionalHaveValueDecl(nullptr);
-  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  Substitution sub = getSimpleSubstitution(fnType, valueType);
-
-  CanType resultType = fnType.getResult();
-  assert(resultType->isBuiltinIntegerType(1));
+  Substitution sub = getSimpleSubstitution(fn, valueType);
 
   // The argument to _doesOptionalHaveValue is passed by reference.
   return emitApplyOfLibraryIntrinsic(loc, fn, sub,
                                      ManagedValue::forUnmanaged(addr),
-                                     resultType, SGFContext())
+                                     SGFContext())
     .getUnmanagedValue();
-}
-
-ManagedValue SILGenFunction::emitGetOptionalValue(SILLocation loc,
-                                                  ManagedValue value,
-                                                  const TypeLowering &optTL,
-                                                  SGFContext C) {
-  SILType optType = value.getType().getObjectType();
-  CanType valueType = getOptionalValueType(optType);
-
-  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
-
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, value, valueType, C);
 }
 
 ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
@@ -904,13 +858,7 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
   FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
-  ManagedValue arg = src;
-  if (!optTL.isAddressOnly()) {
-    SILValue value = optTL.emitLoadOfCopy(B, loc, arg.forward(*this), IsTake);
-    arg = emitManagedRValueWithCleanup(value, optTL);
-  }
-
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType, C);
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);
 }
 
 /// Given that the type-of-rvalue differs from the type-of-storage,
@@ -952,15 +900,6 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
                                       const TypeLowering &valueTL,
                                       IsInitialization_t isInit) {
   auto storageType = dest.getType();
-
-  // Function values might need to be generalized.  This is actually
-  // pretty broken; the general expression emitter has a
-  // responsibility to emit functions with the right type.
-  if (storageType.is<AnyFunctionType>()) {
-    value = gen.B.emitGeneralizedValue(loc, value);
-    emitUnloweredStoreOfCopy(gen.B, loc, value, dest, isInit);
-    return;
-  }
 
   // For [weak] types, we need to break down an Optional<T> and then
   // emit the storeWeak ourselves.
@@ -1187,7 +1126,8 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc,
                                         Initialization *dest) {
   auto skipPeephole = [&]{
     if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
-      RValue(*this, loaded, loc).forwardInto(*this, dest, loc);
+      RValue(*this, loc, src.getSubstFormalType(), loaded)
+        .forwardInto(*this, dest, loc);
     }
   };
   

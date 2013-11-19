@@ -600,6 +600,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isSILType, DeclContext *DC,
 }
 
 namespace {
+  const auto DefaultParameterConvention = ParameterConvention::Direct_Unowned;
+  const auto DefaultResultConvention = ResultConvention::Unowned;
+
   class TypeResolver {
     TypeChecker &TC;
     ASTContext &Context;
@@ -621,10 +624,16 @@ namespace {
     Type resolveAttributedType(AttributedTypeRepr *repr, bool isSILType);
     Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                                bool isSILType);
-    Type resolveFunctionType(FunctionTypeRepr *repr,
-                             bool isSILType,
-                             FunctionType::ExtInfo extInfo
-                               = FunctionType::ExtInfo());
+    Type resolveASTFunctionType(FunctionTypeRepr *repr,
+                                FunctionType::ExtInfo extInfo
+                                  = FunctionType::ExtInfo());
+    Type resolveSILFunctionType(FunctionTypeRepr *repr,
+                                FunctionType::ExtInfo extInfo
+                                  = FunctionType::ExtInfo(),
+                                ParameterConvention calleeConvention
+                                  = DefaultParameterConvention);
+    SILParameterInfo resolveSILParameter(TypeRepr *repr);
+    SILResultInfo resolveSILResult(TypeRepr *repr);
     Type resolveArrayType(ArrayTypeRepr *repr, bool isSILType);
     Type resolveOptionalType(OptionalTypeRepr *repr, bool isSILType);
     Type resolveTupleType(TupleTypeRepr *repr, bool isSILType);
@@ -664,7 +673,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, bool isSILType) {
                                     Resolver);
 
   case TypeReprKind::Function:
-    return resolveFunctionType(cast<FunctionTypeRepr>(repr), isSILType);
+    if (!isSILType)
+      return resolveASTFunctionType(cast<FunctionTypeRepr>(repr));
+    return resolveSILFunctionType(cast<FunctionTypeRepr>(repr));
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), isSILType);
@@ -708,7 +719,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn
+    TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
+    TAK_callee_owned, TAK_callee_guaranteed
   };
 
   bool hasFunctionAttr = false;
@@ -740,7 +752,23 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   attrs.has(TAK_noreturn),
                                   attrs.has(TAK_auto_closure),
                                   attrs.has(TAK_objc_block));
-    ty = resolveFunctionType(fnRepr, isSILType, extInfo);
+
+    auto calleeConvention = ParameterConvention::Direct_Unowned;
+    if (attrs.has(TAK_callee_owned)) {
+      if (attrs.has(TAK_callee_guaranteed)) {
+        TC.diagnose(attrs.getLoc(TAK_callee_owned),
+                    diag::sil_function_repeat_convention, /*callee*/ 2);
+      }
+      calleeConvention = ParameterConvention::Direct_Owned;
+    } else if (attrs.has(TAK_callee_guaranteed)) {
+      calleeConvention = ParameterConvention::Direct_Guaranteed;
+    }
+
+    if (isSILType) {
+      ty = resolveSILFunctionType(fnRepr, extInfo, calleeConvention);
+    } else {
+      ty = resolveASTFunctionType(fnRepr, extInfo);
+    }
 
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
@@ -804,16 +832,124 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   return ty;
 }
 
-Type TypeResolver::resolveFunctionType(FunctionTypeRepr *repr,
-                                       bool isSILType,
-                                       FunctionType::ExtInfo extInfo) {
-  Type inputTy = resolveType(repr->getArgsTypeRepr(), isSILType);
+Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
+                                          FunctionType::ExtInfo extInfo) {
+  // Generic types are only first-class in SIL.
+  if (auto generics = repr->getGenericParams()) {
+    TC.diagnose(generics->getSourceRange().Start,
+                diag::first_class_generic_function);
+  }
+
+  Type inputTy = resolveType(repr->getArgsTypeRepr(), false);
   if (inputTy->is<ErrorType>())
     return inputTy;
-  Type outputTy = resolveType(repr->getResultTypeRepr(), isSILType);
+  Type outputTy = resolveType(repr->getResultTypeRepr(), false);
   if (outputTy->is<ErrorType>())
     return outputTy;
   return FunctionType::get(inputTy, outputTy, extInfo, Context);
+}
+
+Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
+                                          FunctionType::ExtInfo extInfo,
+                                          ParameterConvention callee) {
+  bool hasError = false;
+
+  SmallVector<SILParameterInfo, 4> params;
+  if (auto tuple = dyn_cast<TupleTypeRepr>(repr->getArgsTypeRepr())) {
+    // SIL functions cannot be variadic.
+    if (tuple->hasEllipsis()) {
+      TC.diagnose(tuple->getEllipsisLoc(), diag::sil_function_ellipsis);
+    }
+
+    for (auto elt : tuple->getElements()) {
+      if (auto named = dyn_cast<NamedTypeRepr>(elt)) {
+        TC.diagnose(named->getNameLoc(), diag::sil_function_label);
+        elt = named->getTypeRepr();
+      }
+
+      SILParameterInfo param = resolveSILParameter(elt);
+      params.push_back(param);
+      if (param.getType()->is<ErrorType>())
+        hasError = true;
+    }
+  } else {
+    SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr());
+    params.push_back(param);
+    if (param.getType()->is<ErrorType>())
+      hasError = true;
+  }
+
+  SILResultInfo result = resolveSILResult(repr->getResultTypeRepr());
+  if (result.getType()->is<ErrorType>())
+    hasError = true;
+
+  if (hasError)
+    return ErrorType::get(Context);
+
+  return SILFunctionType::get(repr->getGenericParams(), extInfo, callee,
+                              params, result, Context);
+}
+
+SILParameterInfo TypeResolver::resolveSILParameter(TypeRepr *repr) {
+  auto convention = DefaultParameterConvention;
+  Type type;
+  bool hadError = false;
+
+  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+    auto attrs = attrRepr->getAttrs();
+    auto checkFor = [&](TypeAttrKind tak, ParameterConvention attrConv) {
+      if (!attrs.has(tak)) return;
+      if (convention != DefaultParameterConvention) {
+        TC.diagnose(attrs.getLoc(tak), diag::sil_function_repeat_convention,
+                    /*input*/ 0);
+        hadError = true;
+      }
+      attrs.clearAttribute(tak);
+      convention = attrConv;
+    };
+    checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
+    checkFor(TypeAttrKind::TAK_out, ParameterConvention::Indirect_Out);
+    checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
+    checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
+    checkFor(TypeAttrKind::TAK_guaranteed,
+             ParameterConvention::Direct_Guaranteed);
+
+    type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), true);
+  } else {
+    type = resolveType(repr, true);
+  }
+
+  if (hadError) type = ErrorType::get(Context);
+  return SILParameterInfo(type->getCanonicalType(), convention);
+}
+
+SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr) {
+  auto convention = DefaultResultConvention;
+  Type type;
+  bool hadError = false;
+
+  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+    auto attrs = attrRepr->getAttrs();
+    auto checkFor = [&](TypeAttrKind tak, ResultConvention attrConv) {
+      if (!attrs.has(tak)) return;
+      if (convention != DefaultResultConvention) {
+        TC.diagnose(attrs.getLoc(tak), diag::sil_function_repeat_convention,
+                    /*result*/ 1);
+        hadError = true;
+      }
+      attrs.clearAttribute(tak);
+      convention = attrConv;
+    };
+    checkFor(TypeAttrKind::TAK_owned, ResultConvention::Owned);
+    checkFor(TypeAttrKind::TAK_autoreleased, ResultConvention::Autoreleased);
+
+    type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), true);
+  } else {
+    type = resolveType(repr, true);
+  }
+
+  if (hadError) type = ErrorType::get(Context);
+  return SILResultInfo(type->getCanonicalType(), convention);
 }
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr, bool isSILType) {

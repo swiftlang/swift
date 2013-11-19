@@ -136,6 +136,10 @@ ParserResult<TypeRepr> Parser::parseType() {
 ///     type-simple '->' type-annotation
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
+  // Parse Generic Parameters. Generic Parameters are visible in the function
+  // body.
+  GenericParamList *generics = maybeParseGenericParams();
+
   ParserResult<TypeRepr> ty = parseTypeSimple(MessageID);
   if (ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
@@ -152,7 +156,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     if (SecondHalf.isNull())
       return nullptr;
     return makeParserResult(
-        new (Context) FunctionTypeRepr(ty.get(), SecondHalf.get()));
+        new (Context) FunctionTypeRepr(generics, ty.get(), SecondHalf.get()));
+  }
+
+  if (generics) {
+    auto brackets = generics->getSourceRange();
+    diagnose(brackets.Start, diag::generic_non_function);
   }
 
   // Parse array types, plus recovery for optional array types.

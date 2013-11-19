@@ -774,11 +774,6 @@ public:
     lowering.emitDestroyValue(*this, loc, v);
   }
 
-  /// Generalize a function value.  This is a hack and probably not
-  /// actually implementable at the SILBuilder level because it may
-  /// require memory management.
-  SILValue emitGeneralizedValue(SILLocation loc, SILValue value);
-  
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,
                             unsigned FieldNo, SILType ResultTy) {
     // Fold tuple_extract(tuple(x,y,z),2)
@@ -806,7 +801,6 @@ public:
     auto type = Operand.getType().getFieldType(Field, F.getModule());
     return emitStructExtract(Loc, Operand, Field, type);
   }
-
 
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

@@ -18,13 +18,12 @@
 #ifndef SWIFT_LOWERING_INITIALIZATION_H
 #define SWIFT_LOWERING_INITIALIZATION_H
 
-#include "swift/SIL/SILValue.h"
-#include "SILGen.h"
-#include "swift/Basic/DiverseList.h"
+#include "RValue.h"
 #include <memory>
 
 namespace swift {
 namespace Lowering {
+  class ManagedValue;
   class SILGenFunction;
 
 class Initialization;
@@ -54,6 +53,9 @@ public:
     /// This Initialization is for a single buffer with a physical address,
     /// which can be accessed with getAddress() and stored to.
     SingleBuffer,
+    /// This Initialization performs a semantic translation on its
+    /// operand and cannot be directly stored to.
+    Translating,
     /// This Initialization is for a tuple of sub-initializations, which can
     /// be accessed with getSubInitializations().
     Tuple
@@ -69,11 +71,18 @@ public:
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() = 0;
   
-  /// Binds an address value to this initialization. Used for [inout] arguments,
-  /// but invalid anywhere else.
+  /// Binds an address value to this initialization. Called only on
+  /// initializations with Kind::AddressBinding.
   virtual void bindAddress(SILValue address, SILGenFunction &gen,
                            SILLocation loc) {
     llvm_unreachable("unexpected address value in initialization!");
+  }
+
+  /// Provide a value to this initialization.  Called only on
+  /// initializations with Kind::Translating.
+  virtual void translateValue(SILGenFunction &gen, SILLocation loc,
+                              ManagedValue value) {
+    llvm_unreachable("unexpected translated value in initialization!");
   }
   
   /// Returns true if this initialization represents a single contiguous buffer.
@@ -150,7 +159,17 @@ public:
 
   /// Returns the cleanup corresponding to the value of the temporary.
   CleanupHandle getInitializedCleanup() const { return Cleanup; }
+
+  ManagedValue getManagedAddress() const  {
+    return ManagedValue(getAddress(), getInitializedCleanup());
+  }
 };
+
+inline bool SGFContext::hasAddressToEmitInto() const {
+  if (auto init = getEmitInto())
+    return init->kind == Initialization::Kind::SingleBuffer;
+  return false;
+}
 
 } // end namespace Lowering
 } // end namespace swift

@@ -39,6 +39,11 @@ static char mangleConstructorKind(SILDeclRef::Kind kind) {
   }
 }
 
+void SILGenModule::mangleThunk(SILFunction *f) {
+  llvm::raw_string_ostream buffer(f->getMutableName());
+  buffer << "thunk" << anonymousSymbolCounter++;
+}
+
 /// Mangle this entity into the given stream.
 void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
   llvm::raw_string_ostream buffer(f->getMutableName());

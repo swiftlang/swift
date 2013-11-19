@@ -443,8 +443,8 @@ static llvm::FunctionType *getMsgSendSuperTy(IRGenModule &IGM,
 /// '_cmd' arguments.
 CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               SILDeclRef method,
-                                              SILType origType,
-                                              SILType substResultType,
+                                              CanSILFunctionType origFnType,
+                                              CanSILFunctionType substFnType,
                                               ArrayRef<Substitution> subs,
                                               ExplosionKind maxExplosion,
                                               bool isSuper) {
@@ -453,15 +453,16 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Getter
           || method.kind == SILDeclRef::Kind::Setter)
          && "objc method call must be to a func/initializer/getter/setter");
+
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
-                                      origType.getSwiftRValueType(),
-                                      ExplosionKind::Minimal,
-                                      0,
+  auto fnTy = IGF.IGM.getFunctionType(origFnType,
+                                      explosionLevel,
                                       ExtraData::None,
                                       attrs);
-  bool indirectResult = requiresExternalIndirectResult(IGF.IGM,
-                                                       substResultType);
+  bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType,
+                                                       explosionLevel);
   if (isSuper)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 
@@ -482,11 +483,11 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
 
   CallEmission emission(IGF,
-                        Callee::forKnownFunction(origType,
-                                                 substResultType,
+                        Callee::forKnownFunction(origFnType,
+                                                 substFnType,
                                                  subs,
                                                  messenger, nullptr,
-                                                 ExplosionKind::Minimal));
+                                                 explosionLevel));
   return emission;
 }
 
@@ -517,13 +518,22 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
 }
 
 /// Return the formal type that we would use for +allocWithZone:.
-static CanType getAllocObjectFormalType(ASTContext &ctx, CanType classType) {
-  TupleTypeElt argElts[] = {
-    { ctx.TheRawPointerType },
-    { MetaTypeType::get(classType, ctx) }
+static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
+                                                   CanType classType) {
+  SILParameterInfo inputs[] = {
+    SILParameterInfo(CanType(ctx.TheRawPointerType), /* (NSZone*), kindof */
+                     ParameterConvention::Direct_Unowned),
+    SILParameterInfo(CanType(MetaTypeType::get(classType, ctx)),
+                     ParameterConvention::Direct_Unowned)
   };
-  Type argTy = TupleType::get(argElts, ctx);
-  return FunctionType::get(argTy, classType, ctx)->getCanonicalType();
+  auto result = SILResultInfo(classType, ResultConvention::Owned);
+  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::ObjCMethod,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false);
+
+  return SILFunctionType::get(nullptr, extInfo,
+                              /*callee*/ ParameterConvention::Direct_Unowned,
+                              inputs, result, ctx);
 }
 
 /// Call [self allocWithZone: nil].
@@ -531,14 +541,13 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
                                             CanType classType) {
   // Compute the formal type that we expect +allocWithZone: to have.
-  CanType formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
+  auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
   auto explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 0;
 
   // Compute the appropriate LLVM type for the function.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod, formalType,
-                                      explosionLevel, uncurryLevel,
+  auto fnTy = IGF.IGM.getFunctionType(formalType, explosionLevel,
                                       ExtraData::None, attrs);
 
   // Get the messenger function.
@@ -546,15 +555,15 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
 
   // Prepare the call.
-  CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::ObjCMethod,
-                                                      formalType, classType, {},
+  CallEmission emission(IGF, Callee::forKnownFunction(formalType,
+                                                      formalType, {},
                                                       messenger, nullptr,
                                                       explosionLevel,
                                                       uncurryLevel));
 
   // Emit the arguments.
   {
-    Explosion args(ExplosionKind::Minimal);
+    Explosion args(emission.getCurExplosionLevel());
     args.add(self);
     args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
     args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
@@ -568,16 +577,14 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
-                                                     SILDeclRef method,
-                                                     SILType origMethodType,
-                                                     SILType resultType,
-                                                     const HeapLayout &layout,
-                                                     const TypeInfo &selfTI) {
+                                            SILDeclRef method,
+                                            CanSILFunctionType origMethodType,
+                                            CanSILFunctionType resultType,
+                                            const HeapLayout &layout,
+                                            const TypeInfo &selfTI) {
   llvm::AttributeSet attrs;
-  llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
-                                                  resultType.getSwiftRValueType(),
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType,
                                                   ExplosionKind::Minimal,
-                                                  /*curryLevel=*/ 0,
                                                   ExtraData::Retainable,
                                                   attrs);
   // FIXME: Give the thunk a real name.
@@ -587,10 +594,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                            "_TPAo", &IGM.Module);
   fwd->setAttributes(attrs);
   
-  IRGenFunction subIGF(IGM, ExplosionKind::Minimal, fwd);
+  IRGenFunction subIGF(IGM, fwd);
   
   // Recover 'self' from the context.
-  Explosion params = subIGF.collectParameters();
+  Explosion params = subIGF.collectParameters(ExplosionKind::Minimal);
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
   auto &fieldLayout = layout.getElements()[0];
@@ -604,8 +611,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Save off the forwarded indirect return address if we have one.
   llvm::Value *indirectReturn = nullptr;
-  SILType appliedResultTy
-    = origMethodType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultSILType();
+  SILType appliedResultTy = origMethodType->getSemanticResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
   if (appliedResultTI.getSchema(ExplosionKind::Minimal)
         .requiresIndirectResult(IGM)) {
@@ -614,7 +620,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   // Prepare the call to the underlying method.
   CallEmission emission
-    = prepareObjCMethodRootCall(subIGF, method, origMethodType, appliedResultTy,
+    = prepareObjCMethodRootCall(subIGF, method, origMethodType, origMethodType,
        ArrayRef<Substitution>{}, ExplosionKind::Minimal, /*isSuper*/ false);
   
   Explosion args(params.getKind());
@@ -638,8 +644,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
 void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
                                        SILDeclRef method,
-                                       SILType origMethodType,
-                                       SILType resultType,
+                                       CanSILFunctionType origMethodType,
+                                       CanSILFunctionType resultType,
                                        llvm::Value *self,
                                        SILType selfType,
                                        Explosion &out) {
@@ -695,22 +701,21 @@ static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM, StringRef name) {
 /// given Swift implementation, at the given explosion and uncurry levels.
 static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                                   const Selector &selector,
-                                                  AbstractFunctionDecl *method,
+                                                        SILDeclRef declRef,
                                                   llvm::Function *swiftImpl,
-                                                  ExplosionKind explosionLevel,
-                                                  unsigned uncurryLevel) {
+                                               ExplosionKind explosionLevel) {
 
   // Construct a callee and derive its ownership conventions.
-  auto origFormalType
-    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
-  auto origFnType
-    = cast<AnyFunctionType>(CanType(origFormalType->getResult()));
-  auto callee = Callee::forMethod(CanType(origFormalType),
-                                  CanType(origFnType->getResult()),
+  auto origFormalType = IGM.SILMod->Types.getConstantFormalType(declRef);
+  auto origFnType = IGM.SILMod->Types.getSILFunctionType(origFormalType,
+                                               origFormalType, /*uncurry*/ 0);
+
+  auto callee = Callee::forMethod(origFnType,
+                                  origFnType,
                                   ArrayRef<Substitution>{},
                                   swiftImpl,
                                   explosionLevel,
-                                  uncurryLevel);
+                                  declRef.uncurryLevel);
 
   llvm::Function *objcImpl
     = findSwiftAsObjCThunk(IGM, swiftImpl->getName());
@@ -787,14 +792,16 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
   auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
                              absCallee.getMaxUncurryLevel());
-    
-  llvm::Function *swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
   ExplosionKind explosionLevel = fnRef.getExplosionLevel();
   unsigned uncurryLevel = fnRef.getUncurryLevel();
-  
-  return getObjCMethodPointerForSwiftImpl(IGM, selector, method,
-                                          swiftImpl, explosionLevel,
-                                          uncurryLevel);
+
+  SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
+                                  uncurryLevel, /*foreign*/ true);
+    
+  llvm::Function *swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+
+  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
+                                          swiftImpl, explosionLevel);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -809,14 +816,18 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, constructor);
+  unsigned uncurryLevel = absCallee.getMaxUncurryLevel();
+  auto explosionLevel = absCallee.getBestExplosionLevel();
+
   llvm::Function *swiftImpl
     = IGM.getAddrOfConstructor(constructor, ConstructorKind::Initializing,
-                               absCallee.getBestExplosionLevel());
+                               explosionLevel);
 
-  return getObjCMethodPointerForSwiftImpl(IGM, selector, constructor,
-                                          swiftImpl,
-                                          absCallee.getBestExplosionLevel(),
-                                          absCallee.getMaxUncurryLevel());
+  SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
+                                  uncurryLevel, /*foreign*/ true);
+
+  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
+                                          swiftImpl, explosionLevel);
 }
 
 /// True if the value is of class type, or of a type that is bridged to class

@@ -28,19 +28,59 @@ namespace swift {
 
 namespace Lowering {
 
-/// Given a function type or polymorphic function type, returns the same type
-/// with [thin] and calling convention attributes added.
-/// FIXME: The thinness of func decls should be checked by the Swift
-/// typechecker.
-Type getThinFunctionType(Type t, AbstractCC cc);
-Type getThinFunctionType(Type t);
+/// The default convention for handling the callee object on thick
+/// callees.
+const ParameterConvention DefaultThickCalleeConvention =
+  ParameterConvention::Direct_Owned;
 
-/// Given a function type or polymorphic function type, returns the same type
-/// with the [thin] attribute removed and a calling convention attribute added.
-/// FIXME: The thinness of func decls should be checked by the Swift
-/// typechecker.
-Type getThickFunctionType(Type t, AbstractCC cc);
-Type getThickFunctionType(Type t);
+/// Given an AST function type, return a type that is identical except
+/// for using the given ExtInfo.
+CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
+                                      AnyFunctionType::ExtInfo extInfo);
+
+/// Make the given function type @thin and change its CC.
+inline CanAnyFunctionType getThinFunctionType(CanAnyFunctionType t,
+                                              AbstractCC cc) {
+  auto extInfo = t->getExtInfo().withIsThin(true).withCallingConv(cc);
+  return adjustFunctionType(t, extInfo);
+}
+/// Make the given function type @thin.
+inline CanAnyFunctionType getThinFunctionType(CanAnyFunctionType t) {
+  auto extInfo = t->getExtInfo().withIsThin(true);
+  return adjustFunctionType(t, extInfo);  
+}
+
+/// Make the given function type no longer @thin and change its CC.
+inline CanAnyFunctionType getThickFunctionType(CanAnyFunctionType t,
+                                               AbstractCC cc) {
+  auto extInfo = t->getExtInfo().withIsThin(false).withCallingConv(cc);
+  return adjustFunctionType(t, extInfo);
+}
+/// Make the given function type no longer @thin.
+inline CanAnyFunctionType getThickFunctionType(CanAnyFunctionType t) {
+  auto extInfo = t->getExtInfo().withIsThin(false);
+  return adjustFunctionType(t, extInfo);
+}
+
+/// Given a SIL function type, return a type that is identical except
+/// for using the given ExtInfo.
+CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
+                                      SILFunctionType::ExtInfo extInfo,
+                                      ParameterConvention calleeConv);
+inline CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
+                                      SILFunctionType::ExtInfo extInfo) {
+  return adjustFunctionType(type, extInfo, type->getCalleeConvention());
+}
+inline CanSILFunctionType getThinFunctionType(CanSILFunctionType t) {
+  if (t->isThin()) return t;
+  return adjustFunctionType(t, t->getExtInfo().withIsThin(true),
+                            ParameterConvention::Direct_Unowned);
+}
+inline CanSILFunctionType getThickFunctionType(CanSILFunctionType t) {
+  if (!t->isThin()) return t;
+  return adjustFunctionType(t, t->getExtInfo().withIsThin(false),
+                            DefaultThickCalleeConvention);
+}
 
 /// CaptureKind - Different ways in which a function can capture context.
 enum class CaptureKind {
@@ -262,6 +302,76 @@ public:
 protected:
   void operator delete(void*) {}
 };
+
+/// A pattern for the abstraction of a value.  See the large comment
+/// in SILGenPoly.cpp.
+///
+/// An abstraction pattern is represented with an original,
+/// unsubstituted type.  The archetypes naturally fall at exactly
+/// the specified abstraction points.
+class AbstractionPattern {
+  CanType OrigType;
+public:
+  explicit AbstractionPattern(CanType origType) : OrigType(origType) {}
+  CanType getAsType() const { return OrigType; }
+
+  bool isOpaque() const {
+    return isa<ArchetypeType>(OrigType) &&
+           !cast<ArchetypeType>(OrigType)->requiresClass();
+  }
+
+  bool matchesTuple(CanTupleType substType) {
+    if (auto tuple = dyn_cast<TupleType>(OrigType))
+      return tuple->getNumElements() == substType->getNumElements();
+    return isOpaque();
+  }
+  AbstractionPattern getTupleElementType(unsigned index) const {
+    if (auto tuple = dyn_cast<TupleType>(OrigType))
+      return AbstractionPattern(tuple.getElementType(index));
+    assert(isOpaque());
+    return AbstractionPattern(OrigType);
+  }
+
+  AbstractionPattern getFunctionResultType() const {
+    if (auto fn = dyn_cast<AnyFunctionType>(OrigType))
+      return AbstractionPattern(fn.getResult());
+    assert(isOpaque());
+    return AbstractionPattern(OrigType);
+  }
+  AbstractionPattern getFunctionInputType() const {
+    if (auto fn = dyn_cast<AnyFunctionType>(OrigType))
+      return AbstractionPattern(fn.getInput());
+    assert(isOpaque());
+    return AbstractionPattern(OrigType);
+  }
+};
+
+/// Type and lowering information about a constant function.
+struct SILConstantInfo {
+  /// The formal type of the constant, still curried.  For a normal
+  /// function, this is just its declared type; for a getter or
+  /// setter, computing this can be more involved.
+  CanAnyFunctionType FormalType;
+
+  /// The uncurried and bridged type of the constant.
+  CanAnyFunctionType LoweredType;
+
+  /// The SIL function type of the constant.
+  CanSILFunctionType SILFnType;
+
+  SILType getSILType() const {
+    return SILType::getPrimitiveObjectType(SILFnType);
+  }
+
+  friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
+    return lhs.FormalType == rhs.FormalType &&
+           lhs.LoweredType == rhs.LoweredType &&
+           lhs.SILFnType == rhs.SILFnType;
+  }
+  friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
+    return !(lhs == rhs);
+  }
+};
   
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
@@ -275,16 +385,37 @@ class TypeConverter {
     /// responsibility to call the destructor for these entries.
     UniqueLoweringEntry = ~0U
   };
+
+  struct TypeKey {
+    /// An unsubstituted version of a type, dictating its abstraction patterns.
+    CanType OrigType;
+
+    /// The substituted version of the type, dictating the types that
+    /// should be used in the lowered type.
+    CanType SubstType;
+
+    /// The uncurrying level of the type.
+    unsigned UncurryLevel;
+
+    friend bool operator==(const TypeKey &lhs, const TypeKey &rhs) {
+      return lhs.OrigType == rhs.OrigType
+          && lhs.SubstType == rhs.SubstType
+          && lhs.UncurryLevel == rhs.UncurryLevel;
+    }
+    friend bool operator!=(const TypeKey &lhs, const TypeKey &rhs) {
+      return !(lhs == rhs);
+    }
+  };
+  friend struct llvm::DenseMapInfo<TypeKey>;
   
-  using TypeKey = std::pair<TypeBase *, unsigned>;
-  TypeKey getTypeKey(CanType t, unsigned uncurryLevel) {
-    return {t.getPointer(), uncurryLevel};
+  TypeKey getTypeKey(CanType origTy, CanType substTy, unsigned uncurryLevel) {
+    return { origTy, substTy, uncurryLevel };
   }
   
   llvm::DenseMap<TypeKey, const TypeLowering *> Types;
-  llvm::DenseMap<SILDeclRef, SILType> constantTypes;
+  llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
-  Type makeConstantType(SILDeclRef constant);
+  CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
   
   // Types converted during foreign bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
@@ -292,9 +423,11 @@ class TypeConverter {
   Optional<CanType> NativeType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
-  const TypeLowering &getTypeLoweringForLoweredType(CanType type);
-  const TypeLowering &getTypeLoweringForUncachedLoweredType(CanType type);
-  
+  const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
+  const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
+  const TypeLowering &getTypeLoweringForLoweredFunctionType(TypeKey key);
+  const TypeLowering &getTypeLoweringForUncachedLoweredFunctionType(TypeKey key);
+
 public:
   SILModule &M;
   ASTContext &Context;
@@ -321,8 +454,15 @@ public:
 
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLowering &getTypeLowering(Type t,unsigned uncurryLevel = 0);
-  
+  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
+    return getTypeLowering(t, t, uncurryLevel);
+  }
+
+  /// Lowers a Swift type to a SILType according to the abstraction
+  /// patterns of the given original type.
+  const TypeLowering &getTypeLowering(Type origType, Type substType,
+                                      unsigned uncurryLevel = 0);
+
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
@@ -333,14 +473,68 @@ public:
     return getTypeLowering(t, uncurryLevel).getLoweredType();
   }
 
+  // Returns the lowered SIL type for a Swift type.
+  SILType getLoweredType(Type origType, Type substType,
+                         unsigned uncurryLevel = 0) {
+    return getTypeLowering(origType, substType, uncurryLevel).getLoweredType();
+  }
+
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
     const TypeLowering &ti = getTypeLowering(t, uncurryLevel);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
+
+  /// Return the SILFunctionType for a native function value of the
+  /// given type.
+  CanSILFunctionType getSILFunctionType(CanType origType,
+                                        CanAnyFunctionType substType,
+                                        unsigned uncurryLevel);
+
+  /// Returns the formal type, lowered AST type, and SILFunctionType
+  /// for a constant reference.
+  SILConstantInfo getConstantInfo(SILDeclRef constant);
+
+  /// Returns the type of a local function without any additional captures.
+  CanAnyFunctionType getConstantFormalTypeWithoutCaptures(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
-  SILType getConstantType(SILDeclRef constant);
+  SILType getConstantType(SILDeclRef constant) {
+    return getConstantInfo(constant).getSILType();
+  }
+
+  /// Returns the formal AST type of a constant reference.
+  /// Parameters remain uncurried and unbridged.
+  CanAnyFunctionType getConstantFormalType(SILDeclRef constant) {
+    return getConstantInfo(constant).FormalType;
+  }
+
+  /// Returns the lowered AST type of a constant reference.
+  /// Parameters have been uncurried and bridged.
+  CanAnyFunctionType getConstantLoweredType(SILDeclRef constant) {
+    return getConstantInfo(constant).LoweredType;
+  }
+
+  /// Returns the SILFunctionType for the given declaration.
+  CanSILFunctionType getConstantFunctionType(SILDeclRef constant) {
+    return getConstantInfo(constant).SILFnType;
+  }
+
+  /// Returns the SILFunctionType for the given declaration, applying
+  /// substitutions to match the given type.
+  ///
+  ///
+  /// \param substFormalType - a valid substitution of the
+  ///   still-curried type of the function.
+  CanSILFunctionType getConstantFunctionType(SILDeclRef constant,
+                                             CanAnyFunctionType substFormalType,
+                                             bool thin);
+
+  /// Substitute the given function type so that it implements the
+  /// given substituted type.
+  CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
+                                       CanAnyFunctionType origLoweredType,
+                                       CanAnyFunctionType substLoweredType);
   
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
@@ -348,20 +542,27 @@ public:
   }
   
   /// Get a function type curried with its capture context.
-  Type getFunctionTypeWithCaptures(AnyFunctionType *funcType,
-                                   ArrayRef<ValueDecl*> captures,
-                                   DeclContext *parentContext);
+  CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
+                                                 ArrayRef<ValueDecl*> captures,
+                                                 DeclContext *parentContext);
   
   /// Returns the type of the "self" parameter to methods of a type.
-  Type getMethodSelfType(Type selfType) const;
-  
-  /// Convert a nested function type into an uncurried representation.
-  CanAnyFunctionType getUncurriedFunctionType(CanAnyFunctionType t,
-                                              unsigned uncurryLevel);
+  CanType getMethodSelfType(CanType selfType) const;
   
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(Type t, AbstractCC cc);
+
+  /// Convert a nested function type into an uncurried AST representation.
+  CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
+                                               unsigned uncurryLevel) {
+    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo());
+  }
+
+  /// Convert a nested function type into an uncurried AST representation.
+  CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
+                                               unsigned uncurryLevel,
+                                               AnyFunctionType::ExtInfo info);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -388,5 +589,27 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
   
 } // namespace Lowering
 } // namespace swift
+
+namespace llvm {
+  template<> struct DenseMapInfo<swift::Lowering::TypeConverter::TypeKey> {
+    typedef swift::Lowering::TypeConverter::TypeKey TypeKey;
+    static TypeKey getEmptyKey() {
+      return TypeKey{ DenseMapInfo<swift::CanType>::getEmptyKey(),
+                      swift::CanType(), 0 };
+    }
+    static TypeKey getTombstoneKey() {
+      return TypeKey{ DenseMapInfo<swift::CanType>::getTombstoneKey(),
+                      swift::CanType(), 0 };
+    }
+    static unsigned getHashValue(TypeKey val) {
+      return DenseMapInfo<swift::CanType>::getHashValue(val.OrigType)
+           ^ DenseMapInfo<swift::CanType>::getHashValue(val.SubstType)
+           ^ val.UncurryLevel;
+    }
+    static bool isEqual(TypeKey LHS, TypeKey RHS) {
+      return LHS == RHS;
+    }
+  };
+}
 
 #endif

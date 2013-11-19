@@ -19,24 +19,22 @@ using namespace swift;
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                               SILModule &M) {
-  SILFunctionType *FTI = origTy.getFunctionTypeInfo(M);
-  auto params = FTI->getNonReturnParameters();
+  CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
+  auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  SmallVector<TupleTypeElt, 4> newArgTypes;
-  newArgTypes.reserve(newParams.size());
-  for (auto param : newParams) {
-    Type type = param.getType();
-    if (param.isIndirectInOut())
-      type = param.getSILType().getSwiftType();
-    newArgTypes.push_back(type);
-  }
+  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ false,
+                                          /*noreturn*/ FTI->isNoReturn(),
+                                          /*autoclosure*/ false,
+                                          /*block*/ false);
 
-  Type argTy = TupleType::get(newArgTypes, M.getASTContext());
-  Type resTy = FunctionType::get(argTy,
-                                 origTy.getAs<AnyFunctionType>().getResult(),
-                                 M.getASTContext());
-  return M.Types.getLoweredType(resTy);
+  auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
+                                            ParameterConvention::Direct_Owned,
+                                            newParams,
+                                            FTI->getResult(),
+                                            M.getASTContext());
+  return SILType::getPrimitiveObjectType(appliedFnType);
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
@@ -110,21 +108,6 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   InsertPt = BB->end();
   return NewBB;
 }
-
-SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
-  // Thicken thin functions.
-  if (v.getType().is<AnyFunctionType>() &&
-      v.getType().castTo<AnyFunctionType>()->isThin()) {
-    Type thickTy = Lowering::getThickFunctionType(v.getType().getSwiftType(),
-                                                  AbstractCC::Freestanding);
-
-    v = createThinToThickFunction(loc, v,
-                           F.getModule().Types.getLoweredLoadableType(thickTy));
-  }
-
-  return v;
-}
-
 
 /// emitDestroyAddr - Try to fold a destroy_addr operation into the previous
 /// instructions, or generate an explicit one if that fails.

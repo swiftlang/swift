@@ -1665,7 +1665,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
 
-  IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -1872,7 +1872,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(fnName, fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
@@ -2012,7 +2012,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
     auto it = def->arg_begin();
@@ -2043,7 +2043,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
@@ -2073,7 +2073,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
     auto it = def->arg_begin();
@@ -2099,7 +2099,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
@@ -2138,7 +2138,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    IRGenFunction IGF(IGM, def);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
@@ -2324,27 +2324,26 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   return asOpaquePtr(IGM, fn);
 }
 
-/// Look through any single-element labelled or curried tuple types.
-/// FIXME: We could get fulfillments from any tuple element.
-static CanType stripLabel(CanType input) {
-  if (auto tuple = dyn_cast<TupleType>(input))
-    if (tuple->getNumElements() > 0)
-      return stripLabel(tuple.getElementTypes().back());
-  return input;
-}
+static void emitPolymorphicArgumentsWithInput(IRGenFunction &IGF,
+                                              CanSILFunctionType origFnType,
+                                              CanType substInputType,
+                                              ArrayRef<Substitution> subs,
+                                              Explosion &out);
 
 namespace {
   /// A class which builds a single witness.
   class WitnessBuilder {
     IRGenModule &IGM;
     llvm::Constant *ImplPtr;
-    CanType ImplTy;
-    CanType SignatureTy;
+    CanAnyFunctionType ImplTy;
+    CanAnyFunctionType SignatureTy;
+    CanType ConcreteType;
+    GenericParamList *ConcreteGenerics;
 
     ExplosionKind ExplosionLevel;
     unsigned UncurryLevel;
 
-    ArrayRef<Substitution> Substitutions;
+    ArrayRef<Substitution> WitnessSubstitutions;
 
     /// The first argument involves a lvalue-to-rvalue conversion.
     bool HasAbstractedSelf;
@@ -2357,26 +2356,30 @@ namespace {
 
   public:
     WitnessBuilder(IRGenModule &IGM, llvm::Constant *impl,
-                   CanType implTy, CanType sigTy,
-                   ArrayRef<Substitution> subs,
+                   CanAnyFunctionType implTy, CanAnyFunctionType sigTy,
+                   ArrayRef<Substitution> witnessSubs,
+                   CanType concreteType, GenericParamList *concreteGenerics,
                    ExplosionKind explosionLevel, unsigned uncurryLevel)
       : IGM(IGM), ImplPtr(impl),
+        ConcreteType(concreteType), ConcreteGenerics(concreteGenerics),
         ExplosionLevel(explosionLevel), UncurryLevel(uncurryLevel),
-        Substitutions(subs) {
+        WitnessSubstitutions(witnessSubs) {
 
-      implTy = implTy->getUnlabeledType(IGM.Context)->getCanonicalType();
+      implTy = cast<AnyFunctionType>(implTy->getUnlabeledType(IGM.Context)
+                                       ->getCanonicalType());
       ImplTy = implTy;
 
-      sigTy = sigTy->getUnlabeledType(IGM.Context)->getCanonicalType();
+      sigTy = cast<AnyFunctionType>(sigTy->getUnlabeledType(IGM.Context)
+                                       ->getCanonicalType());
       SignatureTy = sigTy;
 
-      AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
-      AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
+      CanAnyFunctionType sigFnTy = sigTy;
+      CanAnyFunctionType implFnTy = implTy;
 
       // We can derive the type metadata from class archetypes; for
       // fully opaque archetypes, we need to pass in the metatype for the
       // archetype as an extra argument.
-      if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
+      if (auto *archetype = sigFnTy.getInput()->getAs<ArchetypeType>()) {
         assert(archetype->requiresClass() &&
                "non-lvalue this argument for non-class This?!");
         (void)archetype;
@@ -2387,8 +2390,8 @@ namespace {
       
       // The first argument isn't necessarily a simple substitution,
       // but if it is, we don't need to compute difference by abstraction.
-      if (isa<LValueType>(CanType(sigFnTy->getInput())) &&
-          !isa<LValueType>(CanType(implFnTy->getInput()))) {
+      if (isa<LValueType>(sigFnTy.getInput()) &&
+          !isa<LValueType>(implFnTy.getInput())) {
         HasAbstractedSelf = true;
         HasAbstraction = true;
         return;
@@ -2425,17 +2428,20 @@ namespace {
       
       // Create the function.
       llvm::AttributeSet attrs;
-      auto fnTy = IGM.getFunctionType(AbstractCC::Freestanding,
-                                      SignatureTy, ExplosionKind::Minimal,
-                                      UncurryLevel, extraData,
-                                      attrs);
+      auto adjSigTy = Lowering::adjustFunctionType(SignatureTy,
+                                         SignatureTy->getExtInfo()
+                               .withCallingConv(AbstractCC::Freestanding));
+      auto sigTy = IGM.SILMod->Types.getSILFunctionType(adjSigTy, adjSigTy,
+                                                        UncurryLevel);
+      auto fnTy = IGM.getFunctionType(sigTy, ExplosionKind::Minimal,
+                                      extraData, attrs);
       fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
                                   name.str(), &IGM.Module);
       fn->setAttributes(attrs);
       //fn->setVisibility(llvm::Function::HiddenVisibility);
 
       // Start building it.
-      IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+      IRGenFunction IGF(IGM, fn);
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -2445,79 +2451,24 @@ namespace {
     }
 
   private:
-    struct ArgSite {
-      AnyFunctionType *SigFnType;
-      AnyFunctionType *ImplFnType;
-
-      ArgSite(AnyFunctionType *sigFnType, AnyFunctionType *implFnType)
-        : SigFnType(sigFnType), ImplFnType(implFnType) {}
-
-      CanType getSigInputType() const {
-        return CanType(SigFnType->getInput());
-      }
-
-      CanType getSigResultType() const {
-        return CanType(SigFnType->getResult());
-      }
-
-      CanType getImplInputType() const {
-        return CanType(ImplFnType->getInput());
-      }
-
-      CanType getImplResultType() const {
-        return CanType(ImplFnType->getResult());
-      }
-    };
-
-    /// Bind the metatype for 'Self' in this witness.
-    void bindSelfArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
-      // Set a name for the metadata value.
-      metadata->setName("Self");
-
-      // Find the Self archetype.
-      auto selfTy = SignatureTy;
-      selfTy = stripLabel(CanType(cast<AnyFunctionType>(selfTy)->getInput()));
-      if (auto lvalueTy = dyn_cast<LValueType>(selfTy)) {
-        selfTy = CanType(lvalueTy->getObjectType());
-      } else if (auto metaTy = dyn_cast<MetaTypeType>(selfTy)) {
-        selfTy = CanType(metaTy->getInstanceType());
-      } else {
-        assert(selfTy->hasReferenceSemantics() &&
-               "non-class archetype Self passed by value?");
-      }
-      auto archetype = cast<ArchetypeType>(selfTy);
-
-      // Set the metadata pointer.
-      setMetadataRef(IGF, archetype, metadata);
-    }
-
     void emitThunk(IRGenFunction &IGF) {
       // FIXME: Ask SIL's TypeConverter to uncurry the signature and impl types
       // so we emit calling conventions consistent with lowered SILFunctions.
       // Witness thunks ultimately should just be built in SILGen.
       auto &tc = IGF.IGM.SILMod->Types;
       auto sigUncurriedTy
-        = tc.getUncurriedFunctionType(cast<AnyFunctionType>(SignatureTy),
-                                      UncurryLevel);
+        = tc.getLoweredASTFunctionType(SignatureTy, UncurryLevel);
+      auto sigFnType = tc.getSILFunctionType(sigUncurriedTy, sigUncurriedTy, 0);
+
       auto implUncurriedTy
-        = tc.getUncurriedFunctionType(cast<AnyFunctionType>(ImplTy),
-                                      UncurryLevel);
+        = tc.getLoweredASTFunctionType(ImplTy, UncurryLevel);
+      auto implFnType = tc.getSILFunctionType(implUncurriedTy, implUncurriedTy, 0);
       
-      // Collect the types for the arg sites.
-      ArgSite argSite(sigUncurriedTy, implUncurriedTy);
-
       // Collect the parameters.
-      Explosion sigParams = IGF.collectParameters();
-
-      // For opaque archetypes, the data parameter is a metatype; bind it as
-      // the Self archetype.
-      if (NeedsExtraMetatype) {
-        llvm::Value *metatype = sigParams.takeLast();
-        bindSelfArchetype(IGF, metatype);
-      }
+      Explosion sigParams = IGF.collectParameters(ExplosionLevel);
 
       // Peel off the result address if necessary.
-      auto &sigResultTI = IGF.getTypeInfoForUnlowered(argSite.getSigResultType());
+      auto &sigResultTI = IGF.getTypeInfoForUnlowered(sigUncurriedTy.getResult());
       llvm::Value *sigResultAddr = nullptr;
       if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult(IGF.IGM)) {
         sigResultAddr = sigParams.claimNext();
@@ -2526,14 +2477,62 @@ namespace {
       // Collect the parameter clause and bind polymorphic parameters.
       Explosion sigClause(ExplosionLevel);
 
-      auto implInputType = argSite.getImplInputType();
-      auto sigInputType = argSite.getSigInputType();
-      unsigned numParams = IGM.getExplosionSize(sigInputType, ExplosionLevel);
+      auto implInputType = implUncurriedTy.getInput();
+      auto sigInputType = sigUncurriedTy.getInput();
+      unsigned numParams = getExplosionSizeForUnlowered(sigInputType);
       sigParams.transferInto(sigClause, numParams);
 
-      // Bind polymorphic parameters.
-      if (auto sigPoly = dyn_cast<PolymorphicFunctionType>(argSite.SigFnType))
-        emitPolymorphicParameters(IGF, sigPoly, sigParams);
+      // Remember the 'self' value, in case we need it later in order
+      // to bind ConcreteGenerics.
+      llvm::Value *self = nullptr;
+      if (!NeedsExtraMetatype) self = sigParams.getLastClaimed();
+
+      // Bind polymorphic parameters from the signature type.  Note
+      // that archetypes derived from Self are implicitly dropped from
+      // getAllArchetypes (!!!), so this will just handle any extra
+      // generics in the actual protocol member's type.
+      emitPolymorphicParameters(IGF, sigFnType, sigParams);
+
+      // Bind polymorphic parameters from the concrete type.
+      if (ConcreteGenerics) {
+        // Fake up a function that takes either the concrete type or
+        // its metatype as the last argument.  The polymorphic conventions
+        // will be able to extract all the type arguments here.
+        //
+        // This assumes for correctness that any archetypes appearing
+        // in ConcreteType are archetypes bound in that context.
+        assert(NeedsExtraMetatype ||
+               ConcreteType->getClassOrBoundGenericClass());
+        SILParameterInfo param;
+        if (NeedsExtraMetatype) {
+          // Provoke the GenericLValueMetadata polymorphic convention.
+          param = SILParameterInfo(ConcreteType,
+                                   ParameterConvention::Indirect_Inout);
+        } else {
+          // Provoke the ClassPointer polymorphic convention.
+          param = SILParameterInfo(ConcreteType,
+                                   ParameterConvention::Direct_Unowned);
+        }
+        auto fakeFnType = SILFunctionType::get(ConcreteGenerics,
+                                               sigFnType->getExtInfo(),
+                                               sigFnType->getCalleeConvention(),
+                                               param,
+                                               sigFnType->getResult(),
+                                               IGM.Context);
+        if (NeedsExtraMetatype) {
+          emitPolymorphicParameters(IGF, fakeFnType, sigParams);
+        } else {
+          Explosion temp(ExplosionLevel);
+          temp.add(self);
+          emitPolymorphicParameters(IGF, fakeFnType, temp);
+        }
+
+      // If we didn't do the above, we may need to claim a useless
+      // metatype parameter.
+      } else if (NeedsExtraMetatype) {
+        auto metatype = sigParams.claimNext();
+        metatype->setName("Self");
+      }
 
       assert(sigParams.empty() && "didn't drain all the parameters");
 
@@ -2544,9 +2543,8 @@ namespace {
       // function and do all our own translation.
       // FIXME: virtual calls!
       CallEmission emission(IGF,
-          Callee::forFreestandingFunction(AbstractCC::Freestanding,
-                                          implUncurriedTy,
-                                          argSite.getImplResultType(),
+          Callee::forFreestandingFunction(implFnType,
+                                          implFnType,
                                           ArrayRef<Substitution>(),
                                           ImplPtr,
                                           ExplosionLevel,
@@ -2555,73 +2553,74 @@ namespace {
       // Now actually pass the arguments.
       Explosion implArgs(ExplosionLevel);
 
-      // The input type we're going to pass to the implementation,
-      // expressed in terms of signature archetypes.
-      CanType sigInputTypeForImpl = sigInputType;
-      
-      // We need some special treatment for 'self'.
+      CanType sigInputTypeForRemapping = sigInputType;
+      CanType implInputTypeForRemapping = implInputType;
+
+      // If we have an abstracted 'self', we have to deal with that
+      // differently; just drop that from the types we're consuming
+      // for simple re-emission.
       if (HasAbstractedSelf) {
-        auto sigTupleType = cast<TupleType>(sigInputType);
-        
-        CanType implSelfType
-          = CanType(cast<TupleType>(implInputType)->getFields().back().getType());
-        CanType sigSelfType
-          = CanType(sigTupleType->getFields().back().getType());
-        
+        auto dropLastElement = [&](CanType type) {
+          auto elts = cast<TupleType>(type)->getFields();
+          return TupleType::get(elts.slice(0, elts.size() - 1),
+                                IGF.IGM.Context)->getCanonicalType();
+        };
+        sigInputTypeForRemapping = dropLastElement(sigInputTypeForRemapping);
+        implInputTypeForRemapping = dropLastElement(implInputTypeForRemapping);
+      }
+
+      // The rest of the implementation type is the result of some
+      // substitution on the sig type.  At least, that's what we're hoping.
+      // The type-checker really ought to produce a function for this.
+      reemitAsSubstituted(IGF, sigInputTypeForRemapping,
+                          implInputTypeForRemapping,
+                          WitnessSubstitutions, sigClause, implArgs);
+
+      // Okay, handle 'self'.
+      if (HasAbstractedSelf) {
+        auto getLastElement = [](CanType type) {
+          return cast<TupleType>(type).getElementTypes().back();
+        };
+        CanType implSelfType = getLastElement(implInputType);
         assert(implSelfType->getClassOrBoundGenericClass());
+
+        CanType sigSelfType = getLastElement(sigInputType);
         assert(isa<LValueType>(sigSelfType));
 
-        CanType sigSelfTypeForImpl =
-          CanType(cast<LValueType>(sigSelfType)->getObjectType());
-        assert(isa<ArchetypeType>(sigSelfTypeForImpl));
-        (void)sigSelfTypeForImpl;
-
-        auto &remappedSelfTI = IGF.getTypeInfoForUnlowered(implSelfType);
+        auto &remappedSelfTI =
+          cast<LoadableTypeInfo>(IGF.getTypeInfoForUnlowered(implSelfType));
 
         // It's an l-value, so the final value is the address.  Cast to T*.
-        auto sigSelfValue = sigClause.takeLast();
+        auto sigSelfValue = sigClause.claimNext();
         auto implPtrTy = remappedSelfTI.getStorageType()->getPointerTo();
         sigSelfValue = IGF.Builder.CreateBitCast(sigSelfValue, implPtrTy);
         auto sigSelf = remappedSelfTI.getAddressForPointer(sigSelfValue);
 
-        Explosion sigClauseForImpl(ExplosionLevel);
-        sigClause.transferInto(sigClauseForImpl, sigClause.size());
-        
-        // Load.  In theory this might require
-        // remapping, but in practice the constraints (which we
-        // assert just above) don't permit that.
-        cast<LoadableTypeInfo>(remappedSelfTI).loadAsCopy(IGF, sigSelf,
-                                                          sigClauseForImpl);
-        sigClause = std::move(sigClauseForImpl);
-        
-        // Respecify the signature type with the remapped 'Self' type.
-        SmallVector<TupleTypeElt, 4> sigInputFieldsForImpl;
-        std::copy(sigTupleType->getFields().begin(),
-                  sigTupleType->getFields().end() - 1,
-                  std::back_inserter(sigInputFieldsForImpl));
-        sigInputFieldsForImpl.push_back(TupleTypeElt(implSelfType));
-        sigInputTypeForImpl = TupleType::get(sigInputFieldsForImpl,
-                                             sigInputType->getASTContext())
-          ->getCanonicalType();
+        // Load.  In theory this might require remapping, but in practice
+        // the constraints (asserted above) don't permit that.
+        remappedSelfTI.loadAsCopy(IGF, sigSelf, implArgs);
       }
-      
-      // The impl type is the result of some substitution
-      // on the sig type.
-      reemitAsSubstituted(IGF, sigInputTypeForImpl, implInputType, Substitutions,
-                          sigClause, implArgs);
-      
+
       // Pass polymorphic arguments.
-      if (auto implPoly =
-            dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
-        emitPolymorphicArguments(IGF, implPoly, sigInputTypeForImpl,
-                                 Substitutions, implArgs);
+      if (implFnType->isPolymorphic()) {
+        auto &module = *IGF.IGM.SILMod;
+        auto substImplType =
+          implFnType->substGenericArgs(module, module.getSwiftModule(),
+                                       WitnessSubstitutions);
+
+        auto params = substImplType->getParametersWithoutIndirectResult();
+        CanType substSelfType =
+          (params.empty() ? CanType() : params.back().getType());
+
+        emitPolymorphicArgumentsWithInput(IGF, implFnType, substSelfType,
+                                          WitnessSubstitutions, implArgs);
       }
       
       emission.addArg(implArgs);
 
       // Emit the call.
-      CanType sigResultType = argSite.getSigResultType();
-      CanType implResultType = argSite.getImplResultType();
+      CanType sigResultType = sigUncurriedTy.getResult();
+      CanType implResultType = implUncurriedTy.getResult();
       auto &implResultTI = IGM.getTypeInfoForUnlowered(implResultType);
 
       // If we have a result address, emit to memory.
@@ -2658,8 +2657,22 @@ namespace {
       // Otherwise, re-emit.
       Explosion sigResult(ExplosionLevel);
       reemitAsUnsubstituted(IGF, sigResultType, implResultType,
-                            Substitutions, implResult, sigResult);
+                            WitnessSubstitutions, implResult, sigResult);
       IGF.emitScalarReturn(sigResult);
+    }
+
+    unsigned getExplosionSizeForUnlowered(CanType type) {
+      if (auto tuple = dyn_cast<TupleType>(type)) {
+        unsigned count = 0;
+        for (auto eltType : tuple.getElementTypes())
+          count += getExplosionSizeForUnlowered(eltType);
+        return count;
+      }
+      if (isa<LValueType>(type)) {
+        return 1;
+      }
+      auto loweredTy = IGM.SILMod->Types.getLoweredType(type);
+      return IGM.getExplosionSize(loweredTy, ExplosionLevel);
     }
 
     /// Mangle the name of the thunk this requires.
@@ -2711,6 +2724,7 @@ namespace {
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
     SmallVectorImpl<llvm::Constant*> &Table;
     CanType ConcreteType;
+    GenericParamList *ConcreteGenerics = nullptr;
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
     ArrayRef<Substitution> Substitutions;
@@ -2728,6 +2742,7 @@ namespace {
       }
       if (ty) {
         if (auto boundTy = ty->getAs<BoundGenericType>()) {
+          ConcreteGenerics = boundTy->getDecl()->getGenericParams();
           Substitutions = boundTy->getSubstitutions(/*FIXME:*/nullptr, nullptr);
         } else {
           assert(!ty || !ty->isSpecialized());
@@ -2768,7 +2783,7 @@ namespace {
 
       FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getStaticMethodWitness(impl,
-                                      iface->getType()->getCanonicalType(),
+                cast<AnyFunctionType>(iface->getType()->getCanonicalType()),
                                       witness.getSubstitutions()));
     }
 
@@ -2778,7 +2793,7 @@ namespace {
 
       FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getInstanceMethodWitness(impl,
-                                      iface->getType()->getCanonicalType(),
+                cast<AnyFunctionType>(iface->getType()->getCanonicalType()),
                                       witness.getSubstitutions()));
     }
     
@@ -2800,19 +2815,19 @@ namespace {
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getInstanceMethodWitness(FuncDecl *impl,
-                                           CanType ifaceType,
+                                             CanAnyFunctionType ifaceType,
                                            ArrayRef<Substitution> witnessSubs) {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
                               ExtraData::None);
-      return getWitness(implPtr, impl->getType()->getCanonicalType(),
-                        ifaceType, 1, witnessSubs);
+      auto implType = cast<AnyFunctionType>(impl->getType()->getCanonicalType());
+      return getWitness(implPtr, implType, ifaceType, 1, witnessSubs);
     }
 
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getStaticMethodWitness(FuncDecl *impl,
-                                           CanType ifaceType,
+                                           CanAnyFunctionType ifaceType,
                                            ArrayRef<Substitution> witnessSubs) {
       if (impl->getDeclContext()->isModuleScopeContext()) {
         llvm::Constant *implPtr =
@@ -2821,28 +2836,24 @@ namespace {
         // FIXME: This is an ugly hack: we're pretending that the function
         // has a different type from its actual type.  This works because the
         // LLVM representation happens to be the same.
-        Type concreteMeta = MetaTypeType::get(ConcreteType, IGM.Context);
-        Type implTy = 
-          FunctionType::get(concreteMeta, impl->getType(), IGM.Context);
-        return getWitness(implPtr, implTy->getCanonicalType(), ifaceType, 1,
-                          witnessSubs);
+        CanType concreteMeta = CanType(MetaTypeType::get(ConcreteType, IGM.Context));
+        auto implTy =  CanFunctionType::get(concreteMeta,
+                                            impl->getType()->getCanonicalType(),
+                                            IGM.Context);
+        return getWitness(implPtr, implTy, ifaceType, 1, witnessSubs);
       }
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
                               ExtraData::None);
-      return getWitness(implPtr, impl->getType()->getCanonicalType(),
-                        ifaceType, 1, witnessSubs);
+      auto implType = cast<AnyFunctionType>(impl->getType()->getCanonicalType());
+      return getWitness(implPtr, implType, ifaceType, 1, witnessSubs);
     }
 
-    llvm::Constant *getWitness(llvm::Constant *fn, CanType fnTy,
-                               CanType ifaceTy, unsigned uncurryLevel,
+    llvm::Constant *getWitness(llvm::Constant *fn, CanAnyFunctionType fnTy,
+                               CanAnyFunctionType ifaceTy, unsigned uncurryLevel,
                                ArrayRef<Substitution> witnessSubs) {
-      // Combine the substitutions for the type and the individual witness.
-      SmallVector<Substitution, 4> combinedSubs;
-      combinedSubs.append(Substitutions.begin(), Substitutions.end());
-      combinedSubs.append(witnessSubs.begin(), witnessSubs.end());
-      
-      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, combinedSubs,
+      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, witnessSubs,
+                            ConcreteType, ConcreteGenerics,
                             ExplosionKind::Minimal, uncurryLevel).get();
     }
   };
@@ -3009,6 +3020,14 @@ ProtocolInfo::~ProtocolInfo() {
   }
 }
 
+/// For the purposes of generating a protocol witness table, get the
+/// type-in-context.
+static CanType getTypeInContext(CanType type) {
+  auto decl = type->getNominalOrBoundGenericNominal();
+  assert(decl && "non-nominal type ascribes to protocol?");
+  return decl->getDeclaredTypeInContext()->getCanonicalType();
+}
+
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
 ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
@@ -3019,14 +3038,26 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
   auto it = Conformances.find(&conformance);
   if (it != Conformances.end()) return *it->second;
 
+  // We key above based only on the protocol conformance, which for a
+  // generic type is common across all specializations.  Thus we need
+  // to map that type to its type-in-context so that we don't build
+  // conformances that only work for the first specialization we
+  // encounter.  This also means that the generic param list for the
+  // type will actually properly close over any archetypes that might
+  // otherwise appear in concreteType.
+  auto realConcreteType = getTypeInContext(concreteType);
+  auto &realConcreteTI =
+    (concreteType == realConcreteType ? concreteTI
+                              : IGM.getTypeInfoForUnlowered(realConcreteType));
+
   // Build the witnesses:
   SmallVector<llvm::Constant*, 32> witnesses;
-  WitnessTableBuilder(IGM, witnesses, concreteType, concreteTI,
+  WitnessTableBuilder(IGM, witnesses, realConcreteType, realConcreteTI,
                       conformance).visit(protocol);
 
   // Build the actual global variable.
   llvm::Constant *table =
-    buildWitnessTable(IGM, concreteType, protocol, witnesses);
+    buildWitnessTable(IGM, realConcreteType, protocol, witnesses);
 
   ConformanceInfo *info = new ConformanceInfo;
   info->Table = table;
@@ -3216,58 +3247,28 @@ namespace {
     };
 
   protected:
-    PolymorphicFunctionType *FnType;
-    SourceKind TheSourceKind;
+    CanSILFunctionType FnType;
+    SourceKind TheSourceKind = SourceKind::None;
     SmallVector<NominalTypeDecl*, 4> TypesForDepths;
 
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
   public:
-    PolymorphicConvention(PolymorphicFunctionType *fnType)
+    PolymorphicConvention(CanSILFunctionType fnType)
         : FnType(fnType) {
-      assert(fnType->isCanonical());
+      assert(fnType->isPolymorphic());
 
       // We don't need to pass anything extra as long as all of the
       // archetypes (and their requirements) are producible from the
       // class-pointer argument.
 
-      // If the argument is a single class pointer, and all the
-      // archetypes exactly match those of the class, we're good.
-      CanType argTy = stripLabel(CanType(fnType->getInput()));
-
-      SourceKind source = SourceKind::None;
-      if (auto classTy = dyn_cast<ClassType>(argTy)) {
-        source = SourceKind::ClassPointer;
-        considerNominalType(classTy, 0);
-      } else if (auto boundTy = dyn_cast<BoundGenericType>(argTy)) {
-        if (isa<ClassDecl>(boundTy->getDecl())) {
-          source = SourceKind::ClassPointer;
-          considerBoundGenericType(boundTy, 0);
-        }
-      } else if (auto lvalueTy = dyn_cast<LValueType>(argTy)) {
-        CanType objTy = CanType(lvalueTy->getObjectType());
-        if (auto nomTy = dyn_cast<NominalType>(objTy)) {
-          source = SourceKind::GenericLValueMetadata;
-          considerNominalType(nomTy, 0);
-        } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
-          source = SourceKind::GenericLValueMetadata;
-          considerBoundGenericType(boundTy, 0);
-        }
-      } else if (auto metatypeTy = dyn_cast<MetaTypeType>(argTy)) {
-        CanType objTy = CanType(metatypeTy->getInstanceType());
-        if (auto nomTy = dyn_cast<ClassType>(objTy)) {
-          source = SourceKind::Metadata;
-          considerNominalType(nomTy, 0);
-        } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
-          if (isa<ClassDecl>(boundTy->getDecl())) {
-            source = SourceKind::Metadata;
-            considerBoundGenericType(boundTy, 0);
-          }
-        }
-      }
+      // Just consider the 'self' parameter for now.
+      auto params = fnType->getParameters();
+      if (params.empty()) return;
+      SourceKind source = considerParameter(params.back());
 
       // If we didn't fulfill anything, there's no source.
-      if (Fulfillments.empty()) source = SourceKind::None;
+      if (Fulfillments.empty()) return;
 
       TheSourceKind = source;
     }
@@ -3275,20 +3276,76 @@ namespace {
     /// Extract archetype metadata for a value witness function of the given
     /// type.
     PolymorphicConvention(NominalTypeDecl *ntd)
-      : FnType(PolymorphicFunctionType::get(
-                                  ntd->getDeclaredTypeInContext(),
-                                  TupleType::getEmpty(ntd->getASTContext()),
-                                  ntd->getGenericParamsOfContext(),
-                                  ntd->getASTContext()))
+      : FnType(getNotionalFunctionType(ntd))
     {
       TheSourceKind = SourceKind::Metadata;
-      considerBoundGenericType(
-                             FnType->getInput()->castTo<BoundGenericType>(), 0);
+
+      auto paramType = FnType->getParameters()[0].getType();
+      considerBoundGenericType(cast<BoundGenericType>(paramType), 0);
     }
     
     SourceKind getSourceKind() const { return TheSourceKind; }
 
   private:
+    static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
+      ASTContext &ctx = D->getASTContext();
+      SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
+                                       /*thin*/ true,
+                                       /*noreturn*/ false);
+      SILParameterInfo param(D->getDeclaredTypeInContext()->getCanonicalType(),
+                             ParameterConvention::Direct_Owned);
+      SILResultInfo result(TupleType::getEmpty(ctx),
+                           ResultConvention::Unowned);
+      return SILFunctionType::get(D->getGenericParamsOfContext(), extInfo,
+                                  ParameterConvention::Direct_Unowned,
+                                  param, result, ctx);
+    }
+
+    SourceKind considerParameter(SILParameterInfo param) {
+      auto type = param.getType();
+      switch (param.getConvention()) {
+      // Out-parameters don't give us a value we can use.
+      case ParameterConvention::Indirect_Out:
+        return SourceKind::None;
+
+      // In-parameters do, but right now we don't bother, for no good reason.
+      case ParameterConvention::Indirect_In:
+        return SourceKind::None;
+
+      case ParameterConvention::Indirect_Inout:
+        if (auto nomTy = dyn_cast<NominalType>(type)) {
+          considerNominalType(nomTy, 0);
+          return SourceKind::GenericLValueMetadata;
+        } else if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+          considerBoundGenericType(boundTy, 0);
+          return SourceKind::GenericLValueMetadata;
+        }
+        return SourceKind::None;
+
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Guaranteed:
+        if (auto classTy = dyn_cast<ClassType>(type)) {
+          considerNominalType(classTy, 0);
+          return SourceKind::ClassPointer;
+        } else if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
+          considerBoundGenericType(boundTy, 0);
+          return SourceKind::ClassPointer;
+        } else if (auto metatypeTy = dyn_cast<MetaTypeType>(type)) {
+          CanType objTy = metatypeTy.getInstanceType();
+          if (auto nomTy = dyn_cast<ClassType>(objTy)) {
+            considerNominalType(nomTy, 0);
+            return SourceKind::Metadata;
+          } else if (auto boundTy = dyn_cast<BoundGenericClassType>(objTy)) {
+            considerBoundGenericType(boundTy, 0);
+            return SourceKind::Metadata;
+          }
+        }
+        return SourceKind::None;
+      }
+      llvm_unreachable("bad parameter convention");
+    }
+    
     void considerParentType(CanType parent, unsigned depth) {
       // We might not have a parent type.
       if (!parent) return;
@@ -3385,7 +3442,7 @@ namespace {
 
   public:
     EmitPolymorphicParameters(IRGenFunction &IGF,
-                              PolymorphicFunctionType *fnType)
+                              CanSILFunctionType fnType)
       : PolymorphicConvention(fnType), IGF(IGF) {}
 
     void emit(Explosion &in);
@@ -3401,7 +3458,7 @@ namespace {
     void emitWithSourceBound(Explosion &in);
     
     CanType getArgType() const {
-      return stripLabel(CanType(cast<AnyFunctionType>(FnType)->getInput()));
+      return FnType->getParameters().back().getType();
     }
 
     /// Emit the source value for parameters.
@@ -3423,7 +3480,7 @@ namespace {
         metatype->setName("Self");
 
         // Mark this as the cached metatype for the l-value's object type.
-        CanType argTy = CanType(cast<LValueType>(getArgType())->getObjectType());
+        CanType argTy = getArgType();
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }
@@ -3468,7 +3525,7 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
 
 void
 EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
-  for (auto archetype : FnType->getAllArchetypes()) {
+  for (auto archetype : FnType->getGenericParams()->getAllArchetypes()) {
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
 
@@ -3514,7 +3571,7 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
 
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
-                                      PolymorphicFunctionType *type,
+                                      CanSILFunctionType type,
                                       Explosion &in) {
   EmitPolymorphicParameters(IGF, type).emit(in);
 }
@@ -3701,7 +3758,7 @@ namespace {
     IRGenFunction &IGF;
   public:
     EmitPolymorphicArguments(IRGenFunction &IGF,
-                             PolymorphicFunctionType *polyFn)
+                             CanSILFunctionType polyFn)
       : PolymorphicConvention(polyFn), IGF(IGF) {}
 
     void emit(CanType substInputType, ArrayRef<Substitution> subs,
@@ -3714,9 +3771,7 @@ namespace {
       case SourceKind::ClassPointer: return;
       case SourceKind::Metadata: return;
       case SourceKind::GenericLValueMetadata: {
-        CanType argTy = stripLabel(substInputType);
-        CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
-        out.add(IGF.emitTypeMetadataRef(objTy));
+        out.add(IGF.emitTypeMetadataRef(substInputType));
         return;
       }
       }
@@ -3727,11 +3782,25 @@ namespace {
 
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
-                                     PolymorphicFunctionType *polyFn,
-                                     CanType substInputType,
+                                     CanSILFunctionType origFnType,
+                                     CanSILFunctionType substFnType,
                                      ArrayRef<Substitution> subs,
                                      Explosion &out) {
-  EmitPolymorphicArguments(IGF, polyFn).emit(substInputType, subs, out);
+  // Grab the apparent 'self' type.  If there isn't a 'self' type,
+  // we're not going to try to access this anyway.
+  CanType substInputType;
+  if (!substFnType->getParameters().empty()) {
+    substInputType = substFnType->getParameters().back().getType();
+  }
+  emitPolymorphicArgumentsWithInput(IGF, origFnType, substInputType, subs, out);
+}
+
+static void emitPolymorphicArgumentsWithInput(IRGenFunction &IGF,
+                                              CanSILFunctionType origFnType,
+                                              CanType substInputType,
+                                              ArrayRef<Substitution> subs,
+                                              Explosion &out) {
+  EmitPolymorphicArguments(IGF, origFnType).emit(substInputType, subs, out);
 }
 
 void EmitPolymorphicArguments::emit(CanType substInputType,
@@ -3744,7 +3813,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // because non-primary archetypes (which correspond to associated types)
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
-  for (auto *archetype : FnType->getAllArchetypes()) {
+  for (auto *archetype : FnType->getGenericParams()->getAllArchetypes()) {
     // Find the substitution for the archetype.
     auto const *subp = std::find_if(subs.begin(), subs.end(),
                                     [&](Substitution const &sub) {
@@ -3801,13 +3870,13 @@ namespace {
   class ExpandPolymorphicSignature : public PolymorphicConvention {
     IRGenModule &IGM;
   public:
-    ExpandPolymorphicSignature(IRGenModule &IGM, PolymorphicFunctionType *fn)
+    ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(fn), IGM(IGM) {}
 
     void expand(SmallVectorImpl<llvm::Type*> &out) {
       addSource(out);
 
-      for (auto archetype : FnType->getAllArchetypes()) {
+      for (auto archetype : FnType->getGenericParams()->getAllArchetypes()) {
         // Pass the type argument if not fulfilled.
         if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);
@@ -3836,7 +3905,7 @@ namespace {
 
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,
-                                       PolymorphicFunctionType *polyFn,
+                                       CanSILFunctionType polyFn,
                                        SmallVectorImpl<llvm::Type*> &out) {
   ExpandPolymorphicSignature(IGM, polyFn).expand(out);
 }

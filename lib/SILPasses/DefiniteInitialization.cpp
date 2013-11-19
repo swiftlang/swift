@@ -82,14 +82,14 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 /// SILType.  For tuples, this is the (recursive) count of the fields it
 /// contains.
 static unsigned getTupleElementCount(CanType T) {
-  TupleType *TT = T->getAs<TupleType>();
+  CanTupleType TT = dyn_cast<TupleType>(T);
 
   // If this isn't a tuple, it is a single element.
   if (!TT) return 1;
 
   unsigned NumElements = 0;
-  for (auto &Elt : TT->getFields())
-    NumElements += getTupleElementCount(Elt.getType()->getCanonicalType());
+  for (auto EltTy : TT.getElementTypes())
+    NumElements += getTupleElementCount(EltTy);
   return NumElements;
 }
 
@@ -121,13 +121,13 @@ static CanType getTupleElementType(CanType T, unsigned EltNo) {
 /// specified std::string.
 static void getPathStringToTupleElement(CanType T, unsigned Element,
                                         std::string &Result) {
-  TupleType *TT = T->getAs<TupleType>();
+  CanTupleType TT = dyn_cast<TupleType>(T);
   if (!TT) return;
 
   unsigned FieldNo = 0;
   for (auto &Field : TT->getFields()) {
-    unsigned ElementsForField =
-      getTupleElementCount(Field.getType()->getCanonicalType());
+    CanType FieldTy(Field.getType());
+    unsigned ElementsForField = getTupleElementCount(FieldTy);
     
     if (Element < ElementsForField) {
       Result += '.';
@@ -135,8 +135,7 @@ static void getPathStringToTupleElement(CanType T, unsigned Element,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToTupleElement(Field.getType()->getCanonicalType(),
-                                         Element, Result);
+      return getPathStringToTupleElement(FieldTy, Element, Result);
     }
     
     Element -= ElementsForField;
@@ -365,8 +364,15 @@ namespace {
     // The instruction is a store to a member of a larger struct value.
     PartialStore,
 
-    /// The instruction is an Apply, this is a inout or indirect return.
+    /// An indirecet 'inout' parameter of an Apply instruction.
     InOutUse,
+
+    /// An indirect 'in' parameter of an Apply instruction.
+    IndirectIn,
+
+    /// An out parameter of an Apply instruction.  This is like a
+    /// store except it cannot be removed.
+    IndirectResult,
 
     /// This instruction is a general escape of the value, e.g. a call to a
     /// closure that captures it.
@@ -402,7 +408,8 @@ namespace {
     
     
     void markAvailable(llvm::SmallBitVector &BV) const {
-      assert(NumTupleElements && "Invalid memory use?");
+      if (!NumTupleElements) return;
+
       // Peel the first iteration of the 'set' loop since there is almost always
       // a single tuple element touched by a MemoryUse.
       BV.set(FirstTupleElement);
@@ -696,19 +703,22 @@ bool ElementPromotion::doIt() {
     // We assume that SILGen knows what it is doing when it produces
     // initializations of variables, because it only produces them when it knows
     // they are correct, and this is a super common case for "var x = 4" cases.
-    if (Use.Kind == UseKind::Store &&
-        isStoreObviouslyAnInitialization(Inst))
+    if (Use.Kind == UseKind::IndirectResult ||
+        (Use.Kind == UseKind::Store &&
+         isStoreObviouslyAnInitialization(Inst)))
       continue;
     
     // Check to see if the value is known-initialized here or not.
     DIKind DI = checkDefinitelyInit(Use);
     
     switch (Use.Kind) {
+    case UseKind::IndirectResult:
     case UseKind::Store:
     case UseKind::PartialStore:
       handleStoreUse(Use, DI);
       break;
 
+    case UseKind::IndirectIn:
     case UseKind::Load:
       // If the value is not definitively initialized, emit an error.
       // TODO: In the "No" case, we can emit a fixit adding a default
@@ -997,6 +1007,9 @@ ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
     
     return DI_Yes;
   }
+
+  // Empty tuples are always (trivially) initialized.
+  if (Use.NumTupleElements == 0) return DI_Yes;
   
   // Check all the tuple elements covered by this memory use.
   llvm::SmallBitVector UsesElements(NumTupleElements);
@@ -1796,27 +1809,35 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     // Note that partial_apply instructions always close over their argument.
     //
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
-      SILType FnTy = Apply->getSubstCalleeType();
-      
-      SILFunctionType *FTI = FnTy.getFunctionTypeInfo(Apply->getModule());
+      auto FTI = Apply->getSubstCalleeType();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
       auto Param = FTI->getParameters()[ArgumentNumber];
+      assert(Param.isIndirect());
 
-      // If this is an indirect return slot, it is a store.
-      if (Param.isIndirectResult()) {
-        assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseTupleElt, PointeeType, User, UseKind::Store);
+      switch (Param.getConvention()) {
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Guaranteed:
+        llvm_unreachable("address value passed to indirect parameter");
+
+      // If this is an in-parameter, it is like a load.
+      case ParameterConvention::Indirect_In:
+        addElementUses(BaseTupleElt, PointeeType, User, UseKind::IndirectIn);
         continue;
-      }
 
-      // Otherwise, check for @inout.
-      if (Param.isIndirectInOut()) {
+      // If this is an out-parameter, it is like a store.
+      case ParameterConvention::Indirect_Out:
+        assert(!InStructSubElement && "We're initializing sub-members?");
+        addElementUses(BaseTupleElt, PointeeType, User, UseKind::IndirectResult);
+        continue;
+
+      // If this is an @inout parameter, it is like both a load and store.
+      case ParameterConvention::Indirect_Inout:
         addElementUses(BaseTupleElt, PointeeType, User, UseKind::InOutUse);
         continue;
       }
-
-      // Otherwise, it is an escape.
+      llvm_unreachable("bad parameter convention");
     }
 
     // enum_data_addr is treated like a tuple_element_addr or other instruction
@@ -2005,7 +2026,6 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
       !Loc.is<MandatoryInlinedLocation>())
     return;
 
-
   // Check the uses list to see if there are any non-store uses left over after
   // load promotion and other things DI does.
   for (auto &U : Uses) {
@@ -2018,6 +2038,8 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
       break;    // These don't prevent removal.
 
     case UseKind::Load:
+    case UseKind::IndirectResult:
+    case UseKind::IndirectIn:
     case UseKind::InOutUse:
     case UseKind::Escape:
       DEBUG(llvm::errs() << "*** Failed to remove autogenerated alloc: "
@@ -2155,8 +2177,10 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through and promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
+    Fn.verify();
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     lowerRawSILOperations(Fn);
+    Fn.verify();
   }
 }

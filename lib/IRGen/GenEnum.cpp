@@ -2896,10 +2896,11 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // the generic case.
       auto *substArgTI = argTI;
       if (type->is<BoundGenericType>()) {
+        Type origArgTy = elt->getArgumentType();
         Type substArgTy = type->getTypeOfMember(theEnum->getModuleContext(),
                                                 elt, nullptr,
-                                                elt->getArgumentType());
-        substArgTI = &TC.getCompleteTypeInfo(substArgTy->getCanonicalType());
+                                                origArgTy);
+        substArgTI = &TC.IGM.getTypeInfoForUnlowered(origArgTy, substArgTy);
       }
       
       elementsWithPayload.push_back({elt, substArgTI});

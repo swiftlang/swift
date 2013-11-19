@@ -41,8 +41,8 @@ namespace irgen {
 
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
                                          SILDeclRef method,
-                                         SILType origType,
-                                         SILType substResultType,
+                                         CanSILFunctionType origFnType,
+                                         CanSILFunctionType substFnType,
                                          ArrayRef<Substitution> subs,
                                          ExplosionKind maxExplosion,
                                          bool isSuper);
@@ -57,8 +57,8 @@ namespace irgen {
   /// argument.
   void emitObjCPartialApplication(IRGenFunction &IGF,
                                   SILDeclRef method,
-                                  SILType origType,
-                                  SILType partialAppliedType,
+                                  CanSILFunctionType origType,
+                                  CanSILFunctionType partialAppliedType,
                                   llvm::Value *self,
                                   SILType selfType,
                                   Explosion &out);

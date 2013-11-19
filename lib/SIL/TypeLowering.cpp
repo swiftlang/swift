@@ -68,52 +68,6 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
   }
 #include "swift/SIL/BridgedTypes.def"
 
-Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
-  if (auto *ft = t->getAs<FunctionType>())
-    return FunctionType::get(ft->getInput(), ft->getResult(),
-                             ft->getExtInfo()
-                               .withIsThin(true)
-                               .withCallingConv(cc),
-                             ft->getASTContext());
-  
-  if (auto *pft = t->getAs<PolymorphicFunctionType>())
-    return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
-                                        &pft->getGenericParams(),
-                                        pft->getExtInfo()
-                                          .withIsThin(true)
-                                          .withCallingConv(cc),
-                                        pft->getASTContext());
-
-  return t;
-}
-
-Type Lowering::getThinFunctionType(Type t) {
-  return getThinFunctionType(t, t->castTo<AnyFunctionType>()->getAbstractCC());
-}
-
-Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
-  if (auto *fTy = t->getAs<FunctionType>())
-    return FunctionType::get(fTy->getInput(), fTy->getResult(),
-                             fTy->getExtInfo()
-                               .withIsThin(false)
-                               .withCallingConv(cc),
-                             fTy->getASTContext());
-  
-  if (auto *pfTy = t->getAs<PolymorphicFunctionType>())
-    return PolymorphicFunctionType::get(pfTy->getInput(), pfTy->getResult(),
-                                        &pfTy->getGenericParams(),
-                                        pfTy->getExtInfo()
-                                          .withIsThin(false)
-                                          .withCallingConv(cc),
-                                        pfTy->getASTContext());
-
-  return t;
-}
-
-Type Lowering::getThickFunctionType(Type t) {
-  return getThickFunctionType(t, t->castTo<AnyFunctionType>()->getAbstractCC());
-}
-
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture))
     if (var->isComputed())
@@ -854,9 +808,10 @@ namespace {
         return handleAddressOnly(structType);
 
       for (auto field : D->getStoredProperties()) {
-        auto fieldType = structType->getTypeOfMember(D->getModuleContext(),
-                                                     field, nullptr);
-        auto &lowering = TC.getTypeLowering(fieldType);
+        auto origFieldType = field->getType();
+        auto substFieldType =
+          structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
+        auto &lowering = TC.getTypeLowering(origFieldType, substFieldType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(structType);
         if (!lowering.isTrivial()) {
@@ -912,7 +867,7 @@ TypeConverter::~TypeConverter() {
   // our TypeLowerings.
   for (auto &ti : Types) {
     // Destroy only the unique entries.
-    CanType srcType = CanType(ti.first.first);
+    CanType srcType = CanType(ti.first.OrigType);
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
     if (srcType == mappedType || isa<LValueType>(srcType))
       ti.second->~TypeLowering();
@@ -922,179 +877,302 @@ TypeConverter::~TypeConverter() {
 void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
   return tc.TypeLoweringBPA.Allocate(size, alignof(TypeLowering));
 }
-  
+
+/// Is this type a lowered type?
+static bool isLoweredType(CanType type) {
+  if (isa<LValueType>(type))
+    return false;
+  if (isa<AnyFunctionType>(type))
+    return false;
+  if (auto tuple = dyn_cast<TupleType>(type)) {
+    for (auto elt : tuple.getElementTypes())
+      if (!isLoweredType(elt))
+        return false;
+    return true;
+  }
+  return true;
+}
+
+/// Lower each of the elements of the substituted type according to
+/// the abstraction pattern of the given original type.
+static CanTupleType getLoweredTupleType(TypeConverter &tc,
+                                        CanType origType,
+                                        CanTupleType substType) {
+  auto origTupleType = dyn_cast<TupleType>(origType);
+  assert(!origTupleType ||
+         origTupleType->getNumElements() == substType->getNumElements());
+
+  // Does the lowered tuple type differ from the substituted type in
+  // any interesting way?
+  bool changed = false;
+  SmallVector<TupleTypeElt, 4> loweredElts;
+  loweredElts.reserve(substType->getNumElements());
+
+  for (auto i : indices(substType->getElementTypes())) {
+    auto substEltType = substType.getElementType(i);
+
+    CanType loweredSubstEltType;
+    if (auto substLV = dyn_cast<LValueType>(substEltType)) {
+      assert(origTupleType && "archetype bound to tuple containing l-value");
+      auto origLV = cast<LValueType>(origTupleType.getElementType(i));
+      SILType silType =
+        tc.getLoweredType(origLV.getObjectType(), substLV.getObjectType());
+      loweredSubstEltType = CanType(LValueType::get(silType.getSwiftRValueType(),
+                                                    substLV->getQualifiers(),
+                                                    tc.Context));
+    } else {
+      // If the original type was an archetype, use that archetype as
+      // the original type of the element --- the actual archetype
+      // doesn't matter, just the abstraction pattern.
+      auto origEltType =
+        (origTupleType ? origTupleType.getElementType(i) : origType);
+      SILType silType = tc.getLoweredType(origEltType, substEltType);
+      loweredSubstEltType = silType.getSwiftRValueType();
+    }
+
+    changed = (changed || substEltType != loweredSubstEltType);
+
+    auto &substElt = substType->getFields()[i];
+    loweredElts.push_back(substElt.getWithType(loweredSubstEltType));
+  }
+
+  if (!changed) return substType;
+
+  // Because we're transforming an existing tuple, the weird corner
+  // case where TupleType::get does not return a TupleType can't happen.
+  return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
+}
+
+CanSILFunctionType
+TypeConverter::getSILFunctionType(CanType origType,
+                                  CanAnyFunctionType substType,
+                                  unsigned uncurryLevel) {
+  return getLoweredType(origType, substType, uncurryLevel)
+           .castTo<SILFunctionType>();
+}
+
 const TypeLowering &
-TypeConverter::getTypeLowering(Type origType, unsigned uncurryLevel) {
-  CanType type = origType->getCanonicalType();
-  auto key = getTypeKey(type, uncurryLevel);
+TypeConverter::getTypeLowering(Type origOrigType, Type origSubstType,
+                               unsigned uncurryLevel) {
+  CanType origType = origOrigType->getCanonicalType();
+  CanType substType = origSubstType->getCanonicalType();
+  auto key = getTypeKey(origType, substType, uncurryLevel);
   auto existing = Types.find(key);
   if (existing != Types.end()) {
     assert(existing->second && "reentered getTypeLowering");
     return *existing->second;
   }
 
-  // LValue types are a special case for lowering, because they get completely
-  // removed and represented as 'address' SILTypes.
-  if (auto lvalueType = dyn_cast<LValueType>(type)) {
+  // AST function types are turned into SIL function types:
+  //   - the type is uncurried as desired
+  //   - types are turned into their unbridged equivalents, depending
+  //     on the abstract CC
+  //   - ownership conventions are deduced
+  if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
+    // First, lower at the AST level by uncurrying and substituting
+    // bridged types.
+    auto substLoweredType =
+      getLoweredASTFunctionType(substFnType, uncurryLevel);
+
+    CanType origLoweredType;
+    if (substType == origType) {
+      origLoweredType = substLoweredType;
+    } else if (isa<ArchetypeType>(origType)) {
+      origLoweredType = origType;
+    } else {
+      auto origFnType = cast<AnyFunctionType>(origType);
+      origLoweredType = getLoweredASTFunctionType(origFnType, uncurryLevel);
+    }
+    TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0);
+
+    // If the uncurrying/unbridging process changed the type, re-check
+    // the cache and add a cache entry for the curried type.
+    if (substLoweredType != substType) {
+      auto &typeInfo = getTypeLoweringForLoweredFunctionType(loweredKey);
+      Types[key] = &typeInfo;
+      return typeInfo;
+    }
+
+    // If it didn't, use the standard logic.
+    return getTypeLoweringForUncachedLoweredFunctionType(loweredKey);
+  }
+
+  assert(uncurryLevel == 0);
+
+  // L-value types are a special case for lowering, because they get
+  // completely removed and represented as 'address' SILTypes.
+  if (auto substLValueType = dyn_cast<LValueType>(substType)) {
     // Derive SILType for LValueType from the object type.
-    CanType objectType = lvalueType.getObjectType();
-    SILType loweredType =
-      getLoweredType(objectType, uncurryLevel).getAddressType();
+    CanType substObjectType = substLValueType.getObjectType();
+    // Archetypes can't be bound to l-value types, so cast<> is okay.
+    CanType origObjectType = cast<LValueType>(origType).getObjectType();
+
+    SILType loweredType = getLoweredType(origObjectType, substObjectType,
+                                         uncurryLevel).getAddressType();
 
     auto *theInfo = new (*this) TrivialTypeLowering(loweredType);
     Types[key] = theInfo;
     return *theInfo;
   }
 
-  // Uncurry and lower function types.  This transformation is
-  // essentially a kind of canonicalization, which makes it idempotent
-  // at uncurry level 0.  We exploit that in our caching logic.
-  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    CanType loweredType = getUncurriedFunctionType(fnType, uncurryLevel);
+  // We need to lower function types within tuples.
+  if (auto substTupleType = dyn_cast<TupleType>(substType)) {
+    auto loweredType = getLoweredTupleType(*this, origType, substTupleType);
 
-    // If the lowering process changed the type, re-check the cache
-    // and add a cache entry for the unlowered type.
-    if (loweredType != type) {
-      auto &typeInfo = getTypeLoweringForLoweredType(loweredType);
-      Types[key] = &typeInfo;
-      return typeInfo;
+    // If that changed anything, check for a lowering at the lowered
+    // type.
+    if (loweredType != substType) {
+      TypeKey loweredKey = getTypeKey(origType, loweredType, 0);
+      auto &lowering = getTypeLoweringForLoweredType(loweredKey);
+      Types[key] = &lowering;
+      return lowering;
     }
 
-    // If it didn't, use the standard logic.
+    // Okay, the lowered type didn't change anything from the subst type.
+    // Fall out into the normal path.
   }
 
   // The Swift type directly corresponds to the lowered type; don't
   // re-check the cache.
-  assert(uncurryLevel == 0);
-  return getTypeLoweringForUncachedLoweredType(type);
+  return getTypeLoweringForUncachedLoweredType(key);
+}
+
+const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
+  auto loweredType = type.getSwiftRValueType();
+  auto key = getTypeKey(loweredType, loweredType, 0);
+  return getTypeLoweringForLoweredType(key);
 }
 
 const TypeLowering &
-TypeConverter::getTypeLowering(SILType type) {
-  return getTypeLoweringForLoweredType(type.getSwiftRValueType());
-}
-
-const TypeLowering &
-TypeConverter::getTypeLoweringForLoweredType(CanType type) {
-  assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
+TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
+  auto type = key.SubstType;
+  assert(isLoweredType(type) && "type is not lowered!");
 
   // Re-using uncurry level 0 is reasonable because our uncurrying
   // transforms are idempotent at this level.  This means we don't
   // need a ton of redundant entries in the map.
-  auto key = getTypeKey(type, 0);
   auto existing = Types.find(key);
   if (existing != Types.end()) {
-    assert(existing->second && "reentered getTypeLoweringForLoweredType");
+    assert(existing->second && "reentered getTypeLowering");
     return *existing->second;
   }
 
-  return getTypeLoweringForUncachedLoweredType(type);
+  return getTypeLoweringForUncachedLoweredType(key);
 }
 
-/// Apply recursive transformations applicable in AST-to-SIL type lowering
-/// (Currenly only removes [auto_closure] from function types, recursively)
-static Type transformTypeForTypeLowering(ASTContext &context, Type type) {
-  if (type->is<ReferenceStorageType>())
-    return type;
-
-  return type.transform(context, [&](Type type) -> Type {
-    if (auto *ft = type->getAs<FunctionType>()) {
-      Type inputType = transformTypeForTypeLowering(context, ft->getInput());
-      Type resultType = transformTypeForTypeLowering(context, ft->getResult());
-      if (inputType.getPointer() == ft->getInput().getPointer() &&
-          resultType.getPointer() == ft->getResult().getPointer() &&
-          ft->getExtInfo().isAutoClosure() == false)
-        return type;
-      return FunctionType::get(inputType, resultType,
-                               ft->getExtInfo()
-                                 .withIsAutoClosure(false),
-                               ft->getASTContext());
-    }
-
-    if (auto *pft = type->getAs<PolymorphicFunctionType>()) {
-      Type inputType = transformTypeForTypeLowering(context, pft->getInput());
-      Type resultType = transformTypeForTypeLowering(context, pft->getResult());
-      if (inputType.getPointer() == pft->getInput().getPointer() &&
-          resultType.getPointer() == pft->getResult().getPointer() &&
-          pft->getExtInfo().isAutoClosure() == false)
-        return type;
-      return PolymorphicFunctionType::get(inputType, resultType,
-                                          &pft->getGenericParams(),
-                                          pft->getExtInfo()
-                                            .withIsAutoClosure(false),
-                                          pft->getASTContext());
-    }
-
-    return type;
-  });
-}
-
-/// Do type-lowering for a lowered type which is not already in the cache.
 const TypeLowering &
-TypeConverter::getTypeLoweringForUncachedLoweredType(CanType type) {
-  auto key = getTypeKey(type, 0);
-  assert(!Types.count(key) && "re-entrant or already cached");
-  assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
+TypeConverter::getTypeLoweringForLoweredFunctionType(TypeKey key) {
+  assert(isa<AnyFunctionType>(key.SubstType));
+  assert(key.UncurryLevel == 0);
+
+  // Check for an existing mapping for the key.
+  auto existing = Types.find(key);
+  if (existing != Types.end()) {
+    assert(existing->second && "reentered type-lowering");
+    return *existing->second;
+  }
+
+  // Okay, we didn't find one; go ahead and produce a SILFunctionType.
+  return getTypeLoweringForUncachedLoweredFunctionType(key);
+}
+
+const TypeLowering &TypeConverter::
+getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
+  assert(isa<AnyFunctionType>(key.SubstType));
+  assert(key.UncurryLevel == 0);
 
 #ifndef NDEBUG
   // Catch reentrancy bugs.
   Types[key] = nullptr;
 #endif
 
-  CanType transformed = CanType(transformTypeForTypeLowering(Context, type));
-  auto *theInfo = LowerType(*this).visit(transformed);
+  // Construct the SILFunctionType.
+  CanType silFnType = getNativeSILFunctionType(M, key.OrigType,
+                                       cast<AnyFunctionType>(key.SubstType));
+
+  // Do a cached lookup under yet another key, just so later lookups
+  // using the SILType will find the same TypeLowering object.
+  TypeKey loweredKey = getTypeKey(key.OrigType, silFnType, 0);
+  auto &lowering = getTypeLoweringForLoweredType(loweredKey);
+  Types[key] = &lowering;
+  return lowering;
+}
+
+/// Do type-lowering for a lowered type which is not already in the cache.
+const TypeLowering &
+TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
+  assert(!Types.count(key) && "re-entrant or already cached");
+  assert(isLoweredType(key.SubstType) && "didn't lower out l-value type?");
+
+#ifndef NDEBUG
+  // Catch reentrancy bugs.
+  Types[key] = nullptr;
+#endif
+
+  auto *theInfo = LowerType(*this).visit(key.SubstType);
   Types[key] = theInfo;
   return *theInfo;
 }
 
 /// Get the type of the 'self' parameter for methods of a type.
-Type TypeConverter::getMethodSelfType(Type selfType) const {
+CanType TypeConverter::getMethodSelfType(CanType selfType) const {
   if (selfType->hasReferenceSemantics()) {
     return selfType;
   } else {
-    return LValueType::get(selfType, LValueType::Qual::DefaultForType, Context);
+    return CanType(LValueType::get(selfType, LValueType::Qual::DefaultForType,
+                                   Context));
   }
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
-static Type getGlobalAccessorType(Type varType, ASTContext &C) {
-  return FunctionType::get(TupleType::getEmpty(C),
-                           C.TheRawPointerType,
-                           C);
+static CanAnyFunctionType getGlobalAccessorType(CanType varType,
+                                                ASTContext &C) {
+  return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType, C);
 }
 
 /// Get the type of a default argument generator, () -> T.
-static Type getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
-                                       unsigned DefaultArgIndex,
-                                       ASTContext &context) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
+static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
+                                                     unsigned DefaultArgIndex,
+                                                     ASTContext &context) {
+  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
   assert(resultTy && "Didn't find default argument?");
-  return FunctionType::get(TupleType::getEmpty(context), resultTy, context);
+  return CanFunctionType::get(TupleType::getEmpty(context), resultTy, context);
 }
 
 /// Get the type of a destructor function, This -> ().
-static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
-  Type classType = cd->getDeclaredTypeInContext();
+static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
+                                                      ASTContext &C) {
+  auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
+
+  auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false);
 
   if (cd->getGenericParams())
-    return PolymorphicFunctionType::get(classType,
-                                        C.TheObjectPointerType,
-                                        cd->getGenericParams(),
-                                        C);
+    return CanPolymorphicFunctionType::get(classType,
+                                           CanType(C.TheObjectPointerType),
+                                           cd->getGenericParams(),
+                                           extInfo,
+                                           C);
 
-  return FunctionType::get(classType, C.TheObjectPointerType, C);
+  return CanFunctionType::get(classType, CanType(C.TheObjectPointerType),
+                              extInfo, C);
 }
 
-Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
-                                                ArrayRef<ValueDecl*> captures,
-                                                DeclContext *parentContext) {
-  assert(!funcType->isThin());
-  if (captures.empty())
-    return funcType;
-  
+CanAnyFunctionType
+TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
+                                           ArrayRef<ValueDecl*> captures,
+                                           DeclContext *parentContext) {
+  if (captures.empty()) {
+    return getThinFunctionType(funcType);
+  }
+
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (ValueDecl *capture : captures) {
+    // FIXME: should this be the type-of-rvalue?
+    auto captureType = capture->getType()->getRValueType()->getCanonicalType();
+
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::None:
       break;
@@ -1103,7 +1181,7 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       // Constants are captured by value.
       assert(!capture->isReferencedAsLValue() &&
              "constant capture is an lvalue?!");
-      inputFields.push_back(TupleTypeElt(capture->getType()));
+      inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
@@ -1131,81 +1209,93 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       assert(capture->isReferencedAsLValue() &&
              "lvalue capture not an lvalue?!");
       inputFields.push_back(Context.TheObjectPointerType);
-      LValueType *lvType = LValueType::get(capture->getType()->getRValueType(),
-                                           LValueType::Qual::DefaultForType,
-                                           Context);
+      auto lvType = CanLValueType::get(captureType,
+                                       LValueType::Qual::DefaultForType,
+                                       Context);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
   }
   
-  Type capturedInputs = TupleType::get(inputFields, Context);
+  CanType capturedInputs = TupleType::get(inputFields, Context)->getCanonicalType();
+
+  auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false);
   
   // Capture generic parameters from the enclosing context.
   GenericParamList *genericParams = nullptr;
   // FIXME: This is a clunky way of uncurrying nested type parameters from
   // a function context.
   if (auto func = dyn_cast<AbstractFunctionDecl>(parentContext)) {
-    if (auto pft = getConstantType(SILDeclRef(func))
-          .getAs<PolymorphicFunctionType>())
-      genericParams = &pft->getGenericParams();
+    genericParams = getConstantFunctionType(SILDeclRef(func))->getGenericParams();
   } else if (auto closure = dyn_cast<AbstractClosureExpr>(parentContext)) {
-    if (auto pft = getConstantType(SILDeclRef(closure))
-        .getAs<PolymorphicFunctionType>())
-      genericParams = &pft->getGenericParams();
+    genericParams = getConstantFunctionType(SILDeclRef(closure))->getGenericParams();
   } else {
     genericParams = parentContext->getGenericParamsOfContext();
   }
   
-  
   if (genericParams)
-    return PolymorphicFunctionType::get(capturedInputs, funcType,
-                                        genericParams,
-                                        Context);
+    return CanPolymorphicFunctionType::get(capturedInputs, funcType,
+                                           genericParams, extInfo,
+                                           Context);
   
-  return FunctionType::get(capturedInputs, funcType, Context);
+  return CanFunctionType::get(capturedInputs, funcType, extInfo, Context);
 }
 
-Type TypeConverter::makeConstantType(SILDeclRef c) {
+template <class T>
+static CanAnyFunctionType getAccessorType(T *decl, SILDeclRef c) {
+  auto fnType =
+    (c.kind == SILDeclRef::Kind::Getter ? decl->getGetterType()
+                                        : decl->getSetterType());
+  return cast<AnyFunctionType>(fnType->getCanonicalType());
+}
+
+CanAnyFunctionType
+TypeConverter::getConstantFormalTypeWithoutCaptures(SILDeclRef c) {
+  return makeConstantType(c, /*withCaptures*/ false);
+}
+
+CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
+                                                   bool withCaptures) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<ValueDecl*, 4> LocalCaptures;
+    SmallVector<ValueDecl*, 4> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      auto *FuncTy = ACE->getType()->castTo<AnyFunctionType>();
-      ACE->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      return getFunctionTypeWithCaptures(FuncTy,LocalCaptures,ACE->getParent());
+      auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
+      if (!withCaptures) return funcTy;
+      ACE->getCaptureInfo().getLocalCaptures(captures);
+      return getFunctionTypeWithCaptures(funcTy, captures, ACE->getParent());
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
-    auto *funcTy = func->getType()->castTo<AnyFunctionType>();
-    func->getCaptureInfo().getLocalCaptures(LocalCaptures);
-    return getFunctionTypeWithCaptures(funcTy, LocalCaptures,
+    auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
+    if (!withCaptures) return funcTy;
+    func->getCaptureInfo().getLocalCaptures(captures);
+    return getFunctionTypeWithCaptures(funcTy, captures,
                                        func->getDeclContext());
   }
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
-      return c.kind == SILDeclRef::Kind::Getter? sd->getGetterType()
-                                               : sd->getSetterType();
+      return getAccessorType(sd, c);
     }
 
     VarDecl *var = cast<VarDecl>(c.getDecl());
-    Type accessorMethodType
-      = c.kind == SILDeclRef::Kind::Getter? var->getGetterType()
-                                          : var->getSetterType();
+    auto accessorMethodType = getAccessorType(var, c);
+    if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
     if (var->isComputed()) {
       FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
         ? var->getGetter()
         : var->getSetter();
-      auto *propTy = accessorMethodType->castTo<AnyFunctionType>();
       SmallVector<ValueDecl*, 4> LocalCaptures;
       property->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      return getFunctionTypeWithCaptures(propTy, LocalCaptures,
+      return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
                                          var->getDeclContext());
     }
     return accessorMethodType;
@@ -1213,10 +1303,11 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
       
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
-    return vd->getType();
+    return cast<AnyFunctionType>(vd->getType()->getCanonicalType());
   
   case SILDeclRef::Kind::Initializer:
-    return cast<ConstructorDecl>(vd)->getInitializerType();
+    return cast<AnyFunctionType>(cast<ConstructorDecl>(vd)
+                                   ->getInitializerType()->getCanonicalType());
   
   case SILDeclRef::Kind::Destroyer:
     return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
@@ -1224,7 +1315,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(!var->isComputed() && "constant ref to computed global var");
-    return getGlobalAccessorType(var->getType(), Context);
+    return getGlobalAccessorType(var->getType()->getCanonicalType(), Context);
   }
   case SILDeclRef::Kind::DefaultArgGenerator: {
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
@@ -1290,13 +1381,25 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
-  auto fieldTy =
+  auto origFieldTy = field->getType();
+  auto substFieldTy =
     getSwiftRValueType()->getTypeOfMember(field->getModuleContext(),
                                           field, nullptr);
-  auto loweredTy = M.Types.getLoweredType(fieldTy);
+  auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return loweredTy.getAddressType();
   } else {
     return loweredTy.getObjectType();
   }
+}
+
+SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
+  assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
+  assert(elt->hasArgumentType());
+  auto origEltTy = elt->getArgumentType();
+  auto substEltTy =
+    getSwiftRValueType()->getTypeOfMember(elt->getModuleContext(),
+                                          elt, nullptr, origEltTy);
+  auto loweredTy = M.Types.getLoweredType(origEltTy, substEltTy);
+  return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }

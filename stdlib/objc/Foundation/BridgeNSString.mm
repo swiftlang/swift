@@ -161,7 +161,7 @@ using block_type = void (^)(id, BOOL*);
 using code_type = void (*)(const char*, size_t, HeapObject*, BOOL*, HeapObject*);
 
 extern "C"
-block_type _TTbbTSSGVSs13UnsafePointerV10ObjectiveC8ObjCBool__T_(
+block_type _TTbXFoCb_oSSdGVSs13UnsafePointerV10ObjectiveC8ObjCBool__T__(
                                                     code_type code,
                                                     HeapObject *data) {
   SwiftRAII dataRAII(data, true);

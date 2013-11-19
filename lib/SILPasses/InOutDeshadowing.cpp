@@ -140,7 +140,7 @@ void swift::performInOutDeshadowing(SILModule *M) {
 
     // For each function, find any inout arguments and try to optimize each of
     // them.
-    SILFunctionType *FTI = Fn.getFunctionTypeInfo();
+    SILFunctionType *FTI = Fn.getLoweredFunctionType();
     
     for (unsigned arg = 0, e = FTI->getParameters().size(); arg != e; ++arg) {
       if (!FTI->getParameters()[arg].isIndirectInOut()) continue;

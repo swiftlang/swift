@@ -20,6 +20,7 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -251,10 +252,6 @@ struct SILDeclRef {
       return SILDeclRef();
     return SILDeclRef(overridden, kind, uncurryLevel);
   }
-
-  /// Return the SIL function type for this declaration (presumed to
-  /// be a function).
-  SILFunctionType *getSILFunctionType(SILModule &M) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {

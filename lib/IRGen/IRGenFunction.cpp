@@ -29,14 +29,13 @@ using namespace swift;
 using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM,
-                             ExplosionKind explosionLevel,
                              llvm::Function *Fn,
                              SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
-    CurFn(Fn), CurExplosionLevel(explosionLevel),
-    ContextPtr(nullptr),
-    DbgScope(DbgScope) {
+    CurFn(Fn), ContextPtr(nullptr), DbgScope(DbgScope)
+  {
+
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
     // Functions, especially artificial thunks and closures, are often

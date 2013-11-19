@@ -242,7 +242,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
-sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> RootGeneric<F> -> F {
+sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (@out F, RootGeneric<F>) -> () {
 entry(%z : $*F, %c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #y
   copy_addr %p to [initialization] %z : $*F

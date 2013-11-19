@@ -121,6 +121,7 @@ bool Parser::skipExtraTopLevelRBraces() {
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
+      Tok.isNot(tok::kw_in) &&
       Tok.isNot(tok::kw_weak) &&
       Tok.isNot(tok::kw_unowned)) {
     diagnose(Tok, diag::expected_attribute_name);
@@ -249,7 +250,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
 /// \endverbatim
 bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.
-  if (Tok.isNot(tok::identifier)) {
+  if (Tok.isNot(tok::identifier) && !Tok.is(tok::kw_in)) {
     diagnose(Tok, diag::expected_attribute_name);
     return true;
   }

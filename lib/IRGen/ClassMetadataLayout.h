@@ -178,8 +178,8 @@ private:
 
     // Update the class layout based on abstract, globally-known
     // characteristics of the type.
-    switch (IGM.classifyTypeSize(field->getType()->getCanonicalType(),
-                                 ResilienceScope::Universal)) {
+    SILType fieldType = IGM.getLoweredType(field->getType(), field->getType());
+    switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Universal)) {
     case ObjectSize::Fixed:
       return;
     case ObjectSize::Resilient:

@@ -9,6 +9,7 @@ add_swift_library(swiftSILGen
   SILGenExpr.cpp
   SILGenLValue.cpp
   SILGenPattern.cpp
+  SILGenPoly.cpp
   SILGenStmt.cpp
   DEPENDS swiftSIL)
 
