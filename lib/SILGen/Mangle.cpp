@@ -128,7 +128,13 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
 
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
-    buffer << introducer;
+    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
+      // FIXME: Generate a more descriptive name for getters.
+      buffer << "closure" << anonymousSymbolCounter++;
+      return;
+    }
+
+      buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
     buffer << 'g';
@@ -136,6 +142,12 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
 
   //   entity ::= declaration 's'                 // setter
   case SILDeclRef::Kind::Setter:
+    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
+      // FIXME: Generate a more descriptive name for setters.
+      buffer << "closure" << anonymousSymbolCounter++;
+      return;
+    }
+
     buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
