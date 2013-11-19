@@ -798,7 +798,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   auto generics = gen.F.getLoweredFunctionType()->getGenericParams();
   if (generics) {
     for (auto archetype : generics->getAllArchetypes())
-      subs.push_back({ archetype, archetype});
+      subs.push_back({ archetype, archetype, { }});
   }
 
   // Add the function type as the parameter.
