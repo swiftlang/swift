@@ -454,6 +454,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= V <decl>              # struct (substitutable)
 /// <type> ::= Xo <type>             # unowned reference type
 /// <type> ::= Xw <type>             # weak reference type
+/// <type> ::= XF <impl-function-type> # SIL function type
 ///
 /// <index> ::= _                    # 0
 /// <index> ::= <natural> _          # N+1
@@ -467,9 +468,6 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
 
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
-
-  case TypeKind::SILFunction:
-    llvm_unreachable("SILFunctionType in mangler?");
 
   case TypeKind::Error:
     Buffer << "ERR";
@@ -604,6 +602,93 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     Buffer << 'U';
     manglePolymorphicType(&fn->getGenericParams(), fn, explosion, uncurryLevel,
                           /*mangleAsFunction=*/true);
+    return;
+  }
+
+  case TypeKind::SILFunction: {
+    // <type> ::= 'XF' <impl-function-type>
+    // <impl-function-type> ::= <impl-callee-convention>
+    //                          <impl-function-attribute>* '_'
+    //                          <impl-parameter>* '_' <impl-result>* '_'
+    // <impl-callee-convention> ::= 't'               // thin
+    // <impl-callee-convention> ::= <impl-convention> // thick
+    // <impl-convention> ::= 'a'                      // direct, autoreleased
+    // <impl-convention> ::= 'd'                      // direct, no ownership transfer
+    // <impl-convention> ::= 'g'                      // direct, guaranteed
+    // <impl-convention> ::= 'i'                      // indirect, ownership transfer
+    // <impl-convention> ::= 'l'                      // indirect, inout
+    // <impl-convention> ::= 'o'                      // direct, ownership transfer
+    // <impl-function-attribute> ::= 'Cb'             // block invocation function
+    // <impl-function-attribute> ::= 'Cc'             // C global function
+    // <impl-function-attribute> ::= 'Cm'             // Swift method
+    // <impl-function-attribute> ::= 'CO'             // ObjC method
+    // <impl-function-attribute> ::= 'N'              // noreturn
+    // <impl-parameter> ::= <impl-convention> <type>
+    // <impl-result> ::= <impl-convention> <type>
+    auto fn = cast<SILFunctionType>(type);
+    Buffer << "XF";
+
+    auto mangleParameterConvention = [](ParameterConvention conv) {
+      // @in and @out are mangled the same because they're put in
+      // different places.
+      switch (conv) {
+      case ParameterConvention::Indirect_In: return 'i';
+      case ParameterConvention::Indirect_Out: return 'i';
+      case ParameterConvention::Indirect_Inout: return 'l';
+      case ParameterConvention::Direct_Owned: return 'o';
+      case ParameterConvention::Direct_Unowned: return 'd';
+      case ParameterConvention::Direct_Guaranteed: return 'g';
+      }
+      llvm_unreachable("bad parameter convention");
+    };
+    auto mangleResultConvention = [](ResultConvention conv) {
+      switch (conv) {
+      case ResultConvention::Owned: return 'o';
+      case ResultConvention::Unowned: return 'd';
+      case ResultConvention::Autoreleased: return 'a';
+      }
+      llvm_unreachable("bad result convention");
+    };
+
+    // <impl-callee-convention>
+    if (fn->isThin()) {
+      Buffer << 't';
+    } else {
+      Buffer << mangleParameterConvention(fn->getCalleeConvention());
+    }
+
+    // <impl-function-attribute>*
+    if (fn->isBlock()) {
+      Buffer << "Cb";
+    } else {
+      switch (fn->getAbstractCC()) {
+      case AbstractCC::Freestanding: break;
+      case AbstractCC::C: Buffer << "Cc"; break;
+      case AbstractCC::ObjCMethod: Buffer << "CO"; break;
+      case AbstractCC::Method: Buffer << "Cm"; break;
+      }
+    }
+    if (fn->isNoReturn()) Buffer << 'N';
+    Buffer << '_';
+
+    auto mangleParameter = [&](SILParameterInfo param) {
+      Buffer << mangleParameterConvention(param.getConvention());
+      mangleType(param.getType(), ExplosionKind::Minimal, 0);
+    };
+
+    for (auto param : fn->getParametersWithoutIndirectResult()) {
+      mangleParameter(param);
+    }
+    Buffer << '_';
+
+    if (fn->hasIndirectResult()) {
+      mangleParameter(fn->getIndirectResult());
+    } else {
+      auto result = fn->getResult();
+      mangleResultConvention(result.getConvention());
+      mangleType(result.getType(), ExplosionKind::Minimal, 0);
+    }
+    Buffer << '_';
     return;
   }
 

@@ -755,6 +755,7 @@ Types
   type ::= 'U' generics '_' type             // generic type
   type ::= 'Xo' type                         // [unowned] type
   type ::= 'Xw' type                         // [weak] type
+  type ::= 'XF' impl-function-type           // function implementation type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name
@@ -779,6 +780,35 @@ Note that protocols mangle differently as types and as contexts. A protocol
 context always consists of a single protocol name and so mangles without a
 trailing underscore. A protocol type can have zero, one, or many protocol bounds
 which are juxtaposed and terminated with a trailing underscore.
+
+::
+  impl-function-type ::= impl-callee-convention impl-function-attribute* '_' impl-parameter* '_' impl-result* '_'
+  impl-callee-convention ::= 't'              // thin
+  impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
+  impl-convention ::= 'a'                     // direct, autoreleased
+  impl-convention ::= 'd'                     // direct, no ownership transfer
+  impl-convention ::= 'g'                     // direct, guaranteed
+  impl-convention ::= 'i'                     // indirect, ownership transfer
+  impl-convention ::= 'l'                     // indirect, inout
+  impl-convention ::= 'o'                     // direct, ownership transfer
+  impl-function-attribute ::= 'Cb'            // compatible with C block invocation function
+  impl-function-attribute ::= 'Cc'            // compatible with C global function
+  impl-function-attribute ::= 'Cm'            // compatible with Swift method
+  impl-function-attribute ::= 'CO'            // compatible with ObjC method
+  impl-function-attribute ::= 'N'             // noreturn
+  impl-parameter ::= impl-convention type
+  impl-result ::= impl-convention type
+
+For the most part, manglings follow the structure of formal language
+types.  However, in some cases it is more useful to encode the exact
+implementation details of a function type.
+
+Any ``<impl-function-attribute>`` productions must appear in the order
+in which they are specified above: e.g. a noreturn C function is
+mangled with ``CcN``.
+
+Note that the convention and function-attribute productions do not
+need to be disambiguated from the start of a ``<type>``.
 
 Generics
 ~~~~~~~~
