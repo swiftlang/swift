@@ -54,6 +54,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
  
   performSILMandatoryInlining(&Module);
 
+  performSILCapturePromotion(&Module);
   performSILAllocBoxToStackPromotion(&Module);
   performInOutDeshadowing(&Module);
   performSILDefiniteInitialization(&Module);
