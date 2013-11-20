@@ -1,3 +1,5 @@
+:orphan:
+
 Text Formatting in Swift
 ========================
 
@@ -108,7 +110,7 @@ Output Streams
 ..............
 
 The most fundamental part of this design is ``OutputStream``, a thing
-into which we can stream text: [#character]_
+into which we can stream text: [#character1]_
 
 ::
 
@@ -454,7 +456,7 @@ to tip the balance in favor of the current design.
    generic ``format`` with arguments that depend on the type being
    formatted, so an ad-hoc convention would be just fine.
 
-.. [#character] We don't support streaming individual code points
+.. [#character1] We don't support streaming individual code points
    directly because it's possible to create invalid sequences of code
    points. For any code point that, on its own, represents a valid
    ``Character`` (a.k.a. Unicode `extended grapheme cluster`__), it is

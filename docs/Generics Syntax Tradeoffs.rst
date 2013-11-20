@@ -1,3 +1,5 @@
+:orphan:
+
 .. @raise litre.TestsAreMissing
 
 This document summarizes a few email and meeting discussions we have had. Thanks

@@ -1,3 +1,5 @@
+:orphan:
+
 Swift supports what type theory calls "algebraic data types", or ADTs, which
 are an amalgam of two familiar C-family language features, enums and unions.
 They are similar to enums in that they allow collections of independent symbolic
@@ -51,7 +53,7 @@ C programmers with no interest in learning about ADTs can use 'enum' like they
 always have.
 
 "Union" doesn't exist to Cocoa programmers
----------------------------------------
+------------------------------------------
 
 Cocoa programmers really don't think about unions at all. The frameworks vend
 no public unions. If a Cocoa programmer knows what a union is, it's as a

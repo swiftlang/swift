@@ -1,3 +1,5 @@
+:orphan:
+
 .. @raise litre.TestsAreMissing
 
 ==========
