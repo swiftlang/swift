@@ -1159,12 +1159,43 @@ static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
                               extInfo, C);
 }
 
+GenericParamList *
+TypeConverter::getEffectiveGenericParamsForContext(DeclContext *dc) {
+
+  // FIXME: This is a clunky way of uncurrying nested type parameters from
+  // a function context.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+    return getConstantFunctionType(SILDeclRef(func))->getGenericParams();
+  }
+
+  if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    return getConstantFunctionType(SILDeclRef(closure))->getGenericParams();
+  }
+
+  return dc->getGenericParamsOfContext();
+}
+
 CanAnyFunctionType
 TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                            ArrayRef<ValueDecl*> captures,
                                            DeclContext *parentContext) {
+  // Capture generic parameters from the enclosing context.
+  GenericParamList *genericParams
+    = getEffectiveGenericParamsForContext(parentContext);;
+
   if (captures.empty()) {
-    return getThinFunctionType(funcType);
+    if (!genericParams)
+      return getThinFunctionType(funcType);
+
+    auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                            /*thin*/ true,
+                                            /*noreturn*/ false);
+
+    return CanPolymorphicFunctionType::get(funcType.getInput(),
+                                           funcType.getResult(),
+                                           genericParams, extInfo,
+                                           Context);
+
   }
 
   SmallVector<TupleTypeElt, 8> inputFields;
@@ -1222,19 +1253,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           /*thin*/ true,
                                           /*noreturn*/ false);
-  
-  // Capture generic parameters from the enclosing context.
-  GenericParamList *genericParams = nullptr;
-  // FIXME: This is a clunky way of uncurrying nested type parameters from
-  // a function context.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(parentContext)) {
-    genericParams = getConstantFunctionType(SILDeclRef(func))->getGenericParams();
-  } else if (auto closure = dyn_cast<AbstractClosureExpr>(parentContext)) {
-    genericParams = getConstantFunctionType(SILDeclRef(closure))->getGenericParams();
-  } else {
-    genericParams = parentContext->getGenericParamsOfContext();
-  }
-  
+
   if (genericParams)
     return CanPolymorphicFunctionType::get(capturedInputs, funcType,
                                            genericParams, extInfo,

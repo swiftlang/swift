@@ -80,6 +80,9 @@ public:
       CurInstruction->printInContext(llvm::dbgs());
       llvm::dbgs() << "In function @" << F.getName() <<" basic block:\n";
       CurInstruction->getParent()->print(llvm::dbgs());
+    } else {
+      llvm::dbgs() << "In function @" << F.getName() <<" basic block:\n";
+      F.print(llvm::dbgs());
     }
 
     abort();

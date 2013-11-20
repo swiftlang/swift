@@ -570,7 +570,10 @@ public:
   ///
   /// \return - always an address type
   SILType getSubstitutedStorageType(ValueDecl *value, Type lvalueType);
-  
+
+  /// Retrieve the set of generic parameters considered for the given context.
+  GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
+
   /// Known types for bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
   CanType get##BridgedType##Type(); \

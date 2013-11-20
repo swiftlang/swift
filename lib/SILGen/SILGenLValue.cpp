@@ -484,10 +484,15 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   // If it's a computed variable, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isComputed()) {
-      lv.add<GetterSetterComponent>(sgl.gen, 
-                                    var,
-                                    ArrayRef<Substitution>{},
-                                    typeData);
+      ArrayRef<Substitution> substitutions;
+      if (auto genericParams
+            = sgl.gen.SGM.Types.getEffectiveGenericParamsForContext(
+                decl->getDeclContext())) {
+        substitutions = sgl.gen.buildForwardingSubstitutions(
+                          genericParams->getAllArchetypes());
+      }
+
+      lv.add<GetterSetterComponent>(sgl.gen, var, substitutions, typeData);
       return ::std::move(lv);
     }
   }
