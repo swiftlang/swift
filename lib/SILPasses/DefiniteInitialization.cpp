@@ -405,18 +405,6 @@ namespace {
 
     bool isInvalid() const { return Inst == nullptr; }
     bool isValid() const { return Inst != nullptr; }
-    
-    
-    void markAvailable(llvm::SmallBitVector &BV) const {
-      if (!NumTupleElements) return;
-
-      // Peel the first iteration of the 'set' loop since there is almost always
-      // a single tuple element touched by a MemoryUse.
-      BV.set(FirstTupleElement);
-      
-      for (unsigned i = 1; i != NumTupleElements; ++i)
-        BV.set(FirstTupleElement+i);
-    }
   };
 } // end anonymous namespace
 
@@ -426,6 +414,13 @@ enum class EscapeKind {
   Yes,
   No
 };
+
+enum class DIKind {
+  No,
+  Yes,
+  Partial
+};
+
 
 namespace {
   /// LiveOutBlockState - Keep track of information about blocks that have
@@ -455,18 +450,77 @@ namespace {
     LiveOutBlockState(unsigned NumTupleElements)
       : EscapeInfo(EscapeKind::Unknown), HasNonLoadUse(false),
         LOState(IsUnknown) {
-      TupleElementAvailability.resize(NumTupleElements);
+      TupleElementAvailability.resize(NumTupleElements*2, true);
     }
-    
-    void setAvailability(const llvm::SmallBitVector &BV) {
+
+    DIKind getAvailability(unsigned Elt) {
+      return getAvailability(Elt, TupleElementAvailability);
+    }
+
+    static Optional<DIKind> getAvailabilityField(unsigned Elt,
+                                                 llvm::SmallBitVector &BV) {
+      // T,T -> Nothing/Unknown
+      // F,F -> No
+      // F,T -> Yes
+      // T,F -> Partial
+      bool V1 = BV[Elt*2], V2 = BV[Elt*2+1];
+      if (V1 == V2)
+        return V1 ? Optional<DIKind>(Nothing) : DIKind::No;
+      return V2 ? DIKind::Yes : DIKind::Partial;
+    }
+    Optional<DIKind> getAvailabilityField(unsigned Elt) {
+      return getAvailabilityField(Elt, TupleElementAvailability);
+    }
+
+    static DIKind getAvailability(unsigned Elt, llvm::SmallBitVector &BV) {
+      // This will assert if nothing is set, the client shouldn't call this when
+      // that is possible.
+      return getAvailabilityField(Elt, BV).getValue();
+    }
+
+    static void setAvailability(unsigned Elt, DIKind K,
+                                llvm::SmallBitVector &BV) {
+      switch (K) {
+      case DIKind::No:      BV[Elt*2] = false; BV[Elt*2+1] = false; break;
+      case DIKind::Yes:     BV[Elt*2] = false, BV[Elt*2+1] = true; break;
+      case DIKind::Partial: BV[Elt*2] = true, BV[Elt*2+1] = false; break;
+      }
+    }
+    void setAvailability(unsigned Elt, DIKind K) {
+      setAvailability(Elt, K, TupleElementAvailability);
+    }
+
+    void setBlockAvailability(const llvm::SmallBitVector &BV) {
       assert(LOState != IsKnown &&"Changing live out state of computed block?");
       TupleElementAvailability = BV;
-    }
-    void setAvailability1(bool V) {
-      assert(TupleElementAvailability.size() == 1 && "Not 1 element case");
-      assert(LOState != IsKnown &&"Changing live out state of computed block?");
-      TupleElementAvailability[0] = true;
       LOState = LiveOutBlockState::IsKnown;
+
+#ifndef NDEBUG
+      // Check that we didn't get any unknown values.
+      for (unsigned i = 0, e = BV.size()/2; i != e; ++i)
+        assert(getAvailabilityField(i).hasValue() &&
+               "Set block to unknown value");
+#endif
+    }
+
+    void setBlockAvailability1(DIKind K) {
+      assert(LOState != IsKnown &&"Changing live out state of computed block?");
+      assert(TupleElementAvailability.size() == 2 && "Not 1 element case");
+      setAvailability(0, K, TupleElementAvailability);
+      LOState = LiveOutBlockState::IsKnown;
+    }
+
+    void markAvailable(const MemoryUse &Use) {
+      // If the memory object has nothing in it (e.g., is an empty tuple)
+      // ignore.
+      if (TupleElementAvailability.empty()) return;
+      
+      // Peel the first iteration of the 'set' loop since there is almost always
+      // a single tuple element touched by a MemoryUse.
+      setAvailability(Use.FirstTupleElement, DIKind::Yes);
+                         
+      for (unsigned i = 1; i != Use.NumTupleElements; ++i)
+        setAvailability(Use.FirstTupleElement+i, DIKind::Yes);
     }
   };
 } // end anonymous namespace
@@ -519,22 +573,19 @@ namespace {
                         LiveOutBlockState(NumTupleElements)}).first->second;
     }
     
-    enum DIKind {
-      DI_Yes,
-      DI_No,
-      DI_Partial
-    };
     DIKind checkDefinitelyInit(const MemoryUse &Use);
 
     void handleStoreUse(MemoryUse &InstInfo, DIKind Kind);
 
-    void processNonTrivialRelease(SILInstruction *Inst);
+    bool processNonTrivialRelease(SILInstruction *Inst);
 
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
 
-    bool isLiveOut1(SILBasicBlock *BB);
-    llvm::SmallBitVector isLiveOutN(SILBasicBlock *BB);
+    Optional<DIKind> getLiveOut1(SILBasicBlock *BB);
+    void getPredsLiveOut1(SILBasicBlock *BB, Optional<DIKind> &Result);
+    llvm::SmallBitVector getLiveOutN(SILBasicBlock *BB);
+    void getPredsLiveOutN(SILBasicBlock *BB, llvm::SmallBitVector &Result);
 
     void diagnoseInitError(const MemoryUse &Use, Diag<StringRef> DiagMessage);
 
@@ -597,11 +648,17 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
     // Each of the non-load instructions will each be checked to make sure that
     // they are live-in or a full element store.  This means that the block they
     // are in should be treated as a live out for cross-block analysis purposes.
-    Use.markAvailable(BBInfo.TupleElementAvailability);
+    BBInfo.markAvailable(Use);
     
     // If all of the tuple elements are available in the block, then it is known
     // to be live-out.  This is the norm for non-tuple memory objects.
-    if (BBInfo.TupleElementAvailability.all())
+    bool AllSet = true;
+    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
+      auto Val = BBInfo.getAvailabilityField(i);
+      if (!Val.hasValue() || Val.getValue() != DIKind::Yes)
+        AllSet = false;
+    }
+    if (AllSet)
       BBInfo.LOState = LiveOutBlockState::IsKnown;
 
     if (Use.Kind == UseKind::Escape) {
@@ -620,7 +677,12 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
 
   // There is no scanning required (or desired) for the block that defines the
   // memory object itself.  Its live-out properties are whatever are trivially
-  // locally inferred by the loop above.
+  // locally inferred by the loop above.  Mark any unset elements as not
+  // available.
+  for (unsigned i = 0, e = NumTupleElements; i != e; ++i)
+    if (!MemBBInfo.getAvailabilityField(i).hasValue())
+      MemBBInfo.setAvailability(i, DIKind::No);
+    
   MemBBInfo.LOState = LiveOutBlockState::IsKnown;
 }
 
@@ -725,7 +787,7 @@ bool ElementPromotion::doIt() {
       // initialization of the type.
       // TODO: In the "partial" case, we can produce a more specific diagnostic
       // indicating where the control flow merged.
-      if (DI != DI_Yes) {
+      if (DI != DIKind::Yes) {
         // Otherwise, this is a use of an uninitialized value.  Emit a
         // diagnostic.
         diagnoseInitError(Use, diag::variable_used_before_initialized);
@@ -733,14 +795,14 @@ bool ElementPromotion::doIt() {
       break;
       
     case UseKind::InOutUse:
-      if (DI != DI_Yes) {
+      if (DI != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         diagnoseInitError(Use, diag::variable_inout_before_initialized);
       }
       break;
       
     case UseKind::Escape:
-      if (DI != DI_Yes) {
+      if (DI != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
           diagnoseInitError(Use, diag::global_variable_function_use_uninit);
@@ -759,8 +821,13 @@ bool ElementPromotion::doIt() {
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
   if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
-    for (auto I : Releases) {
-      processNonTrivialRelease(I);
+    for (unsigned i = 0; i != Releases.size(); ++i) {
+      if (processNonTrivialRelease(Releases[i])) {
+        Releases[i] = Releases.back();
+        Releases.pop_back();
+        --i;
+        continue;
+      }
 
       // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
       if (!EmittedErrorLocs.empty()) return true;
@@ -790,7 +857,6 @@ bool ElementPromotion::doIt() {
       }
   }
 
-
   // If this is an allocation, try to remove it completely.
   if (!isa<MarkUninitializedInst>(TheMemory))
     tryToRemoveDeadAllocation();
@@ -804,7 +870,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
-  if (InstInfo.Kind == UseKind::PartialStore && DI != DI_Yes) {
+  if (InstInfo.Kind == UseKind::PartialStore && DI != DIKind::Yes) {
     diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
     return;
   }
@@ -815,7 +881,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
   // FIXME: This needs to be supported through the introduction of a boolean
   // control path, or (for reference types as an important special case) a store
   // of zero at the definition point.
-  if (DI == DI_Partial) {
+  if (DI == DIKind::Partial) {
     diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
     return;
   }
@@ -823,11 +889,11 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
   if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
-    CA->setIsInitializationOfDest(IsInitialization_t(DI == DI_No));
+    CA->setIsInitializationOfDest(IsInitialization_t(DI == DIKind::No));
     return;
   }
   if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
-    SW->setIsInitializationOfDest(IsInitialization_t(DI == DI_No));
+    SW->setIsInitializationOfDest(IsInitialization_t(DI == DIKind::No));
     return;
   }
 
@@ -845,7 +911,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
     SmallVector<SILInstruction*, 8> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
 
-    LowerAssignInstruction(B, AI, DI == DI_No);
+    LowerAssignInstruction(B, AI, DI == DIKind::No);
 
     // If lowering of the assign introduced any new stores, keep track of them.
     for (auto I : InsertedInsts) {
@@ -868,20 +934,36 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 /// a release.  As such, we have to push the releases up the CFG to where the
 /// value is initialized.
 ///
-void ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
+/// This returns true if the release was deleted.
+///
+bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
+  // If the instruction is a deallocation of uninitialized memory, no action is
+  // required (or desired).
+  if (isa<DeallocStackInst>(Inst) || isa<DeallocBoxInst>(Inst))
+    return false;
+
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
   DIKind DI =
     checkDefinitelyInit(MemoryUse(Inst, UseKind::Escape, 0, NumTupleElements));
-  if (DI == DI_Yes) return;
+  if (DI == DIKind::Yes) return false;
 
-  // DI_No -> dealloc.
+  // If the memory is definitely not initialized at this point, we can just drop
+  // destory_addrs.
+  if (DI == DIKind::No && isa<DestroyAddrInst>(Inst)) {
+    SILValue Addr = Inst->getOperand(0);
+    Inst->eraseFromParent();
+    RemoveDeadAddressingInstructions(Addr);
+    return true;
+  }
+
+
+  // If the element type of the memory object is a class value
+  
 
   // Okay, the release is conditionally live.  We have to force it up the CFG to
   // a place where we have unconditional liveness, and if the memory object is a
   // tuple, we have to do so for each element individually.
-
-
 
   /// TODO: We could make this more powerful to directly support these
   /// cases, at least when the value doesn't escape.
@@ -889,23 +971,24 @@ void ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
   /// When this gets fixed, the code in the ~ElementUseCollector() method
   /// can be removed.
   ///
-  if (DI != DI_Yes) {
-    // This is a release of an uninitialized value.  Emit a diagnostic.
-    diagnoseInitError(MemoryUse(Inst, UseKind::Load, 0, 0),
-                      diag::variable_destroyed_before_initialized);
-  }
+
+  // This is a release of an uninitialized value.  Emit a diagnostic.
+  diagnoseInitError(MemoryUse(Inst, UseKind::Load, 0, 0),
+                    diag::variable_destroyed_before_initialized);
+  return false;
 }
 
 
 
-bool ElementPromotion::isLiveOut1(SILBasicBlock *BB) {
+Optional<DIKind> ElementPromotion::getLiveOut1(SILBasicBlock *BB) {
   LiveOutBlockState &BBState = getBlockInfo(BB);
   switch (BBState.LOState) {
   case LiveOutBlockState::IsKnown:
-    return BBState.TupleElementAvailability[0];
+    return BBState.getAvailability(0);
   case LiveOutBlockState::IsComputingLiveOut:
-    // Speculate that it will be live out in cyclic cases.
-    return true;
+    // In cyclic cases we contribute no information, allow other nodes feeding
+    // in to define the successors liveness.
+    return Nothing;
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -914,30 +997,57 @@ bool ElementPromotion::isLiveOut1(SILBasicBlock *BB) {
   // Set the block's state to reflect that we're currently processing it.  This
   // is required to handle cycles properly.
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
-  
+
+  // Compute the liveness of our predecessors value.
+  Optional<DIKind> Result = BBState.getAvailabilityField(0);
+  getPredsLiveOut1(BB, Result);
+
+  // Otherwise, we're golden.  Return success.
+  getBlockInfo(BB).setBlockAvailability1(Result.getValue());
+  return Result.getValue();
+}
+
+void ElementPromotion::getPredsLiveOut1(SILBasicBlock *BB,
+                                        Optional<DIKind> &Result) {
+  bool LiveInAny = false, LiveInAll = true;
+
+  // If we have a starting point, incorporate it into our state.
+  if (Result.hasValue()) {
+    if (Result.getValue() != DIKind::No)
+      LiveInAny = true;
+    if (Result.getValue() != DIKind::Yes)
+      LiveInAll = false;
+  }
+
   // Recursively processes all of our predecessor blocks.  If any of them is
   // not live out, then we aren't either.
   for (auto P : BB->getPreds()) {
-    if (!isLiveOut1(P)) {
-      // If any predecessor fails, then we're not live out either.
-      getBlockInfo(BB).setAvailability1(false);
-      return false;
-    }
+    auto LOPred = getLiveOut1(P);
+    if (!LOPred.hasValue()) continue;
+    
+    if (LOPred.getValue() != DIKind::No)
+      LiveInAny = true;
+
+    if (LOPred.getValue() != DIKind::Yes)
+      LiveInAll = false;
   }
 
-  // Otherwise, we're golden.  Return success.
-  getBlockInfo(BB).setAvailability1(true);
-  return true;
+  if (LiveInAll)
+    Result = DIKind::Yes;
+  else if (LiveInAny)
+    Result = DIKind::Partial;
+  else
+    Result = DIKind::No;
 }
 
-llvm::SmallBitVector ElementPromotion::isLiveOutN(SILBasicBlock *BB) {
+llvm::SmallBitVector ElementPromotion::getLiveOutN(SILBasicBlock *BB) {
   LiveOutBlockState &BBState = getBlockInfo(BB);
   switch (BBState.LOState) {
   case LiveOutBlockState::IsKnown:
     return BBState.TupleElementAvailability;
   case LiveOutBlockState::IsComputingLiveOut:
     // Speculate that it will be live out in cyclic cases.
-    return llvm::SmallBitVector(NumTupleElements, true);
+    return llvm::SmallBitVector(NumTupleElements*2, true);
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -946,32 +1056,64 @@ llvm::SmallBitVector ElementPromotion::isLiveOutN(SILBasicBlock *BB) {
   // Set the block's state to reflect that we're currently processing it.  This
   // is required to handle cycles properly.
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
-  
-  // The liveness of this block is the intersection of all of the predecessor
-  // block's liveness.
-  llvm::SmallBitVector Result(NumTupleElements, true);
-  
-  // Recursively processes all of our predecessor blocks.  If any of them is
-  // not live out, then we aren't either.
-  for (auto P : BB->getPreds()) {
-    Result &= isLiveOutN(P);
-    
-    // If any predecessor fails, then we're not live out either.
-    if (Result.none()) break;
-  }
-  
-  // Otherwise, we're golden.  Return success.
-  BBState.setAvailability(Result);
+
+  llvm::SmallBitVector Result = BBState.TupleElementAvailability;
+  getPredsLiveOutN(BB, Result);
+
+  // Finally, cache and return our result.
+  getBlockInfo(BB).setBlockAvailability(Result);
   return Result;
 }
 
+void ElementPromotion::getPredsLiveOutN(SILBasicBlock *BB,
+                                        llvm::SmallBitVector &Result) {
+  // The liveness of this block is the intersection of all of the predecessor
+  // block's liveness.
+  llvm::SmallBitVector Tmp;
+
+  // Recursively processes all of our predecessor blocks.  If any of them is
+  // not live out, then we aren't either.
+  for (auto P : BB->getPreds()) {
+    Tmp = getLiveOutN(P);
+
+    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
+      Optional<DIKind> TK = LiveOutBlockState::getAvailabilityField(i, Tmp);
+
+      // If T is unset, ignore it.
+      if (!TK.hasValue())
+        continue;
+
+      // If R is unset, take T
+      Optional<DIKind> RK = LiveOutBlockState::getAvailabilityField(i, Result);
+      if (!RK.hasValue()) {
+        Result[i*2] = Tmp[i*2], Result[i*2+1] = Tmp[i*2+1];
+        continue;
+      }
+
+      // If "R" is already partial, we don't know anything.
+      if (RK.getValue() == DIKind::Partial)
+        continue;
+
+      // If "R" is yes, or no, then switch to partial if we find a different
+      // answer.
+      if (RK.getValue() != TK.getValue())
+        LiveOutBlockState::setAvailability(i, DIKind::Partial, Result);
+    }
+  }
+  
+  // If any elements are still unknown, smash them to "yes".  This can't
+  // happen in live code, and we want to avoid having analyzed blocks with
+  // "unset" values.
+  for (unsigned i = 0, e = NumTupleElements; i != e; ++i)
+    if (!LiveOutBlockState::getAvailabilityField(i, Result).hasValue())
+      LiveOutBlockState::setAvailability(i, DIKind::Yes, Result);
+}
 
 
 /// The specified instruction is a use of the element.  Determine whether the
 /// element is definitely initialized at this point or not.  If the value is
 /// initialized on some paths, but not others, this returns a partial result.
-ElementPromotion::DIKind
-ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
+DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
   SILBasicBlock *InstBB = Use.Inst->getParent();
   
   // The vastly most common case is memory allocations that are not tuples,
@@ -994,22 +1136,17 @@ ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
         // is not defined at all yet.  Otherwise, we've found a definition, or
         // something else that will require that the memory is initialized at
         // this point.
-        return TheInst == TheMemory ? DI_No : DI_Yes;
+        return TheInst == TheMemory ? DIKind::No : DIKind::Yes;
       }
     }
-    
-    // Okay, the value isn't locally available in this block.  Check to see if
-    // it is live in all predecessors.
-    for (auto PI = InstBB->pred_begin(), E = InstBB->pred_end(); PI != E; ++PI){
-      if (!isLiveOut1(*PI))
-        return DI_No;
-    }
-    
-    return DI_Yes;
+
+    Optional<DIKind> Result = Nothing;
+    getPredsLiveOut1(InstBB, Result);
+    return Result.getValue();
   }
 
   // Empty tuples are always (trivially) initialized.
-  if (Use.NumTupleElements == 0) return DI_Yes;
+  if (Use.NumTupleElements == 0) return DIKind::Yes;
   
   // Check all the tuple elements covered by this memory use.
   llvm::SmallBitVector UsesElements(NumTupleElements);
@@ -1032,7 +1169,7 @@ ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.
       if (TheInst == TheMemory)
-        return DI_No;
+        return DIKind::No;
 
       // Check to see which tuple elements this instruction defines.  Clear them
       // from the set we're scanning from.
@@ -1042,19 +1179,35 @@ ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
       // If that satisfied all of the elements we're looking for, then we're
       // done.  Otherwise, keep going.
       if (UsesElements.none())
-        return DI_Yes;
+        return DIKind::Yes;
     }
   }
 
-  // Okay, the value isn't locally available in this block.  Check to see if all
-  // of the required elements are live in from all predecessors.
-  for (auto PI = InstBB->pred_begin(), E = InstBB->pred_end(); PI != E; ++PI) {
-    if (UsesElements.test(isLiveOutN(*PI)))
-      return DI_No;
+  // Compute the liveness of each element according to our predecessors.
+  llvm::SmallBitVector Result(NumTupleElements*2, true);
+  getPredsLiveOutN(InstBB, Result);
+
+  // Now that we know about each element, determine a yes/no/partial result
+  // based on the elements we care about.
+  bool LiveInAll = true, LiveInAny = false;
+
+  for (unsigned i = Use.FirstTupleElement, e = i+Use.NumTupleElements;
+       i != e; ++i) {
+    // If this element was satisfied locally, ignore its predecessor liveness.
+    if (!UsesElements[i]) continue;
+
+    DIKind ElementKind = LiveOutBlockState::getAvailability(i, Result);
+    if (ElementKind != DIKind::No)
+      LiveInAny = true;
+    if (ElementKind != DIKind::Yes)
+      LiveInAll = false;
   }
-  
-  // If it is available in all predecessors, then we're ok!
-  return DI_Yes;
+
+  if (LiveInAll)
+    return DIKind::Yes;
+  if (LiveInAny)
+    return DIKind::Partial;
+  return DIKind::No;
 }
 
 
