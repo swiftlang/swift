@@ -1778,7 +1778,8 @@ public:
       }
 
       if (isObjC &&
-          !TC.isRepresentableInObjC(FD, /*Diagnose=*/FD->getAttrs().isObjC()))
+          (FD->isInvalid() ||
+           !TC.isRepresentableInObjC(FD, /*Diagnose=*/FD->getAttrs().isObjC())))
         isObjC = false;
       FD->setIsObjC(isObjC);
     }
