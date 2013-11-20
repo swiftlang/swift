@@ -34,25 +34,33 @@ public:
     assert(ACE && "should have a closure");
   }
 
-  CaptureInfo &getCaptureInfo() {
+  CaptureInfo &getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  ArrayRef<Pattern *> getArgParamPatterns() {
+  ArrayRef<Pattern *> getArgParamPatterns() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getArgParamPatterns();
     return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
   }
 
-  Type getType() {
+  Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
+  
+  /// FIXME: This should just be getType() when interface types take over in
+  /// the AST.
+  Type getInterfaceType() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getInterfaceType();
+    return TheFunction.get<AbstractClosureExpr *>()->getType();
+  }
 
-  Type getBodyResultType() {
+  Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
         return FD->getBodyResultType();
@@ -61,7 +69,7 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
   }
 
-  BraceStmt *getBody() {
+  BraceStmt *getBody() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBody();
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
@@ -70,7 +78,7 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  DeclContext *getAsDeclContext() {
+  DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;
     return TheFunction.get<AbstractClosureExpr *>();
