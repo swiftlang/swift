@@ -64,17 +64,13 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
                                const clang::TargetInfo &TargetInfo,
                                IRGenModule &IGM,
-                               TypeConverter &Types,
-                               ASTContext &Context,
                                llvm::Module &M)
   : Opts(Opts),
     TargetInfo(TargetInfo),
-    Context(Context),
-    SM(Context.SourceMgr),
+    SM(IGM.Context.SourceMgr),
     M(M),
     DBuilder(M),
     IGM(IGM),
-    Types(Types),
     LastFn(nullptr),
     MetadataTypeDecl(nullptr),
     LastLoc({}),
@@ -414,16 +410,18 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
 /// Create a single parameter type and push it.
 void IRGenDebugInfo::
 createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                    CanType CanTy,
+                    SILType type,
                     llvm::DIDescriptor Scope,
                     DeclContext* DeclCtx) {
+  // FIXME: these uses of getSwiftType() are extremely suspect.
   if (DeclCtx) {
     VarDecl VD(/*static*/ false,
-               SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
-    DebugTypeInfo DTy(&VD, Types.getCompleteTypeInfo(CanTy));
+               SourceLoc(), Identifier::getEmptyKey(),
+               type.getSwiftType(), DeclCtx);
+    DebugTypeInfo DTy(&VD, IGM.getTypeInfo(type));
     Parameters.push_back(getOrCreateType(DTy, Scope));
   } else {
-    DebugTypeInfo DTy(CanTy, Types.getCompleteTypeInfo(CanTy));
+    DebugTypeInfo DTy(type.getSwiftType(), IGM.getTypeInfo(type));
     Parameters.push_back(getOrCreateType(DTy, Scope));
   }
 }
@@ -436,21 +434,22 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
   return createParameterTypes(SILTy.castTo<SILFunctionType>(), Scope, DeclCtx);
 }
 
-/// Create the array of function parameters for FnTy. Swift Version.
+/// Create the array of function parameters for a function type.
 llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    llvm::DIDescriptor Scope,
                                                    DeclContext* DeclCtx) {
   SmallVector<llvm::Value *, 16> Parameters;
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, FnTy->getResult().getType(),
+  createParameterType(Parameters,
+                      FnTy->getSemanticResultSILType(),
                       Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
   for (auto Param : FnTy->getParameters())
-    createParameterType(Parameters, Param.getSILType().getSwiftType(),
+    createParameterType(Parameters, Param.getSILType(),
                         Scope, DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);
@@ -686,11 +685,11 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
 
 TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl)
-    MetadataTypeDecl = new (Context)
+    MetadataTypeDecl = new (IGM.Context)
       TypeAliasDecl(SourceLoc(),
-                    Context.getIdentifier("$swift.type"), SourceLoc(),
-                    TypeLoc::withoutLoc(Context.TheRawPointerType),
-                    Context.TheBuiltinModule,
+                    IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
+                    TypeLoc::withoutLoc(IGM.Context.TheRawPointerType),
+                    IGM.Context.TheBuiltinModule,
                     MutableArrayRef<TypeLoc>());
   return MetadataTypeDecl;
 }
@@ -906,7 +905,7 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   for (auto ElemTy : TupleTy->getElementTypes()) {
     VarDecl VD(/*static*/ false,
                SourceLoc(), Identifier::getEmptyKey(), ElemTy, DeclContext);
-    DebugTypeInfo DTI(&VD, Types.getCompleteTypeInfo(ElemTy->getCanonicalType()));
+    DebugTypeInfo DTI(&VD, IGM.getTypeInfoForUnlowered(ElemTy));
     Elements.push_back(createMemberType(DTI, OffsetInBits, Scope, File, Flags));
   }
   return DBuilder.getOrCreateArray(Elements);
@@ -923,7 +922,7 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
     if (VarDecl *VD = dyn_cast<VarDecl>(Decl))
       if (!VD->isComputed()) {
         auto Ty = VD->getType()->getCanonicalType();
-        DebugTypeInfo DTI(VD, Types.getCompleteTypeInfo(Ty));
+        DebugTypeInfo DTI(VD, IGM.getTypeInfoForUnlowered(Ty));
         Elements.push_back(createMemberType(DTI, OffsetInBits,
                                             Scope, File, Flags));
       }
@@ -1276,7 +1275,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     SmallVector<llvm::Value *, 4> Protocols;
     for (auto ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = ProtocolDecl->getType()->getCanonicalType();
-      auto PDbgTy = DebugTypeInfo(ProtocolDecl, Types.getCompleteTypeInfo(PTy));
+      auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy, Scope);
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
     }

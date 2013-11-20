@@ -76,12 +76,10 @@ enum IntrinsicKind  : bool { Declare = false, Value = true };
 class IRGenDebugInfo {
   const Options &Opts;
   const clang::TargetInfo &TargetInfo;
-  ASTContext &Context;
   SourceManager &SM;
   llvm::Module &M;
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
-  TypeConverter &Types;
 
   // Various caches.
   llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
@@ -116,8 +114,6 @@ public:
   IRGenDebugInfo(const Options &Opts,
                  const clang::TargetInfo &TargetInfo,
                  IRGenModule &IGM,
-                 TypeConverter &Types,
-                 ASTContext &Context,
                  llvm::Module &M);
 
   /// Finalize the llvm::DIBuilder owned by this object.
@@ -245,7 +241,7 @@ private:
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                           CanType CanTy, llvm::DIDescriptor Scope,
+                           SILType CanTy, llvm::DIDescriptor Scope,
                            DeclContext* DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
