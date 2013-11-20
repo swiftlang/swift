@@ -1,0 +1,182 @@
+#!/usr/bin/env bash  -o errexit -o pipefail
+
+usage(){
+  echo "Usage: $0 [options] [-- buildbot_script args]
+
+  Builds Swift incrementally using Swift's own buildbot script,
+  optionally testing it thereafter.  Different build configurations
+  are maintained in parallel.
+
+  Options:
+
+                      SourceKit before building
+
+    -U, --update-all: update your git checkouts of LLVM and Clang, and
+                      building
+
+    -r, --release:    build the RelWithDebInfo variant
+                      (default is Debug)
+
+    -d, --debug:      build the Debug variant
+
+    -x, --xcode:      use CMake's Xcode generator (default is Ninja)
+
+    -m, --make:       use CMake's Makefile generator (default is Ninja)
+
+    -t, --test:       test Swift and SourceKit after building
+
+    -h, --help:       this message
+
+  Any arguments passed after \"--\" are forwarded directly to Swift's
+  buildbot_script.sh.  See that file's help for details.
+
+  This script respects a couple of environment variables, should you
+  choose to set them:
+
+  SWIFT_SOURCE_ROOT: a directory containing the source for llvm,
+                    clang, swift, and SourceKit.  Defaults to
+                    \"${HOME}/src/s\"
+
+  SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
+                    Defaults to \"${HOME}/build/swift\"
+
+  Preparing to run this script:
+
+    $ mkdir ~/src/s
+    $ cd ~/src/s
+    $ git clone http://llvm.org/git/llvm.git
+    $ git clone http://llvm.org/git/clang.git
+
+  That's it; you're ready to go!
+"
+}
+
+# In some odd circumstances (e.g. building under Emacs) this is needed
+# so that sphinx-build doesn't barf
+export COLUMNS=80
+
+# Set SWIFT_SOURCE_ROOT in your environment to control where the sources are found
+SOURCE_ROOT="${SWIFT_SOURCE_ROOT:-${HOME}/src/s}"
+
+BUILD_TYPE=Debug
+GENERATOR=Ninja
+
+# Set SWIFT_BUILD_ROOT to a directory that will contain a subdirectory
+# for each build configuration
+BUILD_ROOT="${SWIFT_BUILD_ROOT:-${HOME}/build/swift/}"
+
+TEST_SWIFT=
+CLEAN=
+UPDATE_SWIFT=
+UPDATE_ALL=
+
+BUILDBOT_SCRIPT_ADDITIONAL_ARGS=( )
+
+while [ x"$1" != x ] ; do
+    case $1 in
+        -u | --update )
+            UPDATE_SWIFT=1
+            ;;
+
+        -U | --update-all )
+            UPDATE_ALL=1
+            UPDATE_SWIFT=1
+            ;;
+
+        -r | --release )
+            BUILD_TYPE=RelWithDebInfo
+            ;;
+
+        -d | --debug )
+            BUILD_TYPE=Debug
+            ;;
+        
+        -x | --xcode )
+            GENERATOR=Xcode
+            ;;
+
+        -m | --make )
+            GENERATOR="Unix Makefiles"
+            # CMAKE_ADDITIONAL_ARGS="-DCMAKE_VERBOSE_MAKEFILE=1"
+            ;;
+        
+        -c | --clean )
+            CLEAN=1
+            ;;
+        
+        -t | --test )
+            TEST_SWIFT=1
+            ;;
+
+        -h | --help )
+            usage
+            exit
+            ;;
+        
+        -- )
+            shift
+            BUILDBOT_SCRIPT_ADDITIONAL_ARGS="$@"
+            break
+            ;;
+
+        * ) usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ ! "${TEST_SWIFT}" ]] ; then
+    BUILDBOT_SCRIPT_ADDITIONAL_ARGS=(
+        "${BUILDBOT_SCRIPT_ADDITIONAL_ARGS[@]}"
+        --skip-test-swift
+        --skip-test-sourcekit
+    )
+fi
+
+BUILD_DIR="${BUILD_ROOT}/${GENERATOR// /_/}-${BUILD_TYPE}"
+
+if [ "$CLEAN" ]; then
+    rm -rf "${BUILD_DIR}"
+fi
+
+if [[ "${UPDATE_ALL}" ]] ; then
+  (cd "${SOURCE_ROOT}/llvm" && git pull || exit 1)
+  (cd "${SOURCE_ROOT}/clang" && git pull || exit 1)
+fi
+
+function update_git_svn() {
+    pushd "${1}"
+    use_stash="$(git status --porcelain)"
+    
+    if [[ "${use_stash}" ]] ; then
+        git stash save --all
+    fi
+
+    # Try first to pull from an upstream Git repo, assuming there is one
+    if git pull --rebase 2> /dev/null; then
+        git svn rebase -l
+    else
+        git svn rebase
+    fi
+    
+    if [[ "${use_stash}" ]] ; then
+        git stash pop
+    fi
+    popd
+}
+
+if [[ "${UPDATE_SWIFT}" ]]; then
+    update_git_svn "${SOURCE_ROOT}/swift"
+    update_git_svn "${SOURCE_ROOT}/SourceKit"
+fi
+
+sh "${SOURCE_ROOT}/swift/utils/buildbot-script.sh" \
+    --build-dir "${BUILD_DIR}" \
+    --build-type="${BUILD_TYPE}" \
+    --skip-test-swift-performance \
+    --cmake-generator="${GENERATOR}" \
+    --workspace "${SOURCE_ROOT}" \
+    "${BUILDBOT_SCRIPT_ADDITIONAL_ARGS[@]}"
+
+
