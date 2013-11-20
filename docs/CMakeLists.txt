@@ -16,7 +16,11 @@ SET(SPHINX_ARGS
 if(SPHINX_EXECUTABLE)
   add_custom_target(docs_html ALL
     ${SPHINX_EXECUTABLE} ${SPHINX_ARGS} -b html
-      . ${CMAKE_BINARY_DIR}/docs/html
+      . ${CMAKE_BINARY_DIR}/docs/html 
+       # filter only stderr; see http://stackoverflow.com/a/15936384/125349
+       # unfortunately I can't get CMake to pass this form through correctly
+       # 2> >(grep -v "\"WARNING: document isn't included in any toctree\"" 1>&2)
+       2>&1 | grep -v "\"WARNING: document isn't included in any toctree\""
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building HTML documentation")
 
