@@ -4096,12 +4096,19 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
         SmallVector<VarDecl *, 6> Params;
         closure->getParams()->collectVariables(Params);
         for (auto VD : Params) {
-          Type T = VD->getType();
-          if (cs)
-            T = cs->simplifyType(T);
-          if (T->hasTypeVariable())
-            T = ErrorType::get(context);
-          VD->overwriteType(T);
+          if (VD->hasType()) {
+            Type T = VD->getType();
+            if (cs)
+              T = cs->simplifyType(T);
+            if (T->hasTypeVariable()) {
+              T = ErrorType::get(context);
+              VD->setInvalid();
+            }
+            VD->overwriteType(T);
+          } else {
+            VD->setType(ErrorType::get(context));
+            VD->setInvalid();
+          }
         }
         if (!closure->hasSingleExpressionBody()) {
           return { false, walkToExprPost(expr) };
