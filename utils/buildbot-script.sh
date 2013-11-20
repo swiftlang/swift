@@ -1,4 +1,6 @@
-#!/bin/bash -o pipefail -o errexit
+#!/bin/bash
+set -o pipefail
+set -e
 #
 # Note: Jenkins is set up to restore the repositories to pristine
 # state before building, so we rebuild from scratch every time.  If
