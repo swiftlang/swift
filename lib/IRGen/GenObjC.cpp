@@ -596,6 +596,22 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   IRGenFunction subIGF(IGM, fwd);
   
+  // Do we need to retain self before calling, and/or release it after?
+  bool retainsSelf;
+  switch (origMethodType->getParameters().back().getConvention()) {
+  case ParameterConvention::Direct_Unowned:
+    retainsSelf = false;
+    break;
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Owned:
+    retainsSelf = true;
+    break;
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_Inout:
+    llvm_unreachable("self passed indirectly?!");
+  }
+  
   // Recover 'self' from the context.
   Explosion params = subIGF.collectParameters(ExplosionKind::Minimal);
   llvm::Value *context = params.takeLast();
@@ -603,10 +619,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   auto &fieldLayout = layout.getElements()[0];
   Address selfAddr = fieldLayout.project(subIGF, dataAddr, Nothing);
   Explosion selfParams(ExplosionKind::Minimal);
-  // FIXME: Copying the value leaks if 'self' is unconsumed, but not copying it
-  // overreleases if 'self' is consumed and the forwarder is invoked multiple
-  // times.
-  cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
+  if (retainsSelf)
+    cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
+  else
+    cast<LoadableTypeInfo>(selfTI).loadAsTake(subIGF, selfAddr, selfParams);
   llvm::Value *self = selfParams.claimNext();
   
   // Save off the forwarded indirect return address if we have one.
@@ -632,10 +648,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   if (indirectReturn) {
     emission.emitToMemory(appliedResultTI.getAddressForPointer(indirectReturn),
                           appliedResultTI);
+    subIGF.emitRelease(context);
     subIGF.Builder.CreateRetVoid();
   } else {
     Explosion result(ExplosionKind::Minimal);
     emission.emitToExplosion(result);
+    subIGF.emitRelease(context);
     subIGF.emitScalarReturn(result);
   }
   

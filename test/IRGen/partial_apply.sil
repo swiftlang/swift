@@ -14,6 +14,8 @@ entry:
 
 @objc class ObjCClass {
   func method(x: Int64) {}
+  
+  func initFamily() -> ObjCClass { return self }
 }
 
 sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
@@ -33,6 +35,11 @@ sil @_TToCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin (Int64, ObjC
 bb0(%0 : $Int64, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
+}
+
+sil @_TToCSo9ObjCClass10initFamilyfS_FT_S_ : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass {
+bb0(%0 : $ObjCClass):
+  return %0 : $ObjCClass
 }
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {
@@ -79,10 +86,15 @@ entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
 // CHECK: }
 // CHECK: define internal void [[OBJC_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
 // CHECK: entry:
+// CHECK-NOT: swift_retain
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %1 to [[DATA_TYPE]]*
+// CHECK-NOT: swift_retain
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
+// CHECK-NOT: swift_retain
 // CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
+// CHECK-NOT: swift_retain
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(method:)", align 8
+// CHECK-NOT: swift_retain
 // CHECK:   call void bitcast (void ()* @objc_msgSend to void (%CSo9ObjCClass*, i8*, i64)*)(%CSo9ObjCClass* [[SELF]], i8* [[CMD]], i64 %0)
 // CHECK:   ret void
 // CHECK: }
@@ -92,6 +104,26 @@ entry(%c : $ObjCClass):
   %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $@cc(objc_method) @thin (Int64, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@cc(objc_method) @thin (Int64, ObjCClass) -> ()
   return %p : $@callee_owned Int64 -> ()
+}
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%CSo9ObjCClass*) {
+// CHECK:         bitcast %swift.refcounted* {{%.*}} to [[DATA_TYPE:<{ %swift.refcounted, %CSo9ObjCClass\* }>]]*
+// CHECK:         insertvalue {{.*}} [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]]
+// CHECK: define internal %CSo9ObjCClass* [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB]](%swift.refcounted*) {
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]*
+// CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
+// CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
+// CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
+// CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(initFamily)", align 8
+// CHECK:   call %CSo9ObjCClass* bitcast (void ()* @objc_msgSend to %CSo9ObjCClass* (%CSo9ObjCClass*, i8*)*)(%CSo9ObjCClass* [[SELF]], i8* [[CMD]])
+// CHECK:   ret void
+// CHECK: }
+
+sil @objc_partial_apply_consumes_self : $@thin ObjCClass -> @callee_owned () -> @owned ObjCClass {
+entry(%c : $ObjCClass):
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.initFamily!1.foreign : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass
+  %p = partial_apply %m(%c) : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass
+  return %p : $@callee_owned () -> @owned ObjCClass
 }
 
 sil @dummy : $@thin Int64 -> () {
