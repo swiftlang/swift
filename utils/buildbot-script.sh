@@ -303,6 +303,8 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
     echo "--- Running Swift Tests ---"
     
     build_cmd=("$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS})
+
+    "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
     
     if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
         # Ninja buffers command output to avoid scrambling the output
