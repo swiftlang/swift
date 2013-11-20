@@ -968,12 +968,17 @@ getEnumElements(DebugTypeInfo DbgTy,
                  EnumDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
                  unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
-  for (auto Decl : D->getAllElements()) {
-    auto CanTy = Decl->getType()->getCanonicalType();
-    // Use Decl as DeclContext.
-    DebugTypeInfo DTI(Decl, DbgTy.size, DbgTy.align);
-    auto DTy = getOrCreateDesugaredType(CanTy, DTI, Scope);
-    Elements.push_back(DTy);
+  for (auto ElemDecl : D->getAllElements()) {
+    // FIXME <rdar://problem/14845818> Support enums.
+    // Swift Enums can be both like DWARF enums and DWARF unions.
+    // We currently cannot represent the enum-like subset of enums.
+    if (ElemDecl->hasType()) {
+      auto CanTy = ElemDecl->getType()->getCanonicalType();
+      // Use Decl as DeclContext.
+      DebugTypeInfo DTI(ElemDecl, DbgTy.size, DbgTy.align);
+      auto DTy = getOrCreateDesugaredType(CanTy, DTI, Scope);
+      Elements.push_back(DTy);
+    }
   }
   return DBuilder.getOrCreateArray(Elements);
 }
@@ -997,11 +1002,11 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
 
   DITypeCache[DbgTy.getHash()] = llvm::WeakVH(FwdDecl);
 
-  auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
-                                      SizeInBits, AlignInBits, Flags,
-                                      getEnumElements(DbgTy, Decl, Scope, File,
-                                                       Flags),
-                                      dwarf::DW_LANG_Swift);
+  auto DTy =
+    DBuilder.createUnionType(Scope, Name, File, Line,
+                             SizeInBits, AlignInBits, Flags,
+                             getEnumElements(DbgTy, Decl, Scope, File, Flags),
+                             dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
   return DTy;
 }
