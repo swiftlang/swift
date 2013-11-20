@@ -108,7 +108,7 @@ static bool isReturnedOwned(IRGenModule &IGM, SILResultInfo result) {
   case ResultConvention::Owned: return true;
   case ResultConvention::Autoreleased: return false;
   case ResultConvention::Unowned:
-    return IGM.SILMod->getTypeLowering(result.getSILType()).isTrivial();
+    return result.getSILType().isTrivial(*IGM.SILMod);
   }
   llvm_unreachable("bad result convention");
 }

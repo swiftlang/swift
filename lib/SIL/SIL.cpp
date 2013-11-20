@@ -285,3 +285,8 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
   }
   return getPrimitiveObjectType(CanType(ty));
 }
+
+bool SILType::isTrivial(SILModule &M) const {
+  return M.getTypeLowering(*this).isTrivial();
+}
+

@@ -248,6 +248,9 @@ public:
     return isAddressOnly(getSwiftRValueType(), M);
   }
 
+  /// True if the type, or the referenced type of an address type, is trivial.
+  bool isTrivial(SILModule &M) const;
+
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();

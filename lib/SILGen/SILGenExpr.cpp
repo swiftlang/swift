@@ -122,12 +122,11 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v.getType());
-  if (lowering.isTrivial()) {
+  if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
-  } else {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(v);
-    return ManagedValue(v, getTopCleanup());
-  }
+
+  Cleanups.pushCleanup<CleanupMaterializedValue>(v);
+  return ManagedValue(v, getTopCleanup());
 }
 
 static void destroyRValue(SILGenFunction &SGF, CleanupLocation loc,
@@ -609,12 +608,11 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
   }
 
   // Add a cleanup for the temporary we allocated.
-  if (bufferTL.isTrivial()) {
+  if (bufferTL.isTrivial())
     return ManagedValue::forUnmanaged(buffer);
-  } else {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(buffer);
-    return ManagedValue(buffer, getTopCleanup());
-  }
+
+  Cleanups.pushCleanup<CleanupMaterializedValue>(buffer);
+  return ManagedValue(buffer, getTopCleanup());
 }
 
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {

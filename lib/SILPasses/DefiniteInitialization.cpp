@@ -46,15 +46,13 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   auto &M = Inst->getModule();
   SILValue Src = Inst->getSrc();
 
-  auto &destTL = M.getTypeLowering(Inst->getDest().getType());
-
   // If this is an initialization, or the storage type is trivial, we
   // can just replace the assignment with a store.
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
-  if (isInitialization || destTL.isTrivial()) {
+  if (isInitialization || Inst->getDest().getType().isTrivial(M)) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
   } else {
     // Otherwise, we need to replace the assignment with the full
@@ -62,11 +60,12 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // considered to be retained (by the semantics of the storage type),
     // and we're transfering that ownership count into the destination.
 
-    // This is basically destTL.emitStoreOfCopy, except that if we have
+    // This is basically TypeLowering::emitStoreOfCopy, except that if we have
     // a known incoming value, we can avoid the load.
     SILValue IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
-    destTL.emitDestroyValue(B, Inst->getLoc(), IncomingVal);
+
+    B.emitDestroyValueOperation(Inst->getLoc(), IncomingVal);
   }
 
   Inst->eraseFromParent();
@@ -820,7 +819,7 @@ bool ElementPromotion::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
+  if (!MemoryType.isTrivial(TheMemory->getModule())) {
     for (unsigned i = 0; i != Releases.size(); ++i) {
       if (processNonTrivialRelease(Releases[i])) {
         Releases[i] = Releases.back();
@@ -1663,10 +1662,7 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
   DEBUG(llvm::errs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   DEBUG(llvm::errs() << "      To value: " << *NewVal.getDef() << "\n");
 
-  auto &TL = DAI->getModule().getTypeLowering(MemoryType);
-  SILBuilder B(DAI);
-  TL.emitDestroyValue(B, DAI->getLoc(), NewVal);
-
+  SILBuilder(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
   return true;
 }
@@ -2203,7 +2199,7 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
 
   // If the memory object has non-trivial type, then removing the deallocation
   // will drop any releases.  Check that there is nothing preventing removal.
-  if (!TheMemory->getModule().getTypeLowering(MemoryType).isTrivial()) {
+  if (!MemoryType.isTrivial(TheMemory->getModule())) {
     for (auto *R : Releases) {
       if (isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
         continue;
