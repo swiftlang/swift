@@ -838,6 +838,10 @@ clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.Instance->getTarget();
 }
 
+clang::ASTContext &ClangImporter::getClangASTContext() const {
+  return Impl.getClangASTContext();
+}
+
 void ClangImporter::verifyAllModules() {
   if (Impl.ImportCounter == Impl.VerifiedImportCounter)
     return;

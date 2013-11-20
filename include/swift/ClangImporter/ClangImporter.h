@@ -19,8 +19,9 @@
 #include "swift/AST/ModuleLoader.h"
 
 namespace clang {
-  class VisibleDeclConsumer;
+  class ASTContext;
   class TargetInfo;
+  class VisibleDeclConsumer;
 }
 
 namespace swift {
@@ -176,6 +177,7 @@ public:
   void verifyAllModules() override;
 
   clang::TargetInfo &getTargetInfo() const;
+  clang::ASTContext &getClangASTContext() const;
 };
 
 typedef decltype(&ClangImporter::create) ClangImporterCtorTy;

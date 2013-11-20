@@ -39,17 +39,14 @@ namespace llvm {
   class DIBuilder;
 }
 
-namespace clang {
-  class TargetInfo;
-}
-
 namespace swift {
 
 class ASTContext;
+class AllocStackInst;
+class ClangImporter;
 class SILArgument;
 class SILDebugScope;
 class SILModule;
-class AllocStackInst;
 
 namespace irgen {
 
@@ -75,7 +72,7 @@ enum IntrinsicKind  : bool { Declare = false, Value = true };
 /// <llvm::DebugLoc>s.
 class IRGenDebugInfo {
   const Options &Opts;
-  const clang::TargetInfo &TargetInfo;
+  ClangImporter &CI;
   SourceManager &SM;
   llvm::Module &M;
   llvm::DIBuilder DBuilder;
@@ -88,8 +85,8 @@ class IRGenDebugInfo {
   std::map<std::string, llvm::WeakVH> DINameSpaceCache;
   llvm::DITypeIdentifierMap DIRefMap;
 
-  // Subprograms need their scope to be RAUW'd when we work through
-  // the list of imports.
+  // Subprograms and need their scope to be RAUW'd when we work
+  // through the list of imports.
   std::map<StringRef, llvm::WeakVH> Functions;
 
   // These are used by getArgNo.
@@ -112,7 +109,7 @@ class IRGenDebugInfo {
 
 public:
   IRGenDebugInfo(const Options &Opts,
-                 const clang::TargetInfo &TargetInfo,
+                 ClangImporter &CI,
                  IRGenModule &IGM,
                  llvm::Module &M);
 
@@ -137,7 +134,6 @@ public:
     LocationStack.push_back(std::make_pair(LastLoc, LastScope));
     LastLoc = {};
     LastScope = nullptr;
-    //Builder.SetCurrentDebugLocation(DebugLoc());
   }
 
   /// Restore the current debug location from the stack.
@@ -227,6 +223,8 @@ private:
                           llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
+  //  llvm::DIDescriptor getOrCreateImportedModuleScope(StringRef ModuleName);
+
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
   llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI,

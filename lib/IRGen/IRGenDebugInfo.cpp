@@ -25,11 +25,17 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Basic/Module.h"
+#include "clang/Basic/SourceLocation.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Config/config.h"
 #include "llvm/DebugInfo.h"
@@ -62,11 +68,11 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
 }
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
-                               const clang::TargetInfo &TargetInfo,
+                               ClangImporter &CI,
                                IRGenModule &IGM,
                                llvm::Module &M)
   : Opts(Opts),
-    TargetInfo(TargetInfo),
+    CI(CI),
     SM(IGM.Context.SourceMgr),
     M(M),
     DBuilder(M),
@@ -296,9 +302,8 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
 
   // Try to find it in the cache first.
   auto CachedScope = ScopeCache.find(DS);
-  if (CachedScope != ScopeCache.end()) {
+  if (CachedScope != ScopeCache.end())
     return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
-  }
 
   Location L = getLocation(SM, DS->Loc).LocForLinetable;
   llvm::DIFile File = getOrCreateFile(L.Filename);
@@ -738,8 +743,8 @@ void IRGenDebugInfo::
 emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
   auto TName = BumpAllocatedString(("$swift.type."+Name).str());
   DebugTypeInfo DTI(getMetadataType(),
-                    (Size)TargetInfo.getPointerWidth(0),
-                    (Alignment)TargetInfo.getPointerAlign(0),
+                    (Size)CI.getTargetInfo().getPointerWidth(0),
+                    (Alignment)CI.getTargetInfo().getPointerAlign(0),
                     IGF.getDebugScope());
   emitVariableDeclaration
     (IGF.Builder, Metadata, DTI,
@@ -882,7 +887,7 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
                                                      llvm::DIDescriptor Scope,
                                                      llvm::DIFile File,
                                                      unsigned Flags) {
-  unsigned SizeOfByte = TargetInfo.getCharWidth();
+  unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   auto Ty = getOrCreateType(DTI, Scope);
   auto DTy = DBuilder.createMemberType(Scope, StringRef(), File, 0,
                                        SizeOfByte*DTI.size.getValue(),
@@ -982,7 +987,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
                                 llvm::DIDescriptor Scope,
                                 llvm::DIFile File, unsigned Line,
                                 unsigned Flags) {
-  unsigned SizeOfByte = TargetInfo.getCharWidth();
+  unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   // FIXME: Is DW_TAG_union_type the right thing here?
@@ -1036,7 +1041,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // in the LLVM IR. For all types that are boxed in a struct, we are
   // emitting the storage size of the struct, but it may be necessary
   // to emit the (target!) size of the underlying basic type.
-  unsigned SizeOfByte = TargetInfo.getCharWidth();
+  unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
@@ -1141,6 +1146,17 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Location L = getLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
+      if (auto ClangDecl = Decl->getClangDecl()) {
+        auto ClangSrcLoc = ClangDecl->getLocStart();
+        clang::SourceManager &ClangSM =
+          CI.getClangASTContext().getSourceManager();
+        L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
+        L.Filename = ClangSM.getBufferName(ClangSrcLoc);
+        auto ModuleName = ClangDecl->getOwningModule()->getTopLevelModuleName();
+        auto ModuleFile = getOrCreateFile(L.Filename);
+        // This placeholder gets RAUW'd by finalize().
+        Scope =getOrCreateNamespace(ModuleFile, ModuleName, ModuleFile, L.Line);
+      }
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
