@@ -1507,9 +1507,14 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param) {
       auto value = std::move(arg).getScalarValue();
-      value = SGF.emitNativeToBridgedValue(loc, value, CC,
-                                           origParamType.getAsType(),
-                                           arg.getType(), param.getType());
+      if (isNative(CC)) {
+        value = SGF.emitSubstToOrigValue(loc, value, origParamType,
+                                         arg.getType());
+      } else {
+        value = SGF.emitNativeToBridgedValue(loc, value, CC,
+                                             origParamType.getAsType(),
+                                             arg.getType(), param.getType());
+      }
       Args.push_back(value);
     }
   };
