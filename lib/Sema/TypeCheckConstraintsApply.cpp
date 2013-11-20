@@ -1270,11 +1270,25 @@ namespace {
     }
     
   private:
+    struct ValueTypeMemberApplication {
+      unsigned level : 30;
+      // Selector for the partial_application_of_value_type_method diagnostic
+      // message.
+      enum : unsigned {
+        Struct,
+        Enum,
+        Archetype,
+        Protocol,
+      };
+      unsigned kind : 2;
+    };
+    
     // A map used to track partial applications of value type methods to
     // require that they be fully applied. Partial applications of value types
     // would capture 'self' as an [inout] and hide any mutation of 'self',
     // which is surprising.
-    llvm::DenseMap<Expr*, unsigned> ValueTypeMemberApplications;
+    llvm::DenseMap<Expr*, ValueTypeMemberApplication>
+      ValueTypeMemberApplications;
     
   public:
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -1296,6 +1310,8 @@ namespace {
                                      expr->isImplicit());
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
+        FuncDecl *fn = nullptr;
+        unsigned kind;
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
           auto selfLVT = apply->getArg()->getType()->getAs<LValueType>();
           if (!selfLVT)
@@ -1303,16 +1319,35 @@ namespace {
           auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
           if (!fnDeclRef)
             goto not_value_type_member;
-          auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-          if (!fn)
+          fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+          if (selfLVT->getObjectType()->getStructOrBoundGenericStruct())
+            kind = ValueTypeMemberApplication::Struct;
+          else if (selfLVT->getObjectType()->getEnumOrBoundGenericEnum())
+            kind = ValueTypeMemberApplication::Enum;
+          else
+            llvm_unreachable("unknown kind of value type?!");
+        } else if (auto amRef = dyn_cast<ArchetypeMemberRefExpr>(member)) {
+          auto selfLVT = amRef->getBase()->getType()->getAs<LValueType>();
+          if (!selfLVT)
             goto not_value_type_member;
-          if (fn->isInstanceMember())
-            ValueTypeMemberApplications.insert({
-              member,
-              // We need to apply all of the non-self argument clauses.
-              fn->getNaturalArgumentCount() - 1
-            });
+          fn = dyn_cast<FuncDecl>(amRef->getDecl());
+          kind = ValueTypeMemberApplication::Archetype;
+        } else if (auto pmRef = dyn_cast<ExistentialMemberRefExpr>(member)) {
+          auto selfLVT = pmRef->getBase()->getType()->getAs<LValueType>();
+          if (!selfLVT)
+            goto not_value_type_member;
+          fn = dyn_cast<FuncDecl>(pmRef->getDecl());
+          kind = ValueTypeMemberApplication::Protocol;
         }
+        if (!fn)
+          goto not_value_type_member;
+        if (fn->isInstanceMember())
+          ValueTypeMemberApplications.insert({
+            member,
+            // We need to apply all of the non-self argument clauses.
+            {fn->getNaturalArgumentCount() - 1, kind},
+          });
+
       not_value_type_member:
         return member;
       }
@@ -1644,11 +1679,16 @@ namespace {
       auto foundApplication = ValueTypeMemberApplications.find(
                                    expr->getFn()->getSemanticsProvidingExpr());
       if (foundApplication != ValueTypeMemberApplications.end()) {
-        unsigned count = foundApplication->second;
-        assert(count > 0);
+        unsigned level = foundApplication->second.level;
+        assert(level > 0);
         ValueTypeMemberApplications.erase(foundApplication);
-        if (count > 1)
-          ValueTypeMemberApplications.insert({result, count - 1});
+        if (level > 1)
+          ValueTypeMemberApplications.insert({
+            result, {
+              level - 1,
+              foundApplication->second.kind
+            }
+          });
       }
       
       return result;
@@ -1956,7 +1996,8 @@ namespace {
       // Check that all value type methods were fully applied.
       for (auto &unapplied : ValueTypeMemberApplications) {
         cs.getTypeChecker().diagnose(unapplied.first->getLoc(),
-                               diag::partial_application_of_value_type_method);
+                               diag::partial_application_of_value_type_method,
+                               unapplied.second.kind);
       }
     }
   };
