@@ -22,6 +22,7 @@ KNOWN_SETTINGS=(
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
     cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
+    incremental                 ""               "when build directories already exist, skip configuration"
     package                     ""               "set to build packages"
     prefix                      "/usr"           "installation prefix"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
@@ -248,15 +249,17 @@ esac
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
-  mkdir -p "${LLVM_BUILD_DIR}"
-  (cd "${LLVM_BUILD_DIR}" &&
-    "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
-      -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-      -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
-      -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
-      -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
-      -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
-      "$WORKSPACE/llvm" || exit 1)
+  if [[ ! -f  "${LLVM_BUILD_DIR}/CMakeCache.txt" ]] ; then
+      mkdir -p "${LLVM_BUILD_DIR}"
+      (cd "${LLVM_BUILD_DIR}" &&
+          "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+              -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+              -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
+              -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
+              -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
+              "$WORKSPACE/llvm" || exit 1)
+  fi
   "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
 fi
 
@@ -284,18 +287,21 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
         
         echo "--- Building ${product} ---"
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
-        mkdir -p "${!_PRODUCT_BUILD_DIR}"
+        
+        if [[ ! -f  "${!_PRODUCT_BUILD_DIR}/CMakeCache.txt" ]] ; then
+            mkdir -p "${!_PRODUCT_BUILD_DIR}"
 
-        _PRODUCT_CMAKE_OPTIONS=${PRODUCT}_CMAKE_OPTIONS[@]
-        (cd "${!_PRODUCT_BUILD_DIR}" &&
-            "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
-                "${!_PRODUCT_CMAKE_OPTIONS}" \
-                -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-                -D${PRODUCT}_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
-                -D${PRODUCT}_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
-                -D${PRODUCT}_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
-                -D${PRODUCT}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
-                "$WORKSPACE/${product}" || exit 1)
+            _PRODUCT_CMAKE_OPTIONS=${PRODUCT}_CMAKE_OPTIONS[@]
+            (cd "${!_PRODUCT_BUILD_DIR}" &&
+                "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+                    "${!_PRODUCT_CMAKE_OPTIONS}" \
+                    -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+                    -D${PRODUCT}_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
+                    -D${PRODUCT}_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
+                    -D${PRODUCT}_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
+                    -D${PRODUCT}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+                    "$WORKSPACE/${product}" || exit 1)
+        fi
         "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
     fi
 done
