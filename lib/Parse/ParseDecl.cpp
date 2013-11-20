@@ -85,7 +85,8 @@ bool Parser::parseTopLevel() {
 
   // Add newly parsed decls to the translation unit.
   for (auto Item : Items)
-    SF.Decls.push_back(Item.get<Decl*>());
+    if (Decl *D = Item.dyn_cast<Decl*>())
+      SF.Decls.push_back(D);
 
   // Note that the translation unit is fully parsed and verify it.
   SF.ASTStage = SourceFile::Parsed;
