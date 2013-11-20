@@ -23,13 +23,11 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Subsystems.h"
 using namespace swift;
-using namespace swift::PatternMatch;
 
 STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
@@ -218,7 +216,6 @@ public:
 
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
-  SILInstruction *visitStructExtractInst(StructExtractInst *V);
 
 private:
   /// Perform one SILCombine iteration.
@@ -397,30 +394,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   Worklist.zap();
   return MadeChange;
-}
-
-//===----------------------------------------------------------------------===//
-//                                  Visitors
-//===----------------------------------------------------------------------===//
-
-SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
-
-  // (struct_extract (load %x) #vardecl)
-  //   ->
-  // (load (struct_element_addr %x), #vardecl)
-  LoadInst *LI;
-  if (match(&*SEI->getOperand(), m_LoadInst(LI))) {
-    SILType ResultType = SEI->getType().getAddressType();
-    StructElementAddrInst *SEA = Builder->createStructElementAddr(SEI->getLoc(),
-                                                                  LI->getOperand(),
-                                                                  SEI->getField(),
-                                                                  ResultType);
-    LoadInst *Result = Builder->createLoad(SEI->getLoc(), SEA);
-
-    return replaceInstUsesWith(*SEI, Result);
-  }
-
-  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

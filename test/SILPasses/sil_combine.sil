@@ -271,16 +271,3 @@ bb2:
 bb3(%3 : $BoolLike):
   return %3 : $BoolLike
 }
-
-// CHECK-LABEL: sil @struct_extract_load_to_load_struct_element_addr
-// CHECK: bb0(%0 : $*UInt8):
-// CHECK-NEXT:  %1 = struct_element_addr %0 : $*UInt8, #value
-// CHECK-NEXT:  %2 = load %1 : $*Builtin.Int8
-// CHECK-NEXT:  return %2 : $Builtin.Int8
-
-sil @struct_extract_load_to_load_struct_element_addr : $@thin (@inout UInt8) -> (Builtin.Int8) {
-bb0(%0 : $*UInt8):
-  %1 = load %0 : $*UInt8
-  %2 = struct_extract %1 : $UInt8, #value
-  return %2 : $Builtin.Int8
-}
