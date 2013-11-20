@@ -1060,6 +1060,7 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
 
   llvm_unreachable("no other types should differ by abstraction");
 }
+#endif
 
 static bool isNative(AbstractCC cc) {
   switch (cc) {
@@ -1072,7 +1073,6 @@ static bool isNative(AbstractCC cc) {
   }
   llvm_unreachable("bad CC");
 }
-#endif
 
 /// Given two SIL types which are representations of the same type,
 /// check whether they have an abstraction difference.
