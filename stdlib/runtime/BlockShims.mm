@@ -63,7 +63,7 @@ namespace {
 #define OWNED(T) o##T
 #define DIRECT(T) d##T
 #define INDIRECT(T) i##T
-#define VOID T_
+#define VOID dT_
 #define NONE
 
 /// () -> Void

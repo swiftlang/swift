@@ -685,7 +685,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       mangleParameter(fn->getIndirectResult());
     } else {
       auto result = fn->getResult();
-      mangleResultConvention(result.getConvention());
+      Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), ExplosionKind::Minimal, 0);
     }
     Buffer << '_';
