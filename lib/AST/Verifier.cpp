@@ -614,21 +614,14 @@ namespace {
         abort();
       }
       
-      if (!E->getType()->is<LValueType>()) {
-        Out << "Member reference type is not an lvalue\n";
+      if (!E->getType()->is<LValueType>() && !E->getType()->is<MetaTypeType>()) {
+        Out << "Member reference type is not an lvalue or metatype\n";
         E->dump(Out);
         abort();
       }
       
       if (!E->getMember()) {
         Out << "Member reference is missing declaration\n";
-        E->dump(Out);
-        abort();
-      }
-
-      LValueType *ResultLV = E->getType()->getAs<LValueType>();
-      if (!ResultLV) {
-        Out << "Member reference has non-lvalue type\n";
         E->dump(Out);
         abort();
       }
