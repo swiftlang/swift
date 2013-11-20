@@ -583,7 +583,34 @@ public:
     OS << " // " << decimal;
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal \"" << SLI->getValue() << "\"";
+    OS << "string_literal \"";
+
+    auto value = SLI->getValue();
+    for (size_t i = 0, e = value.size(); i != e; ++i) {
+      switch (value[i]) {
+      case '\\': OS << "\\\\"; break;
+      case '\t': OS << "\\t"; break;
+      case '\n': OS << "\\n"; break;
+      case '\r': OS << "\\r"; break;
+      case '"': OS << "\\\""; break;
+      case '\'': OS << '\''; break; // no need to escape these
+      case '\0': OS << "\\0"; break;
+      default:
+        auto c = (unsigned char) value[i];
+        // Other ASCII control characters should get escaped.
+        if (c < 0x20) {
+          static const char hexdigit[] = {
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            'A', 'B', 'C', 'D', 'E', 'F', 'G'
+          };
+          OS << "\\x" << hexdigit[c >> 4] << hexdigit[c & 0xF];
+        } else {
+          OS << c;
+        }
+        break;
+      }
+    }
+    OS << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getIDAndType(LI->getOperand());
