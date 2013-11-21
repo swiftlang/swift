@@ -746,12 +746,13 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                     (Size)CI.getTargetInfo().getPointerWidth(0),
                     (Alignment)CI.getTargetInfo().getPointerAlign(0),
                     IGF.getDebugScope());
-  emitVariableDeclaration
-    (IGF.Builder, Metadata, DTI,
-     TName, llvm::dwarf::DW_TAG_auto_variable, 0,
-     isa<llvm::AllocaInst>(Metadata) ? IndirectValue : DirectValue,
-     ArtificialValue,
-     isa<llvm::AllocaInst>(Metadata) ? Declare : Value);
+  emitVariableDeclaration(IGF.Builder, Metadata, DTI,
+                          TName, llvm::dwarf::DW_TAG_auto_variable, 0,
+                          // swift.type is already pointer type,
+                          // having a shadow copy doesn't add another
+                          // layer of indirection.
+                          DirectValue, ArtificialValue,
+                          isa<llvm::AllocaInst>(Metadata) ? Declare : Value);
 }
 
 
