@@ -136,7 +136,8 @@ namespace {
     void visitType(CanType origType, CanType substType) {
       unsigned origParamIndex = NextOrigParamIndex++;
 
-      auto &substTL = M.Types.getTypeLowering(origType, substType);
+      auto &substTL =
+        M.Types.getTypeLowering(AbstractionPattern(origType), substType);
       ParameterConvention convention;
       if (isa<LValueType>(origType)) {
         convention = ParameterConvention::Indirect_Inout;
@@ -257,7 +258,7 @@ namespace {
     }
 
     void addInput(CanType unlowered, ParameterConvention convention) {
-      auto lowered = M.Types.getLoweredType(OrigType.getAsType(), unlowered);
+      auto lowered = M.Types.getLoweredType(OrigType, unlowered);
       Inputs.push_back(SILParameterInfo(lowered.getSwiftRValueType(),
                                         convention));
     }
@@ -987,7 +988,7 @@ namespace {
       : TC(TC), OrigFnType(origFnType), OrigParams(origFnType->getParameters())
     {}
 
-    SILResultInfo substResult(CanType origResultType,
+    SILResultInfo substResult(AbstractionPattern origResultType,
                               CanType substResultType) {
       SILResultInfo origResult = OrigFnType->getResult();
       bool origHasIndirectResult = OrigFnType->hasIndirectResult();
@@ -1001,7 +1002,7 @@ namespace {
 
       // If the result type didn't change, we can just use the
       // original result.
-      if (origResultType == substResultType) {
+      if (origResultType.getAsType() == substResultType) {
         // That includes the implicit indirect result parameter.
         if (origHasIndirectResult)
           SubstParams.push_back(origIndirectResult);
@@ -1065,7 +1066,8 @@ namespace {
 
       // Otherwise, lower the substituted type using the abstraction
       // patterns of the original.
-      auto &substTL = TC.getTypeLowering(origType, substType);
+      auto &substTL =
+        TC.getTypeLowering(AbstractionPattern(origType), substType);
       auto substConvention = getSubstConvention(origParam.getConvention(),
                                                 substTL.isTrivial());
       assert(isIndirectParameter(substConvention) ||
@@ -1127,7 +1129,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
 
   // Map the result.
   SILResultInfo substResult =
-    substituter.substResult(origLoweredType.getResult(),
+    substituter.substResult(AbstractionPattern(origLoweredType.getResult()),
                             substLoweredType.getResult());
 
   // Map the inputs.
@@ -1262,7 +1264,8 @@ namespace {
         return origType;
       }
 
-      return TheSILModule.Types.getLoweredType(origType, substType)
+      return TheSILModule.Types.getLoweredType(AbstractionPattern(origType),
+                                               substType)
                .getSwiftRValueType();
     }
   };

@@ -27,6 +27,8 @@
 #include "llvm/ADT/StringSet.h"
 using namespace swift;
 
+using Lowering::AbstractionPattern;
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
@@ -480,7 +482,7 @@ public:
               "number of struct operands does not match number of stored "
               "member variables of struct");
 
-      Type origFormalType = field->getType();
+      auto origFormalType = AbstractionPattern(field->getType());
       Type substFormalType = structTy->getTypeOfMember(M, field, nullptr);
       SILType loweredType = TC.getLoweredType(origFormalType, substFormalType);
       
@@ -686,7 +688,7 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
 
-    Type origFormalTy = EI->getField()->getType();
+    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
     Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
     SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
@@ -729,7 +731,7 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
-    Type origFormalTy = EI->getField()->getType();
+    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
     Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
     SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
@@ -752,7 +754,7 @@ public:
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
 
-    Type origFormalTy = EI->getField()->getType();
+    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
     Type substFormalTy = operandTy.getSwiftRValueType()
       ->getTypeOfMember(M, EI->getField(), nullptr);
     SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);

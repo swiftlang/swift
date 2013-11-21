@@ -1181,7 +1181,8 @@ namespace {
       // For now, we never try to emit specialized versions of the
       // metadata statically, so compute the field layout using the
       // originally-declared type.
-      SILType fieldType = IGM.getLoweredType(var->getType(), var->getType());
+      SILType fieldType =
+        IGM.getLoweredType(AbstractionPattern(var->getType()), var->getType());
       Ivars.push_back(buildIvar(var, fieldType));
       if (!IGM.isPOD(fieldType, ResilienceScope::Local)) {
         HasNonTrivialDestructor = true;

@@ -20,6 +20,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Mangle.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include <cassert>
 
 namespace llvm {
@@ -34,7 +35,7 @@ namespace Mangle {
 }
 
 namespace irgen {
-  
+  using Lowering::AbstractionPattern;
   using Mangle::ExplosionKind;
 
 class Size;

@@ -194,9 +194,11 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
-  SILType getLoweredType(Type orig, Type subst);
-  const TypeInfo &getTypeInfoForUnlowered(CanType orig, CanType subst);
-  const TypeInfo &getTypeInfoForUnlowered(Type orig, Type subst);
+  SILType getLoweredType(AbstractionPattern orig, Type subst);
+  const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
+                                          CanType subst);
+  const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
+                                          Type subst);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);

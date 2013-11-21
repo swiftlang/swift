@@ -36,15 +36,15 @@ static CanType getSubstFormalRValueType(Expr *expr) {
   return lv.getObjectType();
 }
 
-static CanType getOrigFormalRValueType(ASTContext &ctx,
-                                       Type formalStorageType) {
+static AbstractionPattern getOrigFormalRValueType(ASTContext &ctx,
+                                                  Type formalStorageType) {
   auto type = formalStorageType->getCanonicalType();
   if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
     type = ref.getReferentType();
     if (isa<WeakStorageType>(ref))
       type = OptionalType::get(type, ctx)->getCanonicalType();
   }
-  return type;
+  return AbstractionPattern(type);
 }
 
 /// Return the LValueTypeData for the formal type of a declaration
@@ -52,7 +52,7 @@ static CanType getOrigFormalRValueType(ASTContext &ctx,
 static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
                                                CanType formalRValueType) {
   return {
-    formalRValueType,
+    AbstractionPattern(formalRValueType),
     formalRValueType,
     gen.getLoweredType(formalRValueType),
   };
@@ -65,7 +65,7 @@ static LValueTypeData getValueTypeData(SILValue value) {
   assert(value.getType().hasReferenceSemantics() ||
          value.getType().is<MetaTypeType>());
   return {
-    value.getType().getSwiftRValueType(),
+    AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
     value.getType()
   };
@@ -79,7 +79,7 @@ static LValueTypeData getMemberTypeData(SILGenFunction &gen,
   auto substFormalType = getSubstFormalRValueType(lvalueExpr);
   return {
     origFormalType,
-      substFormalType,
+    substFormalType,
     gen.getLoweredType(origFormalType, substFormalType)
   };
 }
@@ -604,14 +604,8 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
 
   auto baseTypeData = lv.getTypeData();
-  auto getElementType = [](CanType type, unsigned index) {
-    if (auto tuple = dyn_cast<TupleType>(type))
-      return tuple.getElementType(index);
-    assert(isa<ArchetypeType>(type));
-    return type;
-  };
   LValueTypeData typeData = {
-    getElementType(baseTypeData.OrigFormalType, index),
+    baseTypeData.OrigFormalType.getTupleElementType(index),
     cast<TupleType>(baseTypeData.SubstFormalType).getElementType(index),
     baseTypeData.TypeOfRValue.getTupleElementType(index)
   };

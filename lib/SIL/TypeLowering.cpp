@@ -808,7 +808,7 @@ namespace {
         return handleAddressOnly(structType);
 
       for (auto field : D->getStoredProperties()) {
-        auto origFieldType = field->getType();
+        auto origFieldType = AbstractionPattern(field->getType());
         auto substFieldType =
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
         auto &lowering = TC.getTypeLowering(origFieldType, substFieldType);
@@ -898,11 +898,9 @@ static bool isLoweredType(CanType type) {
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
 static CanTupleType getLoweredTupleType(TypeConverter &tc,
-                                        CanType origType,
+                                        AbstractionPattern origType,
                                         CanTupleType substType) {
-  auto origTupleType = dyn_cast<TupleType>(origType);
-  assert(!origTupleType ||
-         origTupleType->getNumElements() == substType->getNumElements());
+  assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
   // any interesting way?
@@ -911,14 +909,13 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
   loweredElts.reserve(substType->getNumElements());
 
   for (auto i : indices(substType->getElementTypes())) {
+    auto origEltType = origType.getTupleElementType(i);
     auto substEltType = substType.getElementType(i);
 
     CanType loweredSubstEltType;
     if (auto substLV = dyn_cast<LValueType>(substEltType)) {
-      assert(origTupleType && "archetype bound to tuple containing l-value");
-      auto origLV = cast<LValueType>(origTupleType.getElementType(i));
-      SILType silType =
-        tc.getLoweredType(origLV.getObjectType(), substLV.getObjectType());
+      SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
+                                          substLV.getObjectType());
       loweredSubstEltType = CanType(LValueType::get(silType.getSwiftRValueType(),
                                                     substLV->getQualifiers(),
                                                     tc.Context));
@@ -926,8 +923,6 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
       // If the original type was an archetype, use that archetype as
       // the original type of the element --- the actual archetype
       // doesn't matter, just the abstraction pattern.
-      auto origEltType =
-        (origTupleType ? origTupleType.getElementType(i) : origType);
       SILType silType = tc.getLoweredType(origEltType, substEltType);
       loweredSubstEltType = silType.getSwiftRValueType();
     }
@@ -946,7 +941,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 }
 
 CanSILFunctionType
-TypeConverter::getSILFunctionType(CanType origType,
+TypeConverter::getSILFunctionType(AbstractionPattern origType,
                                   CanAnyFunctionType substType,
                                   unsigned uncurryLevel) {
   return getLoweredType(origType, substType, uncurryLevel)
@@ -954,9 +949,9 @@ TypeConverter::getSILFunctionType(CanType origType,
 }
 
 const TypeLowering &
-TypeConverter::getTypeLowering(Type origOrigType, Type origSubstType,
+TypeConverter::getTypeLowering(AbstractionPattern origType,
+                               Type origSubstType,
                                unsigned uncurryLevel) {
-  CanType origType = origOrigType->getCanonicalType();
   CanType substType = origSubstType->getCanonicalType();
   auto key = getTypeKey(origType, substType, uncurryLevel);
   auto existing = Types.find(key);
@@ -976,14 +971,15 @@ TypeConverter::getTypeLowering(Type origOrigType, Type origSubstType,
     auto substLoweredType =
       getLoweredASTFunctionType(substFnType, uncurryLevel);
 
-    CanType origLoweredType;
-    if (substType == origType) {
-      origLoweredType = substLoweredType;
-    } else if (isa<ArchetypeType>(origType)) {
+    AbstractionPattern origLoweredType;
+    if (substType == origType.getAsType()) {
+      origLoweredType = AbstractionPattern(substLoweredType);
+    } else if (origType.isOpaque()) {
       origLoweredType = origType;
     } else {
-      auto origFnType = cast<AnyFunctionType>(origType);
-      origLoweredType = getLoweredASTFunctionType(origFnType, uncurryLevel);
+      auto origFnType = cast<AnyFunctionType>(origType.getAsType());
+      origLoweredType =
+        AbstractionPattern(getLoweredASTFunctionType(origFnType, uncurryLevel));
     }
     TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0);
 
@@ -1006,8 +1002,7 @@ TypeConverter::getTypeLowering(Type origOrigType, Type origSubstType,
   if (auto substLValueType = dyn_cast<LValueType>(substType)) {
     // Derive SILType for LValueType from the object type.
     CanType substObjectType = substLValueType.getObjectType();
-    // Archetypes can't be bound to l-value types, so cast<> is okay.
-    CanType origObjectType = cast<LValueType>(origType).getObjectType();
+    AbstractionPattern origObjectType = origType.getLValueObjectType();
 
     SILType loweredType = getLoweredType(origObjectType, substObjectType,
                                          uncurryLevel).getAddressType();
@@ -1041,7 +1036,7 @@ TypeConverter::getTypeLowering(Type origOrigType, Type origSubstType,
 
 const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
   auto loweredType = type.getSwiftRValueType();
-  auto key = getTypeKey(loweredType, loweredType, 0);
+  auto key = getTypeKey(AbstractionPattern(loweredType), loweredType, 0);
   return getTypeLoweringForLoweredType(key);
 }
 
@@ -1095,7 +1090,7 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
 
   // Do a cached lookup under yet another key, just so later lookups
   // using the SILType will find the same TypeLowering object.
-  TypeKey loweredKey = getTypeKey(key.OrigType, silFnType, 0);
+  auto loweredKey = getTypeKey(AbstractionPattern(key.OrigType), silFnType, 0);
   auto &lowering = getTypeLoweringForLoweredType(loweredKey);
   Types[key] = &lowering;
   return lowering;
@@ -1403,7 +1398,7 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
-  auto origFieldTy = field->getType();
+  auto origFieldTy = AbstractionPattern(field->getType());
   auto substFieldTy =
     getSwiftRValueType()->getTypeOfMember(field->getModuleContext(),
                                           field, nullptr);
@@ -1422,6 +1417,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   auto substEltTy =
     getSwiftRValueType()->getTypeOfMember(elt->getModuleContext(),
                                           elt, nullptr, origEltTy);
-  auto loweredTy = M.Types.getLoweredType(origEltTy, substEltTy);
+  auto loweredTy =
+    M.Types.getLoweredType(AbstractionPattern(origEltTy), substEltTy);
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }

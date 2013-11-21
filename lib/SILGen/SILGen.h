@@ -497,14 +497,15 @@ public:
   SILFunction &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
-  const TypeLowering &getTypeLowering(Type orig, Type subst,
+  const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst,
                                       unsigned uncurryLevel = 0) {
     return SGM.Types.getTypeLowering(orig, subst, uncurryLevel);
   }
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
     return SGM.Types.getTypeLowering(t, uncurryLevel);
   }
-  SILType getLoweredType(Type orig, Type subst, unsigned uncurryLevel = 0) {
+  SILType getLoweredType(AbstractionPattern orig, Type subst,
+                         unsigned uncurryLevel = 0) {
     return SGM.Types.getLoweredType(orig, subst, uncurryLevel);
   }
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {

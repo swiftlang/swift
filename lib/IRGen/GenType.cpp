@@ -568,14 +568,15 @@ const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type subst) {
 
 /// Get the fragile type information for the given type, which may not
 /// have yet undergone SIL type lowering.
-const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(Type orig, Type subst) {
+const TypeInfo &
+IRGenFunction::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
   return IGM.getTypeInfoForUnlowered(orig, subst);
 }
 
 /// Get the fragile type information for the given type, which may not
 /// have yet undergone SIL type lowering.
-const TypeInfo &IRGenFunction::getTypeInfoForUnlowered(CanType orig,
-                                                       CanType subst) {
+const TypeInfo &
+IRGenFunction::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
   return IGM.getTypeInfoForUnlowered(orig, subst);
 }
 
@@ -592,7 +593,7 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type orig, Type subst) {
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
   return SILMod->Types.getLoweredType(orig, subst);
 }
 
@@ -634,20 +635,20 @@ llvm::Type *IRGenModule::getStorageTypeForLowered(CanType T) {
 /// yet undergone SIL type lowering.  The type can serve as its own
 /// abstraction pattern.
 const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type subst) {
-  return getTypeInfoForUnlowered(subst, subst);
+  return getTypeInfoForUnlowered(AbstractionPattern(subst), subst);
 }
 
 /// Get the type information for the given type, which may not
 /// have yet undergone SIL type lowering.
-const TypeInfo &IRGenModule::getTypeInfoForUnlowered(Type orig, Type subst) {
-  return getTypeInfoForUnlowered(orig->getCanonicalType(),
-                                 subst->getCanonicalType());
+const TypeInfo &
+IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
+  return getTypeInfoForUnlowered(orig, subst->getCanonicalType());
 }
 
 /// Get the type information for the given type, which may not
 /// have yet undergone SIL type lowering.
-const TypeInfo &IRGenModule::getTypeInfoForUnlowered(CanType orig,
-                                                     CanType subst) {
+const TypeInfo &
+IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
   return getTypeInfo(SILMod->Types.getLoweredType(orig, subst));
 }
 

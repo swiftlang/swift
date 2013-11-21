@@ -30,7 +30,7 @@ class LogicalPathComponent;
 
 /// Information about the type of an l-value.
 struct LValueTypeData {
-  CanType OrigFormalType;
+  AbstractionPattern OrigFormalType;
   CanType SubstFormalType;
   SILType TypeOfRValue;
 };
@@ -95,7 +95,9 @@ public:
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
-  CanType getOrigFormalType() const { return TypeData.OrigFormalType; }
+  AbstractionPattern getOrigFormalType() const {
+    return TypeData.OrigFormalType;
+  }
   CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
 
   const LValueTypeData &getTypeData() const { return TypeData; }
@@ -223,8 +225,10 @@ public:
   /// this l-value.  Note that this may differ significantly from the
   /// type of l-value.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
-  CanType getOrigFormalType() const { return TypeData.OrigFormalType; }
   CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
+  AbstractionPattern getOrigFormalType() const {
+    return TypeData.OrigFormalType;
+  }
   const LValueTypeData &getTypeData() const { return TypeData; }
 };
   

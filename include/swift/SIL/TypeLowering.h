@@ -14,6 +14,7 @@
 #define SIL_TypeLowering_h
 
 #include "swift/Basic/Optional.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -303,49 +304,6 @@ protected:
   void operator delete(void*) {}
 };
 
-/// A pattern for the abstraction of a value.  See the large comment
-/// in SILGenPoly.cpp.
-///
-/// An abstraction pattern is represented with an original,
-/// unsubstituted type.  The archetypes naturally fall at exactly
-/// the specified abstraction points.
-class AbstractionPattern {
-  CanType OrigType;
-public:
-  explicit AbstractionPattern(CanType origType) : OrigType(origType) {}
-  CanType getAsType() const { return OrigType; }
-
-  bool isOpaque() const {
-    return isa<ArchetypeType>(OrigType) &&
-           !cast<ArchetypeType>(OrigType)->requiresClass();
-  }
-
-  bool matchesTuple(CanTupleType substType) {
-    if (auto tuple = dyn_cast<TupleType>(OrigType))
-      return tuple->getNumElements() == substType->getNumElements();
-    return isOpaque();
-  }
-  AbstractionPattern getTupleElementType(unsigned index) const {
-    if (auto tuple = dyn_cast<TupleType>(OrigType))
-      return AbstractionPattern(tuple.getElementType(index));
-    assert(isOpaque());
-    return AbstractionPattern(OrigType);
-  }
-
-  AbstractionPattern getFunctionResultType() const {
-    if (auto fn = dyn_cast<AnyFunctionType>(OrigType))
-      return AbstractionPattern(fn.getResult());
-    assert(isOpaque());
-    return AbstractionPattern(OrigType);
-  }
-  AbstractionPattern getFunctionInputType() const {
-    if (auto fn = dyn_cast<AnyFunctionType>(OrigType))
-      return AbstractionPattern(fn.getInput());
-    assert(isOpaque());
-    return AbstractionPattern(OrigType);
-  }
-};
-
 /// Type and lowering information about a constant function.
 struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
@@ -408,8 +366,9 @@ class TypeConverter {
   };
   friend struct llvm::DenseMapInfo<TypeKey>;
   
-  TypeKey getTypeKey(CanType origTy, CanType substTy, unsigned uncurryLevel) {
-    return { origTy, substTy, uncurryLevel };
+  TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
+                     unsigned uncurryLevel) {
+    return { origTy.getAsType(), substTy, uncurryLevel };
   }
   
   llvm::DenseMap<TypeKey, const TypeLowering *> Types;
@@ -455,12 +414,13 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(t, t, uncurryLevel);
+    return getTypeLowering(AbstractionPattern(t), t, uncurryLevel);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
   /// patterns of the given original type.
-  const TypeLowering &getTypeLowering(Type origType, Type substType,
+  const TypeLowering &getTypeLowering(AbstractionPattern origType,
+                                      Type substType,
                                       unsigned uncurryLevel = 0);
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
@@ -474,7 +434,7 @@ public:
   }
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type origType, Type substType,
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
                          unsigned uncurryLevel = 0) {
     return getTypeLowering(origType, substType, uncurryLevel).getLoweredType();
   }
@@ -487,7 +447,7 @@ public:
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
-  CanSILFunctionType getSILFunctionType(CanType origType,
+  CanSILFunctionType getSILFunctionType(AbstractionPattern origType,
                                         CanAnyFunctionType substType,
                                         unsigned uncurryLevel);
 

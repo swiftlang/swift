@@ -725,8 +725,9 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
 
   // Construct a callee and derive its ownership conventions.
   auto origFormalType = IGM.SILMod->Types.getConstantFormalType(declRef);
-  auto origFnType = IGM.SILMod->Types.getSILFunctionType(origFormalType,
-                                               origFormalType, /*uncurry*/ 0);
+  auto origFnType =
+    IGM.SILMod->Types.getSILFunctionType(AbstractionPattern(origFormalType),
+                                         origFormalType, /*uncurry*/ 0);
 
   auto callee = Callee::forMethod(origFnType,
                                   origFnType,

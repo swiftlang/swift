@@ -2431,8 +2431,9 @@ namespace {
       auto adjSigTy = Lowering::adjustFunctionType(SignatureTy,
                                          SignatureTy->getExtInfo()
                                .withCallingConv(AbstractCC::Freestanding));
-      auto sigTy = IGM.SILMod->Types.getSILFunctionType(adjSigTy, adjSigTy,
-                                                        UncurryLevel);
+      auto sigTy =
+        IGM.SILMod->Types.getSILFunctionType(AbstractionPattern(adjSigTy),
+                                             adjSigTy, UncurryLevel);
       auto fnTy = IGM.getFunctionType(sigTy, ExplosionKind::Minimal,
                                       extraData, attrs);
       fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
@@ -2458,11 +2459,13 @@ namespace {
       auto &tc = IGF.IGM.SILMod->Types;
       auto sigUncurriedTy
         = tc.getLoweredASTFunctionType(SignatureTy, UncurryLevel);
-      auto sigFnType = tc.getSILFunctionType(sigUncurriedTy, sigUncurriedTy, 0);
+      auto sigFnType = tc.getSILFunctionType(AbstractionPattern(sigUncurriedTy),
+                                             sigUncurriedTy, 0);
 
       auto implUncurriedTy
         = tc.getLoweredASTFunctionType(ImplTy, UncurryLevel);
-      auto implFnType = tc.getSILFunctionType(implUncurriedTy, implUncurriedTy, 0);
+      auto implFnType = tc.getSILFunctionType(AbstractionPattern(implUncurriedTy),
+                                              implUncurriedTy, 0);
       
       // Collect the parameters.
       Explosion sigParams = IGF.collectParameters(ExplosionLevel);

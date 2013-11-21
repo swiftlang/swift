@@ -1022,7 +1022,7 @@ namespace {
 
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
                                                 CanType substType) override {
-      return SGF.getTypeLowering(origType.getAsType(), substType);
+      return SGF.getTypeLowering(origType, substType);
     }
   };
 }
@@ -1030,7 +1030,7 @@ namespace {
 ManagedValue SubstToOrig::transformFunction(ManagedValue fn,
                                             AbstractionPattern origFormalType,
                                             CanAnyFunctionType substFormalType) {
-  auto &expectedTL = SGF.getTypeLowering(origFormalType.getAsType(), substFormalType);
+  auto &expectedTL = SGF.getTypeLowering(origFormalType, substFormalType);
   if (expectedTL.getLoweredType() == fn.getType()) return fn;
 
   return createThunk(SGF, Loc, TranslationKind::SubstToOrig, fn,
@@ -1054,7 +1054,7 @@ ManagedValue RValueSource::materialize(SILGenFunction &SGF,
                                        SILType destType) && {
   auto substFormalType = getSubstType();
   assert(!destType || destType.getObjectType() ==
-               SGF.SGM.Types.getLoweredType(origFormalType.getAsType(),
+               SGF.SGM.Types.getLoweredType(origFormalType,
                                             substFormalType).getObjectType());
 
   // Fast path: if the types match exactly, no abstraction difference
@@ -1064,8 +1064,7 @@ ManagedValue RValueSource::materialize(SILGenFunction &SGF,
 
   auto &destTL =
     (destType ? SGF.getTypeLowering(destType)
-              : SGF.getTypeLowering(origFormalType.getAsType(),
-                                    substFormalType));
+              : SGF.getTypeLowering(origFormalType, substFormalType));
   if (!destType) destType = destTL.getLoweredType();
 
   // If there's no abstraction difference, we can just materialize as normal.
@@ -1088,7 +1087,7 @@ void RValueSource::forwardInto(SILGenFunction &SGF,
                                const TypeLowering &destTL) && {
   auto substFormalType = getSubstType();
   assert(destTL.getLoweredType() ==
-           SGF.getLoweredType(origFormalType.getAsType(), substFormalType));
+                        SGF.getLoweredType(origFormalType, substFormalType));
 
   // If there are no abstraction changes, we can just forward
   // normally.

@@ -189,7 +189,7 @@ static SILValue emitGetStoredPropertyFromValueTypeRValue(SILGenFunction &gen,
   assert(aggregate.getType().getStructOrBoundGenericStruct());
 
   auto origPropTy = AbstractionPattern(property->getType()->getCanonicalType());
-  auto &propTL = gen.getTypeLowering(origPropTy.getAsType(), substPropTy);
+  auto &propTL = gen.getTypeLowering(origPropTy, substPropTy);
 
   ManagedValue result;
   if (aggregate.getType().isAddress()) {

@@ -2900,7 +2900,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
         Type substArgTy = type->getTypeOfMember(theEnum->getModuleContext(),
                                                 elt, nullptr,
                                                 origArgTy);
-        substArgTI = &TC.IGM.getTypeInfoForUnlowered(origArgTy, substArgTy);
+        substArgTI = &TC.IGM.getTypeInfoForUnlowered(AbstractionPattern(origArgTy),
+                                                     substArgTy);
       }
       
       elementsWithPayload.push_back({elt, substArgTI});
