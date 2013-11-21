@@ -85,7 +85,8 @@ public:
               StringRef MangledName, CanSILFunctionType LoweredType,
               Optional<SILLocation> Loc = Nothing,
               IsTransparent_t isTrans = IsNotTransparent,
-              SILFunction *InsertBefore = nullptr);
+              SILFunction *InsertBefore = nullptr,
+              SILDebugScope *DebugScope = nullptr);
 
   ~SILFunction();
 

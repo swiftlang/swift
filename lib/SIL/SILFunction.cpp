@@ -19,13 +19,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, CanSILFunctionType LoweredType,
                          Optional<SILLocation> Loc,
                          IsTransparent_t isTrans,
-                         SILFunction *InsertBefore)
+                         SILFunction *InsertBefore,
+                         SILDebugScope *DebugScope)
   : ModuleAndLinkage(&Module, Linkage),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc),
     DeclCtx(nullptr),
-    DebugScope(nullptr),
+    DebugScope(DebugScope),
     Transparent(isTrans) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
