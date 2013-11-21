@@ -448,23 +448,52 @@ ConstraintSystem::SolverScope::~SolverScope() {
   cs.failedConstraint = nullptr;
 }
 
+namespace {
+  struct PotentialBindings {
+    /// The set of potential bindings.
+    SmallVector<std::pair<Type, bool>, 4> Bindings;
+
+    /// Whether this type variable is fully bound by one of its constraints.
+    bool FullyBound = false;
+
+    /// Whether the bindings of this type involve other type variables.
+    bool InvolvesTypeVariables = false;
+
+    /// Whether this type variable has literal bindings.
+    bool HasLiteralBindings = false;
+
+    /// Determine whether the set of bindings is non-empty.
+    explicit operator bool() const {
+      return !Bindings.empty();
+    }
+
+    /// Compare two sets of bindings, where \c x < y indicates that
+    /// \c x is a better set of bindings that \c y.
+    friend bool operator<(const PotentialBindings &x, 
+                          const PotentialBindings &y) {
+      return std::make_tuple(x.FullyBound, x.InvolvesTypeVariables, 
+                             x.HasLiteralBindings, -x.Bindings.size())
+        < std::make_tuple(y.FullyBound, y.InvolvesTypeVariables, 
+                          y.HasLiteralBindings, -y.Bindings.size());
+    }
+  };
+}
+
 /// \brief Retrieve the set of potential type bindings for the given type
 /// variable, along with flags indicating whether those types should be
 /// opened.
-static SmallVector<std::pair<Type, bool>, 4>
-getPotentialBindings(ConstraintSystem &cs,
-                     TypeVariableConstraints &tvc,
-                     bool &involvesTypeVariables,
-                     bool &hasLiteralBindings) {
-  involvesTypeVariables = tvc.HasNonConcreteConstraints;
-  hasLiteralBindings = false;
+static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
+                                              TypeVariableConstraints &tvc) {
+  PotentialBindings result;
+  result.FullyBound = tvc.FullyBound;
+  result.InvolvesTypeVariables = tvc.HasNonConcreteConstraints;
+  result.HasLiteralBindings = false;
+
+  if (result.FullyBound)
+    return result;
 
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   SmallVector<std::pair<Type, bool>, 4> bindings;
-
-  // If this type variable is fully bound, return an empty set.
-  if (tvc.FullyBound)
-    return bindings;
 
   // Add the types below this type variable.
   for (auto arg : tvc.Below) {
@@ -475,15 +504,15 @@ getPotentialBindings(ConstraintSystem &cs,
 
       // Check whether the type involves type variables.
       if (type->hasTypeVariable())
-        involvesTypeVariables = true;
+        result.InvolvesTypeVariables = true;
     } else {
       // If it's recursive, obviously it involves type variables.
-      involvesTypeVariables = true;
+      result.InvolvesTypeVariables = true;
       continue;
     }
 
     if (exactTypes.insert(type->getCanonicalType()))
-      bindings.push_back({type, false});
+      result.Bindings.push_back({type, false});
   }
 
   // Add the types above this type variable.
@@ -495,15 +524,15 @@ getPotentialBindings(ConstraintSystem &cs,
 
       // Anything with a type variable in it is not definitive.
       if (type->hasTypeVariable())
-        involvesTypeVariables = true;
+        result.InvolvesTypeVariables = true;
     } else {
       // If it's recursive, obviously it involves type variables.
-      involvesTypeVariables = true;
+      result.InvolvesTypeVariables = true;
       continue;
     }
 
     if (exactTypes.insert(type->getCanonicalType()))
-      bindings.push_back({type, false});
+      result.Bindings.push_back({type, false});
   }
 
   // When we see conformance to a known protocol, add the default type for
@@ -514,8 +543,8 @@ getPotentialBindings(ConstraintSystem &cs,
       // For non-generic literal types, just check for exact types.
       if (!type->isUnspecializedGeneric()) {
         if (exactTypes.insert(type->getCanonicalType())) {
-          hasLiteralBindings = true;
-          bindings.push_back({type, true});
+          result.HasLiteralBindings = true;
+          result.Bindings.push_back({type, true});
         }
         continue;
       }
@@ -535,9 +564,9 @@ getPotentialBindings(ConstraintSystem &cs,
       }
 
       if (!matched) {
-        hasLiteralBindings = true;
+        result.HasLiteralBindings = true;
         exactTypes.insert(type->getCanonicalType());
-        bindings.push_back({type, true});
+        result.Bindings.push_back({type, true});
       }
     }
   }
@@ -545,7 +574,7 @@ getPotentialBindings(ConstraintSystem &cs,
   // FIXME: Minimize type bindings here by removing types that are supertypes
   // of others in the list.
 
-  return bindings;
+  return result;
 }
 
 /// \brief Try each of the given type variable bindings to find solutions
@@ -744,44 +773,29 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   if (!typeVarConstraints.empty()) {
     // Look for the best type variable to bind.
     unsigned bestTypeVarIndex = 0;
-    bool bestInvolvesTypeVariables = false;
-    bool bestHasLiteralBindings = false;
-    SmallVector<std::pair<Type, bool>, 4> bestBindings
-      = getPotentialBindings(*this,
-                             typeVarConstraints[0],
-                             bestInvolvesTypeVariables,
-                             bestHasLiteralBindings);
+    auto bestBindings = getPotentialBindings(*this, typeVarConstraints[0]);
     for (unsigned i = 1, n = typeVarConstraints.size(); i != n; ++i) {
-      bool involvesTypeVariables = false;
-      bool hasLiteralBindings = false;
-      SmallVector<std::pair<Type, bool>, 4> bindings
-        = getPotentialBindings(*this, typeVarConstraints[i],
-                               involvesTypeVariables, hasLiteralBindings);
-      if (bindings.empty())
+      auto bindings = getPotentialBindings(*this, typeVarConstraints[i]);
+      if (!bindings)
         continue;
       
       // Prefer type variables whose bindings don't involve type variables or,
       // if neither involves type variables, those with fewer bindings.
-      if (bestBindings.empty() ||
-          std::make_tuple(involvesTypeVariables, hasLiteralBindings,
-                          -bindings.size())
-            <
-          std::make_tuple(bestInvolvesTypeVariables, bestHasLiteralBindings,
-                          -bestBindings.size())) {
+      if (!bestBindings || bindings < bestBindings) {
         bestTypeVarIndex = i;
-        bestInvolvesTypeVariables = involvesTypeVariables;
         bestBindings = std::move(bindings);
       }
     }
 
     // If we have a binding that does not involve type variables, or we have
     // no other option, go ahead and try the bindings for this type variable.
-    if (!bestBindings.empty() &&
-        (!bestInvolvesTypeVariables || disjunctions.empty())) {
+    if (bestBindings && 
+        (disjunctions.empty() ||
+         (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound))) {
       return tryTypeVariableBindings(*this,
                                      solverState->depth,
                                      typeVarConstraints[bestTypeVarIndex],
-                                     bestBindings,
+                                     bestBindings.Bindings,
                                      solutions,
                                      allowFreeTypeVariables);
     }
