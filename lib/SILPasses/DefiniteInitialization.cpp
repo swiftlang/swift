@@ -420,6 +420,113 @@ enum class DIKind {
   Partial
 };
 
+namespace {
+  /// AvailabilitySet - This class stores an array of lattice values for tuple
+  /// elements being analyzed for liveness computations.  Each element is
+  /// represented with two bits in a bitvector, allowing this to represent the
+  /// lattice values corresponding to "Unknown" (bottom), "Live" or "Not Live",
+  /// which are the middle elements of the lattice, and "Partial" which is the
+  /// top element.
+  class AvailabilitySet {
+    // We store two bits per element, encoded in the following form:
+    //   T,T -> Nothing/Unknown
+    //   F,F -> No
+    //   F,T -> Yes
+    //   T,F -> Partial
+    llvm::SmallBitVector Data;
+  public:
+    AvailabilitySet(unsigned NumElts) {
+      Data.resize(NumElts*2, true);
+    }
+
+    bool empty() const { return Data.empty(); }
+    unsigned size() const { return Data.size()/2; }
+
+    DIKind get(unsigned Elt) const {
+      return getConditional(Elt).getValue();
+    }
+
+    Optional<DIKind> getConditional(unsigned Elt) const {
+      bool V1 = Data[Elt*2], V2 = Data[Elt*2+1];
+      if (V1 == V2)
+        return V1 ? Optional<DIKind>(Nothing) : DIKind::No;
+      return V2 ? DIKind::Yes : DIKind::Partial;
+    }
+
+    void set(unsigned Elt, DIKind K) {
+      switch (K) {
+      case DIKind::No:      Data[Elt*2] = false; Data[Elt*2+1] = false; break;
+      case DIKind::Yes:     Data[Elt*2] = false, Data[Elt*2+1] = true; break;
+      case DIKind::Partial: Data[Elt*2] = true,  Data[Elt*2+1] = false; break;
+      }
+    }
+    
+    void set(unsigned Elt, Optional<DIKind> K) {
+      if (!K.hasValue())
+        Data[Elt*2] = true, Data[Elt*2+1] = true;
+      else
+        set(Elt, K.getValue());
+    }
+
+    /// containsUnknownElements - Return true if there are any elements that are
+    /// unknown.
+    bool containsUnknownElements() const {
+      // Check that we didn't get any unknown values.
+      for (unsigned i = 0, e = size(); i != e; ++i)
+        if (!getConditional(i).hasValue())
+          return true;
+      return false;
+    }
+
+    bool isAllYes() const {
+      for (unsigned i = 0, e = size(); i != e; ++i) {
+        auto Elt = getConditional(i);
+        if (!Elt.hasValue() || Elt.getValue() != DIKind::Yes)
+          return false;
+      }
+      return true;
+    }
+    
+    /// changeUnsetElementsTo - If any elements of this availability set are not
+    /// known yet, switch them to the specified value.
+    void changeUnsetElementsTo(DIKind K) {
+      for (unsigned i = 0, e = size(); i != e; ++i)
+        if (!getConditional(i).hasValue())
+          set(i, K);
+    }
+    
+    void mergeIn(const AvailabilitySet &RHS) {
+      // Logically, "this |= RHS".
+      for (unsigned i = 0, e = size(); i != e; ++i) {
+        Optional<DIKind> RO = RHS.getConditional(i);
+        
+        // If RHS is unset, ignore it.
+        if (!RO.hasValue())
+          continue;
+
+        DIKind R = RO.getValue();
+        
+        // If This is unset, take R
+        Optional<DIKind> TO = getConditional(i);
+        if (!TO.hasValue()) {
+          set(i, R);
+          continue;
+        }
+        DIKind T = TO.getValue();
+        
+        // If "this" is already partial, we won't learn anything.
+        if (T == DIKind::Partial)
+          continue;
+        
+        // If "T" is yes, or no, then switch to partial if we find a different
+        // answer.
+        if (T != R)
+          set(i, DIKind::Partial);
+      }
+    }
+  };
+}
+
 
 namespace {
   /// LiveOutBlockState - Keep track of information about blocks that have
@@ -438,7 +545,7 @@ namespace {
     /// is only fully set when LOState==IsKnown.  In other states, this may only
     /// contain local availability information.
     ///
-    llvm::SmallBitVector TupleElementAvailability;
+    AvailabilitySet Availability;
 
     enum LiveOutStateTy {
       IsUnknown,
@@ -448,78 +555,46 @@ namespace {
 
     LiveOutBlockState(unsigned NumTupleElements)
       : EscapeInfo(EscapeKind::Unknown), HasNonLoadUse(false),
-        LOState(IsUnknown) {
-      TupleElementAvailability.resize(NumTupleElements*2, true);
+        Availability(NumTupleElements), LOState(IsUnknown) {
+    }
+
+    AvailabilitySet &getAvailabilitySet() {
+      return Availability;
     }
 
     DIKind getAvailability(unsigned Elt) {
-      return getAvailability(Elt, TupleElementAvailability);
+      return Availability.get(Elt);
     }
 
-    static Optional<DIKind> getAvailabilityField(unsigned Elt,
-                                                 llvm::SmallBitVector &BV) {
-      // T,T -> Nothing/Unknown
-      // F,F -> No
-      // F,T -> Yes
-      // T,F -> Partial
-      bool V1 = BV[Elt*2], V2 = BV[Elt*2+1];
-      if (V1 == V2)
-        return V1 ? Optional<DIKind>(Nothing) : DIKind::No;
-      return V2 ? DIKind::Yes : DIKind::Partial;
-    }
-    Optional<DIKind> getAvailabilityField(unsigned Elt) {
-      return getAvailabilityField(Elt, TupleElementAvailability);
+    Optional<DIKind> getAvailabilityConditional(unsigned Elt) {
+      return Availability.getConditional(Elt);
     }
 
-    static DIKind getAvailability(unsigned Elt, llvm::SmallBitVector &BV) {
-      // This will assert if nothing is set, the client shouldn't call this when
-      // that is possible.
-      return getAvailabilityField(Elt, BV).getValue();
-    }
-
-    static void setAvailability(unsigned Elt, DIKind K,
-                                llvm::SmallBitVector &BV) {
-      switch (K) {
-      case DIKind::No:      BV[Elt*2] = false; BV[Elt*2+1] = false; break;
-      case DIKind::Yes:     BV[Elt*2] = false, BV[Elt*2+1] = true; break;
-      case DIKind::Partial: BV[Elt*2] = true, BV[Elt*2+1] = false; break;
-      }
-    }
-    void setAvailability(unsigned Elt, DIKind K) {
-      setAvailability(Elt, K, TupleElementAvailability);
-    }
-
-    void setBlockAvailability(const llvm::SmallBitVector &BV) {
+    void setBlockAvailability(const AvailabilitySet &AV) {
       assert(LOState != IsKnown &&"Changing live out state of computed block?");
-      TupleElementAvailability = BV;
+      assert(!AV.containsUnknownElements() && "Set block to unknown value?");
+      Availability = AV;
       LOState = LiveOutBlockState::IsKnown;
-
-#ifndef NDEBUG
-      // Check that we didn't get any unknown values.
-      for (unsigned i = 0, e = BV.size()/2; i != e; ++i)
-        assert(getAvailabilityField(i).hasValue() &&
-               "Set block to unknown value");
-#endif
     }
 
     void setBlockAvailability1(DIKind K) {
       assert(LOState != IsKnown &&"Changing live out state of computed block?");
-      assert(TupleElementAvailability.size() == 2 && "Not 1 element case");
-      setAvailability(0, K, TupleElementAvailability);
+      assert(Availability.size() == 1 && "Not 1 element case");
+      Availability.set(0, K);
       LOState = LiveOutBlockState::IsKnown;
     }
 
     void markAvailable(const MemoryUse &Use) {
       // If the memory object has nothing in it (e.g., is an empty tuple)
       // ignore.
-      if (TupleElementAvailability.empty()) return;
+      if (Availability.empty()) return;
       
       // Peel the first iteration of the 'set' loop since there is almost always
       // a single tuple element touched by a MemoryUse.
-      setAvailability(Use.FirstTupleElement, DIKind::Yes);
+      Availability.set(Use.FirstTupleElement, DIKind::Yes);
                          
       for (unsigned i = 1; i != Use.NumTupleElements; ++i)
-        setAvailability(Use.FirstTupleElement+i, DIKind::Yes);
+        Availability.set(Use.FirstTupleElement+i, DIKind::Yes);
     }
   };
 } // end anonymous namespace
@@ -583,8 +658,8 @@ namespace {
 
     Optional<DIKind> getLiveOut1(SILBasicBlock *BB);
     void getPredsLiveOut1(SILBasicBlock *BB, Optional<DIKind> &Result);
-    llvm::SmallBitVector getLiveOutN(SILBasicBlock *BB);
-    void getPredsLiveOutN(SILBasicBlock *BB, llvm::SmallBitVector &Result);
+    AvailabilitySet getLiveOutN(SILBasicBlock *BB);
+    void getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result);
 
     void diagnoseInitError(const MemoryUse &Use, Diag<StringRef> DiagMessage);
 
@@ -651,13 +726,7 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
     
     // If all of the tuple elements are available in the block, then it is known
     // to be live-out.  This is the norm for non-tuple memory objects.
-    bool AllSet = true;
-    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
-      auto Val = BBInfo.getAvailabilityField(i);
-      if (!Val.hasValue() || Val.getValue() != DIKind::Yes)
-        AllSet = false;
-    }
-    if (AllSet)
+    if (BBInfo.getAvailabilitySet().isAllYes())
       BBInfo.LOState = LiveOutBlockState::IsKnown;
 
     if (Use.Kind == UseKind::Escape) {
@@ -678,9 +747,7 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
   // memory object itself.  Its live-out properties are whatever are trivially
   // locally inferred by the loop above.  Mark any unset elements as not
   // available.
-  for (unsigned i = 0, e = NumTupleElements; i != e; ++i)
-    if (!MemBBInfo.getAvailabilityField(i).hasValue())
-      MemBBInfo.setAvailability(i, DIKind::No);
+  MemBBInfo.getAvailabilitySet().changeUnsetElementsTo(DIKind::No);
     
   MemBBInfo.LOState = LiveOutBlockState::IsKnown;
 }
@@ -990,7 +1057,7 @@ Optional<DIKind> ElementPromotion::getLiveOut1(SILBasicBlock *BB) {
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
 
   // Compute the liveness of our predecessors value.
-  Optional<DIKind> Result = BBState.getAvailabilityField(0);
+  Optional<DIKind> Result = BBState.getAvailabilityConditional(0);
   getPredsLiveOut1(BB, Result);
 
   // Otherwise, we're golden.  Return success.
@@ -1031,14 +1098,14 @@ void ElementPromotion::getPredsLiveOut1(SILBasicBlock *BB,
     Result = DIKind::No;
 }
 
-llvm::SmallBitVector ElementPromotion::getLiveOutN(SILBasicBlock *BB) {
+AvailabilitySet ElementPromotion::getLiveOutN(SILBasicBlock *BB) {
   LiveOutBlockState &BBState = getBlockInfo(BB);
   switch (BBState.LOState) {
   case LiveOutBlockState::IsKnown:
-    return BBState.TupleElementAvailability;
+    return BBState.getAvailabilitySet();
   case LiveOutBlockState::IsComputingLiveOut:
     // Speculate that it will be live out in cyclic cases.
-    return llvm::SmallBitVector(NumTupleElements*2, true);
+    return AvailabilitySet(NumTupleElements);
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1048,7 +1115,7 @@ llvm::SmallBitVector ElementPromotion::getLiveOutN(SILBasicBlock *BB) {
   // is required to handle cycles properly.
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
 
-  llvm::SmallBitVector Result = BBState.TupleElementAvailability;
+  auto Result = BBState.getAvailabilitySet();
   getPredsLiveOutN(BB, Result);
 
   // Finally, cache and return our result.
@@ -1056,48 +1123,20 @@ llvm::SmallBitVector ElementPromotion::getLiveOutN(SILBasicBlock *BB) {
   return Result;
 }
 
-void ElementPromotion::getPredsLiveOutN(SILBasicBlock *BB,
-                                        llvm::SmallBitVector &Result) {
-  // The liveness of this block is the intersection of all of the predecessor
-  // block's liveness.
-  llvm::SmallBitVector Tmp;
-
+void ElementPromotion::
+getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
   // Recursively processes all of our predecessor blocks.  If any of them is
   // not live out, then we aren't either.
   for (auto P : BB->getPreds()) {
-    Tmp = getLiveOutN(P);
-
-    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
-      Optional<DIKind> TK = LiveOutBlockState::getAvailabilityField(i, Tmp);
-
-      // If T is unset, ignore it.
-      if (!TK.hasValue())
-        continue;
-
-      // If R is unset, take T
-      Optional<DIKind> RK = LiveOutBlockState::getAvailabilityField(i, Result);
-      if (!RK.hasValue()) {
-        Result[i*2] = Tmp[i*2], Result[i*2+1] = Tmp[i*2+1];
-        continue;
-      }
-
-      // If "R" is already partial, we don't know anything.
-      if (RK.getValue() == DIKind::Partial)
-        continue;
-
-      // If "R" is yes, or no, then switch to partial if we find a different
-      // answer.
-      if (RK.getValue() != TK.getValue())
-        LiveOutBlockState::setAvailability(i, DIKind::Partial, Result);
-    }
+    // The liveness of this block is the intersection of all of the predecessor
+    // block's liveness.
+    Result.mergeIn(getLiveOutN(P));
   }
   
   // If any elements are still unknown, smash them to "yes".  This can't
   // happen in live code, and we want to avoid having analyzed blocks with
   // "unset" values.
-  for (unsigned i = 0, e = NumTupleElements; i != e; ++i)
-    if (!LiveOutBlockState::getAvailabilityField(i, Result).hasValue())
-      LiveOutBlockState::setAvailability(i, DIKind::Yes, Result);
+  Result.changeUnsetElementsTo(DIKind::Yes);
 }
 
 
@@ -1175,7 +1214,7 @@ DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
   }
 
   // Compute the liveness of each element according to our predecessors.
-  llvm::SmallBitVector Result(NumTupleElements*2, true);
+  AvailabilitySet Result(NumTupleElements);
   getPredsLiveOutN(InstBB, Result);
 
   // Now that we know about each element, determine a yes/no/partial result
@@ -1187,7 +1226,7 @@ DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
     // If this element was satisfied locally, ignore its predecessor liveness.
     if (!UsesElements[i]) continue;
 
-    DIKind ElementKind = LiveOutBlockState::getAvailability(i, Result);
+    DIKind ElementKind = Result.get(i);
     if (ElementKind != DIKind::No)
       LiveInAny = true;
     if (ElementKind != DIKind::Yes)
