@@ -225,7 +225,7 @@ bb0(%1 : $Int64):
 
 class SomeClass {}
 
-sil @getSomeClass : $@thin (SomeClass.metatype) -> @owned SomeClass
+sil @getSomeClass : $@thin () -> @owned SomeClass
 
 
 // CHECK-LABEL: sil @assign_test_trivial
@@ -253,15 +253,14 @@ bb0:
   // lone store), the second becomes an assignment (retain/release dance).
 
   %c = alloc_box $SomeClass
-  %f = function_ref @getSomeClass : $@thin (SomeClass.metatype) -> @owned SomeClass
-  %3 = metatype $SomeClass.metatype
+  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
-  %4 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %4 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   assign %4 to %c#1 : $*SomeClass
 
-  %8 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %8 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c#1 : $*SomeClass
@@ -309,10 +308,9 @@ bb0:
   // Invalid load to keep the alloc_box around so we can check init semantics.
   load %c#1 : $*@sil_weak SomeClass    // expected-error {{used before being initialized}}
 
-  %f = function_ref @getSomeClass : $@thin (SomeClass.metatype) -> @owned SomeClass
-  %3 = metatype $SomeClass.metatype
+  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
-  %4 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %4 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // THis should become an initialization.
@@ -322,7 +320,7 @@ bb0:
   strong_release %4 : $SomeClass
   // CHECK-NEXT: release [[C1]]
 
-  %8 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %8 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   store_weak %8 to %c#1 : $*@sil_weak SomeClass
@@ -345,10 +343,9 @@ bb0:
 
   %c = alloc_box $@sil_unowned SomeClass
 
-  %f = function_ref @getSomeClass : $@thin (SomeClass.metatype) -> @owned SomeClass
-  %3 = metatype $SomeClass.metatype
+  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
-  %4 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %4 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
@@ -360,7 +357,7 @@ bb0:
   // CHECK-NEXT: unowned_retain [[C1u]]
   // CHECK-NEXT: strong_release [[C1]]
 
-  %8 = apply %f(%3) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %8 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   %9 = ref_to_unowned %8 : $SomeClass to $@sil_unowned SomeClass
@@ -619,9 +616,8 @@ entry(%a : $*C):
 sil @destroy_addr_removed : $@thin () -> () {
 bb0:
   %3 = alloc_stack $SomeClass
-  %f = function_ref @getSomeClass : $@thin (SomeClass.metatype) -> @owned SomeClass
-  %m = metatype $SomeClass.metatype
-  %9 = apply %f(%m) : $@thin (SomeClass.metatype) -> @owned SomeClass
+  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %9 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[CVAL:%[0-9]+]] = apply
 
   assign %9 to %3#1 : $*SomeClass
@@ -643,4 +639,5 @@ bb0:  // CHECK: bb0:
   %15 = tuple ()
   return %15 : $()
 }
+
 
