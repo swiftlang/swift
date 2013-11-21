@@ -230,6 +230,19 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
         continue;
       }
 
+      if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
+        // Applicable function constraints fully bind the type variables on
+        // the left-hand side.
+        SmallVector<TypeVariableType *, 4> lhsTypeVars;
+        first->getTypeVariables(lhsTypeVars);
+        for (auto typeVar : lhsTypeVars)
+          getTVC(typeVar).FullyBound = true;
+
+        simplifyType(constraint->getSecondType())
+          ->getTypeVariables(referencedTypeVars);
+        continue;
+      }
+
       // Handle this interesting case below.
       break;
 
@@ -295,17 +308,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       // Record the constraint.
       getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
     } else {
-      if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
-        // Applicable function constraints fully bind the type variables on
-        // the left-hand side.
-        SmallVector<TypeVariableType *, 4> lhsTypeVars;
-        simplifyType(constraint->getFirstType())->getTypeVariables(lhsTypeVars);
-        for (auto typeVar : lhsTypeVars)
-          getTVC(typeVar).FullyBound = true;
-      } else {
-        // Collect any type variables represented in the first type.
-        first->getTypeVariables(referencedTypeVars);
-      }
+      // Collect any type variables represented in the first type.
+      first->getTypeVariables(referencedTypeVars);
     }
 
     auto secondTV = second->getAs<TypeVariableType>();
@@ -488,9 +492,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   result.FullyBound = tvc.FullyBound;
   result.InvolvesTypeVariables = tvc.HasNonConcreteConstraints;
   result.HasLiteralBindings = false;
-
-  if (result.FullyBound)
-    return result;
 
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   SmallVector<std::pair<Type, bool>, 4> bindings;

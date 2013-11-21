@@ -636,8 +636,12 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 }
 
 static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
-                                        TypeVariableType *typeVar) {
+                                        TypeVariableType *typeVar,
+                                        bool wantRValue) {
   while (auto fixed = cs.getFixedType(typeVar)) {
+    if (wantRValue)
+      fixed = fixed->getRValueType();
+
     typeVar = fixed->getAs<TypeVariableType>();
     if (!typeVar)
       return fixed;
@@ -648,11 +652,15 @@ static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
 /// \brief Retrieve the fixed type for this type variable, looking through a
 /// chain of type variables to get at the underlying type.
 static Type getFixedTypeRecursive(ConstraintSystem &cs,
-                                  Type type, TypeVariableType *&typeVar) {
+                                  Type type, TypeVariableType *&typeVar,
+                                  bool wantRValue) {
+  if (wantRValue)
+    type = type->getRValueType();
+
   auto desugar = type->getDesugaredType();
   typeVar = desugar->getAs<TypeVariableType>();
   if (typeVar) {
-    if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar)) {
+    if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar, wantRValue)) {
       type = fixed;
       typeVar = nullptr;
     }
@@ -856,8 +864,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            DependentTypeOpener *opener) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar)
-                     ->getRValueType();
+  Type baseObjTy = getFixedTypeRecursive(*this, baseTy, baseTypeVar, 
+                                         /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1572,11 +1580,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   TypeVariableType *typeVar1;
-  type1 = getFixedTypeRecursive(*this, type1, typeVar1);
+  type1 = getFixedTypeRecursive(*this, type1, typeVar1,
+                                kind == TypeMatchKind::SameType);
   auto desugar1 = type1->getDesugaredType();
 
   TypeVariableType *typeVar2;
-  type2 = getFixedTypeRecursive(*this, type2, typeVar2);
+  type2 = getFixedTypeRecursive(*this, type2, typeVar2,
+                                kind == TypeMatchKind::SameType);
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
@@ -2331,23 +2341,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintLocatorBuilder locator,
                                  bool allowNonConformingExistential) {
   // Dig out the fixed type to which this type refers.
-  while (true) {
-    TypeVariableType *typeVar;
-    type = getFixedTypeRecursive(*this, type, typeVar);
+  TypeVariableType *typeVar;
+  type = getFixedTypeRecursive(*this, type, typeVar, /*wantRValue=*/true);
 
-    // If we hit a type variable without a fixed type, we can't
-    // solve this yet.
-    if (typeVar)
-      return SolutionKind::Unsolved;
-
-    auto rvalueType = type->getRValueType();
-    if (rvalueType.getPointer() != type.getPointer()) {
-      type = rvalueType;
-      continue;
-    }
-
-    break;
-  }
+  // If we hit a type variable without a fixed type, we can't
+  // solve this yet.
+  if (typeVar)
+    return SolutionKind::Unsolved;
 
   // If existential types don't need to conform (i.e., they only need to
   // contain the protocol), check that separately.
@@ -2735,17 +2735,12 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
 
   // Drill down to the concrete type on the right hand side.
   TypeVariableType *typeVar2;
-  Type type2 = getFixedTypeRecursive(*this,constraint.getSecondType(),typeVar2);
+  Type type2 = getFixedTypeRecursive(*this, constraint.getSecondType(),
+                                     typeVar2, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
   // Force the right-hand side to be an rvalue.
   unsigned flags = TMF_GenerateConstraints;
-  while (isa<LValueType>(desugar2)) {
-    type2 = type2->castTo<LValueType>()->getObjectType();
-    type2 = getFixedTypeRecursive(*this, type2, typeVar2);
-    desugar2 = type2->getDesugaredType();
-    flags |= TMF_GenerateConstraints;
-  }
 
   // If the types are obviously equivalent, we're done.
   if (type1.getPointer() == desugar2)

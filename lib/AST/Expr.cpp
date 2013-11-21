@@ -383,3 +383,9 @@ SourceRange MetatypeExpr::getSourceRange() const {
   return SourceRange(MetatypeLoc);
 }
 
+SourceRange UnresolvedMemberExpr::getSourceRange() const { 
+  if (Argument)
+    return SourceRange(DotLoc, Argument->getEndLoc());
+
+  return SourceRange(DotLoc, NameLoc);
+}

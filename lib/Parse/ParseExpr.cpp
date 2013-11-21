@@ -727,10 +727,23 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     SourceLoc NameLoc;
     if (parseIdentifier(Name, NameLoc,diag::expected_identifier_after_dot_expr))
       return nullptr;
-    
+
+    ParserResult<Expr> Arg;
+
+    // Check for a () suffix, which indicates a call when constructing
+    // this member.  Note that this cannot be the start of a new line.
+    if (Tok.isFollowingLParen()) {
+      Arg = parseExprList(tok::l_paren, tok::r_paren);
+      if (Arg.hasCodeCompletion())
+        return makeParserCodeCompletionResult<Expr>();
+      if (Arg.isNull())
+        return nullptr;
+    }
+
     // Handle .foo by just making an AST node.
     Result = makeParserResult(
-        new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name));
+               new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name,
+                                                  Arg.getPtrOrNull()));
     break;
   }
       

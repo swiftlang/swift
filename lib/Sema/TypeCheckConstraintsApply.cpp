@@ -1239,13 +1239,9 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // Dig out the type of the base, which will either be the result
-      // type of this expression (for unit enum cases or static properties)
-      // or the result of the function type of this expression (for non-unit
-      // enum cases or static methods).
+      // Dig out the type of the base, which will be the result
+      // type of this expression.
       Type baseTy = simplifyType(expr->getType());
-      if (auto funcTy = baseTy->getAs<FunctionType>())
-        baseTy = funcTy->getResult();
       auto &tc = cs.getTypeChecker();
       auto baseMetaTy = MetaTypeType::get(baseTy, tc.Context);
 
@@ -1261,12 +1257,24 @@ namespace {
                                                 baseMetaTy);
 
       // Build the member reference.
-      return buildMemberRef(base,
-                            selected.openedFullType,
-                            expr->getDotLoc(), member, expr->getNameLoc(),
-                            selected.openedType,
-                            cs.getConstraintLocator(expr, { }),
-                            expr->isImplicit());
+      auto result = buildMemberRef(base,
+                                   selected.openedFullType,
+                                   expr->getDotLoc(), member, 
+                                   expr->getNameLoc(),
+                                   selected.openedType,
+                                   cs.getConstraintLocator(expr, { }),
+                                   expr->isImplicit());
+      if (!result)
+        return nullptr;
+
+      // If there was an argument, apply it.
+      if (auto arg = expr->getArgument()) {
+        ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
+                                                     /*Implicit=*/false);
+        result = finishApply(apply, Type(), cs.getConstraintLocator(expr, { }));
+      }
+
+      return result;
     }
     
   private:

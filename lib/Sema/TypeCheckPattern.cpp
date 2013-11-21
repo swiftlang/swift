@@ -243,10 +243,17 @@ public:
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
+    // We the unresolved member has an argument, turn it into a subpattern.
+    Pattern *subPattern = nullptr;
+    if (auto arg = ume->getArgument()) {
+      subPattern = getSubExprPattern(arg);
+    }
+    
     return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
-                                                ume->getNameLoc(),
-                                                ume->getName(),
-                                                nullptr, nullptr);
+                                               ume->getNameLoc(),
+                                               ume->getName(),
+                                               nullptr,
+                                               subPattern);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -327,17 +334,7 @@ public:
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
     DependentGenericTypeResolver resolver;
-    
-    // '.Element(x...)' is always treated as an EnumElementPattern.
-    if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
-      auto *subPattern = getSubExprPattern(ce->getArg());
-      return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
-                                         ume->getNameLoc(),
-                                         ume->getName(),
-                                         nullptr,
-                                         subPattern);
-    }
-    
+        
     SmallVector<IdentTypeRepr::Component, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
       return nullptr;

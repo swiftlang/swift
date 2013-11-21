@@ -2968,13 +2968,16 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
   
   <pre class="grammar">
-    expr-delayed-identifier ::= '.' <a href="#identifier">identifier</a>
+    expr-delayed-identifier ::= '.' <a href="#identifier">identifier</a> <a href="#expr-paren">expr-paren</a>?
   </pre>
   
-  <p>A delayed identifier expression refers to a constructor of a <a 
-    href="type-enum">enum</a> type, without knowing which type it is referring
-    to.  The expression is resolved to a constructor of a concrete type through
-    context sensitive type inference.</p>
+  <p>A delayed identifier expression refers to a case of an <a 
+    href="type-enum">enum</a> type or a static member of a nominal
+    type, without knowing which type it is referring to.  The
+    expression is resolved to a member of a concrete type through
+    context-sensitive type inference. When it is followed by an <a
+    href="#expr-paren">expr-paren</a>, the member must either be an
+    enum case that carries a value or a (static) member function.</p>
   
   <pre class="example">
     enum Direction { case Up, Down }

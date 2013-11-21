@@ -1066,7 +1066,12 @@ public:
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
-      << " name='" << E->getName() << "')";
+      << " name='" << E->getName() << "'";
+    if (E->getArgument()) {
+      OS << '\n';
+      printRec(E->getArgument());
+    }
+    OS << "')";
   }
   void visitParenExpr(ParenExpr *E) {
     printCommon(E, "paren_expr");

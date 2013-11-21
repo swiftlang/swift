@@ -372,31 +372,42 @@ namespace {
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
       auto baseTy = CS.createTypeVariable(baseLocator, /*options=*/0);
-      auto memberTy = CS.createTypeVariable(memberLocator, /*options=*/0);
+      auto memberTy = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
       //
-      //   T0[.member] == T1
+      //   T0.metatype[.member] == T1
       //
-      // for fresh type variables T0 and T1. Depending on whether the member
-      // will end up having unit type () or an actual type, T1 will either be
-      // T0 or will be T2 -> T0 for some fresh type variable T2. Since T0
-      // cannot be determined without picking one of these options, and we
-      // cannot know whether to select the value form (T0) or the function
-      // form (T2 -> T0) until T0 has been deduced, we cannot model this
-      // directly within the constraint system. Instead, we introduce a new
-      // overload set with two entries: one for T0 and one for T2 -> T0.
-      auto baseMetaTy = MetaTypeType::get(baseTy, CS.getASTContext());
+      // for fresh type variables T0 and T1, which pulls out a static
+      // member, i.e., an enum case or a static variable.
+      auto &ctx = CS.getASTContext();
+      auto baseMetaTy = MetaTypeType::get(baseTy, ctx);
       CS.addValueMemberConstraint(baseMetaTy, expr->getName(), memberTy,
                                   memberLocator);
 
-      OverloadChoice choices[2] = {
-        OverloadChoice(baseTy, OverloadChoiceKind::BaseType),
-        OverloadChoice(baseTy, OverloadChoiceKind::FunctionReturningBaseType),
-      };
-      CS.addOverloadSet(memberTy, choices, baseLocator);
-      return memberTy;
+      // If there is an argument, apply it.
+      if (auto arg = expr->getArgument()) {
+        // The result type of the function must be the base type.
+        auto outputTy
+          = CS.createTypeVariable(
+              CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+              /*options=*/0);
+        CS.addConstraint(ConstraintKind::Equal, outputTy, baseTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+
+        // The function/enum case must be callable with the given argument.
+        auto funcTy = FunctionType::get(arg->getType(), outputTy, ctx);
+        CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
+          memberTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+      } else {
+        // Otherwise, the member needs to have the same type as the base.
+        CS.addConstraint(ConstraintKind::Equal, baseTy, memberTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+      }
+
+      return baseTy;
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {

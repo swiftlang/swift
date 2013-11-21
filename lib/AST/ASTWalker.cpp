@@ -102,7 +102,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
-  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
+  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { 
+    if (E->getArgument()) {
+      if (auto arg = doIt(E->getArgument())) {
+        E->setArgument(arg);
+        return E;
+      }
+
+      return nullptr;
+    }
+    return E; 
+  }
+
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
   Expr *visitZeroValueExpr(ZeroValueExpr *E) { return E; }
 

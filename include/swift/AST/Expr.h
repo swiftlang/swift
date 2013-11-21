@@ -937,22 +937,23 @@ class UnresolvedMemberExpr : public Expr {
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
+  Expr *Argument;
 
 public:  
   UnresolvedMemberExpr(SourceLoc dotLoc, SourceLoc nameLoc,
-                       Identifier name)
+                       Identifier name, Expr *argument)
     : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
-      DotLoc(dotLoc), NameLoc(nameLoc), Name(name) {
+      DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
   }
 
   Identifier getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
+  Expr *getArgument() const { return Argument; }
+  void setArgument(Expr *argument) { Argument = argument; }
 
   SourceLoc getLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const { 
-    return SourceRange(DotLoc, NameLoc);
-  }
+  SourceRange getSourceRange() const;
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedMember;
