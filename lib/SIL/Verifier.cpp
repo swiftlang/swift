@@ -88,14 +88,14 @@ public:
     abort();
   }
 #define require(condition, complaint) \
-  _require(condition, complaint ": " #condition)
+  _require(bool(condition), complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILType type, const Twine &valueDescription,
                      const char *typeName) {
     _require(type.isObject(), valueDescription + " must be an object");
     auto result = type.getAs<T>();
-    _require(result, valueDescription + " must have type " + typeName);
+    _require(bool(result), valueDescription + " must have type " + typeName);
     return result;
   }
   template <class T> typename CanTypeWrapperTraits<T>::type

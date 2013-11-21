@@ -182,7 +182,7 @@ public:                                                             \
   }                                                                 \
   TYPE *operator->() const { return getPointer(); }                 \
   operator TYPE *() const { return getPointer(); }                  \
-  operator bool() const { return getPointer() != nullptr; }         \
+  explicit operator bool() const { return getPointer() != nullptr; }
 
 #define PROXY_CAN_TYPE_SIMPLE_GETTER(METHOD)                        \
   CanType METHOD() const { return CanType(getPointer()->METHOD()); }
