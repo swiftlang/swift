@@ -478,14 +478,17 @@ namespace {
       return false;
     }
 
-    bool isAllYes() const {
+    bool isAll(DIKind K) const {
       for (unsigned i = 0, e = size(); i != e; ++i) {
         auto Elt = getConditional(i);
-        if (!Elt.hasValue() || Elt.getValue() != DIKind::Yes)
+        if (!Elt.hasValue() || Elt.getValue() != K)
           return false;
       }
       return true;
     }
+    
+    bool isAllYes() const { return isAll(DIKind::Yes); }
+    bool isAllNo() const { return isAll(DIKind::No); }
     
     /// changeUnsetElementsTo - If any elements of this availability set are not
     /// known yet, switch them to the specified value.
@@ -496,7 +499,8 @@ namespace {
     }
     
     void mergeIn(const AvailabilitySet &RHS) {
-      // Logically, "this |= RHS".
+      // Logically, this is an elementwise "this = merge(this, RHS)" operation,
+      // using the lattice merge operation for each element.
       for (unsigned i = 0, e = size(); i != e; ++i) {
         Optional<DIKind> RO = RHS.getConditional(i);
         
@@ -647,7 +651,10 @@ namespace {
                         LiveOutBlockState(NumTupleElements)}).first->second;
     }
     
-    DIKind checkDefinitelyInit(const MemoryUse &Use);
+    AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
+                                      unsigned NumElts);
+
+    DIKind getLivenessAtUse(const MemoryUse &Use);
 
     void handleStoreUse(MemoryUse &InstInfo, DIKind Kind);
 
@@ -837,8 +844,7 @@ bool ElementPromotion::doIt() {
       continue;
     
     // Check to see if the value is known-initialized here or not.
-    DIKind DI = checkDefinitelyInit(Use);
-    
+    DIKind DI = getLivenessAtUse(Use);
     switch (Use.Kind) {
     case UseKind::IndirectResult:
     case UseKind::Store:
@@ -1010,13 +1016,12 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
-  DIKind DI =
-    checkDefinitelyInit(MemoryUse(Inst, UseKind::Escape, 0, NumTupleElements));
-  if (DI == DIKind::Yes) return false;
+  AvailabilitySet Availability = getLivenessAtInst(Inst, 0, NumTupleElements);
+  if (Availability.isAllYes()) return false;
 
   // If the memory is definitely not initialized at this point, we can just drop
   // destory_addrs.
-  if (DI == DIKind::No && isa<DestroyAddrInst>(Inst)) {
+  if (Availability.isAllNo() && isa<DestroyAddrInst>(Inst)) {
     SILValue Addr = Inst->getOperand(0);
     Inst->eraseFromParent();
     RemoveDeadAddressingInstructions(Addr);
@@ -1139,12 +1144,20 @@ getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
   Result.changeUnsetElementsTo(DIKind::Yes);
 }
 
+/// getLivenessAtInst - Compute the liveness state for any number of tuple
+/// elements at the specified instruction.  The elements are returned as an
+/// AvailabilitySet.  Elements outside of the range specified may not be
+/// computed correctly.
+AvailabilitySet ElementPromotion::
+getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
+  AvailabilitySet Result(NumTupleElements);
 
-/// The specified instruction is a use of the element.  Determine whether the
-/// element is definitely initialized at this point or not.  If the value is
-/// initialized on some paths, but not others, this returns a partial result.
-DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
-  SILBasicBlock *InstBB = Use.Inst->getParent();
+  // Empty tuple queries return a completely "unknown" vector, since they don't
+  // care about any of the elements.
+  if (NumElts == 0)
+    return Result;
+  
+  SILBasicBlock *InstBB = Inst->getParent();
   
   // The vastly most common case is memory allocations that are not tuples,
   // so special case this with a more efficient algorithm.
@@ -1154,7 +1167,7 @@ DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
     // store is before or after the load.  If it is before, it produces the value
     // we are looking for.
     if (getBlockInfo(InstBB).HasNonLoadUse) {
-      for (SILBasicBlock::iterator BBI = Use.Inst, E = InstBB->begin();
+      for (SILBasicBlock::iterator BBI = Inst, E = InstBB->begin();
            BBI != E;) {
         SILInstruction *TheInst = --BBI;
         
@@ -1166,29 +1179,27 @@ DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
         // is not defined at all yet.  Otherwise, we've found a definition, or
         // something else that will require that the memory is initialized at
         // this point.
-        return TheInst == TheMemory ? DIKind::No : DIKind::Yes;
+        Result.set(0, TheInst == TheMemory ? DIKind::No : DIKind::Yes);
+        return Result;
       }
     }
 
-    Optional<DIKind> Result = Nothing;
-    getPredsLiveOut1(InstBB, Result);
-    return Result.getValue();
+    Optional<DIKind> ResultVal = Nothing;
+    getPredsLiveOut1(InstBB, ResultVal);
+    Result.set(0, ResultVal.getValue());
+    return Result;
   }
 
-  // Empty tuples are always (trivially) initialized.
-  if (Use.NumTupleElements == 0) return DIKind::Yes;
-  
-  // Check all the tuple elements covered by this memory use.
-  llvm::SmallBitVector UsesElements(NumTupleElements);
-  UsesElements.set(Use.FirstTupleElement,
-                   Use.FirstTupleElement+Use.NumTupleElements);
+  // Check locally to see if any elements are satified within the block, and
+  // keep track of which ones are still needed in the NeededElements set.
+  llvm::SmallBitVector NeededElements(NumTupleElements);
+  NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it may produce some of
   // the elements we are looking for.
   if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (SILBasicBlock::iterator BBI = Use.Inst, E = InstBB->begin();
-         BBI != E;) {
+    for (SILBasicBlock::iterator BBI = Inst, E = InstBB->begin(); BBI != E;) {
       SILInstruction *TheInst = --BBI;
 
       // If this instruction is unrelated to the memory, ignore it.
@@ -1197,42 +1208,59 @@ DIKind ElementPromotion::checkDefinitelyInit(const MemoryUse &Use) {
         continue;
       
       // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.
-      if (TheInst == TheMemory)
-        return DIKind::No;
-
+      // is not defined at all yet.  Scan no further.
+      if (TheInst == TheMemory) {
+        Result.changeUnsetElementsTo(DIKind::No);
+        return Result;
+      }
+      
       // Check to see which tuple elements this instruction defines.  Clear them
       // from the set we're scanning from.
       auto &TheInstUse = Uses[It->second];
-      UsesElements.reset(TheInstUse.FirstTupleElement,
+      NeededElements.reset(TheInstUse.FirstTupleElement,
                       TheInstUse.FirstTupleElement+TheInstUse.NumTupleElements);
       // If that satisfied all of the elements we're looking for, then we're
       // done.  Otherwise, keep going.
-      if (UsesElements.none())
-        return DIKind::Yes;
+      if (NeededElements.none()) {
+        Result.changeUnsetElementsTo(DIKind::Yes);
+        return Result;
+      }
     }
   }
 
   // Compute the liveness of each element according to our predecessors.
-  AvailabilitySet Result(NumTupleElements);
   getPredsLiveOutN(InstBB, Result);
+  
+  // If any of the elements was locally satisfied, make sure to mark them.
+  for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
+    if (!NeededElements[i])
+      Result.set(i, DIKind::Yes);
+  }
+  return Result;
+}
 
+/// The specified instruction is a use of the element.  Determine whether all of
+/// the tuple elements touched by the instruction are definitely initialized at
+/// this point or not.  If the value is initialized on some paths, but not
+/// others, this returns a partial result.
+DIKind ElementPromotion::getLivenessAtUse(const MemoryUse &Use) {
+  // Determine the liveness states of the elements that we care about.
+  AvailabilitySet Liveness =
+    getLivenessAtInst(Use.Inst, Use.FirstTupleElement, Use.NumTupleElements);
+  
   // Now that we know about each element, determine a yes/no/partial result
   // based on the elements we care about.
   bool LiveInAll = true, LiveInAny = false;
-
+  
   for (unsigned i = Use.FirstTupleElement, e = i+Use.NumTupleElements;
        i != e; ++i) {
-    // If this element was satisfied locally, ignore its predecessor liveness.
-    if (!UsesElements[i]) continue;
-
-    DIKind ElementKind = Result.get(i);
+    DIKind ElementKind = Liveness.get(i);
     if (ElementKind != DIKind::No)
       LiveInAny = true;
     if (ElementKind != DIKind::Yes)
       LiveInAll = false;
   }
-
+  
   if (LiveInAll)
     return DIKind::Yes;
   if (LiveInAny)
