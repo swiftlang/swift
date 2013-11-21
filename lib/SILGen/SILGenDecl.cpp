@@ -1657,6 +1657,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
     assert((theType->getStructOrBoundGenericStruct()
             || theType->getEnumOrBoundGenericEnum())
            && "only value type static properties are implemented");
+    (void)theType;
   }
   
   if (M.getASTContext().LangOpts.EmitLazyGlobalInitializers) {

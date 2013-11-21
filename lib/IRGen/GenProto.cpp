@@ -2586,6 +2586,7 @@ namespace {
 
         CanType sigSelfType = getLastElement(sigInputType);
         assert(isa<LValueType>(sigSelfType));
+        (void)sigSelfType;
 
         auto &remappedSelfTI =
           cast<LoadableTypeInfo>(IGF.getTypeInfoForUnlowered(implSelfType));

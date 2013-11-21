@@ -878,6 +878,7 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
   return tc.TypeLoweringBPA.Allocate(size, alignof(TypeLowering));
 }
 
+#ifndef NDEBUG
 /// Is this type a lowered type?
 static bool isLoweredType(CanType type) {
   if (isa<LValueType>(type))
@@ -892,6 +893,7 @@ static bool isLoweredType(CanType type) {
   }
   return true;
 }
+#endif
 
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
@@ -1047,6 +1049,7 @@ const TypeLowering &
 TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
   auto type = key.SubstType;
   assert(isLoweredType(type) && "type is not lowered!");
+  (void)type;
 
   // Re-using uncurry level 0 is reasonable because our uncurrying
   // transforms are idempotent at this level.  This means we don't
