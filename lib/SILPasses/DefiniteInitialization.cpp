@@ -956,13 +956,21 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
     return true;
   }
 
+
+  // If the element type of the memory object is a class value
+  
+
   // Okay, the release is conditionally live.  We have to force it up the CFG to
   // a place where we have unconditional liveness, and if the memory object is a
   // tuple, we have to do so for each element individually.
 
+  /// TODO: We could make this more powerful to directly support these
+  /// cases, at least when the value doesn't escape.
+  ///
+  /// When this gets fixed, the code in the ~ElementUseCollector() method
+  /// can be removed.
+  ///
 
-
-  
   // This is a release of an uninitialized value.  Emit a diagnostic.
   diagnoseInitError(MemoryUse(Inst, UseKind::Load, 0, 0),
                     diag::variable_destroyed_before_initialized);
