@@ -2146,15 +2146,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = choice.getBaseType();
     break;
 
-  case OverloadChoiceKind::FunctionReturningBaseType:
-    refType = FunctionType::get(createTypeVariable(
-                                  getConstraintLocator(
-                                    locator,
-                                    ConstraintLocator::FunctionResult),
-                                  /*options=*/0),
-                                choice.getBaseType(),
-                                getASTContext());
-    break;
   case OverloadChoiceKind::IdentityFunction:
     refType = FunctionType::get(choice.getBaseType(), choice.getBaseType(),
                                 getASTContext());
@@ -3098,7 +3089,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   switch (x.getKind()) {
   case OverloadChoiceKind::BaseType:
-  case OverloadChoiceKind::FunctionReturningBaseType:
   case OverloadChoiceKind::IdentityFunction:
     // FIXME: Compare base types after substitution?
     return true;
@@ -3535,7 +3525,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       break;
 
     case OverloadChoiceKind::BaseType:
-    case OverloadChoiceKind::FunctionReturningBaseType:
     case OverloadChoiceKind::IdentityFunction:
       llvm_unreachable("Never considered different");
 
@@ -5015,10 +5004,6 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
       out << "base type " << choice.getBaseType()->getString() << "\n";
       break;
 
-    case OverloadChoiceKind::FunctionReturningBaseType:
-      out << "function returning base type "
-        << choice.getBaseType()->getString() << "\n";
-      break;
     case OverloadChoiceKind::IdentityFunction:
       out << "identity " << choice.getBaseType()->getString() << " -> "
         << choice.getBaseType()->getString() << "\n";
@@ -5093,14 +5078,11 @@ void ConstraintSystem::dump(raw_ostream &out) {
           out << "base type " << choice.getBaseType()->getString() << "\n";
           break;
 
-        case OverloadChoiceKind::FunctionReturningBaseType:
-          out << "function returning base type "
-              << choice.getBaseType()->getString() << "\n";
-          break;
         case OverloadChoiceKind::IdentityFunction:
           out << "identity " << choice.getBaseType()->getString() << " -> "
               << choice.getBaseType()->getString() << "\n";
           break;
+
         case OverloadChoiceKind::TupleIndex:
           out << "tuple " << choice.getBaseType()->getString() << " index "
               << choice.getTupleIndex() << "\n";

@@ -47,11 +47,6 @@ enum class OverloadChoiceKind : int {
   /// refer to enum members with unit type.
   BaseType,
   /// \brief The overload choice equates the member type with a function
-  /// of arbitrary input type whose result type is the base type. Used for
-  /// unresolved member expressions like ".internal" that refer to enum
-  /// members with non-unit type.
-  FunctionReturningBaseType,
-  /// \brief The overload choice equates the member type with a function
   /// from the base type to itself.
   IdentityFunction,
   /// \brief The overload choice indexes into a tuple. Index zero will
