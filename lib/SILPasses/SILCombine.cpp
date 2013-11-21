@@ -421,10 +421,9 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
     //
     // if (do_stuff) modifies the memory at %x, we get the original value.
     Builder->setInsertionPoint(LI);
-    SILType ResultType = SEI->getType().getAddressType();
     StructElementAddrInst *SEA =
       Builder->createStructElementAddr(SEI->getLoc(), LI->getOperand(),
-                                       SEI->getField(), ResultType);
+                                       SEI->getField());
     LoadInst *Result = Builder->createLoad(SEI->getLoc(), SEA);
 
     return replaceInstUsesWith(*SEI, Result);
