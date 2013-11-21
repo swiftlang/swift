@@ -926,6 +926,9 @@ private:
 
   /// \brief Describes the current solver state.
   struct SolverState {
+    SolverState();
+    ~SolverState();
+
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
@@ -952,8 +955,13 @@ private:
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
+
+    // Statistics
+    #define CS_STATISTIC(Name, Description) unsigned Name = 0;
+    #include "ConstraintSolverStats.def"
   };
 
+public:
   /// \brief The current solver state.
   ///
   /// This will be non-null when we're actively solving the constraint
@@ -961,6 +969,7 @@ private:
   /// we're exploring. 
   SolverState *solverState = nullptr;
 
+private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
   }
