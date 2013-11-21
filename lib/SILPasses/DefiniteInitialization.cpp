@@ -92,6 +92,36 @@ static unsigned getTupleElementCount(CanType T) {
   return NumElements;
 }
 
+/// computeTupleElementAddress - Given a tuple element number (in the flattened
+/// sense) return a pointer to a leaf element of the specified number.
+static SILValue computeTupleElementAddress(SILValue Ptr, unsigned TupleEltNo,
+                                           SILLocation Loc, SILBuilder &B) {
+  CanType PointeeType = Ptr.getType().getSwiftRValueType();
+  while (1) {
+    // Have we gotten to our leaf element?
+    CanTupleType TT = dyn_cast<TupleType>(PointeeType);
+    if (TT == 0) {
+      assert(TupleEltNo == 0 && "Element count problem");
+      return Ptr;
+    }
+  
+    // Figure out which field we're walking into.
+    unsigned FieldNo = 0;
+    for (auto EltTy : TT.getElementTypes()) {
+      unsigned NumSubElt = getTupleElementCount(EltTy);
+      if (TupleEltNo < NumSubElt) {
+        Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
+        PointeeType = EltTy;
+        break;
+      }
+
+      TupleEltNo -= NumSubElt;
+      ++FieldNo;
+    }
+  }
+}
+
+
 #if 0
 /// Given a symbolic element number, return the type of the element.
 static CanType getTupleElementType(CanType T, unsigned EltNo) {
@@ -658,7 +688,8 @@ namespace {
 
     void handleStoreUse(MemoryUse &InstInfo, DIKind Kind);
 
-    bool processNonTrivialRelease(SILInstruction *Inst);
+    bool processNonTrivialRelease(SILInstruction *Inst,
+                                  SmallVectorImpl<SILInstruction*>&NewReleases);
 
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
@@ -893,8 +924,9 @@ bool ElementPromotion::doIt() {
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
   if (!MemoryType.isTrivial(TheMemory->getModule())) {
+    SmallVector<SILInstruction*, 4> NewReleases;
     for (unsigned i = 0; i != Releases.size(); ++i) {
-      if (processNonTrivialRelease(Releases[i])) {
+      if (processNonTrivialRelease(Releases[i], NewReleases)) {
         Releases[i] = Releases.back();
         Releases.pop_back();
         --i;
@@ -904,6 +936,12 @@ bool ElementPromotion::doIt() {
       // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
       if (!EmittedErrorLocs.empty()) return true;
     }
+    
+    // Add new releases onto the release list so the load promotion can see
+    // them.
+    // FIXME: When load promotion is split out to its own pass, this logic
+    // (and "NewReleases" entirely) should disappear.
+    Releases.append(NewReleases.begin(), NewReleases.end());
   }
 
 
@@ -1008,7 +1046,8 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 ///
 /// This returns true if the release was deleted.
 ///
-bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
+bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst,
+                                SmallVectorImpl<SILInstruction*> &NewReleases) {
   // If the instruction is a deallocation of uninitialized memory, no action is
   // required (or desired).
   if (isa<DeallocStackInst>(Inst) || isa<DeallocBoxInst>(Inst))
@@ -1019,21 +1058,60 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst) {
   AvailabilitySet Availability = getLivenessAtInst(Inst, 0, NumTupleElements);
   if (Availability.isAllYes()) return false;
 
-  // If the memory is definitely not initialized at this point, we can just drop
-  // destory_addrs.
-  if (Availability.isAllNo() && isa<DestroyAddrInst>(Inst)) {
+  // The only instruction that can be in a partially live region is a
+  // destroy_addr.  A strong_release must only occur in code that was mandatory
+  // inlined, and the argument would have required it to be live at that site.
+  assert(isa<DestroyAddrInst>(Inst) && "Only destroy_addr should be here");
+  
+  // If the memory is not-fully initialized at the destroy_addr, then there can
+  // be multiple issues: we could have some tuple elements initialized and some
+  // not, or we could have a control flow sensitive situation where the elements
+  // are only initialized on some paths.  We handle this by splitting the
+  // multi-element case into its component parts and treating each separately.
+  //
+  // Start by classifying each element into three cases: known initialized,
+  // known uninitialized, or partially initialized.  The first two cases are
+  // simple to handle, whereas the partial case needs more analysis.
+  llvm::SmallBitVector ElementsToHandle(NumTupleElements);
+  
+  SILBuilder B(Inst);
+  for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
+    switch (Availability.get(i)) {
+    case DIKind::No:
+      // If an element is known to be uninitialized, then we know we can
+      // completely ignore it.
+      break;
+    
+    case DIKind::Yes: {
+      // If an element is known to be initialized, then we can strictly destroy
+      // its value at Inst's position and then ignore it.
+      SILValue EltPtr = computeTupleElementAddress(Inst->getOperand(0), i,
+                                                   Inst->getLoc(), B);
+      // Note: we cannot use "emitDestroyAddr" here, because it could change
+      // our Uses list out from under us.
+      if (auto *DA = B.emitDestroyAddr(Inst->getLoc(), EltPtr))
+        NewReleases.push_back(DA);
+      break;
+    }
+    
+    case DIKind::Partial:
+      // Otherwise, it's a partially live case.  We have to do code motion or
+      // emit a control variable to destroy it.
+      ElementsToHandle.set(i);
+      break;
+    }
+  }
+
+  // If there are no partially live elements, we're done!
+  if (ElementsToHandle.none()) {
     SILValue Addr = Inst->getOperand(0);
     Inst->eraseFromParent();
     RemoveDeadAddressingInstructions(Addr);
     return true;
   }
-
-  // Okay, the release is conditionally live.  We have to force it up the CFG to
-  // a place where we have unconditional liveness, and if the memory object is a
-  // tuple, we have to do so for each element individually.
-
-
-
+  
+  // TODO: Handle the partially live case.
+  
   
   // This is a release of an uninitialized value.  Emit a diagnostic.
   diagnoseInitError(MemoryUse(Inst, UseKind::Load, 0, 0),
@@ -1210,7 +1288,9 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.  Scan no further.
       if (TheInst == TheMemory) {
-        Result.changeUnsetElementsTo(DIKind::No);
+        // The result is perfectly decided locally.
+        for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
+          Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
         return Result;
       }
       
@@ -1705,7 +1785,7 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
     computeAvailableValues(DAI, RequiredElts, AvailableValues);
 
     // If some value is not available at this load point, then we fail.
-    for (unsigned i = 0, e = AvailableValues.size(); i != e; ++i)
+    for (unsigned i = FirstElt, e = FirstElt+NumLoadSubElements; i != e; ++i)
       if (!AvailableValues[i].first.isValid())
         return false;
   }

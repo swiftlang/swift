@@ -640,4 +640,30 @@ bb0:  // CHECK: bb0:
   return %15 : $()
 }
 
+// CHECK-LABEL: sil @release_some_constructed
+sil @release_some_constructed : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = alloc_stack $(SomeClass, SomeClass)
+  %2 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %3 = apply %2() : $@thin () -> @owned SomeClass
+  %4 = tuple_element_addr %1#1 : $*(SomeClass, SomeClass), 0
+  store %3 to %4 : $*SomeClass
+
+  destroy_addr %1#1 : $*(SomeClass, SomeClass)
+  dealloc_stack %1#0 : $*@local_storage (SomeClass, SomeClass)
+  %8 = tuple ()
+  return %8 : $()
+
+// Only Element #0 should get released.  This should just be turned into
+// release(apply())
+
+// CHECK-NOT: alloc_stack
+// CHECK: [[V:%[0-9]+]] = apply
+// CHECK-NEXT: strong_release [[V]]
+// CHECK-NOT: store
+// CHECK-NOT: strong_release
+// CHECK-NOT: dealloc_stack
+}
+
 
