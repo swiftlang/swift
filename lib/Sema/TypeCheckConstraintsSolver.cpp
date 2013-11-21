@@ -24,7 +24,15 @@ using namespace constraints;
 // Constraint solver statistics
 //===--------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver"
+STATISTIC(NumSolutionAttempts, "# of solution attempts");
+STATISTIC(NumTypeVariablesBound, "# of type variables bound");
+STATISTIC(NumTypeVariableBindings, "# of type variable bindings attempted");
+STATISTIC(NumDisjunctions, "# of disjunctions explored");
+STATISTIC(NumDisjunctionTerms, "# of disjunction terms explored");
+STATISTIC(NumSimplifiedConstraints, "# of constraints simplified");
+STATISTIC(NumUnsimplifiedConstraints, "# of constraints not simplified");
 STATISTIC(NumSimplifyIterations, "# of simplification iterations");
+STATISTIC(NumStatesExplored, "# of solution states explored");
 
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.
@@ -362,9 +370,11 @@ bool ConstraintSystem::simplify() {
       
       if (addConstraint(constraint, false, true)) {
         solvedAny = true;
-
+        ++NumSimplifiedConstraints;
         if (TC.getLangOpts().DebugConstraintSolver && !solverState)
           SolvedConstraints.push_back(constraint);        
+      } else if (!failedConstraint) {
+        ++NumUnsimplifiedConstraints;
       }
 
       if (failedConstraint) {
@@ -406,6 +416,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   numRetiredConstraints = cs.solverState->retiredConstraints.size();
   numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
+
+  ++NumStatesExplored;
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
@@ -601,8 +613,11 @@ static bool tryTypeVariableBindings(
 
   SmallVector<std::pair<Type, bool>, 4> storedBindings;
   auto &tc = cs.getTypeChecker();
+  ++NumTypeVariablesBound;
+
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
+    ++NumTypeVariableBindings;
     bool sawFirstLiteralConstraint = false;
     for (auto binding : bindings) {
       auto type = binding.first;
@@ -722,6 +737,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
   if (!solverState) {
+    ++NumSolutionAttempts;
+
     // Set up solver state.
     SolverState state;
     this->solverState = &state;
@@ -868,6 +885,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
+  ++NumDisjunctions;
   for (auto constraint : disjunction->getNestedConstraints()) {
     // These kinds of conversions should be avoided if we've already found a
     // solution.
@@ -879,10 +897,9 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       }
     }
 
-
     // Try to solve the system with this option in the disjunction.
     SolverScope scope(*this);
-
+    ++NumDisjunctionTerms;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2)
