@@ -421,10 +421,7 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  llvm::errs() << NumStatesExplored << " vs. " << LargestNumStatesExplored.Value
-               << '\n';
   if (NumStatesExplored > LargestNumStatesExplored.Value) {
-    llvm::errs() << "Overwriting \"largest\" results\n";
     #define CS_STATISTIC(Name, Description) \
       JOIN2(Largest,Name).Value = Name-1; \
       ++JOIN2(Largest,Name);
