@@ -1706,7 +1706,7 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
     // If there are no values available at this load point, then we fail to
     // promote this load and there is nothing to do.
     bool AnyAvailable = false;
-    for (unsigned i = 0, e = AvailableValues.size(); i != e; ++i)
+    for (unsigned i = FirstElt, e = i+NumLoadSubElements; i != e; ++i)
       if (AvailableValues[i].first.isValid()) {
         AnyAvailable = true;
         break;
