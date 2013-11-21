@@ -29,6 +29,10 @@ namespace swift {
     /// solver.
     bool DebugConstraintSolver = false;
 
+    /// \brief Specific solution attempt for which the constraint
+    /// solver should be debugged.
+    unsigned DebugConstraintSolverAttempt = 0;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;

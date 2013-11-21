@@ -37,6 +37,7 @@ STATISTIC(NumSolutionAttempts, "# of solution attempts");
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(JOIN2(Largest,Name), Description);
 #include "ConstraintSolverStats.def"
+STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.
@@ -409,11 +410,28 @@ void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
 
 } // end anonymous namespace
 
-ConstraintSystem::SolverState::SolverState() {
+ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
   ++NumSolutionAttempts;
+  SolutionAttempt = NumSolutionAttempts;
+
+  // If we're supposed to debug a specific constraint solver attempt,
+  // turn on debugging now.
+  ASTContext &ctx = CS.getTypeChecker().Context;
+  LangOptions &langOpts = ctx.LangOpts;
+  OldDebugConstraintSolver = langOpts.DebugConstraintSolver;
+  if (langOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+    langOpts.DebugConstraintSolver = true;
+    llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
+    dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
+    CS.dump(dbgOut);
+  }
 }
 
 ConstraintSystem::SolverState::~SolverState() {
+  // Restore debugging state.
+  LangOptions &langOpts = CS.getTypeChecker().Context.LangOpts;
+  langOpts.DebugConstraintSolver = OldDebugConstraintSolver;
+
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "ConstraintSolverStats.def"
@@ -422,6 +440,8 @@ ConstraintSystem::SolverState::~SolverState() {
   // previous one.  
   // FIXME: This is not at all thread-safe.
   if (NumStatesExplored > LargestNumStatesExplored.Value) {
+    LargestSolutionAttemptNumber.Value = SolutionAttempt-1;
+    ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
       JOIN2(Largest,Name).Value = Name-1; \
       ++JOIN2(Largest,Name);
@@ -762,7 +782,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // state and begin recursion.
   if (!solverState) {
     // Set up solver state.
-    SolverState state;
+    SolverState state(*this);
     this->solverState = &state;
 
     // Solve the system.

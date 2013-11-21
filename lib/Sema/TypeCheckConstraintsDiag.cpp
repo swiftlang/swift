@@ -696,7 +696,7 @@ bool ConstraintSystem::diagnose() {
     SmallVector<Solution, 4> solutions;
     
     // Set up solver state.
-    SolverState state;
+    SolverState state(*this);
     state.recordFailures = true;
     this->solverState = &state;
 

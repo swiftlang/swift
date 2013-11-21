@@ -926,8 +926,16 @@ private:
 
   /// \brief Describes the current solver state.
   struct SolverState {
-    SolverState();
+    SolverState(ConstraintSystem &cs);
     ~SolverState();
+
+    /// The constraint system.
+    ConstraintSystem &CS;
+
+    /// Old value of DebugConstraintSolver.
+    /// FIXME: Move the "debug constraint solver" bit into the constraint 
+    /// system itself.
+    bool OldDebugConstraintSolver;
 
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
@@ -955,6 +963,9 @@ private:
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
+
+    /// The number of the solution attempt we're looking at.
+    unsigned SolutionAttempt;
 
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
