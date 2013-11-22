@@ -995,29 +995,36 @@ void IRGenSILFunction::emitSILFunction() {
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
-  if (IGM.DebugInfo && BB->pred_empty()) {
-    // This is the prologue of a function.
-    // Emit debug info for any captured and promoted [inout] variables.
-    int ArgNo = 0;
-    for (auto Arg : BB->getBBArgs()) {
-      ++ArgNo;
-      if (Arg->getDecl()) {
-        LoweredValue const &LoweredArg = getLoweredValue(Arg);
-        if (LoweredArg.isAddress()) {
-          // LValues are indirect by definition.
-          auto Indirection = IndirectValue;
-          if (Arg->getDecl()->getType()->getKind() == TypeKind::LValue)
-            Indirection = DirectValue;
+  if (!IGM.DebugInfo) return;
+  if (!BB->pred_empty()) return;
+  // This is the prologue of a function. Emit debug info for all
+  // trivial arguments and any captured and promoted [inout]
+  // variables.
+  int ArgNo = 0;
+  for (auto Arg : BB->getBBArgs()) {
+    ++ArgNo;
 
-          auto Name = Arg->getDecl()->getName().str();
-          auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
-          DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
-                            getTypeInfo(Arg->getType()),
-                            getDebugScope());
-          IGM.DebugInfo->emitArgVariableDeclaration
-            (Builder, AddrIR, DTI, Name, ArgNo, Indirection);
-        }
-      }
+    if (!Arg->getDecl())
+      continue;
+
+    // These are handled in visitAllocStackInst.
+    if (Arg->getType().isExistentialType())
+      continue;
+
+    LoweredValue const &LoweredArg = getLoweredValue(Arg);
+    if (LoweredArg.isAddress()) {
+      // LValues are indirect by definition.
+      auto Indirection = DirectValue;
+      if (Arg->getDecl()->getType()->getKind() == TypeKind::LValue)
+        Indirection = IndirectValue;
+
+      auto Name = Arg->getDecl()->getName().str();
+      auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
+      DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
+                        getTypeInfo(Arg->getType()),
+                        getDebugScope());
+      IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
+                                                ArgNo, Indirection);
     }
   }
 }
