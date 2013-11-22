@@ -23,6 +23,9 @@ using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
 STATISTIC(NumInstructionsRemoved, "Number of unreachable instructions removed");
+STATISTIC(NumTerminatorsFolded, "Number of terminators folded");
+STATISTIC(NumBasicBlockArgsPropagated,
+          "Number of basic block arguments propagated");
 
 typedef llvm::SmallPtrSet<const SILBasicBlock*, 16> SILBasicBlockSet;
 
@@ -154,7 +157,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     ToBeDeleted.push_back(BI);
   }
 
-  // Drop the paranters from basic blocks and replace all uses with the passed
+  // Drop the parameters from basic blocks and replace all uses with the passed
   // in arguments.
   unsigned Idx = 0;
   for (SILBasicBlock::bbarg_iterator AI = BB.bbarg_begin(),
@@ -168,13 +171,15 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     assert(Arg->getTypes().size() == 1 &&
            "Currently, we only support single result instructions.");
     SILValue(Arg).replaceAllUsesWith(Args[Idx]);
-
-    // Remove args from the block.
-    BB.dropAllArgs();
+    NumBasicBlockArgsPropagated++;
   }
+
+  // Remove args from the block.
+  BB.dropAllArgs();
 
   // The old branch instructions are no longer used, erase them.
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
+  NumInstructionsRemoved += ToBeDeleted.size();
 }
 
 static bool constantFoldTerminator(SILBasicBlock &BB,
@@ -208,6 +213,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         CondIsTrue = true;
       }
       recursivelyDeleteTriviallyDeadInstructions(TI, true);
+      NumInstructionsRemoved++;
 
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
@@ -224,6 +230,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
             UnreachableInfo{UnreachableKind::FoldedBranch, Loc, CondIsTrue}));
       }
 
+      NumTerminatorsFolded++;
       return true;
     }
   }
@@ -309,6 +316,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       }
 
       recursivelyDeleteTriviallyDeadInstructions(TI, true);
+      NumTerminatorsFolded++;
       return true;
     }
   }
@@ -339,6 +347,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         SILBuilder B(&BB);
         B.createBranch(TI->getLoc(), TheSuccessorBlock);
         recursivelyDeleteTriviallyDeadInstructions(TI, true);
+        NumTerminatorsFolded++;
         return true;
       }
       
@@ -440,8 +449,8 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     }
   }
 
-
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
+  NumInstructionsRemoved += ToBeDeleted.size();
 
   // Add an unreachable terminator. The terminator has an invalid source
   // location to signal to the DataflowDiagnostic pass that this code does
@@ -588,6 +597,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
     // Drop references to other blocks.
     recursivelyDeleteTriviallyDeadInstructions(BB->getTerminator(), true);
+    NumInstructionsRemoved++;
   }
 
   // Delete dead instrcutions and everything that could become dead after
@@ -598,6 +608,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
       for (auto I = BI->begin(), E = BI->end(); I != E; ++I)
         ToBeDeleted.push_back(&*I);
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
+  NumInstructionsRemoved += ToBeDeleted.size();
 
   // Delete the dead blocks.
   for (auto I = F.begin(), E = F.end(); I != E;)
