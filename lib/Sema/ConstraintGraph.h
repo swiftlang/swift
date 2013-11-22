@@ -47,6 +47,12 @@ public:
   /// A single node in the constraint graph, which represents a type variable.
   class Node {
   public:
+    explicit Node(TypeVariableType *typeVar) : TypeVar(typeVar) { }
+
+    Node(const Node&) = delete;
+    Node &operator=(const Node&) = delete;
+
+
     /// Retrieve the type variable this node represents.
     TypeVariableType *getTypeVariable() const { return TypeVar; }
 
@@ -134,8 +140,32 @@ public:
   /// Access the node corresponding to the given type variable.
   Node &operator[](TypeVariableType *typeVar);
 
+  /// Retrieve the node and index corresponding to the given type variable.
+  std::pair<Node &, unsigned> lookupNode(TypeVariableType *typeVar);
+
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
+
+  /// Retrieve the type variables that correspond to nodes in the graph.
+  ///
+  /// The subscript operator can be
+  ArrayRef<TypeVariableType *> getTypeVariables() const {
+    return TypeVariables;
+  }
+
+  /// Compute the connected components of the graph.
+  ///
+  /// \param components Receives the component number in which each type
+  /// variable resides. The indices of this vector correspond to the indices
+  /// of each type variable in \c getTypeVariables().
+  ///
+  /// \param componentSizes If non-null, receives a count of the number of type
+  /// variables within each connected component.
+  ///
+  /// \returns the number of connected components in the graph.
+  unsigned computeConnectedComponents(
+             SmallVectorImpl<unsigned> &components,
+             SmallVectorImpl<unsigned> *componentSizes);
 
   /// Print the graph.
   void print(llvm::raw_ostream &out);

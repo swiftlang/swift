@@ -811,18 +811,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return true;
   }
 
-  // FIXME: Actually use the constraint graph for something other than
-  // debugging.
-  if (TC.Context.LangOpts.DebugConstraintSolver) {
-    ConstraintGraph cg(*this);
-    for (auto constraint : Constraints)
-      cg.addConstraint(constraint);
-    cg.verify();
-
-    llvm::errs() << "---Constraint graph---\n";
-    cg.print(llvm::errs());
-  }
-
   // If there are no constraints remaining, we're done. Save this solution.
   if (Constraints.empty()) {
     // If any free type variables remain and we're not allowed to have them,
@@ -839,6 +827,40 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     solutions.push_back(std::move(solution));
     return false;
+  }
+
+  // FIXME: Actually use the constraint graph for something other than
+  // debugging.
+  if (TC.Context.LangOpts.DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+
+    ConstraintGraph cg(*this);
+    for (auto constraint : Constraints)
+      cg.addConstraint(constraint);
+    cg.verify();
+
+    log << "---Constraint graph---\n";
+    cg.print(log);
+
+    SmallVector<unsigned, 16> components;
+    SmallVector<unsigned, 4> componentSizes;
+    unsigned numComponents = cg.computeConnectedComponents(components,
+                                                           &componentSizes);
+    ArrayRef<TypeVariableType *> typeVars = cg.getTypeVariables();
+    if (numComponents > 1) {
+      log << "---Connected components---\n";
+      for (unsigned component = 0; component != numComponents; ++component) {
+        log.indent(2);
+        log << component << ":";
+        for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+          if (components[i] == component) {
+            log << ' ';
+            typeVars[i]->print(log);
+          }
+        }
+        log << '\n';
+      }
+    }
   }
 
   // Collect the type variable constraints.

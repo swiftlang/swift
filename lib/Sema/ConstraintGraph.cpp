@@ -19,6 +19,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
+#include <numeric>
 
 using namespace swift;
 using namespace constraints;
@@ -104,25 +105,29 @@ gatherReferencedTypeVars(ConstraintSystem &cs,
 #pragma mark Graph accessors
 
 ConstraintGraph::Node &ConstraintGraph::operator[](TypeVariableType *typeVar) {
+  return lookupNode(typeVar).first;
+}
+
+std::pair<ConstraintGraph::Node &, unsigned>
+ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   typeVar = CS.getRepresentative(typeVar);
 
   // Check whether we've already created a node for this type variable.
   auto known = Nodes.find(typeVar);
   if (known != Nodes.end()) {
     assert(known->second.NodePtr && "Missing node pointer?");
-    return *known->second.NodePtr;
+    return { *known->second.NodePtr, known->second.Index };
   }
 
   // Allocate the new node.
   StoredNode &stored = Nodes[typeVar];
-  stored.NodePtr = new Node;
-  stored.NodePtr->TypeVar = typeVar;
+  stored.NodePtr = new Node(typeVar);
   stored.Index = TypeVariables.size();
 
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  return *stored.NodePtr;
+  return { *stored.NodePtr, stored.Index };
 }
 
 #pragma mark Node mutation
@@ -236,6 +241,71 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
       node.addAdjacency(otherTypeVar);
     }
   }
+}
+
+#pragma mark Algorithms
+
+/// Depth-first search for connected components
+static void connectedComponentsDFS(ConstraintGraph &cg,
+                                   ConstraintGraph::Node &node,
+                                   unsigned component,
+                                   SmallVectorImpl<unsigned> &components) {
+  // Recurse to mark adjacent nodes as part of this connected component.
+  for (auto adj : node.getAdjacencies()) {
+    auto nodeAndIndex = cg.lookupNode(adj);
+    // If we've already seen this node in this component, we're done.
+    unsigned &curComponent = components[nodeAndIndex.second];
+    if (curComponent == component)
+      continue;
+
+    // Mark this node as part of this connected component, then recurse.
+    assert(curComponent == components.size() && "Already in a component?");
+    curComponent = component;
+    connectedComponentsDFS(cg, nodeAndIndex.first, component, components);
+  }
+}
+
+unsigned ConstraintGraph::computeConnectedComponents(
+           SmallVectorImpl<unsigned> &components,
+           SmallVectorImpl<unsigned> *componentSizes) {
+  // Initialize the components with component == # of type variables,
+  // a sentinel value indicating
+  unsigned numTypeVariables = TypeVariables.size();
+  components.assign(numTypeVariables, numTypeVariables);
+  if (componentSizes)
+    componentSizes->clear();
+
+  // Perform a depth-first search from each type variable to identify
+  // what component it is in.
+  unsigned numComponents = 0;
+  for (unsigned i = 0; i != numTypeVariables; ++i) {
+    // Look up the node for this type variable.
+    auto typeVar = TypeVariables[i];
+    auto nodeAndIndex = lookupNode(typeVar);
+
+    // If we're already assigned a component for this node, skip it.
+    unsigned &curComponent = components[nodeAndIndex.second];
+    if (curComponent != numTypeVariables) {
+      if (componentSizes)
+        ++(*componentSizes)[curComponent];
+      continue;
+    }
+
+    // Record this component.
+    unsigned component = numComponents++;
+    if (componentSizes)
+      componentSizes->push_back(1);
+
+    // Note that this node is part of this component, then visit it.
+    curComponent = component;
+    connectedComponentsDFS(*this, nodeAndIndex.first, component, components);
+  }
+
+  // If we computed component sizes, make sure we did something sane.
+  assert(!componentSizes ||
+         (std::accumulate(componentSizes->begin(), componentSizes->end(),
+                          0u) == numTypeVariables));
+  return numComponents;
 }
 
 #pragma mark Debugging output
