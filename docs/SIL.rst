@@ -386,7 +386,7 @@ Protocol ``Self`` Types
 ```````````````````````
 
 The *self type for T* ``sil_self T`` refers to the ``Self`` type
-within the protocol ``T`.
+within the protocol ``T``.
 
 Function Types
 ``````````````
