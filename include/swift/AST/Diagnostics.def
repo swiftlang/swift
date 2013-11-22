@@ -1551,9 +1551,6 @@ ERROR(variable_escape_before_initialized,sil_analysis,none,
 ERROR(global_variable_function_use_uninit,sil_analysis,none,
       "variable '%0' used by function definition before being initialized",
       (StringRef))
-ERROR(variable_destroyed_before_initialized,sil_analysis,none,
-      "variable '%0' destroyed without being fully initialized on all paths",
-      (StringRef))
 ERROR(variable_initialized_on_some_paths,sil_analysis,none,
       "variable '%0' inconsistently initialized on paths to this assignment",
       (StringRef))

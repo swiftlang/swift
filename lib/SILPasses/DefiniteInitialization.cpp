@@ -432,6 +432,10 @@ namespace {
 
     MemoryUse() : Inst(nullptr) {}
 
+    bool usesElement(unsigned i) const {
+      return i >= FirstTupleElement && i < FirstTupleElement+NumTupleElements;
+    }
+
     bool isInvalid() const { return Inst == nullptr; }
     bool isValid() const { return Inst != nullptr; }
   };
@@ -637,6 +641,8 @@ namespace {
   /// ElementPromotion - This is the main heavy lifting for processing the uses
   /// of an element of an allocation.
   class ElementPromotion {
+    SILModule &Module;
+
     /// TheMemory - This is either an alloc_box instruction or a
     /// mark_uninitialized instruction.  This represents the start of the
     /// lifetime of the value being analyzed.
@@ -690,6 +696,10 @@ namespace {
 
     bool processNonTrivialRelease(SILInstruction *Inst,
                                   SmallVectorImpl<SILInstruction*>&NewReleases);
+    void processPartiallyLiveElementDestroy(DestroyAddrInst *Inst,
+                                            unsigned TupleElt,
+                              SmallVectorImpl<SILInstruction*> &NewReleases);
+
 
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
@@ -727,7 +737,8 @@ namespace {
 ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
                                    SmallVectorImpl<MemoryUse> &Uses,
                                    SmallVectorImpl<SILInstruction*> &Releases)
-  : TheMemory(TheMemory), Uses(Uses), Releases(Releases) {
+  : Module(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses),
+    Releases(Releases) {
 
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
@@ -740,7 +751,7 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
   }
 
   NumTupleElements = getTupleElementCount(MemoryType.getSwiftRValueType());
-  NumMemorySubElements = getNumSubElements(MemoryType, TheMemory->getModule());
+  NumMemorySubElements = getNumSubElements(MemoryType, Module);
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -820,14 +831,14 @@ void ElementPromotion::diagnoseInitError(const MemoryUse &Use,
   // thing is accessed inappropriately.
   getPathStringToTupleElement(AllocTy, Use.FirstTupleElement, Name);
 
-  diagnose(Inst->getModule(), Inst->getLoc(), DiagMessage, Name);
+  diagnose(Module, Inst->getLoc(), DiagMessage, Name);
 
   // Provide context as note diagnostics.
 
   // TODO: The QoI could be improved in many different ways here.  For example,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
-  diagnose(Inst->getModule(), TheMemory->getLoc(), diag::variable_defined_here);
+  diagnose(Module, TheMemory->getLoc(), diag::variable_defined_here);
 }
 
 static bool isStoreObviouslyAnInitialization(SILInstruction *Inst) {
@@ -923,7 +934,7 @@ bool ElementPromotion::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!MemoryType.isTrivial(TheMemory->getModule())) {
+  if (!MemoryType.isTrivial(Module)) {
     SmallVector<SILInstruction*, 4> NewReleases;
     for (unsigned i = 0; i != Releases.size(); ++i) {
       if (processNonTrivialRelease(Releases[i], NewReleases)) {
@@ -932,9 +943,6 @@ bool ElementPromotion::doIt() {
         --i;
         continue;
       }
-
-      // FIXME: processNonTrivialRelease shouldn't generate diagnostics.
-      if (!EmittedErrorLocs.empty()) return true;
     }
     
     // Add new releases onto the release list so the load promotion can see
@@ -1046,35 +1054,33 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
 ///
 /// This returns true if the release was deleted.
 ///
-bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst,
+bool ElementPromotion::processNonTrivialRelease(SILInstruction *Release,
                                 SmallVectorImpl<SILInstruction*> &NewReleases) {
   // If the instruction is a deallocation of uninitialized memory, no action is
   // required (or desired).
-  if (isa<DeallocStackInst>(Inst) || isa<DeallocBoxInst>(Inst))
+  if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release))
     return false;
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
-  AvailabilitySet Availability = getLivenessAtInst(Inst, 0, NumTupleElements);
+  AvailabilitySet Availability = getLivenessAtInst(Release, 0,NumTupleElements);
   if (Availability.isAllYes()) return false;
 
   // The only instruction that can be in a partially live region is a
   // destroy_addr.  A strong_release must only occur in code that was mandatory
   // inlined, and the argument would have required it to be live at that site.
-  assert(isa<DestroyAddrInst>(Inst) && "Only destroy_addr should be here");
-  
+  auto *Inst = cast<DestroyAddrInst>(Release);
+  SILValue Addr = Inst->getOperand();
+
   // If the memory is not-fully initialized at the destroy_addr, then there can
   // be multiple issues: we could have some tuple elements initialized and some
   // not, or we could have a control flow sensitive situation where the elements
   // are only initialized on some paths.  We handle this by splitting the
   // multi-element case into its component parts and treating each separately.
   //
-  // Start by classifying each element into three cases: known initialized,
-  // known uninitialized, or partially initialized.  The first two cases are
-  // simple to handle, whereas the partial case needs more analysis.
-  llvm::SmallBitVector ElementsToHandle(NumTupleElements);
-  
-  SILBuilder B(Inst);
+  // Classify each element into three cases: known initialized, known
+  // uninitialized, or partially initialized.  The first two cases are simple to
+  // handle, whereas the partial case requires dynamic codegen (worst case).
   for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
     switch (Availability.get(i)) {
     case DIKind::No:
@@ -1085,10 +1091,8 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst,
     case DIKind::Yes: {
       // If an element is known to be initialized, then we can strictly destroy
       // its value at Inst's position and then ignore it.
-      SILValue EltPtr = computeTupleElementAddress(Inst->getOperand(0), i,
-                                                   Inst->getLoc(), B);
-      // Note: we cannot use "emitDestroyAddr" here, because it could change
-      // our Uses list out from under us.
+      SILBuilder B(Inst);
+      SILValue EltPtr = computeTupleElementAddress(Addr, i, Inst->getLoc(), B);
       if (auto *DA = B.emitDestroyAddr(Inst->getLoc(), EltPtr))
         NewReleases.push_back(DA);
       break;
@@ -1097,26 +1101,89 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Inst,
     case DIKind::Partial:
       // Otherwise, it's a partially live case.  We have to do code motion or
       // emit a control variable to destroy it.
-      ElementsToHandle.set(i);
+      processPartiallyLiveElementDestroy(Inst, i, NewReleases);
       break;
     }
   }
 
-  // If there are no partially live elements, we're done!
-  if (ElementsToHandle.none()) {
-    SILValue Addr = Inst->getOperand(0);
-    Inst->eraseFromParent();
-    RemoveDeadAddressingInstructions(Addr);
-    return true;
+  Inst->eraseFromParent();
+  RemoveDeadAddressingInstructions(Addr);
+  return true;
+}
+
+/// processPartiallyLiveElementDestroy - The specified destroy_addr is
+/// destroying a tuple element of the memory object that is only live on some
+/// paths through the CFG.  Handle this by moving the destroy_addr or inserting
+/// dynamic control logic to handle it.
+void ElementPromotion::
+processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
+                                SmallVectorImpl<SILInstruction*> &NewReleases) {
+  // TODO: We can avoid generating dynamic code by inserting the element destroy
+  // earlier.
+
+  // Create the boolean control value as a stack variable, and initialize it
+  // with zero.
+  SILBuilder B(std::next(SILBasicBlock::iterator(TheMemory)));
+  SILType I1Type = SILType::getBuiltinIntegerType(1, Module.getASTContext());
+  auto Alloc = B.createAllocStack(TheMemory->getLoc(), I1Type);
+  SILValue AllocAddr = SILValue(Alloc, 1);
+  auto Zero = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 0);
+  B.createStore(TheMemory->getLoc(), Zero, AllocAddr);
+
+  // Split the basic block *after* the placeholder dealloc_inst, to leave it
+  // in its old block.
+  auto ContBlock =
+    DAI->getParent()->splitBasicBlock(std::next(SILBasicBlock::iterator(DAI)));
+
+  auto *CondDestroyBlock = new (Module) SILBasicBlock(DAI->getFunction());
+  B.moveBlockTo(CondDestroyBlock, ContBlock);
+
+  // Insert the load and conditional branch in the original block.
+  B.setInsertionPoint(DAI->getParent());
+  auto *Load = B.createLoad(DAI->getLoc(), AllocAddr);
+  B.createCondBranch(DAI->getLoc(), Load, CondDestroyBlock, ContBlock);
+
+  // Set up the conditional destroy block.
+  B.setInsertionPoint(CondDestroyBlock);
+  SILValue EltPtr =
+    computeTupleElementAddress(DAI->getOperand(), TupleElt, DAI->getLoc(), B);
+  if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
+    NewReleases.push_back(DA);
+  B.createBranch(DAI->getLoc(), ContBlock);
+
+  // Destroy the alloc_stack.
+  B.setInsertionPoint(ContBlock, ContBlock->begin());
+  B.createDeallocStack(DAI->getLoc(), SILValue(Alloc, 0));
+
+  // Loop over all of the store uses and mark the variable initialized.  Since
+  // the control variable is next to "TheMemory", dominance is trivially
+  // satisfied.
+
+  // If we've successfully checked all of the definitive initialization
+  // requirements, try to promote loads.  This can explode copy_addrs, so the
+  // use list may change size.
+  for (auto &Use : Uses) {
+    // Ignore deleted uses.
+    if (Use.Inst == nullptr) continue;
+
+    // Only stores can make something live.  inout uses and escapes only happen
+    // when some kind of store made the element live.
+    // TODO: It would be interesting to classify initializations as such, so we
+    // don't get extraneous stores here.
+    if (Use.Kind != UseKind::Store)
+      continue;
+
+    // If the store doesn't cover the element we're looking at, it is unrelated.
+    if (!Use.usesElement(TupleElt))
+      continue;
+
+    // Otherwise, the instruction could make the element live, make sure to mark
+    // it as such.
+    B.setInsertionPoint(Use.Inst);
+    auto One = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 1);
+    B.createStore(TheMemory->getLoc(), One, AllocAddr);
   }
-  
-  // TODO: Handle the partially live case.
-  
-  
-  // This is a release of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(MemoryUse(Inst, UseKind::Load, 0, 0),
-                    diag::variable_destroyed_before_initialized);
-  return false;
+
 }
 
 
@@ -1373,14 +1440,12 @@ void ElementPromotion::
 updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
                       llvm::SmallBitVector &ConflictingValues) {
-  SILModule &M = Inst->getModule();
-
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
     unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
     SILType ValTy = Inst->getOperand(0).getType();
 
-    for (unsigned i = 0, e = getNumSubElements(ValTy, M); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
 
@@ -1408,7 +1473,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     SILType ValTy = Inst->getOperand(1).getType();
 
     bool AnyRequired = false;
-    for (unsigned i = 0, e = getNumSubElements(ValTy, M); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -1421,7 +1486,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
 
     // If the copyaddr is of an non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
-    if (CAI->getOperand(0).getType().isLoadable(CAI->getModule())) {
+    if (CAI->getOperand(0).getType().isLoadable(Module)) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
@@ -1672,7 +1737,7 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   if (auto CAI = dyn_cast<CopyAddrInst>(Inst)) {
     // If this is a CopyAddr, verify that the element type is loadable.  If not,
     // we can't explode to a load.
-    if (!CAI->getSrc().getType().isLoadable(Inst->getModule()))
+    if (!CAI->getSrc().getType().isLoadable(Module))
       return false;
   } else if (!isa<LoadInst>(Inst))
     return false;
@@ -1688,8 +1753,7 @@ bool ElementPromotion::promoteLoad(SILInstruction *Inst) {
   // compute the access path down to the field so we can determine precise
   // def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
-  unsigned NumLoadSubElements =
-    getNumSubElements(LoadTy, TheMemory->getModule());
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
   
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
@@ -1759,7 +1823,7 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
   SILType LoadTy = Address.getType().getObjectType();
-  if (LoadTy.isAddressOnly(DAI->getModule()))
+  if (LoadTy.isAddressOnly(Module))
     return false;
 
   // If the box has escaped at this instruction, we can't safely promote the
@@ -1770,7 +1834,7 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
   // Compute the access path down to the field so we can determine precise
   // def/use behavior.
   unsigned FirstElt = ComputeAccessPath(Address, TheMemory);
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, DAI->getModule());
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
 
   // Set up the bitvector of elements being demanded by the load.
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
@@ -1812,7 +1876,7 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
 /// operations like loads, stores, retains, releases, copy_value, etc.
 void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
   SILType ValTy = CAI->getDest().getType().getObjectType();
-  auto &TL = CAI->getModule().getTypeLowering(ValTy);
+  auto &TL = Module.getTypeLowering(ValTy);
 
   // Keep track of the new instructions emitted.
   SmallVector<SILInstruction*, 4> NewInsts;
@@ -2338,7 +2402,7 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
 
   // If the memory object has non-trivial type, then removing the deallocation
   // will drop any releases.  Check that there is nothing preventing removal.
-  if (!MemoryType.isTrivial(TheMemory->getModule())) {
+  if (!MemoryType.isTrivial(Module)) {
     for (auto *R : Releases) {
       if (isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
         continue;
