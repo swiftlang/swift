@@ -263,6 +263,7 @@ private:
                                          llvm::DIType DerivedFrom,
                                          unsigned RuntimeLang);
   llvm::DIDerivedType createMemberType(DebugTypeInfo DTI,
+                                       StringRef Name,
                                        unsigned &OffsetInBits,
                                        llvm::DIDescriptor Scope,
                                        llvm::DIFile File,

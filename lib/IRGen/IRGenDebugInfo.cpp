@@ -884,13 +884,14 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
 
 /// Create a member of a struct, class, tuple, or enum.
 llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
+                                                     StringRef Name,
                                                      unsigned &OffsetInBits,
                                                      llvm::DIDescriptor Scope,
                                                      llvm::DIFile File,
                                                      unsigned Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   auto Ty = getOrCreateType(DTI, Scope);
-  auto DTy = DBuilder.createMemberType(Scope, StringRef(), File, 0,
+  auto DTy = DBuilder.createMemberType(Scope, Name, File, 0,
                                        SizeOfByte*DTI.size.getValue(),
                                        SizeOfByte*DTI.align.getValue(),
                                        OffsetInBits, Flags, Ty);
@@ -909,10 +910,13 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
-    VarDecl VD(/*static*/ false,
-               SourceLoc(), Identifier::getEmptyKey(), ElemTy, DeclContext);
+    // Wrap the type in a fake VarDecl so we cann pass the DeclContext
+    // to the Mangler.
+    VarDecl VD(/*static*/ false, SourceLoc(), Identifier::getEmptyKey(),
+               ElemTy, DeclContext);
     DebugTypeInfo DTI(&VD, IGM.getTypeInfoForUnlowered(ElemTy));
-    Elements.push_back(createMemberType(DTI, OffsetInBits, Scope, File, Flags));
+    Elements.push_back(createMemberType(DTI, StringRef(), OffsetInBits,
+                                        Scope, File, Flags));
   }
   return DBuilder.getOrCreateArray(Elements);
 }
@@ -929,8 +933,8 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
       if (!VD->isComputed()) {
         auto Ty = VD->getType()->getCanonicalType();
         DebugTypeInfo DTI(VD, IGM.getTypeInfoForUnlowered(Ty));
-        Elements.push_back(createMemberType(DTI, OffsetInBits,
-                                            Scope, File, Flags));
+        Elements.push_back(createMemberType(DTI, VD->getName().str(),
+                                            OffsetInBits, Scope, File, Flags));
       }
   return DBuilder.getOrCreateArray(Elements);
 }
