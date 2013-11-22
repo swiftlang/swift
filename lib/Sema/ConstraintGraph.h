@@ -35,6 +35,13 @@ class ConstraintSystem;
 
 /// A graph that describes the relationships among the various type variables
 /// and constraints within a constraint system.
+///
+/// The constraint graph is a hypergraph where the nodes are type variables and
+/// the edges are constraints. Any given constraint connects a type variable to
+/// zero or more other type variables. Because these adjacencies are as
+/// important as the edges themselves and are expensive to calculate from the
+/// constraints, each node in the graph tracks both its edges (constraints) and
+/// its adjacencies (the type variables) separately.
 class ConstraintGraph {
 public:
   /// A single node in the constraint graph, which represents a type variable.
