@@ -419,7 +419,8 @@ ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
   ASTContext &ctx = CS.getTypeChecker().Context;
   LangOptions &langOpts = ctx.LangOpts;
   OldDebugConstraintSolver = langOpts.DebugConstraintSolver;
-  if (langOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+  if (langOpts.DebugConstraintSolverAttempt &&
+      langOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     langOpts.DebugConstraintSolver = true;
     llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
     dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
@@ -480,7 +481,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
                 n = cs.solverState->retiredConstraints.size();
        i != n; ++i) {
     assert(std::find(cs.Constraints.begin(), cs.Constraints.end(),
-                     cs.solverState->retiredConstraints[i]) == cs.Constraints.end());
+                     cs.solverState->retiredConstraints[i]) 
+             == cs.Constraints.end());
   }
 
   cs.Constraints.append(
