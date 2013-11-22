@@ -1044,11 +1044,20 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
+      auto ILoc = I.getLoc();
+      if (ILoc.getKind() == SILLocation::CleanupKind) {
+        // Cleanup locations point to the decl of the the value that
+        // is being destroyed (for diagnostic generation). For the
+        // linetable they should point to the cleanup location, which
+        // is the location of the last instruction in the basic block.
+        assert(BB->getTerminator());
+        ILoc = BB->getTerminator()->getLoc();
+      }
       if (auto DS = I.getDebugScope())
-        IGM.DebugInfo->setCurrentLoc(Builder, DS, I.getLoc());
+        IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
       else {
         if (auto FnDS = CurSILFn->getDebugScope())
-          IGM.DebugInfo->setCurrentLoc(Builder, FnDS, I.getLoc());
+          IGM.DebugInfo->setCurrentLoc(Builder, FnDS, ILoc);
         else
           // We don't expect a scope from transparent functions. They
           // should be elided during IR generation anyway.

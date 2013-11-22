@@ -944,7 +944,6 @@ void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
 /// Emit a release of a live value.
 void IRGenFunction::emitRelease(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
-  ArtificialLocation(IGM.DebugInfo, Builder);
   emitUnaryRefCountCall(*this, IGM.getReleaseFn(), value);
 }
 
