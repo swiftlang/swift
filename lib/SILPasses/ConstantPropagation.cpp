@@ -150,9 +150,9 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   return constructResultWithOverflowTuple(AI, Res, Overflow);
 }
 
-static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
-                                                   BuiltinValueKind ID,
-                                                   bool &ResultsInError) {
+static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
+                                                      BuiltinValueKind ID,
+                                                      bool &ResultsInError) {
   OperandValueArrayRef Args = AI->getArguments();
   IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(AI,
@@ -179,8 +179,8 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
   return nullptr;
 }
 
-static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
-                                                  BuiltinValueKind ID) {
+static SILInstruction *constantFoldCompare(ApplyInst *AI,
+                                           BuiltinValueKind ID) {
   OperandValueArrayRef Args = AI->getArguments();
 
   // Fold for integer constant arguments.
@@ -208,6 +208,76 @@ static SILInstruction *constantFoldCompareBuiltin(ApplyInst *AI,
   }
 
   return nullptr;
+}
+
+static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
+                                                    BuiltinValueKind ID,
+                                                    bool &ResultsInError) {
+  assert(ID == BuiltinValueKind::SDiv ||
+         ID == BuiltinValueKind::ExactSDiv ||
+         ID == BuiltinValueKind::SRem ||
+         ID == BuiltinValueKind::UDiv ||
+         ID == BuiltinValueKind::ExactUDiv ||
+         ID == BuiltinValueKind::URem);
+
+  OperandValueArrayRef Args = AI->getArguments();
+  SILModule &M = AI->getModule();
+
+  // Get the denominator.
+  IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
+  if (!Denom)
+    return nullptr;
+  APInt DenomVal = Denom->getValue();
+
+  // Reoprt an error if the denominator is zero.
+  if (DenomVal == 0) {
+    diagnose(M.getASTContext(),
+             AI->getLoc().getSourceLoc(),
+             diag::division_by_zero);
+    ResultsInError = true;
+    return nullptr;
+  }
+
+  // Get the numerator.
+  IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
+  if (!Num)
+    return nullptr;
+  APInt NumVal = Num->getValue();
+
+  APInt ResVal;
+  bool Overflowed = false;
+  switch (ID) {
+      // We do not cover all the cases below - only the ones that are easily
+      // computable for APInt.
+    default : return nullptr;
+    case BuiltinValueKind::SDiv:
+      ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
+      break;
+    case BuiltinValueKind::SRem:
+      ResVal = NumVal.srem(DenomVal);
+      break;
+    case BuiltinValueKind::UDiv:
+      ResVal = NumVal.udiv(DenomVal);
+      break;
+    case BuiltinValueKind::URem:
+      ResVal = NumVal.urem(DenomVal);
+      break;
+  }
+
+  if (Overflowed) {
+    diagnose(M.getASTContext(),
+             AI->getLoc().getSourceLoc(),
+             diag::division_overflow,
+             NumVal.toString(/*Radix*/ 10, /*Signed*/true),
+             "/",
+             DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+    ResultsInError = true;
+    return nullptr;
+  }
+
+  // Add the literal instruction to represnet the result of the division.
+  SILBuilder B(AI);
+  return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
 }
 
 static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
@@ -401,14 +471,14 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return constantFoldOverflowBuiltin(AI, Builtin.ID, ResultsInError);
+    return constantFoldBinaryWithOverflow(AI, Builtin.ID, ResultsInError);
 
 // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
 case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return constantFoldCompareBuiltin(AI, Builtin.ID);
+      return constantFoldCompare(AI, Builtin.ID);
 
   case BuiltinValueKind::Trunc:
   case BuiltinValueKind::ZExt:
@@ -461,61 +531,7 @@ case BuiltinValueKind::id:
   case BuiltinValueKind::UDiv:
   case BuiltinValueKind::ExactUDiv:
   case BuiltinValueKind::URem: {
-    // Get the denominator.
-    IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
-    if (!Denom)
-      return nullptr;
-    APInt DenomVal = Denom->getValue();
-
-    // Reoprt an error if the denominator is zero.
-    if (DenomVal == 0) {
-      diagnose(M.getASTContext(),
-               AI->getLoc().getSourceLoc(),
-               diag::division_by_zero);
-      ResultsInError = true;
-      return nullptr;
-    }
-
-    // Get the numerator.
-    IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
-    if (!Num)
-      return nullptr;
-    APInt NumVal = Num->getValue();
-
-    APInt ResVal;
-    bool Overflowed = false;
-    switch (Builtin.ID) {
-    // We do not cover all the cases below - only the ones that are easily
-    // computable for APInt.
-    default : return nullptr;
-    case BuiltinValueKind::SDiv:
-      ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
-      break;
-    case BuiltinValueKind::SRem:
-      ResVal = NumVal.srem(DenomVal);
-      break;
-    case BuiltinValueKind::UDiv:
-      ResVal = NumVal.udiv(DenomVal);
-      break;
-    case BuiltinValueKind::URem:
-      ResVal = NumVal.urem(DenomVal);
-      break;
-    }
-
-    if (Overflowed) {
-      diagnose(M.getASTContext(),
-               AI->getLoc().getSourceLoc(),
-               diag::division_overflow,
-               NumVal.toString(/*Radix*/ 10, /*Signed*/true),
-               "/",
-               DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
-      ResultsInError = true;
-      return nullptr;
-    }
-
-    // Add the literal instruction to represnet the result of the division.
-    SILBuilder B(AI);
-    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
+    return constantFoldAndCheckDivision(AI, Builtin.ID, ResultsInError);
   }
 
   // Process special builtins that are designed to check for overflows in
