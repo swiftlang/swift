@@ -252,11 +252,11 @@ public:
     return insert(new (F.getModule()) LoadInst(Loc, LV));
   }
 
-  StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestLValue) {
-    return insert(new (F.getModule()) StoreInst(Loc, Src, DestLValue));
+  StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr) {
+    return insert(new (F.getModule()) StoreInst(Loc, Src, DestAddr));
   }
-  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestLValue) {
-    return insert(new (F.getModule()) AssignInst(Loc, Src, DestLValue));
+  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
+    return insert(new (F.getModule()) AssignInst(Loc, Src, DestAddr));
   }
 
   MarkUninitializedInst *createMarkUninitialized(SILLocation loc, SILValue src){
@@ -264,7 +264,7 @@ public:
   }
 
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation loc,
-                                                   ArrayRef<SILValue> vars){
+                                                   ArrayRef<SILValue> vars) {
     return insert(MarkFunctionEscapeInst::create(loc, vars, F));
   }
 
@@ -277,20 +277,17 @@ public:
     return insert(new (F.getModule()) StoreWeakInst(loc, value, dest, isInit));
   }
 
-  InitializeVarInst *createInitializeVar(SILLocation Loc,
-                                         SILValue DestLValue,
+  InitializeVarInst *createInitializeVar(SILLocation Loc, SILValue DestLValue,
                                          bool canDefaultConstruct) {
     return insert(new (F.getModule())
                     InitializeVarInst(Loc, DestLValue, canDefaultConstruct));
   }
 
-  CopyAddrInst *createCopyAddr(SILLocation loc,
-                               SILValue srcLValue, SILValue destLValue,
-                               IsTake_t isTake,
+  CopyAddrInst *createCopyAddr(SILLocation loc, SILValue srcAddr,
+                               SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {
     return insert(new (F.getModule())
-                    CopyAddrInst(loc, srcLValue, destLValue,
-                                 isTake, isInitialize));
+                    CopyAddrInst(loc, srcAddr, destAddr, isTake, isInitialize));
   }
   
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
