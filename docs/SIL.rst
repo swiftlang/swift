@@ -457,7 +457,7 @@ which becomes responsible for destroying the value.
 An unowned direct parameter or result is instantaneously valid at the
 point of transfer.  The recipient does not need to worry about race
 conditions immediately destroying the value, but should copy it
-(e.g. by ``strong_retain``ing an object pointer) if the value will be
+(e.g. by ``strong_retain``\ ing an object pointer) if the value will be
 needed sooner rather than later.
 
 A guaranteed direct parameter is like an unowned direct parameter
