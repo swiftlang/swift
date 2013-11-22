@@ -387,21 +387,20 @@ namespace {
     // The instruction is a Load.
     Load,
 
+    // The instruction is an initialization of the tuple element.
+    Initialization,
+
     // The instruction is a Store.
     Store,
 
     // The instruction is a store to a member of a larger struct value.
     PartialStore,
-
+    
     /// An indirecet 'inout' parameter of an Apply instruction.
     InOutUse,
 
     /// An indirect 'in' parameter of an Apply instruction.
     IndirectIn,
-
-    /// An out parameter of an Apply instruction.  This is like a
-    /// store except it cannot be removed.
-    IndirectResult,
 
     /// This instruction is a general escape of the value, e.g. a call to a
     /// closure that captures it.
@@ -841,28 +840,6 @@ void ElementPromotion::diagnoseInitError(const MemoryUse &Use,
   diagnose(Module, TheMemory->getLoc(), diag::variable_defined_here);
 }
 
-static bool isStoreObviouslyAnInitialization(SILInstruction *Inst) {
-  if (isa<AssignInst>(Inst))
-    return false;
-  
-  else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
-    if (CA->isInitializationOfDest()) return true;
-  } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
-    if (SW->isInitializationOfDest()) return true;
-  } else if (isa<InitExistentialInst>(Inst) ||
-             isa<UpcastExistentialInst>(Inst) ||
-             isa<EnumDataAddrInst>(Inst) ||
-             isa<InjectEnumAddrInst>(Inst)) {
-    // These instructions *on a box* are only formed by direct initialization
-    // like "var x : Proto = foo".
-    return true;
-  } else {
-    return true;
-  }
-
-  return false;
-}
-
 /// doIt - returns true on error.
 bool ElementPromotion::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
@@ -879,16 +856,15 @@ bool ElementPromotion::doIt() {
 
     // We assume that SILGen knows what it is doing when it produces
     // initializations of variables, because it only produces them when it knows
-    // they are correct, and this is a super common case for "var x = 4" cases.
-    if (Use.Kind == UseKind::IndirectResult ||
-        (Use.Kind == UseKind::Store &&
-         isStoreObviouslyAnInitialization(Inst)))
+    // they are correct, and this is a super common case for "var x = y" cases.
+    if (Use.Kind == UseKind::Initialization)
       continue;
     
     // Check to see if the value is known-initialized here or not.
     DIKind DI = getLivenessAtUse(Use);
     switch (Use.Kind) {
-    case UseKind::IndirectResult:
+    case UseKind::Initialization:
+      assert(0 && "Handled above");
     case UseKind::Store:
     case UseKind::PartialStore:
       handleStoreUse(Use, DI);
@@ -1003,6 +979,11 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
     diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
     return;
   }
+  
+  // If this is an initialization, upgrade the store to an initialization in the
+  // uses list so that clients know about it.
+  if (DI == DIKind::No)
+    InstInfo.Kind = UseKind::Initialization;
 
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
@@ -1035,7 +1016,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
     for (auto I : InsertedInsts) {
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
-        Uses.push_back(MemoryUse(I, Store,
+        Uses.push_back(MemoryUse(I, DI == DIKind::No ? Initialization : Store,
                                  FirstTupleElement, NumTupleElements));
       } else if (isa<LoadInst>(I)) {
         Uses.push_back(MemoryUse(I, Load, FirstTupleElement, NumTupleElements));
@@ -1166,11 +1147,9 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
     // Ignore deleted uses.
     if (Use.Inst == nullptr) continue;
 
-    // Only stores can make something live.  inout uses and escapes only happen
-    // when some kind of store made the element live.
-    // TODO: It would be interesting to classify initializations as such, so we
-    // don't get extraneous stores here.
-    if (Use.Kind != UseKind::Store)
+    // Only initializations make something live.  inout uses, escapes, and
+    // assignments only happen when some kind of init made the element live.
+    if (Use.Kind != UseKind::Initialization)
       continue;
 
     // If the store doesn't cover the element we're looking at, it is unrelated.
@@ -1875,6 +1854,8 @@ bool ElementPromotion::promoteDestroyAddr(DestroyAddrInst *DAI) {
 /// Explode a copy_addr instruction of a loadable type into lower level
 /// operations like loads, stores, retains, releases, copy_value, etc.
 void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
+  DEBUG(llvm::errs() << "  -- Exploding copy_addr: " << *CAI << "\n");
+
   SILType ValTy = CAI->getDest().getType().getObjectType();
   auto &TL = Module.getTypeLowering(ValTy);
 
@@ -1920,7 +1901,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
   assert((LoadUse.isValid() || StoreUse.isValid()) &&
          "we should have a load or a store, possibly both");
   assert(StoreUse.isInvalid() || StoreUse.Kind == Store ||
-         StoreUse.Kind == PartialStore);
+         StoreUse.Kind == PartialStore || StoreUse.Kind == Initialization);
 
   // Now that we've emitted a bunch of instructions, including a load and store
   // but also including other stuff, update the internal state of
@@ -2112,26 +2093,46 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     }
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
-         isa<StoreWeakInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
         UI->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
-        assert(!isa<StoreWeakInst>(User) &&
-               "Can't weak store a struct or tuple");
         UsesToScalarize.push_back(User);
         continue;
       }
       
-      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+      // Note that we assume that raw stores are initializations, which is true
+      // coming out of silgen for non-trivial types, but this will misclassify
+      // trivial types.  That's ok for what we're doing with the initialization
+      // bit, since initialize vs assign are the same for trivial types.
+      UseKind Kind;
+      if (InStructSubElement)
+        Kind = UseKind::PartialStore;
+      else if (isa<StoreInst>(User))
+        Kind = UseKind::Initialization;
+      else
+        Kind = UseKind::Store;
       Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
       continue;
     }
-
-    if (isa<CopyAddrInst>(User)) {
+    
+    if (auto SWI = dyn_cast<StoreWeakInst>(User))
+      if (UI->getOperandNumber() == 1) {
+        UseKind Kind;
+        if (InStructSubElement)
+          Kind = UseKind::PartialStore;
+        else if (SWI->isInitializationOfDest())
+          Kind = UseKind::Initialization;
+        else
+          Kind = UseKind::Store;
+        Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
+        continue;
+      }
+    
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
       // have an access that crosses elements.
       if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(User);
+        UsesToScalarize.push_back(CAI);
         continue;
       }
       
@@ -2139,16 +2140,25 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       // the destination, then this is a store.  Note that we'll revisit this
       // instruction and add it to Uses twice if it is both a load and store to
       // the same aggregate.
-      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
-      if (UI->getOperandNumber() == 0) Kind = UseKind::Load;
-      Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
+      UseKind Kind;
+      if (UI->getOperandNumber() == 0)
+        Kind = UseKind::Load;
+      else if (InStructSubElement)
+        Kind = UseKind::PartialStore;
+      else if (CAI->isInitializationOfDest())
+        Kind = UseKind::Initialization;
+      else
+        Kind = UseKind::Store;
+      
+      Uses.push_back(MemoryUse(CAI, Kind, BaseTupleElt, 1));
       continue;
     }
     
     // Initializations are definitions.  This is currently used in constructors
     // and should go away someday.
     if (isa<InitializeVarInst>(User)) {
-      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+      auto Kind = InStructSubElement ?
+        UseKind::PartialStore : UseKind::Initialization;
       addElementUses(BaseTupleElt, PointeeType, User, Kind);
       continue;
     }
@@ -2181,7 +2191,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       // If this is an out-parameter, it is like a store.
       case ParameterConvention::Indirect_Out:
         assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseTupleElt, PointeeType, User, UseKind::IndirectResult);
+        addElementUses(BaseTupleElt, PointeeType, User,UseKind::Initialization);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
@@ -2212,7 +2222,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     if (isa<InitExistentialInst>(User)) {
       assert(!InStructSubElement && !InEnumSubElement &&
              "init_existential should not apply to subelements");
-      Uses.push_back(MemoryUse(User, UseKind::Store, BaseTupleElt, 1));
+      Uses.push_back(MemoryUse(User, UseKind::Initialization, BaseTupleElt, 1));
 
       // Set the "InEnumSubElement" flag (so we don't consider tuple indexes to
       // index across elements) and recursively process the uses.
@@ -2220,23 +2230,24 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       collectUses(SILValue(User, 0), BaseTupleElt);
       continue;
     }
-
+    
     // inject_enum_addr is treated as a store unconditionally.
     if (isa<InjectEnumAddrInst>(User)) {
       assert(!InStructSubElement &&
              "inject_enum_addr the subelement of a struct unless in a ctor");
-      Uses.push_back(MemoryUse(User, UseKind::Store, BaseTupleElt, 1));
+      Uses.push_back(MemoryUse(User, UseKind::Initialization, BaseTupleElt, 1));
       continue;
     }
 
-    // upcast_existential is modeled as a load or store depending on which
-    // operand we're looking at.
+    // upcast_existential is modeled as a load or initialization depending on
+    // which operand we're looking at.
     if (isa<UpcastExistentialInst>(User)) {
-      auto Kind = UI->getOperandNumber() == 1 ? UseKind::Store : UseKind::Load;
+      auto Kind = UI->getOperandNumber() == 1 ?
+        UseKind::Initialization : UseKind::Load;
       Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
       continue;
     }
-
+    
     // project_existential is a use of the protocol value, so it is modeled as a
     // load.
     if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)) {
@@ -2388,9 +2399,11 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
     case UseKind::Store:
     case UseKind::PartialStore:
       break;    // These don't prevent removal.
-
+    case UseKind::Initialization:
+      if (!isa<ApplyInst>(U.Inst))
+        break;
+      // FALL THROUGH.
     case UseKind::Load:
-    case UseKind::IndirectResult:
     case UseKind::IndirectIn:
     case UseKind::InOutUse:
     case UseKind::Escape:

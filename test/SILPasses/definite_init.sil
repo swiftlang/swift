@@ -267,6 +267,7 @@ bb0:
   destroy_addr %c#1 : $*SomeClass
   dealloc_box $SomeClass, %c#0 : $Builtin.ObjectPointer
   // CHECK-NEXT: strong_release [[C1]]
+  // CHECK-NEXT: strong_release [[C2]]
 
   %11 = tuple ()
   return %11 : $()
