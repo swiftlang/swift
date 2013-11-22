@@ -71,6 +71,15 @@ gatherReferencedTypeVarsRec(ConstraintSystem &cs,
   case ConstraintKind::SelfObjectOfProtocol: {
     Type first = cs.simplifyType(constraint->getFirstType());
     first->getTypeVariables(typeVars);
+
+    // Special case: the base type of an overloading binding.
+    if (constraint->getKind() == ConstraintKind::BindOverload) {
+      if (auto baseType = constraint->getOverloadChoice().getBaseType()) {
+        baseType = cs.simplifyType(baseType);
+        baseType->getTypeVariables(typeVars);
+      }
+    }
+
     break;
   }
   }
