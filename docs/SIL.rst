@@ -195,60 +195,281 @@ SIL Types
 
   sil-type ::= '$' '*'? generic-parameter-list? type
 
-SIL types are introduced with the ``$`` sigil. SIL's type system is a superset
-of Swift's, and so the type after the ``$`` is parsed using Swift's
-type grammar. SIL adds some additional kinds of type of its own:
+SIL types are introduced with the ``$`` sigil. SIL's type system is
+closely related to Swift's, and so the type after the ``$`` is parsed
+largely according to Swift's type grammar.
 
-- The *address of T* ``$*T``, a pointer to memory containing a
-  value of any reference or value type ``$T``.  This can be an internal pointer
-  into a data structure. Addresses of loadable types can be loaded and stored
-  to access values of those types.
+Type Lowering
+`````````````
 
-  Addresses of address-only types (see below) can only be used with
-  instructions that manipulate their operands indirectly by address, such
-  as ``copy_addr`` or ``destroy_addr``, or as arguments to functions.
-  For an address-only type ``T``, only the SIL address ``$*T`` can be
-  formed, and ``$T`` is an invalid SIL type.
+A *formal type* is the type of a value in Swift, such as an expression
+result.  Swift's formal type system intentionally abstracts over a
+large number of representational issues like ownership transfer
+conventions and directness of arguments.  However, SIL aims to
+represent most such implementation details, and so these differences
+deserve to be reflected in the SIL type system.  *Type lowering* is
+the process of turning a formal type into its *lowered type*.
+
+It is important to be aware that the lowered type of a declaration
+need not be the lowered type of the formal type of that declaration.
+For example, the lowered type of a declaration reference:
+
+- will usually be thin,
+
+- will frequently be uncurried,
+
+- may have a non-Swift calling convention,
+
+- may use bridged types in its interface, and
+
+- may use ownership conventions that differ from Swift's default
+  conventions.
+
+Abstraction Difference
+``````````````````````
+
+Generic functions working with values of unconstrained type must
+generally work with them indirectly, e.g. by allocating sufficient
+memory for them and then passing around pointers to that memory.
+Consider a generic function like this:
+
+::
+
+  func generateArray<T>(n : Int, generator : () -> T) -> T[]
+
+The function ``generator`` will be expected to store its result
+indirectly into an address passed in an implicit parameter.  There's
+really just no reasonable alternative when working with a value of
+arbitrary type:
+
+- We don't want to generate a different copy of ``generateArray`` for
+  every type ``T``.
+
+- We don't want to give every type in the language a common
+  representation.
+
+- We don't want to dynamically construct a call to ``generator``
+  depending on the type ``T``.
+
+But we also don't want the existence of the generic system to force
+inefficiencies on non-generic code.  For example, we'd like a function
+of type ``() -> Int`` to be able to return its result directly; and
+yet, ``() -> Int`` is a valid substitution of ``() -> T``, and a
+caller of ``generateArray<Int>`` should be able to pass an arbitrary
+``() -> Int`` in as the generator.
+
+Therefore, the representation of a formal type in a generic context
+may differ from the representation of a substitution of that formal type.
+We call such differences *abstraction differences*.
+
+SIL's type system is designed to make abstraction differences always
+result in differences between SIL types.  The goal is that a properly-
+abstracted value should be correctly usable at any level of substitution.
+
+In order to achieve this, the formal type of a generic entity should
+always be lowered using the abstraction pattern of its unsubstituted
+formal type.  For example, consider the following generic type:
+
+::
+
+  struct Generator<T> {
+    var fn : () -> T
+  }
+  var intGen : Generator<Int>
+
+``intGen.fn`` has the substituted formal type ``() -> Int``, which
+would normally lower to the type ``@callee_owned () -> Int``, i.e.
+returning its result directly.  But if that type is properly lowered
+with the pattern of its unsubstituted type ``() -> T``, it becomes
+``@callee_owned (@out Int) -> ()``.
+
+When a type is lowered using the abstraction pattern of an
+unrestricted type, it is lowered as if the pattern were replaced with
+a type sharing the same structure but replacing all materializable
+types with fresh type variables.
+
+For example, if ``g`` has type ``Generator<(Int,Int) -> Float>``, ``g.fn`` is
+lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
+-> Float`` to be lowered using the pattern ``T``, which is the same as
+lowering it with the pattern ``U -> V``; the result is that ``g.fn``
+has the following lowered type::
+
+  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ()``.
+
+As another example, suppose that ``h`` has type
+``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
+nor ``@inout Int`` are potential results of substitution because they
+aren't materializable, so ``h.fn`` has the following lowered type::
+
+  @callee_owned () -> @owned @callee_owned (@out Float, @in Int, @inout Int)
+
+This system has the property that abstraction patterns are preserved
+through repeated substitutions.  That is, you can consider a lowered
+type to encode an abstraction pattern; lowering ``T`` by ``R`` is
+equivalent to lowering ``T`` by (``S`` lowered by ``R``).
+
+SILGen has procedures for converting values between abstraction
+patterns.
+
+At present, only function and tuple types are changed by abstraction
+differences.
+
+Legal SIL Types
+```````````````
+
+The type of a value in SIL shall be:
+
+- a loadable legal SIL type, ``$T``,
+
+- the address of a legal SIL type, ``$*T``, or
+
+- the address of local storage of a legal SIL type, ``$*@local_storage T``.
+
+A type ``T`` is a *legal SIL type* if:
+
+- it is a function type which satisfies the constraints (below) on
+  function types in SIL,
+
+- it is a tuple type whose element types are legal SIL types, or
+
+- it is a legal Swift type that is not a function, tuple, or l-value type.
+
+Note that types in other recursive positions in the type grammar are
+still formal types.  For example, the instance type of a metatype or
+the type arguments of a generic type are still formal Swift types, not
+lowered SIL types.
+
+Address Types
+`````````````
+
+The *address of T* ``$*T`` is a pointer to memory containing a value
+of any reference or value type ``$T``.  This can be an internal
+pointer into a data structure. Addresses of loadable types can be
+loaded and stored to access values of those types.
+
+Addresses of address-only types (see below) can only be used with
+nstructions that manipulate their operands indirectly by address, such
+as ``copy_addr`` or ``destroy_addr``, or as arguments to functions.
+It is illegal to have a value of type ``$T`` if ``T`` is address-only.
   
-  Addresses are not reference-counted pointers like class values are. They
-  cannot be retained or released.
-  
-  The address of an address cannot be taken. ``$**T`` is not a representable
-  type. Values of address type thus cannot be allocated, loaded, or stored
-  (though addresses can of course be loaded from and stored to).
+Addresses are not reference-counted pointers like class values are. They
+cannot be retained or released.
 
-  If a function takes address arguments, those addresses are assumed to be
-  non-aliasing. A function may not capture an address, that is, it may not
-  store the address value in a location that survives the duration of a
-  function call. (Although addresses cannot directly be stored, they can be
-  cast to ``Builtin.RawPointer`` values using the ``address_to_pointer``
-  instruction, which could be stored.) In LLVM terms, all address arguments are
-  ``noalias nocapture``. It is undefined behavior for two address arguments to
-  alias or for a captured address value to be dereferenced. Addresses are
-  never null. (Note that class 
-  values are not considered "addresses". Their instance pointers may be null,
-  may be captured, and may alias subject to `class aliasing`_ rules.)
-  
-  Functions cannot return an address. If an address-only
-  value needs to be returned, it is done so using an indirect return argument
-  according to the `calling convention`_ of the function.
+Address types are not *first-class*: they cannot appear in recursive
+positions in type expressions.  For example, the type ``$**T`` is not
+a legal type.
 
-- The *address of local storage for T* ``$*@local_storage T``, a
-  handle to a stack allocation of a variable of type ``$T``.
+The address of an address cannot be directly taken. ``$**T`` is not a representable
+type. Values of address type thus cannot be allocated, loaded, or stored
+(though addresses can of course be loaded from and stored to).
 
-  For many types, the handle for a stack allocation is simply the
-  allocated address itself.  However, if a type is runtime-sized, the
-  compiler must emit code to potentially dynamically allocate memory.
-  SIL abstracts over such differences by using values of local-storage
-  type as the first result of ``alloc_stack`` and the operand of
-  ``dealloc_stack``.
+Addresses can be passed as arguments to functions if the corresponding
+parameter is indirect.  They cannot be returned.
 
-- The *self type for T* ``$*sil_self T``, which refers to the ``Self``
-  type within the protocol ``T``.
+Local Storage Types
+```````````````````
 
-- Values of *generic function type* such as
-  ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
-  function with ``function_ref`` will give a value of a generic function type.
+The *address of local storage for T* ``$*@local_storage T`` is a
+handle to a stack allocation of a variable of type ``$T``.
+
+For many types, the handle for a stack allocation is simply the
+allocated address itself.  However, if a type is runtime-sized, the
+compiler must emit code to potentially dynamically allocate memory.
+SIL abstracts over such differences by using values of local-storage
+type as the first result of ``alloc_stack`` and the operand of
+``dealloc_stack``.
+
+Local-storage address types are not *first-class* in the same sense
+that address types are not first-class.
+
+Protocol ``Self`` Types
+```````````````````````
+
+The *self type for T* ``sil_self T`` refers to the ``Self`` type
+within the protocol ``T`.
+
+Function Types
+``````````````
+
+Function types in SIL are different from function types in Swift in a
+number of ways:
+
+- A SIL function type may be generic.  For example, accessing a
+  generic function with ``function_ref`` will give a value of
+  generic function type.
+
+- A SIL function type declares its conventional treatment of its
+  context value:
+
+  - If it is ``@thin``, the function requires no context value.
+
+  - If it is ``@callee_owned``, the context value is treated as an
+    owned direct parameter.
+
+  - If it is ``@callee_guaranteed``, the context value is treated as
+    a guaranteed direct parameter.
+
+  - Otherwise, the context value is treated as an unowned direct
+    parameter.
+
+- A SIL function type declares the conventions for its parameters,
+  including any implicit out-parameters.  The parameters are written
+  as an unlabelled tuple; the elements of that tuple must be legal SIL
+  types, optionally decorated with one of the following convention
+  attributes.
+
+  The value of an indirect parameter has type ``*T``; the value of a
+  direct parameter has type ``T``.
+
+  - An ``@in`` parameter is indirect.  The address must be of an
+    initialized object; the function is responsible for destroying
+    the value held there.
+
+  - An ``@inout`` parameter is indirect.  The address must be of an
+    initialized object, and the function must leave an initialized
+    object there upon exit.
+
+  - An ``@out`` parameter is indirect.  The address must be of an
+    uninitialized object; the function is responsible for initializing
+    a value there.  If there is an ``@out`` parameter, it must be
+    the first parameter, and the direct result must be ``()``.
+
+  - An ``@owned`` parameter is an owned direct parameter.
+
+  - A ``@guaranteed`` parameter is a guaranteed direct parameter.
+
+  - Otherwise, the parameter is an unowned direct parameter.
+
+- A SIL function type declares the convention for its direct result.
+  The result must be a legal SIL type.
+
+  - An ``@owned`` result is an owned direct result.
+
+  - An ``@autoreleased`` result is an autoreleased direct result.
+
+  - Otherwise, the parameter is an unowned direct result.
+
+A direct parameter or result of trivial type must always be unowned.
+
+An owned direct parameter or result is transferred to the recipient,
+which becomes responsible for destroying the value.
+
+An unowned direct parameter or result is instantaneously valid at the
+point of transfer.  The recipient does not need to worry about race
+conditions immediately destroying the value, but should copy it
+(e.g. by ``strong_retain``ing an object pointer) if the value will be
+needed sooner rather than later.
+
+A guaranteed direct parameter is like an unowned direct parameter
+value, except that it is guaranteed by the caller to remain valid
+throughout the execution of the call.
+
+An autoreleased direct result must have object pointer type.  It may
+have been autoreleased, and the caller should take action to reclaim
+that autorelease with ``strong_retain_autoreleased``.
+
+Properties of Types
+```````````````````
 
 SIL classifies types into additional subgroups based on ABI stability and
 generic constraints:
