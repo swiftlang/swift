@@ -196,3 +196,76 @@ bb0:
 // CHECK-NEXT: return
 }
 
+// fold_binary_bitwise
+sil @fold_binary_bitwise : $@thin () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1          // users: %7, %6, %5
+  %1 = integer_literal $Builtin.Int64, 0          // users: %7, %6, %5
+  %2 = builtin_function_ref #Builtin.and_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %5
+  %3 = builtin_function_ref #Builtin.or_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
+  %4 = builtin_function_ref #Builtin.xor_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
+  %5 = apply %2(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %6 = apply %3(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %7 = apply %4(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %8
+  return %7 : $Builtin.Int64                      // id: %8
+
+// CHECK-LABEL: sil @fold_binary_bitwise
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
+// CHECK_NEXT: %1 = integer_literal $Builtin.Int64, 1
+// CHECK_NEXT: %2 = integer_literal $Builtin.Int64, 1
+// CHECK_NEXT: return %2 : $Builtin.Int64
+}
+
+// fold_shifts
+sil @fold_shifts : $@thin () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -32        // users: %9, %8
+  %1 = integer_literal $Builtin.Int64, 32         // users: %11, %10
+  %2 = integer_literal $Builtin.Int64, 3          // users: %11, %10, %9, %8
+  %3 = integer_literal $Builtin.Int64, 1          // user: %12
+  %4 = integer_literal $Builtin.Int64, 5          // user: %12
+  %5 = builtin_function_ref #Builtin.ashr_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %10, %8
+  %6 = builtin_function_ref #Builtin.lshr_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %11, %9
+  %7 = builtin_function_ref #Builtin.shl_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %12
+  %8 = apply %5(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %9 = apply %6(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %10 = apply %5(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %11 = apply %6(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %12 = apply %7(%3, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %13
+  return %12 : $Builtin.Int64                     // id: %13
+
+// CHECK-LABEL: sil @fold_shifts
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, -4
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int64, 2305843009213693948
+// CHECK-NEXT: %2 = integer_literal $Builtin.Int64, 4
+// CHECK-NEXT: %3 = integer_literal $Builtin.Int64, 4
+// CHECK-NEXT: %4 = integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: return %4 : $Builtin.Int64
+}
+
+// fold_float_operations
+sil @fold_float_operations : $@thin () -> Builtin.FPIEEE64 {
+bb0:
+  %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
+  %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
+  %0 = builtin_function_ref #Builtin.fadd_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64 
+  %1 = builtin_function_ref #Builtin.fdiv_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %2 = builtin_function_ref #Builtin.fsub_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %3 = builtin_function_ref #Builtin.fmul_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %8 = apply %0(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %9 = apply %1(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %10 = apply %2(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %13 = apply %3(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  return %13 : $Builtin.FPIEEE64                  
+
+// CHECK-LABEL: sil @fold_float_operations
+// CHECK: bb0:
+// CHECK-NEXT: %0 = float_literal $Builtin.FPIEEE64, 0x4032733333333333
+// CHECK-NEXT: %1 = float_literal $Builtin.FPIEEE64, 0x40125D1745D1745D
+// CHECK-NEXT: %2 = float_literal $Builtin.FPIEEE64, 0x4027B33333333334
+// CHECK-NEXT: %3 = float_literal $Builtin.FPIEEE64, 0x4048FF5C28F5C28F
+// CHECK-NEXT: return %3 : $Builtin.FPIEEE64
+}
+

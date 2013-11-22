@@ -280,6 +280,106 @@ static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
   return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
 }
 
+/// \brief Fold binary operations.
+///
+/// The list of operations we constant fold might not be complete. Start with
+/// folding the operations used by the standard library.
+static SILInstruction *constantFoldBinary(ApplyInst *AI,
+                                          BuiltinValueKind ID,
+                                          bool &ResultsInError) {
+  switch (ID) {
+  default:
+    llvm_unreachable("Not all BUILTIN_BINARY_OPERATIONs are covered!");
+
+  // Fold constant division operations and report div by zero.
+  case BuiltinValueKind::SDiv:
+  case BuiltinValueKind::ExactSDiv:
+  case BuiltinValueKind::SRem:
+  case BuiltinValueKind::UDiv:
+  case BuiltinValueKind::ExactUDiv:
+  case BuiltinValueKind::URem: {
+    return constantFoldAndCheckDivision(AI, ID, ResultsInError);
+  }
+
+  // Are there valid uses for these in stdlib?
+  case BuiltinValueKind::Add:
+  case BuiltinValueKind::Mul:
+  case BuiltinValueKind::Sub:
+    return nullptr;
+
+  case BuiltinValueKind::And:
+  case BuiltinValueKind::AShr:
+  case BuiltinValueKind::LShr:
+  case BuiltinValueKind::Or:
+  case BuiltinValueKind::Shl:
+  case BuiltinValueKind::Xor: {
+    OperandValueArrayRef Args = AI->getArguments();
+    IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+    IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+    if (!RHS || !LHS)
+      return nullptr;
+    APInt LHSI = LHS->getValue();
+    APInt RHSI = RHS->getValue();
+    APInt ResI;
+    switch (ID) {
+    default: llvm_unreachable("Not all cases are covered!");
+    case BuiltinValueKind::And:
+      ResI = LHSI.And(RHSI);
+      break;
+    case BuiltinValueKind::AShr:
+      ResI = LHSI.ashr(RHSI);
+      break;
+    case BuiltinValueKind::LShr:
+      ResI = LHSI.lshr(RHSI);
+      break;
+    case BuiltinValueKind::Or:
+      ResI = LHSI.Or(RHSI);
+      break;
+    case BuiltinValueKind::Shl:
+      ResI = LHSI.shl(RHSI);
+      break;
+    case BuiltinValueKind::Xor:
+      ResI = LHSI.Xor(RHSI);
+      break;
+    }
+    // Add the literal instruction to represent the result.
+    SILBuilder B(AI);
+    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResI);
+  }
+  case BuiltinValueKind::FAdd:
+  case BuiltinValueKind::FDiv:
+  case BuiltinValueKind::FMul:
+  case BuiltinValueKind::FSub: {
+    OperandValueArrayRef Args = AI->getArguments();
+    FloatLiteralInst *LHS = dyn_cast<FloatLiteralInst>(Args[0]);
+    FloatLiteralInst *RHS = dyn_cast<FloatLiteralInst>(Args[1]);
+    if (!RHS || !LHS)
+      return nullptr;
+    APFloat LHSF = LHS->getValue();
+    APFloat RHSF = RHS->getValue();
+    switch (ID) {
+    default: llvm_unreachable("Not all cases are covered!");
+    case BuiltinValueKind::FAdd:
+        LHSF.add(RHSF, APFloat::rmNearestTiesToEven);
+      break;
+    case BuiltinValueKind::FDiv:
+      LHSF.divide(RHSF, APFloat::rmNearestTiesToEven);
+      break;
+    case BuiltinValueKind::FMul:
+      LHSF.multiply(RHSF, APFloat::rmNearestTiesToEven);
+      break;
+    case BuiltinValueKind::FSub:
+      LHSF.subtract(RHSF, APFloat::rmNearestTiesToEven);
+      break;
+    }
+
+    // Add the literal instruction to represent the result.
+    SILBuilder B(AI);
+    return B.createFloatLiteral(AI->getLoc(), AI->getType(), LHSF);
+  }
+  }
+}
+
 static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
   bool SrcTySigned =
   (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
@@ -473,6 +573,12 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 #include "swift/AST/Builtins.def"
     return constantFoldBinaryWithOverflow(AI, Builtin.ID, ResultsInError);
 
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
+case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      return constantFoldBinary(AI, Builtin.ID, ResultsInError);
+
 // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
@@ -522,16 +628,6 @@ case BuiltinValueKind::id:
     // Add the literal instruction to represent the result of the cast.
     SILBuilder B(AI);
     return B.createIntegerLiteral(AI->getLoc(), AI->getType(), CastResV);
-  }
-
-  // Fold constant division operations and report div by zero.
-  case BuiltinValueKind::SDiv:
-  case BuiltinValueKind::ExactSDiv:
-  case BuiltinValueKind::SRem:
-  case BuiltinValueKind::UDiv:
-  case BuiltinValueKind::ExactUDiv:
-  case BuiltinValueKind::URem: {
-    return constantFoldAndCheckDivision(AI, Builtin.ID, ResultsInError);
   }
 
   // Process special builtins that are designed to check for overflows in
@@ -607,7 +703,7 @@ static SILValue constantFoldInstruction(SILInstruction &I,
 }
 
 static bool isFoldable(SILInstruction *I) {
-  return isa<IntegerLiteralInst>(I);
+  return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
 }
 
 static bool CCPFunctionBody(SILFunction &F) {
