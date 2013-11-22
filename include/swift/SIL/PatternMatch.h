@@ -38,6 +38,13 @@ bool match(Val *V, const Pattern &P) {
   return const_cast<Pattern &>(P).match(V);
 }
 
+/// Explicit template instantiation for SILValue so we can access the value
+/// inside.
+template<typename Pattern>
+bool match(SILValue V, const Pattern &P) {
+  return const_cast<Pattern &>(P).match(&*V);
+}
+
 template<typename SubPatternTy>
 struct OneUse_match {
   SubPatternTy SubPattern;

@@ -409,7 +409,7 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
   //   ->
   // (load (struct_element_addr %x), #vardecl)
   LoadInst *LI;
-  if (match(&*SEI->getOperand(), m_LoadInst(LI))) {
+  if (match(SEI->getOperand(), m_LoadInst(LI))) {
     // Move our insertion point to the load so we insert the new
     // struct_element_addr and load there.
     //
