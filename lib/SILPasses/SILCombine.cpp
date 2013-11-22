@@ -43,12 +43,12 @@ namespace swift {
 
 /// This is the worklist management logic for SILCombine.
 class SILCombineWorklist {
-  llvm::SmallVector<SILInstruction*, 256> Worklist;
-  llvm::DenseMap<SILInstruction*, unsigned> WorklistMap;
+  llvm::SmallVector<SILInstruction *, 256> Worklist;
+  llvm::DenseMap<SILInstruction *, unsigned> WorklistMap;
   llvm::SmallVector<SILInstruction *, 8> TrackingList;
 
-  void operator=(const SILCombineWorklist&RHS) = delete;
-  SILCombineWorklist(const SILCombineWorklist&) = delete;
+  void operator=(const SILCombineWorklist &RHS) = delete;
+  SILCombineWorklist(const SILCombineWorklist &Worklist) = delete;
 public:
   SILCombineWorklist() {}
 
@@ -404,7 +404,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 
 SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
-
   // (struct_extract (load %x) #vardecl)
   //   ->
   // (load (struct_element_addr %x), #vardecl)
