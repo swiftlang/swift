@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
+#include "ConstraintGraph.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
@@ -808,6 +809,18 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Simplify this system.
   if (failedConstraint || simplify()) {
     return true;
+  }
+
+  // FIXME: Actually use the constraint graph for something other than
+  // debugging.
+  if (TC.Context.LangOpts.DebugConstraintSolver) {
+    ConstraintGraph cg(*this);
+    for (auto constraint : Constraints)
+      cg.addConstraint(constraint);
+    cg.verify();
+
+    llvm::errs() << "---Constraint graph---\n";
+    cg.print(llvm::errs());
   }
 
   // If there are no constraints remaining, we're done. Save this solution.
