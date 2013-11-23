@@ -903,6 +903,14 @@ private:
       return nullptr;
     NodePointer demangled_ctx(nullptr);
     char c = Mangled.peek();
+    if (c == 'F') {
+      Mangled.next();
+      demangled_ctx = Node::makeNodePointer(Node::Kind::Declaration);
+      if (!demangleEntity(demangled_ctx))
+        return NodePointer(new Node(Node::Kind::Failure, ""));
+      else return demangled_ctx;
+   }
+
     if (isStartOfIdentifier(c) || c == 'S') {
       demangled_ctx = demangleModule();
       if (allow_greedy && Mangled.hasAtLeast(1) && isStartOfIdentifier(Mangled.peek()))

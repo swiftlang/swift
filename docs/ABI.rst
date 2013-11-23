@@ -718,7 +718,7 @@ Declaration Contexts
 ::
 
   context ::= module
-  context ::= function
+  context ::= 'F' function
   context ::= nominal-type
   context ::= protocol-context
   module ::= substitution                    // other substitution

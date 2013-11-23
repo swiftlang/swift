@@ -236,6 +236,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(ctx);
+    Buffer << 'F';
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       // FIXME: We need a real solution here for local types.
