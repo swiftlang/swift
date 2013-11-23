@@ -205,6 +205,7 @@ typeVariablesIntersect(ConstraintSystem &cs,
 }
 
 void ConstraintSystem::collectConstraintsForTypeVariables(
+       ArrayRef<Constraint *> constraints,
        SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
        SmallVectorImpl<Constraint *> &disjunctions) {
   typeVarConstraints.clear();
@@ -225,7 +226,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // First, collect all of the constraints that relate directly to a
   // type variable.
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  for (auto constraint : Constraints) {
+  for (auto constraint : constraints) {
     Type first;
     if (constraint->getKind() != ConstraintKind::Conjunction &&
         constraint->getKind() != ConstraintKind::Disjunction)
@@ -653,7 +654,8 @@ static bool tryTypeVariableBindings(
               TypeVariableConstraints &tvc,
               ArrayRef<std::pair<Type, bool>> bindings,
               SmallVectorImpl<Solution> &solutions,
-              FreeTypeVariableBinding allowFreeTypeVariables) {
+              FreeTypeVariableBinding allowFreeTypeVariables,
+              Optional<unsigned> cutpoint) {
   auto typeVar = tvc.TypeVar;
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
@@ -695,7 +697,7 @@ static bool tryTypeVariableBindings(
       }
 
       cs.addConstraint(ConstraintKind::Bind, typeVar, type);
-      if (!cs.solve(solutions, allowFreeTypeVariables))
+      if (!cs.solve(solutions, allowFreeTypeVariables, cutpoint))
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
@@ -780,7 +782,8 @@ static bool tryTypeVariableBindings(
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables) {
+                             FreeTypeVariableBinding allowFreeTypeVariables,
+                             Optional<unsigned> cutpoint) {
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
   if (!solverState) {
@@ -806,10 +809,33 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return solutions.size() != 1;
   }
 
-  // Simplify this system.
-  if (failedConstraint || simplify()) {
+  // If we already failed, return.
+  if (failedConstraint)
     return true;
+
+  // If we have a cut point, move all of the uninteresting constraints
+  // over to
+  // Note that the interesting constraints come *after* the cutpoint, because
+  // we expect that we'll have fewer interesting constraints than uninteresting
+  // constraints, and our current data structures require us to copy this data.
+  // FIXME: A real worklist wouldn't have this silliness.
+  SmallVector<Constraint *, 4> uninterestingConstraints;
+  if (cutpoint) {
+    uninterestingConstraints.append(Constraints.begin() + *cutpoint,
+                                    Constraints.end());
+    Constraints.erase(Constraints.begin() + *cutpoint, Constraints.end());
+    uninterestingConstraints.swap(Constraints);
   }
+
+  // Simplify this system.
+  bool failed = simplify();
+
+  Constraints.append(uninterestingConstraints.begin(),
+                     uninterestingConstraints.end());
+
+  // If we failed, return now.
+  if (failed || failedConstraint)
+    return true;
 
   // If there are no constraints remaining, we're done. Save this solution.
   if (Constraints.empty()) {
@@ -829,23 +855,65 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return false;
   }
 
-  // FIXME: Actually use the constraint graph for something other than
-  // debugging.
+  // Build a constraint graph.
+  ConstraintGraph cg(*this);
+  for (auto constraint : Constraints)
+    cg.addConstraint(constraint);
+
+  // Compute the connected components of the constraint graph. We only want to
+  // look at the smallest one.
+  SmallVector<unsigned, 16> components;
+  SmallVector<unsigned, 4> componentSizes;
+  unsigned numComponents = cg.computeConnectedComponents(components,
+                                                         &componentSizes);
+  ArrayRef<Constraint *> constraintsInCC;
+
+  Optional<unsigned> innerCutpoint;
+  if (numComponents > 1) {
+    // There are multiple connected components. Find the smallest of them.
+    unsigned component = std::min_element(componentSizes.begin(),
+                                          componentSizes.end())
+                           - componentSizes.begin();
+
+    // Add constraints
+    llvm::SmallPtrSet<Constraint *, 4> addedConstraints;
+    auto typeVars = cg.getTypeVariables();
+    for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+      // If this type variable isn't in the selected component, ignore it.
+      if (components[i] != component)
+        continue;
+
+      // Add all of the constraints associated with this type variable.
+      for (auto constraint : cg[typeVars[i]].getConstraints()) {
+        addedConstraints.insert(constraint);
+      }
+    }
+
+    // Partition the constraints into those that are outside of the chosen
+    // connected component and then, afterward, those that are inside the
+    // component.
+    innerCutpoint
+      = std::stable_partition(Constraints.begin(), Constraints.end(),
+                              [&](Constraint *constraint) {
+                                return addedConstraints.count(constraint) == 0;
+                              })
+          - Constraints.begin();
+
+    constraintsInCC = llvm::makeArrayRef(Constraints).slice(*innerCutpoint);
+  } else {
+    // All of the constraints are in the smallest CC.
+    constraintsInCC = Constraints;
+  }
+
   if (TC.Context.LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
 
-    ConstraintGraph cg(*this);
-    for (auto constraint : Constraints)
-      cg.addConstraint(constraint);
+    // Verify that the constraint graph is valid.
     cg.verify();
 
     log << "---Constraint graph---\n";
     cg.print(log);
 
-    SmallVector<unsigned, 16> components;
-    SmallVector<unsigned, 4> componentSizes;
-    unsigned numComponents = cg.computeConnectedComponents(components,
-                                                           &componentSizes);
     ArrayRef<TypeVariableType *> typeVars = cg.getTypeVariables();
     if (numComponents > 1) {
       log << "---Connected components---\n";
@@ -866,7 +934,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Collect the type variable constraints.
   SmallVector<TypeVariableConstraints, 4> typeVarConstraints;
   SmallVector<Constraint *, 4> disjunctions;
-  collectConstraintsForTypeVariables(typeVarConstraints, disjunctions);
+  collectConstraintsForTypeVariables(constraintsInCC,
+                                     typeVarConstraints, disjunctions);
   if (!typeVarConstraints.empty()) {
     // Look for the best type variable to bind.
     unsigned bestTypeVarIndex = 0;
@@ -894,7 +963,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                                      typeVarConstraints[bestTypeVarIndex],
                                      bestBindings.Bindings,
                                      solutions,
-                                     allowFreeTypeVariables);
+                                     allowFreeTypeVariables,
+                                     innerCutpoint);
     }
 
     // Fall through to resolve an overload set.
@@ -1005,7 +1075,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Record this as a generated constraint.
     solverState->generatedConstraints.push_back(constraint);
 
-    if (!solve(solutions, allowFreeTypeVariables)) {
+    if (!solve(solutions, allowFreeTypeVariables, innerCutpoint)) {
       anySolved = true;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.

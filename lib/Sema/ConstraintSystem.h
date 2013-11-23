@@ -1615,6 +1615,8 @@ public:
   /// \brief Walks through the list of constraints, collecting the constraints
   /// that directly apply to each representative type variable.
   ///
+  /// \param constraints The set of constraints to consider.
+  ///
   /// \param typeVarConstraints will be populated with a list of
   /// representative type variables and the constraints that apply directly
   /// to them.
@@ -1622,6 +1624,7 @@ public:
   /// \param disjunctions will be populated with the list of disjunction
   /// constraints encountered.
   void collectConstraintsForTypeVariables(
+         ArrayRef<Constraint *> constraints,
          SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
          SmallVectorImpl<Constraint *> &disjunctions);
 
@@ -1642,13 +1645,18 @@ public:
   /// \brief Solve the system of constraints.
   ///
   /// \param solutions The set of solutions to this system of constraints.
+  ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
+  ///
+  /// \param cutpoint The cut point, which separates the uninteresting
+  /// constraints from the interesting constraints.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables
-               = FreeTypeVariableBinding::Disallow);
+               = FreeTypeVariableBinding::Disallow,
+             Optional<unsigned> cutpoint = Nothing);
 
 private:
   // \brief Compare two solutions to the same set of constraints.

@@ -141,7 +141,10 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
 
 #pragma mark Node mutation
 void ConstraintGraph::Node::addConstraint(Constraint *constraint) {
-  assert(ConstraintIndex.count(constraint) == 0 && "Constraint already known");
+  // FIXME: Assert that this never happens. We shouldn't re-insert a constraint.
+  if (ConstraintIndex.count(constraint))
+    return;
+
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
 }
