@@ -1642,6 +1642,23 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool simplify();
 
+private:
+  /// \brief Solve the system of constraints after it has already been
+  /// simplified.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  ///
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \param cutpoint The cut point, which separates the uninteresting
+  /// constraints from the interesting constraints.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
+                       FreeTypeVariableBinding allowFreeTypeVariables,
+                       Optional<unsigned> cutpoint);
+ public:
   /// \brief Solve the system of constraints.
   ///
   /// \param solutions The set of solutions to this system of constraints.

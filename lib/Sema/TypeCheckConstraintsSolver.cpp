@@ -866,7 +866,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   SmallVector<unsigned, 4> componentSizes;
   unsigned numComponents = cg.computeConnectedComponents(components,
                                                          &componentSizes);
-  ArrayRef<Constraint *> constraintsInCC;
 
   Optional<unsigned> innerCutpoint;
   if (numComponents > 1) {
@@ -899,10 +898,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                               })
           - Constraints.begin();
 
-    constraintsInCC = llvm::makeArrayRef(Constraints).slice(*innerCutpoint);
-  } else {
-    // All of the constraints are in the smallest CC.
-    constraintsInCC = Constraints;
   }
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
@@ -929,6 +924,21 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
         log << '\n';
       }
     }
+  }
+
+  return solveSimplified(solutions, allowFreeTypeVariables, innerCutpoint);
+}
+
+bool ConstraintSystem::solveSimplified(
+       SmallVectorImpl<Solution> &solutions,
+       FreeTypeVariableBinding allowFreeTypeVariables,
+       Optional<unsigned> cutpoint) {
+  // Find the constraints in the given connected component.
+  ArrayRef<Constraint *> constraintsInCC;
+  if (cutpoint) {
+    constraintsInCC = llvm::makeArrayRef(Constraints).slice(*cutpoint);
+  } else {
+    constraintsInCC = Constraints;
   }
 
   // Collect the type variable constraints.
@@ -964,7 +974,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                                      bestBindings.Bindings,
                                      solutions,
                                      allowFreeTypeVariables,
-                                     innerCutpoint);
+                                     cutpoint);
     }
 
     // Fall through to resolve an overload set.
@@ -1075,7 +1085,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Record this as a generated constraint.
     solverState->generatedConstraints.push_back(constraint);
 
-    if (!solve(solutions, allowFreeTypeVariables, innerCutpoint)) {
+    if (!solve(solutions, allowFreeTypeVariables, cutpoint)) {
       anySolved = true;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
