@@ -26,4 +26,5 @@ CS_STATISTIC(NumSimplifiedConstraints, "# of constraints simplified")
 CS_STATISTIC(NumUnsimplifiedConstraints, "# of constraints not simplified")
 CS_STATISTIC(NumSimplifyIterations, "# of simplification iterations")
 CS_STATISTIC(NumStatesExplored, "# of solution states explored")
+CS_STATISTIC(NumComponentsSplit, "# of connected components split")
 #undef CS_STATISTIC

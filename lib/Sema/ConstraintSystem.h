@@ -1040,6 +1040,13 @@ private:
   /// \returns the solution.
   Solution finalize(FreeTypeVariableBinding allowFreeTypeVariables);
 
+  /// \brief Apply the given solution to the current constraint system.
+  ///
+  /// This operation is used to take a solution computed based on some
+  /// subset of the constraints and then apply it back to the
+  /// constraint system for further exploration.
+  void applySolution(const Solution &solution);
+
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
   ///

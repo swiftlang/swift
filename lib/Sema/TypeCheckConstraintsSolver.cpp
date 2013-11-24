@@ -17,6 +17,7 @@
 #include "ConstraintGraph.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
+#include <memory>
 #include <tuple>
 using namespace swift;
 using namespace constraints;
@@ -118,6 +119,42 @@ Solution ConstraintSystem::finalize(
   }
 
   return std::move(solution);
+}
+
+void ConstraintSystem::applySolution(const Solution &solution) {
+  // Assign fixed types to the type variables solved by this solution.
+  llvm::SmallPtrSet<TypeVariableType *, 4> 
+    knownTypeVariables(TypeVariables.begin(), TypeVariables.end());
+  for (auto binding : solution.typeBindings) {
+    // If we haven't seen this type variable before, record it now.
+    if (knownTypeVariables.insert(binding.first))
+      TypeVariables.push_back(binding.first);
+
+    // If we don't already have a fixed type for this type variable,
+    // assign the fixed type from the solution.
+    if (!getFixedType(binding.first))
+      assignFixedType(binding.first, binding.second);
+  }
+
+  // Register overload choices.
+  // FIXME: Copy these directly into some kind of partial solution?
+  for (auto overload : solution.overloadChoices) {
+    resolvedOverloadSets
+      = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
+                                                Type(),
+                                                overload.second.choice,
+                                                overload.first,
+                                                overload.second.openedFullType,
+                                                overload.second.openedType};    
+  }
+
+  // Register constraint restrictions.
+  // FIXME: Copy these directly into some kind of partial solution?
+  for (auto restriction : solution.constraintRestrictions) {
+    solverState->constraintRestrictions.push_back({restriction.first.first,
+                                                   restriction.first.second,
+                                                   restriction.second});
+  }
 }
 
 /// \brief Restore the type variable bindings to what they were before
@@ -867,37 +904,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   unsigned numComponents = cg.computeConnectedComponents(components,
                                                          &componentSizes);
 
-  Optional<unsigned> innerCutpoint;
-  if (numComponents > 1) {
-    // There are multiple connected components. Find the smallest of them.
-    unsigned component = std::min_element(componentSizes.begin(),
-                                          componentSizes.end())
-                           - componentSizes.begin();
-
-    // Add constraints
-    llvm::SmallPtrSet<Constraint *, 4> addedConstraints;
-    auto typeVars = cg.getTypeVariables();
-    for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-      // If this type variable isn't in the selected component, ignore it.
-      if (components[i] != component)
-        continue;
-
-      // Add all of the constraints associated with this type variable.
-      for (auto constraint : cg[typeVars[i]].getConstraints()) {
-        addedConstraints.insert(constraint);
-      }
-    }
-
-    // Partition the constraints into those that are outside of the chosen
-    // connected component and then, afterward, those that are inside the
-    // component.
-    innerCutpoint
-      = std::stable_partition(Constraints.begin(), Constraints.end(),
-                              [&](Constraint *constraint) {
-                                return addedConstraints.count(constraint) == 0;
-                              })
-          - Constraints.begin();
-
+  // If we don't have more than one component, just solve the whole
+  // system.
+  if (numComponents < 2) {
+    return solveSimplified(solutions, allowFreeTypeVariables, Nothing);
   }
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
@@ -910,23 +920,156 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     cg.print(log);
 
     ArrayRef<TypeVariableType *> typeVars = cg.getTypeVariables();
-    if (numComponents > 1) {
-      log << "---Connected components---\n";
-      for (unsigned component = 0; component != numComponents; ++component) {
-        log.indent(2);
-        log << component << ":";
-        for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-          if (components[i] == component) {
-            log << ' ';
-            typeVars[i]->print(log);
-          }
+    log << "---Connected components---\n";
+    for (unsigned component = 0; component != numComponents; ++component) {
+      log.indent(2);
+      log << component << ":";
+      for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+        if (components[i] == component) {
+          log << ' ';
+          typeVars[i]->print(log);
         }
-        log << '\n';
       }
+      log << '\n';
     }
   }
 
-  return solveSimplified(solutions, allowFreeTypeVariables, innerCutpoint);
+  // Construct a mapping from type variables and constraints to their
+  // owning component.
+  llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
+  llvm::DenseMap<Constraint *, unsigned> constraintComponent;
+  auto typeVars = cg.getTypeVariables();
+  for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+    // Record the component of this type variable.
+    typeVarComponent[typeVars[i]] = components[i];
+
+    // Record the component of each of the constraints.
+    for (auto constraint : cg[typeVars[i]].getConstraints())
+      constraintComponent[constraint] = components[i];
+  }
+
+  // Sort constraints based on the component each falls into.
+  SmallVector<Constraint *, 16> allConstraints = std::move(Constraints);
+  std::stable_sort(allConstraints.begin(), allConstraints.end(),
+                   [&](Constraint *c1, Constraint *c2) {
+                     return constraintComponent[c1] < constraintComponent[c2];
+                   });
+
+  // Compute the partial solutions produced for each connected component.
+  std::unique_ptr<SmallVector<Solution, 4>[]> 
+    partialSolutions(new SmallVector<Solution, 4>[numComponents]);
+  unsigned constraintIndex = 0, numConstraints = allConstraints.size();
+  for (unsigned component = 0; component != numComponents; ++component) {
+    ++solverState->NumComponentsSplit;
+
+    // Collect the constraints for this component.
+    for(; constraintIndex != numConstraints; ++constraintIndex) {
+      if (constraintComponent[allConstraints[constraintIndex]] != component)
+        break;
+
+      Constraints.push_back(allConstraints[constraintIndex]);
+    }
+
+    // Collect the type variables that are not part of a different
+    // component; this includes type variables that are part of the
+    // component as well as already-resolved type variables.
+    // FIXME: The latter could be avoided if we had already
+    // substituted all of those other type variables through.
+    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables 
+      = std::move(TypeVariables);
+    for (auto typeVar : allTypeVariables) {
+      auto known = typeVarComponent.find(getRepresentative(typeVar));
+      if (known != typeVarComponent.end() && known->second != component)
+        continue;
+
+      TypeVariables.push_back(typeVar);
+    }
+    
+    // Solve for this component. If it fails, we're done.
+    bool failed;
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "(solving component #" 
+                                         << component << "\n";
+    }
+    {
+      SolverScope scope(*this);
+      failed = solveSimplified(partialSolutions[component], 
+                               allowFreeTypeVariables, Nothing);
+    }
+    
+    if (failed) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log.indent(solverState->depth * 2) << "failed component #" 
+                                           << component << ")\n";
+      }
+      
+      TypeVariables = std::move(allTypeVariables);
+      Constraints = std::move(allConstraints);
+      return true;
+    }
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "finised component #" 
+                                         << component << ")\n";
+    }
+    
+    assert(!partialSolutions[component].empty() &&" No solutions?");
+
+    // Move the type variables back, clear out constraints; we're
+    // ready for the next component.
+    TypeVariables = std::move(allTypeVariables);
+    Constraints.clear();
+  }
+
+  // Move the constraints back. The system is back in a normal state.
+  Constraints = std::move(allConstraints);
+  
+  // Produce all combinations of partial solutions.
+  // FIXME: Prune partial solutions that are worse than other partial
+  // solutions for their component?
+  SmallVector<unsigned, 2> indices(numComponents, 0);
+  bool done = false;
+  do {
+    // Create a new solver scope in which we apply all of the partial
+    // solutions.
+    SolverScope scope(*this);
+    for (unsigned i = 0; i != numComponents; ++i)
+      applySolution(partialSolutions[i][indices[i]]);
+
+    // Finalize this solution.
+    auto solution = finalize(allowFreeTypeVariables);
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "(composed solution)\n";
+    }
+
+    // Save this solution.
+    solutions.push_back(std::move(solution));
+
+    // Find the next combination.
+    for (unsigned n = numComponents; n > 0; --n) {
+      ++indices[n-1];
+
+      // If we haven't run out of solutions yet, we're done.
+      if (indices[n-1] < partialSolutions[n-1].size())
+        break;
+
+      // If we ran out of solutions at the first position, we're done.
+      if (n == 1) {
+        done = true;
+        break;
+      } 
+
+      // Zero out the indices from here to the end.
+      for (unsigned i = n-1; i != numComponents; ++i)
+        indices[i] = 0;
+    }
+  } while (!done);
+
+  return false;
 }
 
 bool ConstraintSystem::solveSimplified(
