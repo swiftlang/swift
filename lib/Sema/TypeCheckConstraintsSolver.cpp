@@ -242,7 +242,6 @@ typeVariablesIntersect(ConstraintSystem &cs,
 }
 
 void ConstraintSystem::collectConstraintsForTypeVariables(
-       ArrayRef<Constraint *> constraints,
        SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
        SmallVectorImpl<Constraint *> &disjunctions) {
   typeVarConstraints.clear();
@@ -263,7 +262,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // First, collect all of the constraints that relate directly to a
   // type variable.
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  for (auto constraint : constraints) {
+  for (auto constraint : Constraints) {
     Type first;
     if (constraint->getKind() != ConstraintKind::Conjunction &&
         constraint->getKind() != ConstraintKind::Disjunction)
@@ -691,8 +690,7 @@ static bool tryTypeVariableBindings(
               TypeVariableConstraints &tvc,
               ArrayRef<std::pair<Type, bool>> bindings,
               SmallVectorImpl<Solution> &solutions,
-              FreeTypeVariableBinding allowFreeTypeVariables,
-              Optional<unsigned> cutpoint) {
+              FreeTypeVariableBinding allowFreeTypeVariables) {
   auto typeVar = tvc.TypeVar;
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
@@ -734,7 +732,7 @@ static bool tryTypeVariableBindings(
       }
 
       cs.addConstraint(ConstraintKind::Bind, typeVar, type);
-      if (!cs.solve(solutions, allowFreeTypeVariables, cutpoint))
+      if (!cs.solve(solutions, allowFreeTypeVariables))
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
@@ -819,8 +817,7 @@ static bool tryTypeVariableBindings(
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables,
-                             Optional<unsigned> cutpoint) {
+                             FreeTypeVariableBinding allowFreeTypeVariables) {
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
   if (!solverState) {
@@ -846,32 +843,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return solutions.size() != 1;
   }
 
-  // If we already failed, return.
-  if (failedConstraint)
-    return true;
-
-  // If we have a cut point, move all of the uninteresting constraints
-  // over to
-  // Note that the interesting constraints come *after* the cutpoint, because
-  // we expect that we'll have fewer interesting constraints than uninteresting
-  // constraints, and our current data structures require us to copy this data.
-  // FIXME: A real worklist wouldn't have this silliness.
-  SmallVector<Constraint *, 4> uninterestingConstraints;
-  if (cutpoint) {
-    uninterestingConstraints.append(Constraints.begin() + *cutpoint,
-                                    Constraints.end());
-    Constraints.erase(Constraints.begin() + *cutpoint, Constraints.end());
-    uninterestingConstraints.swap(Constraints);
-  }
-
-  // Simplify this system.
-  bool failed = simplify();
-
-  Constraints.append(uninterestingConstraints.begin(),
-                     uninterestingConstraints.end());
-
-  // If we failed, return now.
-  if (failed || failedConstraint)
+  // If we already failed, or simplification fails, return.
+  if (failedConstraint || simplify())
     return true;
 
   // If there are no constraints remaining, we're done. Save this solution.
@@ -907,7 +880,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // If we don't have more than one component, just solve the whole
   // system.
   if (numComponents < 2) {
-    return solveSimplified(solutions, allowFreeTypeVariables, Nothing);
+    return solveSimplified(solutions, allowFreeTypeVariables);
   }
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
@@ -995,7 +968,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     {
       SolverScope scope(*this);
       failed = solveSimplified(partialSolutions[component], 
-                               allowFreeTypeVariables, Nothing);
+                               allowFreeTypeVariables);
     }
     
     if (failed) {
@@ -1074,21 +1047,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 bool ConstraintSystem::solveSimplified(
        SmallVectorImpl<Solution> &solutions,
-       FreeTypeVariableBinding allowFreeTypeVariables,
-       Optional<unsigned> cutpoint) {
-  // Find the constraints in the given connected component.
-  ArrayRef<Constraint *> constraintsInCC;
-  if (cutpoint) {
-    constraintsInCC = llvm::makeArrayRef(Constraints).slice(*cutpoint);
-  } else {
-    constraintsInCC = Constraints;
-  }
-
+       FreeTypeVariableBinding allowFreeTypeVariables) {
   // Collect the type variable constraints.
   SmallVector<TypeVariableConstraints, 4> typeVarConstraints;
   SmallVector<Constraint *, 4> disjunctions;
-  collectConstraintsForTypeVariables(constraintsInCC,
-                                     typeVarConstraints, disjunctions);
+  collectConstraintsForTypeVariables(typeVarConstraints, disjunctions);
   if (!typeVarConstraints.empty()) {
     // Look for the best type variable to bind.
     unsigned bestTypeVarIndex = 0;
@@ -1116,8 +1079,7 @@ bool ConstraintSystem::solveSimplified(
                                      typeVarConstraints[bestTypeVarIndex],
                                      bestBindings.Bindings,
                                      solutions,
-                                     allowFreeTypeVariables,
-                                     cutpoint);
+                                     allowFreeTypeVariables);
     }
 
     // Fall through to resolve an overload set.
@@ -1228,7 +1190,7 @@ bool ConstraintSystem::solveSimplified(
     // Record this as a generated constraint.
     solverState->generatedConstraints.push_back(constraint);
 
-    if (!solve(solutions, allowFreeTypeVariables, cutpoint)) {
+    if (!solve(solutions, allowFreeTypeVariables)) {
       anySolved = true;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
