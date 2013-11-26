@@ -921,9 +921,6 @@ private:
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
     RepresentativeOrFixed;
 
-  // Valid everywhere, for debugging
-  SmallVector<Constraint *, 16> SolvedConstraints;
-
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);

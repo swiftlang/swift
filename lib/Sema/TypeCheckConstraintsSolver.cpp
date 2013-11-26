@@ -414,8 +414,6 @@ bool ConstraintSystem::simplify() {
       if (addConstraint(constraint, false, true)) {
         solvedAny = true;
         ++solverState->NumSimplifiedConstraints;
-        if (TC.getLangOpts().DebugConstraintSolver && !solverState)
-          SolvedConstraints.push_back(constraint);        
       } else if (!failedConstraint) {
         ++solverState->NumUnsimplifiedConstraints;
       }

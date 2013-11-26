@@ -239,9 +239,6 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   case SolutionKind::Solved:
     // This constraint has already been solved; there is nothing more
     // to do.
-    if (TC.getLangOpts().DebugConstraintSolver && !solverState)
-      SolvedConstraints.push_back(constraint);
-
     // Record solved constraint.
     if (solverState) {
       solverState->retiredConstraints.push_back(constraint);
@@ -5043,13 +5040,6 @@ void ConstraintSystem::dump(raw_ostream &out) {
 
   out << "\nUnsolved Constraints:\n";
   for (auto constraint : Constraints) {
-    out.indent(2);
-    constraint->print(out, &getTypeChecker().Context.SourceMgr);
-    out << "\n";
-  }
-
-  out << "\nSolved Constraints:\n";
-  for (auto constraint : SolvedConstraints) {
     out.indent(2);
     constraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
