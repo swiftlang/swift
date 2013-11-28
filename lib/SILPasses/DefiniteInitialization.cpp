@@ -72,6 +72,49 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 }
 
 
+/// InsertCFGDiamond - Insert a CFG diamond at the position specified by the
+/// SILBuilder, with a conditional branch based on "Cond".  This returns the
+/// true, false, and continuation block.  If FalseBB is passed in as a null
+/// pointer, then only the true block is created - a CFG triangle instead of a
+/// diamond.
+///
+/// The SILBuilder is left at the start of the ContBB block.
+static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
+                             SILBasicBlock *&TrueBB,
+                             SILBasicBlock **FalseBB,
+                             SILBasicBlock *&ContBB) {
+  SILBasicBlock *StartBB = B.getInsertionBB();
+  SILModule &Module = StartBB->getModule();
+  
+  // Start by splitting the current block.
+  ContBB = StartBB->splitBasicBlock(B.getInsertionPoint());
+  
+  // Create the true block.
+  TrueBB = new (Module) SILBasicBlock(StartBB->getParent());
+  B.moveBlockTo(TrueBB, ContBB);
+  B.setInsertionPoint(TrueBB);
+  B.createBranch(Loc, ContBB);
+  
+  // If the client wanted a false BB, create it too.
+  SILBasicBlock *FalseDest;
+  if (!FalseBB) {
+    FalseDest = ContBB;
+  } else {
+    FalseDest = new (Module) SILBasicBlock(StartBB->getParent());
+    B.moveBlockTo(FalseDest, ContBB);
+    B.setInsertionPoint(FalseDest);
+    B.createBranch(Loc, ContBB);
+    *FalseBB = FalseDest;
+  }
+  
+  // Now that we have our destinations, insert a conditional branch on the
+  // condition.
+  B.setInsertionPoint(StartBB);
+  B.createCondBranch(Loc, Cond, TrueBB, FalseDest);
+  
+  B.setInsertionPoint(ContBB, ContBB->begin());
+}
+
 
 //===----------------------------------------------------------------------===//
 // Tuple Element Flattening/Counting Logic
@@ -1099,6 +1142,7 @@ bool ElementPromotion::processNonTrivialRelease(SILInstruction *Release,
   return true;
 }
 
+
 /// processPartiallyLiveElementDestroy - The specified destroy_addr is
 /// destroying a tuple element of the memory object that is only live on some
 /// paths through the CFG.  Handle this by moving the destroy_addr or inserting
@@ -1108,7 +1152,7 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
                                 SmallVectorImpl<SILInstruction*> &NewReleases) {
   // TODO: We can avoid generating dynamic code by inserting the element destroy
   // earlier.
-
+  
   // Create the boolean control value as a stack variable, and initialize it
   // with zero.
   SILBuilder B(std::next(SILBasicBlock::iterator(TheMemory)));
@@ -1118,30 +1162,25 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
   auto Zero = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 0);
   B.createStore(TheMemory->getLoc(), Zero, AllocAddr);
 
-  // Split the basic block *after* the placeholder dealloc_inst, to leave it
-  // in its old block.
-  auto ContBlock =
-    DAI->getParent()->splitBasicBlock(std::next(SILBasicBlock::iterator(DAI)));
-
-  auto *CondDestroyBlock = new (Module) SILBasicBlock(DAI->getFunction());
-  B.moveBlockTo(CondDestroyBlock, ContBlock);
-
-  // Insert the load and conditional branch in the original block.
-  B.setInsertionPoint(DAI->getParent());
+  // Insert a load after the destroy_addr and split the CFG into a diamond
+  // right after it.  We split the basic block after the destroy_addr, to leave
+  // it in its old block.
+  B.setInsertionPoint(DAI->getNextNode());
   auto *Load = B.createLoad(DAI->getLoc(), AllocAddr);
-  B.createCondBranch(DAI->getLoc(), Load, CondDestroyBlock, ContBlock);
 
+  SILBasicBlock *CondDestroyBlock, *ContBlock;
+  InsertCFGDiamond(SILValue(Load, 0), DAI->getLoc(),
+                   B, CondDestroyBlock, nullptr, ContBlock);
+
+  // Destroy the alloc_stack for the control variable in the continue block.
+  B.createDeallocStack(DAI->getLoc(), SILValue(Alloc, 0));
+  
   // Set up the conditional destroy block.
-  B.setInsertionPoint(CondDestroyBlock);
+  B.setInsertionPoint(CondDestroyBlock->begin());
   SILValue EltPtr =
     computeTupleElementAddress(DAI->getOperand(), TupleElt, DAI->getLoc(), B);
   if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
     NewReleases.push_back(DA);
-  B.createBranch(DAI->getLoc(), ContBlock);
-
-  // Destroy the alloc_stack.
-  B.setInsertionPoint(ContBlock, ContBlock->begin());
-  B.createDeallocStack(DAI->getLoc(), SILValue(Alloc, 0));
 
   // Loop over all of the store uses and mark the variable initialized.  Since
   // the control variable is next to "TheMemory", dominance is trivially
