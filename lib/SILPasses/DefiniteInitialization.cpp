@@ -386,6 +386,11 @@ namespace {
   enum UseKind {
     // The instruction is a Load.
     Load,
+    
+    // The instruction is either an initialization or an assignment, we don't
+    // know which.  This classification only happens with values of trivial type
+    // where the different isn't significant.
+    InitOrAssign,
 
     // The instruction is an initialization of the tuple element.
     Initialization,
@@ -857,7 +862,8 @@ bool ElementPromotion::doIt() {
     // We assume that SILGen knows what it is doing when it produces
     // initializations of variables, because it only produces them when it knows
     // they are correct, and this is a super common case for "var x = y" cases.
-    if (Use.Kind == UseKind::Initialization)
+    if (Use.Kind == UseKind::Initialization ||
+        Use.Kind == UseKind::InitOrAssign)
       continue;
     
     // Check to see if the value is known-initialized here or not.
@@ -865,6 +871,7 @@ bool ElementPromotion::doIt() {
     switch (Use.Kind) {
     case UseKind::Initialization:
       assert(0 && "Handled above");
+    case UseKind::InitOrAssign:
     case UseKind::Store:
     case UseKind::PartialStore:
       handleStoreUse(Use, DI);
@@ -1147,7 +1154,7 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
     // Ignore deleted uses.
     if (Use.Inst == nullptr) continue;
 
-    // Only initializations make something live.  inout uses, escapes, and
+    // Only full initializations make something live.  inout uses, escapes, and
     // assignments only happen when some kind of init made the element live.
     if (Use.Kind != UseKind::Initialization)
       continue;
@@ -2100,17 +2107,18 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
         continue;
       }
       
-      // Note that we assume that raw stores are initializations, which is true
-      // coming out of silgen for non-trivial types, but this will misclassify
-      // trivial types.  That's ok for what we're doing with the initialization
-      // bit, since initialize vs assign are the same for trivial types.
+      // Coming out of SILGen, we assume that raw stores are initializations,
+      // unless they have trivial type (which we classify as InitOrAssign).
       UseKind Kind;
       if (InStructSubElement)
         Kind = UseKind::PartialStore;
-      else if (isa<StoreInst>(User))
-        Kind = UseKind::Initialization;
-      else
+      else if (!isa<StoreInst>(User))
         Kind = UseKind::Store;
+      else if (PointeeType.isTrivial(User->getModule()))
+        Kind = UseKind::InitOrAssign;
+      else
+        Kind = UseKind::Initialization;
+      
       Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
       continue;
     }
@@ -2398,6 +2406,7 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
     switch (U.Kind) {
     case UseKind::Store:
     case UseKind::PartialStore:
+    case UseKind::InitOrAssign:
       break;    // These don't prevent removal.
     case UseKind::Initialization:
       if (!isa<ApplyInst>(U.Inst))
