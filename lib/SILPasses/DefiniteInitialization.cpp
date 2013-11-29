@@ -742,6 +742,7 @@ namespace {
     DIKind getLivenessAtUse(const MemoryUse &Use);
 
     void handleStoreUse(MemoryUse &InstInfo);
+    void handleInconsistentInitOrAssign(MemoryUse &InstInfo);
 
     bool processNonTrivialRelease(SILInstruction *Inst,
                                   SmallVectorImpl<SILInstruction*>&NewReleases);
@@ -1019,9 +1020,38 @@ bool ElementPromotion::doIt() {
   return false;
 }
 
+
+/// Process an InitOrAssign access which is neither an init nor an assignment.
+/// This is an ambiguous access that needs to be turned into a diamond in the
+/// control flow graph (in the fully general case).
+void ElementPromotion::handleInconsistentInitOrAssign(MemoryUse &InstInfo) {
+  // This is classified as InitOrAssign (not PartialStore), so there are only
+  // a few instructions that could reach here.
+  assert(InstInfo.Kind == UseKind::InitOrAssign &&
+         "should only have inconsistent InitOrAssign's here");
+
+  auto *Inst = InstInfo.Inst;
+  
+  // If the value has trivial type, then we can trivially resolve this, by
+  // ignoring the situation, since for trivial types init and assign are the
+  // same.  Just leave the instruction as InitOrAssign, since it truly is
+  // ambiguous.
+  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst) || isa<CopyAddrInst>(Inst)){
+    if (Inst->getOperand(1).getType().getObjectType().isTrivial(Module))
+      return;
+  } else {
+    // StoreWeak instructions are never of trivial type.
+    assert(isa<StoreWeakInst>(Inst) && "Unknown InitOrAssign instruction kind");
+  }
+
+  // FIXME: This needs to be supported through the introduction of a boolean
+  // control path, or (for reference types as an important special case) a store
+  // of zero at the definition point.
+  diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
+}
+
 void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
   DIKind DI = getLivenessAtUse(InstInfo);
-  SILInstruction *Inst = InstInfo.Inst;
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
@@ -1031,17 +1061,10 @@ void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
   }
 
   // If it is initialized on some paths, but not others, then we have an
-  // inconsistent initialization - the value is initialized on some paths, but
-  // not others.
+  // inconsistent initialization, which needs dynamic control logic in the
+  // general case.
   if (DI == DIKind::Partial) {
-    // This is classified as InitOrAssign (not PartialStore), so there are only
-    // a few instructions that could reach here.
-    assert(InstInfo.Kind == UseKind::InitOrAssign);
-
-    // FIXME: This needs to be supported through the introduction of a boolean
-    // control path, or (for reference types as an important special case) a store
-    // of zero at the definition point.
-    diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
+    handleInconsistentInitOrAssign(InstInfo);
     return;
   }
   
@@ -1053,6 +1076,8 @@ void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
     assert(DI == DIKind::Yes);
     InstInfo.Kind = UseKind::Assign;
   }
+
+  SILInstruction *Inst = InstInfo.Inst;
 
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
