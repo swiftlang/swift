@@ -16,6 +16,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -438,8 +439,9 @@ namespace {
     // The instruction is an initialization of the tuple element.
     Initialization,
 
-    // The instruction is a Store.
-    Store,
+    // The instruction is an assignment, overwriting an already initialized
+    // value.
+    Assign,
 
     // The instruction is a store to a member of a larger struct value.
     PartialStore,
@@ -739,7 +741,7 @@ namespace {
 
     DIKind getLivenessAtUse(const MemoryUse &Use);
 
-    void handleStoreUse(MemoryUse &InstInfo, DIKind Kind);
+    void handleStoreUse(MemoryUse &InstInfo);
 
     bool processNonTrivialRelease(SILInstruction *Inst,
                                   SmallVectorImpl<SILInstruction*>&NewReleases);
@@ -901,23 +903,32 @@ bool ElementPromotion::doIt() {
     auto *Inst = Uses[i].Inst;
     // Ignore entries for instructions that got expanded along the way.
     if (Inst == nullptr) continue;
-
-    // We assume that SILGen knows what it is doing when it produces
-    // initializations of variables, because it only produces them when it knows
-    // they are correct, and this is a super common case for "var x = y" cases.
-    if (Use.Kind == UseKind::Initialization ||
-        Use.Kind == UseKind::InitOrAssign)
-      continue;
     
-    // Check to see if the value is known-initialized here or not.
-    DIKind DI = getLivenessAtUse(Use);
     switch (Use.Kind) {
     case UseKind::Initialization:
-      assert(0 && "Handled above");
+      // We assume that SILGen knows what it is doing when it produces
+      // initializations of variables, because it only produces them when it knows
+      // they are correct, and this is a super common case for "var x = y" cases.
+      continue;
+        
+    case UseKind::Assign:
+      // Instructions classified as assign are only generated when lowering
+      // InitOrAssign instructions in regions known to be initialized.  Since
+      // they are already known to be definitely init, don't reprocess them.
+      continue;
     case UseKind::InitOrAssign:
-    case UseKind::Store:
+      // FIXME: This is a hack because DI is not understanding SILGen's
+      // stack values that have multiple init and destroy lifetime cycles with
+      // one allocation.  This happens in foreach silgen (see rdar://15532779)
+      // and needs to be resolved someday, either by changing silgen or by
+      // teaching DI about destroy events.  In the meantime, just assume that
+      // all stores of trivial type are ok.
+      if (isa<StoreInst>(Use.Inst))
+        continue;
+        
+      SWIFT_FALLTHROUGH;
     case UseKind::PartialStore:
-      handleStoreUse(Use, DI);
+      handleStoreUse(Use);
       break;
 
     case UseKind::IndirectIn:
@@ -927,7 +938,7 @@ bool ElementPromotion::doIt() {
       // initialization of the type.
       // TODO: In the "partial" case, we can produce a more specific diagnostic
       // indicating where the control flow merged.
-      if (DI != DIKind::Yes) {
+      if (getLivenessAtUse(Use) != DIKind::Yes) {
         // Otherwise, this is a use of an uninitialized value.  Emit a
         // diagnostic.
         diagnoseInitError(Use, diag::variable_used_before_initialized);
@@ -935,14 +946,14 @@ bool ElementPromotion::doIt() {
       break;
       
     case UseKind::InOutUse:
-      if (DI != DIKind::Yes) {
+      if (getLivenessAtUse(Use) != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         diagnoseInitError(Use, diag::variable_inout_before_initialized);
       }
       break;
       
     case UseKind::Escape:
-      if (DI != DIKind::Yes) {
+      if (getLivenessAtUse(Use) != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
           diagnoseInitError(Use, diag::global_variable_function_use_uninit);
@@ -1008,8 +1019,8 @@ bool ElementPromotion::doIt() {
   return false;
 }
 
-void ElementPromotion::
-handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
+void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
+  DIKind DI = getLivenessAtUse(InstInfo);
   SILInstruction *Inst = InstInfo.Inst;
 
   // If this is a partial store into a struct and the whole struct hasn't been
@@ -1020,20 +1031,28 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
   }
 
   // If it is initialized on some paths, but not others, then we have an
-  // inconsistent initialization error.
-  //
-  // FIXME: This needs to be supported through the introduction of a boolean
-  // control path, or (for reference types as an important special case) a store
-  // of zero at the definition point.
+  // inconsistent initialization - the value is initialized on some paths, but
+  // not others.
   if (DI == DIKind::Partial) {
+    // This is classified as InitOrAssign (not PartialStore), so there are only
+    // a few instructions that could reach here.
+    assert(InstInfo.Kind == UseKind::InitOrAssign);
+
+    // FIXME: This needs to be supported through the introduction of a boolean
+    // control path, or (for reference types as an important special case) a store
+    // of zero at the definition point.
     diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
     return;
   }
   
-  // If this is an initialization, upgrade the store to an initialization in the
-  // uses list so that clients know about it.
+  // If this is an initialization or a normal assignment, upgrade the store to
+  // an initialization or assign in the uses list so that clients know about it.
   if (DI == DIKind::No)
     InstInfo.Kind = UseKind::Initialization;
+  else {
+    assert(DI == DIKind::Yes);
+    InstInfo.Kind = UseKind::Assign;
+  }
 
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
@@ -1051,6 +1070,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
+    auto Kind = InstInfo.Kind;
     InstInfo.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
@@ -1066,8 +1086,7 @@ handleStoreUse(MemoryUse &InstInfo, DIKind DI) {
     for (auto I : InsertedInsts) {
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
-        Uses.push_back(MemoryUse(I, DI == DIKind::No ? Initialization : Store,
-                                 FirstTupleElement, NumTupleElements));
+        Uses.push_back(MemoryUse(I, Kind, FirstTupleElement, NumTupleElements));
       } else if (isa<LoadInst>(I)) {
         Uses.push_back(MemoryUse(I, Load, FirstTupleElement, NumTupleElements));
       }
@@ -1946,7 +1965,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI) {
 
   assert((LoadUse.isValid() || StoreUse.isValid()) &&
          "we should have a load or a store, possibly both");
-  assert(StoreUse.isInvalid() || StoreUse.Kind == Store ||
+  assert(StoreUse.isInvalid() || StoreUse.Kind == Assign ||
          StoreUse.Kind == PartialStore || StoreUse.Kind == Initialization);
 
   // Now that we've emitted a bunch of instructions, including a load and store
@@ -2151,8 +2170,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       UseKind Kind;
       if (InStructSubElement)
         Kind = UseKind::PartialStore;
-      else if (!isa<StoreInst>(User))
-        Kind = UseKind::Store;
+      else if (isa<AssignInst>(User))
+        Kind = UseKind::InitOrAssign;
       else if (PointeeType.isTrivial(User->getModule()))
         Kind = UseKind::InitOrAssign;
       else
@@ -2170,7 +2189,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
         else if (SWI->isInitializationOfDest())
           Kind = UseKind::Initialization;
         else
-          Kind = UseKind::Store;
+          Kind = UseKind::InitOrAssign;
         Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
         continue;
       }
@@ -2184,9 +2203,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       }
       
       // If this is the source of the copy_addr, then this is a load.  If it is
-      // the destination, then this is a store.  Note that we'll revisit this
-      // instruction and add it to Uses twice if it is both a load and store to
-      // the same aggregate.
+      // the destination, then this is an unknown assignment.  Note that we'll
+      // revisit this instruction and add it to Uses twice if it is both a load
+      // and store to the same aggregate.
       UseKind Kind;
       if (UI->getOperandNumber() == 0)
         Kind = UseKind::Load;
@@ -2195,7 +2214,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       else if (CAI->isInitializationOfDest())
         Kind = UseKind::Initialization;
       else
-        Kind = UseKind::Store;
+        Kind = UseKind::InitOrAssign;
       
       Uses.push_back(MemoryUse(CAI, Kind, BaseTupleElt, 1));
       continue;
@@ -2443,7 +2462,7 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case UseKind::Store:
+    case UseKind::Assign:
     case UseKind::PartialStore:
     case UseKind::InitOrAssign:
       break;    // These don't prevent removal.
