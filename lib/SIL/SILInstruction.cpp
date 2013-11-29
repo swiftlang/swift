@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
@@ -195,6 +196,42 @@ bool SILInstruction::mayHaveSideEffects() const {
     B == SILInstructionMemoryBehavior::MayReadWrite ||
     B == SILInstructionMemoryBehavior::MayHaveSideEffects;
 }
+
+namespace {
+  class TrivialCloner : public SILCloner<TrivialCloner> {
+    friend class SILCloner<TrivialCloner>;
+    friend class SILVisitor<TrivialCloner>;
+    SILInstruction *Result = nullptr;
+    TrivialCloner(SILFunction *F) : SILCloner(*F) {}
+  public:
+    
+    static SILInstruction *doIt(SILInstruction *I) {
+      TrivialCloner TC(I->getFunction());
+      TC.visit(I);
+      return TC.Result;
+    }
+    
+    void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+      Result = Cloned;
+    }
+    SILValue remapValue(SILValue Value) {
+      return Value;
+    }
+  };
+}
+
+/// Create a new copy of this instruction, which retains all of the operands
+/// and other information of this one.  If an insertion point is specified,
+/// then the new instruction is inserted before the specified point, otherwise
+/// the new instruction is returned without a parent.
+SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
+  SILInstruction *NewInst = TrivialCloner::doIt(this);
+  
+  if (InsertPt)
+    InsertPt->getParent()->getInstList().insert(InsertPt, NewInst);
+  return NewInst;
+}
+
 
 //===----------------------------------------------------------------------===//
 // SILInstruction Subclasses

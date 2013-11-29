@@ -162,6 +162,12 @@ public:
            V->getKind() <= ValueKind::Last_SILInstruction;
   }
   
+  /// Create a new copy of this instruction, which retains all of the operands
+  /// and other information of this one.  If an insertion point is specified,
+  /// then the new instruction is inserted before the specified point, otherwise
+  /// the new instruction is returned without a parent.
+  SILInstruction *clone(SILInstruction *InsertPt = nullptr);
+  
   /// Invoke an Instruction's destructor. This dispatches to the appropriate
   /// leaf class destructor for the type of the instruction. This does not
   /// deallocate the instruction.
