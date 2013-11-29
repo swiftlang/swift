@@ -167,7 +167,6 @@ static SILValue computeTupleElementAddress(SILValue Ptr, unsigned TupleEltNo,
 }
 
 
-#if 0
 /// Given a symbolic element number, return the type of the element.
 static CanType getTupleElementType(CanType T, unsigned EltNo) {
   TupleType *TT = T->getAs<TupleType>();
@@ -189,7 +188,6 @@ static CanType getTupleElementType(CanType T, unsigned EltNo) {
   assert(0 && "invalid element number");
   abort();
 }
-#endif
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
@@ -482,12 +480,33 @@ namespace {
 
     MemoryUse() : Inst(nullptr) {}
 
+    bool isInvalid() const { return Inst == nullptr; }
+    bool isValid() const { return Inst != nullptr; }
+
     bool usesElement(unsigned i) const {
       return i >= FirstTupleElement && i < FirstTupleElement+NumTupleElements;
     }
+    
+    /// onlyTouchesTrivialElements - Return true if all of the accessed elements
+    /// have trivial type.
+    bool onlyTouchesTrivialElements(SILType MemoryType) const {
+      CanType MemoryCType = MemoryType.getSwiftRValueType();
+      auto &Module = Inst->getModule();
+      
+      for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
+        auto EltTy = getTupleElementType(MemoryCType, i);
+        if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
+          return false;
+      }
+      return true;
+    }
 
-    bool isInvalid() const { return Inst == nullptr; }
-    bool isValid() const { return Inst != nullptr; }
+    /// getElementBitmask - Return a bitmask with the touched tuple elements
+    /// set.
+    APInt getElementBitmask(unsigned NumTupleElements) {
+      return APInt::getBitsSet(NumTupleElements, FirstTupleElement,
+                               FirstTupleElement+NumTupleElements);
+    }
   };
 } // end anonymous namespace
 
@@ -720,6 +739,10 @@ namespace {
     /// Does this value escape anywhere in the function.
     bool HasAnyEscape = false;
 
+    /// This is true when there is an ambiguous store, which may be an init or
+    /// assign, depending on the CFG path.
+    bool HasConditionalInitAssigns = false;
+    
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
     std::vector<SILLocation> EmittedErrorLocs;
@@ -742,7 +765,9 @@ namespace {
 
     DIKind getLivenessAtUse(const MemoryUse &Use);
 
-    void handleStoreUse(MemoryUse &InstInfo);
+    void handleStoreUse(unsigned UseID);
+    void updateInstructionForInitState(MemoryUse &InstInfo);
+
 
     bool processNonTrivialRelease(SILInstruction *Inst,
                                   SmallVectorImpl<SILInstruction*>&NewReleases);
@@ -750,6 +775,7 @@ namespace {
                                             unsigned TupleElt,
                               SmallVectorImpl<SILInstruction*> &NewReleases);
 
+    void handleConditionalInitAssigns();
 
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
@@ -924,12 +950,12 @@ bool ElementPromotion::doIt() {
       // and needs to be resolved someday, either by changing silgen or by
       // teaching DI about destroy events.  In the meantime, just assume that
       // all stores of trivial type are ok.
-      if (isa<StoreInst>(Use.Inst))
+      if (isa<StoreInst>(Inst))
         continue;
         
       SWIFT_FALLTHROUGH;
     case UseKind::PartialStore:
-      handleStoreUse(Use);
+      handleStoreUse(i);
       break;
 
     case UseKind::IndirectIn:
@@ -989,6 +1015,12 @@ bool ElementPromotion::doIt() {
     // (and "NewReleases" entirely) should disappear.
     Releases.append(NewReleases.begin(), NewReleases.end());
   }
+  
+  // If the memory object had any non-trivial stores that are init or assign
+  // based on the control flow path reaching them, then insert dynamic control
+  // logic and CFG diamonds to handle this.
+  if (HasConditionalInitAssigns)
+    handleConditionalInitAssigns();
 
 
   // If we've successfully checked all of the definitive initialization
@@ -1020,8 +1052,8 @@ bool ElementPromotion::doIt() {
   return false;
 }
 
-
-void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
+void ElementPromotion::handleStoreUse(unsigned UseID) {
+  MemoryUse &InstInfo = Uses[UseID];
   DIKind DI = getLivenessAtUse(InstInfo);
 
   // If this is a partial store into a struct and the whole struct hasn't been
@@ -1030,8 +1062,6 @@ void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
     diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
     return;
   }
-
-  SILInstruction *Inst = InstInfo.Inst;
 
   // If this is an initialization or a normal assignment, upgrade the store to
   // an initialization or assign in the uses list so that clients know about it.
@@ -1052,40 +1082,44 @@ void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
     assert(InstInfo.Kind == UseKind::InitOrAssign &&
            "should only have inconsistent InitOrAssign's here");
 
-    // If the value has trivial type, then we can trivially resolve this, by
-    // ignoring the situation, since for trivial types init and assign are the
-    // same.  Just leave the instruction as InitOrAssign, since it truly is
-    // ambiguous.
-    if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst) ||
-        isa<CopyAddrInst>(Inst)) {
-      if (Inst->getOperand(1).getType().getObjectType().isTrivial(Module))
-        return;
-    } else {
-      // StoreWeak instructions are never of trivial type.
-      assert(isa<StoreWeakInst>(Inst) &&
-             "Unknown InitOrAssign instruction kind");
-    }
-
-    // FIXME: This needs to be supported through the introduction of a boolean
-    // control path, or (for reference types as an important special case) a
-    // store of zero at the definition point.
-    diagnoseInitError(InstInfo, diag::variable_initialized_on_some_paths);
+    // If this access stores something of non-trivial type, then keep track of
+    // it for later.   Once we've collected all of the conditional init/assigns,
+    // we can insert a single control variable for the memory object for the
+    // whole function.
+    if (!InstInfo.onlyTouchesTrivialElements(MemoryType))
+      HasConditionalInitAssigns = true;
     return;
   }
   
   // Otherwise, we have a definite init or assign.  Make sure the instruction
   // itself is tagged properly.
-  auto IsInit = IsInitialization_t(DI == DIKind::No);
+  updateInstructionForInitState(InstInfo);
+}
+
+/// updateInstructionForInitState - When an instruction being analyzed moves
+/// from being InitOrAssign to some concrete state, update it for that state.
+/// This includes rewriting them from assign instructions into their composite
+/// operations.
+void ElementPromotion::updateInstructionForInitState(MemoryUse &InstInfo) {
+  SILInstruction *Inst = InstInfo.Inst;
+  
+  IsInitialization_t InitKind;
+  if (InstInfo.Kind == UseKind::Initialization)
+    InitKind = IsInitialization;
+  else {
+    assert(InstInfo.Kind == UseKind::Assign);
+    InitKind = IsNotInitialization;
+  }
 
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
   if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
-    CA->setIsInitializationOfDest(IsInit);
+    CA->setIsInitializationOfDest(InitKind);
     return;
   }
   
   if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
-    SW->setIsInitializationOfDest(IsInit);
+    SW->setIsInitializationOfDest(InitKind);
     return;
   }
   
@@ -1104,9 +1138,10 @@ void ElementPromotion::handleStoreUse(MemoryUse &InstInfo) {
     SmallVector<SILInstruction*, 8> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
 
-    LowerAssignInstruction(B, AI, IsInit);
+    LowerAssignInstruction(B, AI, InitKind);
 
-    // If lowering of the assign introduced any new stores, keep track of them.
+    // If lowering of the assign introduced any new loads or stores, keep track
+    // of them.
     for (auto I : InsertedInsts) {
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
@@ -1201,7 +1236,7 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
   
   // Create the boolean control value as a stack variable, and initialize it
   // with zero.
-  SILBuilder B(std::next(SILBasicBlock::iterator(TheMemory)));
+  SILBuilder B(TheMemory->getNextNode());
   SILType I1Type = SILType::getBuiltinIntegerType(1, Module.getASTContext());
   auto Alloc = B.createAllocStack(TheMemory->getLoc(), I1Type);
   SILValue AllocAddr = SILValue(Alloc, 1);
@@ -1254,8 +1289,134 @@ processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
     auto One = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 1);
     B.createStore(TheMemory->getLoc(), One, AllocAddr);
   }
-
 }
+
+/// handleConditionalInitAssigns - This memory object has some stores into (some
+/// element of) it that is either an init or an assign based on the control flow
+/// path through the function.  Handle this by inserting a bitvector that tracks
+/// the liveness of each tuple element independently.
+void ElementPromotion::handleConditionalInitAssigns() {
+  SILLocation Loc = TheMemory->getLoc();
+  Loc.markAutoGenerated();
+  
+  // Create the control variable as the first instruction in the function (so
+  // that it is easy to destroy the stack location.
+  SILBuilder B(TheMemory->getFunction()->begin()->begin());
+  SILType IVType =
+    SILType::getBuiltinIntegerType(NumTupleElements, Module.getASTContext());
+  auto Alloc = B.createAllocStack(Loc, IVType);
+  
+  // Find all the return blocks in the function, inserting a dealloc_stack
+  // before the return.
+  for (auto &BB : *TheMemory->getFunction()) {
+    if (auto *RI = dyn_cast<ReturnInst>(BB.getTerminator())) {
+      B.setInsertionPoint(RI);
+      B.createDeallocStack(Loc, SILValue(Alloc, 0));
+    }
+  }
+  
+  // Before the memory allocation, store zero in the control variable.
+  B.setInsertionPoint(TheMemory->getNextNode());
+  SILValue AllocAddr = SILValue(Alloc, 1);
+  auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
+  B.createStore(Loc, Zero, AllocAddr);
+
+  // At each initialization, mark the initialized elements live.  At each
+  // conditional assign, resolve the ambiguity by inserting a CFG diamond.
+  for (unsigned i = 0; i != Uses.size(); ++i) {
+    auto &Use = Uses[i];
+    
+    // Ignore deleted uses.
+    if (Use.Inst == nullptr) continue;
+    
+    // Only full initializations make something live.  inout uses, escapes, and
+    // assignments only happen when some kind of init made the element live.
+    switch (Use.Kind) {
+    default:
+      // We can ignore most use kinds here.
+      continue;
+    case UseKind::InitOrAssign:
+      // The dynamically unknown case is the interesting one, handle it below.
+      break;
+
+    case UseKind::Initialization:
+      // If this is an initialization of only trivial elements, then we don't
+      // need to update the bitvector.
+      if (Use.onlyTouchesTrivialElements(MemoryType))
+        continue;
+      
+      // Get the integer constant.
+      B.setInsertionPoint(Use.Inst);
+      APInt Bitmask = Use.getElementBitmask(NumTupleElements);
+      auto MaskVal = B.createIntegerLiteral(Loc, IVType,Bitmask);
+
+      // If the mask is all ones, do a simple store, otherwise do a
+      // load/or/store sequence to mask in the bits.
+      if (!Bitmask.isAllOnesValue()) {
+        // FIXME: No funcdecl to create a builtinfunctionref!
+        abort();
+        //auto Tmp = B.createLoad(Loc, AllocAddr);
+        //BuiltinValueKind::Or
+        //%4 = builtin_function_ref #Builtin.or_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
+        //%6 = apply %4(%5, %3) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
+      }
+      B.createStore(Loc, MaskVal, AllocAddr);
+      continue;
+    }
+    
+    // If this ambiguous store is only of trivial types, then we don't need to
+    // do anything special.  We don't even need keep the init bit for the
+    // element precise.
+    if (Use.onlyTouchesTrivialElements(MemoryType))
+      continue;
+    
+    B.setInsertionPoint(Use.Inst);
+
+    // If this is the interesting case, we need to generate a CFG diamond where
+    // one side does an initialize and the other side does an assignment.  This
+    // disambiguates the dynamic uncertainty with a runtime check.
+    auto Bitmask = B.createLoad(Loc, AllocAddr);
+    
+    // FIXME: Only handles the single-tuple element case here so far.  Other
+    // cases need to generate builtins to shift the mask right and compare
+    // against a constant.
+    // FIXME: A copyaddr or other interesting init could touch multiple tuple
+    // elements and they may be in different state of initialization.  For
+    // example, something like this gets hard:
+    //   var a : (T,T)
+    //    ...
+    //   a.1 = T()
+    //   a = foo()   // init a.0 and assigns to a.1.
+    //
+    assert(NumTupleElements == 1);
+
+    SILBasicBlock *TrueBB, *FalseBB, *ContBB;
+    InsertCFGDiamond(Bitmask, Loc, B, TrueBB, &FalseBB, ContBB);
+
+    // Clone the use, and insert the copy at the start of the false block.
+    MemoryUse UseCopy = Use;
+    UseCopy.Inst = Use.Inst->clone(FalseBB->begin());
+
+    // Move the use to the true branch and update the use record.  It will
+    // become the assignment.
+    Use.Inst->moveBefore(TrueBB->begin());
+    Use.Kind = UseKind::Assign;
+    
+    // Now that the instruction has a concrete "assign" form, update it to
+    // reflect that.  Note that this can invalidate the Uses vector and delete
+    // the instruction.
+    updateInstructionForInitState(Use);
+
+    // Add a new entry to the Uses list for the 'false' instruction.  Since
+    // we're adding the initialization to the end of the uses list, we'll
+    // process it in future iterations of this loop, updating the liveness
+    // bitmask.
+    UseCopy.Kind = UseKind::Initialization;
+    Uses.push_back(UseCopy);
+    updateInstructionForInitState(Uses.back());
+  }
+}
+
 
 
 
