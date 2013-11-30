@@ -590,6 +590,15 @@ namespace {
       return true;
     }
     
+    bool hasAny(DIKind K) const {
+      for (unsigned i = 0, e = size(); i != e; ++i) {
+        auto Elt = getConditional(i);
+        if (Elt.hasValue() && Elt.getValue() == K)
+          return true;
+      }
+      return false;
+    }
+    
     bool isAllYes() const { return isAll(DIKind::Yes); }
     bool isAllNo() const { return isAll(DIKind::No); }
     
@@ -729,6 +738,7 @@ namespace {
 
     SmallVectorImpl<MemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
+    std::vector<std::pair<unsigned, AvailabilitySet>> ConditionalDestroys;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
@@ -741,7 +751,7 @@ namespace {
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
-    bool HasConditionalInitAssigns = false;
+    bool HasConditionalInitAssignOrDestroys = false;
     
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
@@ -769,13 +779,10 @@ namespace {
     void updateInstructionForInitState(MemoryUse &InstInfo);
 
 
-    bool processNonTrivialRelease(SILInstruction *Inst,
-                                  SmallVectorImpl<SILInstruction*>&NewReleases);
-    void processPartiallyLiveElementDestroy(DestroyAddrInst *Inst,
-                                            unsigned TupleElt,
-                              SmallVectorImpl<SILInstruction*> &NewReleases);
+    void processNonTrivialRelease(unsigned ReleaseID);
 
-    void handleConditionalInitAssigns();
+    SILValue handleConditionalInitAssign();
+    void handleConditionalDestroys(SILValue ControlVariableAddr);
 
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
@@ -999,29 +1006,19 @@ bool ElementPromotion::doIt() {
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
   if (!MemoryType.isTrivial(Module)) {
-    SmallVector<SILInstruction*, 4> NewReleases;
-    for (unsigned i = 0; i != Releases.size(); ++i) {
-      if (processNonTrivialRelease(Releases[i], NewReleases)) {
-        Releases[i] = Releases.back();
-        Releases.pop_back();
-        --i;
-        continue;
-      }
-    }
-    
-    // Add new releases onto the release list so the load promotion can see
-    // them.
-    // FIXME: When load promotion is split out to its own pass, this logic
-    // (and "NewReleases" entirely) should disappear.
-    Releases.append(NewReleases.begin(), NewReleases.end());
+    for (unsigned i = 0, e = Releases.size(); i != e; ++i)
+      processNonTrivialRelease(i);
   }
   
   // If the memory object had any non-trivial stores that are init or assign
   // based on the control flow path reaching them, then insert dynamic control
   // logic and CFG diamonds to handle this.
-  if (HasConditionalInitAssigns)
-    handleConditionalInitAssigns();
-
+  SILValue ControlVariable;
+  if (HasConditionalInitAssignOrDestroys)
+    ControlVariable = handleConditionalInitAssign();
+  if (!ConditionalDestroys.empty())
+    handleConditionalDestroys(ControlVariable);
+  
 
   // If we've successfully checked all of the definitive initialization
   // requirements, try to promote loads.  This can explode copy_addrs, so the
@@ -1036,12 +1033,10 @@ bool ElementPromotion::doIt() {
 
   // destroy_addr(p) is strong_release(load(p)), try to promote it too.
   for (unsigned i = 0; i != Releases.size(); ++i) {
-    if (auto *DAI = dyn_cast<DestroyAddrInst>(Releases[i]))
+    if (auto *DAI = dyn_cast_or_null<DestroyAddrInst>(Releases[i]))
       if (promoteDestroyAddr(DAI)) {
         // remove entry if destroy_addr got deleted.
-        Releases[i] = Releases.back();
-        Releases.pop_back();
-        --i;
+        Releases[i] = nullptr;
       }
   }
 
@@ -1087,7 +1082,7 @@ void ElementPromotion::handleStoreUse(unsigned UseID) {
     // we can insert a single control variable for the memory object for the
     // whole function.
     if (!InstInfo.onlyTouchesTrivialElements(MemoryType))
-      HasConditionalInitAssigns = true;
+      HasConditionalInitAssignOrDestroys = true;
     return;
   }
   
@@ -1166,136 +1161,43 @@ void ElementPromotion::updateInstructionForInitState(MemoryUse &InstInfo) {
 ///
 /// This returns true if the release was deleted.
 ///
-bool ElementPromotion::processNonTrivialRelease(SILInstruction *Release,
-                                SmallVectorImpl<SILInstruction*> &NewReleases) {
+void ElementPromotion::processNonTrivialRelease(unsigned ReleaseID) {
+  SILInstruction *Release = Releases[ReleaseID];
+  
   // If the instruction is a deallocation of uninitialized memory, no action is
   // required (or desired).
   if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release))
-    return false;
+    return;
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
   AvailabilitySet Availability = getLivenessAtInst(Release, 0,NumTupleElements);
-  if (Availability.isAllYes()) return false;
-
-  // The only instruction that can be in a partially live region is a
-  // destroy_addr.  A strong_release must only occur in code that was mandatory
-  // inlined, and the argument would have required it to be live at that site.
-  auto *Inst = cast<DestroyAddrInst>(Release);
-  SILValue Addr = Inst->getOperand();
-
-  // If the memory is not-fully initialized at the destroy_addr, then there can
-  // be multiple issues: we could have some tuple elements initialized and some
-  // not, or we could have a control flow sensitive situation where the elements
-  // are only initialized on some paths.  We handle this by splitting the
-  // multi-element case into its component parts and treating each separately.
-  //
-  // Classify each element into three cases: known initialized, known
-  // uninitialized, or partially initialized.  The first two cases are simple to
-  // handle, whereas the partial case requires dynamic codegen (worst case).
-  for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
-    switch (Availability.get(i)) {
-    case DIKind::No:
-      // If an element is known to be uninitialized, then we know we can
-      // completely ignore it.
-      break;
-    
-    case DIKind::Yes: {
-      // If an element is known to be initialized, then we can strictly destroy
-      // its value at Inst's position and then ignore it.
-      SILBuilder B(Inst);
-      SILValue EltPtr = computeTupleElementAddress(Addr, i, Inst->getLoc(), B);
-      if (auto *DA = B.emitDestroyAddr(Inst->getLoc(), EltPtr))
-        NewReleases.push_back(DA);
-      break;
-    }
-    
-    case DIKind::Partial:
-      // Otherwise, it's a partially live case.  We have to do code motion or
-      // emit a control variable to destroy it.
-      processPartiallyLiveElementDestroy(Inst, i, NewReleases);
-      break;
-    }
+  if (Availability.isAllYes()) return;
+  
+  // If it is all no, then we can just remove it.
+  if (Availability.isAllNo()) {
+    SILValue Addr = Release->getOperand(0);
+    Release->eraseFromParent();
+    RemoveDeadAddressingInstructions(Addr);
+    Releases[ReleaseID] = nullptr;
+    return;
   }
+  
+  // If any elements are partially live, we need to emit conditional logic.
+  if (Availability.hasAny(DIKind::Partial))
+    HasConditionalInitAssignOrDestroys = true;
 
-  Inst->eraseFromParent();
-  RemoveDeadAddressingInstructions(Addr);
-  return true;
+  // Otherwise, it is conditionally live, safe it for later processing.
+  ConditionalDestroys.push_back({ ReleaseID, Availability });
 }
 
-
-/// processPartiallyLiveElementDestroy - The specified destroy_addr is
-/// destroying a tuple element of the memory object that is only live on some
-/// paths through the CFG.  Handle this by moving the destroy_addr or inserting
-/// dynamic control logic to handle it.
-void ElementPromotion::
-processPartiallyLiveElementDestroy(DestroyAddrInst *DAI, unsigned TupleElt,
-                                SmallVectorImpl<SILInstruction*> &NewReleases) {
-  // TODO: We can avoid generating dynamic code by inserting the element destroy
-  // earlier.
-  
-  // Create the boolean control value as a stack variable, and initialize it
-  // with zero.
-  SILBuilder B(TheMemory->getNextNode());
-  SILType I1Type = SILType::getBuiltinIntegerType(1, Module.getASTContext());
-  auto Alloc = B.createAllocStack(TheMemory->getLoc(), I1Type);
-  SILValue AllocAddr = SILValue(Alloc, 1);
-  auto Zero = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 0);
-  B.createStore(TheMemory->getLoc(), Zero, AllocAddr);
-
-  // Insert a load after the destroy_addr and split the CFG into a diamond
-  // right after it.  We split the basic block after the destroy_addr, to leave
-  // it in its old block.
-  B.setInsertionPoint(DAI->getNextNode());
-  auto *Load = B.createLoad(DAI->getLoc(), AllocAddr);
-
-  SILBasicBlock *CondDestroyBlock, *ContBlock;
-  InsertCFGDiamond(SILValue(Load, 0), DAI->getLoc(),
-                   B, CondDestroyBlock, nullptr, ContBlock);
-
-  // Destroy the alloc_stack for the control variable in the continue block.
-  B.createDeallocStack(DAI->getLoc(), SILValue(Alloc, 0));
-  
-  // Set up the conditional destroy block.
-  B.setInsertionPoint(CondDestroyBlock->begin());
-  SILValue EltPtr =
-    computeTupleElementAddress(DAI->getOperand(), TupleElt, DAI->getLoc(), B);
-  if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
-    NewReleases.push_back(DA);
-
-  // Loop over all of the store uses and mark the variable initialized.  Since
-  // the control variable is next to "TheMemory", dominance is trivially
-  // satisfied.
-
-  // If we've successfully checked all of the definitive initialization
-  // requirements, try to promote loads.  This can explode copy_addrs, so the
-  // use list may change size.
-  for (auto &Use : Uses) {
-    // Ignore deleted uses.
-    if (Use.Inst == nullptr) continue;
-
-    // Only full initializations make something live.  inout uses, escapes, and
-    // assignments only happen when some kind of init made the element live.
-    if (Use.Kind != UseKind::Initialization)
-      continue;
-
-    // If the store doesn't cover the element we're looking at, it is unrelated.
-    if (!Use.usesElement(TupleElt))
-      continue;
-
-    // Otherwise, the instruction could make the element live, make sure to mark
-    // it as such.
-    B.setInsertionPoint(Use.Inst);
-    auto One = B.createIntegerLiteral(TheMemory->getLoc(), I1Type, 1);
-    B.createStore(TheMemory->getLoc(), One, AllocAddr);
-  }
-}
-
-/// handleConditionalInitAssigns - This memory object has some stores into (some
-/// element of) it that is either an init or an assign based on the control flow
-/// path through the function.  Handle this by inserting a bitvector that tracks
-/// the liveness of each tuple element independently.
-void ElementPromotion::handleConditionalInitAssigns() {
+/// handleConditionalInitAssignOr - This memory object has some stores
+/// into (some element of) it that is either an init or an assign based on the
+/// control flow path through the function, or have a destroy event that happens
+/// when the memory object may or may not be initialized.  Handle this by
+/// inserting a bitvector that tracks the liveness of each tuple element
+/// independently.
+SILValue ElementPromotion::handleConditionalInitAssign() {
   SILLocation Loc = TheMemory->getLoc();
   Loc.markAutoGenerated();
   
@@ -1415,10 +1317,89 @@ void ElementPromotion::handleConditionalInitAssigns() {
     Uses.push_back(UseCopy);
     updateInstructionForInitState(Uses.back());
   }
+  
+  return AllocAddr;
 }
 
+void ElementPromotion::handleConditionalDestroys(SILValue ControlVariableAddr) {
+  SILBuilder B(TheMemory);
+  
+  // After handling any conditional initializations, check to see if we have any
+  // cases where the value is only partially initialized by the time its
+  // lifetime ends.  In this case, we have to make sure not to destroy an
+  // element that wasn't initialized yet.
+  for (auto &CDElt : ConditionalDestroys) {
+    auto *DAI = cast<DestroyAddrInst>(Releases[CDElt.first]);
+    auto &Availability = CDElt.second;
+    
+    // The only instruction that can be in a partially live region is a
+    // destroy_addr.  A strong_release must only occur in code that was
+    // mandatory inlined, and the argument would have required it to be live at
+    // that site.
+    SILValue Addr = DAI->getOperand();
+  
+    // If the memory is not-fully initialized at the destroy_addr, then there
+    // can be multiple issues: we could have some tuple elements initialized and
+    // some not, or we could have a control flow sensitive situation where the
+    // elements are only initialized on some paths.  We handle this by splitting
+    // the multi-element case into its component parts and treating each
+    // separately.
+    //
+    // Classify each element into three cases: known initialized, known
+    // uninitialized, or partially initialized.  The first two cases are simple
+    // to handle, whereas the partial case requires dynamic codegen based on the
+    // liveness bitmask.
+    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
+      switch (Availability.get(i)) {
+      case DIKind::No:
+        // If an element is known to be uninitialized, then we know we can
+        // completely ignore it.
+        continue;
+      case DIKind::Partial:
+        // In the partially live case, we have to check our control variable to
+        // destroy it.  Handle this below.
+        break;
 
-
+      case DIKind::Yes:
+        // If an element is known to be initialized, then we can strictly
+        // destroy its value at DAI's position.
+        B.setInsertionPoint(DAI);
+        SILValue EltPtr = computeTupleElementAddress(Addr, i, DAI->getLoc(), B);
+        if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
+          Releases.push_back(DA);
+        continue;
+      }
+      
+      // Note - in some partial liveness cases, we can push the destroy_addr up
+      // the CFG, instead of immediately generating dynamic control flow checks.
+      // This could be handled in processNonTrivialRelease some day.
+      
+      // Insert a load of the liveness bitmask and split the CFG into a diamond
+      // right before it.
+      B.setInsertionPoint(DAI);
+      auto *Load = B.createLoad(DAI->getLoc(), ControlVariableAddr);
+      
+      // FIXME: Shift and mask the liveness down.
+      assert(NumTupleElements == 1 && "FIXME: Broken");
+      
+      SILBasicBlock *CondDestroyBlock, *ContBlock;
+      InsertCFGDiamond(SILValue(Load, 0), DAI->getLoc(),
+                       B, CondDestroyBlock, nullptr, ContBlock);
+      
+      // Set up the conditional destroy block.
+      B.setInsertionPoint(CondDestroyBlock->begin());
+      SILValue EltPtr = computeTupleElementAddress(Addr, i, DAI->getLoc(), B);
+      if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
+        Releases.push_back(DA);
+    }
+    
+    // Finally, now that the destroy_addr is handled, remove the original
+    // destroy.
+    DAI->eraseFromParent();
+    RemoveDeadAddressingInstructions(Addr);
+    Releases[CDElt.first] = nullptr;
+  }
+}
 
 Optional<DIKind> ElementPromotion::getLiveOut1(SILBasicBlock *BB) {
   LiveOutBlockState &BBState = getBlockInfo(BB);
@@ -2672,7 +2653,7 @@ void ElementPromotion::tryToRemoveDeadAllocation() {
   // will drop any releases.  Check that there is nothing preventing removal.
   if (!MemoryType.isTrivial(Module)) {
     for (auto *R : Releases) {
-      if (isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
+      if (R == nullptr || isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
         continue;
 
       DEBUG(llvm::errs() << "*** Failed to remove autogenerated alloc: "
