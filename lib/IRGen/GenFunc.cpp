@@ -784,23 +784,21 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
   }
 }
 
-static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
-                            CanSILFunctionType substFnType,
+static void emitCastBuiltin(IRGenFunction &IGF, CanSILFunctionType substFnType,
                             Explosion &result,
                             Explosion &args,
                             llvm::Instruction::CastOps opcode) {
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getResult().getConvention() ==
-           ResultConvention::Unowned);
+  assert(substFnType->getResult().getConvention() == ResultConvention::Unowned);
   SILType destType = substFnType->getResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
   result.add(output);
 }
 
-static void emitCastOrBitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
+static void emitCastOrBitCastBuiltin(IRGenFunction &IGF,
                                      CanSILFunctionType substFnType,
                                      Explosion &result,
                                      Explosion &args,
@@ -825,10 +823,8 @@ static void emitCastOrBitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
   result.add(output);
 }
 
-static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
-                               Explosion &result,
-                               Explosion &args,
-                               llvm::CmpInst::Predicate pred) {
+static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
+                               Explosion &args, llvm::CmpInst::Predicate pred) {
   llvm::Value *lhs = args.claimNext();
   llvm::Value *rhs = args.claimNext();
   
@@ -932,12 +928,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
 #define BUILTIN_CAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCastBuiltin(IGF, fn, substFnType, *out, args, \
+    return emitCastBuiltin(IGF, substFnType, *out, args, \
                            llvm::Instruction::id);
 
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCastOrBitCastBuiltin(IGF, fn, substFnType, *out, args, \
+    return emitCastOrBitCastBuiltin(IGF, substFnType, *out, args, \
                                     BuiltinValueKind::id);
   
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
@@ -951,8 +947,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
 if (Builtin.ID == BuiltinValueKind::id) { \
   SmallVector<llvm::Type*, 2> ArgTys; \
-  const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn); \
-  auto opType = BInfo.Types[0]->getCanonicalType(); \
+  auto opType = Builtin.Types[0]->getCanonicalType(); \
   ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(opType)); \
   auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module, \
     getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), ArgTys); \
@@ -969,7 +964,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCompareBuiltin(IGF, fn, *out, args, llvm::CmpInst::id);
+    return emitCompareBuiltin(IGF, *out, args, llvm::CmpInst::id);
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
@@ -1144,11 +1139,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::SToUCheckedTrunc) {
-    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
     auto FromTy =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
     auto ToTy =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
 
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
@@ -1177,11 +1171,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::UToSCheckedTrunc) {
-    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
     auto FromTy =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
     auto ToTy =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
     llvm::Type *ToMinusOneTy =
       llvm::Type::getIntNTy(ToTy->getContext(), ToTy->getIntegerBitWidth() - 1);
 
@@ -1206,9 +1199,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
   if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
       Builtin.ID == BuiltinValueKind::USCheckedConversion) {
-    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
     auto Ty =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[0]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
 
     // Report a sign error if the input parameter is a negative number, when
     // interpreted as signed.
@@ -1225,10 +1217,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
     auto TruncTy = IGF.IGM.Int32Ty;
-    const BuiltinInfo &BInfo = IGF.IGM.SILMod->getBuiltinInfo(fn);
     auto ToTy =
-      IGF.IGM.getStorageTypeForLowered(BInfo.Types[1]->getCanonicalType());
-    using namespace llvm;
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
     llvm::Value *V = IGF.Builder.CreateSIToFP(Truncated, ToTy);

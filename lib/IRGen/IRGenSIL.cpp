@@ -394,8 +394,7 @@ public:
   
   void setLoweredBuiltinValue(SILValue v,
                               FuncDecl *builtin) {
-    assert(isa<BuiltinModule>(builtin->getDeclContext())
-           && "not a builtin");
+    assert(isa<BuiltinModule>(builtin->getDeclContext()) && "not a builtin");
     setLoweredValue(v, BuiltinValue{builtin});
   }
   
