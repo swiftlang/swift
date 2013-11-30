@@ -94,26 +94,25 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   return NewList;
 }
 
-const IntrinsicInfo &SILModule::getIntrinsicInfo(const FuncDecl* FD) {
+const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
   unsigned OldSize = IntrinsicIDCache.size();
-  IntrinsicInfo &Info = IntrinsicIDCache[FD];
+  IntrinsicInfo &Info = IntrinsicIDCache[ID];
 
   // If the element was is in the cache, return it.
   if (OldSize == IntrinsicIDCache.size())
     return Info;
 
   // Otherwise, lookup the ID and Type and store them in the map.
-  StringRef NameRef = getBuiltinBaseName(getASTContext(),
-                                         FD->getName().str(), Info.Types);
+  StringRef NameRef = getBuiltinBaseName(getASTContext(), ID.str(), Info.Types);
   Info.ID =
     (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef, !Info.Types.empty());
 
   return Info;
 }
 
-const BuiltinInfo &SILModule::getBuiltinInfo(const FuncDecl* FD) {
+const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   unsigned OldSize = BuiltinIDCache.size();
-  BuiltinInfo &Info = BuiltinIDCache[FD];
+  BuiltinInfo &Info = BuiltinIDCache[ID];
 
   // If the element was is in the cache, return it.
   if (OldSize == BuiltinIDCache.size())
@@ -121,9 +120,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(const FuncDecl* FD) {
 
   // Otherwise, lookup the ID and Type and store them in the map.
   // Find the matching ID.
-  StringRef OperationName = getBuiltinBaseName(getASTContext(),
-                                               FD->getName().str(),
-                                               Info.Types);
+  StringRef OperationName =
+    getBuiltinBaseName(getASTContext(), ID.str(), Info.Types);
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.

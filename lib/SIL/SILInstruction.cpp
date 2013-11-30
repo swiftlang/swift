@@ -370,12 +370,12 @@ SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
     Global(Global)
 {}
 
-const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
-  return getModule().getIntrinsicInfo(Function);
+const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const {
+  return getModule().getIntrinsicInfo(Function->getName());
 }
 
-const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() {
-  return getModule().getBuiltinInfo(Function);
+const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() const {
+  return getModule().getBuiltinInfo(Function->getName());
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {

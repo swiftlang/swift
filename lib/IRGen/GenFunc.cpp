@@ -859,7 +859,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
          "cannot emit builtin to both explosion and memory");
 
   // Decompose the function's name into a builtin name and type list.
-  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(fn);
+  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(fn->getName());
 
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
@@ -900,7 +900,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   // Everything else cares about the (rvalue) argument.
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
-  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(fn);
+  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(fn->getName());
   llvm::Intrinsic::ID IID = IInfo.ID;
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;

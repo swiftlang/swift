@@ -2063,7 +2063,7 @@ namespace {
     if (!isa<BuiltinModule>(decl->getDeclContext()))
       return nullptr;
 
-    const BuiltinInfo &Builtin = SILM.getBuiltinInfo(cast<FuncDecl>(decl));
+    const BuiltinInfo &Builtin = SILM.getBuiltinInfo(decl->getName());
 
     // Match SIL builtins to their emitters.
     #define BUILTIN(Id, Name, Attrs)

@@ -107,10 +107,10 @@ private:
   llvm::SetVector<VarDecl*> globals;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
-  llvm::DenseMap<const FuncDecl*, IntrinsicInfo> IntrinsicIDCache;
+  llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
   /// This is a cache of builtin Function declarations to numeric ID mappings.
-  llvm::DenseMap<const FuncDecl*, BuiltinInfo> BuiltinIDCache;
+  llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
 
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef*> UndefValues;
@@ -277,14 +277,14 @@ public:
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
-  /// retruned value are defined in llvm/Intrinsics.h.
-  const IntrinsicInfo &getIntrinsicInfo(const FuncDecl* FD);
+  /// returned value are defined in llvm/Intrinsics.h.
+  const IntrinsicInfo &getIntrinsicInfo(Identifier ID);
 
   /// \brief Looks up the lazily cached identification for the builtin function.
   ///
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
-  /// decalation is not a builtin.
-  const BuiltinInfo &getBuiltinInfo(const FuncDecl* FD);
+  /// declaration is not a builtin.
+  const BuiltinInfo &getBuiltinInfo(Identifier ID);
 };
   
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
