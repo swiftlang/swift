@@ -86,7 +86,7 @@ namespace irgen {
                                   Alignment align);
   
   /// Emit a call to a builtin function.
-  void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
+  void emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                        CanSILFunctionType substFnType,
                        Explosion &args, Explosion *result,
                        Address indirectResult,

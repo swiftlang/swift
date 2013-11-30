@@ -132,14 +132,11 @@ public:
 
 /// Represents a builtin function.
 class BuiltinValue {
-  FuncDecl *decl;
-  
+  Identifier Id;
 public:
-  BuiltinValue(FuncDecl *decl)
-    : decl(decl)
-  {}
+  BuiltinValue(Identifier Id) : Id(Id) {}
   
-  FuncDecl *getDecl() const { return decl; }
+  Identifier getId() const { return Id; }
 };
   
 /// Represents a SIL value lowered to IR, in one of these forms:
@@ -392,9 +389,7 @@ public:
     setLoweredValue(v, MetatypeValue{swiftMetatype, objcMetatype});
   }
   
-  void setLoweredBuiltinValue(SILValue v,
-                              FuncDecl *builtin) {
-    assert(isa<BuiltinModule>(builtin->getDeclContext()) && "not a builtin");
+  void setLoweredBuiltinValue(SILValue v, Identifier builtin) {
     setLoweredValue(v, BuiltinValue{builtin});
   }
   
@@ -1145,10 +1140,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var) {
   return gvarAddr;
 }
 
-void IRGenSILFunction::visitBuiltinFunctionRefInst(
-                                             swift::BuiltinFunctionRefInst *i) {
-  setLoweredBuiltinValue(SILValue(i, 0),
-                         cast<FuncDecl>(i->getReferencedFunction()));
+void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) {
+  auto *FD = cast<FuncDecl>(i->getReferencedFunction());
+  setLoweredBuiltinValue(SILValue(i, 0), FD->getName());
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
@@ -1460,7 +1454,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
 }
 
 static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
-                                 FuncDecl *builtin,
+                                 Identifier builtin,
                                  ApplyInst *i,
                                  ArrayRef<Substitution> substitutions) {
   auto argValues = i->getArgumentsWithoutIndirectResult();
@@ -1493,7 +1487,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // Handle builtin calls separately.
   if (calleeLV.kind == LoweredValue::Kind::BuiltinValue) {
     auto &builtin = calleeLV.getBuiltinValue();
-    return emitBuiltinApplyInst(*this, builtin.getDecl(), i,
+    return emitBuiltinApplyInst(*this, builtin.getId(), i,
                                 i->getSubstitutions());
   }
 

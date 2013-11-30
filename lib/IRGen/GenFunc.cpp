@@ -850,7 +850,7 @@ static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
-void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
+void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                             CanSILFunctionType substFnType,
                             Explosion &args, Explosion *out,
                             Address indirectOut,
@@ -859,7 +859,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
          "cannot emit builtin to both explosion and memory");
 
   // Decompose the function's name into a builtin name and type list.
-  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(fn->getName());
+  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(FnId);
 
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
@@ -900,7 +900,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   // Everything else cares about the (rvalue) argument.
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
-  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(fn->getName());
+  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
@@ -994,8 +994,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
   if (Builtin.ID == BuiltinValueKind::Fence) {
     SmallVector<Type, 4> Types;
-    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
-                                               fn->getName().str(), Types);
+    StringRef BuiltinName =
+      getBuiltinBaseName(IGF.IGM.Context, FnId.str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("fence_"));
     // Decode the ordering argument, which is required.
     auto underscore = BuiltinName.find('_');
@@ -1016,8 +1016,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
   if (Builtin.ID == BuiltinValueKind::CmpXChg) {
     SmallVector<Type, 4> Types;
-    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
-                                               fn->getName().str(), Types);
+    StringRef BuiltinName =
+      getBuiltinBaseName(IGF.IGM.Context, FnId.str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));
     // Decode the ordering argument, which is required.
     auto underscore = BuiltinName.find('_');
@@ -1062,7 +1062,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     SmallVector<Type, 4> Types;
     StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
-                                               fn->getName().str(), Types);
+                                               FnId.str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
     auto underscore = BuiltinName.find('_');
     StringRef SubOp = BuiltinName.substr(0, underscore);
