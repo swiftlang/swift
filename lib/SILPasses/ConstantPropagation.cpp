@@ -561,7 +561,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
   // Otherwise, it should be one of the builin functions.
   OperandValueArrayRef Args = AI->getArguments();
-  const BuiltinInfo &Builtin = M.getBuiltinInfo(FR->getReferencedFunction());
+  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
 
   switch (Builtin.ID) {
   default: break;

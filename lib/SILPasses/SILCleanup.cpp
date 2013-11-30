@@ -1,4 +1,4 @@
-//===-- SILCleanup.cpp ---------- Emits diagnostics based on SIL analysis -===//
+//===-- SILCleanup.cpp - Removes diagnostics instructions -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,8 +9,13 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "swift/Subsystems.h"
+//
+// Cleanup SIL to make it suitable for IRGen. Specifically, removes the calls to
+// Builtin.staticReport(), which are not needed post SIL.
+//
+//===----------------------------------------------------------------------===//
 
+#include "swift/Subsystems.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -29,8 +34,7 @@ void swift::performSILCleanup(SILModule *M) {
         if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
           if (BuiltinFunctionRefInst *FR =
               dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-            const BuiltinInfo &B =
-                              M->getBuiltinInfo(FR->getReferencedFunction());
+            const BuiltinInfo &B = FR->getBuiltinInfo();
             if (B.ID == BuiltinValueKind::StaticReport) {
               // The call to the builtin should get removed before we reach
               // IRGen.

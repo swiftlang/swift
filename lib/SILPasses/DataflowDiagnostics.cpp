@@ -128,7 +128,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
     if (const BuiltinFunctionRefInst *FR =
         dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-      const BuiltinInfo &B = M.getBuiltinInfo(FR->getReferencedFunction());
+      const BuiltinInfo &B = FR->getBuiltinInfo();
       if (B.ID == BuiltinValueKind::StaticReport) {
 
         // Report diagnostic if the first argument has been folded to '1'.
