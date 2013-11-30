@@ -191,7 +191,7 @@ private:
   };
 
 public:
-  LoweredValue(Address const &address)
+  LoweredValue(const Address &address)
     : kind(Kind::Address), address(address)
   {}
   
@@ -264,22 +264,22 @@ public:
     return e;
   }
   
-  StaticFunction const &getStaticFunction() const {
+  const StaticFunction &getStaticFunction() const {
     assert(kind == Kind::StaticFunction && "not a static function");
     return staticFunction;
   }
   
-  ObjCMethod const &getObjCMethod() const {
+  const ObjCMethod &getObjCMethod() const {
     assert(kind == Kind::ObjCMethod && "not an objc method");
     return objcMethod;
   }
   
-  MetatypeValue const &getMetatypeValue() const {
+  const MetatypeValue &getMetatypeValue() const {
     assert(kind == Kind::MetatypeValue && "not a metatype value");
     return metatypeValue;
   }
   
-  BuiltinValue const &getBuiltinValue() const {
+  const BuiltinValue &getBuiltinValue() const {
     assert(kind == Kind::BuiltinValue && "not a builtin");
     return builtinValue;
   }
@@ -349,7 +349,7 @@ public:
   }
   
   /// Create a new Address corresponding to the given SIL address value.
-  void setLoweredAddress(SILValue v, Address const &address) {
+  void setLoweredAddress(SILValue v, const Address &address) {
     assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
            "address for non-address value?!");
     setLoweredValue(v, address);
@@ -1011,7 +1011,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     if (Arg->getType().isExistentialType())
       continue;
 
-    LoweredValue const &LoweredArg = getLoweredValue(Arg);
+    const LoweredValue &LoweredArg = getLoweredValue(Arg);
     if (LoweredArg.isAddress()) {
       // LValues are indirect by definition.
       auto Indirection = DirectValue;
@@ -1363,7 +1363,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          CanSILFunctionType origCalleeType,
                                          CanSILFunctionType substCalleeType,
-                                         LoweredValue const &lv,
+                                         const LoweredValue &lv,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
   ExtraData extraData;
@@ -1428,8 +1428,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     llvm_unreachable("builtins should be handled before reaching here");
   }
   
-  Callee callee = Callee::forKnownFunction(origCalleeType,
-                                           substCalleeType,
+  Callee callee = Callee::forKnownFunction(origCalleeType, substCalleeType,
                                            substitutions, calleeFn, calleeData,
                                            explosionLevel);
   return CallEmission(IGF, callee);
@@ -1437,7 +1436,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
 static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
                                          SILValue v) {
-  LoweredValue const &lv = IGF.getLoweredValue(v);
+  const LoweredValue &lv = IGF.getLoweredValue(v);
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
     llvm_unreachable("address isn't a valid metatype");
@@ -1490,7 +1489,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   SILValue v(i, 0);
   
-  LoweredValue const &calleeLV = getLoweredValue(i->getCallee());
+  const LoweredValue &calleeLV = getLoweredValue(i->getCallee());
   
   // Handle builtin calls separately.
   if (calleeLV.kind == LoweredValue::Kind::BuiltinValue) {
@@ -2528,7 +2527,7 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   // Get the value we're testing, which may be an address or an instance
   // pointer.
   llvm::Value *val;
-  LoweredValue const &lv = getLoweredValue(i->getOperand());
+  const LoweredValue &lv = getLoweredValue(i->getOperand());
   if (lv.isAddress()) {
     val = lv.getAddress().getAddress();
   } else {
@@ -2709,7 +2708,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
   SILType ty = i->getOperand().getType();
-  TypeInfo const &ti = getTypeInfo(ty);
+  const TypeInfo &ti = getTypeInfo(ty);
   Address dest = getLoweredAddress(i->getOperand());
   Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
                                              IGM.Int8PtrTy),
@@ -2723,7 +2722,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc().getType();
   Address src = getLoweredAddress(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
-  TypeInfo const &addrTI = getTypeInfo(addrTy);
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
 
   unsigned takeAndOrInitialize =
     (i->isTakeOfSrc() << 1U) | i->isInitializationOfDest();
@@ -2750,7 +2749,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
-  TypeInfo const &addrTI = getTypeInfo(addrTy);
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
   addrTI.destroy(*this, base);
 }
 
