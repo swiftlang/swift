@@ -1141,11 +1141,10 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var) {
 }
 
 void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) {
-  auto *FD = cast<FuncDecl>(i->getReferencedFunction());
-  setLoweredBuiltinValue(SILValue(i, 0), FD->getName());
+  setLoweredBuiltinValue(SILValue(i, 0), i->getName());
 }
 
-void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
+void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // FIXME: pick the best available explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   llvm::Function *fnptr =

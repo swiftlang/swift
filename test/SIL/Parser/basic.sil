@@ -671,8 +671,8 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %3 = alloc_box $Builtin.Int1
   store %0 to %2#1 : $*Builtin.Int1
   store %1 to %3#1 : $*Builtin.Int1
-  // CHECK: builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %7 = builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  // CHECK: builtin_function_ref "cmp_eq_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %7 = builtin_function_ref "cmp_eq_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %8 = load %2#1 : $*Builtin.Int1
   %9 = load %3#1 : $*Builtin.Int1
   %10 = apply %7(%8, %9) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1

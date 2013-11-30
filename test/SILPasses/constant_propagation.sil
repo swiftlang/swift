@@ -5,9 +5,9 @@ import swift
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
 sil @fold_arithmetic_with_overflow : $@thin () -> Builtin.Int64 {
 bb0:
- %1 = builtin_function_ref #Builtin.int_sadd_with_overflow_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
- %2 = builtin_function_ref #Builtin.int_smul_with_overflow_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
- %3 = builtin_function_ref #Builtin.int_ssub_with_overflow_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %2 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %3 = builtin_function_ref "int_ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 2 
  %110 = integer_literal $Builtin.Int64, 3        
  %18 = apply %1(%0, %110) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
@@ -19,9 +19,9 @@ bb0:
  return %23 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_arithmetic_with_overflow
-// CHECK-NOT: builtin_function_ref #Builtin.int_sadd_with_overflow_Int64
-// CHECK-NOT: builtin_function_ref #Builtin.int_smul_with_overflow_Int64
-// CHECK-NOT: builtin_function_ref #Builtin.int_ssub_with_overflow_Int64
+// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
+// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
+// CHECK-NOT: builtin_function_ref "int_ssub_with_overflow_Int64"
 // CHECK-NOT: integer_literal $Builtin.Int64, 2
 // CHECK-NOT: integer_literal $Builtin.Int64, 3
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
@@ -34,19 +34,19 @@ bb0:
 sil @fold_trunc : $@thin () -> Builtin.Int64 {
 bb0:
  %0 = integer_literal $Builtin.Int128, 22
- %1 = builtin_function_ref #Builtin.trunc_Int128_Int64 : $@thin Builtin.Int128 -> Builtin.Int64
+ %1 = builtin_function_ref "trunc_Int128_Int64" : $@thin Builtin.Int128 -> Builtin.Int64
  %2 = apply %1(%0) : $@thin Builtin.Int128 -> Builtin.Int64
  br bb4(%2 : $Builtin.Int64)
 
 bb1:
  %3 = integer_literal $Builtin.Int8, 23
- %4 = builtin_function_ref #Builtin.sext_Int8_Int64 : $@thin Builtin.Int8 -> Builtin.Int64
+ %4 = builtin_function_ref "sext_Int8_Int64" : $@thin Builtin.Int8 -> Builtin.Int64
  %5 = apply %4(%3) : $@thin Builtin.Int8 -> Builtin.Int64
  br bb4(%5 : $Builtin.Int64)
 
 bb2:
  %6 = integer_literal $Builtin.Int8, 24
- %7 = builtin_function_ref #Builtin.zext_Int8_Int64 : $@thin Builtin.Int8 -> Builtin.Int64
+ %7 = builtin_function_ref "zext_Int8_Int64" : $@thin Builtin.Int8 -> Builtin.Int64
  %8 = apply %7(%6) : $@thin Builtin.Int8 -> Builtin.Int64
  br bb4(%8 : $Builtin.Int64)
 
@@ -126,7 +126,7 @@ bb0:
 
 sil @testChainingCCP : $@thin () -> Builtin.Int1 {
 bb0:
-  %1 = builtin_function_ref #Builtin.trunc_Int64_Int1 : $@thin Builtin.Int64 -> Builtin.Int1
+  %1 = builtin_function_ref "trunc_Int64_Int1" : $@thin Builtin.Int64 -> Builtin.Int1
   %2 = integer_literal $Builtin.Int64, 0
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   %4 = struct_extract %3 : $Int64, #value
@@ -142,7 +142,7 @@ bb0:
 
 sil @testDivision : $@thin () -> Builtin.Int8 {
 bb0:
-  %0 = builtin_function_ref #Builtin.sdiv_Int8 : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
+  %0 = builtin_function_ref "sdiv_Int8" : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
   %1 = integer_literal $Builtin.Int8, 6
   %2 = integer_literal $Builtin.Int8, 3
   %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
@@ -157,7 +157,7 @@ bb0:
 
 sil @testRem : $@thin () -> Builtin.Int64 {
 bb0:
-  %0 = builtin_function_ref #Builtin.urem_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %0 = builtin_function_ref "urem_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %1 = integer_literal $Builtin.Int64, 10
   %2 = integer_literal $Builtin.Int64, 2
   %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -174,15 +174,15 @@ sil @testFoldingIntBinaryPredicates : $@thin () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int1, 1
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = builtin_function_ref #Builtin.cmp_eq_Int1 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %3 = builtin_function_ref "cmp_eq_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %4 = apply %3(%1, %2) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 
   %11 = integer_literal $Builtin.Int32, 21
   %12 = integer_literal $Builtin.Int32, 12
-  %13 = builtin_function_ref #Builtin.cmp_ne_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %13 = builtin_function_ref "cmp_ne_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
   %14 = apply %13(%11, %12) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
-  %15 = builtin_function_ref #Builtin.cmp_sgt_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %15 = builtin_function_ref "cmp_sgt_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
   %16 = apply %15(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
-  %17 = builtin_function_ref #Builtin.cmp_ult_Int32 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %17 = builtin_function_ref "cmp_ult_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
   %18 = apply %17(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1 
   %5 = tuple ()
   return %5 : $()
@@ -201,9 +201,9 @@ sil @fold_binary_bitwise : $@thin () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 1          // users: %7, %6, %5
   %1 = integer_literal $Builtin.Int64, 0          // users: %7, %6, %5
-  %2 = builtin_function_ref #Builtin.and_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %5
-  %3 = builtin_function_ref #Builtin.or_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
-  %4 = builtin_function_ref #Builtin.xor_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
+  %2 = builtin_function_ref "and_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %5
+  %3 = builtin_function_ref "or_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
+  %4 = builtin_function_ref "xor_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
   %5 = apply %2(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %6 = apply %3(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %7 = apply %4(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %8
@@ -225,9 +225,9 @@ bb0:
   %2 = integer_literal $Builtin.Int64, 3          // users: %11, %10, %9, %8
   %3 = integer_literal $Builtin.Int64, 1          // user: %12
   %4 = integer_literal $Builtin.Int64, 5          // user: %12
-  %5 = builtin_function_ref #Builtin.ashr_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %10, %8
-  %6 = builtin_function_ref #Builtin.lshr_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %11, %9
-  %7 = builtin_function_ref #Builtin.shl_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %12
+  %5 = builtin_function_ref "ashr_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %10, %8
+  %6 = builtin_function_ref "lshr_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %11, %9
+  %7 = builtin_function_ref "shl_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %12
   %8 = apply %5(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %9 = apply %6(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %10 = apply %5(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -250,10 +250,10 @@ sil @fold_float_operations : $@thin () -> Builtin.FPIEEE64 {
 bb0:
   %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
   %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
-  %0 = builtin_function_ref #Builtin.fadd_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64 
-  %1 = builtin_function_ref #Builtin.fdiv_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %2 = builtin_function_ref #Builtin.fsub_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %3 = builtin_function_ref #Builtin.fmul_FPIEEE64 : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %0 = builtin_function_ref "fadd_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %1 = builtin_function_ref "fdiv_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %2 = builtin_function_ref "fsub_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %3 = builtin_function_ref "fmul_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
   %8 = apply %0(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
   %9 = apply %1(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
   %10 = apply %2(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64

@@ -42,7 +42,36 @@ struct ID {
   unsigned Number;
   int ResultNumber;
 };
-  
+
+static void printEscapedString(raw_ostream &OS, StringRef value) {
+  OS << '"';
+  for (auto C : value) {
+    switch (C) {
+    case '\\': OS << "\\\\"; break;
+    case '\t': OS << "\\t"; break;
+    case '\n': OS << "\\n"; break;
+    case '\r': OS << "\\r"; break;
+    case '"': OS << "\\\""; break;
+    case '\'': OS << '\''; break; // no need to escape these
+    case '\0': OS << "\\0"; break;
+    default:
+      auto c = (unsigned char)C;
+      // Other ASCII control characters should get escaped.
+      if (c < 0x20) {
+        static const char hexdigit[] = {
+          '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+          'A', 'B', 'C', 'D', 'E', 'F', 'G'
+        };
+        OS << "\\x" << hexdigit[c >> 4] << hexdigit[c & 0xF];
+      } else {
+        OS << c;
+      }
+      break;
+    }
+  }
+  OS << '"';
+}
+
 enum SILColorKind {
   SC_Type,
 };
@@ -555,8 +584,9 @@ public:
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref " << SILDeclRef(BFI->getReferencedFunction())
-       << " : " << BFI->getType();
+    OS << "builtin_function_ref ";
+    printEscapedString(OS, BFI->getName().str());
+    OS << " : " << BFI->getType();
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
@@ -583,34 +613,8 @@ public:
     OS << " // " << decimal;
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal \"";
-
-    auto value = SLI->getValue();
-    for (size_t i = 0, e = value.size(); i != e; ++i) {
-      switch (value[i]) {
-      case '\\': OS << "\\\\"; break;
-      case '\t': OS << "\\t"; break;
-      case '\n': OS << "\\n"; break;
-      case '\r': OS << "\\r"; break;
-      case '"': OS << "\\\""; break;
-      case '\'': OS << '\''; break; // no need to escape these
-      case '\0': OS << "\\0"; break;
-      default:
-        auto c = (unsigned char) value[i];
-        // Other ASCII control characters should get escaped.
-        if (c < 0x20) {
-          static const char hexdigit[] = {
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-            'A', 'B', 'C', 'D', 'E', 'F', 'G'
-          };
-          OS << "\\x" << hexdigit[c >> 4] << hexdigit[c & 0xF];
-        } else {
-          OS << c;
-        }
-        break;
-      }
-    }
-    OS << "\"";
+    OS << "string_literal ";
+    printEscapedString(OS, SLI->getValue());
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getIDAndType(LI->getOperand());

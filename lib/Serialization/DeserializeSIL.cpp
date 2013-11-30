@@ -634,8 +634,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::BuiltinFunctionRefInst: {
     // Format: FuncDecl and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createBuiltinFunctionRef(Loc,
-                    cast<FuncDecl>(MF->getDecl(ValID)),
+    ResultVal = Builder.createBuiltinFunctionRef(Loc, MF->getIdentifier(ValID),
                     getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
@@ -666,7 +665,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::FunctionRefInst: {
     auto Ty = MF->getType(TyID);
-    Identifier FuncName = MF->getIdentifier(ValID); 
+    Identifier FuncName = MF->getIdentifier(ValID);
     ResultVal = Builder.createFunctionRef(Loc,
         getFuncForReference(FuncName,
                             getSILType(Ty, (SILValueCategory)TyCategory),

@@ -234,7 +234,7 @@ void
 SILCloner<ImplClass>::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *Inst){
   doPostProcess(Inst,
     Builder.createBuiltinFunctionRef(getOpLocation(Inst->getLoc()),
-                                     Inst->getReferencedFunction(),
+                                     Inst->getName(),
                                      getOpType(Inst->getType())));
 }
 

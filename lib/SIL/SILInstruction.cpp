@@ -371,11 +371,11 @@ SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
 {}
 
 const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const {
-  return getModule().getIntrinsicInfo(Function->getName());
+  return getModule().getIntrinsicInfo(getName());
 }
 
 const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() const {
-  return getModule().getBuiltinInfo(Function->getName());
+  return getModule().getBuiltinInfo(getName());
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {

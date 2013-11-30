@@ -1210,13 +1210,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   case ValueKind::BuiltinFunctionRefInst: {
     SILType Ty;
-    SILDeclRef FuncRef;
-    if (parseSILDeclRef(FuncRef) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin_function_ref");
+      return true;
+    }
+    StringRef Str = P.Tok.getText();
+    Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
+    P.consumeToken(tok::string_literal);
+
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
       return true;
-    ResultVal = B.createBuiltinFunctionRef(InstLoc,
-                      cast<FuncDecl>(FuncRef.getDecl()), Ty);
+    ResultVal = B.createBuiltinFunctionRef(InstLoc, Id, Ty);
     break;
   }
   case ValueKind::ProjectExistentialInst:

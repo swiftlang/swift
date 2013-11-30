@@ -203,10 +203,9 @@ public:
   }
 
   BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
-                                                   FuncDecl *f,
+                                                   Identifier Id,
                                                    SILType ty) {
-    return insert(new (F.getModule())
-                    BuiltinFunctionRefInst(loc, f, ty));
+    return insert(new (F.getModule()) BuiltinFunctionRefInst(loc, Id, ty));
   }
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new (F.getModule())

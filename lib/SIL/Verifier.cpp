@@ -366,8 +366,6 @@ public:
   }
 
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    require(isa<BuiltinModule>(BFI->getReferencedFunction()->getDeclContext()),
-         "builtin_function_ref must refer to a function in the Builtin module");
     auto fnType = requireObjectType(SILFunctionType, BFI,
                                     "result of builtin_function_ref");
     require(fnType->isThin(),

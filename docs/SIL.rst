@@ -1755,10 +1755,10 @@ builtin_function_ref
 ````````````````````
 ::
 
-  sil-instruction ::= 'builtin_function_ref' sil-decl-ref ':' sil-type
+  sil-instruction ::= 'builtin_function_ref' sil-identifier ':' sil-type
 
-  %1 = builtin_function_ref #Builtin.foo : $@thin T -> U
-  // #Builtin.foo must name a function in the Builtin module
+  %1 = builtin_function_ref "foo" : $@thin T -> U
+  // "foo" must name a function in the Builtin module
   // $@thin T -> U must be a thin function type
   // %1 has type $@thin T -> U
 

@@ -512,15 +512,15 @@ public:
 /// BuiltinFunctionRefInst - Represents a reference to a primitive function from
 /// the Builtin module.
 class BuiltinFunctionRefInst : public SILInstruction {
-  FuncDecl *Function;
+  Identifier Name;
 public:
-  BuiltinFunctionRefInst(SILLocation Loc, FuncDecl *Function, SILType Ty)
+  BuiltinFunctionRefInst(SILLocation Loc, Identifier Name, SILType Ty)
     : SILInstruction(ValueKind::BuiltinFunctionRefInst, Loc, Ty),
-      Function(Function)
+      Name(Name)
   {}
   
   /// Return the referenced function.
-  FuncDecl *getReferencedFunction() const { return Function; }
+  Identifier getName() const { return Name; }
   
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 

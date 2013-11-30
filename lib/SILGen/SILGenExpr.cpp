@@ -265,7 +265,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
          "emitting ref to local constant without context?!");
   if (constant.hasDecl() &&
       isa<BuiltinModule>(constant.getDecl()->getDeclContext())) {
-    return B.createBuiltinFunctionRef(loc, cast<FuncDecl>(constant.getDecl()),
+    return B.createBuiltinFunctionRef(loc, constant.getDecl()->getName(),
                                       constantInfo.getSILType());
   }
   
@@ -2537,7 +2537,8 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   // Emit a reference to Builtin.once.
   SILDeclRef builtinOnceConstant(builtinOnceDecl, SILDeclRef::Kind::Func);
   auto builtinOnceSILTy = SGM.Types.getConstantType(builtinOnceConstant);
-  auto builtinOnce = B.createBuiltinFunctionRef(global, builtinOnceDecl,
+  auto builtinOnce = B.createBuiltinFunctionRef(global,
+                                                builtinOnceDecl->getName(),
                                                 builtinOnceSILTy);
 
   SILType rawPointerSILTy

@@ -390,7 +390,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(BFR->getType().getSwiftRValueType()),
         (unsigned)BFR->getType().getCategory(),
-        S.addDeclRef(BFR->getReferencedFunction()), 0);
+        S.addIdentifierRef(BFR->getName()), 0);
     break;
   }
   case ValueKind::GlobalAddrInst: {
