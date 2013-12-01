@@ -15,7 +15,6 @@
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/StringSwitch.h"
-
 using namespace swift;
 
 namespace swift {
@@ -35,8 +34,7 @@ namespace swift {
   };
 } // end namespace swift.
 
-void SILExternalSource::anchor()
-{
+void SILExternalSource::anchor() {
 }
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
@@ -44,8 +42,7 @@ void SILExternalSource::anchor()
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
 
 SILModule::SILModule(Module *SwiftModule)
-  : TheSwiftModule(SwiftModule), Stage(SILStage::Raw), Types(*this)
-{
+  : TheSwiftModule(SwiftModule), Stage(SILStage::Raw), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
 }
 
@@ -125,15 +122,13 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.
-  if (OperationName.startswith("fence_")) {
+  if (OperationName.startswith("fence_"))
     Info.ID = BuiltinValueKind::Fence;
-  } else
-  if (OperationName.startswith("cmpxchg_")) {
+  else if (OperationName.startswith("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
-  } else
-  if (OperationName.startswith("atomicrmw_")) {
+  else if (OperationName.startswith("atomicrmw_"))
     Info.ID = BuiltinValueKind::AtomicRMW;
-  } else {
+  else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(ID, Name, Attrs) \

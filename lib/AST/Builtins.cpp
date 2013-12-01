@@ -880,7 +880,7 @@ static bool isValidAtomicOrdering(StringRef Ordering) {
          Ordering == "acqrel" || Ordering == "seqcst";
 }
 
-ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
+ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
 

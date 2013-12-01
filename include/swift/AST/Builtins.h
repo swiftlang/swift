@@ -86,19 +86,19 @@ llvm::Intrinsic::ID
 getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 
 
-/// \brief Finds the builtin value with the given name.
+/// \brief Create a ValueDecl for the builtin with the given name.
 ///
 /// Returns null if the name does not identifier a known builtin value.
-ValueDecl *getBuiltinValue(ASTContext &Context, Identifier Name);
+ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
 
-/// \brief The information identifying the builtin - it's kind and types.
+/// \brief The information identifying the builtin - its kind and types.
 struct BuiltinInfo {
   BuiltinValueKind ID;
   SmallVector<Type, 4> Types;
   bool isReadNone() const;
 };
 
-/// \brief The information identifying the llvm intrinsic - it's id and types.
+/// \brief The information identifying the llvm intrinsic - its id and types.
 struct IntrinsicInfo {
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;

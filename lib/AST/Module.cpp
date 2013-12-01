@@ -77,7 +77,7 @@ BuiltinModule::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
                                         MutableArrayRef<TypeLoc>());
 
   if (Entry == 0)
-    Entry = getBuiltinValue(M.Ctx, Name);
+    Entry = getBuiltinValueDecl(M.Ctx, Name);
 
   if (Entry)
     Result.push_back(Entry);
