@@ -746,9 +746,6 @@ namespace {
     /// InOutUses, and Escapes), to their entry in Uses.
     llvm::SmallDenseMap<SILInstruction*, unsigned, 16> NonLoadUses;
 
-    /// Does this value escape anywhere in the function.
-    bool HasAnyEscape = false;
-
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
     bool HasConditionalInitAssignOrDestroys = false;
@@ -841,7 +838,6 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
     if (Use.Kind == UseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
       // promote loads in blocks reachable from an escape point.
-      HasAnyEscape = true;
       BBInfo.EscapeInfo = EscapeKind::Yes;
     }
   }
@@ -2101,9 +2097,6 @@ namespace {
     /// This is the SILType of the memory object.
     SILType MemoryType;
     
-    /// The number of tuple elements in this memory object.
-    unsigned NumTupleElements;
-    
     /// The number of primitive subelements across all elements of this memory
     /// value.
     unsigned NumMemorySubElements;
@@ -2111,7 +2104,7 @@ namespace {
     SmallVectorImpl<MemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     
-    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
+    llvm::SmallDenseMap<SILBasicBlock*, bool, 32> HasLocalDefinition;
     
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
@@ -2129,11 +2122,6 @@ namespace {
     
   private:
     
-    LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
-      return PerBlockInfo.insert({BB,
-        LiveOutBlockState(NumTupleElements)}).first->second;
-    }
-    
     bool promoteLoad(SILInstruction *Inst);
     bool promoteDestroyAddr(DestroyAddrInst *DAI);
     
@@ -2141,16 +2129,16 @@ namespace {
     bool hasEscapedAt(SILInstruction *I);
     void updateAvailableValues(SILInstruction *Inst,
                                llvm::SmallBitVector &RequiredElts,
-                               SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
                                llvm::SmallBitVector &ConflictingValues);
     void computeAvailableValues(SILInstruction *StartingFrom,
                                 llvm::SmallBitVector &RequiredElts,
-                                SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
     void computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
                                     SILBasicBlock *BB,
                                     llvm::SmallBitVector &RequiredElts,
-                                    SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
-                                    llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
+                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+  llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
                                     llvm::SmallBitVector &ConflictingValues);
     
     void explodeCopyAddr(CopyAddrInst *CAI);
@@ -2174,7 +2162,6 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
     MemoryType = cast<AllocStackInst>(TheMemory)->getElementType();
   }
   
-  NumTupleElements = getTupleElementCount(MemoryType.getSwiftRValueType());
   NumMemorySubElements = getNumSubElements(MemoryType, Module);
   
   // The first step of processing an element is to collect information about the
@@ -2189,40 +2176,19 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
     
     NonLoadUses[Use.Inst] = ui;
     
-    auto &BBInfo = getBlockInfo(Use.Inst->getParent());
-    BBInfo.HasNonLoadUse = true;
-    
-    // Each of the non-load instructions will each be checked to make sure that
-    // they are live-in or a full element store.  This means that the block they
-    // are in should be treated as a live out for cross-block analysis purposes.
-    BBInfo.markAvailable(Use);
-    
-    // If all of the tuple elements are available in the block, then it is known
-    // to be live-out.  This is the norm for non-tuple memory objects.
-    if (BBInfo.getAvailabilitySet().isAllYes())
-      BBInfo.LOState = LiveOutBlockState::IsKnown;
+    HasLocalDefinition[Use.Inst->getParent()] = true;
     
     if (Use.Kind == UseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
       // promote loads in blocks reachable from an escape point.
       HasAnyEscape = true;
-      BBInfo.EscapeInfo = EscapeKind::Yes;
     }
   }
   
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
   // as a use so we see it in our dataflow walks.
   NonLoadUses[TheMemory] = ~0U;
-  auto &MemBBInfo = getBlockInfo(TheMemory->getParent());
-  MemBBInfo.HasNonLoadUse = true;
-  
-  // There is no scanning required (or desired) for the block that defines the
-  // memory object itself.  Its live-out properties are whatever are trivially
-  // locally inferred by the loop above.  Mark any unset elements as not
-  // available.
-  MemBBInfo.getAvailabilitySet().changeUnsetElementsTo(DIKind::No);
-  
-  MemBBInfo.LOState = LiveOutBlockState::IsKnown;
+  HasLocalDefinition[TheMemory->getParent()] = true;
 }
 
 
@@ -2356,7 +2322,7 @@ computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
   // If there is a potential modification in the current block, scan the block
   // to see if the store or escape is before or after the load.  If it is
   // before, check to see if it produces the value we are looking for.
-  if (getBlockInfo(BB).HasNonLoadUse) {
+  if (HasLocalDefinition.count(BB)) {
     for (SILBasicBlock::iterator BBI = StartingFrom; BBI != BB->begin();) {
       SILInstruction *TheInst = std::prev(BBI);
       
