@@ -52,7 +52,6 @@ public:
     Node(const Node&) = delete;
     Node &operator=(const Node&) = delete;
 
-
     /// Retrieve the type variable this node represents.
     TypeVariableType *getTypeVariable() const { return TypeVar; }
 
@@ -78,14 +77,20 @@ public:
     void removeConstraint(Constraint *constraint);
 
     /// Add an adjacency to the list of adjacencies.
-    void addAdjacency(TypeVariableType *typeVar);
+    void addAdjacency(TypeVariableType *typeVar, unsigned degree = 1);
 
     /// Remove an adjacency from the list of adjacencies.
     ///
-    /// This removes a single instance of the adjacency between two type
-    /// variables. If it was the last adjacency, then the two type variables
-    /// are no longer adjacent.
-    void removeAdjacency(TypeVariableType *typeVar);
+    /// \param allAdjacencies When true, remove all adjacencies with
+    /// the given type variable. Otherwise (the default), removes a
+    /// single instance of the adjacency between two type
+    /// variables. If it was the last adjacency, then the two type
+    /// variables are no longer adjacent.
+    void removeAdjacency(TypeVariableType *typeVar,
+                         bool allAdjacencies = false);
+    
+    /// Collapse this node into the given node.
+    void collapseInto(ConstraintGraph &cg, Node &combined);
 
     /// The type variable this node represents.
     TypeVariableType *TypeVar;
@@ -146,9 +151,21 @@ public:
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
 
+  /// Remove a constraint from the graph.
+  void removeConstraint(Constraint *constraint);
+
+  /// Combine the node for the first type variable into the node for
+  /// the second type variable (due to the type variables being
+  /// unified).
+  ///
+  /// The two type variables must be representatives of their
+  /// corresponding sets.
+  void mergeNodes(TypeVariableType *typeVar1, TypeVariableType *typeVar2);
+
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
-  /// The subscript operator can be
+  /// The subscript operator can be used to retrieve the nodes that
+  /// correspond to these type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
     return TypeVariables;
   }

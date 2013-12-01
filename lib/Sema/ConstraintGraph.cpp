@@ -19,6 +19,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
+#include <memory>
 #include <numeric>
 
 using namespace swift;
@@ -141,10 +142,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
 
 #pragma mark Node mutation
 void ConstraintGraph::Node::addConstraint(Constraint *constraint) {
-  // FIXME: Assert that this never happens. We shouldn't re-insert a constraint.
-  if (ConstraintIndex.count(constraint))
-    return;
-
+  assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
 }
@@ -174,7 +172,8 @@ void ConstraintGraph::Node::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
+void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar, 
+                                         unsigned degree) {
   assert(typeVar != TypeVar && "Cannot be adjacent to oneself");
 
   // Look for existing adjacency information.
@@ -189,24 +188,27 @@ void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
     Adjacencies.push_back(typeVar);
   }
 
-  // Note that we have another constraint making these two variables adjacent.
-  ++pos->second.NumConstraints;
+  // Bump the degree of the adjacency.
+  pos->second.NumConstraints += degree;
 }
 
-void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
+void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar,
+                                            bool allAdjacencies) {
   // Find the adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
   assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");
   assert(Adjacencies[pos->second.Index] == typeVar && "Mismatched adjacency");
 
-  // Decrement the number of constraints that make these two type variables
-  // adjacent.
-  --pos->second.NumConstraints;
-
-  // If there are other constraints that make these type variables
-  // adjacent,
-  if (pos->second.NumConstraints > 0)
-    return;
+  if (!allAdjacencies) {
+    // Decrement the number of constraints that make these two type variables
+    // adjacent.
+    --pos->second.NumConstraints;
+    
+    // If there are other constraints that make these type variables
+    // adjacent,
+    if (pos->second.NumConstraints > 0)
+      return;
+  }
 
   // Remove this adjacency from the mapping.
   unsigned index = pos->second.Index;
@@ -228,6 +230,34 @@ void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
   Adjacencies.pop_back();
 }
 
+void ConstraintGraph::Node::collapseInto(ConstraintGraph &cg, Node &combined) {
+  // Add each of the constraints into the combined node.
+  for (auto constraint : Constraints) {
+    if (combined.ConstraintIndex.count(constraint) == 0)
+      combined.addConstraint(constraint);
+  }
+
+  // Update adjacency counts in the combined node and remap the
+  // adjacent nodes.
+  for (const auto &adj : AdjacencyInfo) {
+    // If this is a newly-created self-adjacency, remove it from the
+    // combined node and we're done.
+    if (adj.first == combined.TypeVar) {
+      combined.removeAdjacency(TypeVar, /*allAdjacencies=*/true);
+      continue;
+    }
+
+    // Add this adjacency to the combined node.
+    combined.addAdjacency(adj.first, adj.second.NumConstraints);
+
+    // Replace the adjacency in the adjacent node with the combined
+    // node.
+    auto &adjNode = cg[adj.first];
+    adjNode.removeAdjacency(TypeVar, /*allAdjacencies=*/true);
+    adjNode.addAdjacency(combined.TypeVar, adj.second.NumConstraints);
+  }
+}
+
 #pragma mark Graph mutation
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
@@ -235,12 +265,12 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
   gatherReferencedTypeVars(CS, constraint, referencedTypeVars);
 
-  // Note the constraint in the node for that type variable.
+  // For the nodes corresponding to each type variable...
   for (auto typeVar : referencedTypeVars) {
     // Find the node for this type variable.
     Node &node = (*this)[typeVar];
 
-    // Note the constraint.
+    // Note the constraint within the node for that type variable.
     node.addConstraint(constraint);
 
     // Record the adjacent type variables.
@@ -253,6 +283,66 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
       node.addAdjacency(otherTypeVar);
     }
   }
+}
+
+void ConstraintGraph::removeConstraint(Constraint *constraint) {
+  // Gather the set of type variables referenced by this constraint.
+  SmallVector<TypeVariableType *, 8> referencedTypeVars;
+  gatherReferencedTypeVars(CS, constraint, referencedTypeVars);
+
+  // For the nodes corresponding to each type variable...
+  for (auto typeVar : referencedTypeVars) {
+    // Find the node for this type variable.
+    Node &node = (*this)[typeVar];
+
+    // Remove the constraint.
+    node.removeConstraint(constraint);
+
+    // Remove the adjacencies for all adjacent type variables.
+    // This is O(N^2) in the number of referenced type variables, because
+    // we're updating all of the adjacent type variables eagerly.
+    for (auto otherTypeVar : referencedTypeVars) {
+      if (typeVar == otherTypeVar)
+        continue;
+
+      node.removeAdjacency(otherTypeVar);
+    }
+  }  
+}
+
+void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
+                                 TypeVariableType *typeVar2) {
+  assert(typeVar1 == CS.getRepresentative(typeVar1) && "non-representative 1");
+  assert(typeVar2 == CS.getRepresentative(typeVar2) && "non-representative 2");
+  assert(typeVar1 != typeVar2 && "Type variables aren't different");
+
+  // Pull the first node out of storage.
+  std::unique_ptr<Node> node1;
+  {
+    auto known1 = Nodes.find(typeVar1);
+    assert(known1 != Nodes.end() && "Missing first node");
+    auto storedNode1 = known1->second;
+    Nodes.erase(known1);
+
+    unsigned lastIndex = TypeVariables.size()-1;
+    if (storedNode1.Index < lastIndex) {
+      // Shuffle the last type variable to the index of the first
+      // node's type variable.
+      auto lastTypeVar = TypeVariables[lastIndex];
+      TypeVariables[storedNode1.Index] = lastTypeVar;
+      Nodes[lastTypeVar].Index = storedNode1.Index;
+    } 
+
+    // Pop the removed variable off the end.
+    TypeVariables.pop_back();
+
+    // Save the node pointer.
+    node1.reset(storedNode1.NodePtr);
+  }
+  
+  // Collapse the first type variable's node into the second.
+  auto &node2 = (*this)[typeVar2];
+  node1->collapseInto(*this, node2);
 }
 
 #pragma mark Algorithms
