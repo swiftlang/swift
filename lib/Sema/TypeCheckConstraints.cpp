@@ -230,8 +230,11 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
       failedConstraint = constraint;
     }
 
-    if (!simplifyExisting && solverState) {
-      solverState->generatedConstraints.push_back(constraint);
+    if (solverState) {
+      solverState->retiredConstraints.push_front(constraint);
+      if (!simplifyExisting && solverState->generatedConstraints) {
+        solverState->generatedConstraints->insert(constraint);
+      }
     }
 
     return false;
@@ -241,9 +244,9 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // to do.
     // Record solved constraint.
     if (solverState) {
-      solverState->retiredConstraints.push_back(constraint);
-      if (!simplifyExisting)
-        solverState->generatedConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_front(constraint);
+      if (!simplifyExisting && solverState->generatedConstraints)
+        solverState->generatedConstraints->insert(constraint);
     }
     return true;
 
@@ -252,8 +255,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     if (!isExternallySolved)
       Constraints.push_back(constraint);
 
-    if (!simplifyExisting && solverState) {
-      solverState->generatedConstraints.push_back(constraint);
+    if (!simplifyExisting && solverState && solverState->generatedConstraints) {
+      solverState->generatedConstraints->insert(constraint);
     }
 
     return false;
@@ -5039,10 +5042,19 @@ void ConstraintSystem::dump(raw_ostream &out) {
   }
 
   out << "\nUnsolved Constraints:\n";
-  for (auto constraint : Constraints) {
+  for (auto &constraint : Constraints) {
     out.indent(2);
-    constraint->print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
+  }
+
+  if (solverState && !solverState->retiredConstraints.empty()) {
+    out << "\nRetired Constraints:\n";
+    for (auto &constraint : solverState->retiredConstraints) {
+      out.indent(2);
+      constraint.print(out, &getTypeChecker().Context.SourceMgr);
+      out << "\n";
+    }
   }
 
   if (resolvedOverloadSets) {

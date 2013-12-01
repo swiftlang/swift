@@ -262,26 +262,26 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // First, collect all of the constraints that relate directly to a
   // type variable.
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  for (auto constraint : Constraints) {
+  for (auto &constraint : Constraints) {
     Type first;
-    if (constraint->getKind() != ConstraintKind::Conjunction &&
-        constraint->getKind() != ConstraintKind::Disjunction)
-      first = simplifyType(constraint->getFirstType());
+    if (constraint.getKind() != ConstraintKind::Conjunction &&
+        constraint.getKind() != ConstraintKind::Disjunction)
+      first = simplifyType(constraint.getFirstType());
 
-    switch (constraint->getClassification()) {
+    switch (constraint.getClassification()) {
     case ConstraintClassification::Relational:
       // Store conformance constraints separately.
-      if (constraint->getKind() == ConstraintKind::ConformsTo ||
-          constraint->getKind() == ConstraintKind::SelfObjectOfProtocol) {
+      if (constraint.getKind() == ConstraintKind::ConformsTo ||
+          constraint.getKind() == ConstraintKind::SelfObjectOfProtocol) {
         if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
           // Record this constraint on the type variable.
-          getTVC(firstTV).ConformsToConstraints.push_back(constraint);
+          getTVC(firstTV).ConformsToConstraints.push_back(&constraint);
         }
         
         continue;
       }
 
-      if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
+      if (constraint.getKind() == ConstraintKind::ApplicableFunction) {
         // Applicable function constraints fully bind the type variables on
         // the left-hand side.
         SmallVector<TypeVariableType *, 4> lhsTypeVars;
@@ -289,7 +289,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
         for (auto typeVar : lhsTypeVars)
           getTVC(typeVar).FullyBound = true;
 
-        simplifyType(constraint->getSecondType())
+        simplifyType(constraint.getSecondType())
           ->getTypeVariables(referencedTypeVars);
         continue;
       }
@@ -311,7 +311,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       first->getTypeVariables(baseTypeVars);
 
       SmallVector<TypeVariableType *, 4> memberTypeVars;
-      simplifyType(constraint->getSecondType())
+      simplifyType(constraint.getSecondType())
         ->getTypeVariables(memberTypeVars);
 
       // If the set of type variables in the base type does not intersect with
@@ -331,10 +331,10 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     case ConstraintClassification::Disjunction:
       // Record this disjunction.
-      disjunctions.push_back(constraint);
+      disjunctions.push_back(&constraint);
 
       // Reference type variables in all of the constraints.
-      for (auto dis : constraint->getNestedConstraints()) {
+      for (auto dis : constraint.getNestedConstraints()) {
         ArrayRef<Constraint *> innerConstraints;
         if (dis->getKind() == ConstraintKind::Conjunction)
           innerConstraints = dis->getNestedConstraints();
@@ -352,12 +352,12 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       continue;
     }
 
-    auto second = simplifyType(constraint->getSecondType());
+    auto second = simplifyType(constraint.getSecondType());
 
     auto firstTV = first->getAs<TypeVariableType>();
     if (firstTV) {
       // Record the constraint.
-      getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
+      getTVC(firstTV).Above.push_back(std::make_pair(&constraint, second));
     } else {
       // Collect any type variables represented in the first type.
       first->getTypeVariables(referencedTypeVars);
@@ -366,7 +366,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     auto secondTV = second->getAs<TypeVariableType>();
     if (secondTV) {
       // Record the constraint.
-      getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
+      getTVC(secondTV).Below.push_back(std::make_pair(&constraint, first));
     } else {
       // Collect any type variables represented in the second type.
       second->getTypeVariables(referencedTypeVars);
@@ -399,18 +399,14 @@ bool ConstraintSystem::simplify() {
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
-    SmallVector<Constraint *, 16> existingConstraints;
-    llvm::SmallPtrSet<Constraint *, 16> visited;
-    existingConstraints.swap(Constraints);
+    ConstraintList existingConstraints;
+    existingConstraints.splice(existingConstraints.end(), Constraints);
     solvedAny = false;
-    for (unsigned i = 0, n = existingConstraints.size(); i != n; ++i) {
-      auto constraint = existingConstraints[i];
+    while (!existingConstraints.empty()) {
+      // Pull the next constraint off the beginning of the list.
+      auto constraint = &existingConstraints.front();
+      existingConstraints.pop_front();
 
-      // FIXME: Temporary hack. We shouldn't ever end up revisiting a
-      // constraint like this.
-      if (!visited.insert(constraint))
-        continue;
-      
       if (addConstraint(constraint, false, true)) {
         solvedAny = true;
         ++solverState->NumSimplifiedConstraints;
@@ -420,9 +416,9 @@ bool ConstraintSystem::simplify() {
 
       if (failedConstraint) {
         if (solverState) {
-          solverState->retiredConstraints.append(
-            existingConstraints.begin() + i,
-            existingConstraints.end());
+          solverState->retiredConstraints.splice(
+            solverState->retiredConstraints.begin(),
+            existingConstraints);
         }
         return true;
       }
@@ -494,9 +490,10 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
-  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
-  numRetiredConstraints = cs.solverState->retiredConstraints.size();
+  firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
+  oldGeneratedConstraints = cs.solverState->generatedConstraints;
+  cs.solverState->generatedConstraints = &generatedConstraints;
 
   ++cs.solverState->NumStatesExplored;
 }
@@ -513,34 +510,21 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                    numSavedBindings);
 
   // Add the retired constraints back into circulation.
-  for (unsigned i = numRetiredConstraints,
-                n = cs.solverState->retiredConstraints.size();
-       i != n; ++i) {
-    assert(std::find(cs.Constraints.begin(), cs.Constraints.end(),
-                     cs.solverState->retiredConstraints[i]) 
-             == cs.Constraints.end());
-  }
-
-  cs.Constraints.append(
-    cs.solverState->retiredConstraints.begin() + numRetiredConstraints,
-    cs.solverState->retiredConstraints.end());
-  truncate(cs.solverState->retiredConstraints, numRetiredConstraints);
+  cs.Constraints.splice(cs.Constraints.end(), 
+                        cs.solverState->retiredConstraints,
+                        cs.solverState->retiredConstraints.begin(),
+                        firstRetired);
 
   // Remove any constraints that were generated here.
-  llvm::SmallPtrSet<Constraint *, 4> generated;
-  generated.insert(
-    cs.solverState->generatedConstraints.begin() + numGeneratedConstraints,
-    cs.solverState->generatedConstraints.end());
-  cs.Constraints.erase(std::remove_if(cs.Constraints.begin(),
-                                      cs.Constraints.end(),
-                                      [&](Constraint *c) {
-                                        return generated.count(c) > 0;
-                                      }),
-                       cs.Constraints.end());
-  truncate(cs.solverState->generatedConstraints, numGeneratedConstraints);
+  cs.Constraints.erase_if([&](Constraint &c) {
+                            return generatedConstraints.count(&c) > 0;
+                          });
 
   // Remove any constraint restrictions.
   truncate(cs.solverState->constraintRestrictions, numConstraintRestrictions);
+
+  // Reset the prior generated-constraints pointer.
+  cs.solverState->generatedConstraints = oldGeneratedConstraints;
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
@@ -865,8 +849,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Build a constraint graph.
   ConstraintGraph cg(*this);
-  for (auto constraint : Constraints)
-    cg.addConstraint(constraint);
+  for (auto &constraint : Constraints)
+    cg.addConstraint(&constraint);
 
   // Compute the connected components of the constraint graph. We only want to
   // look at the smallest one.
@@ -919,27 +903,33 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       constraintComponent[constraint] = components[i];
   }
 
-  // Sort constraints based on the component each falls into.
-  SmallVector<Constraint *, 16> allConstraints = std::move(Constraints);
-  std::stable_sort(allConstraints.begin(), allConstraints.end(),
-                   [&](Constraint *c1, Constraint *c2) {
-                     return constraintComponent[c1] < constraintComponent[c2];
-                   });
+  // Sort the constraints into buckets based on component number.
+  std::unique_ptr<ConstraintList[]> constraintBuckets(
+                                      new ConstraintList[numComponents]);
+  while (!Constraints.empty()) {
+    auto constraint = &Constraints.front();
+    Constraints.pop_front();
+    constraintBuckets[constraintComponent[constraint]].push_back(constraint);
+  }
+
+  // Function object that returns all constraints placed into buckets
+  // back to the list of constraints.
+  auto returnAllConstraints = [&] {
+    assert(Constraints.empty() && "Already have constraints?");
+    for (unsigned component = 0; component != numComponents; ++component) {
+      Constraints.splice(Constraints.end(), constraintBuckets[component]);
+    }
+  };
 
   // Compute the partial solutions produced for each connected component.
   std::unique_ptr<SmallVector<Solution, 4>[]> 
     partialSolutions(new SmallVector<Solution, 4>[numComponents]);
-  unsigned constraintIndex = 0, numConstraints = allConstraints.size();
   for (unsigned component = 0; component != numComponents; ++component) {
+    assert(Constraints.empty() && "Some constraints were not transferred?");
     ++solverState->NumComponentsSplit;
 
     // Collect the constraints for this component.
-    for(; constraintIndex != numConstraints; ++constraintIndex) {
-      if (constraintComponent[allConstraints[constraintIndex]] != component)
-        break;
-
-      Constraints.push_back(allConstraints[constraintIndex]);
-    }
+    Constraints.splice(Constraints.end(), constraintBuckets[component]);
 
     // Collect the type variables that are not part of a different
     // component; this includes type variables that are part of the
@@ -968,6 +958,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       failed = solveSimplified(partialSolutions[component], 
                                allowFreeTypeVariables);
     }
+
+    // Put the constraints back into their original bucket.
+    auto &bucket = constraintBuckets[component];
+    bucket.splice(bucket.end(), Constraints);
     
     if (failed) {
       if (TC.getLangOpts().DebugConstraintSolver) {
@@ -977,7 +971,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       }
       
       TypeVariables = std::move(allTypeVariables);
-      Constraints = std::move(allConstraints);
+      returnAllConstraints();
       return true;
     }
 
@@ -992,11 +986,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Move the type variables back, clear out constraints; we're
     // ready for the next component.
     TypeVariables = std::move(allTypeVariables);
-    Constraints.clear();
   }
 
   // Move the constraints back. The system is back in a normal state.
-  Constraints = std::move(allConstraints);
+  returnAllConstraints();
   
   // Produce all combinations of partial solutions.
   // FIXME: Prune partial solutions that are worse than other partial
@@ -1093,12 +1086,12 @@ bool ConstraintSystem::solveSimplified(
     if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
         hasFreeTypeVariables()) {
       bool anyNonConformanceConstraints = false;
-      for (auto constraint : Constraints) {
-        if (constraint->getKind() == ConstraintKind::ConformsTo ||
-            constraint->getKind() == ConstraintKind::SelfObjectOfProtocol)
+      for (auto &constraint : Constraints) {
+        if (constraint.getKind() == ConstraintKind::ConformsTo ||
+            constraint.getKind() == ConstraintKind::SelfObjectOfProtocol)
           continue;
 
-        if (constraint->getKind() == ConstraintKind::TypeMember)
+        if (constraint.getKind() == ConstraintKind::TypeMember)
           continue;
 
         anyNonConformanceConstraints = true;
@@ -1138,12 +1131,7 @@ bool ConstraintSystem::solveSimplified(
   }
 
   // Remove this disjunction constraint from the list.
-  unsigned disjunctionIdx = std::find(Constraints.begin(), Constraints.end(),
-                                      disjunction)
-                          - Constraints.begin();
-  assert(disjunctionIdx < Constraints.size() && "Couldn't find constraint?");
-  std::swap(Constraints[disjunctionIdx], Constraints.back());
-  Constraints.pop_back();
+  auto afterDisjunction = Constraints.erase(disjunction);
 
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
@@ -1186,7 +1174,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // Record this as a generated constraint.
-    solverState->generatedConstraints.push_back(constraint);
+    solverState->generatedConstraints->insert(constraint);
 
     if (!solve(solutions, allowFreeTypeVariables)) {
       anySolved = true;
@@ -1206,8 +1194,7 @@ bool ConstraintSystem::solveSimplified(
   }
 
   // Put the disjunction constraint back in its place.
-  Constraints.push_back(disjunction);
-  std::swap(Constraints[disjunctionIdx], Constraints.back());
+  Constraints.insert(afterDisjunction, disjunction);
 
   return !anySolved;
 }

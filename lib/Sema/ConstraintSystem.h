@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -870,6 +871,9 @@ public:
   }
 };
 
+/// An intrusive, doubly-linked list of constraints.
+typedef llvm::ilist<Constraint> ConstraintList;
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -916,7 +920,7 @@ private:
   ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
-  SmallVector<Constraint *, 16> Constraints;
+  ConstraintList Constraints;
 
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
     RepresentativeOrFixed;
@@ -940,13 +944,12 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFailures = false;
 
-    /// \brief The set of constraints that were generated along the current
-    /// path.
-    SmallVector<Constraint *, 32> generatedConstraints;
-
-    /// \brief The set of constraints that have been retired along the
+    /// The list of constraints that have been retired along the
     /// current path.
-    SmallVector<Constraint *, 32> retiredConstraints;
+    ConstraintList retiredConstraints;
+
+    /// The current set of generated constraints.
+    llvm::SmallPtrSet<Constraint *, 4> *generatedConstraints = nullptr;
 
     /// \brief The set of constraint restrictions used to reach this state.
     ///
@@ -1000,11 +1003,14 @@ public:
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
 
-    /// \brief The length of \c generatedConstraints.
-    unsigned numGeneratedConstraints;
+    /// The set of constraints generated within this scope.
+    llvm::SmallPtrSet<Constraint *, 4> generatedConstraints;
 
-    /// \brief The length of \c retiredConstraints.
-    unsigned numRetiredConstraints;
+    /// The outer generatedConstraints setting.
+    llvm::SmallPtrSet<Constraint *, 4> *oldGeneratedConstraints;
+
+    /// \brief The last retired constraint in the list.
+    ConstraintList::iterator firstRetired;
 
     /// \brief The length of \c constraintRestrictions.
     unsigned numConstraintRestrictions;
