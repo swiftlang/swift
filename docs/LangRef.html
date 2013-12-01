@@ -1923,13 +1923,8 @@ if vec[3] {
   <p>While they look syntactically very similar, an array type with a size has
   very different semantics than an array without.  In the former case, the type
   indicates a declaration of actual storage space.  In the later case, the type
-  indicates a <em>reference</em> to storage space allocated elsewhere of
-  runtime-specified size.
+  indicates storage space allocated elsewhere of runtime-specified size.
   </p>
-  
-  <p>FIXME: We should separate out "Arrays" from "Slices".  Arrays should always
-  require a size and is by-value, a slice is a by-ref and never have a
-  (statically specified) size.</p>
 
   <p>For an array with a size, the size must be more than zero (no
   indices would be valid).  For now, the array size must be a literal integer.
@@ -2827,7 +2822,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// An operator that operates on metatypes.</i>
     func @infix +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
     
-    var foo = (Dict&lt;String, Int&gt;) +-+ (Slice&lt;Char&gt;)
+    var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;Char&gt;)
     println(foo)
   </pre>
 

@@ -142,7 +142,7 @@ the same mutable state**. [#cow]_
    Second, it's easy to implement a `struct` with reference semantics:
    simply keep the primary value in a `class` and refer to it through
    an instance variable.  So, one cannot assume that a `struct` type
-   has value semantics.  `Slice` could be seen (depending on how you
+   has value semantics.  `Array` could be seen (depending on how you
    view its value) as an example of a reference-semantics `struct`
    from the standard library.
 

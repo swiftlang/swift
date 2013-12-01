@@ -954,7 +954,7 @@ Predefined Substitutions
 
   known-module ::= 'So'                      // Objective-C
   known-module ::= 'Ss'                      // swift
-  known-nominal-type ::= 'Sa'                // swift.Slice
+  known-nominal-type ::= 'Sa'                // swift.Array
   known-nominal-type ::= 'Sb'                // swift.Bool
   known-nominal-type ::= 'Sc'                // swift.Char
   known-nominal-type ::= 'Sd'                // swift.Float64

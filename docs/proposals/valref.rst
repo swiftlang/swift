@@ -333,8 +333,8 @@ Default Initialization of ref
 
 TODO
 
-Vector, Slice, and Array
-========================
+Array
+=====
 
 TODO: Int[..], etc.
 

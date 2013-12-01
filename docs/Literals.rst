@@ -121,17 +121,16 @@ Arrays, Dictionaries, and Interpolation
 ---------------------------------------
 
 Array and dictionary literals don't have a Builtin*Convertible form. Instead,
-they just always use a variadic list of elements (``T...``) in the array case 
+they just always use a variadic list of elements (``T...``) in the array case
 and (key, value) tuples in the dictionary case. A variadic list is always
-exposed using the standard library's Slice type, so there is no separate step
+exposed using the standard library's Array type, so there is no separate step
 to jump through.
 
-The default array literal type is always Slice, and the default dictionary
+The default array literal type is always Array, and the default dictionary
 literal type is always Dictionary.
 
 String interpolations are a bit different: they try to individually convert
-each element of the interpolation to the type that adopts 
-StringInterpolationConvertible, then calls the variadic 
+each element of the interpolation to the type that adopts
+StringInterpolationConvertible, then calls the variadic
 ``convertFromStringInterpolation`` to put them all together. The default type
 for an interpolated literal without context is also ``StringLiteralType``.
-
