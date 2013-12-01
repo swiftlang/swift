@@ -1,3 +1,10 @@
+2013-12-04
+----------
+
+* The "slice" versus "array" subtlety is now dead. Slice<T> has been folded
+  into Array<T> and T[] is just sugar for Array<T>.
+
+
 2013-11-20
 ----------
 * Unreachable code warning has been added:
