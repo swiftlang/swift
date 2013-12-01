@@ -1,3 +1,4 @@
+
 //===--- ConstraintSystem.h - Constraint-based Type Checking ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -64,9 +65,6 @@ class SavedTypeVariableBinding {
 
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-  /// The options.
-  unsigned Options;
 
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
@@ -224,24 +222,12 @@ public:
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
-      if (rep->getImpl().prefersSubtypeBinding()) {
-        auto myRep = getRepresentative(record);
-        if (record)
-          myRep->getImpl().recordBinding(*record);
-        myRep->getImpl().Options|=TVO_PrefersSubtypeBinding;
-      }
       assert(rep->getImpl().canBindToLValue() == canBindToLValue());
     } else {
       auto rep = getRepresentative(record);
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = other;
-      if (rep->getImpl().prefersSubtypeBinding()) {
-        auto otherRep = other->getImpl().getRepresentative(record);
-        if (record)
-          otherRep->getImpl().recordBinding(*record);
-        otherRep->getImpl().Options |= TVO_PrefersSubtypeBinding;
-      }
       assert(rep->getImpl().canBindToLValue()
                == other->getImpl().canBindToLValue());
     }

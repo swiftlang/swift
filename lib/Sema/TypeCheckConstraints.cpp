@@ -56,12 +56,10 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed),
-    Options(typeVar->getImpl().Options){ }
+  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
-  TypeVar->getImpl().Options = Options;
 }
 
 ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
