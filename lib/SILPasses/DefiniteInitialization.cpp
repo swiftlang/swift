@@ -511,12 +511,6 @@ namespace {
 } // end anonymous namespace
 
 
-enum class EscapeKind {
-  Unknown,
-  Yes,
-  No
-};
-
 enum class DIKind {
   No,
   Yes,
@@ -649,10 +643,6 @@ namespace {
   /// already been analyzed.  Since this is a global analysis, we need this to
   /// cache information about different paths through the CFG.
   struct LiveOutBlockState {
-    /// For this block, keep track of whether there is a path from the entry
-    /// of the function to the end of the block that crosses an escape site.
-    EscapeKind EscapeInfo : 2;
-
     /// Keep track of whether there is a Store, InOutUse, or Escape locally in
     /// this block.
     bool HasNonLoadUse : 1;
@@ -670,7 +660,7 @@ namespace {
     } LOState : 2;
 
     LiveOutBlockState(unsigned NumTupleElements)
-      : EscapeInfo(EscapeKind::Unknown), HasNonLoadUse(false),
+      : HasNonLoadUse(false),
         Availability(NumTupleElements), LOState(IsUnknown) {
     }
 
@@ -834,12 +824,6 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
     // to be live-out.  This is the norm for non-tuple memory objects.
     if (BBInfo.getAvailabilitySet().isAllYes())
       BBInfo.LOState = LiveOutBlockState::IsKnown;
-
-    if (Use.Kind == UseKind::Escape) {
-      // Determine which blocks the value can escape from.  We aren't allowed to
-      // promote loads in blocks reachable from an escape point.
-      BBInfo.EscapeInfo = EscapeKind::Yes;
-    }
   }
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
@@ -1447,7 +1431,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // destroy.
     DAI->eraseFromParent();
     RemoveDeadAddressingInstructions(Addr);
-    Releases[CDElt.first] = nullptr;
   }
 }
 
@@ -2104,7 +2087,7 @@ namespace {
     SmallVectorImpl<MemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     
-    llvm::SmallDenseMap<SILBasicBlock*, bool, 32> HasLocalDefinition;
+    llvm::SmallPtrSet<SILBasicBlock*, 32> HasLocalDefinition;
     
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
@@ -2176,7 +2159,7 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
     
     NonLoadUses[Use.Inst] = ui;
     
-    HasLocalDefinition[Use.Inst->getParent()] = true;
+    HasLocalDefinition.insert(Use.Inst->getParent());
     
     if (Use.Kind == UseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
@@ -2188,7 +2171,7 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
   // as a use so we see it in our dataflow walks.
   NonLoadUses[TheMemory] = ~0U;
-  HasLocalDefinition[TheMemory->getParent()] = true;
+  HasLocalDefinition.insert(TheMemory->getParent());
 }
 
 
