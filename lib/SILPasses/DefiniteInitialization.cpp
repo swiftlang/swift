@@ -1402,6 +1402,7 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
 
 void ElementPromotion::handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilder B(TheMemory);
+  SILValue ShiftRightFn, TruncateFn;
   
   // After handling any conditional initializations, check to see if we have any
   // cases where the value is only partially initialized by the time its
@@ -1428,8 +1429,9 @@ void ElementPromotion::handleConditionalDestroys(SILValue ControlVariableAddr) {
     // uninitialized, or partially initialized.  The first two cases are simple
     // to handle, whereas the partial case requires dynamic codegen based on the
     // liveness bitmask.
-    for (unsigned i = 0, e = NumTupleElements; i != e; ++i) {
-      switch (Availability.get(i)) {
+    SILValue LoadedMask;
+    for (unsigned Elt = 0, e = NumTupleElements; Elt != e; ++Elt) {
+      switch (Availability.get(Elt)) {
       case DIKind::No:
         // If an element is known to be uninitialized, then we know we can
         // completely ignore it.
@@ -1443,7 +1445,7 @@ void ElementPromotion::handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If an element is known to be initialized, then we can strictly
         // destroy its value at DAI's position.
         B.setInsertionPoint(DAI);
-        SILValue EltPtr = computeTupleElementAddress(Addr, i, DAI->getLoc(), B);
+        SILValue EltPtr = computeTupleElementAddress(Addr, Elt,DAI->getLoc(),B);
         if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
           Releases.push_back(DA);
         continue;
@@ -1454,20 +1456,43 @@ void ElementPromotion::handleConditionalDestroys(SILValue ControlVariableAddr) {
       // This could be handled in processNonTrivialRelease some day.
       
       // Insert a load of the liveness bitmask and split the CFG into a diamond
-      // right before it.
+      // right before the destroy_addr, if we haven't already loaded it.
       B.setInsertionPoint(DAI);
-      auto *Load = B.createLoad(DAI->getLoc(), ControlVariableAddr);
+      if (!LoadedMask)
+        LoadedMask = B.createLoad(DAI->getLoc(), ControlVariableAddr);
+      SILValue CondVal = LoadedMask;
       
-      // FIXME: Shift and mask the liveness down.
-      assert(NumTupleElements == 1 && "FIXME: Broken");
+      // If this memory object has multiple tuple elements, we need to make sure
+      // to test the right one.
+      if (NumTupleElements != 1) {
+        // Shift the mask down to this element.
+        if (Elt != 0) {
+          if (!ShiftRightFn) {
+            SILBuilder FB(TheMemory->getFunction()->begin()->begin());
+            ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
+                                             DAI->getLoc(), FB);
+          }
+          SILValue Amt = B.createIntegerLiteral(DAI->getLoc(),
+                                                CondVal.getType(), Elt);
+          SILValue Args[] = { CondVal, Amt };
+          CondVal = B.createApply(DAI->getLoc(), ShiftRightFn, Args);
+        }
+        
+        if (!TruncateFn) {
+          SILBuilder FB(TheMemory->getFunction()->begin()->begin());
+          TruncateFn = getTruncateToI1Function(CondVal.getType(),
+                                               DAI->getLoc(), FB);
+        }
+        CondVal = B.createApply(DAI->getLoc(), TruncateFn, CondVal);
+      }
       
       SILBasicBlock *CondDestroyBlock, *ContBlock;
-      InsertCFGDiamond(SILValue(Load, 0), DAI->getLoc(),
+      InsertCFGDiamond(CondVal, DAI->getLoc(),
                        B, CondDestroyBlock, nullptr, ContBlock);
       
       // Set up the conditional destroy block.
       B.setInsertionPoint(CondDestroyBlock->begin());
-      SILValue EltPtr = computeTupleElementAddress(Addr, i, DAI->getLoc(), B);
+      SILValue EltPtr = computeTupleElementAddress(Addr, Elt, DAI->getLoc(), B);
       if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
         Releases.push_back(DA);
     }
