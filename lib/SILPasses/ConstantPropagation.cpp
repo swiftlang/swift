@@ -247,21 +247,21 @@ static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
   APInt ResVal;
   bool Overflowed = false;
   switch (ID) {
-      // We do not cover all the cases below - only the ones that are easily
-      // computable for APInt.
-    default : return nullptr;
-    case BuiltinValueKind::SDiv:
-      ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
-      break;
-    case BuiltinValueKind::SRem:
-      ResVal = NumVal.srem(DenomVal);
-      break;
-    case BuiltinValueKind::UDiv:
-      ResVal = NumVal.udiv(DenomVal);
-      break;
-    case BuiltinValueKind::URem:
-      ResVal = NumVal.urem(DenomVal);
-      break;
+    // We do not cover all the cases below - only the ones that are easily
+    // computable for APInt.
+  default : return nullptr;
+  case BuiltinValueKind::SDiv:
+    ResVal = NumVal.sdiv_ov(DenomVal, Overflowed);
+    break;
+  case BuiltinValueKind::SRem:
+    ResVal = NumVal.srem(DenomVal);
+    break;
+  case BuiltinValueKind::UDiv:
+    ResVal = NumVal.udiv(DenomVal);
+    break;
+  case BuiltinValueKind::URem:
+    ResVal = NumVal.urem(DenomVal);
+    break;
   }
 
   if (Overflowed) {
@@ -360,7 +360,7 @@ static SILInstruction *constantFoldBinary(ApplyInst *AI,
     switch (ID) {
     default: llvm_unreachable("Not all cases are covered!");
     case BuiltinValueKind::FAdd:
-        LHSF.add(RHSF, APFloat::rmNearestTiesToEven);
+      LHSF.add(RHSF, APFloat::rmNearestTiesToEven);
       break;
     case BuiltinValueKind::FDiv:
       LHSF.divide(RHSF, APFloat::rmNearestTiesToEven);
@@ -681,9 +681,8 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
     // Constant fold calls to builtins.
-    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
       return constantFoldBuiltin(AI, FR, ResultsInError);
-    }
     return SILValue();
   }
 

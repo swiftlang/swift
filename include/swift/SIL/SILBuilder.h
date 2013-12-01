@@ -52,6 +52,7 @@ public:
 
   SILFunction &getFunction() const { return F; }
   SILModule &getModule() const { return F.getModule(); }
+  ASTContext &getASTContext() const { return F.getASTContext(); }
 
   //===--------------------------------------------------------------------===//
   // Insertion Point Management
@@ -192,6 +193,15 @@ public:
     return insert(ApplyInst::create(Loc, Fn, SubstFnTy, Result,
                                     Subs, Args, Transparent, F));
   }
+  
+  ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
+                         bool Transparent = false) {
+    auto FnTy = Fn.getType();
+    return createApply(Loc, Fn, FnTy,
+                       FnTy.castTo<SILFunctionType>()->getResult().getSILType(),
+                       ArrayRef<Substitution>(), Args, Transparent);
+  }
+
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
                                        SILType SubstFnTy,
@@ -207,16 +217,19 @@ public:
                                                    SILType ty) {
     return insert(new (F.getModule()) BuiltinFunctionRefInst(loc, Id, ty));
   }
+  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
+                                                   StringRef Str,
+                                                   SILType ty) {
+    return createBuiltinFunctionRef(loc, getASTContext().getIdentifier(Str),ty);
+  }
+
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
-    return insert(new (F.getModule())
-                    FunctionRefInst(loc, f));
+    return insert(new (F.getModule()) FunctionRefInst(loc, f));
   }
   GlobalAddrInst *createGlobalAddr(SILLocation loc, VarDecl *g, SILType ty) {
-    return insert(new (F.getModule())
-                    GlobalAddrInst(loc, g, ty));
+    return insert(new (F.getModule()) GlobalAddrInst(loc, g, ty));
   }
-  SILGlobalAddrInst *createSILGlobalAddr(SILLocation loc,
-                                         SILGlobalVariable *g) {
+  SILGlobalAddrInst *createSILGlobalAddr(SILLocation loc, SILGlobalVariable *g){
     return insert(new (F.getModule()) SILGlobalAddrInst(loc, g));
   }
 
@@ -363,7 +376,7 @@ public:
                                  SILValue operand) {
     return insert(new (F.getModule())
                     IsNonnullInst(loc, operand,
-                      SILType::getBuiltinIntegerType(1, F.getASTContext())));
+                      SILType::getBuiltinIntegerType(1, getASTContext())));
   }
 
   UnconditionalCheckedCastInst *createUnconditionalCheckedCast(SILLocation loc,
