@@ -480,7 +480,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   else if (protocol == getProtocol(SourceLoc(),
                                    KnownProtocolKind::ArrayLiteralConvertible)){
     type = &ArrayLiteralType;
-    name = "Slice";
+    name = "Array";
   }
   // DictionaryLiteralConvertible -> Dictionary
   else if (protocol == getProtocol(

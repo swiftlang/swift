@@ -467,7 +467,7 @@ Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
   if (auto boundStruct
         = dyn_cast<BoundGenericStructType>(result.getPointer())) {
     if (!boundStruct->getParent() &&
-        boundStruct->getDecl()->getName().str() == "Slice" &&
+        boundStruct->getDecl()->getName().str() == "Array" &&
         boundStruct->getGenericArgs().size() == 1) {
       if (auto replacement = getTypeChecker().getArraySliceType(
                                SourceLoc(), boundStruct->getGenericArgs()[0])) {

@@ -903,7 +903,7 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "Optional") {
     Buffer << "Sq";
     return true;
-  } else if (name == "Slice") {
+  } else if (name == "Array") {
     Buffer << "Sa";
     return true;
   } else if (name == "String") {

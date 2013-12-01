@@ -382,7 +382,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     // implementable yet.  We don't want the T argument of the slice to be
     // constrained to being replPrintable.  We need replPrint to be more
     // dynamically reflective in its implementation.
-    if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Slice") {
+    if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Array") {
       PrintCollection(TC, Arg, Type(), BGST->getGenericArgs()[0], Loc, EndLoc,
                       MemberIndexes, BodyContent, PrintDecls, DC);
       return;

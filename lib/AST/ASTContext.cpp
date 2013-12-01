@@ -299,7 +299,7 @@ static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
 
 NominalTypeDecl *ASTContext::getSliceDecl() const {
   if (!Impl.SliceDecl)
-    Impl.SliceDecl = findSyntaxSugarImpl(*this, "Slice");
+    Impl.SliceDecl = findSyntaxSugarImpl(*this, "Array");
 
   return Impl.SliceDecl;
 }

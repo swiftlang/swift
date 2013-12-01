@@ -2148,7 +2148,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    transparent, ctx);
 }
 
-/// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
+/// emitArrayInjectionCall - Form an array "Array" out of an ObjectPointer
 /// (which represents the retain count), a base pointer to some elements, and a
 /// length.
 ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,

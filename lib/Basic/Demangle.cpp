@@ -692,7 +692,7 @@ private:
     if (Mangled.nextIf('a')) {
       NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Slice"));
+                            Node::makeNodePointer(Node::Kind::Structure,"Array"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('b')) {
@@ -1786,7 +1786,7 @@ private:
             if (module->getKind() == Node::Kind::Module &&
                 name->getKind() == Node::Kind::Structure &&
                 module->getText() == "swift" &&
-                name->getText() == "Slice")
+                name->getText() == "Array")
             {
               is_slice = true;
             }
