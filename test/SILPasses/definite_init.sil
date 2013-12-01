@@ -698,3 +698,51 @@ bb2:
   return %14 : $()
 }
 
+// CHECK-LABEL: sil @conditionalInitOrAssign
+sil @conditionalInitOrAssign : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
+  // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack $SomeClass
+  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: store
+  %6 = alloc_stack $SomeClass
+  cond_br %0, bb1, bb2
+
+bb1:
+  // CHECK: = function_ref
+  %2 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  // CHECK-NEXT: [[V1:%[0-9]+]] = apply
+  %12 = apply %2() : $@thin () -> @owned SomeClass
+
+  // This assign becomes a simple store, since it is an initialize. This updates
+  // the control variable to say that it is initialized.
+  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: store {{.*}} to [[CONTROL]]
+  // CHECK: store [[V1]] to [[CLASSVAL]]
+  assign %12 to %6#1 : $*SomeClass                // id: %13
+  br bb2                                          // id: %14
+
+bb2:
+  // CHECK: = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %3 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  // CHECK-NEXT: [[V2:%[0-9]+]] = apply
+  %17 = apply %3() : $@thin () -> @owned SomeClass
+  
+  // This assign is either an initialize or an assign depending on whether %0 is
+  // true or not.  This gets expanded out to a conditional destroy of the value.
+  // CHECK:   load [[CONTROL]]
+  // CHECK:   cond_br
+  // CHECK: bb3:
+  // CHECK:   destroy_addr [[CLASSVAL]]
+  // CHECK:   br bb4
+  // CHECK: bb4:
+  // CHECK: store [[V2]] to [[CLASSVAL]]
+
+  assign %17 to %6#1 : $*SomeClass                // id: %18
+  destroy_addr %6#1 : $*SomeClass                 // id: %19
+  dealloc_stack %6#0 : $*@local_storage SomeClass // id: %20
+  %23 = tuple ()                                  // user: %24
+  return %23 : $()                                // id: %24
+}
+
+

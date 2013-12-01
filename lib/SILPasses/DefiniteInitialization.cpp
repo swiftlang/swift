@@ -1191,7 +1191,7 @@ void ElementPromotion::processNonTrivialRelease(unsigned ReleaseID) {
   ConditionalDestroys.push_back({ ReleaseID, Availability });
 }
 
-/// handleConditionalInitAssignOr - This memory object has some stores
+/// handleConditionalInitAssign - This memory object has some stores
 /// into (some element of) it that is either an init or an assign based on the
 /// control flow path through the function, or have a destroy event that happens
 /// when the memory object may or may not be initialized.  Handle this by
@@ -1274,14 +1274,16 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
     
     B.setInsertionPoint(Use.Inst);
 
-    // If this is the interesting case, we need to generate a CFG diamond where
-    // one side does an initialize and the other side does an assignment.  This
-    // disambiguates the dynamic uncertainty with a runtime check.
+    // If this is the interesting case, we need to generate a CFG diamond for
+    // each element touched, destroying any live elements so that the resulting
+    // store is always an initialize.  This disambiguates the dynamic
+    // uncertainty with a runtime check.
     auto Bitmask = B.createLoad(Loc, AllocAddr);
     
-    // FIXME: Only handles the single-tuple element case here so far.  Other
-    // cases need to generate builtins to shift the mask right and compare
-    // against a constant.
+    // If this
+    //if (Use.NumTupleElements == 1) {}
+    
+    // FIXME: Only handles the single element update case here so far.
     // FIXME: A copyaddr or other interesting init could touch multiple tuple
     // elements and they may be in different state of initialization.  For
     // example, something like this gets hard:
@@ -1292,30 +1294,28 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
     //
     assert(NumTupleElements == 1);
 
-    SILBasicBlock *TrueBB, *FalseBB, *ContBB;
-    InsertCFGDiamond(Bitmask, Loc, B, TrueBB, &FalseBB, ContBB);
+    SILBasicBlock *TrueBB, *ContBB;
+    InsertCFGDiamond(Bitmask, Loc, B, TrueBB, nullptr, ContBB);
 
-    // Clone the use, and insert the copy at the start of the false block.
-    MemoryUse UseCopy = Use;
-    UseCopy.Inst = Use.Inst->clone(FalseBB->begin());
-
-    // Move the use to the true branch and update the use record.  It will
-    // become the assignment.
-    Use.Inst->moveBefore(TrueBB->begin());
-    Use.Kind = UseKind::Assign;
+    // Emit a destroy_addr in the taken block.
+    B.setInsertionPoint(TrueBB->begin());
+    SILValue EltPtr = computeTupleElementAddress(SILValue(TheMemory, 1),
+                                                 0, Loc, B);
+    if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
+      Releases.push_back(DA);
     
-    // Now that the instruction has a concrete "assign" form, update it to
-    // reflect that.  Note that this can invalidate the Uses vector and delete
+    // Finally, now that we know the value is uninitialized on all paths, it is
+    // safe to do an unconditional initialization.
+    Use.Kind = UseKind::Initialization;
+    
+    // Now that the instruction has a concrete "init" form, update it to reflect
+    // that.  Note that this can invalidate the Uses vector and delete
     // the instruction.
     updateInstructionForInitState(Use);
 
-    // Add a new entry to the Uses list for the 'false' instruction.  Since
-    // we're adding the initialization to the end of the uses list, we'll
-    // process it in future iterations of this loop, updating the liveness
-    // bitmask.
-    UseCopy.Kind = UseKind::Initialization;
-    Uses.push_back(UseCopy);
-    updateInstructionForInitState(Uses.back());
+    // Revisit the instruction on the next pass through the loop, so that we
+    // emit a mask update as appropriate.
+    --i;
   }
   
   return AllocAddr;
