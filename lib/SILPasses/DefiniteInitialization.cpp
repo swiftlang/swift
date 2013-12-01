@@ -2072,9 +2072,7 @@ namespace {
   class AllocOptimize {
     SILModule &Module;
     
-    /// TheMemory - This is either an alloc_box instruction or a
-    /// mark_uninitialized instruction.  This represents the start of the
-    /// lifetime of the value being analyzed.
+    /// TheMemory - This is either an alloc_box or alloc_stack instruction.
     SILInstruction *TheMemory;
     
     /// This is the SILType of the memory object.
@@ -2297,8 +2295,8 @@ void AllocOptimize::
 computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
                            SILBasicBlock *BB,
                            llvm::SmallBitVector &RequiredElts,
-                           SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
-                           llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
+                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+   llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
                            llvm::SmallBitVector &ConflictingValues) {
   assert(!RequiredElts.none() && "Scanning with a goal of finding nothing?");
   
