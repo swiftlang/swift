@@ -503,8 +503,8 @@ namespace {
 
     /// getElementBitmask - Return a bitmask with the touched tuple elements
     /// set.
-    APInt getElementBitmask(unsigned NumTupleElements) {
-      return APInt::getBitsSet(NumTupleElements, FirstTupleElement,
+    APInt getElementBitmask(unsigned NumMemoryTupleElements) const {
+      return APInt::getBitsSet(NumMemoryTupleElements, FirstTupleElement,
                                FirstTupleElement+NumTupleElements);
     }
   };
@@ -1191,6 +1191,67 @@ void ElementPromotion::processNonTrivialRelease(unsigned ReleaseID) {
   ConditionalDestroys.push_back({ ReleaseID, Availability });
 }
 
+static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
+                                  SILLocation Loc, SILBuilder &B) {
+  CanType IntTy = IntSILTy.getSwiftRValueType();
+  unsigned NumBits =
+    cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
+  // Name is something like: add_Int64
+  std::string NameStr = Name;
+  NameStr += "_Int" + llvm::utostr(NumBits);
+  
+  // Woo, boilerplate to produce a function type.
+  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false,
+                                          /*autoclosure*/ false,
+                                          /*block*/ false);
+  
+  SILParameterInfo Params[] = {
+    SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
+    SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned)
+  };
+  SILResultInfo Result(IntTy, ResultConvention::Unowned);
+  
+  auto FnType = SILFunctionType::get(nullptr, extInfo,
+                                            ParameterConvention::Direct_Owned,
+                                            Params, Result,
+                                            B.getASTContext());
+  auto Ty = SILType::getPrimitiveObjectType(FnType);
+  return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
+}
+static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
+                                        SILBuilder &B) {
+  CanType IntTy = IntSILTy.getSwiftRValueType();
+  unsigned NumBits =
+    cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
+
+  // Name is something like: trunc_Int64_Int8
+  std::string NameStr = "trunc_Int" + llvm::utostr(NumBits) + "_Int1";
+
+  // Woo, boilerplate to produce a function type.
+  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false,
+                                          /*autoclosure*/ false,
+                                          /*block*/ false);
+  
+  SILParameterInfo Param(IntTy, ParameterConvention::Direct_Unowned);
+  Type Int1Ty = BuiltinIntegerType::get(1, B.getASTContext());
+  SILResultInfo Result(Int1Ty->getCanonicalType(),
+                       ResultConvention::Unowned);
+  
+  auto FnType = SILFunctionType::get(nullptr, extInfo,
+                                     ParameterConvention::Direct_Owned,
+                                     Param, Result,
+                                     B.getASTContext());
+  auto Ty = SILType::getPrimitiveObjectType(FnType);
+
+  
+  return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
+}
+
+
 /// handleConditionalInitAssign - This memory object has some stores
 /// into (some element of) it that is either an init or an assign based on the
 /// control flow path through the function, or have a destroy event that happens
@@ -1222,6 +1283,8 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
   SILValue AllocAddr = SILValue(Alloc, 1);
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, AllocAddr);
+  
+  SILValue OrFn;
 
   // At each initialization, mark the initialized elements live.  At each
   // conditional assign, resolve the ambiguity by inserting a CFG diamond.
@@ -1250,17 +1313,19 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
       // Get the integer constant.
       B.setInsertionPoint(Use.Inst);
       APInt Bitmask = Use.getElementBitmask(NumTupleElements);
-      auto MaskVal = B.createIntegerLiteral(Loc, IVType,Bitmask);
+      SILValue MaskVal = B.createIntegerLiteral(Loc, IVType,Bitmask);
 
       // If the mask is all ones, do a simple store, otherwise do a
       // load/or/store sequence to mask in the bits.
       if (!Bitmask.isAllOnesValue()) {
-        // FIXME: No funcdecl to create a builtinfunctionref!
-        abort();
-        //auto Tmp = B.createLoad(Loc, AllocAddr);
-        //BuiltinValueKind::Or
-        //%4 = builtin_function_ref #Builtin.or_Int64 : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
-        //%6 = apply %4(%5, %3) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
+        SILValue Tmp = B.createLoad(Loc, AllocAddr);
+        if (!OrFn) {
+          SILBuilder FnB(TheMemory->getFunction()->begin()->begin());
+          OrFn = getBinaryFunction("or", Tmp.getType(), Loc, FnB);
+        }
+        
+        SILValue Args[] = { Tmp, MaskVal };
+        MaskVal = B.createApply(Loc, OrFn, Args);
       }
       B.createStore(Loc, MaskVal, AllocAddr);
       continue;
@@ -1278,31 +1343,45 @@ SILValue ElementPromotion::handleConditionalInitAssign() {
     // each element touched, destroying any live elements so that the resulting
     // store is always an initialize.  This disambiguates the dynamic
     // uncertainty with a runtime check.
-    auto Bitmask = B.createLoad(Loc, AllocAddr);
+    SILValue Bitmask = B.createLoad(Loc, AllocAddr);
     
-    // If this
-    //if (Use.NumTupleElements == 1) {}
+    // If we have multiple tuple elements, we'll have to do some shifting and
+    // truncating of the mask value.  These values cache the function_ref so we
+    // don't emit multiple of them.
+    SILValue ShiftRightFn, TruncateFn;
     
-    // FIXME: Only handles the single element update case here so far.
-    // FIXME: A copyaddr or other interesting init could touch multiple tuple
-    // elements and they may be in different state of initialization.  For
-    // example, something like this gets hard:
-    //   var a : (T,T)
-    //    ...
-    //   a.1 = T()
-    //   a = foo()   // init a.0 and assigns to a.1.
-    //
-    assert(NumTupleElements == 1);
+    // If the memory object has multiple tuple elements, we need to destroy any
+    // live subelements, since they can each be in a different state of
+    // initialization.
+    for (unsigned Elt = Use.FirstTupleElement, e = Elt+Use.NumTupleElements;
+         Elt != e; ++Elt) {
+      B.setInsertionPoint(Use.Inst);
+      SILValue CondVal = Bitmask;
+      if (NumTupleElements != 1) {
+        // Shift the mask down to this element.
+        if (Elt != 0) {
+          if (!ShiftRightFn)
+            ShiftRightFn = getBinaryFunction("lshr", Bitmask.getType(), Loc, B);
+          SILValue Amt = B.createIntegerLiteral(Loc, Bitmask.getType(), Elt);
+          SILValue Args[] = { CondVal, Amt };
+          CondVal = B.createApply(Loc, ShiftRightFn, Args);
+        }
+        
+        if (!TruncateFn)
+          TruncateFn = getTruncateToI1Function(Bitmask.getType(), Loc, B);
+        CondVal = B.createApply(Loc, TruncateFn, CondVal);
+      }
+      
+      SILBasicBlock *TrueBB, *ContBB;
+      InsertCFGDiamond(CondVal, Loc, B, TrueBB, nullptr, ContBB);
 
-    SILBasicBlock *TrueBB, *ContBB;
-    InsertCFGDiamond(Bitmask, Loc, B, TrueBB, nullptr, ContBB);
-
-    // Emit a destroy_addr in the taken block.
-    B.setInsertionPoint(TrueBB->begin());
-    SILValue EltPtr = computeTupleElementAddress(SILValue(TheMemory, 1),
-                                                 0, Loc, B);
-    if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
-      Releases.push_back(DA);
+      // Emit a destroy_addr in the taken block.
+      B.setInsertionPoint(TrueBB->begin());
+      SILValue EltPtr = computeTupleElementAddress(SILValue(TheMemory, 1),
+                                                   Elt, Loc, B);
+      if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
+        Releases.push_back(DA);
+    }
     
     // Finally, now that we know the value is uninitialized on all paths, it is
     // safe to do an unconditional initialization.
