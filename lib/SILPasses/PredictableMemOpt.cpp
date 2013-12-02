@@ -24,22 +24,6 @@ STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
 STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 
-// recursivelyDeleteTriviallyDeadInstructions??
-
-/// Remove dead tuple_element_addr and struct_element_addr chains - only.
-static void RemoveDeadAddressingInstructions(SILValue Pointer) {
-  if (!Pointer.use_empty()) return;
-  
-  SILInstruction *I = dyn_cast<SILInstruction>(Pointer);
-  if (I == 0 ||
-      !(isa<TupleElementAddrInst>(Pointer) ||
-        isa<StructElementAddrInst>(Pointer)))
-    return;
-  Pointer = I->getOperand(0);
-  I->eraseFromParent();
-  RemoveDeadAddressingInstructions(Pointer);
-}
-
 //===----------------------------------------------------------------------===//
 // Subelement Analysis Implementation
 //===----------------------------------------------------------------------===//
@@ -665,7 +649,8 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   SILValue(Inst, 0).replaceAllUsesWith(NewVal);
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
-  RemoveDeadAddressingInstructions(Addr);
+  if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
+    recursivelyDeleteTriviallyDeadInstructions(AddrI);
   return true;
 }
 

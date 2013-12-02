@@ -115,21 +115,6 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
 }
 
 
-/// Remove dead tuple_element_addr and struct_element_addr chains - only.
-static void RemoveDeadAddressingInstructions(SILValue Pointer) {
-  if (!Pointer.use_empty()) return;
-
-  SILInstruction *I = dyn_cast<SILInstruction>(Pointer);
-  if (I == 0 ||
-      !(isa<TupleElementAddrInst>(Pointer) ||
-        isa<StructElementAddrInst>(Pointer)))
-    return;
-  Pointer = I->getOperand(0);
-  I->eraseFromParent();
-  RemoveDeadAddressingInstructions(Pointer);
-}
-
-
 //===----------------------------------------------------------------------===//
 // Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
@@ -729,7 +714,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   if (Availability.isAllNo()) {
     SILValue Addr = Release->getOperand(0);
     Release->eraseFromParent();
-    RemoveDeadAddressingInstructions(Addr);
+    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
+      recursivelyDeleteTriviallyDeadInstructions(AddrI);
     Releases[ReleaseID] = nullptr;
     return;
   }
@@ -1052,7 +1038,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // Finally, now that the destroy_addr is handled, remove the original
     // destroy.
     DAI->eraseFromParent();
-    RemoveDeadAddressingInstructions(Addr);
+    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
+      recursivelyDeleteTriviallyDeadInstructions(AddrI);
   }
 }
 
