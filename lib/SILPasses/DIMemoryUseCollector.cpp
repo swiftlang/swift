@@ -530,7 +530,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     SILBuilder AddrBuilder(++SILBasicBlock::iterator(PointerInst));
     getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
                                   ElementAddrs);
-
     
     SmallVector<SILValue, 4> ElementTmps;
     for (auto *User : UsesToScalarize) {
