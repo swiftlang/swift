@@ -80,9 +80,16 @@ public:
   bool operator==(SILSuccessorIterator I2) const { return Cur == I2.Cur; }
   bool operator!=(SILSuccessorIterator I2) const { return Cur != I2.Cur; }
 
-  void operator++() {
+  SILSuccessorIterator &operator++() {
     assert(Cur && "Trying to advance past end");
     Cur = Cur->Next;
+    return *this;
+  }
+
+  SILSuccessorIterator operator++(int) {
+    SILSuccessorIterator copy = *this;
+    ++copy;
+    return copy;
   }
   
   SILBasicBlock *operator*();
