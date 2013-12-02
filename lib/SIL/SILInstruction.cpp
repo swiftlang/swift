@@ -204,13 +204,13 @@ namespace {
     SILInstruction *Result = nullptr;
     TrivialCloner(SILFunction *F) : SILCloner(*F) {}
   public:
-    
+
     static SILInstruction *doIt(SILInstruction *I) {
       TrivialCloner TC(I->getFunction());
       TC.visit(I);
       return TC.Result;
     }
-    
+
     void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
       Result = Cloned;
     }
@@ -226,7 +226,7 @@ namespace {
 /// the new instruction is returned without a parent.
 SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
   SILInstruction *NewInst = TrivialCloner::doIt(this);
-  
+
   if (InsertPt)
     InsertPt->getParent()->getInstList().insert(InsertPt, NewInst);
   return NewInst;
@@ -356,7 +356,7 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
   : SILInstruction(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
     Function(F) {
-      
+
       F->RefCount++;
 }
 
@@ -410,7 +410,7 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
   assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
   (void)intTy;
-  
+
   void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(B,
                                                           Value.getBitWidth());
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
@@ -464,9 +464,9 @@ FloatLiteralInst::create(SILLocation Loc, SILType Ty, const APFloat &Value,
   assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
          "FloatLiteralInst value's APFloat semantics do not match type");
   (void)floatTy;
-  
+
   APInt Bits = Value.bitcastToAPInt();
-  
+
   void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(B,
                                                             Bits.getBitWidth());
   return ::new (buf) FloatLiteralInst(Loc, Ty, Bits);
@@ -505,16 +505,16 @@ StringLiteralInst *
 StringLiteralInst::create(SILLocation Loc, StringRef Text, SILFunction &F) {
   void *buf
     = allocateLiteralInstWithTextSize<StringLiteralInst>(F, Text.size());
-  
+
   const ASTContext &Ctx = F.getModule().getASTContext();
   SILType ResTys[] = {
     SILType::getRawPointerType(Ctx),
     SILType::getBuiltinIntegerType(64, Ctx),
     SILType::getBuiltinIntegerType(1, Ctx)
   };
-  
+
   SILTypeList *Ty = F.getModule().getSILTypeList(ResTys);
-  
+
   return ::new (buf) StringLiteralInst(Loc, Text, Ty);
 }
 
@@ -621,7 +621,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
     if (auto I = dyn_cast<TYPE>(this)) \
       return I->getSuccessors();
   #include "swift/SIL/SILNodes.def"
-  
+
   llvm_unreachable("not a terminator?!");
 }
 
@@ -698,9 +698,9 @@ SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();
   auto *succs = getSuccessorBuf();
-  
+
   unsigned words = getNumWordsForCase();
-  
+
   for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
     assert(CaseBBs[i].first.getBitWidth() == getBitWidthForCase() &&
            "switch_int case value is not same bit width as operand");
@@ -708,7 +708,7 @@ SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
            words * sizeof(llvm::integerPart));
     ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
   }
-  
+
   if (HasDefault)
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
@@ -731,11 +731,11 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   // `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
-  
+
   unsigned bits = Operand.getType().castTo<BuiltinIntegerType>()
     ->getGreatestWidth();
   unsigned words = (bits + llvm::integerPartWidth - 1) / llvm::integerPartWidth;
-  
+
   void *buf = F.getModule().allocate(sizeof(SwitchIntInst)
                                       + sizeof(llvm::integerPart) * numCases
                                                                   * words
@@ -761,7 +761,7 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     cases[i] = CaseBBs[i].first;
     ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
   }
-  
+
   if (HasDefault)
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
@@ -785,7 +785,7 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
-  
+
   void *buf = F.getModule().allocate(sizeof(SWITCH_ENUM_INST)
                                        + sizeof(EnumElementDecl*) * numCases
                                        + sizeof(SILSuccessor) * numSuccessors,
