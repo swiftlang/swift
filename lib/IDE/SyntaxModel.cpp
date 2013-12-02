@@ -131,6 +131,12 @@ SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
   }
 }
 
+CharSourceRange charSourceRangeFromSourceRange(SourceManager &SM,
+                                               const SourceRange &SR) {
+  SourceLoc SRE = Lexer::getLocForEndOfToken(SM, SR.End);
+  return CharSourceRange(SM, SR.Start, SRE);
+}
+
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
@@ -160,8 +166,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
     else {
       // Pass Function / Method structure node.
-      SourceRange SR = AFD->getSourceRange();
-      SourceLoc NL = AFD->getNameLoc();
       SyntaxStructureKind Kind;
       const DeclContext *DC = AFD->getDeclContext();
       if (DC->isTypeContext()) {
@@ -172,21 +176,24 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       }
       else
         Kind = SyntaxStructureKind::FreeFunction;
-
-      pushStructureNode({Kind, AFD->getAttrs(),
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                 AFD->getName().getLength()))});
+      ASTContext &AC = FD->getASTContext();
+      CharSourceRange SR = charSourceRangeFromSourceRange(AC.SourceMgr,
+                                                          AFD->getSourceRange());
+      SourceLoc NRStart = AFD->getNameLoc();
+      SourceLoc NREnd = NRStart.getAdvancedLoc(AFD->getName().getLength());
+      CharSourceRange NR = CharSourceRange(SM, NRStart, NREnd);
+      pushStructureNode({Kind, AFD->getAttrs(), SR, NR});
     }
   }
   else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureKind Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
-    SourceRange SR = NTD->getSourceRange();
-    SourceLoc NL = NTD->getNameLoc();
-    pushStructureNode({Kind, NTD->getAttrs(),
-                       CharSourceRange(SM, SR.Start, SR.End),
-                       CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                 NTD->getName().getLength()))});
+    ASTContext &AC = NTD->getASTContext();
+    CharSourceRange SR = charSourceRangeFromSourceRange(AC.SourceMgr,
+                                                        NTD->getSourceRange());
+    SourceLoc NRStart = NTD->getNameLoc();
+    SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getName().getLength());
+    CharSourceRange NR = CharSourceRange(SM, NRStart, NREnd);
+    pushStructureNode({Kind, NTD->getAttrs(), SR, NR});
   }
   else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
@@ -196,12 +203,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SR = PD->getSourceRange();
       else
         SR = VD->getSourceRange();
-      SourceLoc NL = VD->getNameLoc();
+      ASTContext &AC = VD->getASTContext();
+      CharSourceRange CSR = charSourceRangeFromSourceRange(AC.SourceMgr, SR);
+      SourceLoc NRStart = VD->getNameLoc();
+      SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+      CharSourceRange NR = CharSourceRange(SM, NRStart, NREnd);
       SyntaxStructureKind Kind = SyntaxStructureKind::InstanceVariable;
-      pushStructureNode({Kind, VD->getAttrs(),
-                         CharSourceRange(SM, SR.Start, SR.End),
-                         CharSourceRange(SM, NL, NL.getAdvancedLoc(
-                                                  VD->getName().getLength()))});
+      pushStructureNode({Kind, VD->getAttrs(), CSR, NR});
     }
   }
   return true;
