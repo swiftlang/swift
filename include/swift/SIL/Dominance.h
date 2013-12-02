@@ -27,6 +27,8 @@ extern template class llvm::DomTreeNodeBase<swift::SILBasicBlock>;
 
 namespace swift {
 
+typedef llvm::DomTreeNodeBase<SILBasicBlock> DominanceInfoNode;
+
 /// A class for computing basic dominance information.
 class DominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
 public:
