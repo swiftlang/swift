@@ -2017,7 +2017,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // Note that this initialization *cannot* be lowered to a
   // default constructor--we're already in a constructor!
-  if (!ctor->getDeclContext()->getDeclaredTypeOfContext()->is<EnumType>())
+  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
+  auto TypeDecl = ConstructedType->getAnyNominal();
+  if (!TypeDecl || !isa<EnumDecl>(TypeDecl))
     B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
   
   // Create a basic block to jump to for the implicit 'self' return.
