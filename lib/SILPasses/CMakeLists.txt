@@ -9,6 +9,7 @@ add_swift_library(swiftSILPasses
   Link.cpp
   MandatoryInlining.cpp
   DefiniteInitialization.cpp
+  DIMemoryUseCollector.cpp
   SILCleanup.cpp
   SILCombine.cpp
   SimplifyCFG.cpp

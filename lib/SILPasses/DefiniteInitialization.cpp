@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "swift/Subsystems.h"
+#include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
@@ -119,105 +120,6 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
 
 
 //===----------------------------------------------------------------------===//
-// Tuple Element Flattening/Counting Logic
-//===----------------------------------------------------------------------===//
-
-/// getTupleElementCount - Return the number of elements in the flattened
-/// SILType.  For tuples, this is the (recursive) count of the fields it
-/// contains.
-static unsigned getTupleElementCount(CanType T) {
-  CanTupleType TT = dyn_cast<TupleType>(T);
-
-  // If this isn't a tuple, it is a single element.
-  if (!TT) return 1;
-
-  unsigned NumElements = 0;
-  for (auto EltTy : TT.getElementTypes())
-    NumElements += getTupleElementCount(EltTy);
-  return NumElements;
-}
-
-/// computeTupleElementAddress - Given a tuple element number (in the flattened
-/// sense) return a pointer to a leaf element of the specified number.
-static SILValue computeTupleElementAddress(SILValue Ptr, unsigned TupleEltNo,
-                                           SILLocation Loc, SILBuilder &B) {
-  CanType PointeeType = Ptr.getType().getSwiftRValueType();
-  while (1) {
-    // Have we gotten to our leaf element?
-    CanTupleType TT = dyn_cast<TupleType>(PointeeType);
-    if (TT == 0) {
-      assert(TupleEltNo == 0 && "Element count problem");
-      return Ptr;
-    }
-  
-    // Figure out which field we're walking into.
-    unsigned FieldNo = 0;
-    for (auto EltTy : TT.getElementTypes()) {
-      unsigned NumSubElt = getTupleElementCount(EltTy);
-      if (TupleEltNo < NumSubElt) {
-        Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
-        PointeeType = EltTy;
-        break;
-      }
-
-      TupleEltNo -= NumSubElt;
-      ++FieldNo;
-    }
-  }
-}
-
-
-/// Given a symbolic element number, return the type of the element.
-static CanType getTupleElementType(CanType T, unsigned EltNo) {
-  TupleType *TT = T->getAs<TupleType>();
-
-  // If this isn't a tuple, it is a leaf element.
-  if (!TT) {
-    assert(EltNo == 0);
-    return T;
-  }
-
-  for (auto &Elt : TT->getFields()) {
-    auto FieldType = Elt.getType()->getCanonicalType();
-    unsigned NumFields = getTupleElementCount(FieldType);
-    if (EltNo < NumFields)
-      return getTupleElementType(FieldType, EltNo);
-    EltNo -= NumFields;
-  }
-
-  assert(0 && "invalid element number");
-  abort();
-}
-
-/// Push the symbolic path name to the specified element number onto the
-/// specified std::string.
-static void getPathStringToTupleElement(CanType T, unsigned Element,
-                                        std::string &Result) {
-  CanTupleType TT = dyn_cast<TupleType>(T);
-  if (!TT) return;
-
-  unsigned FieldNo = 0;
-  for (auto &Field : TT->getFields()) {
-    CanType FieldTy(Field.getType());
-    unsigned ElementsForField = getTupleElementCount(FieldTy);
-    
-    if (Element < ElementsForField) {
-      Result += '.';
-      if (Field.hasName())
-        Result += Field.getName().str();
-      else
-        Result += llvm::utostr(FieldNo);
-      return getPathStringToTupleElement(FieldTy, Element, Result);
-    }
-    
-    Element -= ElementsForField;
-    
-    ++FieldNo;
-  }
-  assert(0 && "Element number is out of range for this type!");
-}
-
-//===----------------------------------------------------------------------===//
 // Scalarization Logic
 //===----------------------------------------------------------------------===//
 
@@ -293,229 +195,16 @@ static SILValue scalarizeLoad(LoadInst *LI,
 }
 
 //===----------------------------------------------------------------------===//
-// Access Path Analysis Logic
-//===----------------------------------------------------------------------===//
-
-static unsigned getNumSubElements(SILType T, SILModule &M) {
-  if (auto TT = T.getAs<TupleType>()) {
-    unsigned NumElements = 0;
-    for (auto index : indices(TT.getElementTypes()))
-      NumElements += getNumSubElements(T.getTupleElementType(index), M);
-    return NumElements;
-  }
-
-  if (auto *SD = T.getStructOrBoundGenericStruct()) {
-    unsigned NumElements = 0;
-    for (auto *D : SD->getStoredProperties())
-      NumElements += getNumSubElements(T.getFieldType(D, M), M);
-    return NumElements;
-  }
-
-  // If this isn't a tuple or struct, it is a single element.
-  return 1;
-}
-
-/// getAccessPathRoot - Given an address, dive through any tuple/struct element
-/// addresses to get the underlying value.
-static SILValue getAccessPathRoot(SILValue Pointer) {
-  while (1) {
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer))
-      Pointer = TEAI->getOperand();
-    else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
-      Pointer = SEAI->getOperand();
-    else
-      return Pointer;
-  }
-}
-
-/// Compute the access path indicated by the specified pointer (which is derived
-/// from the root by a series of tuple/struct element addresses) and return
-/// the first subelement addressed by the address.  For example, given:
-///
-///   root = alloc { a: { c: i64, d: i64 }, b: (i64, i64) }
-///   tmp1 = struct_element_addr root, 1
-///   tmp2 = tuple_element_addr tmp1, 0
-///
-/// This will return an access path of [struct: 'b', tuple: 0] and a base
-/// element of 2.
-///
-static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
-  unsigned SubEltNumber = 0;
-  SILModule &M = RootInst->getModule();
-
-  while (1) {
-    // If we got to the root, we're done.
-    if (RootInst == Pointer.getDef())
-      return SubEltNumber;
-
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
-      SILType TT = TEAI->getOperand().getType();
-
-      // Keep track of what subelement is being referenced.
-      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
-        SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
-      }
-      Pointer = TEAI->getOperand();
-    } else {
-      auto *SEAI = cast<StructElementAddrInst>(Pointer);
-      SILType ST = SEAI->getOperand().getType();
-
-      // Keep track of what subelement is being referenced.
-      StructDecl *SD = SEAI->getStructDecl();
-      for (auto *D : SD->getStoredProperties()) {
-        if (D == SEAI->getField()) break;
-        SubEltNumber += getNumSubElements(ST.getFieldType(D, M), M);
-      }
-
-      Pointer = SEAI->getOperand();
-    }
-  }
-}
-
-
-
-/// Given an aggregate value and an access path, extract the value indicated by
-/// the path.
-static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
-                                  SILBuilder &B, SILLocation Loc) {
-  SILType ValTy = Val.getType();
-
-  // Extract tuple elements.
-  if (auto TT = ValTy.getAs<TupleType>()) {
-    for (unsigned EltNo : indices(TT.getElementTypes())) {
-      // Keep track of what subelement is being referenced.
-      SILType EltTy = ValTy.getTupleElementType(EltNo);
-      unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
-      if (SubElementNumber < NumSubElt) {
-        Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
-        return ExtractSubElement(Val, SubElementNumber, B, Loc);
-      }
-
-      SubElementNumber -= NumSubElt;
-    }
-
-    llvm_unreachable("Didn't find field");
-  }
-
-  // Extract struct elements.
-  if (auto *SD = ValTy.getStructOrBoundGenericStruct()) {
-    for (auto *D : SD->getStoredProperties()) {
-      auto fieldType = ValTy.getFieldType(D, B.getModule());
-      unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
-
-      if (SubElementNumber < NumSubElt) {
-        Val = B.emitStructExtract(Loc, Val, D);
-        return ExtractSubElement(Val, SubElementNumber, B, Loc);
-      }
-
-      SubElementNumber -= NumSubElt;
-
-    }
-    llvm_unreachable("Didn't find field");
-  }
-
-  // Otherwise, we're down to a scalar.
-  assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  return Val;
-}
-
-
-
-//===----------------------------------------------------------------------===//
 // Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
 
 namespace {
-  enum UseKind {
-    // The instruction is a Load.
-    Load,
-    
-    // The instruction is either an initialization or an assignment, we don't
-    // know which.  This classification only happens with values of trivial type
-    // where the different isn't significant.
-    InitOrAssign,
-
-    // The instruction is an initialization of the tuple element.
-    Initialization,
-
-    // The instruction is an assignment, overwriting an already initialized
-    // value.
-    Assign,
-
-    // The instruction is a store to a member of a larger struct value.
-    PartialStore,
-    
-    /// An indirecet 'inout' parameter of an Apply instruction.
-    InOutUse,
-
-    /// An indirect 'in' parameter of an Apply instruction.
-    IndirectIn,
-
-    /// This instruction is a general escape of the value, e.g. a call to a
-    /// closure that captures it.
-    Escape
+  enum class DIKind {
+    No,
+    Yes,
+    Partial
   };
-} // end anonymous namespace
-
-
-namespace {
-  /// This struct represents a single classified access to the memory object
-  /// being analyzed, along with classification information about the access.
-  struct MemoryUse {
-    /// This is the instruction accessing the memory.
-    SILInstruction *Inst;
-
-    /// This is what kind of access it is, load, store, escape, etc.
-    UseKind Kind;
-
-    /// For memory objects of (potentially recursive) tuple type, this keeps
-    /// track of which tuple elements are affected.
-    unsigned short FirstTupleElement, NumTupleElements;
-
-    MemoryUse(SILInstruction *Inst, UseKind Kind, unsigned FTE, unsigned NTE)
-      : Inst(Inst), Kind(Kind),FirstTupleElement(FTE), NumTupleElements(NTE) {
-        assert(FTE == FirstTupleElement && NumTupleElements == NTE &&
-               "more than 65K tuple elements not supported yet");
-    }
-
-    MemoryUse() : Inst(nullptr) {}
-
-    bool isInvalid() const { return Inst == nullptr; }
-    bool isValid() const { return Inst != nullptr; }
-
-    bool usesElement(unsigned i) const {
-      return i >= FirstTupleElement && i < FirstTupleElement+NumTupleElements;
-    }
-    
-    /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-    /// have trivial type.
-    bool onlyTouchesTrivialElements(SILType MemoryType) const {
-      CanType MemoryCType = MemoryType.getSwiftRValueType();
-      auto &Module = Inst->getModule();
-      
-      for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
-        auto EltTy = getTupleElementType(MemoryCType, i);
-        if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
-          return false;
-      }
-      return true;
-    }
-
-    /// getElementBitmask - Return a bitmask with the touched tuple elements
-    /// set.
-    APInt getElementBitmask(unsigned NumMemoryTupleElements) const {
-      return APInt::getBitsSet(NumMemoryTupleElements, FirstTupleElement,
-                               FirstTupleElement+NumTupleElements);
-    }
-  };
-} // end anonymous namespace
-
-
-enum class DIKind {
-  No,
-  Yes,
-  Partial
-};
+}
 
 namespace {
   /// AvailabilitySet - This class stores an array of lattice values for tuple
@@ -690,13 +379,13 @@ namespace {
       LOState = LiveOutBlockState::IsKnown;
     }
 
-    void markAvailable(const MemoryUse &Use) {
+    void markAvailable(const DIMemoryUse &Use) {
       // If the memory object has nothing in it (e.g., is an empty tuple)
       // ignore.
       if (Availability.empty()) return;
       
       // Peel the first iteration of the 'set' loop since there is almost always
-      // a single tuple element touched by a MemoryUse.
+      // a single tuple element touched by a DIMemoryUse.
       Availability.set(Use.FirstTupleElement, DIKind::Yes);
                          
       for (unsigned i = 1; i != Use.NumTupleElements; ++i)
@@ -722,11 +411,7 @@ namespace {
     /// The number of tuple elements in this memory object.
     unsigned NumTupleElements;
     
-    /// The number of primitive subelements across all elements of this memory
-    /// value.
-    unsigned NumMemorySubElements;
-
-    SmallVectorImpl<MemoryUse> &Uses;
+    SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     std::vector<std::pair<unsigned, AvailabilitySet>> ConditionalDestroys;
 
@@ -745,7 +430,7 @@ namespace {
     std::vector<SILLocation> EmittedErrorLocs;
   public:
     LifetimeChecker(SILInstruction *TheMemory,
-                    SmallVectorImpl<MemoryUse> &Uses,
+                    SmallVectorImpl<DIMemoryUse> &Uses,
                     SmallVectorImpl<SILInstruction*> &Releases);
 
     void doIt();
@@ -760,10 +445,10 @@ namespace {
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
 
-    DIKind getLivenessAtUse(const MemoryUse &Use);
+    DIKind getLivenessAtUse(const DIMemoryUse &Use);
 
     void handleStoreUse(unsigned UseID);
-    void updateInstructionForInitState(MemoryUse &InstInfo);
+    void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
     void processNonTrivialRelease(unsigned ReleaseID);
@@ -776,14 +461,14 @@ namespace {
     AvailabilitySet getLiveOutN(SILBasicBlock *BB);
     void getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result);
 
-    void diagnoseInitError(const MemoryUse &Use, Diag<StringRef> DiagMessage);
+    void diagnoseInitError(const DIMemoryUse &Use, Diag<StringRef> DiagMessage);
   };
 } // end anonymous namespace
 
 
 LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
-                                 SmallVectorImpl<MemoryUse> &Uses,
-                                   SmallVectorImpl<SILInstruction*> &Releases)
+                                 SmallVectorImpl<DIMemoryUse> &Uses,
+                                 SmallVectorImpl<SILInstruction*> &Releases)
   : Module(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
 
@@ -797,8 +482,7 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
     MemoryType = TheMemory->getType(0).getObjectType();
   }
 
-  NumTupleElements = getTupleElementCount(MemoryType.getSwiftRValueType());
-  NumMemorySubElements = getNumSubElements(MemoryType, Module);
+  NumTupleElements = TF::getElementCount(MemoryType.getSwiftRValueType());
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -807,7 +491,7 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
     assert(Use.Inst && "No instruction identified?");
 
     // Keep track of all the uses that aren't loads.
-    if (Use.Kind == UseKind::Load)
+    if (Use.Kind == DIUseKind::Load)
       continue;
 
     NonLoadUses[Use.Inst] = ui;
@@ -841,8 +525,8 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
   MemBBInfo.LOState = LiveOutBlockState::IsKnown;
 }
 
-void LifetimeChecker::diagnoseInitError(const MemoryUse &Use,
-                                              Diag<StringRef> DiagMessage) {
+void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
+                                        Diag<StringRef> DiagMessage) {
   auto *Inst = Use.Inst;
 
   // Check to see if we've already emitted an error at this location.  If so,
@@ -869,7 +553,7 @@ void LifetimeChecker::diagnoseInitError(const MemoryUse &Use,
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
-  getPathStringToTupleElement(AllocTy, Use.FirstTupleElement, Name);
+  TF::getPathStringToElement(AllocTy, Use.FirstTupleElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
 
@@ -895,18 +579,18 @@ void LifetimeChecker::doIt() {
     if (Inst == nullptr) continue;
     
     switch (Use.Kind) {
-    case UseKind::Initialization:
+    case DIUseKind::Initialization:
       // We assume that SILGen knows what it is doing when it produces
       // initializations of variables, because it only produces them when it knows
       // they are correct, and this is a super common case for "var x = y" cases.
       continue;
         
-    case UseKind::Assign:
+    case DIUseKind::Assign:
       // Instructions classified as assign are only generated when lowering
       // InitOrAssign instructions in regions known to be initialized.  Since
       // they are already known to be definitely init, don't reprocess them.
       continue;
-    case UseKind::InitOrAssign:
+    case DIUseKind::InitOrAssign:
       // FIXME: This is a hack because DI is not understanding SILGen's
       // stack values that have multiple init and destroy lifetime cycles with
       // one allocation.  This happens in foreach silgen (see rdar://15532779)
@@ -917,12 +601,12 @@ void LifetimeChecker::doIt() {
         continue;
         
       SWIFT_FALLTHROUGH;
-    case UseKind::PartialStore:
+    case DIUseKind::PartialStore:
       handleStoreUse(i);
       break;
 
-    case UseKind::IndirectIn:
-    case UseKind::Load:
+    case DIUseKind::IndirectIn:
+    case DIUseKind::Load:
       // If the value is not definitively initialized, emit an error.
       // TODO: In the "No" case, we can emit a fixit adding a default
       // initialization of the type.
@@ -935,14 +619,14 @@ void LifetimeChecker::doIt() {
       }
       break;
       
-    case UseKind::InOutUse:
+    case DIUseKind::InOutUse:
       if (getLivenessAtUse(Use) != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         diagnoseInitError(Use, diag::variable_inout_before_initialized);
       }
       break;
       
-    case UseKind::Escape:
+    case DIUseKind::Escape:
       if (getLivenessAtUse(Use) != DIKind::Yes) {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
@@ -977,12 +661,12 @@ void LifetimeChecker::doIt() {
 }
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
-  MemoryUse &InstInfo = Uses[UseID];
+  DIMemoryUse &InstInfo = Uses[UseID];
   DIKind DI = getLivenessAtUse(InstInfo);
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
-  if (InstInfo.Kind == UseKind::PartialStore && DI != DIKind::Yes) {
+  if (InstInfo.Kind == DIUseKind::PartialStore && DI != DIKind::Yes) {
     diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
     return;
   }
@@ -991,10 +675,10 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // an initialization or assign in the uses list so that clients know about it.
   switch (DI) {
   case DIKind::No:
-    InstInfo.Kind = UseKind::Initialization;
+    InstInfo.Kind = DIUseKind::Initialization;
     break;
   case DIKind::Yes:
-    InstInfo.Kind = UseKind::Assign;
+    InstInfo.Kind = DIUseKind::Assign;
     break;
   case DIKind::Partial:
     // If it is initialized on some paths, but not others, then we have an
@@ -1003,7 +687,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 
     // This is classified as InitOrAssign (not PartialStore), so there are only
     // a few instructions that could reach here.
-    assert(InstInfo.Kind == UseKind::InitOrAssign &&
+    assert(InstInfo.Kind == DIUseKind::InitOrAssign &&
            "should only have inconsistent InitOrAssign's here");
 
     // If this access stores something of non-trivial type, then keep track of
@@ -1024,14 +708,14 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 /// from being InitOrAssign to some concrete state, update it for that state.
 /// This includes rewriting them from assign instructions into their composite
 /// operations.
-void LifetimeChecker::updateInstructionForInitState(MemoryUse &InstInfo) {
+void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   SILInstruction *Inst = InstInfo.Inst;
   
   IsInitialization_t InitKind;
-  if (InstInfo.Kind == UseKind::Initialization)
+  if (InstInfo.Kind == DIUseKind::Initialization)
     InitKind = IsInitialization;
   else {
-    assert(InstInfo.Kind == UseKind::Assign);
+    assert(InstInfo.Kind == DIUseKind::Assign);
     InitKind = IsNotInitialization;
   }
 
@@ -1069,9 +753,11 @@ void LifetimeChecker::updateInstructionForInitState(MemoryUse &InstInfo) {
     for (auto I : InsertedInsts) {
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
-        Uses.push_back(MemoryUse(I, Kind, FirstTupleElement, NumTupleElements));
+        Uses.push_back(DIMemoryUse(I, Kind,
+                                   FirstTupleElement, NumTupleElements));
       } else if (isa<LoadInst>(I)) {
-        Uses.push_back(MemoryUse(I, Load, FirstTupleElement, NumTupleElements));
+        Uses.push_back(DIMemoryUse(I, Load,
+                                   FirstTupleElement, NumTupleElements));
       }
     }
     return;
@@ -1229,11 +915,11 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     default:
       // We can ignore most use kinds here.
       continue;
-    case UseKind::InitOrAssign:
+    case DIUseKind::InitOrAssign:
       // The dynamically unknown case is the interesting one, handle it below.
       break;
 
-    case UseKind::Initialization:
+    case DIUseKind::Initialization:
       // If this is an initialization of only trivial elements, then we don't
       // need to update the bitvector.
       if (Use.onlyTouchesTrivialElements(MemoryType))
@@ -1306,15 +992,15 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
-      SILValue EltPtr = computeTupleElementAddress(SILValue(TheMemory, 1),
-                                                   Elt, Loc, B);
+      SILValue EltPtr = TF::emitElementAddress(SILValue(TheMemory, 1),
+                                               Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
         Releases.push_back(DA);
     }
     
     // Finally, now that we know the value is uninitialized on all paths, it is
     // safe to do an unconditional initialization.
-    Use.Kind = UseKind::Initialization;
+    Use.Kind = DIUseKind::Initialization;
     
     // Now that the instruction has a concrete "init" form, update it to reflect
     // that.  Note that this can invalidate the Uses vector and delete
@@ -1375,7 +1061,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If an element is known to be initialized, then we can strictly
         // destroy its value at DAI's position.
         B.setInsertionPoint(DAI);
-        SILValue EltPtr = computeTupleElementAddress(Addr, Elt,DAI->getLoc(),B);
+        SILValue EltPtr = TF::emitElementAddress(Addr, Elt, DAI->getLoc(), B);
         if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
           Releases.push_back(DA);
         continue;
@@ -1422,7 +1108,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // Set up the conditional destroy block.
       B.setInsertionPoint(CondDestroyBlock->begin());
-      SILValue EltPtr = computeTupleElementAddress(Addr, Elt, DAI->getLoc(), B);
+      SILValue EltPtr = TF::emitElementAddress(Addr, Elt, DAI->getLoc(), B);
       if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
         Releases.push_back(DA);
     }
@@ -1636,7 +1322,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 /// the tuple elements touched by the instruction are definitely initialized at
 /// this point or not.  If the value is initialized on some paths, but not
 /// others, this returns a partial result.
-DIKind LifetimeChecker::getLivenessAtUse(const MemoryUse &Use) {
+DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstTupleElement, Use.NumTupleElements);
@@ -1668,7 +1354,7 @@ DIKind LifetimeChecker::getLivenessAtUse(const MemoryUse &Use) {
 
 namespace {
   class ElementUseCollector {
-    SmallVectorImpl<MemoryUse> &Uses;
+    SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     
     /// This is true if definite initialization has finished processing assign
@@ -1684,7 +1370,7 @@ namespace {
     /// of this.
     bool InEnumSubElement = false;
   public:
-    ElementUseCollector(SmallVectorImpl<MemoryUse> &Uses,
+    ElementUseCollector(SmallVectorImpl<DIMemoryUse> &Uses,
                         SmallVectorImpl<SILInstruction*> &Releases,
                         bool isDefiniteInitFinished)
       : Uses(Uses), Releases(Releases),
@@ -1716,7 +1402,7 @@ namespace {
     void collectUses(SILValue Pointer, unsigned BaseTupleElt);
 
     void addElementUses(unsigned BaseTupleElt, SILType UseTy,
-                        SILInstruction *User, UseKind Kind);
+                        SILInstruction *User, DIUseKind Kind);
     void collectTupleElementUses(TupleElementAddrInst *TEAI,
                                  unsigned BaseTupleElt);
   };
@@ -1729,14 +1415,14 @@ namespace {
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
 void ElementUseCollector::addElementUses(unsigned BaseTupleElt, SILType UseTy,
-                                         SILInstruction *User, UseKind Kind) {
+                                         SILInstruction *User, DIUseKind Kind) {
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumTupleElements = 1;
   if (!InStructSubElement && !InEnumSubElement)
-    NumTupleElements = getTupleElementCount(UseTy.getSwiftRValueType());
+    NumTupleElements = TF::getElementCount(UseTy.getSwiftRValueType());
   
-  Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, NumTupleElements));
+  Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, NumTupleElements));
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new
@@ -1758,7 +1444,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseTupleElt) {
   unsigned NewBaseElt = BaseTupleElt;
   for (unsigned i = 0; i != FieldNo; ++i) {
     CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    NewBaseElt += getTupleElementCount(EltTy);
+    NewBaseElt += TF::getElementCount(EltTy);
   }
   
   collectUses(SILValue(TEAI, 0), NewBaseElt);
@@ -1798,12 +1484,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
-        Uses.push_back(MemoryUse(User, UseKind::Load, BaseTupleElt, 1));
+        Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
       continue;
     }
 
     if (isa<LoadWeakInst>(User)) {
-      Uses.push_back(MemoryUse(User, UseKind::Load, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
       continue;
     }
 
@@ -1817,32 +1503,32 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
-      UseKind Kind;
+      DIUseKind Kind;
       if (InStructSubElement)
-        Kind = UseKind::PartialStore;
+        Kind = DIUseKind::PartialStore;
       else if (isa<AssignInst>(User))
-        Kind = UseKind::InitOrAssign;
+        Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(User->getModule()))
-        Kind = UseKind::InitOrAssign;
+        Kind = DIUseKind::InitOrAssign;
       else
-        Kind = UseKind::Initialization;
+        Kind = DIUseKind::Initialization;
       
-      Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
       continue;
     }
     
     if (auto SWI = dyn_cast<StoreWeakInst>(User))
       if (UI->getOperandNumber() == 1) {
-        UseKind Kind;
+        DIUseKind Kind;
         if (InStructSubElement)
-          Kind = UseKind::PartialStore;
+          Kind = DIUseKind::PartialStore;
         else if (SWI->isInitializationOfDest())
-          Kind = UseKind::Initialization;
+          Kind = DIUseKind::Initialization;
         else if (isDefiniteInitFinished)
-          Kind = UseKind::Assign;
+          Kind = DIUseKind::Assign;
         else
-          Kind = UseKind::InitOrAssign;
-        Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
+          Kind = DIUseKind::InitOrAssign;
+        Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
         continue;
       }
     
@@ -1858,19 +1544,19 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load
       // and store to the same aggregate.
-      UseKind Kind;
+      DIUseKind Kind;
       if (UI->getOperandNumber() == 0)
-        Kind = UseKind::Load;
+        Kind = DIUseKind::Load;
       else if (InStructSubElement)
-        Kind = UseKind::PartialStore;
+        Kind = DIUseKind::PartialStore;
       else if (CAI->isInitializationOfDest())
-        Kind = UseKind::Initialization;
+        Kind = DIUseKind::Initialization;
       else if (isDefiniteInitFinished)
-        Kind = UseKind::Assign;
+        Kind = DIUseKind::Assign;
       else
-        Kind = UseKind::InitOrAssign;
+        Kind = DIUseKind::InitOrAssign;
       
-      Uses.push_back(MemoryUse(CAI, Kind, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(CAI, Kind, BaseTupleElt, 1));
       continue;
     }
     
@@ -1878,7 +1564,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     // and should go away someday.
     if (isa<InitializeVarInst>(User)) {
       auto Kind = InStructSubElement ?
-        UseKind::PartialStore : UseKind::Initialization;
+        DIUseKind::PartialStore : DIUseKind::Initialization;
       addElementUses(BaseTupleElt, PointeeType, User, Kind);
       continue;
     }
@@ -1905,18 +1591,19 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
-        addElementUses(BaseTupleElt, PointeeType, User, UseKind::IndirectIn);
+        addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
       // If this is an out-parameter, it is like a store.
       case ParameterConvention::Indirect_Out:
         assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseTupleElt, PointeeType, User,UseKind::Initialization);
+        addElementUses(BaseTupleElt, PointeeType, User,
+                       DIUseKind::Initialization);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
       case ParameterConvention::Indirect_Inout:
-        addElementUses(BaseTupleElt, PointeeType, User, UseKind::InOutUse);
+        addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::InOutUse);
         continue;
       }
       llvm_unreachable("bad parameter convention");
@@ -1942,7 +1629,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     if (isa<InitExistentialInst>(User)) {
       assert(!InStructSubElement && !InEnumSubElement &&
              "init_existential should not apply to subelements");
-      Uses.push_back(MemoryUse(User, UseKind::Initialization, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
+                                 BaseTupleElt, 1));
 
       // Set the "InEnumSubElement" flag (so we don't consider tuple indexes to
       // index across elements) and recursively process the uses.
@@ -1955,7 +1643,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     if (isa<InjectEnumAddrInst>(User)) {
       assert(!InStructSubElement &&
              "inject_enum_addr the subelement of a struct unless in a ctor");
-      Uses.push_back(MemoryUse(User, UseKind::Initialization, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
+                                 BaseTupleElt, 1));
       continue;
     }
 
@@ -1963,15 +1652,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     // which operand we're looking at.
     if (isa<UpcastExistentialInst>(User)) {
       auto Kind = UI->getOperandNumber() == 1 ?
-        UseKind::Initialization : UseKind::Load;
-      Uses.push_back(MemoryUse(User, Kind, BaseTupleElt, 1));
+        DIUseKind::Initialization : DIUseKind::Load;
+      Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
       continue;
     }
     
     // project_existential is a use of the protocol value, so it is modeled as a
     // load.
     if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)) {
-      Uses.push_back(MemoryUse(User, UseKind::Load, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
       // TODO: Is it safe to ignore all uses of the project_existential?
       continue;
     }
@@ -1983,7 +1672,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     }
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(BaseTupleElt, PointeeType, User, UseKind::Escape);
+    addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::Escape);
   }
 
   // Now that we've walked all of the immediate uses, scalarize any operations
@@ -2062,8 +1751,136 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
   }
 }
 
+
 //===----------------------------------------------------------------------===//
-//                         Dead Allocation Elimination
+// Subelement Analysis Implementation
+//===----------------------------------------------------------------------===//
+
+static unsigned getNumSubElements(SILType T, SILModule &M) {
+  if (auto TT = T.getAs<TupleType>()) {
+    unsigned NumElements = 0;
+    for (auto index : indices(TT.getElementTypes()))
+      NumElements += getNumSubElements(T.getTupleElementType(index), M);
+    return NumElements;
+  }
+  
+  if (auto *SD = T.getStructOrBoundGenericStruct()) {
+    unsigned NumElements = 0;
+    for (auto *D : SD->getStoredProperties())
+      NumElements += getNumSubElements(T.getFieldType(D, M), M);
+    return NumElements;
+  }
+  
+  // If this isn't a tuple or struct, it is a single element.
+  return 1;
+}
+
+/// getAccessPathRoot - Given an address, dive through any tuple/struct element
+/// addresses to get the underlying value.
+static SILValue getAccessPathRoot(SILValue Pointer) {
+  while (1) {
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer))
+      Pointer = TEAI->getOperand();
+    else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
+      Pointer = SEAI->getOperand();
+    else
+      return Pointer;
+  }
+}
+
+/// Compute the element number indicated by the specified pointer (which is
+/// derived from the root by a series of tuple/struct element addresses) and return
+/// the first subelement addressed by the address.  For example, given:
+///
+///   root = alloc { a: { c: i64, d: i64 }, b: (i64, i64) }
+///   tmp1 = struct_element_addr root, 1
+///   tmp2 = tuple_element_addr tmp1, 0
+///
+/// This will return an access path of [struct: 'b', tuple: 0] and a base
+/// element of 2.
+///
+static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
+  unsigned SubEltNumber = 0;
+  SILModule &M = RootInst->getModule();
+  
+  while (1) {
+    // If we got to the root, we're done.
+    if (RootInst == Pointer.getDef())
+      return SubEltNumber;
+    
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+      SILType TT = TEAI->getOperand().getType();
+      
+      // Keep track of what subelement is being referenced.
+      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
+        SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
+      }
+      Pointer = TEAI->getOperand();
+    } else {
+      auto *SEAI = cast<StructElementAddrInst>(Pointer);
+      SILType ST = SEAI->getOperand().getType();
+      
+      // Keep track of what subelement is being referenced.
+      StructDecl *SD = SEAI->getStructDecl();
+      for (auto *D : SD->getStoredProperties()) {
+        if (D == SEAI->getField()) break;
+        SubEltNumber += getNumSubElements(ST.getFieldType(D, M), M);
+      }
+      
+      Pointer = SEAI->getOperand();
+    }
+  }
+}
+
+
+
+/// Given an aggregate value and an access path, extract the value indicated by
+/// the path.
+static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
+                                  SILBuilder &B, SILLocation Loc) {
+  SILType ValTy = Val.getType();
+  
+  // Extract tuple elements.
+  if (auto TT = ValTy.getAs<TupleType>()) {
+    for (unsigned EltNo : indices(TT.getElementTypes())) {
+      // Keep track of what subelement is being referenced.
+      SILType EltTy = ValTy.getTupleElementType(EltNo);
+      unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
+      if (SubElementNumber < NumSubElt) {
+        Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
+        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+      }
+      
+      SubElementNumber -= NumSubElt;
+    }
+    
+    llvm_unreachable("Didn't find field");
+  }
+  
+  // Extract struct elements.
+  if (auto *SD = ValTy.getStructOrBoundGenericStruct()) {
+    for (auto *D : SD->getStoredProperties()) {
+      auto fieldType = ValTy.getFieldType(D, B.getModule());
+      unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
+      
+      if (SubElementNumber < NumSubElt) {
+        Val = B.emitStructExtract(Loc, Val, D);
+        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+      }
+      
+      SubElementNumber -= NumSubElt;
+      
+    }
+    llvm_unreachable("Didn't find field");
+  }
+  
+  // Otherwise, we're down to a scalar.
+  assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
+  return Val;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Allocation Optimization
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -2082,7 +1899,7 @@ namespace {
     /// value.
     unsigned NumMemorySubElements;
     
-    SmallVectorImpl<MemoryUse> &Uses;
+    SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     
     llvm::SmallPtrSet<SILBasicBlock*, 32> HasLocalDefinition;
@@ -2096,7 +1913,7 @@ namespace {
     
   public:
     AllocOptimize(SILInstruction *TheMemory,
-                  SmallVectorImpl<MemoryUse> &Uses,
+                  SmallVectorImpl<DIMemoryUse> &Uses,
                   SmallVectorImpl<SILInstruction*> &Releases);
     
     void doIt();
@@ -2130,7 +1947,7 @@ namespace {
 
 
 AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
-                             SmallVectorImpl<MemoryUse> &Uses,
+                             SmallVectorImpl<DIMemoryUse> &Uses,
                              SmallVectorImpl<SILInstruction*> &Releases)
 : Module(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses),
   Releases(Releases) {
@@ -2152,14 +1969,14 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
     assert(Use.Inst && "No instruction identified?");
     
     // Keep track of all the uses that aren't loads.
-    if (Use.Kind == UseKind::Load)
+    if (Use.Kind == DIUseKind::Load)
       continue;
     
     NonLoadUses[Use.Inst] = ui;
     
     HasLocalDefinition.insert(Use.Inst->getParent());
     
-    if (Use.Kind == UseKind::Escape) {
+    if (Use.Kind == DIUseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
       // promote loads in blocks reachable from an escape point.
       HasAnyEscape = true;
@@ -2655,11 +2472,11 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
   // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
   // times if the source and dest are to elements within a single aggregate, but
   // we only want to pick up the CopyAddrKind from the store.
-  MemoryUse LoadUse, StoreUse;
+  DIMemoryUse LoadUse, StoreUse;
   for (auto &Use : Uses) {
     if (Use.Inst != CAI) continue;
     
-    if (Use.Kind == UseKind::Load) {
+    if (Use.Kind == DIUseKind::Load) {
       assert(LoadUse.isInvalid());
       LoadUse = Use;
     } else {
@@ -2777,18 +2594,18 @@ void AllocOptimize::tryToRemoveDeadAllocation() {
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case UseKind::Assign:
-    case UseKind::PartialStore:
-    case UseKind::InitOrAssign:
+    case DIUseKind::Assign:
+    case DIUseKind::PartialStore:
+    case DIUseKind::InitOrAssign:
       break;    // These don't prevent removal.
-    case UseKind::Initialization:
+    case DIUseKind::Initialization:
       if (!isa<ApplyInst>(U.Inst))
         break;
       // FALL THROUGH.
-    case UseKind::Load:
-    case UseKind::IndirectIn:
-    case UseKind::InOutUse:
-    case UseKind::Escape:
+    case DIUseKind::Load:
+    case DIUseKind::IndirectIn:
+    case DIUseKind::InOutUse:
+    case DIUseKind::Escape:
       DEBUG(llvm::errs() << "*** Failed to remove autogenerated alloc: "
             "kept alive by: " << *U.Inst);
       return;   // These do prevent removal.
@@ -2824,7 +2641,7 @@ void AllocOptimize::doIt() {
   for (unsigned i = 0; i != Uses.size(); ++i) {
     auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
-    if (Use.Inst && Use.Kind == UseKind::Load)
+    if (Use.Inst && Use.Kind == DIUseKind::Load)
       if (promoteLoad(Use.Inst))
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
   }
@@ -2853,7 +2670,7 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
         DEBUG(llvm::errs() << "*** DI Optimize looking at: " << *Inst << "\n");
         
         // Set up the datastructure used to collect the uses of the allocation.
-        SmallVector<MemoryUse, 16> Uses;
+        SmallVector<DIMemoryUse, 16> Uses;
         SmallVector<SILInstruction*, 4> Releases;
         
         // Walk the use list of the pointer, collecting them.
@@ -2885,7 +2702,7 @@ static void processAllocation(SILInstruction *I) {
   DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
 
   // Set up the datastructure used to collect the uses of the allocation.
-  SmallVector<MemoryUse, 16> Uses;
+  SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
@@ -2899,7 +2716,7 @@ static void processMarkUninitialized(MarkUninitializedInst *MUI) {
   
   // Set up the datastructure used to collect the uses of the
   // mark_uninitialized.
-  SmallVector<MemoryUse, 16> Uses;
+  SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
