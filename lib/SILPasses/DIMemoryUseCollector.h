@@ -128,6 +128,23 @@ struct DIMemoryUse {
   }
 };
 
+/// collectDIElementUsesFromAllocation - Analyze all uses of the specified
+/// allocation instruction (alloc_box or alloc_stack), classifying them and
+/// storing the information found into the Uses and Releases lists.
+void collectDIElementUsesFromAllocation(SILInstruction *AllocInst,
+                                        SmallVectorImpl<DIMemoryUse> &Uses,
+                                    SmallVectorImpl<SILInstruction*> &Releases,
+                                        bool isDefiniteInitFinished);
+  
+/// collectDIElementUsesFromMarkUninit - Analyze all uses of the specified
+/// mark_uninitialized instruction, classifying them and storing the information
+/// found into the Uses and Releases lists.
+void collectDIElementUsesFromMarkUninit(MarkUninitializedInst *AllocInst,
+                                        SmallVectorImpl<DIMemoryUse> &Uses,
+                                    SmallVectorImpl<SILInstruction*> &Releases,
+                                        bool isDefiniteInitFinished);
+  
+  
 } // end namespace swift
 
 #endif
