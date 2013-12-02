@@ -272,34 +272,34 @@ inline Argument_match<SubPatternTy> m_Argument(const SubPatternTy &Op) {
 // argument matchers.
 
 template <typename CalleeTy, typename ...Arguments>
-struct m_Apply_Ty;
+struct Apply_match;
 
 template <typename CalleeTy>
-struct m_Apply_Ty<CalleeTy> {
+struct Apply_match<CalleeTy> {
   typedef Callee_match<CalleeTy> Ty;
 };
 
 template <typename CalleeTy, typename T0>
-struct m_Apply_Ty<CalleeTy, T0> {
+struct Apply_match<CalleeTy, T0> {
   typedef match_combine_and<Callee_match<CalleeTy>, Argument_match<T0>> Ty;
 };
 
 template <typename CalleeTy, typename T0, typename ...Arguments>
-struct m_Apply_Ty<CalleeTy, T0, Arguments ...> {
-  typedef match_combine_and<typename m_Apply_Ty<CalleeTy, Arguments ...>::Ty,
+struct Apply_match<CalleeTy, T0, Arguments ...> {
+  typedef match_combine_and<typename Apply_match<CalleeTy, Arguments ...>::Ty,
                             Argument_match<T0> > Ty;
 };
 
 /// Match only an ApplyInst's Callee.
 template <typename CalleeTy>
-inline typename m_Apply_Ty<Callee_match<CalleeTy>>::Ty
+inline typename Apply_match<Callee_match<CalleeTy>>::Ty
 m_ApplyInst(CalleeTy *Callee) {
   return m_Callee(Callee);
 }
 
 /// Match an ApplyInst's Callee and first argument.
 template <typename CalleeTy, typename T0, unsigned Index=0>
-inline typename m_Apply_Ty<Callee_match<CalleeTy>, T0>::Ty
+inline typename Apply_match<Callee_match<CalleeTy>, T0>::Ty
 m_ApplyInst(CalleeTy *Callee, const T0 &Op0) {
   return m_CombineAnd(m_Callee(Callee), m_Argument<Index>(Op0));
 }
@@ -308,7 +308,7 @@ m_ApplyInst(CalleeTy *Callee, const T0 &Op0) {
 /// is sizeof...(Arguments) + 1.
 template <typename CalleeTy, typename T0, unsigned Index=0,
           typename ...Arguments>
-inline typename m_Apply_Ty<Callee_match<CalleeTy>, T0, Arguments ...>::Ty
+inline typename Apply_match<Callee_match<CalleeTy>, T0, Arguments ...>::Ty
 m_ApplyInst(CalleeTy *Callee, const T0 &Op0, const Arguments &...Args) {
   return m_CombineAnd(m_ApplyInst<Index+1>(Callee, Args...),
                       m_Argument<Index>(Op0));
