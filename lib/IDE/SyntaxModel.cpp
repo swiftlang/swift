@@ -295,8 +295,6 @@ bool ModelASTWalker::popStructureNode() {
   SyntaxStructureNode Node = SubStructureStack.back();
   SubStructureStack.pop_back();
 
-  if (!passTokenNodesUntil(Node.Range.getEnd(), ExcludeNodeAtLocation))
-    return false;
   if (!Walker.walkToSubStructurePost(Node))
     return false;
 
