@@ -27,13 +27,14 @@ using namespace swift;
 
 enum class PassKind {
   AllocBoxToStack,
-  DefiniteInit,
+  CapturePromotion,
   CCP,
+  DefiniteInit,
   DCE,
   DataflowDiagnostics,
   InOutDeshadowing,
   MandatoryInlining,
-  CapturePromotion,
+  PredictableMemoryOpt,
   SILCleanup,
   SILCombine,
   SimplifyCFG,
@@ -53,32 +54,35 @@ static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(clEnumValN(PassKind::AllocBoxToStack,
                                    "allocbox-to-stack", "Promote memory"),
-                        clEnumValN(PassKind::DefiniteInit,
-                                   "definite-init","definitive initialization"),
-                        clEnumValN(PassKind::CCP,
-                                   "constant-propagation",
-                                   "Propagate constants"),
-                        clEnumValN(PassKind::DCE,
-                                   "dead-code-elimination", "Remove dead code"),
-                        clEnumValN(PassKind::DataflowDiagnostics,
-                                   "dataflow-diagnostics",
-                                   "Emit SIL diagnostics"),
-                        clEnumValN(PassKind::InOutDeshadowing,
-                                   "inout-deshadow",
-                                   "Remove inout argument shadow variables"),
-                        clEnumValN(PassKind::MandatoryInlining,
-                                   "mandatory-inlining",
-                                   "Inline transparent functions"),
                         clEnumValN(PassKind::CapturePromotion,
                                    "capture-promotion",
                                    "Promote closure capture variables"),
                         clEnumValN(PassKind::SILCleanup,
                                    "cleanup",
                                    "Cleanup SIL in preparation for IRGen"),
+                        clEnumValN(PassKind::CCP,
+                                   "constant-propagation",
+                                   "Propagate constants"),
+                        clEnumValN(PassKind::DataflowDiagnostics,
+                                   "dataflow-diagnostics",
+                                   "Emit SIL diagnostics"),
+                        clEnumValN(PassKind::DCE,
+                                   "dead-code-elimination", "Remove dead code"),
+                        clEnumValN(PassKind::DefiniteInit,
+                                   "definite-init","definitive initialization"),
+                        clEnumValN(PassKind::InOutDeshadowing,
+                                   "inout-deshadow",
+                                   "Remove inout argument shadow variables"),
+                        clEnumValN(PassKind::MandatoryInlining,
+                                   "mandatory-inlining",
+                                   "Inline transparent functions"),
+                        clEnumValN(PassKind::PredictableMemoryOpt,
+                                   "predictable-memopt",
+                                   "Predictable early memory optimization"),
                         clEnumValN(PassKind::SILCombine,
                                    "sil-combine",
                                    "Perform small peepholes/combine operations/"
-                                   "dead code elimination."),
+                                   "dead code elimination"),
                         clEnumValN(PassKind::SimplifyCFG,
                                    "simplify-cfg",
                                    "Clean up the CFG of SIL functions"),
@@ -153,14 +157,17 @@ int main(int argc, char **argv) {
     case PassKind::AllocBoxToStack:
       performSILAllocBoxToStackPromotion(CI.getSILModule());
       break;
-    case PassKind::DefiniteInit:
-      performSILDefiniteInitialization(CI.getSILModule());
+    case PassKind::CapturePromotion:
+      performSILCapturePromotion(CI.getSILModule());
       break;
     case PassKind::CCP:
       performSILConstantPropagation(CI.getSILModule());
       break;
     case PassKind::DCE:
       performSILDeadCodeElimination(CI.getSILModule());
+      break;
+    case PassKind::DefiniteInit:
+      performSILDefiniteInitialization(CI.getSILModule());
       break;
     case PassKind::DataflowDiagnostics:
       emitSILDataflowDiagnostics(CI.getSILModule());
@@ -171,8 +178,8 @@ int main(int argc, char **argv) {
     case PassKind::MandatoryInlining:
       performSILMandatoryInlining(CI.getSILModule());
       break;
-    case PassKind::CapturePromotion:
-      performSILCapturePromotion(CI.getSILModule());
+    case PassKind::PredictableMemoryOpt:
+      performSILPredictableMemoryOptimizations(CI.getSILModule());
       break;
     case PassKind::SILCleanup:
       performSILCleanup(CI.getSILModule());

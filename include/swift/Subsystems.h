@@ -142,9 +142,15 @@ namespace swift {
                                                   unsigned StartElem = 0);
 
   /// performSILDefiniteInitialization - Perform definitive initialization
-  /// analysis and promote alloc_box uses into SSA registers for later SSA-based
-  /// dataflow passes.
+  /// analysis, applying flow sensitive analysis to the SILGen generated code
+  /// to determine whether unadorned assignment operations are actually
+  /// assignment or if they are initializations.
   void performSILDefiniteInitialization(SILModule *M);
+
+  /// performSILPredictableMemoryOptimizations - Perform predictable memory
+  /// optimizations, including promoting operations to SSA form so that later
+  /// analysis can depend on SSA use-def chains.
+  void performSILPredictableMemoryOptimizations(SILModule *M);
 
   /// performSILAllocBoxToStackPromotion - Promote alloc_box into stack
   /// allocations.

@@ -2226,9 +2226,17 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
       ++I;
     }
   }
-
 }
 
+/// performSILPredictableMemoryOptimizations - Perform predictable memory
+/// optimizations, including promoting operations to SSA form so that later
+/// analysis can depend on SSA use-def chains.
+void swift::performSILPredictableMemoryOptimizations(SILModule *M) {
+  for (auto &Fn : *M) {
+    optimizeMemoryAllocations(Fn);
+    Fn.verify();
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Driver
@@ -2329,6 +2337,7 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 }
 
 
+
 /// performSILDefiniteInitialization - Perform definitive initialization
 /// analysis and promote alloc_box uses into SSA registers for later SSA-based
 /// dataflow passes.
@@ -2340,9 +2349,6 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     lowerRawSILOperations(Fn);
-    Fn.verify();
-    
-    optimizeMemoryAllocations(Fn);
     Fn.verify();
   }
 }
