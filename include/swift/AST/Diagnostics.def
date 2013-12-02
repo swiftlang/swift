@@ -1075,11 +1075,6 @@ ERROR(transparent_in_classes_not_supported,sema_tcd,none,
 
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
-ERROR(invalid_objc_decl,sema_tcd,none,
-      "only classes, methods, properties, and subscript declarations "
-      "can be declared 'objc'", ())
-ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
-      "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(invalid_iboutlet,sema_tcd,none,
       "only properties can be declared 'iboutlet'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
@@ -1474,6 +1469,14 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 //------------------------------------------------------------------------------
 // @objc
 //------------------------------------------------------------------------------
+
+ERROR(invalid_objc_decl,sema_tcd,none,
+      "only classes, methods, properties, and subscript declarations "
+      "can be declared 'objc'", ())
+ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
+      "only [class_protocol] protocols can be declared 'objc'", ())
+ERROR(objc_invalid_on_static_var,sema_tcd,none,
+      "static properties can not be declared '@objc'", ())
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property can not be marked @objc because its type can not be "
