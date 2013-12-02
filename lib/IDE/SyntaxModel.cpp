@@ -191,7 +191,11 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
-      SourceRange SR = VD->getSourceRange();
+      SourceRange SR;
+      if (PatternBindingDecl *PD = VD->getParentPattern())
+        SR = PD->getSourceRange();
+      else
+        SR = VD->getSourceRange();
       SourceLoc NL = VD->getNameLoc();
       SyntaxStructureKind Kind = SyntaxStructureKind::InstanceVariable;
       pushStructureNode({Kind, VD->getAttrs(),
