@@ -2012,10 +2012,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitProlog(ctor->getBodyParams(), ctor->getImplicitSelfDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
   
-  // Emit a default initialization of the this value.
+  // Emit a default initialization of the this value if this is a struct.  DI
+  // can handle Enums.
+  
   // Note that this initialization *cannot* be lowered to a
   // default constructor--we're already in a constructor!
-  B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
+  if (!ctor->getDeclContext()->getDeclaredTypeOfContext()->is<EnumType>())
+    B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
   
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.

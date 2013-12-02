@@ -408,9 +408,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
       postEmitFunction(initConstant, initF);
     }
   } else {
-    // Struct constructors do everything in a single function.
-    SILGenFunction(*this, *f)
-      .emitValueConstructor(decl);
+    // Struct and enum constructors do everything in a single function.
+    SILGenFunction(*this, *f).emitValueConstructor(decl);
     postEmitFunction(constant, f);
   }  
 }
