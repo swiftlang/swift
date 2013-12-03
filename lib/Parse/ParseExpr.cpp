@@ -1338,7 +1338,8 @@ Expr *Parser::parseExprAnonClosureArg() {
   if (!closure || closure->getParams()) {
     // FIXME: specialize diagnostic when there were closure parameters.
     // We can be fairly smart here.
-    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
+    diagnose(Loc, closure ? diag::anon_closure_arg_in_closure_with_args
+                          : diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }
 

@@ -678,6 +678,9 @@ ERROR(numeric_literal_numeric_member,expr_parsing,none,
 
 ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
       "anonymous closure argument not contained in a closure", ())
+ERROR(anon_closure_arg_in_closure_with_args,expr_parsing,none,
+      "anonymous closure arguments can not be used inside a closure that has "
+      "explicit arguments", ())
 ERROR(expected_closure_parameter_name,expr_parsing,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_closure_result_type,expr_parsing,none,
