@@ -231,6 +231,7 @@ private:
                                         llvm::DIDescriptor Scope);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
+  StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
   llvm::DIArray createParameterTypes(CanSILFunctionType FnTy,
                                      llvm::DIDescriptor Scope,

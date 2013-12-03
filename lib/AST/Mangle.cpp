@@ -306,7 +306,7 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
     info.Index = index++;
     // When mangling for DWARF we will visit the same generic
     // parameter a second time wile mangling its declcontext.
-    assert(MangleArchetypesWithContext || !Archetypes.count(archetype));
+    assert(DWARFMangling || !Archetypes.count(archetype));
     Archetypes.insert(std::make_pair(archetype, info));
 
     if (!mangle) continue;
@@ -366,7 +366,15 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
   // from the context.
   typedef std::pair<bool, bool> result_t;
   struct ClassifyDecl : swift::DeclVisitor<ClassifyDecl, result_t> {
-    /// TypeDecls don't need their types mangled in.
+    bool DWARFMangling;
+    ClassifyDecl(bool DWARFMangling) : DWARFMangling(DWARFMangling) {};
+
+    /// TypeAliasDecls need to be mangled, but only if we are mangling
+    /// for DWARF.
+    result_t visitTypeAliasDecl(TypeDecl *D) {
+      return { DWARFMangling, false };
+    }
+    /// Other TypeDecls don't need their types mangled in.
     result_t visitTypeDecl(TypeDecl *D) {
       return { false, false };
     }
@@ -403,7 +411,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
     }
   };
 
-  auto result = ClassifyDecl().visit(decl);
+  auto result = ClassifyDecl(DWARFMangling).visit(decl);
   assert(result.first || !result.second);
 
   DeclCtx = decl->getDeclContext();
@@ -423,7 +431,17 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 
   // Mangle the type if requested.
   if (result.first) {
-    mangleType(decl->getType()->getCanonicalType(), explosion, uncurryLevel);
+    Type T = decl->getType();
+    if ((DWARFMangling && decl->getKind() == DeclKind::TypeAlias)
+        && !isa<BuiltinModule>(decl->getDeclContext())) {
+      // For the DWARF output we want to mangle the type alias + context.
+      Buffer << "a";
+      mangleContextOf(decl);
+      mangleIdentifier(decl->getName());
+    } else {
+      // Otherwise, mangle the canonical type.
+      mangleType(T->getCanonicalType(), explosion, uncurryLevel);
+    }
   }
 }
 
@@ -440,6 +458,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
 /// <type> ::= ERR                   # Error type
+/// <type> ::= 'a' <context> <identifier> # Type alias (DWARF only)
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= G <type> <type>+ _    # bound generic type
@@ -754,7 +773,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
 
-    if (MangleArchetypesWithContext) {
+    if (DWARFMangling) {
       // The DWARF output created by swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext.
       Buffer << 'q' << Index(info.Index);

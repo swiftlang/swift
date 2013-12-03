@@ -744,6 +744,7 @@ Types
   type ::= 'Bw'                              // Builtin.Word
   type ::= nominal-type
   type ::= associated-type
+  type ::= 'a' context identifier            // Type alias (DWARF only)
   type ::= 'b' type type                     // objc block function type
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type

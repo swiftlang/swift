@@ -871,8 +871,16 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
 /// Return the mangled name of any nominal type, including the global
 /// _Tt prefix, which marks the Swift namespace for types in DWARF.
+StringRef IRGenDebugInfo::getMangledName(TypeAliasDecl *Decl) {
+  llvm::SmallString<160> Buffer;
+  LinkEntity::forDebuggerTypeMangling(Decl).mangle(Buffer);
+  return BumpAllocatedString(Buffer);
+}
+
+/// Return the mangled name of any nominal type, including the global
+/// _Tt prefix, which marks the Swift namespace for types in DWARF.
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
-  llvm::SmallString<128> Buffer;
+  llvm::SmallString<160> Buffer;
   if (auto Decl = DTI.getDecl()) {
     LinkEntity::forDebuggerTypeMangling(Decl).mangle(Buffer);
   } else {
@@ -881,6 +889,7 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
   }
   return BumpAllocatedString(Buffer);
 }
+
 
 /// Create a member of a struct, class, tuple, or enum.
 llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
@@ -1388,7 +1397,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // We cannot use BaseTy->castTo<>(), because it will use the desugared type!
     auto NameAliasTy = cast<NameAliasType>(BaseTy);
     if (auto Decl = NameAliasTy->getDecl()) {
-      Name = Decl->getName().str();
+      Name = getMangledName(Decl);
       Location L = getLoc(SM, Decl);
       auto AliasedTy = Decl->getUnderlyingType();
       auto File = getOrCreateFile(L.Filename);
