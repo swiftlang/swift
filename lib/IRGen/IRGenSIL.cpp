@@ -1007,18 +1007,13 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
     const LoweredValue &LoweredArg = getLoweredValue(Arg);
     if (LoweredArg.isAddress()) {
-      // LValues are indirect by definition.
-      auto Indirection = DirectValue;
-      if (Arg->getDecl()->getType()->getKind() == TypeKind::LValue)
-        Indirection = IndirectValue;
-
       auto Name = Arg->getDecl()->getName().str();
       auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
       DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                         getTypeInfo(Arg->getType()),
                         getDebugScope());
       IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
-                                                ArgNo, Indirection);
+                                                ArgNo, DirectValue);
     }
   }
 }

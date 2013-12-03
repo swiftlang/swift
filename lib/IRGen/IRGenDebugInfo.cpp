@@ -837,7 +837,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;
     Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
-    //assert(Flags == 0 && "Complex variables cannot have flags");
+    assert(Flags == 0 && "Complex variables cannot have flags");
     Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name,
                                                 Unit, Line, DTy, Addr, ArgNo);
   } else {
