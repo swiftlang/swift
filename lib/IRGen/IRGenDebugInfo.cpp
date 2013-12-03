@@ -1074,8 +1074,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // bits using TargetInfo.
     if (IntegerTy->isFixedWidth()) {
       SizeInBits = IntegerTy->getFixedWidth();
-      std::string buf = "Builtin.Int";
-      llvm::raw_string_ostream s(buf);
+      llvm::SmallString<24> buf("Builtin.Int");
+      llvm::raw_svector_ostream s(buf);
       s << SizeInBits;
       Name = BumpAllocatedString(s.str());
     } else if (IntegerTy->getWidth().isPointerWidth()) {
@@ -1091,8 +1091,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
     SizeInBits = FloatTy->getBitWidth();
-    std::string buf = "Builtin.Float";
-    llvm::raw_string_ostream s(buf);
+    llvm::SmallString<24> buf("Builtin.Float");
+    llvm::raw_svector_ostream s(buf);
     s << SizeInBits;
     Name = BumpAllocatedString(s.str());
     Encoding = llvm::dwarf::DW_ATE_float;
