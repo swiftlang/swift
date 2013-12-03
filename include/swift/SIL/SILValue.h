@@ -21,6 +21,7 @@
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/Hashing.h"
 
 namespace swift {
   class SILTypeList;
@@ -678,6 +679,12 @@ namespace llvm {
     
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
+
+  /// SILValue hashes just like a pointer.
+  static inline hash_code hash_value(const swift::SILValue V) {
+    return hash_value(V.getDef());
+  }
+
 }  // end namespace llvm
 
 #endif

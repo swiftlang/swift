@@ -23,6 +23,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/SIL/SILAllocated.h"
+#include "llvm/ADT/Hashing.h"
 
 namespace swift {
   class ASTContext;
@@ -424,6 +425,11 @@ public:
     return LHS == RHS;
   }
 };
+
+/// The hash of a SILType is the hash of its opaque value.
+static inline hash_code hash_value(const swift::SILType V) {
+  return hash_value(V.getOpaqueValue());
+}
 
 } // end llvm namespace
 
