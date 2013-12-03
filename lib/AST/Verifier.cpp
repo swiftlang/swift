@@ -24,6 +24,40 @@
 using namespace swift;
 
 namespace {
+
+template<typename T>
+struct ASTNodeBase {};
+
+#define EXPR(ID, PARENT) \
+    template<> \
+    struct ASTNodeBase<ID ## Expr *> { \
+      typedef PARENT BaseTy; \
+    };
+#define ABSTRACT_EXPR(ID, PARENT) EXPR(ID, PARENT)
+#include "swift/AST/ExprNodes.def"
+
+#define STMT(ID, PARENT) \
+    template<> \
+    struct ASTNodeBase<ID ## Stmt *> { \
+      typedef PARENT BaseTy; \
+    };
+#include "swift/AST/StmtNodes.def"
+
+#define DECL(ID, PARENT) \
+    template<> \
+    struct ASTNodeBase<ID ## Decl *> { \
+      typedef PARENT BaseTy; \
+    };
+#define ABSTRACT_DECL(ID, PARENT) DECL(ID, PARENT)
+#include "swift/AST/DeclNodes.def"
+
+#define PATTERN(ID, PARENT) \
+    template<> \
+    struct ASTNodeBase<ID ## Pattern *> { \
+      typedef PARENT BaseTy; \
+    };
+#include "swift/AST/PatternNodes.def"
+
   enum ShouldHalt { Continue, Halt };
 
   class Verifier : public ASTWalker {
@@ -255,6 +289,11 @@ namespace {
         abort();
       }
     }
+    template<typename T>
+    void verifyParsedBase(T ASTNode) {
+      verifyParsed(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
+    }
+
     void verifyBound(Expr *E) {}
     void verifyBound(Stmt *S) {}
     void verifyBound(Pattern *P) {}
@@ -267,6 +306,11 @@ namespace {
     void verifyCheckedAlways(Stmt *S) {}
     void verifyCheckedAlways(Pattern *P) {}
     void verifyCheckedAlways(Decl *D) {}
+
+    template<typename T>
+    void verifyCheckedAlwaysBase(T ASTNode) {
+      verifyCheckedAlways(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
+    }
     /// @}
 
     /// @{
@@ -276,6 +320,11 @@ namespace {
     void verifyChecked(Stmt *S) {}
     void verifyChecked(Pattern *P) {}
     void verifyChecked(Decl *D) {}
+
+    template<typename T>
+    void verifyCheckedBase(T ASTNode) {
+      verifyChecked(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
+    }
     /// @}
 
     // Specialized verifiers.
@@ -350,6 +399,7 @@ namespace {
           abort();
         }
       }
+      verifyCheckedAlwaysBase(D);
     }
 
     void verifyChecked(ReturnStmt *S) {
@@ -372,16 +422,20 @@ namespace {
         // Make sure that the function has a Void result type.
         checkSameType(resultType, TupleType::getEmpty(Ctx), "return type");
       }
+
+      verifyCheckedBase(S);
     }
 
     void verifyChecked(IfStmt *S) {
       checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
                     "if condition type");
+      verifyCheckedBase(S);
     }
 
     void verifyChecked(WhileStmt *S) {
       checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
                     "while condition type");
+      verifyCheckedBase(S);
     }
 
     Type checkAssignDest(Expr *Dest) {
@@ -403,11 +457,13 @@ namespace {
         E->dump(Out);
         abort();
       }
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(AssignExpr *S) {
       Type lhsTy = checkAssignDest(S->getDest());
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
+      verifyCheckedBase(S);
     }
 
     void verifyChecked(AddressOfExpr *E) {
@@ -428,6 +484,7 @@ namespace {
         Out << "\n";
         abort();
       }
+      verifyCheckedBase(E);
     }
 
     void verifyParsed(AbstractClosureExpr *E) {
@@ -442,6 +499,7 @@ namespace {
         Out << "\n";
         abort();
       }
+      verifyParsedBase(E);
     }
 
     void verifyChecked(RequalifyExpr *E) {
@@ -471,6 +529,7 @@ namespace {
         Out << "\n";
         abort();
       }
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(MetatypeConversionExpr *E) {
@@ -487,6 +546,7 @@ namespace {
       }
 
       checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(DerivedToBaseExpr *E) {
@@ -508,12 +568,14 @@ namespace {
       }
 
       checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(MaterializeExpr *E) {
       Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
       checkSameType(obj, E->getSubExpr()->getType(),
                     "result and operand of MaterializeExpr");
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(TupleElementExpr *E) {
@@ -539,6 +601,7 @@ namespace {
 
       checkSameType(resultType, tupleType->getElementType(E->getFieldNumber()),
                     "TupleElementExpr and the corresponding tuple element");
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(ApplyExpr *E) {
@@ -603,6 +666,7 @@ namespace {
         E->dump(Out);
         abort();
       }
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(MemberRefExpr *E) {
@@ -627,6 +691,8 @@ namespace {
       }
 
       // FIXME: Check container/member types through substitutions.
+
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(DynamicMemberRefExpr *E) {
@@ -653,6 +719,8 @@ namespace {
         E->dump(Out);
         abort();
       }
+
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(SubscriptExpr *E) {
@@ -673,6 +741,8 @@ namespace {
       }
 
       // FIXME: Check base/member types through substitutions.
+
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(CheckedCastExpr *E) {
@@ -680,6 +750,8 @@ namespace {
         Out << "CheckedCast kind not resolved\n";
         abort();
       }
+
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(TupleShuffleExpr *E) {
@@ -724,6 +796,8 @@ namespace {
           }
         }
       }
+
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(MetatypeExpr *E) {
@@ -737,6 +811,8 @@ namespace {
         checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
                       "base type of .metatype expression");
       }
+
+      verifyCheckedBase(E);
     }
 
     void verifyParsed(NewArrayExpr *E) {
@@ -748,6 +824,7 @@ namespace {
         Out << "First bound of NewArrayExpr is missing\n";
         abort();
       }
+      verifyParsedBase(E);
     }
 
     void verifyChecked(NewArrayExpr *E) {
@@ -760,6 +837,7 @@ namespace {
         Out << "NewArrayExpr is missing an injection function";
         abort();
       }
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(InjectIntoOptionalExpr *expr) {
@@ -773,6 +851,7 @@ namespace {
         Out << "InjectIntoOptionalExpr operand is not of the value type";
         abort();
       }
+      verifyCheckedBase(expr);
     }
 
     void verifyChecked(IfExpr *expr) {
@@ -786,6 +865,7 @@ namespace {
       checkSameType(expr->getThenExpr()->getType(),
                     expr->getElseExpr()->getType(),
                     "then and else branches of an if-expr");
+      verifyCheckedBase(expr);
     }
     
     void verifyChecked(SuperRefExpr *expr) {
@@ -793,12 +873,14 @@ namespace {
         Out << "Type of SuperRefExpr should be an LValueType";
         abort();
       }
+      verifyCheckedBase(expr);
     }
 
     void verifyChecked(ForceValueExpr *E) {
       auto valueTy = E->getType();
       auto optTy = OptionalType::get(valueTy, Ctx);
       checkSameType(optTy, E->getSubExpr()->getType(), "optional type");
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(OpaqueValueExpr *expr) {
@@ -814,6 +896,7 @@ namespace {
         Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();
       }
+      verifyCheckedBase(expr);
     }
 
     void verifyChecked(VarDecl *var) {
@@ -831,7 +914,7 @@ namespace {
         var->getType().print(Out);
         abort();
       }
-      return verifyParsed(cast<ValueDecl>(var));
+      verifyParsedBase(var);
     }
 
     void verifyParsed(EnumElementDecl *UED) {
@@ -840,7 +923,7 @@ namespace {
         abort();
       }
 
-      return verifyParsed(cast<ValueDecl>(UED));
+      verifyParsedBase(UED);
     }
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
@@ -861,7 +944,7 @@ namespace {
         }
       }
 
-      return verifyParsed(cast<ValueDecl>(AFD));
+      verifyParsedBase(AFD);
     }
 
     void verifyParsed(ConstructorDecl *CD) {
@@ -879,7 +962,7 @@ namespace {
         abort();
       }
 
-      return verifyParsed(cast<AbstractFunctionDecl>(CD));
+      verifyParsedBase(CD);
     }
 
     void verifyParsed(ProtocolDecl *PD) {
@@ -887,7 +970,7 @@ namespace {
         Out << "@objc protocols should be class protocols as well";
         abort();
       }
-      return verifyParsed(cast<NominalTypeDecl>(PD));
+      verifyParsedBase(PD);
     }
 
     void verifyChecked(ConstructorDecl *CD) {
@@ -898,7 +981,7 @@ namespace {
                "should be marked invalid";
         abort();
       }
-      return verifyChecked(cast<AbstractFunctionDecl>(CD));
+      verifyCheckedBase(CD);
     }
 
     void verifyParsed(DestructorDecl *DD) {
@@ -925,7 +1008,7 @@ namespace {
         abort();
       }
 
-      return verifyParsed(cast<AbstractFunctionDecl>(DD));
+      verifyParsedBase(DD);
     }
 
     /// Check that the generic requirements line up with the archetypes.
@@ -1133,7 +1216,7 @@ namespace {
         checkGenericRequirements(AFD, AFD, genericTy);
       }
 
-      return verifyChecked(cast<ValueDecl>(AFD));
+      verifyCheckedBase(AFD);
     }
 
     void verifyChecked(DestructorDecl *DD) {
@@ -1142,7 +1225,7 @@ namespace {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
       }
-      return verifyChecked(cast<AbstractFunctionDecl>(DD));
+      verifyCheckedBase(DD);
     }
 
     void verifyChecked(FuncDecl *FD) {
@@ -1218,7 +1301,7 @@ namespace {
         }
       }
 
-      return verifyParsed(cast<AbstractFunctionDecl>(FD));
+      verifyParsedBase(FD);
     }
 
     void verifyChecked(ClassDecl *CD) {
@@ -1234,7 +1317,7 @@ namespace {
         abort();
       }
 
-      return verifyChecked(cast<NominalTypeDecl>(CD));
+      verifyCheckedBase(CD);
     }
 
     void verifyParsed(AssociatedTypeDecl *ATD) {
@@ -1244,7 +1327,7 @@ namespace {
         Out << "AssociatedTypeDecl should only occur inside a protocol";
         abort();
       }
-      return verifyParsed(cast<AbstractTypeParamDecl>(ATD));
+      verifyParsedBase(ATD);
     }
 
     void verifyParsed(TuplePattern *TP) {
@@ -1256,6 +1339,7 @@ namespace {
           abort();
         }
       }
+      verifyParsedBase(TP);
     }
 
     void verifyChecked(TuplePattern *TP) {
@@ -1269,6 +1353,7 @@ namespace {
         Out << "a vararg subpattern of a TuplePattern has wrong type";
         abort();
       }
+      verifyCheckedBase(TP);
     }
 
     /// Look through a possible l-value type, returning true if it was
