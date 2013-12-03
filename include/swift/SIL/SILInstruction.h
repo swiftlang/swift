@@ -1161,7 +1161,7 @@ public:
     if (!V || V->isComputed())
       return nullptr;
 
-    StructDecl *S = getType().getStructOrBoundGenericStruct();
+    StructDecl *S = getStructDecl();
     assert(S && "A struct should always have a StructDecl associated with it");
 
     NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
@@ -1172,6 +1172,12 @@ public:
 
     // Did not find a matching VarDecl, return nullptr.
     return nullptr;
+  }
+
+  StructDecl *getStructDecl() const {
+    auto s = getType().getStructOrBoundGenericStruct();
+    assert(s);
+    return s;
   }
 
   static bool classof(const ValueBase *V) {
@@ -1226,6 +1232,10 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::TupleInst;
+  }
+
+  TupleType *getTupleType() const {
+    return getType().getSwiftRValueType()->castTo<TupleType>();
   }
 };
   
