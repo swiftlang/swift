@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_VALUE_H
-#define SWIFT_SIL_VALUE_H
+#ifndef SWIFT_SIL_SILVALUE_H
+#define SWIFT_SIL_SILVALUE_H
 
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILType.h"

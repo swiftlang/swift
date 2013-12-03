@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILType_H
-#define SWIFT_SIL_SILType_H
+#ifndef SWIFT_SIL_SILTYPE_H
+#define SWIFT_SIL_SILTYPE_H
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
