@@ -145,7 +145,7 @@ public:
   bool mayHaveSideEffects() const;
 
   /// Returns true if the instruction may write to memory.
-  bool mayWrite() const {
+  bool mayWriteToMemory() const {
     const SILInstructionMemoryBehavior B = getMemoryBehavior();
     return B == SILInstructionMemoryBehavior::MayWrite ||
       B == SILInstructionMemoryBehavior::MayReadWrite ||
@@ -153,7 +153,7 @@ public:
   }
 
   /// Returns true if the instruction may read from memory.
-  bool mayRead() const {
+  bool mayReadFromMemory() const {
     const SILInstructionMemoryBehavior B = getMemoryBehavior();
     return B == SILInstructionMemoryBehavior::MayRead ||
       B == SILInstructionMemoryBehavior::MayReadWrite ||
