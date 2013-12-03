@@ -831,6 +831,7 @@ namespace {
         var->getType().print(Out);
         abort();
       }
+      return verifyParsed(cast<ValueDecl>(var));
     }
 
     void verifyParsed(EnumElementDecl *UED) {
