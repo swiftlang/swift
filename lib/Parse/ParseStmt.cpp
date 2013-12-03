@@ -637,7 +637,7 @@ ParserResult<Stmt> Parser::parseStmtFor() {
 ///           (expr-basic (',' expr-basic)*)? ')' stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
-///     expr-basic-or-stmt-assign
+///     expr (',' expr)*
 ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
   SourceLoc LPLoc, RPLoc;
@@ -668,11 +668,40 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {
+    SmallVector<Expr *, 1> FirstExprs;
+
+    // Parse the first expression.
     HaveFirst = true;
     First = parseExpr(diag::expected_init_for_stmt);
     Status |= First;
     if (First.isNull() || First.hasCodeCompletion())
       return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+
+    FirstExprs.push_back(First.get());
+
+    // Parse additional expressions.
+    while (Tok.is(tok::comma)) {
+      consumeToken(tok::comma);
+
+      First = parseExpr(diag::expected_expr);
+      Status |= First;
+
+      if (First.isNull() || First.hasCodeCompletion())
+        return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+
+      if (First.isNonNull())
+        FirstExprs.push_back(First.get());
+    }
+
+    // If we had more than one expression, form a tuple.
+    if (FirstExprs.size() > 1) {
+      First = makeParserResult(new (Context) TupleExpr(
+                                               SourceLoc(),
+                                               Context.AllocateCopy(FirstExprs),
+                                               nullptr, SourceLoc(),
+                                               /*hasTrailingClosure=*/false,
+                                               /*Implicit=*/true));
+    }
   }
 
   ArrayRef<Decl *> FirstDeclsContext;
