@@ -2048,6 +2048,8 @@ private:
           NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
           NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
           toString(path);
+          if (Options.DisplayTypeOfIVarFieldOffset == false)
+            break;
           if (typeNeedsColonForDecl(type))
             Printer << " : ";
           else
@@ -2145,8 +2147,9 @@ private:
             break;
           NodePointer number = pointer->child_at(0);
           NodePointer decl_ctx = pointer->child_at(1);
-          Printer << "archetype " << number->getText() << " of ";
+          Printer << "(archetype " << number->getText() << " of ";
           toString(decl_ctx);
+          Printer << ")";
           break;
         }
         case swift::Demangle::Node::Kind::GenericType: {

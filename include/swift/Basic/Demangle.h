@@ -24,8 +24,9 @@ namespace Demangle {
 struct DemangleOptions
 {
   bool SynthesizeSugarOnTypes = false;
+  bool DisplayTypeOfIVarFieldOffset = true;
 
-  DemangleOptions () : SynthesizeSugarOnTypes(false) {}
+  DemangleOptions () : SynthesizeSugarOnTypes(false), DisplayTypeOfIVarFieldOffset(true) {}
 };
 
 class Node;
