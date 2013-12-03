@@ -114,6 +114,14 @@ public:
       add(UI->getUser());
   }
 
+  /// If only one result of an instruction has been simplified, add all of the
+  /// users of that result to the worklist since additional simplifications of
+  /// its users may have been exposed.
+  void addUsersToWorklist(ValueBase *I, unsigned Index) {
+    for (auto UI : SILValue(I, Index).getUses())
+      add(UI->getUser());
+  }
+
   /// Check that the worklist is empty and nuke the backing store for the map if
   /// it is large.
   void zap() {
@@ -191,6 +199,26 @@ public:
 
     for (unsigned i = 0, e = I.getNumTypes(); i != e; ++i)
       SILValue(&I, i).replaceAllUsesWith(SILValue(V, i));
+
+    return &I;
+  }
+
+  /// This is meant to be used when one is attempting to replace only one of the
+  /// results of I with a result of V.
+  SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V,
+                                      unsigned IIndex, unsigned VIndex=0) {
+    assert(IIndex < I.getNumTypes() && "Can not have more results than "
+           "types.");
+    assert(VIndex < V->getNumTypes() && "Can not have more results than "
+           "types.");
+
+    // Add all modified instrs to worklist.
+    Worklist.addUsersToWorklist(&I, IIndex);
+
+    DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
+          "    with " << *V << '\n');
+
+    SILValue(&I, IIndex).replaceAllUsesWith(SILValue(V, VIndex));
 
     return &I;
   }
