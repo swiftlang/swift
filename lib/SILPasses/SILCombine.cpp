@@ -349,9 +349,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       continue;
     }
 
-    // Now that we have an instruction, try simplifying it.
-    Builder->setInsertionPoint(I->getParent(), I);
-
     // Check to see if we can instsimplify the instruction.
     if (SILValue Result = simplifyInstruction(I)) {
       ++NumSimplified;
@@ -370,6 +367,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       continue;
     }
 
+    // If we have reached this point, all attempts to do simple simplifications
+    // have failed. Prepare to SILCombine.
+    Builder->setInsertionPoint(I->getParent(), I);
 
 #ifndef NDEBUG
     std::string OrigI;
