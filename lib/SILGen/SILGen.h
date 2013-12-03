@@ -109,9 +109,12 @@ public:
   void mangleConstant(SILDeclRef constant,
                       SILFunction *f);
 
-  /// Generate the mangled symbol name for a reabstraction thunk.
-  /// TODO: pass meaningful information here.
-  void mangleThunk(SILFunction *f);
+  /// Get or create the declaration of a reabstraction thunk with the
+  /// given signature.
+  SILFunction *getOrCreateReabstractionThunk(SILLocation loc,
+                                             CanSILFunctionType thunkType,
+                                             CanSILFunctionType fromType,
+                                             CanSILFunctionType toType);
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms

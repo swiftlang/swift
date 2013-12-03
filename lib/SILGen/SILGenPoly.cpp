@@ -846,13 +846,12 @@ static ManagedValue createThunk(SILGenFunction &gen,
   CanSILFunctionType substFnType;
   auto thunkType = buildThunkType(gen, fn, expectedType,
                                   substFnType, substitutions);
-  auto thunk = new (gen.SGM.M) SILFunction(gen.SGM.M, SILLinkage::Internal,
-                                           "", thunkType, loc,
-                                           IsTransparent);
-  gen.SGM.mangleThunk(thunk);
+  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc, thunkType,
+                                       fn.getType().castTo<SILFunctionType>(),
+                                                     expectedType);
 
-  // Build it.
-  {
+  // Build it if necessary.
+  if (thunk->empty()) {
     SILGenFunction thunkSGF(gen.SGM, *thunk);
     buildThunkBody(thunkSGF, loc, kind, origFormalType, substFormalType);
   }

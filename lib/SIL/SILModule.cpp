@@ -50,6 +50,22 @@ SILModule::~SILModule() {
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
+SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
+                                                  StringRef name,
+                                                  CanSILFunctionType type,
+                                                IsTransparent_t isTransparent) {
+  // TODO: use a 'shared' linkage.
+  auto linkage = SILLinkage::Internal;
+
+  if (auto fn = lookup(name)) {
+    assert(fn->getLoweredFunctionType() == type);
+    return fn;
+  }
+
+  return new (*this) SILFunction(*this, linkage, name, type,
+                                 loc, isTransparent);
+}
+
 ArrayRef<SILType> ValueBase::getTypes() const {
   // No results.
   if (TypeOrTypeList.isNull())

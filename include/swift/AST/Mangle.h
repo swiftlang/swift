@@ -84,6 +84,8 @@ public:
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(ProtocolDecl *protocol);
   void mangleProtocolConformance(ProtocolConformance *conformance);
+  void bindGenericParameters(const GenericParamList *genericParams,
+                             bool mangleParameters);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,
@@ -93,8 +95,6 @@ private:
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
   void mangleGetterOrSetterContext(FuncDecl *fn);
-  void bindGenericParameters(const GenericParamList *genericParams,
-                             bool mangleParameters);
   void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
                              ExplosionKind explosion, unsigned uncurryLevel,
                              bool mangleAsFunction);

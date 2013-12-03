@@ -39,9 +39,30 @@ static char mangleConstructorKind(SILDeclRef::Kind kind) {
   }
 }
 
-void SILGenModule::mangleThunk(SILFunction *f) {
-  llvm::raw_string_ostream buffer(f->getMutableName());
-  buffer << "thunk" << anonymousSymbolCounter++;
+SILFunction *
+SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
+                                            CanSILFunctionType thunkType,
+                                            CanSILFunctionType fromType,
+                                            CanSILFunctionType toType) {
+  // Mangle the reabstraction thunk.
+  llvm::SmallString<256> buffer;
+  {
+    llvm::raw_svector_ostream stream(buffer);
+    Mangler mangler(stream);
+
+    // This is actually the SIL helper function.  For now, IR-gen
+    // makes the actual thunk.
+    stream << "_TTR";
+    if (auto generics = thunkType->getGenericParams()) {
+      stream << 'G';
+      mangler.bindGenericParameters(generics, /*mangle*/ true);
+    }
+    mangler.mangleType(fromType, ExplosionKind::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(toType, ExplosionKind::Minimal, /*uncurry*/ 0);
+  }
+
+  return M.getOrCreateSharedFunction(loc, buffer.str(), thunkType,
+                                     IsTransparent);
 }
 
 /// Mangle this entity into the given stream.

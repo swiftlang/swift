@@ -232,6 +232,13 @@ public:
         return &F;
     return nullptr;
   }
+
+  /// \brief Return the declaration of a utility function that can,
+  /// but needn't, be shared between modules.
+  SILFunction *getOrCreateSharedFunction(SILLocation loc,
+                                         StringRef name,
+                                         CanSILFunctionType type,
+                                         IsTransparent_t isTransparent);
   
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }

@@ -628,7 +628,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
   case TypeKind::SILFunction: {
     // <type> ::= 'XF' <impl-function-type>
     // <impl-function-type> ::= <impl-callee-convention>
-    //                          <impl-function-attribute>* '_'
+    //                          <impl-function-attribute>* <generics>? '_'
     //                          <impl-parameter>* '_' <impl-result>* '_'
     // <impl-callee-convention> ::= 't'               // thin
     // <impl-callee-convention> ::= <impl-convention> // thick
@@ -643,6 +643,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     // <impl-function-attribute> ::= 'Cm'             // Swift method
     // <impl-function-attribute> ::= 'CO'             // ObjC method
     // <impl-function-attribute> ::= 'N'              // noreturn
+    // <impl-function-attribute> ::= 'G'              // generic
     // <impl-parameter> ::= <impl-convention> <type>
     // <impl-result> ::= <impl-convention> <type>
     auto fn = cast<SILFunctionType>(type);
@@ -689,6 +690,10 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       }
     }
     if (fn->isNoReturn()) Buffer << 'N';
+    if (fn->isPolymorphic()) {
+      Buffer << 'G';
+      bindGenericParameters(fn->getGenericParams(), /*mangle*/ true);
+    }
     Buffer << '_';
 
     auto mangleParameter = [&](SILParameterInfo param) {

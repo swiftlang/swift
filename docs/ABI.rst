@@ -669,6 +669,8 @@ Globals
   global ::= local-marker? entity        // some identifiable thing
   global ::= 'To' global                 // swift-as-ObjC thunk
   global ::= 'Tb' type                   // swift-to-ObjC block converter
+  global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
+  global ::= 'Tr' reabstract-signature   // reabstraction thunk
   entity ::= context 'D'                 // deallocating destructor
   entity ::= context 'd'                 // non-deallocating destructor
   entity ::= context 'C' type            // allocating constructor
@@ -679,6 +681,7 @@ Globals
   entity ::= declaration                 // other declaration
   declaration ::= declaration-name type
   declaration-name ::= context identifier
+  reabstract-signature ::= ('G' generics)? type type
   local-marker ::= 'L'
 
 Entity manglings all start with a nominal-type-kind (``[COPV]``), an
@@ -688,6 +691,9 @@ with any of those or ``[MTWw]``.
 If a partial application forwarder is for a static symbol, its name will
 start with the sequence ``_TPA_`` followed by the mangled symbol name of the
 forwarder's destination.
+
+The types in a ``<reabstract-signature>`` are always non-polymorphic
+``<impl-function-type>`` types.
 
 Direct and Indirect Symbols
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -785,7 +791,7 @@ trailing underscore. A protocol type can have zero, one, or many protocol bounds
 which are juxtaposed and terminated with a trailing underscore.
 
 ::
-  impl-function-type ::= impl-callee-convention impl-function-attribute* '_' impl-parameter* '_' impl-result* '_'
+  impl-function-type ::= impl-callee-convention impl-function-attribute* generics? '_' impl-parameter* '_' impl-result* '_'
   impl-callee-convention ::= 't'              // thin
   impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
   impl-convention ::= 'a'                     // direct, autoreleased
@@ -799,6 +805,7 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-function-attribute ::= 'Cm'            // compatible with Swift method
   impl-function-attribute ::= 'CO'            // compatible with ObjC method
   impl-function-attribute ::= 'N'             // noreturn
+  impl-function-attribute ::= 'G'             // generic
   impl-parameter ::= impl-convention type
   impl-result ::= impl-convention type
 
