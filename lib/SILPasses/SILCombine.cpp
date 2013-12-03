@@ -185,7 +185,13 @@ public:
     DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
           "    with " << *V << '\n');
 
-    SILValue(&I, 0).replaceAllUsesWith(V);
+    assert(I.getNumTypes() == V->getNumTypes() &&
+           "An instruction and the value base that it is being replaced by "
+           "must have the same number of types.");
+
+    for (unsigned i = 0, e = I.getNumTypes(); i != e; ++i)
+      SILValue(&I, i).replaceAllUsesWith(SILValue(V, i));
+
     return &I;
   }
 
