@@ -635,6 +635,10 @@ public:
   const Operand &operator[](unsigned i) const { return asArray()[i]; }
 };
 
+/// SILValue hashes just like a pointer.
+static inline llvm::hash_code hash_value(SILValue V) {
+  return llvm::hash_value(V.getDef());
+}
 
 } // end namespace swift
 
@@ -679,11 +683,6 @@ namespace llvm {
     
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
-
-  /// SILValue hashes just like a pointer.
-  static inline hash_code hash_value(const swift::SILValue V) {
-    return hash_value(V.getDef());
-  }
 
 }  // end namespace llvm
 

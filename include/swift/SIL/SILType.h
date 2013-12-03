@@ -384,6 +384,11 @@ inline SILType SILFunctionType::getSemanticResultSILType() const {
   return (hasIndirectResult() ? getIndirectResult().getSILType()
                               : getResult().getSILType());
 }  
+
+/// The hash of a SILType is the hash of its opaque value.
+static inline llvm::hash_code hash_value(SILType V) {
+  return llvm::hash_value(V.getOpaqueValue());
+}
   
 } // end swift namespace
 
@@ -425,11 +430,6 @@ public:
     return LHS == RHS;
   }
 };
-
-/// The hash of a SILType is the hash of its opaque value.
-static inline hash_code hash_value(const swift::SILType V) {
-  return hash_value(V.getOpaqueValue());
-}
 
 } // end llvm namespace
 
