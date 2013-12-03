@@ -430,8 +430,19 @@ Type ValueDecl::getInterfaceType() const {
   if (!hasType())
     return Type();
 
-  InterfaceTy = getType();
+  // If the type involves a type variable, don't cache it.
+  auto type = getType();
+  if (type->hasTypeVariable())
+    return type;
+
+  InterfaceTy = type;
   return InterfaceTy;
+}
+
+void ValueDecl::setInterfaceType(Type type) {
+  assert((type.isNull() || !type->hasTypeVariable()) &&
+         "Type variable in interface type");
+  InterfaceTy = type;
 }
 
 Type TypeDecl::getDeclaredType() const {

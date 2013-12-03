@@ -1129,7 +1129,7 @@ public:
   Type getInterfaceType() const;
 
   /// Set the interface type for the given value.
-  void setInterfaceType(Type type) { InterfaceTy = type; }
+  void setInterfaceType(Type type);
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
