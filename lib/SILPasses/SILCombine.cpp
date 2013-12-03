@@ -454,7 +454,7 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
                                        SEI->getField());
     LoadInst *Result = Builder->createLoad(SEI->getLoc(), SEA);
 
-    return replaceInstUsesWith(*SEI, Result);
+    return replaceInstUsesWith(*SEI, Result, 0);
   }
 
   return nullptr;
