@@ -548,8 +548,7 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   return MutableArrayRef<CodeCompletionResult *>(Results, Count);
 }
 
-namespace {
-StringRef getFirstTextChunk(CodeCompletionResult *R) {
+static StringRef getFirstTextChunk(CodeCompletionResult *R) {
   for (auto C : R->getCompletionString()->getChunks()) {
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::Text:
@@ -579,7 +578,6 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
   }
   return StringRef();
 }
-} // unnamed namespace
 
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
