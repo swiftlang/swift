@@ -1351,6 +1351,10 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
   return transform(module->getASTContext(), [&](Type type) -> Type {
+    assert(!isa<SILFunctionType>(type.getPointer()) &&
+           "should not be doing AST type-substitution on a lowered SIL type;"
+           "use SILType::subst");
+
     // We only substitute for substitutable types.
     auto substOrig = type->getAs<SubstitutableType>();
     if (!substOrig)

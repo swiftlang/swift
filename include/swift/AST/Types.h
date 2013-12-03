@@ -2833,11 +2833,19 @@ case TypeKind::Id:
 
       return false;
 
-#define ARTIFICIAL_TYPE(Id, Parent) \
-case TypeKind::Id:
-#define TYPE(Id, Parent)
-#include "swift/AST/TypeNodes.def"
-      llvm_unreachable("transforming artificial type?");
+    case TypeKind::WeakStorage:
+    case TypeKind::UnownedStorage:
+      return cast<ReferenceStorageType>(base)->getReferentType().findIf(pred);
+
+    case TypeKind::SILFunction: {
+      auto fnTy = cast<SILFunctionType>(base);
+      if (fnTy->getResult().getType().findIf(pred))
+        return true;
+      for (auto param : fnTy->getParameters())
+        if (param.getType().findIf(pred))
+          return true;
+      return false;
+    }
 
     case TypeKind::UnboundGeneric: {
       if (auto parentTy = cast<UnboundGenericType>(base)->getParent()) {
@@ -2992,12 +3000,35 @@ case TypeKind::Id:
     return *this;
   }
 
-  /// We could potentially support arbitrary transforms on SIL
-  /// function types.  However, *substitution* specifically is
-  /// inappropriate because the parameters and results of SIL
-  /// functions need to have SIL-lowered types.
-  case TypeKind::SILFunction:
-    llvm_unreachable("transforming SIL function type?");
+  case TypeKind::SILFunction: {
+    auto fnTy = cast<SILFunctionType>(base);
+    SILResultInfo origResult = fnTy->getResult();
+    Type transResult = origResult.getType().transform(ctx, fn);
+    if (!transResult)
+      return Type();
+    auto canTransResult = transResult->getCanonicalType();
+    bool changed = (canTransResult != origResult.getType());
+
+    SmallVector<SILParameterInfo, 8> transParams;
+    for (auto origParam : fnTy->getParameters()) {
+      Type transParam = origParam.getType().transform(ctx, fn);
+      if (!transParam) return Type();
+
+      CanType canTransParam = transParam->getCanonicalType();
+      transParams.push_back(SILParameterInfo(canTransParam,
+                                             origParam.getConvention()));
+      changed = changed || (canTransParam != origParam.getType());
+    }
+
+    if (!changed) return *this;
+
+    return SILFunctionType::get(fnTy->getGenericParams(), fnTy->getExtInfo(),
+                                fnTy->getCalleeConvention(),
+                                transParams,
+                                SILResultInfo(canTransResult,
+                                              origResult.getConvention()),
+                                ctx);
+  }
 
   case TypeKind::UnownedStorage:
   case TypeKind::WeakStorage: {
