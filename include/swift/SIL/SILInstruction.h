@@ -120,19 +120,6 @@ public:
   /// the basic block that MovePos lives in, right before MovePos.
   void moveBefore(SILInstruction *MovePos);
 
-  /// Replace every use of a result of this instruction with the corresponding
-  /// result from RHS. The method assumes that both instructions have the same
-  /// number of results. To replace just one result use
-  /// SILValue::replaceAllUsesWith.
-  void replaceAllUsesWith(ValueBase *RHS) {
-    assert(getNumTypes() == RHS->getNumTypes() &&
-           "An instruction and the value base that it is being replaced by "
-           "must have the same number of types.");
-
-    for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
-      SILValue(this, i).replaceAllUsesWith(SILValue(RHS, i));
-  }
-
   /// \brief Drops all uses that belong to this instruction.
   void dropAllReferences();
 

@@ -88,6 +88,11 @@ public:
     return getTypes().size();
   }
 
+  /// Replace every use of a result of this instruction with the corresponding
+  /// result from RHS. The method assumes that both instructions have the same
+  /// number of results. To replace just one result use
+  /// SILValue::replaceAllUsesWith.
+  void replaceAllUsesWith(ValueBase *RHS);
 
   bool use_empty() const { return FirstUse == nullptr; }
   inline ValueBaseUseIterator use_begin();

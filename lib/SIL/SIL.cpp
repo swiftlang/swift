@@ -22,6 +22,15 @@
 #include "swift/AST/Pattern.h"
 using namespace swift;
 
+void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
+  assert(this != RHS && "Cannot RAUW a value with itself");
+  assert(getNumTypes() == RHS->getNumTypes() &&
+         "An instruction and the value base that it is being replaced by "
+         "must have the same number of types");
+
+  for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
+    SILValue(this, i).replaceAllUsesWith(SILValue(RHS, i));
+}
 
 void SILValue::replaceAllUsesWith(SILValue V) {
   assert(*this != V && "Cannot RAUW a value with itself");
