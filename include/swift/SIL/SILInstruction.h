@@ -134,6 +134,9 @@ public:
 
   SILInstructionMemoryBehavior getMemoryBehavior() const;
 
+  /// Returns true if the given instruction is completely identical to RHS.
+  bool isIdenticalTo(const SILInstruction *RHS) const;
+
   /// \brief Returns true if the instruction may have side effects.
   ///
   /// Instructions that store into memory or change retain counts as well as
