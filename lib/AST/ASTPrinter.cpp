@@ -1200,10 +1200,11 @@ public:
       if (TD.hasName())
         OS << TD.getName() << ": ";
 
-      if (TD.isVararg())
-        OS <<  TD.getVarargBaseTy() << "...";
-      else
-        OS << TD.getType();
+      if (TD.isVararg()) {
+        visit(TD.getVarargBaseTy());
+        OS << "...";
+      } else
+        visit(TD.getType());
     }
     OS << ')';
   }
@@ -1313,7 +1314,8 @@ public:
   void visitFunctionType(FunctionType *T) {
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
-    OS << " -> " << T->getResult();
+    OS << " -> ";
+    T->getResult().print(OS, Options);
   }
 
   void visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
@@ -1321,8 +1323,8 @@ public:
     printGenericParams(&T->getGenericParams());
     OS << ' ';
     printWithParensIfNotSimple(T->getInput());
-
-    OS << " -> " << T->getResult();
+    OS << " -> ";
+    T->getResult().print(OS, Options);
   }
 
   void visitGenericFunctionType(GenericFunctionType *T) {
