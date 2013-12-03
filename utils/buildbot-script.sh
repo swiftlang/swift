@@ -242,6 +242,7 @@ case "${CMAKE_GENERATOR}" in
             -DCMAKE_XCODE_ATTRIBUTE_GCC_VERSION:STRING=com.apple.compilers.llvm.clang.1_0
             -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY:STRING=libc++
             -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8
+            -DCMAKE_CONFIGURATION_TYPES="Debug;Release"
         )
         ;;
 esac
