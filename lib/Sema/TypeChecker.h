@@ -132,6 +132,30 @@ enum class FreeTypeVariableBinding {
   GenericParameters
 };
 
+/// An abstract interface that can interact with the type checker during
+/// the type checking of a particular expression.
+class ExprTypeCheckListener {
+public:
+  virtual ~ExprTypeCheckListener();
+
+  /// Callback invoked once the constraint system has been constructed.
+  ///
+  /// \param cs The constraint system that has been constructed.
+  ///
+  /// \param expr The pre-checked expression from which the constraint system
+  /// was generated.
+  virtual void builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
+
+  /// Callback invoked once the constraint system has been solved.
+  ///
+  /// \param cs The constraint system that has been solved.
+  /// \param solution The chosen solution to the constraint system.
+  virtual void solvedConstraints(constraints::ConstraintSystem &cs,
+                                 constraints::Solution &solution);
+};
+
+/// The Swift type checker, which takes a parsed AST and performs name binding,
+/// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker : public ASTMutationListener, public LazyResolver {
 public:
   ASTContext &Context;
@@ -483,19 +507,6 @@ public:
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
 
-  /// Callback object that adds additional constraints to the given constraint
-  /// system when type-checking an expression.
-  ///
-  /// This callback receives the newly-created constraint system along with
-  /// the pre-checked expression.
-  typedef std::function<void(constraints::ConstraintSystem &, Expr *expr)>
-    AddExprConstraintsCallback;
-
-  /// Callback object when a solution to a constraint system has been selected.
-  typedef std::function<void(constraints::ConstraintSystem &,
-                             constraints::Solution &)>
-    SolvedConstraintSystemCallback;
-
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -510,16 +521,16 @@ public:
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
-  /// \param addConstraints If non-null, will be invoked given the constraint
-  /// system to introduce additional constraints.
+  /// \param listener If non-null, a listener that will be notified of important
+  /// events in the type checking of this expression, and which can introduce
+  /// additional constraints.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            Type convertType, bool discardedExpr,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow,
-                           AddExprConstraintsCallback addConstraints = nullptr,
-                           SolvedConstraintSystemCallback onSolved = nullptr);
+                           ExprTypeCheckListener *listener = nullptr);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.

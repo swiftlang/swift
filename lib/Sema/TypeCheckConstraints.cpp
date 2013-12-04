@@ -4181,39 +4181,51 @@ namespace {
     }
 
   private:
+    /// Expression type-checking listener for checking a cast.
+    class CastCheckListener : public ExprTypeCheckListener {
+      Type &ToType;
+
+    public:
+      explicit CastCheckListener(Type &toType) : ToType(toType) { }
+
+      virtual void builtConstraints(ConstraintSystem &cs, Expr *expr) {
+        // Open up the type we're casting to.
+        ToType = cs.openType(ToType);
+
+        // Either convert the expression to the given type or perform a
+        // checked cast to the given type.
+        auto fromType = expr->getType();
+        auto locator = cs.getConstraintLocator(expr, { });
+        Constraint *constraints[2] = {
+          new (cs) Constraint(ConstraintKind::Conversion, fromType, ToType,
+                              Identifier(), locator),
+          new (cs) Constraint(ConstraintKind::CheckedCast, fromType, ToType,
+                              Identifier(), locator),
+        };
+        cs.addConstraint(Constraint::createDisjunction(cs, constraints,
+                                                       locator));
+      }
+
+      void solvedConstraints(ConstraintSystem &cs, Solution &solution) {
+        // Simplify the type we're converting to.
+        ToType = solution.simplifyType(cs.getTypeChecker(), ToType);
+      }
+    };
+
     /// Type-check a checked cast expression.
     CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
       // Simplify the type we're converting to.
       Type toType = expr->getCastTypeLoc().getType();
 
-      // Type-check the subexpression in isolation.
+      // Type-check the subexpression.
+      CastCheckListener listener(toType);
       Expr *sub = expr->getSubExpr();
       if (TC.typeCheckExpression(sub, DC, Type(), /*discardedExpr=*/false,
                                  FreeTypeVariableBinding::Disallow,
-                                 [&](ConstraintSystem &cs, Expr *expr) {
-            // Open up the type we're casting to.
-            toType = cs.openType(toType);
-
-            // Either convert the expression to the given type or perform a
-            // checked cast to the given type.
-            auto fromType = expr->getType();
-            auto locator = cs.getConstraintLocator(expr, { });
-            Constraint *constraints[2] = {
-              new (cs) Constraint(ConstraintKind::Conversion, fromType, toType,
-                                  Identifier(), locator),
-              new (cs) Constraint(ConstraintKind::CheckedCast, fromType, toType,
-                                  Identifier(), locator),
-             };
-             cs.addConstraint(Constraint::createDisjunction(cs, constraints,
-                                                            locator));
-          },
-                                 [&](ConstraintSystem &cs, Solution &solution) {
-            // Simplify the type we're converting to.
-            toType = solution.simplifyType(TC, toType);
-            expr->getCastTypeLoc().setType(toType);
-          })) {
+                                 &listener)) {
         return CheckedCastKind::Unresolved;
       }
+
       sub = TC.coerceToRValue(sub);
       if (!sub) {
         return CheckedCastKind::Unresolved;
@@ -4221,7 +4233,7 @@ namespace {
       expr->setSubExpr(sub);
 
       Type fromType = sub->getType();
-
+      expr->getCastTypeLoc().setType(toType);
       return TC.typeCheckCheckedCast(fromType, toType, DC,
                                      expr->getLoc(),
                                      sub->getSourceRange(),
@@ -4400,14 +4412,24 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
   return false;
 }
 
+ExprTypeCheckListener::~ExprTypeCheckListener() { }
+
+void ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
+}
+
+
+void ExprTypeCheckListener::solvedConstraints(ConstraintSystem &cs,
+                                              Solution &solution) {
+
+}
+
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(
        Expr *&expr, DeclContext *dc,
        Type convertType,
        bool discardedExpr,
        FreeTypeVariableBinding allowFreeTypeVariables,
-       AddExprConstraintsCallback addConstraints,
-       SolvedConstraintSystemCallback onSolved) {
+       ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -4431,9 +4453,9 @@ bool TypeChecker::typeCheckExpression(
                      cs.getConstraintLocator(expr, { }));
   }
 
-  // If the caller wants to add constraints, do so now.
-  if (addConstraints) {
-    addConstraints(cs, expr);
+  // Notify the listener that we've built the constraint system.
+  if (listener) {
+    listener->builtConstraints(cs, expr);
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -4468,9 +4490,10 @@ bool TypeChecker::typeCheckExpression(
     solution.dump(&Context.SourceMgr, log);
   }
 
-  // If the caller wanted to see the solution, provide it now.
-  if (onSolved)
-    onSolved(cs, solution);
+  // Notify the listener that we have a solution.
+  if (listener) {
+    listener->solvedConstraints(cs, solution);
+  }
 
   // Apply the solution to the expression.
   auto result = cs.applySolution(solution, expr);
