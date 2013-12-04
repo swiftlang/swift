@@ -662,7 +662,6 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
         break;
 
       case OverloadChoiceKind::BaseType:
-      case OverloadChoiceKind::IdentityFunction:
       case OverloadChoiceKind::TupleIndex:
         // FIXME: Actually diagnose something here.
         break;

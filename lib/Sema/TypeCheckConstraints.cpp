@@ -2144,11 +2144,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = choice.getBaseType();
     break;
 
-  case OverloadChoiceKind::IdentityFunction:
-    refType = FunctionType::get(choice.getBaseType(), choice.getBaseType(),
-                                getASTContext());
-    break;
-
   case OverloadChoiceKind::TupleIndex: {
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
       // When the base of a tuple lvalue, the member is always an lvalue.
@@ -3050,7 +3045,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   switch (x.getKind()) {
   case OverloadChoiceKind::BaseType:
-  case OverloadChoiceKind::IdentityFunction:
     // FIXME: Compare base types after substitution?
     return true;
 
@@ -3451,18 +3445,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     
     // If the kinds of overload choice don't match...
     if (choice1.getKind() != choice2.getKind()) {
-      // The identity function beats any declaration.
-      if (choice1.getKind() == OverloadChoiceKind::IdentityFunction &&
-          choice2.getKind() == OverloadChoiceKind::Decl) {
-        ++score1;
-        continue;
-      }
-      if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          choice2.getKind() == OverloadChoiceKind::IdentityFunction) {
-        ++score2;
-        continue;
-      }
-
       // A declaration found directly beats any declaration found via dynamic
       // lookup.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
@@ -3486,7 +3468,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       break;
 
     case OverloadChoiceKind::BaseType:
-    case OverloadChoiceKind::IdentityFunction:
       llvm_unreachable("Never considered different");
 
     case OverloadChoiceKind::TypeDecl:
@@ -5115,10 +5096,6 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
       out << "base type " << choice.getBaseType()->getString() << "\n";
       break;
 
-    case OverloadChoiceKind::IdentityFunction:
-      out << "identity " << choice.getBaseType()->getString() << " -> "
-        << choice.getBaseType()->getString() << "\n";
-      break;
     case OverloadChoiceKind::TupleIndex:
       out << "tuple " << choice.getBaseType()->getString() << " index "
         << choice.getTupleIndex() << "\n";
@@ -5189,11 +5166,6 @@ void ConstraintSystem::dump(raw_ostream &out) {
 
         case OverloadChoiceKind::BaseType:
           out << "base type " << choice.getBaseType()->getString() << "\n";
-          break;
-
-        case OverloadChoiceKind::IdentityFunction:
-          out << "identity " << choice.getBaseType()->getString() << " -> "
-              << choice.getBaseType()->getString() << "\n";
           break;
 
         case OverloadChoiceKind::TupleIndex:

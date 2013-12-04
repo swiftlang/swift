@@ -1391,7 +1391,6 @@ namespace {
       }
 
       case OverloadChoiceKind::TypeDecl:
-      case OverloadChoiceKind::IdentityFunction:
         llvm_unreachable("Nonsensical overload choice");
       }
     }
@@ -2419,14 +2418,6 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
 
   auto selected = knownOverload->second;
 
-  // If we chose the identity constructor, coerce to the expected type
-  // based on the application argument locator.
-  if (selected.choice.getKind() == OverloadChoiceKind::IdentityFunction) {
-    return coerceToType(expr, toType,
-                        locator.withPathElement(
-                          ConstraintLocator::ApplyArgument));
-  }
-
   // FIXME: Location information is suspect throughout.
   // Form a reference to the constructor.
 
@@ -2974,15 +2965,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                     cs.getConstraintLocator(
                       locator.withPathElement(
                         ConstraintLocator::ConstructorMember)));
-
-  // If there is no overload choice, or it was simply the identity function,
-  // it's because this was a coercion rather than a construction. Just perform
-  // the appropriate conversion.
-  if (!selected ||
-      selected->choice.getKind() == OverloadChoiceKind::IdentityFunction) {
-    // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), ty, locator);
-  }
 
   // We have the constructor.
   auto choice = selected->choice;

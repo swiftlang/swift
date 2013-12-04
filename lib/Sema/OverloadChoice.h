@@ -46,9 +46,6 @@ enum class OverloadChoiceKind : int {
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
   BaseType,
-  /// \brief The overload choice equates the member type with a function
-  /// from the base type to itself.
-  IdentityFunction,
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
