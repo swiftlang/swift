@@ -489,11 +489,15 @@ public:
     return insert(new (F.getModule())
                     RefElementAddrInst(Loc, Operand, Field, ResultTy));
   }
-  
+  RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
+                                           VarDecl *Field) {
+    auto ResultTy = Operand.getType().getFieldType(Field, F.getModule());
+    return createRefElementAddr(Loc, Operand, Field, ResultTy);
+  }
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy,
-                                     bool Volatile = false)
-  {
+                                     bool Volatile = false) {
     return insert(new (F.getModule())
                     ClassMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
