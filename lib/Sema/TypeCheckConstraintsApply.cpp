@@ -1736,35 +1736,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    /// Type-check a checked cast expression.
-    CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-
-      // Simplify the type we're converting to.
-      Type toType = expr->getCastTypeLoc().getType();
-
-      // Type-check the subexpression in isolation.
-      Expr *sub = expr->getSubExpr();
-      if (tc.typeCheckExpression(sub, dc, Type(), /*discardedExpr=*/false)) {
-        return CheckedCastKind::Unresolved;
-      }
-      sub = tc.coerceToRValue(sub);
-      if (!sub) {
-        return CheckedCastKind::Unresolved;
-      }
-      expr->setSubExpr(sub);
-
-      Type fromType = sub->getType();
-      
-      return tc.typeCheckCheckedCast(fromType, toType, dc,
-                              expr->getLoc(),
-                              sub->getSourceRange(),
-                              expr->getCastTypeLoc().getSourceRange(),
-                              [&](Type commonTy) -> bool {
-                                return tc.convertToType(sub, commonTy, dc);
-                              });
-    }
-    
     Expr *visitIsaExpr(IsaExpr *expr) {
       // SIL-generation magically turns this into a Bool; make sure it can.
       if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
@@ -1772,93 +1743,15 @@ namespace {
                                      diag::bool_intrinsics_not_found);
         // Continue anyway.
       }
+      return expr;
+    }
 
-      CheckedCastKind castKind = checkCheckedCastExpr(expr);
-      switch (castKind) {
-      // Invalid type check.
-      case CheckedCastKind::Unresolved:
-        return nullptr;
-      // Check is trivially true.
-      case CheckedCastKind::InvalidCoercible:
-        cs.getTypeChecker().diagnose(expr->getLoc(), diag::isa_is_always_true,
-                                     expr->getSubExpr()->getType(),
-                                     expr->getCastTypeLoc().getType());
-        break;
-          
-      // Valid checks.
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
-        expr->setCastKind(castKind);
-        break;
-      }
-      return expr;
-    }
-    
-    Expr *checkAsCastExpr(CheckedCastExpr *expr) {
-      Type toType = expr->getCastTypeLoc().getType();
-      
-      CheckedCastKind castKind = checkCheckedCastExpr(expr);
-      switch (castKind) {
-      /// Invalid cast.
-      case CheckedCastKind::Unresolved:
-        return nullptr;
-      /// Cast trivially succeeds. Emit a fixit and reduce to a coercion.
-      case CheckedCastKind::InvalidCoercible: {
-        // Only complain if the cast was explicitly generated.
-        // FIXME: This leniency is here for the Clang module importer,
-        // which doesn't necessarily know whether it needs to force the
-        // cast or not. instancetype should eliminate the need for it.
-        if (!expr->isImplicit()) {
-          cs.getTypeChecker().diagnose(expr->getLoc(),
-                                       diag::downcast_to_supertype,
-                                       expr->getSubExpr()->getType(),
-                                       expr->getCastTypeLoc().getType())
-            .highlight(expr->getSubExpr()->getSourceRange())
-            .highlight(expr->getCastTypeLoc().getSourceRange())
-            .fixItRemove(SourceRange(expr->getLoc(), expr->getEndLoc()));
-        }
-        
-        // If the types are equivalent, we don't need the 'as' at all.
-        if (expr->getType()->isEqual(expr->getSubExpr()->getType()))
-          return expr->getSubExpr();
-        
-        // Just perform the coercion directly, wrapping in an optional to
-        // preserve the expected type of 'as'.
-        auto coerced = coerceToType(expr->getSubExpr(), toType,
-                                    cs.getConstraintLocator(expr, { }));
-        return new (cs.getASTContext())
-          InjectIntoOptionalExpr(coerced,
-                                 OptionalType::get(toType, cs.getASTContext()));
-      }
-        
-        // Valid casts.
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
-        expr->setCastKind(castKind);
-        break;
-      }
-      return expr;
-    }
-    
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-      expr->setType(cs.getTypeChecker().getOptionalType(expr->getLoc(),
-                                            expr->getCastTypeLoc().getType()));
-      Expr *result = checkAsCastExpr(expr);
-      if (!result)
-        return nullptr;
-      return result;
+      return expr;
+    }
+
+    Expr *visitCoerceExpr(CoerceExpr *expr) {
+      return expr;
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
@@ -3130,10 +3023,9 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, expr };
       }
 
-      // For checked cast expressions, the subexpression is checked
-      // separately.
-      if (auto unchecked = dyn_cast<CheckedCastExpr>(expr)) {
-        return { false, Rewriter.visit(unchecked) };
+      // For explicit casts, the subexpression has already been checked.
+      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        return { false, Rewriter.visit(cast) };
       }
 
       // For a default-value expression, do nothing.

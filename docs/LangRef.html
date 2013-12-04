@@ -2634,17 +2634,21 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <ul>
   <li><tt>x as T</tt> will try to cast the value of the expression
-    <tt>x</tt> to a subtype of its compile-time type. The result of the
-    expression is <tt>T?</tt>. The type of the operand is checked at runtime,
-    and if it is castable to <tt>T</tt>, the <tt>Optional</tt> result contains
+    <tt>x</tt> to the type <tt>T</tt>. If the type of <tt>x</tt> is
+    implicitly convertible to <tt>T</tt>, the conversion is performed
+    and the result of the expression is of type <tt>T</tt>. Otherwise,
+    the result of the expression is of type <tt>T?</tt>. In this case,
+    the type of the operand is checked at runtime, and if it is
+    castable to <tt>T</tt>, the <tt>Optional</tt> result contains
     the result of the cast. If the cast fails, the result contains
-    <tt>.None</tt>.
-    <tt>T</tt> must be a subtype of the compile-time type of <tt>x</tt>.
+    <tt>.None</tt>. The latter is only permissible when 
+    <tt>T</tt> is a subtype of the compile-time type of <tt>x</tt>.
     An example:
 
   <pre class="example">
-    var b:B = new D
-    var d:D? = b as D
+    var b: B = D()
+    var d: D? = b as D
+    var b2 = D! as B
   </pre>
 
   <li><tt>x is T</tt> will query the type of the value of <tt>x</tt> at runtime.

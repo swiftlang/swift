@@ -193,6 +193,7 @@ namespace {
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
+    RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
@@ -1029,6 +1030,10 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
                                                  ManagedValue::Unmanaged),
                                     C);
   return (result ? RValue(SGF, E, result) : RValue());
+}
+
+RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
+  return visit(E->getSubExpr(), C);
 }
 
 static ManagedValue emitVarargs(SILGenFunction &gen,

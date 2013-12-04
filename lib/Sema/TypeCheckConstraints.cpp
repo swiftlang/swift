@@ -3963,9 +3963,18 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
     DeclContext *DC;
+    bool RequiresAnotherPass = false;
 
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
+
+    /// Determine whether pre-check requires another pass.
+    bool requiresAnotherPass() const { return RequiresAnotherPass; }
+
+    // Reset internal state for another pass.
+    void reset() {
+      RequiresAnotherPass = false;
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, type-check the patterns and result type as written,
@@ -4041,11 +4050,62 @@ namespace {
         return expr;
       }
 
-      // Type check the type parameters in cast expressions.
-      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+      // For a coercion "x as T", check the cast first.
+      if (auto cast = dyn_cast<ConditionalCheckedCastExpr>(expr)) {
+        // If there is no subexpression, the sequence hasn't been folded yet.
+        // We'll require another pass.
+        if (!cast->getSubExpr()) {
+          RequiresAnotherPass = true;
+          return cast;
+        }
+
+        // Validate the type.
+        // FIXME: Allow unbound generics.
         if (TC.validateType(cast->getCastTypeLoc(), DC))
           return nullptr;
-        return expr;
+
+        return checkAsCastExpr(cast);
+      }
+
+      // For a dynamic type check "x is T", check it first.
+      if (auto isa = dyn_cast<IsaExpr>(expr)) {
+        // If there is no subexpression, the sequence hasn't been folded yet.
+        // We'll require another pass.
+        if (!isa->getSubExpr()) {
+          RequiresAnotherPass = true;
+          return isa;
+        }
+
+        // Validate the type.
+        // FIXME: Allow unbound generics.
+        if (TC.validateType(isa->getCastTypeLoc(), DC))
+          return nullptr;
+
+        CheckedCastKind castKind = checkCheckedCastExpr(isa);
+        switch (castKind) {
+          // Invalid type check.
+        case CheckedCastKind::Unresolved:
+          return nullptr;
+          // Check is trivially true.
+        case CheckedCastKind::Coercion:
+          TC.diagnose(isa->getLoc(), diag::isa_is_always_true,
+                      isa->getSubExpr()->getType(),
+                      isa->getCastTypeLoc().getType());
+          break;
+
+          // Valid checks.
+        case CheckedCastKind::Downcast:
+        case CheckedCastKind::SuperToArchetype:
+        case CheckedCastKind::ArchetypeToArchetype:
+        case CheckedCastKind::ArchetypeToConcrete:
+        case CheckedCastKind::ExistentialToArchetype:
+        case CheckedCastKind::ExistentialToConcrete:
+        case CheckedCastKind::ConcreteToArchetype:
+        case CheckedCastKind::ConcreteToUnrelatedExistential:
+          isa->setCastKind(castKind);
+          break;
+        }
+        return isa;
       }
 
       return expr;
@@ -4054,6 +4114,88 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Never walk into statements.
       return { false, stmt };
+    }
+
+  private:
+    /// Type-check a checked cast expression.
+    CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
+      // Simplify the type we're converting to.
+      Type toType = expr->getCastTypeLoc().getType();
+
+      // Type-check the subexpression in isolation.
+      // FIXME: Open and use the "toType" here.
+      Expr *sub = expr->getSubExpr();
+      if (TC.typeCheckExpression(sub, DC, Type(), /*discardedExpr=*/false)) {
+        return CheckedCastKind::Unresolved;
+      }
+      sub = TC.coerceToRValue(sub);
+      if (!sub) {
+        return CheckedCastKind::Unresolved;
+      }
+      expr->setSubExpr(sub);
+
+      Type fromType = sub->getType();
+
+      return TC.typeCheckCheckedCast(fromType, toType, DC,
+                                     expr->getLoc(),
+                                     sub->getSourceRange(),
+                                     expr->getCastTypeLoc().getSourceRange(),
+                                     [&](Type commonTy) -> bool {
+                                       return TC.convertToType(sub, commonTy,
+                                                               DC);
+                                     });
+    }
+
+    Expr *checkAsCastExpr(CheckedCastExpr *expr) {
+      Type toType = expr->getCastTypeLoc().getType();
+
+      CheckedCastKind castKind = checkCheckedCastExpr(expr);
+      switch (castKind) {
+        /// Invalid cast.
+      case CheckedCastKind::Unresolved:
+        return nullptr;
+        /// Cast trivially succeeds. Emit a fixit and reduce to a coercion.
+      case CheckedCastKind::Coercion: {
+        // This is a coercion. Convert the subexpression.
+        Expr *sub = expr->getSubExpr();
+        bool failed = TC.convertToType(sub, toType, DC);
+        (void)failed;
+        assert(!failed && "Not convertible?");
+
+        // Transmute the checked cast into a coercion expression.
+        Expr *result = new (TC.Context) CoerceExpr(sub, expr->getLoc(),
+                                                   expr->getCastTypeLoc());
+
+        // The result type is the type we're converting to.
+        result->setType(toType);
+
+        // If the cast was implicitly generated, wrap it in an optional.
+        // FIXME: This hack is only needed for the Clang importer, which
+        // doesn't know whether to force the coercion or not. The introduction
+        // of instancetype should solve the issue, or we could move the hack
+        // over to postfix '!'.
+        if (expr->isImplicit()) {
+          return new (TC.Context) InjectIntoOptionalExpr(
+                                    result,
+                                    OptionalType::get(toType, TC.Context));
+        }
+
+        return result;
+      }
+
+      // Valid casts.
+      case CheckedCastKind::Downcast:
+      case CheckedCastKind::SuperToArchetype:
+      case CheckedCastKind::ArchetypeToArchetype:
+      case CheckedCastKind::ArchetypeToConcrete:
+      case CheckedCastKind::ExistentialToArchetype:
+      case CheckedCastKind::ExistentialToConcrete:
+      case CheckedCastKind::ConcreteToArchetype:
+      case CheckedCastKind::ConcreteToUnrelatedExistential:
+        expr->setCastKind(castKind);
+        break;
+      }
+      return expr;
     }
   };
 }
@@ -4156,13 +4298,21 @@ namespace {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  if (auto result = expr->walk(PreCheckExpression(*this, dc))) {
-    expr = result;
-    return false;
-  }
+  PreCheckExpression preCheck(*this, dc);
+  do {
+    // Perform the pre-check.
+    preCheck.reset();
+    if (auto result = expr->walk(preCheck)) {
+      expr = result;
+      continue;
+    }
 
-  expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
-  return true;
+    // Pre-check failed. Clean up and return.
+    expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
+    return true;
+  } while (preCheck.requiresAnotherPass());
+
+  return false;
 }
 
 #pragma mark High-level entry points
@@ -5117,10 +5267,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool fromExistential = fromType->isExistentialType(fromProtocols);
   
   // If the from/to types are equivalent or implicitly convertible,
-  // this should have been a coercion rather than a
-  // checked cast (a as B). Complain.
+  // this is a coercion.
   if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
-    return CheckedCastKind::InvalidCoercible;
+    return CheckedCastKind::Coercion;
   }
   
   // We can only downcast to an existential if the destination protocols are

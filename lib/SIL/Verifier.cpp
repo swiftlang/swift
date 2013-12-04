@@ -1027,7 +1027,7 @@ public:
     
     switch (kind) {
     case CheckedCastKind::Unresolved:
-    case CheckedCastKind::InvalidCoercible:
+    case CheckedCastKind::Coercion:
       llvm_unreachable("invalid for SIL");
     case CheckedCastKind::Downcast:
       require(fromTy.isObject(),

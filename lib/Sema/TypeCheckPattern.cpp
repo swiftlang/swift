@@ -764,7 +764,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return nullptr;
-    case CheckedCastKind::InvalidCoercible:
+    case CheckedCastKind::Coercion:
       diagnose(IP->getLoc(), diag::isa_is_always_true,
                type,
                IP->getCastTypeLoc().getType());

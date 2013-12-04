@@ -1,3 +1,17 @@
+2013-12-11
+----------
+
+* The casting syntax "x as T" now permits both implicit conversions
+  (in which case it produces a value of type T) and for
+  runtime-checked casts (in which case it produces a value of type T?
+  that will be .Some(casted x) on success and .None on failure). An
+  example:
+
+    func f(s: String, o: NSString) {
+      var ns = s as NSString                  // has type 'NSString'
+      var maybeMutable = o as NSMutableString // has type NSMutableString?
+    }
+
 2013-12-04
 ----------
 

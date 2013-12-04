@@ -533,7 +533,7 @@ public:
   ///
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invald, Unresolved is returned. If the cast represents an implicit
-  /// conversion, InvalidCoercible is returned.
+  /// conversion, Coercion is returned.
   CheckedCastKind typeCheckCheckedCast(Type fromType,
                                        Type toType,
                                        DeclContext *dc,

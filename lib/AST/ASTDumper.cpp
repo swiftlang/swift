@@ -1358,6 +1358,9 @@ public:
   void visitIsaExpr(IsaExpr *E) {
     printExplicitCastExpr(E, "is_subtype_expr");
   }
+  void visitCoerceExpr(CoerceExpr *E) {
+    printExplicitCastExpr(E, "coerce_expr");
+  }
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     printCommon(E, "rebind_self_in_constructor_expr") << '\n';
     printRec(E->getSubExpr());

@@ -2401,7 +2401,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
                                CheckedCastMode mode) {
   switch (kind) {
   case CheckedCastKind::Unresolved:
-  case CheckedCastKind::InvalidCoercible:
+  case CheckedCastKind::Coercion:
     llvm_unreachable("invalid for sil");
     
   case CheckedCastKind::Downcast: {

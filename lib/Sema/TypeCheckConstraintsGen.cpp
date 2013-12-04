@@ -934,16 +934,20 @@ namespace {
     }
     
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-      // FIXME: Open this type.
-      return CS.getTypeChecker().getOptionalType(expr->getLoc(),
-                                             expr->getCastTypeLoc().getType());
+      auto &tc = CS.getTypeChecker();
+      return tc.getOptionalType(expr->getLoc(),
+                                expr->getCastTypeLoc().getType());
     }
     
     Type visitIsaExpr(IsaExpr *expr) {
       // The result is Bool.
       return CS.getTypeChecker().lookupBoolType(CS.DC);
     }
-    
+
+    Type visitCoerceExpr(CoerceExpr *expr) {
+      return expr->getCastTypeLoc().getType();
+    }
+
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       // '_' is only allowed in assignments, so give it an AssignDest locator.
       return CS.createTypeVariable(
@@ -1078,10 +1082,12 @@ namespace {
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Don't recur into array-new or default-value expressions.
+      // Don't recur into array-new, default-value expressions, or explicit
+      // cast expressions.
       return {
         !isa<NewArrayExpr>(expr)
-          && !isa<DefaultValueExpr>(expr),
+          && !isa<DefaultValueExpr>(expr)
+          && !isa<ExplicitCastExpr>(expr),
         expr
       };
     }
@@ -1156,10 +1162,9 @@ namespace {
         return { false, expr };
       }
 
-      // For checked cast expressions, we visit the subexpression
-      // separately.
-      if (auto unchecked = dyn_cast<CheckedCastExpr>(expr)) {
-        auto type = CG.visit(unchecked);
+      // For explicit casts, we've already visited the subexpression.
+      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        auto type = CG.visit(cast);
         expr->setType(type);
         return { false, expr };
       }

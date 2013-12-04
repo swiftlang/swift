@@ -754,6 +754,13 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(CoerceExpr *E) {
+      checkSameType(E->getType(), E->getSubExpr()->getType(),
+                    "coercion type and subexpression type");
+
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(TupleShuffleExpr *E) {
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();

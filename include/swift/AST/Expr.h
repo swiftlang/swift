@@ -2457,15 +2457,14 @@ public:
 enum class CheckedCastKind {
   /// The kind has not been determined yet.
   Unresolved,
-  /// The requested conversion is implicit and should be represented as a
-  /// coercion.
-  InvalidCoercible,
-  
+
   /// Valid resolved kinds start here.
   First_Resolved,
-  
+
+  /// The requested cast is an implicit conversion, so this is a coercion.
+  Coercion = First_Resolved,
   /// A cast from a class to one of its subclasses.
-  Downcast = First_Resolved,
+  Downcast,
   /// A cast from a class to a type parameter constrained by that class as a
   /// superclass.
   SuperToArchetype,
@@ -2550,7 +2549,21 @@ public:
     return E->getKind() == ExprKind::Isa;
   }
 };
-  
+
+/// \brief Represents an explicit coercion from a value to a specific type.
+///
+/// Spelled 'a as T' and produces a value of type 'T'.
+class CoerceExpr : public ExplicitCastExpr {
+public:
+  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
+  { }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Coerce;
+  }
+};
+
 /// \brief Represents the rebinding of 'self' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to
 /// 'self', and the expression returns void.

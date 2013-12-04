@@ -993,9 +993,6 @@ ERROR(invalid_tuple_element_unused,sema_tcc,none,
 ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
   (Type, Identifier))
-ERROR(downcast_to_supertype,sema_tcc,none,
-      "conversion from %0 to supertype %1 is implicit; remove the cast",
-      (Type, Type))
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",
       (Type, Type))

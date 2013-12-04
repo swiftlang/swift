@@ -680,7 +680,7 @@ public:
   StringRef getCastKindName(CheckedCastKind kind) const {
     switch (kind) {
     case CheckedCastKind::Unresolved:
-    case CheckedCastKind::InvalidCoercible:
+    case CheckedCastKind::Coercion:
       llvm_unreachable("invalid cast kind for SIL");
     case CheckedCastKind::Downcast:
       return "downcast";
