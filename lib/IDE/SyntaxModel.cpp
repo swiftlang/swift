@@ -176,7 +176,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       }
       else
         SN.Kind = SyntaxStructureKind::FreeFunction;
-      ASTContext &AC = FD->getASTContext();
+      ASTContext &AC = AFD->getASTContext();
       SN.Range = charSourceRangeFromSourceRange(AC.SourceMgr,
                                                           AFD->getSourceRange());
       SourceLoc NRStart = AFD->getNameLoc();
