@@ -1117,9 +1117,10 @@ public:
         Builder.addLeadingDot();
       Builder.addTextChunk("init");
     }
-    Builder.addLeftParen();
-    addPatternParameters(Builder, CD->getArgParams());
-    Builder.addRightParen();
+    Type ArgsType = CD->getType()
+                        ->castTo<AnyFunctionType>()->getResult()
+                        ->castTo<AnyFunctionType>()->getInput();
+    addPatternFromType(Builder, ArgsType);
     addTypeAnnotation(Builder, CD->getResultType());
   }
 
