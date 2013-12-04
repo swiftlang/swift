@@ -135,12 +135,12 @@ struct DIMemoryUse {
   
   /// For memory objects of (potentially recursive) tuple type, this keeps
   /// track of which tuple elements are affected.
-  unsigned short FirstTupleElement, NumTupleElements;
+  unsigned short FirstElement, NumElements;
   
-  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FTE, unsigned NTE)
-  : Inst(Inst), Kind(Kind), FirstTupleElement(FTE), NumTupleElements(NTE) {
-    assert(FTE == FirstTupleElement && NumTupleElements == NTE &&
-           "more than 65K tuple elements not supported yet");
+  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
+  : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
+    assert(FE == FirstElement && NumElements == NE &&
+           "more than 64K elements not supported yet");
   }
   
   DIMemoryUse() : Inst(nullptr) {}
@@ -149,7 +149,7 @@ struct DIMemoryUse {
   bool isValid() const { return Inst != nullptr; }
   
   bool usesElement(unsigned i) const {
-    return i >= FirstTupleElement && i < FirstTupleElement+NumTupleElements;
+    return i >= FirstElement && i < FirstElement+NumElements;
   }
   
   /// onlyTouchesTrivialElements - Return true if all of the accessed elements
@@ -159,8 +159,8 @@ struct DIMemoryUse {
   /// getElementBitmask - Return a bitmask with the touched tuple elements
   /// set.
   APInt getElementBitmask(unsigned NumMemoryTupleElements) const {
-    return APInt::getBitsSet(NumMemoryTupleElements, FirstTupleElement,
-                             FirstTupleElement+NumTupleElements);
+    return APInt::getBitsSet(NumMemoryTupleElements, FirstElement,
+                             FirstElement+NumElements);
   }
 };
 

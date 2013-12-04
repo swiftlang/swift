@@ -269,9 +269,9 @@ namespace {
       IsKnown
     } LOState : 2;
 
-    LiveOutBlockState(unsigned NumTupleElements)
+    LiveOutBlockState(unsigned NumElements)
       : HasNonLoadUse(false),
-        Availability(NumTupleElements), LOState(IsUnknown) {
+        Availability(NumElements), LOState(IsUnknown) {
     }
 
     AvailabilitySet &getAvailabilitySet() {
@@ -307,10 +307,10 @@ namespace {
       
       // Peel the first iteration of the 'set' loop since there is almost always
       // a single tuple element touched by a DIMemoryUse.
-      Availability.set(Use.FirstTupleElement, DIKind::Yes);
+      Availability.set(Use.FirstElement, DIKind::Yes);
                          
-      for (unsigned i = 1; i != Use.NumTupleElements; ++i)
-        Availability.set(Use.FirstTupleElement+i, DIKind::Yes);
+      for (unsigned i = 1; i != Use.NumElements; ++i)
+        Availability.set(Use.FirstElement+i, DIKind::Yes);
     }
   };
 } // end anonymous namespace
@@ -325,8 +325,8 @@ namespace {
     /// analyzed.
     DIMemoryObjectInfo TheMemory;
     
-    /// The number of tuple elements in this memory object.
-    unsigned NumTupleElements;
+    /// The number of elements in this memory object.
+    unsigned NumElements;
     
     SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
@@ -356,7 +356,7 @@ namespace {
 
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
-                        LiveOutBlockState(NumTupleElements)}).first->second;
+                                 LiveOutBlockState(NumElements)}).first->second;
     }
     
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
@@ -389,7 +389,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
 
-  NumTupleElements = TheMemory.getElementCount();
+  NumElements = TheMemory.getElementCount();
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -459,7 +459,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
-  TheMemory.getPathStringToElement(Use.FirstTupleElement, Name);
+  TheMemory.getPathStringToElement(Use.FirstElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
 
@@ -646,8 +646,8 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     InstInfo.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    unsigned FirstTupleElement = InstInfo.FirstTupleElement;
-    unsigned NumTupleElements = InstInfo.NumTupleElements;
+    unsigned FirstElement = InstInfo.FirstElement;
+    unsigned NumElements = InstInfo.NumElements;
 
     SmallVector<SILInstruction*, 8> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
@@ -659,11 +659,9 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     for (auto I : InsertedInsts) {
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
-        Uses.push_back(DIMemoryUse(I, Kind,
-                                   FirstTupleElement, NumTupleElements));
+        Uses.push_back(DIMemoryUse(I, Kind, FirstElement, NumElements));
       } else if (isa<LoadInst>(I)) {
-        Uses.push_back(DIMemoryUse(I, Load,
-                                   FirstTupleElement, NumTupleElements));
+        Uses.push_back(DIMemoryUse(I, Load, FirstElement, NumElements));
       }
     }
     return;
@@ -692,7 +690,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
-  AvailabilitySet Availability = getLivenessAtInst(Release, 0,NumTupleElements);
+  AvailabilitySet Availability = getLivenessAtInst(Release, 0, NumElements);
   if (Availability.isAllYes()) return;
   
   // If it is all no, then we can just remove it.
@@ -788,7 +786,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   // that it is easy to destroy the stack location.
   SILBuilder B(TheMemory.getFunctionEntryPoint());
   SILType IVType =
-    SILType::getBuiltinIntegerType(NumTupleElements, Module.getASTContext());
+    SILType::getBuiltinIntegerType(NumElements, Module.getASTContext());
   auto Alloc = B.createAllocStack(Loc, IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
@@ -834,8 +832,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       
       // Get the integer constant.
       B.setInsertionPoint(Use.Inst);
-      APInt Bitmask = Use.getElementBitmask(NumTupleElements);
-      SILValue MaskVal = B.createIntegerLiteral(Loc, IVType,Bitmask);
+      APInt Bitmask = Use.getElementBitmask(NumElements);
+      SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
 
       // If the mask is all ones, do a simple store, otherwise do a
       // load/or/store sequence to mask in the bits.
@@ -875,11 +873,11 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // If the memory object has multiple tuple elements, we need to destroy any
     // live subelements, since they can each be in a different state of
     // initialization.
-    for (unsigned Elt = Use.FirstTupleElement, e = Elt+Use.NumTupleElements;
+    for (unsigned Elt = Use.FirstElement, e = Elt+Use.NumElements;
          Elt != e; ++Elt) {
       B.setInsertionPoint(Use.Inst);
       SILValue CondVal = Bitmask;
-      if (NumTupleElements != 1) {
+      if (NumElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
           if (!ShiftRightFn)
@@ -952,7 +950,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // to handle, whereas the partial case requires dynamic codegen based on the
     // liveness bitmask.
     SILValue LoadedMask;
-    for (unsigned Elt = 0, e = NumTupleElements; Elt != e; ++Elt) {
+    for (unsigned Elt = 0, e = NumElements; Elt != e; ++Elt) {
       switch (Availability.get(Elt)) {
       case DIKind::No:
         // If an element is known to be uninitialized, then we know we can
@@ -986,7 +984,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // If this memory object has multiple tuple elements, we need to make sure
       // to test the right one.
-      if (NumTupleElements != 1) {
+      if (NumElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
           if (!ShiftRightFn) {
@@ -1094,7 +1092,7 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
     return BBState.getAvailabilitySet();
   case LiveOutBlockState::IsComputingLiveOut:
     // Speculate that it will be live out in cyclic cases.
-    return AvailabilitySet(NumTupleElements);
+    return AvailabilitySet(NumElements);
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1134,7 +1132,7 @@ getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
 /// computed correctly.
 AvailabilitySet LifetimeChecker::
 getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
-  AvailabilitySet Result(NumTupleElements);
+  AvailabilitySet Result(NumElements);
 
   // Empty tuple queries return a completely "unknown" vector, since they don't
   // care about any of the elements.
@@ -1145,7 +1143,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   
   // The vastly most common case is memory allocations that are not tuples,
   // so special case this with a more efficient algorithm.
-  if (NumTupleElements == 1) {
+  if (NumElements == 1) {
     
     // If there is a store in the current block, scan the block to see if the
     // store is before or after the load.  If it is before, it produces the value
@@ -1177,7 +1175,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 
   // Check locally to see if any elements are satified within the block, and
   // keep track of which ones are still needed in the NeededElements set.
-  llvm::SmallBitVector NeededElements(NumTupleElements);
+  llvm::SmallBitVector NeededElements(NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the
@@ -1204,8 +1202,8 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       // Check to see which tuple elements this instruction defines.  Clear them
       // from the set we're scanning from.
       auto &TheInstUse = Uses[It->second];
-      NeededElements.reset(TheInstUse.FirstTupleElement,
-                      TheInstUse.FirstTupleElement+TheInstUse.NumTupleElements);
+      NeededElements.reset(TheInstUse.FirstElement,
+                           TheInstUse.FirstElement+TheInstUse.NumElements);
       // If that satisfied all of the elements we're looking for, then we're
       // done.  Otherwise, keep going.
       if (NeededElements.none()) {
@@ -1233,13 +1231,13 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
-    getLivenessAtInst(Use.Inst, Use.FirstTupleElement, Use.NumTupleElements);
+    getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
   
   // Now that we know about each element, determine a yes/no/partial result
   // based on the elements we care about.
   bool LiveInAll = true, LiveInAny = false;
   
-  for (unsigned i = Use.FirstTupleElement, e = i+Use.NumTupleElements;
+  for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
        i != e; ++i) {
     DIKind ElementKind = Liveness.get(i);
     if (ElementKind != DIKind::No)

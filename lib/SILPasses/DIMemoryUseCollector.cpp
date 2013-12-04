@@ -250,7 +250,7 @@ bool DIMemoryUse::
 onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   auto &Module = Inst->getModule();
   
-  for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
+  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i){
     auto EltTy = MI.getElementType(i);
     if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
       return false;
@@ -380,12 +380,12 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
                                          SILInstruction *User, DIUseKind Kind) {
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
-  unsigned NumTupleElements = 1;
+  unsigned NumElements = 1;
   if (!InStructSubElement && !InEnumSubElement)
-    NumTupleElements = getElementCountRec(UseTy.getSwiftRValueType(),
-                                          IsSelfOfInitializer);
+    NumElements = getElementCountRec(UseTy.getSwiftRValueType(),
+                                     IsSelfOfInitializer);
   
-  Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, NumTupleElements));
+  Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new
