@@ -2648,7 +2648,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="example">
     var b: B = D()
     var d: D? = b as D
-    var b2 = D! as B
+    var b2 = d! as B
   </pre>
 
   <li><tt>x is T</tt> will query the type of the value of <tt>x</tt> at runtime.
