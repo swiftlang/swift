@@ -279,9 +279,9 @@ public:
                                                           SILValue src) {
     return createMarkUninitialized(loc, src, MarkUninitializedInst::GlobalVar);
   }
-  MarkUninitializedInst *createMarkUninitializedRootInit(SILLocation loc,
+  MarkUninitializedInst *createMarkUninitializedRootSelf(SILLocation loc,
                                                          SILValue src) {
-    return createMarkUninitialized(loc, src, MarkUninitializedInst::RootInit);
+    return createMarkUninitialized(loc, src, MarkUninitializedInst::RootSelf);
   }
 
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation loc,

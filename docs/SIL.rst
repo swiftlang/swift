@@ -1360,7 +1360,7 @@ mark_uninitialized
 ::
   sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
   mu_kind ::= 'globalvar'
-  mu_kind ::= 'rootinit'
+  mu_kind ::= 'rootself'
 
   %2 = mark_uninitialized 'globalvar' %1 : $*T
   // $T must be an address

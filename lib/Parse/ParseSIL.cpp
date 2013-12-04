@@ -1403,18 +1403,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc KindLoc;
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
         P.parseIdentifier(KindId, KindLoc, diag::expected_tok_in_sil_instr,
-                          "globalvar or rootinit") ||
+                          "globalvar or rootself") ||
         P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
       return true;
 
     MarkUninitializedInst::Kind Kind;
     if (KindId.str() == "globalvar")
       Kind = MarkUninitializedInst::GlobalVar;
-    else if (KindId.str() == "rootinit")
-      Kind = MarkUninitializedInst::RootInit;
+    else if (KindId.str() == "rootself")
+      Kind = MarkUninitializedInst::RootSelf;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
-                 "globalvar or rootinit");
+                 "globalvar or rootself");
       return true;
     }
 

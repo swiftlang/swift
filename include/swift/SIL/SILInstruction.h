@@ -781,8 +781,8 @@ public:
     /// top level code declaration.
     GlobalVar,
 
-    /// RootInitializer designates "self" in a struct, enum, or root class.
-    RootInit
+    /// RootSelf designates "self" in a struct, enum, or root class.
+    RootSelf
   };
 private:
   Kind ThisKind;

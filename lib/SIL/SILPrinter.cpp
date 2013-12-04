@@ -628,7 +628,13 @@ public:
        << getIDAndType(AI->getDest());
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
-    OS << "mark_uninitialized " << getIDAndType(MU->getOperand());
+    OS << "mark_uninitialized ";
+    switch (MU->getKind()) {
+    case MarkUninitializedInst::GlobalVar: OS << "[globalvar] "; break;
+    case MarkUninitializedInst::RootSelf:  OS << "[rootself] "; break;
+    }
+    
+    OS << getIDAndType(MU->getOperand());
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     OS << "mark_function_escape ";
