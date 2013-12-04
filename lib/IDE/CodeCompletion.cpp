@@ -1122,11 +1122,12 @@ public:
         Builder.addLeadingDot();
       Builder.addTextChunk("init");
     }
-    Type ArgsType = CD->getType()
-                        ->castTo<AnyFunctionType>()->getResult()
-                        ->castTo<AnyFunctionType>()->getInput();
-    addPatternFromType(Builder, ArgsType);
-    addTypeAnnotation(Builder, CD->getResultType());
+    Type ConstructorType =
+        getTypeOfMember(CD)->castTo<AnyFunctionType>()->getResult();
+    addPatternFromType(
+        Builder, ConstructorType->castTo<AnyFunctionType>()->getInput());
+    addTypeAnnotation(
+        Builder, ConstructorType->castTo<AnyFunctionType>()->getResult());
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
