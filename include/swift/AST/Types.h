@@ -369,7 +369,7 @@ public:
   /// the member's type will be used.
   ///
   /// \returns the resulting member type.
-  Type getTypeOfMember(Module *module, ValueDecl *member,
+  Type getTypeOfMember(Module *module, const ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
 
 
