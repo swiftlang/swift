@@ -4122,7 +4122,6 @@ namespace {
         }
 
         // Validate the type.
-        // FIXME: Allow unbound generics.
         if (TC.validateType(cast->getCastTypeLoc(), DC,
                             /*allowUnboundGenerics=*/true))
           return nullptr;
@@ -4140,7 +4139,6 @@ namespace {
         }
 
         // Validate the type.
-        // FIXME: Allow unbound generics.
         if (TC.validateType(isa->getCastTypeLoc(), DC,
                             /*allowUnboundGenerics=*/true))
           return nullptr;
