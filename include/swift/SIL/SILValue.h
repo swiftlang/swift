@@ -317,6 +317,7 @@ public:
   public:
     iterator(const Operand *ptr) : Ptr(ptr) {}
     SILValue operator*() const { assert(Ptr); return Ptr->get(); }
+    SILValue operator->() const { return operator*(); }
     iterator &operator++() { ++Ptr; return *this; }
     iterator operator++(int) { iterator copy = *this; ++Ptr; return copy; }
 
@@ -352,6 +353,7 @@ class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
 public:
   ValueBaseUseIterator() = default;
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
+  Operand *operator->() const { return Cur; }
   Operand *operator*() const { return Cur; }
 
   SILInstruction *getUser() const {
@@ -411,6 +413,7 @@ public:
   }
 
   Operand *operator*() const { return CurAndResultNumber.getPointer(); }
+  Operand *operator->() const { return operator*(); }
 
   SILInstruction *getUser() const {
     return CurAndResultNumber.getPointer()->getUser();
