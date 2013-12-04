@@ -2446,35 +2446,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
 
-    // Check whether we have an 'identity' constructor.
-    bool needIdentityConstructor = true;
-    if (baseObjTy->getClassOrBoundGenericClass()) {
-      // When we are constructing a class type, there is no coercion case
-      // to consider.
-      needIdentityConstructor = false;
-    } else {
-      // FIXME: Busted for generic types.
-      for (auto constructor : ctors) {
-        if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
-          if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
-            // Dig out the input type.
-            auto inputTy = funcTy->getInput();
-            if (auto inputTupleTy = inputTy->getAs<TupleType>()) {
-              int scalarIdx = inputTupleTy->getFieldForScalarInit();
-              if (scalarIdx >= 0) {
-                inputTy = inputTupleTy->getElementType(scalarIdx);
-              }
-            }
-
-            if (inputTy->isEqual(baseObjTy)) {
-              needIdentityConstructor = false;
-              break;
-            }
-          }
-        }
-      }
-    }
-    
     // Introduce a new overload set.
     SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : ctors) {
@@ -2494,14 +2465,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
       choices.push_back(OverloadChoice(baseTy, constructor,
                                        /*isSpecialized=*/false));
-    }
-
-    // If we need an "identity" constructor, then add an entry in the
-    // overload set for T -> T, where T is the base type. This entry acts as a
-    // stand-in for conversion of the argument to T.
-    if (needIdentityConstructor) {
-      choices.push_back(OverloadChoice(baseTy,
-                                       OverloadChoiceKind::IdentityFunction));
     }
 
     if (choices.empty()) {

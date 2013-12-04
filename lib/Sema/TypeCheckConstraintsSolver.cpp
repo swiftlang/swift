@@ -1185,6 +1185,17 @@ bool ConstraintSystem::solveSimplified(
         if (*restriction == ConversionRestrictionKind::TupleToTuple)
           break;
       }
+
+      // Or, if we see a conversion successfully applied to a string
+      // interpolation argument, we're done.
+      // FIXME: Probably should be more general, as mentioned above.
+      if (auto locator = disjunction->getLocator()) {
+        if (!locator->getPath().empty() &&
+            locator->getPath().back().getKind()
+              == ConstraintLocator::InterpolationArgument &&
+            constraint->getKind() == ConstraintKind::Conversion)
+          break;
+      }
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {

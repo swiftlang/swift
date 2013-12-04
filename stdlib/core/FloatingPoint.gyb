@@ -67,7 +67,11 @@ struct ${Self} : ReplPrintable {
   }
 
   func replPrint() {
+@if bits == 64:
+    print(self)
+@else:
     print(Double(self))
+@end
   }
 }
 
@@ -115,10 +119,12 @@ extension ${Self} : Comparable {
 extension ${Self} : Hashable {
   func hashValue() -> Int {
 @   if bits > intBits:
-    var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
-    return Int(Builtin.trunc_Int${bits}_Int${intBits}(asBuiltinInt))
+      var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
+      return Int(Builtin.trunc_Int${bits}_Int${intBits}(asBuiltinInt))
+@   elif bits == intBits:
+      return Int${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
 @   else:
-    return Int(Int${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)))
+      return Int(Int${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)))
 @   end
   }
 }

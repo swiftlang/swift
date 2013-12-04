@@ -187,13 +187,22 @@ namespace {
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType());
 
-      // Each of the segments needs to be convertible to a constructor argument
-      // for the underlying string type.
+      // Each of the segments needs to be either convertible to the underlying
+      // string type or there must be a string constructor from the segment.
       unsigned index = 0;
       for (auto segment : expr->getSegments()) {
-        CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv,
-          CS.getConstraintLocator(expr,
-            LocatorPathElt::getInterpolationArgument(index++)));
+        auto locator = CS.getConstraintLocator(
+                         expr,
+                         LocatorPathElt::getInterpolationArgument(index++));
+        Constraint *constraints[2] = {
+          new (CS) Constraint(ConstraintKind::Conversion, segment->getType(),
+                              tv, Identifier(), locator),
+          new (CS) Constraint(ConstraintKind::Construction, segment->getType(),
+                              tv, Identifier(), locator)
+        };
+
+        CS.addConstraint(Constraint::createDisjunction(CS, constraints,
+                                                       locator));
       }
       
       return tv;
