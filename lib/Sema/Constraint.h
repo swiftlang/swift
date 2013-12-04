@@ -65,6 +65,8 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// A checked cast from the first type to the second.
+  CheckedCast,
   /// \brief The first type can act as the Self type of the second type (which
   /// is a protocol).
   ///
@@ -250,6 +252,7 @@ public:
     case ConstraintKind::Conversion:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::BindOverload:

@@ -34,6 +34,11 @@ class GenericTypeResolver;
 class NominalTypeDecl;
 class TypeChecker;
 
+namespace constraints {
+  class ConstraintSystem;
+  class Solution;
+}
+
 /// \brief A mapping from substitutable types to the protocol-conformance
 /// mappings for those types.
 typedef llvm::DenseMap<SubstitutableType *,
@@ -477,7 +482,20 @@ public:
   /// Pre-check an expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
-  
+
+  /// Callback object that adds additional constraints to the given constraint
+  /// system when type-checking an expression.
+  ///
+  /// This callback receives the newly-created constraint system along with
+  /// the pre-checked expression.
+  typedef std::function<void(constraints::ConstraintSystem &, Expr *expr)>
+    AddExprConstraintsCallback;
+
+  /// Callback object when a solution to a constraint system has been selected.
+  typedef std::function<void(constraints::ConstraintSystem &,
+                             constraints::Solution &)>
+    SolvedConstraintSystemCallback;
+
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -492,11 +510,16 @@ public:
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
+  /// \param addConstraints If non-null, will be invoked given the constraint
+  /// system to introduce additional constraints.
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            Type convertType, bool discardedExpr,
                            FreeTypeVariableBinding allowFreeTypeVariables
-                             = FreeTypeVariableBinding::Disallow);
+                             = FreeTypeVariableBinding::Disallow,
+                           AddExprConstraintsCallback addConstraints = nullptr,
+                           SolvedConstraintSystemCallback onSolved = nullptr);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.
@@ -541,7 +564,7 @@ public:
                                        SourceRange diagFromRange,
                                        SourceRange diagToRange,
                                        std::function<bool(Type)> convertToType);
-  
+
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.
   ///

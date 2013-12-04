@@ -1589,6 +1589,10 @@ private:
                                             ConstraintLocatorBuilder locator,
                                             bool allowNonConformingExistential);
 
+  /// Attempt to simplify a checked-cast constraint.
+  SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
+                                             ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);
 

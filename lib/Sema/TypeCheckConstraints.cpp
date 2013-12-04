@@ -2359,6 +2359,116 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   return SolutionKind::Error;
 }
 
+/// Determine the kind of checked cast to perform from the given type to
+/// the given type.
+///
+/// This routine does not attempt to check whether the cast can actually
+/// succeed; that's the caller's responsibility.
+static CheckedCastKind getCheckedCastKind(Type fromType, Type toType) {
+  // Classify the from/to types.
+  bool toArchetype = toType->is<ArchetypeType>();
+  bool fromArchetype = fromType->is<ArchetypeType>();
+  bool toExistential = toType->isExistentialType();
+  bool fromExistential = fromType->isExistentialType();
+
+  // We can only downcast to an existential if the destination protocols are
+  // objc and the source type is an objc class or an existential bounded by objc
+  // protocols.
+  if (toExistential) {
+    return CheckedCastKind::ConcreteToUnrelatedExistential;
+  }
+
+  // A downcast can:
+  //   - convert an archetype to a (different) archetype type.
+  if (fromArchetype && toArchetype) {
+    return CheckedCastKind::ArchetypeToArchetype;
+  }
+
+  //   - convert from an existential to an archetype or conforming concrete
+  //     type.
+  if (fromExistential) {
+    if (toArchetype) {
+      return CheckedCastKind::ExistentialToArchetype;
+    }
+
+    return CheckedCastKind::ExistentialToConcrete;
+  }
+
+  //   - convert an archetype to a concrete type fulfilling its constraints.
+  if (fromArchetype) {
+    return CheckedCastKind::ArchetypeToConcrete;
+  }
+
+  if (toArchetype) {
+    //   - convert from a superclass to an archetype.
+    if (toType->castTo<ArchetypeType>()->getSuperclass()) {
+      return CheckedCastKind::SuperToArchetype;
+    }
+
+    //  - convert a concrete type to an archetype for which it fulfills
+    //    constraints.
+    return CheckedCastKind::ConcreteToArchetype;
+  }
+
+  // The remaining case is a class downcast.
+  assert(!fromArchetype && "archetypes should have been handled above");
+  assert(!toArchetype && "archetypes should have been handled above");
+  assert(!fromExistential && "existentials should have been handled above");
+  assert(!toExistential && "existentials should have been handled above");
+
+  return CheckedCastKind::Downcast;
+
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyCheckedCastConstraint(
+                    Type fromType, Type toType,
+                    ConstraintLocatorBuilder locator) {
+  // Dig out the fixed type to which this type refers.
+  TypeVariableType *typeVar1;
+  fromType = getFixedTypeRecursive(*this, fromType, typeVar1, /*wantRValue=*/true);
+
+  // If we hit a type variable without a fixed type, we can't
+  // solve this yet.
+  if (typeVar1)
+    return SolutionKind::Unsolved;
+
+  // Dig out the fixed type to which this type refers.
+  TypeVariableType *typeVar2;
+  toType = getFixedTypeRecursive(*this, toType, typeVar2, /*wantRValue=*/true);
+
+  // If we hit a type variable without a fixed type, we can't
+  // solve this yet.
+  if (typeVar2)
+    return SolutionKind::Unsolved;
+
+  switch (getCheckedCastKind(fromType, toType)) {
+  case CheckedCastKind::ArchetypeToArchetype:
+  case CheckedCastKind::ConcreteToUnrelatedExistential:
+  case CheckedCastKind::ExistentialToArchetype:
+  case CheckedCastKind::SuperToArchetype:
+    return SolutionKind::Solved;
+
+  case CheckedCastKind::ArchetypeToConcrete:
+  case CheckedCastKind::ConcreteToArchetype:
+    // FIXME: Check substitutability.
+    return SolutionKind::Solved;
+
+  case CheckedCastKind::Downcast:
+    addConstraint(ConstraintKind::Subtype, toType, fromType,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
+
+  case CheckedCastKind::ExistentialToConcrete:
+    addConstraint(ConstraintKind::Conversion, toType, fromType);
+    return SolutionKind::Solved;
+
+  case CheckedCastKind::Coercion:
+  case CheckedCastKind::Unresolved:
+    llvm_unreachable("Not a valid result");
+  }
+}
+
 /// \brief Determine whether the given protocol member's signature involves
 /// any associated types or Self.
 static bool involvesAssociatedTypes(TypeChecker &tc, ValueDecl *decl) {
@@ -2787,6 +2897,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::SelfObjectOfProtocol:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
+  case ConstraintKind::CheckedCast:
+    llvm_unreachable("Checked cast constraints don't involve type matches");
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
     llvm_unreachable("Member constraints don't involve type matches");
@@ -2950,6 +3063,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              constraint.getProtocol(),
              constraint.getLocator(),
              constraint.getKind() == ConstraintKind::SelfObjectOfProtocol);
+
+  case ConstraintKind::CheckedCast:
+    return simplifyCheckedCastConstraint(constraint.getFirstType(),
+                                         constraint.getSecondType(),
+                                         constraint.getLocator());
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
@@ -4005,7 +4123,8 @@ namespace {
 
         // Validate the type.
         // FIXME: Allow unbound generics.
-        if (TC.validateType(cast->getCastTypeLoc(), DC))
+        if (TC.validateType(cast->getCastTypeLoc(), DC,
+                            /*allowUnboundGenerics=*/true))
           return nullptr;
 
         return checkAsCastExpr(cast);
@@ -4022,7 +4141,8 @@ namespace {
 
         // Validate the type.
         // FIXME: Allow unbound generics.
-        if (TC.validateType(isa->getCastTypeLoc(), DC))
+        if (TC.validateType(isa->getCastTypeLoc(), DC,
+                            /*allowUnboundGenerics=*/true))
           return nullptr;
 
         CheckedCastKind castKind = checkCheckedCastExpr(isa);
@@ -4067,9 +4187,31 @@ namespace {
       Type toType = expr->getCastTypeLoc().getType();
 
       // Type-check the subexpression in isolation.
-      // FIXME: Open and use the "toType" here.
       Expr *sub = expr->getSubExpr();
-      if (TC.typeCheckExpression(sub, DC, Type(), /*discardedExpr=*/false)) {
+      if (TC.typeCheckExpression(sub, DC, Type(), /*discardedExpr=*/false,
+                                 FreeTypeVariableBinding::Disallow,
+                                 [&](ConstraintSystem &cs, Expr *expr) {
+            // Open up the type we're casting to.
+            toType = cs.openType(toType);
+
+            // Either convert the expression to the given type or perform a
+            // checked cast to the given type.
+            auto fromType = expr->getType();
+            auto locator = cs.getConstraintLocator(expr, { });
+            Constraint *constraints[2] = {
+              new (cs) Constraint(ConstraintKind::Conversion, fromType, toType,
+                                  Identifier(), locator),
+              new (cs) Constraint(ConstraintKind::CheckedCast, fromType, toType,
+                                  Identifier(), locator),
+             };
+             cs.addConstraint(Constraint::createDisjunction(cs, constraints,
+                                                            locator));
+          },
+                                 [&](ConstraintSystem &cs, Solution &solution) {
+            // Simplify the type we're converting to.
+            toType = solution.simplifyType(TC, toType);
+            expr->getCastTypeLoc().setType(toType);
+          })) {
         return CheckedCastKind::Unresolved;
       }
       sub = TC.coerceToRValue(sub);
@@ -4091,9 +4233,8 @@ namespace {
     }
 
     Expr *checkAsCastExpr(CheckedCastExpr *expr) {
-      Type toType = expr->getCastTypeLoc().getType();
-
       CheckedCastKind castKind = checkCheckedCastExpr(expr);
+      Type toType = expr->getCastTypeLoc().getType();
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4264,7 +4405,9 @@ bool TypeChecker::typeCheckExpression(
        Expr *&expr, DeclContext *dc,
        Type convertType,
        bool discardedExpr,
-       FreeTypeVariableBinding allowFreeTypeVariables) {
+       FreeTypeVariableBinding allowFreeTypeVariables,
+       AddExprConstraintsCallback addConstraints,
+       SolvedConstraintSystemCallback onSolved) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -4286,6 +4429,11 @@ bool TypeChecker::typeCheckExpression(
   if (convertType) {
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
                      cs.getConstraintLocator(expr, { }));
+  }
+
+  // If the caller wants to add constraints, do so now.
+  if (addConstraints) {
+    addConstraints(cs, expr);
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -4319,6 +4467,10 @@ bool TypeChecker::typeCheckExpression(
     log << "---Solution---\n";
     solution.dump(&Context.SourceMgr, log);
   }
+
+  // If the caller wanted to see the solution, provide it now.
+  if (onSolved)
+    onSolved(cs, solution);
 
   // Apply the solution to the expression.
   auto result = cs.applySolution(solution, expr);

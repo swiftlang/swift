@@ -54,6 +54,7 @@ gatherReferencedTypeVarsRec(ConstraintSystem &cs,
   case ConstraintKind::Bind:
   case ConstraintKind::Construction:
   case ConstraintKind::Conversion:
+  case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::TrivialSubtype:
