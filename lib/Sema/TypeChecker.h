@@ -148,10 +148,17 @@ public:
 
   /// Callback invoked once the constraint system has been solved.
   ///
-  /// \param cs The constraint system that has been solved.
-  /// \param solution The chosen solution to the constraint system.
-  virtual void solvedConstraints(constraints::ConstraintSystem &cs,
-                                 constraints::Solution &solution);
+  /// \param solution The chosen solution.
+  virtual void solvedConstraints(constraints::Solution &solution);
+
+  /// Callback invokes once the chosen solution has been applied to the
+  /// expression.
+  ///
+  /// The callback may further alter the expression, returning either a
+  /// new expression (to replace the result) or a null pointer to indicate
+  /// failure.
+  virtual Expr *appliedSolution(constraints::Solution &solution,
+                                Expr *expr);
 };
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,

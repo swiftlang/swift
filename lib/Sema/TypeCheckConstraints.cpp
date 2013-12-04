@@ -4206,8 +4206,9 @@ namespace {
                                                        locator));
       }
 
-      void solvedConstraints(ConstraintSystem &cs, Solution &solution) {
+      void solvedConstraints(Solution &solution) {
         // Simplify the type we're converting to.
+        ConstraintSystem &cs = solution.getConstraintSystem();
         ToType = solution.simplifyType(cs.getTypeChecker(), ToType);
       }
     };
@@ -4406,9 +4407,10 @@ void ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
 }
 
 
-void ExprTypeCheckListener::solvedConstraints(ConstraintSystem &cs,
-                                              Solution &solution) {
+void ExprTypeCheckListener::solvedConstraints(Solution &solution) { }
 
+Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
+  return expr;
 }
 
 #pragma mark High-level entry points
@@ -4480,7 +4482,7 @@ bool TypeChecker::typeCheckExpression(
 
   // Notify the listener that we have a solution.
   if (listener) {
-    listener->solvedConstraints(cs, solution);
+    listener->solvedConstraints(solution);
   }
 
   // Apply the solution to the expression.
@@ -4527,6 +4529,15 @@ bool TypeChecker::typeCheckExpression(
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
+  }
+
+  // If there's a listener, notify it that we've applied the solution.
+  if (listener) {
+    result = listener->appliedSolution(solution, result);
+    if (!result) {
+      performExprDiagnostics(*this, expr);
+      return true;
+    }
   }
 
   performExprDiagnostics(*this, result);
@@ -4774,93 +4785,52 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  PrettyStackTraceExpr stackTrace(Context, "type-checking condition", expr);
+  /// Expression type checking listener for conditions.
+  class ConditionListener : public ExprTypeCheckListener {
+    Expr *OrigExpr;
 
-  if (preCheckExpression(*this, expr, dc))
-    return true;
+  public:
+    // Add the appropriate LogicValue constraint.
+    virtual void builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      // Save the original expression.
+      OrigExpr = expr;
 
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  if (auto generatedExpr = cs.generateConstraints(expr))
-    expr = generatedExpr;
-  else
-    return true;
+      // If the expression has type Builtin.Int1 (or an l-value with that
+      // object type), go ahead and special-case that.  This doesn't need
+      // to be deeply principled because builtin types are not user-facing.
+      auto rvalueType = expr->getType()->getRValueType();
+      if (rvalueType->isBuiltinIntegerType(1)) {
+        cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                         rvalueType);
+      } else {
+        // Otherwise, the result must be a LogicValue.
+        auto &tc = cs.getTypeChecker();
+        auto logicValueProto = tc.getProtocol(expr->getLoc(),
+                                              KnownProtocolKind::LogicValue);
+        if (!logicValueProto) {
+          return /*FIXME:true*/;
+        }
 
-  // If the expression has type Builtin.Int1 (or an l-value with that
-  // object type), go ahead and special-case that.  This doesn't need
-  // to be deeply principled because builtin types are not user-facing.
-  auto rvalueType = expr->getType()->getRValueType();
-  if (rvalueType->isBuiltinIntegerType(1)) {
-    cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                     rvalueType);
-
-  // Otherwise, the result must be a LogicValue.
-  } else {
-    auto logicValueProto = getProtocol(expr->getLoc(),
-                                       KnownProtocolKind::LogicValue);
-    if (!logicValueProto) {
-      return true;
+        cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
+                         logicValueProto->getDeclaredType(),
+                         cs.getConstraintLocator(OrigExpr, { }));
+      }
     }
 
-    cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                     logicValueProto->getDeclaredType(),
-                     cs.getConstraintLocator(expr, { }));
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
-    log << "\n";
-    cs.dump(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      return true;
+    // Convert the result to LogicValue.
+    virtual Expr *appliedSolution(constraints::Solution &solution,
+                                  Expr *expr) {
+      auto &cs = solution.getConstraintSystem();
+      return solution.convertToLogicValue(expr,
+                                          cs.getConstraintLocator(OrigExpr,
+                                                                  { }));
     }
+  };
 
-    // FIXME: Crappy diagnostic.
-    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
-
-    return true;
-  }
-
-  auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
-  }
-
-  // Apply the solution to the expression.
-  auto result = cs.applySolution(solution, expr);
-  if (!result) {
-    // Failure already diagnosed, above, as part of applying the solution.
-    return true;
-  }
-
-  // Convert the expression to a logic value.
-  result = solution.convertToLogicValue(result,
-                                        cs.getConstraintLocator(expr, { }));
-  if (!result) {
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-  }
-
-  expr = result;
-  cleanup.disable();
-  return false;
+  ConditionListener listener;
+  return typeCheckExpression(expr, dc, Type(), /*discardedExpr=*/false,
+                             FreeTypeVariableBinding::Disallow,
+                             &listener);
 }
 
 bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
