@@ -888,6 +888,20 @@ public:
       Builder.addTypeAnnotation(T.getString());
   }
 
+  Type getTypeOfMember(const ValueDecl *VD) {
+    if (ExprType) {
+      Type ContextTy = VD->getDeclContext()->getDeclaredTypeOfContext();
+      if (ContextTy) {
+        Type MaybeNominalType = ExprType->getRValueInstanceType();
+        if (ContextTy->getAnyNominal() == MaybeNominalType->getAnyNominal())
+          return MaybeNominalType->getTypeOfMember(
+              CurrDeclContext->getParentModule(), VD, TypeResolver.get());
+      }
+    }
+
+    return VD->getType();
+  }
+
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -908,19 +922,7 @@ public:
     Builder.addTextChunk(Name);
 
     // Add a type annotation.
-    Type VarType;
-    if (ExprType) {
-      Type ContextTy = VD->getDeclContext()->getDeclaredTypeOfContext();
-      if (ContextTy &&
-          ContextTy->getAnyNominal() ==
-              ExprType->getRValueType()->getAnyNominal()) {
-        VarType = ExprType->getRValueType()->getTypeOfMember(
-            CurrDeclContext->getParentModule(), VD, TypeResolver.get());
-      }
-    }
-
-    if (!VarType)
-      VarType = VD->getType();
+    Type VarType = getTypeOfMember(VD);
     if (VD->getName() == Ctx.SelfIdentifier) {
       // Strip [inout] from 'self'.  It is useful to show [inout] for function
       // parameters.  But for 'self' it is just noise.
@@ -1063,19 +1065,7 @@ public:
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
-    Type FunctionType;
-    if (ExprType) {
-      Type ContextTy = FD->getDeclContext()->getDeclaredTypeOfContext();
-      if (ContextTy &&
-          ContextTy->getAnyNominal() ==
-              ExprType->getRValueType()->getAnyNominal()) {
-        FunctionType = ExprType->getRValueType()->getTypeOfMember(
-            CurrDeclContext->getParentModule(), FD, TypeResolver.get());
-      }
-    }
-    if (!FunctionType) {
-      FunctionType = FD->getType();
-    }
+    Type FunctionType = getTypeOfMember(FD);
 
     if (FirstIndex != 0)
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
