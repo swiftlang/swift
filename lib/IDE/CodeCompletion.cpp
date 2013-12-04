@@ -1073,6 +1073,9 @@ public:
     Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
 
     if (IsImlicitlyCurriedInstanceMethod) {
+      if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer()))
+        FirstInputType = PT->getUnderlyingType();
+
       Builder.addLeftParen();
       Builder.addCallParameter(Ctx.SelfIdentifier,
                                FirstInputType.getString());
