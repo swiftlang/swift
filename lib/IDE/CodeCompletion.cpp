@@ -908,18 +908,30 @@ public:
     Builder.addTextChunk(Name);
 
     // Add a type annotation.
-    Type T = VD->getType();
+    Type VarType;
+    if (ExprType) {
+      Type ContextTy = VD->getDeclContext()->getDeclaredTypeOfContext();
+      if (ContextTy &&
+          ContextTy->getAnyNominal() ==
+              ExprType->getRValueType()->getAnyNominal()) {
+        VarType = ExprType->getRValueType()->getTypeOfMember(
+            CurrDeclContext->getParentModule(), VD, TypeResolver.get());
+      }
+    }
+
+    if (!VarType)
+      VarType = VD->getType();
     if (VD->getName() == Ctx.SelfIdentifier) {
       // Strip [inout] from 'self'.  It is useful to show [inout] for function
       // parameters.  But for 'self' it is just noise.
-      T = T->getRValueType();
+      VarType = VarType->getRValueType();
     }
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have
       // Optional<T> type.
-      T = OptionalType::get(T, Ctx);
+      VarType = OptionalType::get(VarType, Ctx);
     }
-    addTypeAnnotation(Builder, T);
+    addTypeAnnotation(Builder, VarType);
   }
 
   void addPatternParameters(CodeCompletionResultBuilder &Builder,
