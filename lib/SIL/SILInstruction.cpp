@@ -303,10 +303,10 @@ unsigned Operand::getOperandNumber() const {
   return this - &cast<SILInstruction>(getUser())->getAllOperands()[0];
 }
 
-SILInstructionMemoryBehavior SILInstruction::getMemoryBehavior() const {
+SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   switch (getKind()) {
 #define INST(CLASS, PARENT, MEMBEHAVIOR) \
-  case ValueKind::CLASS: return SILInstructionMemoryBehavior::MEMBEHAVIOR;
+  case ValueKind::CLASS: return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -316,11 +316,10 @@ SILInstructionMemoryBehavior SILInstruction::getMemoryBehavior() const {
 }
 
 bool SILInstruction::mayHaveSideEffects() const {
-  SILInstructionMemoryBehavior B = getMemoryBehavior();
-
-  return B == SILInstructionMemoryBehavior::MayWrite ||
-    B == SILInstructionMemoryBehavior::MayReadWrite ||
-    B == SILInstructionMemoryBehavior::MayHaveSideEffects;
+  MemoryBehavior B = getMemoryBehavior();
+  return B == MemoryBehavior::MayWrite ||
+    B == MemoryBehavior::MayReadWrite ||
+    B == MemoryBehavior::MayHaveSideEffects;
 }
 
 namespace {

@@ -46,21 +46,6 @@ class Substitution;
 class ValueDecl;
 class VarDecl;
 
-enum class SILInstructionMemoryBehavior {
-  None,
-  /// The instruction may read memory.
-  MayRead,
-  /// \brief The instruction may write to memory.
-  MayWrite,
-  /// The instruction may read or write memory.
-  MayReadWrite,
-  /// \brief The instruction may have side effects not captured solely by its
-  ///        users. Specifically, it can return, release memory, or store. Note,
-  ///        alloc is not considered to have side effects because its
-  ///        result/users represent its effect.
-  MayHaveSideEffects,
-};
-
 enum IsTake_t { IsNotTake, IsTake };
 enum IsInitialization_t { IsNotInitialization, IsInitialization };
 
@@ -93,6 +78,21 @@ protected:
     : ValueBase(Kind, TypeList), ParentBB(0), DebugScope(DS), Loc(Loc) {}
 
 public:
+
+  enum class MemoryBehavior {
+    None,
+    /// The instruction may read memory.
+    MayRead,
+    /// \brief The instruction may write to memory.
+    MayWrite,
+    /// The instruction may read or write memory.
+    MayReadWrite,
+    /// \brief The instruction may have side effects not captured solely by its
+    ///        users. Specifically, it can return, release memory, or store. Note,
+    ///        alloc is not considered to have side effects because its
+    ///        result/users represent its effect.
+    MayHaveSideEffects,
+  };
 
   const SILBasicBlock *getParent() const { return ParentBB; }
   SILBasicBlock *getParent() { return ParentBB; }
@@ -132,7 +132,7 @@ public:
   unsigned getNumOperands() const { return getAllOperands().size(); }
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
 
-  SILInstructionMemoryBehavior getMemoryBehavior() const;
+  MemoryBehavior getMemoryBehavior() const;
 
   /// Returns true if the given instruction is completely identical to RHS.
   bool isIdenticalTo(const SILInstruction *RHS) const;
@@ -146,18 +146,18 @@ public:
 
   /// Returns true if the instruction may write to memory.
   bool mayWriteToMemory() const {
-    const SILInstructionMemoryBehavior B = getMemoryBehavior();
-    return B == SILInstructionMemoryBehavior::MayWrite ||
-      B == SILInstructionMemoryBehavior::MayReadWrite ||
-      B == SILInstructionMemoryBehavior::MayHaveSideEffects;
+    MemoryBehavior B = getMemoryBehavior();
+    return B == MemoryBehavior::MayWrite ||
+      B == MemoryBehavior::MayReadWrite ||
+      B == MemoryBehavior::MayHaveSideEffects;
   }
 
   /// Returns true if the instruction may read from memory.
   bool mayReadFromMemory() const {
-    const SILInstructionMemoryBehavior B = getMemoryBehavior();
-    return B == SILInstructionMemoryBehavior::MayRead ||
-      B == SILInstructionMemoryBehavior::MayReadWrite ||
-      B == SILInstructionMemoryBehavior::MayHaveSideEffects;
+    MemoryBehavior B = getMemoryBehavior();
+    return B == MemoryBehavior::MayRead ||
+      B == MemoryBehavior::MayReadWrite ||
+      B == MemoryBehavior::MayHaveSideEffects;
   }
 
   static bool classof(const ValueBase *V) {
