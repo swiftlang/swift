@@ -4188,7 +4188,7 @@ namespace {
     public:
       explicit CastCheckListener(Type &toType) : ToType(toType) { }
 
-      virtual void builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
         // Open up the type we're casting to.
         ToType = cs.openType(ToType);
 
@@ -4204,6 +4204,8 @@ namespace {
         };
         cs.addConstraint(Constraint::createDisjunction(cs, constraints,
                                                        locator));
+
+        return false;
       }
 
       void solvedConstraints(Solution &solution) {
@@ -4403,7 +4405,8 @@ static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
 
 ExprTypeCheckListener::~ExprTypeCheckListener() { }
 
-void ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
+bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
+  return false;
 }
 
 
@@ -4444,8 +4447,8 @@ bool TypeChecker::typeCheckExpression(
   }
 
   // Notify the listener that we've built the constraint system.
-  if (listener) {
-    listener->builtConstraints(cs, expr);
+  if (listener && listener->builtConstraints(cs, expr)) {
+    return true;
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -4791,7 +4794,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
   public:
     // Add the appropriate LogicValue constraint.
-    virtual void builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
 
@@ -4802,22 +4805,24 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       if (rvalueType->isBuiltinIntegerType(1)) {
         cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
                          rvalueType);
-      } else {
-        // Otherwise, the result must be a LogicValue.
-        auto &tc = cs.getTypeChecker();
-        auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                              KnownProtocolKind::LogicValue);
-        if (!logicValueProto) {
-          return /*FIXME:true*/;
-        }
-
-        cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                         logicValueProto->getDeclaredType(),
-                         cs.getConstraintLocator(OrigExpr, { }));
+        return false;
       }
+
+      // Otherwise, the result must be a LogicValue.
+      auto &tc = cs.getTypeChecker();
+      auto logicValueProto = tc.getProtocol(expr->getLoc(),
+                                            KnownProtocolKind::LogicValue);
+      if (!logicValueProto) {
+        return true;
+      }
+
+      cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
+                       logicValueProto->getDeclaredType(),
+                       cs.getConstraintLocator(OrigExpr, { }));
+      return false;
     }
 
-    // Convert the result to LogicValue.
+    // Convert the result to a logic value.
     virtual Expr *appliedSolution(constraints::Solution &solution,
                                   Expr *expr) {
       auto &cs = solution.getConstraintSystem();
@@ -4863,83 +4868,44 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
     return true;
   }
 
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (preCheckExpression(*this, expr, dc))
-    return true;
+  /// Expression type checking listener for array bounds.
+  class ArrayBoundListener : public ExprTypeCheckListener {
+    Expr *OrigExpr;
 
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  if (auto generatedExpr = cs.generateConstraints(expr))
-    expr = generatedExpr;
-  else
-    return true;
+  public:
+    // Add the appropriate ArrayBound constraint.
+    // Add the appropriate LogicValue constraint.
+    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      // Save the original expression.
+      OrigExpr = expr;
 
-  // The result must be an ArrayBound.
-  auto arrayBoundProto = getProtocol(expr->getLoc(),
-                                     KnownProtocolKind::ArrayBound);
-  if (!arrayBoundProto) {
-    return true;
-  }
+      // The result must be an ArrayBound.
+      auto &tc = cs.getTypeChecker();
+      auto arrayBoundProto = tc.getProtocol(expr->getLoc(),
+                                            KnownProtocolKind::ArrayBound);
+      if (!arrayBoundProto) {
+        return true;
+      }
 
-  cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                   arrayBoundProto->getDeclaredType(),
-                   cs.getConstraintLocator(expr, { }));
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
-    log << "\n";
-    cs.dump(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      return true;
+      cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
+                       arrayBoundProto->getDeclaredType(),
+                       cs.getConstraintLocator(OrigExpr, { }));
+      return false;
     }
 
-    // FIXME: Crappy diagnostic.
-    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
+    // Convert the result to an array bound.
+    virtual Expr *appliedSolution(constraints::Solution &solution,
+                                  Expr *expr) {
+      auto &cs = solution.getConstraintSystem();
+      return solution.convertToArrayBound(expr,
+                                         cs.getConstraintLocator(OrigExpr,
+                                                                 { }));
+    }
+  };
 
-    return true;
-  }
-
-  auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
-  }
-
-  // Apply the solution to the expression.
-  auto result = cs.applySolution(solution, expr);
-  if (!result) {
-    // Failure already diagnosed, above, as part of applying the solution.
-    return true;
-  }
-
-  // Convert the expression to an array bound.
-  result = solution.convertToArrayBound(result,
-                                        cs.getConstraintLocator(expr, { }));
-  if (!result) {
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-  }
-  
-  expr = result;
-  cleanup.disable();
-  return false;
+  ArrayBoundListener listener;
+  return typeCheckExpression(expr, dc, Type(), /*discardedExpr=*/false,
+                             FreeTypeVariableBinding::Disallow, &listener);
 }
 
 /// Find the '~=` operator that can compare an expression inside a pattern to a

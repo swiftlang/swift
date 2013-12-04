@@ -144,7 +144,10 @@ public:
   ///
   /// \param expr The pre-checked expression from which the constraint system
   /// was generated.
-  virtual void builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
+  ///
+  /// \returns true if an error occurred that is not itself part of the
+  /// constraint system, or false otherwise.
+  virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
 
   /// Callback invoked once the constraint system has been solved.
   ///
