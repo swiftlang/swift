@@ -38,7 +38,7 @@ unsigned TF::getElementCount(CanType T) {
 }
 
 /// Given a symbolic element number, return the type of the element.
-CanType TF::getElementType(CanType T, unsigned EltNo) {
+static CanType getElementType(CanType T, unsigned EltNo) {
   TupleType *TT = T->getAs<TupleType>();
   
   // If this isn't a tuple, it is a leaf element.
@@ -51,7 +51,7 @@ CanType TF::getElementType(CanType T, unsigned EltNo) {
     auto FieldType = Elt.getType()->getCanonicalType();
     unsigned NumFields = TF::getElementCount(FieldType);
     if (EltNo < NumFields)
-      return TF::getElementType(FieldType, EltNo);
+      return getElementType(FieldType, EltNo);
     EltNo -= NumFields;
   }
   
@@ -130,7 +130,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(SILType MemoryType) const {
   auto &Module = Inst->getModule();
   
   for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
-    auto EltTy = TF::getElementType(MemoryCType, i);
+    auto EltTy = getElementType(MemoryCType, i);
     if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
       return false;
   }

@@ -42,11 +42,6 @@ namespace TF {
   /// otherwise this is 1.
   unsigned getElementCount(CanType T);
   
-  /// getElementType - Given a symbolic element number, return the type of the
-  /// element.
-  CanType getElementType(CanType T, unsigned EltNo);
-  
-  
   /// emitElementAddress - Given a tuple element number (in the flattened
   /// sense) return a pointer to a leaf element of the specified number.
   SILValue emitElementAddress(SILValue Ptr, unsigned TupleEltNo,
