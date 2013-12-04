@@ -1350,10 +1350,9 @@ private:
                                      "Builtin.Word");
       return nullptr;
     }
-    if (c == 'a') {
-      Mangled.next();
+    if (c == 'a')
       return demangleDeclarationName(Node::Kind::Identifier);
-    }
+
     if (c == 'b') {
       NodePointer in_args = demangleType();
       if (!in_args)
