@@ -4265,18 +4265,6 @@ namespace {
 
         // The result type is the type we're converting to.
         result->setType(toType);
-
-        // If the cast was implicitly generated, wrap it in an optional.
-        // FIXME: This hack is only needed for the Clang importer, which
-        // doesn't know whether to force the coercion or not. The introduction
-        // of instancetype should solve the issue, or we could move the hack
-        // over to postfix '!'.
-        if (expr->isImplicit()) {
-          return new (TC.Context) InjectIntoOptionalExpr(
-                                    result,
-                                    OptionalType::get(toType, TC.Context));
-        }
-
         return result;
       }
 
