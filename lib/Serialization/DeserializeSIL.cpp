@@ -787,7 +787,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
   UNARY_INSTRUCTION(Load)
-  UNARY_INSTRUCTION(MarkUninitialized)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(StrongRetain)
   UNARY_INSTRUCTION(StrongRelease)
@@ -814,6 +813,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)),
         canDefault);
+    break;
+  }
+  case ValueKind::MarkUninitializedInst: {
+    auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    auto Kind = (MarkUninitializedInst::Kind)Attr;
+    auto Val = getLocalValue(ValID, ValResNum, Ty);
+    ResultVal = Builder.createMarkUninitialized(Loc, Val, Kind);
     break;
   }
   case ValueKind::StoreInst: {

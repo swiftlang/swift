@@ -1358,10 +1358,11 @@ by the definitive initialization pass.
 mark_uninitialized
 ``````````````````
 ::
+  sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
+  mu_kind ::= 'globalvar'
+  mu_kind ::= 'rootinit'
 
-  sil-instruction ::= 'mark_uninitialized' sil-operand
-
-  %2 = mark_uninitialized %1 : $*T
+  %2 = mark_uninitialized 'globalvar' %1 : $*T
   // $T must be an address
 
 Indicates that a symbolic memory location is uninitialized, and must be
@@ -1370,8 +1371,9 @@ This instruction returns its operands, and all accesses within the function must
 be performed against the return value of the mark_uninitialized instruction.
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
-definitive initialization analysis for global variables and instance variables,
-which are not represented as box allocations.
+definitive initialization analysis for global variables (when marked as
+'globalvar') and instance variables (when marked as 'rootinit'), which need to
+be distinguished from simple allocations.
 
 It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
 appropriate by the definitive initialization pass.

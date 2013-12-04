@@ -317,7 +317,8 @@ void
 SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
   doPostProcess(Inst,
              Builder.createMarkUninitialized(getOpLocation(Inst->getLoc()),
-                                             getOpValue(Inst->getOperand())));
+                                             getOpValue(Inst->getOperand()),
+                                             Inst->getKind()));
 }
 
 template<typename ImplClass>

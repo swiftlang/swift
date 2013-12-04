@@ -775,10 +775,24 @@ public:
 class MarkUninitializedInst
   : public UnaryInstructionBase<ValueKind::MarkUninitializedInst> {
 public:
-  
-  MarkUninitializedInst(SILLocation Loc, SILValue Address)
-    : UnaryInstructionBase(Loc, Address, Address.getType()) {
+  // This enum captures what the mark_uninitialized instruction is designating.
+  enum Kind {
+    /// GlobalVar designates the start of a global variable live range in a
+    /// top level code declaration.
+    GlobalVar,
+
+    /// RootInitializer designates "self" in a struct, enum, or root class.
+    RootInit
+  };
+private:
+  Kind ThisKind;
+public:
+
+  MarkUninitializedInst(SILLocation Loc, SILValue Address, Kind K)
+    : UnaryInstructionBase(Loc, Address, Address.getType()), ThisKind(K) {
   }
+
+  Kind getKind() const { return ThisKind; }
 };
 
 /// MarkFunctionEscape - Represents the escape point of set of variables due to

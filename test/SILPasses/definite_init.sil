@@ -364,7 +364,7 @@ var int_global : Int
 // CHECK: return
 sil @test_tlc : $() -> () {
   %0 = global_addr #int_global : $*Int64
-  %1 = mark_uninitialized %0 : $*Int64
+  %1 = mark_uninitialized [globalvar] %0 : $*Int64
 
   %9 = tuple ()
   return %9 : $()

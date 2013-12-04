@@ -271,8 +271,17 @@ public:
     return insert(new (F.getModule()) AssignInst(Loc, Src, DestAddr));
   }
 
-  MarkUninitializedInst *createMarkUninitialized(SILLocation loc, SILValue src){
-    return insert(new (F.getModule()) MarkUninitializedInst(loc, src));
+  MarkUninitializedInst *createMarkUninitialized(SILLocation loc, SILValue src,
+                                                 MarkUninitializedInst::Kind k){
+    return insert(new (F.getModule()) MarkUninitializedInst(loc, src, k));
+  }
+  MarkUninitializedInst *createMarkUninitializedGlobalVar(SILLocation loc,
+                                                          SILValue src) {
+    return createMarkUninitialized(loc, src, MarkUninitializedInst::GlobalVar);
+  }
+  MarkUninitializedInst *createMarkUninitializedRootInit(SILLocation loc,
+                                                         SILValue src) {
+    return createMarkUninitialized(loc, src, MarkUninitializedInst::RootInit);
   }
 
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation loc,

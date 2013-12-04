@@ -402,7 +402,7 @@ struct InitializationForPattern
                           Gen.getLoweredType(vd->getType()).getAddressType());
       
       // In a top level context, all global variables must be initialized.
-      addr = Gen.B.createMarkUninitialized(vd, addr);
+      addr = Gen.B.createMarkUninitializedGlobalVar(vd, addr);
       
       Gen.VarLocs[vd] = {SILValue(), addr};
       return InitializationPtr(new GlobalInitialization(addr));

@@ -542,10 +542,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReturnInst: {
     unsigned Attr = 0;
-    if (SI.getKind() == ValueKind::LoadWeakInst)
-      Attr = cast<LoadWeakInst>(&SI)->isTake();
-    else if (SI.getKind() == ValueKind::InitializeVarInst)
-      Attr = cast<InitializeVarInst>(&SI)->canDefaultConstruct();
+    if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
+      Attr = LWI->isTake();
+    else if (auto *IVI = dyn_cast<InitializeVarInst>(&SI))
+      Attr = IVI->canDefaultConstruct();
+    else if (auto *MUI = dyn_cast<MarkUninitializedInst>(&SI))
+      Attr = (unsigned)MUI->getKind();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                  (unsigned)SI.getKind(), Attr,
