@@ -16,6 +16,8 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Attr.h"
 
+#include <vector>
+
 namespace swift {
   class SourceManager;
   class TranslationUnit;
@@ -59,6 +61,7 @@ struct SyntaxStructureNode {
   DeclAttributes Attrs;
   CharSourceRange Range;
   CharSourceRange NameRange;
+  std::vector<CharSourceRange> InheritedTypeRanges;
 };
 
 class SyntaxModelWalker {
