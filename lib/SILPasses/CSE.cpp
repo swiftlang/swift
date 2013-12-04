@@ -102,10 +102,10 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
                               X->getGlobal());
   }
   case ValueKind::IntegerLiteralInst: {
-    IntegerLiteralInst *IntLiteral = cast<IntegerLiteralInst>(Inst);
+    auto *X = cast<IntegerLiteralInst>(Inst);
     return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),
-                              IntLiteral->getType(),
-                              IntLiteral->getValue());
+                              X->getType(),
+                              X->getValue());
   }
   default:
     llvm_unreachable("Unhandled ValueKind.");
