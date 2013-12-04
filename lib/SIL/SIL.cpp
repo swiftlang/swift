@@ -28,8 +28,10 @@ void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
          "An instruction and the value base that it is being replaced by "
          "must have the same number of types");
 
-  for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
-    SILValue(this, i).replaceAllUsesWith(SILValue(RHS, i));
+  while (!use_empty()) {
+    Operand *Op = *use_begin();
+    Op->set(SILValue(RHS, Op->get().getResultNumber()));
+  }
 }
 
 void SILValue::replaceAllUsesWith(SILValue V) {
