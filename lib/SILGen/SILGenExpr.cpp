@@ -2001,10 +2001,23 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   
+  // DI can only handle Enums so far.
+  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
+  bool UseDIForThisCtor = isa<EnumDecl>(ConstructedType->getAnyNominal());
+  
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
   emitLocalVariable(selfDecl);
+  
+  // If DI is enabled, mark self as being uninitialized so that DI knows where
+  // it is and how to check for it.
+  if (UseDIForThisCtor) {
+    auto &VarLocAddrEntry = VarLocs[selfDecl].address;
+    VarLocAddrEntry = B.createMarkUninitializedRootSelf(selfDecl,
+                                                        VarLocAddrEntry);
+  }
+  
   
   SILValue selfLV = VarLocs[selfDecl].address;
 
@@ -2012,14 +2025,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitProlog(ctor->getBodyParams(), ctor->getImplicitSelfDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
   
-  // Emit a default initialization of the this value if this is a struct.  DI
-  // can handle Enums.
-  
-  // Note that this initialization *cannot* be lowered to a
-  // default constructor--we're already in a constructor!
-  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
-  auto TypeDecl = ConstructedType->getAnyNominal();
-  if (!TypeDecl || !isa<EnumDecl>(TypeDecl))
+  // Emit a default initialization of the this value if DI isn't enabled.
+  if (!UseDIForThisCtor)
     B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
   
   // Create a basic block to jump to for the implicit 'self' return.

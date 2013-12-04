@@ -325,7 +325,7 @@ namespace {
     /// mark_uninitialized instruction.  This represents the start of the
     /// lifetime of the value being analyzed.
     SILInstruction *TheMemory;
-
+    
     /// This is the SILType of the memory object.
     SILType MemoryType;
 
@@ -357,7 +357,14 @@ namespace {
     void doIt();
 
   private:
-
+    SILValue getTheMemoryAddr() const {
+      if (isa<MarkUninitializedInst>(TheMemory))
+        return SILValue(TheMemory, 0);
+      return SILValue(TheMemory, 1);
+    }
+    
+    
+    
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
                         LiveOutBlockState(NumTupleElements)}).first->second;
@@ -914,8 +921,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
-      SILValue EltPtr = TF::emitElementAddress(SILValue(TheMemory, 1),
-                                               Elt, Loc, B);
+      SILValue EltPtr =
+        TF::emitElementAddress(getTheMemoryAddr(), Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
         Releases.push_back(DA);
     }
@@ -1281,8 +1288,16 @@ DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
 
 static void processAllocation(SILInstruction *I) {
   assert(isa<AllocBoxInst>(I) || isa<AllocStackInst>(I));
-  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
 
+  // If the allocation's address has a single use, and it is a
+  // mark_uninitialized, then we'll analyze it when we look at the
+  // mark_uninitialized instruction itself.
+  if (SILValue(I, 1).hasOneUse() &&
+      isa<MarkUninitializedInst>(SILValue(I, 1).use_begin()->getUser()))
+    return;
+  
+  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
+  
   // Set up the datastructure used to collect the uses of the allocation.
   SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction*, 4> Releases;
