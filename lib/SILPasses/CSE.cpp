@@ -57,6 +57,7 @@ namespace {
 
     static bool canHandle(SILInstruction *Inst) {
       switch(Inst->getKind()) {     
+      case ValueKind::FunctionRefInst:
       case ValueKind::IntegerLiteralInst:
         return true;
       default:
@@ -83,6 +84,11 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
   SILInstruction *Inst = Val.Inst;
   
   switch (Inst->getKind()) {
+  case ValueKind::FunctionRefInst: {
+    auto *X = cast<FunctionRefInst>(Inst);
+    return llvm::hash_combine(unsigned(ValueKind::FunctionRefInst),
+                              X->getReferencedFunction());
+  }
   case ValueKind::IntegerLiteralInst: {
     IntegerLiteralInst *IntLiteral = cast<IntegerLiteralInst>(Inst);
     return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),

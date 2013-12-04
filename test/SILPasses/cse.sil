@@ -420,3 +420,19 @@ bb0(%0 : $*Builtin.Int8, %1 : $*Builtin.Int8):
     %8 = tuple(%5 : $Builtin.Int8, %6 : $Builtin.Int8, %7 : $Builtin.Int8)
     return %8 : $(Builtin.Int8, Builtin.Int8, Builtin.Int8)
 }
+
+sil @evil : $@thin (@inout Builtin.Int8) -> ()
+
+// CHECK-LABEL: functionrefinst
+// CHECK: bb0
+// CHECK: function_ref @evil : $@thin (@inout Builtin.Int8) -> ()
+// CHECK-NOT: function_ref @evil : $@thin (@inout Builtin.Int8) -> ()
+sil @functionrefinst : $@thin (@inout Builtin.Int8) -> () {
+bb0(%0 : $*Builtin.Int8):
+  %1 = function_ref @evil : $@thin (@inout Builtin.Int8) -> ()
+  apply %1(%0) : $@thin (@inout Builtin.Int8) -> ()
+  %2 = function_ref @evil : $@thin (@inout Builtin.Int8) -> ()
+  apply %2(%0) : $@thin (@inout Builtin.Int8) -> ()
+  %3 = tuple()
+  return %3 : $()
+}
