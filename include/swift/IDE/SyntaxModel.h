@@ -97,7 +97,7 @@ class SyntaxModelContext {
 
 public:
   SyntaxModelContext(SourceManager &SM, unsigned BufferID,
-                        TranslationUnit &TU);
+                     TranslationUnit &TU);
   ~SyntaxModelContext();
 
   bool walk(SyntaxModelWalker &Walker);
