@@ -1053,10 +1053,25 @@ public:
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
-    Type FunctionType = FD->getType();
+    Type FunctionType;
+    if (ExprType) {
+      Type ContextTy = FD->getDeclContext()->getDeclaredTypeOfContext();
+      if (ContextTy &&
+          ContextTy->getAnyNominal() ==
+              ExprType->getRValueType()->getAnyNominal()) {
+        FunctionType = ExprType->getRValueType()->getTypeOfMember(
+            CurrDeclContext->getParentModule(), FD, TypeResolver.get());
+      }
+    }
+    if (!FunctionType) {
+      FunctionType = FD->getType();
+    }
+
     if (FirstIndex != 0)
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
+
     Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
+
     if (IsImlicitlyCurriedInstanceMethod) {
       Builder.addLeftParen();
       Builder.addCallParameter(Ctx.getIdentifier("self"),
@@ -1066,15 +1081,19 @@ public:
       addPatternFromType(Builder, FirstInputType);
     }
 
+    FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
+
     // Build type annotation.
     llvm::SmallString<32> TypeStr;
     {
       llvm::raw_svector_ostream OS(TypeStr);
       for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
-        Patterns[i]->print(OS);
+        FunctionType->castTo<AnyFunctionType>()->getInput()->print(OS);
+        FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
         OS << " -> ";
       }
-      Type ResultType = FD->getResultType();
+      // What's left is the result type.
+      Type ResultType = FunctionType;
       if (ResultType->isVoid())
         OS << "Void";
       else
