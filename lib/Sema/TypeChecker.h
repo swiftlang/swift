@@ -503,10 +503,6 @@ public:
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
   
-  /// Pre-check an expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in

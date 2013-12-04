@@ -4382,8 +4382,8 @@ namespace {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(*this, dc);
+static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
+  PreCheckExpression preCheck(tc, dc);
   do {
     // Perform the pre-check.
     preCheck.reset();
@@ -4422,7 +4422,7 @@ bool TypeChecker::typeCheckExpression(
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(expr, dc))
+  if (preCheckExpression(*this, expr, dc))
     return true;
 
   // Construct a constraint system from this expression.
@@ -4625,7 +4625,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
   // First, pre-check the initializer, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(init, dc))
+  if (preCheckExpression(*this, init, dc))
     return true;
 
   ConstraintSystem cs(*this, dc);
@@ -4776,7 +4776,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking condition", expr);
 
-  if (preCheckExpression(expr, dc))
+  if (preCheckExpression(*this, expr, dc))
     return true;
 
   // Construct a constraint system from this expression.
@@ -4895,7 +4895,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(expr, dc))
+  if (preCheckExpression(*this, expr, dc))
     return true;
 
   // Construct a constraint system from this expression.
