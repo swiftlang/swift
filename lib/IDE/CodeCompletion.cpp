@@ -946,7 +946,7 @@ public:
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
-                              Identifier Label) {
+                              Identifier Label, bool IsTopLevel) {
     if (auto *TT = T->getAs<TupleType>()) {
       if (!Label.empty()) {
         Builder.addTextChunk(Label.str());
@@ -958,23 +958,31 @@ public:
         if (NeedComma)
           Builder.addComma();
         addPatternFromTypeImpl(Builder, TupleElt.getType(),
-                               TupleElt.getName());
+                               TupleElt.getName(), false);
         NeedComma = true;
       }
       Builder.addRightParen();
       return;
     }
     if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
+      if (IsTopLevel)
+        Builder.addLeftParen();
       Builder.addCallParameter(Identifier(),
                                PT->getUnderlyingType().getString());
+      if (IsTopLevel)
+        Builder.addRightParen();
       return;
     }
 
+    if (IsTopLevel)
+      Builder.addLeftParen();
     Builder.addCallParameter(Label, T.getString());
+    if (IsTopLevel)
+      Builder.addRightParen();
   }
 
   void addPatternFromType(CodeCompletionResultBuilder &Builder, Type T) {
-    addPatternFromTypeImpl(Builder, T, Identifier());
+    addPatternFromTypeImpl(Builder, T, Identifier(), true);
   }
 
   void addFunctionCall(const AnyFunctionType *AFT) {
@@ -1040,13 +1048,23 @@ public:
     Builder.addTextChunk(Name);
     if (IsDynamicLookup)
       Builder.addDynamicLookupMethodCallTail();
-    Builder.addLeftParen();
+
     auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
-    addPatternParameters(Builder, Patterns[FirstIndex]);
-    Builder.addRightParen();
+    Type FunctionType = FD->getType();
+    if (FirstIndex != 0)
+      FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
+    Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
+    if (IsImlicitlyCurriedInstanceMethod) {
+      Builder.addLeftParen();
+      Builder.addCallParameter(Ctx.getIdentifier("self"),
+                               FirstInputType.getString());
+      Builder.addRightParen();
+    } else {
+      addPatternFromType(Builder, FirstInputType);
+    }
 
     // Build type annotation.
     llvm::SmallString<32> TypeStr;
