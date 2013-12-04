@@ -436,3 +436,20 @@ bb0(%0 : $*Builtin.Int8):
   %3 = tuple()
   return %3 : $()
 }
+
+// CHECK-LABEL: builtinfunctionrefinst
+// CHECK: bb0
+// CHECK: builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK-NOT: builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+sil @builtinfunctionrefinst : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = apply %4(%0, %1, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %7 = apply %5(%1, %2, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = tuple(%8 : $Builtin.Int64, %9 : $Builtin.Int64)
+  return %10 : $(Builtin.Int64, Builtin.Int64)
+}
