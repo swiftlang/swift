@@ -471,3 +471,14 @@ sil @globaladdr_inst : $@thin () -> (Builtin.Int64) {
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
   return %7 : $(Builtin.Int64)
 }
+
+// CHECK-LABEL: floatliteral
+// CHECK: float_literal $Builtin.FPIEEE32, 0x3F800000
+// CHECK-NOT: float_literal $Builtin.FPIEEE32, 0x3F800000
+sil @floatliteral : $@thin () -> (Builtin.FPIEEE32) {
+  %0 = float_literal $Builtin.FPIEEE32, 0x3F800000
+  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000
+  %2 = builtin_function_ref "fadd_FPIEEE32" : $@thin (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 // user: %5
+  %4 = apply %2(%0, %1) : $@thin (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 // user: %6
+  return %4 : $(Builtin.FPIEEE32)
+}
