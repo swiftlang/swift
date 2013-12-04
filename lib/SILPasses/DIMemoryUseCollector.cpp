@@ -191,21 +191,10 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  CanType AggType = V.getType().getSwiftRValueType();
-  
-  if (TupleType *TT = AggType->getAs<TupleType>()) {
-    for (auto &Field : TT->getFields()) {
-      (void)Field;
-      ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
-    }
-    return;
-  }
-  
-  assert(AggType->is<StructType>() ||
-         AggType->is<BoundGenericStructType>());
-  StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
-  for (auto *VD : SD->getStoredProperties()) {
-    ElementVals.push_back(B.emitStructExtract(Loc, V, VD));
+  TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
+  for (auto &Field : TT->getFields()) {
+    (void)Field;
+    ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
   }
 }
 
