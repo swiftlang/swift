@@ -389,7 +389,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
 
-  NumTupleElements = TF::getElementCount(TheMemory.getType());
+  NumTupleElements = TheMemory.getElementCount();
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -454,13 +454,12 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy = TheMemory.getType();
-
+  //
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
-  TF::getPathStringToElement(AllocTy, Use.FirstTupleElement, Name);
+  TheMemory.getPathStringToElement(Use.FirstTupleElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
 
@@ -900,8 +899,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
-      SILValue EltPtr =
-        TF::emitElementAddress(TheMemory.getAddress(), Elt, Loc, B);
+      SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
         Releases.push_back(DA);
     }
@@ -969,7 +967,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If an element is known to be initialized, then we can strictly
         // destroy its value at DAI's position.
         B.setInsertionPoint(DAI);
-        SILValue EltPtr = TF::emitElementAddress(Addr, Elt, DAI->getLoc(), B);
+        SILValue EltPtr = TheMemory.emitElementAddress(Elt, DAI->getLoc(), B);
         if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
           Releases.push_back(DA);
         continue;
@@ -1016,7 +1014,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // Set up the conditional destroy block.
       B.setInsertionPoint(CondDestroyBlock->begin());
-      SILValue EltPtr = TF::emitElementAddress(Addr, Elt, DAI->getLoc(), B);
+      SILValue EltPtr = TheMemory.emitElementAddress(Elt, DAI->getLoc(), B);
       if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
         Releases.push_back(DA);
     }

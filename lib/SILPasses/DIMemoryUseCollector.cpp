@@ -42,24 +42,23 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return getFunction().begin()->begin();
 }
 
+static unsigned getElementCountRec(CanType T) {
+  CanTupleType TT = dyn_cast<TupleType>(T);
 
-//===----------------------------------------------------------------------===//
-//                  Tuple Element Flattening/Counting Logic
-//===----------------------------------------------------------------------===//
+  // If this isn't a tuple, it is a single element.
+  if (!TT) return 1;
+
+  unsigned NumElements = 0;
+  for (auto EltTy : TT.getElementTypes())
+    NumElements += getElementCountRec(EltTy);
+  return NumElements;
+}
 
 /// getElementCount - Return the number of elements in the flattened type.
 /// For tuples, this is the (recursive) count of the fields it contains,
 /// otherwise this is 1.
-unsigned TF::getElementCount(CanType T) {
-  CanTupleType TT = dyn_cast<TupleType>(T);
-  
-  // If this isn't a tuple, it is a single element.
-  if (!TT) return 1;
-  
-  unsigned NumElements = 0;
-  for (auto EltTy : TT.getElementTypes())
-    NumElements += TF::getElementCount(EltTy);
-  return NumElements;
+unsigned DIMemoryObjectInfo::getElementCount() const {
+  return ::getElementCountRec(getType());
 }
 
 /// Given a symbolic element number, return the type of the element.
@@ -74,7 +73,7 @@ static CanType getElementType(CanType T, unsigned EltNo) {
   
   for (auto &Elt : TT->getFields()) {
     auto FieldType = Elt.getType()->getCanonicalType();
-    unsigned NumFields = TF::getElementCount(FieldType);
+    unsigned NumFields = getElementCountRec(FieldType);
     if (EltNo < NumFields)
       return getElementType(FieldType, EltNo);
     EltNo -= NumFields;
@@ -86,9 +85,10 @@ static CanType getElementType(CanType T, unsigned EltNo) {
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
 /// sense) return a pointer to a leaf element of the specified number.
-SILValue TF::emitElementAddress(SILValue Ptr, unsigned TupleEltNo,
-                                SILLocation Loc, SILBuilder &B) {
-  CanType PointeeType = Ptr.getType().getSwiftRValueType();
+SILValue DIMemoryObjectInfo::
+emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B) const {
+  SILValue Ptr = getAddress();
+  CanType PointeeType = getType();
   while (1) {
     // Have we gotten to our leaf element?
     CanTupleType TT = dyn_cast<TupleType>(PointeeType);
@@ -100,7 +100,7 @@ SILValue TF::emitElementAddress(SILValue Ptr, unsigned TupleEltNo,
     // Figure out which field we're walking into.
     unsigned FieldNo = 0;
     for (auto EltTy : TT.getElementTypes()) {
-      unsigned NumSubElt = TF::getElementCount(EltTy);
+      unsigned NumSubElt = getElementCountRec(EltTy);
       if (TupleEltNo < NumSubElt) {
         Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
         PointeeType = EltTy;
@@ -116,15 +116,15 @@ SILValue TF::emitElementAddress(SILValue Ptr, unsigned TupleEltNo,
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-void TF::getPathStringToElement(CanType T, unsigned Element,
-                                std::string &Result) {
+static void getPathStringToElement(CanType T, unsigned Element,
+                                   std::string &Result) {
   CanTupleType TT = dyn_cast<TupleType>(T);
   if (!TT) return;
   
   unsigned FieldNo = 0;
   for (auto &Field : TT->getFields()) {
     CanType FieldTy(Field.getType());
-    unsigned ElementsForField = TF::getElementCount(FieldTy);
+    unsigned ElementsForField = getElementCountRec(FieldTy);
     
     if (Element < ElementsForField) {
       Result += '.';
@@ -132,7 +132,7 @@ void TF::getPathStringToElement(CanType T, unsigned Element,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return TF::getPathStringToElement(FieldTy, Element, Result);
+      return getPathStringToElement(FieldTy, Element, Result);
     }
     
     Element -= ElementsForField;
@@ -140,6 +140,11 @@ void TF::getPathStringToElement(CanType T, unsigned Element,
     ++FieldNo;
   }
   assert(0 && "Element number is out of range for this type!");
+}
+
+void DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
+                                                std::string &Result) const {
+  ::getPathStringToElement(getType(), Element, Result);
 }
 
 
@@ -295,7 +300,7 @@ void ElementUseCollector::addElementUses(unsigned BaseTupleElt, SILType UseTy,
   // things that come after it in a parent tuple.
   unsigned NumTupleElements = 1;
   if (!InStructSubElement && !InEnumSubElement)
-    NumTupleElements = TF::getElementCount(UseTy.getSwiftRValueType());
+    NumTupleElements = getElementCountRec(UseTy.getSwiftRValueType());
   
   Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, NumTupleElements));
 }
@@ -319,7 +324,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseTupleElt) {
   unsigned NewBaseElt = BaseTupleElt;
   for (unsigned i = 0; i != FieldNo; ++i) {
     CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    NewBaseElt += TF::getElementCount(EltTy);
+    NewBaseElt += getElementCountRec(EltTy);
   }
   
   collectUses(SILValue(TEAI, 0), NewBaseElt);

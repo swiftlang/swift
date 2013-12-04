@@ -61,32 +61,33 @@ public:
       return SILValue(MemoryInst, 0);
     return SILValue(MemoryInst, 1);
   }
-};
 
-/// This is a collection of utilities for reasoning about (potentially
-/// recursively) flattened tuples, and computing access paths and indexes into
-/// the flattened namespace.
-///
-/// The flattened namespace is assigned lexicographically.  For example, in:
-///   (Int, ((Float, (), Double)))
-/// the Int member is numbered 0, the Float is numbered 1, and the Double is
-/// numbered 2.  Empty tuples don't get numbered since they contain no state.
-namespace TF {
+  // These are a collection of utilities for reasoning about (potentially
+  // recursively) exploded aggregate elements, and computing access paths and
+  // indexes into the flattened namespace.
+  //
+  // The flattened namespace is assigned lexicographically.  For example, in:
+  //   (Int, ((Float, (), Double)))
+  // the Int member is numbered 0, the Float is numbered 1, and the Double is
+  // numbered 2.  Empty tuples don't get numbered since they contain no state.
+  //
+  // Structs and classes have their elements exploded when we are analyzing the
+  // 'self' member in an initializer for the aggregate.
+
   /// getElementCount - Return the number of elements in the flattened type.
   /// For tuples, this is the (recursive) count of the fields it contains,
   /// otherwise this is 1.
-  unsigned getElementCount(CanType T);
+  unsigned getElementCount() const;
   
   /// emitElementAddress - Given a tuple element number (in the flattened
   /// sense) return a pointer to a leaf element of the specified number.
-  SILValue emitElementAddress(SILValue Ptr, unsigned TupleEltNo,
-                              SILLocation Loc, SILBuilder &B);
+  SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
+                              SILBuilder &B) const;
 
   /// Push the symbolic path name to the specified element number onto the
   /// specified std::string.
-  void getPathStringToElement(CanType T, unsigned Element,
-                              std::string &Result);
-}
+  void getPathStringToElement(unsigned Element, std::string &Result) const;
+};
   
 enum DIUseKind {
   // The instruction is a Load.
