@@ -164,37 +164,24 @@ void swift::CompilerInstance::doIt() {
 
   PersistentParserState PersistentState;
 
+  // Make sure the main file is the first file in the module. This may only be
+  // a source file, or it may be a SIL file, which requires pumping the parser.
+  // We parse it last, though, to make sure that it can use decls from other
+  // files in the module.
   if (MainBufferIndex != NO_SUCH_BUFFER) {
-    // Parse the main file first. This may only be a main source file or a SIL
-    // file, which requires pumping the parser.
     assert(Kind == SourceFile::Main || Kind == SourceFile::SIL);
 
     unsigned BufferID = BufferIDs[MainBufferIndex];
     if (Kind == SourceFile::Main)
       SourceMgr.setHashbangBufferID(BufferID);
 
-    SILParserState SILContext(TheSILModule.get());
     auto *SingleInputFile =
       new (*Context) SourceFile(*TU, Kind, BufferID,
                                 Invocation.getParseStdlib());
     TU->addSourceFile(*SingleInputFile);
-
-    unsigned CurTUElem = 0;
-    bool Done;
-    do {
-      // Pump the parser multiple times if necessary.  It will return early
-      // after parsing any top level code in a main module, or in SIL mode when
-      // there are chunks of swift decls (e.g. imports and types) interspersed
-      // with 'sil' definitions.
-      parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
-                               TheSILModule ? &SILContext : nullptr,
-                               &PersistentState, DelayedCB.get());
-      if (!Invocation.getParseOnly())
-        performTypeChecking(*SingleInputFile, CurTUElem);
-      CurTUElem = SingleInputFile->Decls.size();
-    } while (!Done);
   }
 
+  // Parse all the library files first.
   for (size_t i = 0, e = BufferIDs.size(); i < e; ++i) {
     if (i == MainBufferIndex)
       continue;
@@ -212,6 +199,27 @@ void swift::CompilerInstance::doIt() {
     (void) Done;
 
     performNameBinding(*NextInput);
+  }
+
+  // Parse the main file last.
+  if (MainBufferIndex != NO_SUCH_BUFFER) {
+    SourceFile &MainFile = *TU->getSourceFiles().front();
+    SILParserState SILContext(TheSILModule.get());
+
+    unsigned CurTUElem = 0;
+    bool Done;
+    do {
+      // Pump the parser multiple times if necessary.  It will return early
+      // after parsing any top level code in a main module, or in SIL mode when
+      // there are chunks of swift decls (e.g. imports and types) interspersed
+      // with 'sil' definitions.
+      parseIntoTranslationUnit(MainFile, MainFile.getBufferID().getValue(),
+                               &Done, TheSILModule ? &SILContext : nullptr,
+                               &PersistentState, DelayedCB.get());
+      if (!Invocation.getParseOnly())
+        performTypeChecking(MainFile, CurTUElem);
+      CurTUElem = MainFile.Decls.size();
+    } while (!Done);
   }
 
   if (!Invocation.getParseOnly()) {
