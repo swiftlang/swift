@@ -4628,110 +4628,70 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 }
 
 bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
-  PrettyStackTraceDecl stackTrace("type-checking", binding);
+  /// Type checking listener for pattern binding initializers.
+  class BindingListener : public ExprTypeCheckListener {
+    /// The pattern binding declaration whose initializer we're checking.
+    PatternBindingDecl *Binding;
 
-  Expr *init = binding->getInit();
-  assert(init && "type-checking an uninitialized binding?");
+    /// The locator we're using.
+    ConstraintLocator *Locator;
 
-  auto pattern = binding->getPattern();
+    /// The type of the pattern.
+    Type PatternType;
 
-  DeclContext *dc = binding->getDeclContext();
+  public:
+    explicit BindingListener(PatternBindingDecl *binding) : Binding(binding) { }
 
-  // First, pre-check the initializer, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (preCheckExpression(*this, init, dc))
-    return true;
+    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      // Save the locator we're using for the expression.
+      Locator = cs.getConstraintLocator(expr, { });
 
-  ConstraintSystem cs(*this, dc);
+      // Collect constraints from the pattern.
+      auto pattern = Binding->getPattern();
+      PatternType = cs.generateConstraints(pattern, Locator);
+      if (!PatternType)
+        return true;
 
-  // Collect constraints from the initializer.
-  CleanupIllFormedExpressionRAII cleanup(cs, init);
-  if (auto generatedExpr = cs.generateConstraints(init))
-    init = generatedExpr;
-  else {
-    return true;
-  }
-
-  auto initLocator = cs.getConstraintLocator(init, { });
-
-  // Collect constraints from the pattern.
-  Type patternType = cs.generateConstraints(pattern, initLocator);
-  if (!patternType) return true;
-
-  // Add a conversion constraint between the types.
-  cs.addConstraint(ConstraintKind::Conversion, init->getType(),
-                   patternType, initLocator);
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given variable binding---\n";
-    init->print(log);
-    log << "\n";
-    cs.dump(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      performExprDiagnostics(*this, init);
-      return true;
+      // Add a conversion constraint between the types.
+      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       PatternType, Locator);
+      return false;
     }
 
-    // FIXME: Crappy diagnostic.
-    diagnose(init->getLoc(), diag::constraint_type_check_fail)
-      .highlight(init->getSourceRange());
+    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+      // Figure out what type the constraints decided on.
+      auto &tc = solution.getConstraintSystem().getTypeChecker();
+      PatternType = solution.simplifyType(tc, PatternType);
 
-    performExprDiagnostics(*this, init);
-    return true;
-  }
+      // Convert the initializer to the type of the pattern.
+      expr = solution.coerceToType(expr, PatternType, Locator);
+      if (!expr) {
+        return nullptr;
+      }
 
-  auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
-  }
+      // Force the initializer to be materializable.
+      // FIXME: work this into the constraint system
+      expr = tc.coerceToMaterializable(expr);
 
-  // Apply the solution to the expression.
-  init = cs.applySolution(solution, init);
-  if (!init) {
-    // Failure already diagnosed, above, as part of applying the solution.
-   return true;
-  }
+      // Apply the solution to the pattern as well.
+      Pattern *pattern = Binding->getPattern();
+      if (tc.coerceToType(pattern, Binding->getDeclContext(),
+                          expr->getType(), /*allowOverride=*/true)) {
+        return nullptr;
+      }
+      Binding->setPattern(pattern);
+      Binding->setInit(expr, /*checked=*/true);
+      return expr;
+    }
+  };
 
-  // Figure out what type the constraints decided on.
-  patternType = solution.simplifyType(*this, patternType);
-
-  // Convert the initializer to the type of the pattern.
-  init = solution.coerceToType(init, patternType, initLocator);
-  if (!init) {
-    return true;
-  }
-
-  // Force the initializer to be materializable.
-  // FIXME: work this into the constraint system
-  init = coerceToMaterializable(init);
-  assert(init && "should never fail");
-
-  performExprDiagnostics(*this, init);
-
-  // Apply the solution to the pattern as well.
-  if (coerceToType(pattern, dc, init->getType(), /*allowOverride=*/true)) {
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    init->dump(log);
-  }
-
-  binding->setPattern(pattern);
-  binding->setInit(init, /*checked=*/true);
-  cleanup.disable();
-  return false;
+  BindingListener listener(binding);
+  Expr *init = binding->getInit();
+  assert(init && "type-checking an uninitialized binding?");
+  return typeCheckExpression(init, binding->getDeclContext(), Type(),
+                             /*discardedExpr=*/false,
+                             FreeTypeVariableBinding::Disallow,
+                             &listener);
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the
