@@ -167,7 +167,10 @@ namespace swift {
   /// \brief Combine instructions to form fewer, simple instructions via a
   /// simple worklist driven algorithm.
   void performSILCombine(SILModule *M);
-  
+
+  /// \brief Perform constant subexpression elimination.
+  void performSILCSE(SILModule *M);
+
   /// \brief Simplify the CFG of SIL functions.
   void performSimplifyCFG(SILModule *M);
 

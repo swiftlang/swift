@@ -74,5 +74,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
   performSILCombine(&Module);
+  performSILCSE(&Module);
   performSimplifyCFG(&Module);
 }

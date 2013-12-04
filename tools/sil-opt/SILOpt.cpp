@@ -29,6 +29,7 @@ enum class PassKind {
   AllocBoxToStack,
   CapturePromotion,
   CCP,
+  CSE,
   DefiniteInit,
   DCE,
   DataflowDiagnostics,
@@ -63,6 +64,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::CCP,
                                    "constant-propagation",
                                    "Propagate constants"),
+                        clEnumValN(PassKind::CSE,
+                                   "cse",
+                                   "Perform constant subexpression elimination."),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
@@ -162,6 +166,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::CCP:
       performSILConstantPropagation(CI.getSILModule());
+      break;
+    case PassKind::CSE:
+      performSILCSE(CI.getSILModule());
       break;
     case PassKind::DCE:
       performSILDeadCodeElimination(CI.getSILModule());

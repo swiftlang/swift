@@ -1,0 +1,422 @@
+// RUN: %sil-opt %s -cse -verify | FileCheck %s
+
+import Builtin
+import swift
+
+//////////////////////
+// Simple DCE Tests //
+//////////////////////
+
+// CHECK-LABEL: sil @dead_inst_elimination_one_bb
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+sil @dead_inst_elimination_one_bb : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int64, 24
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @dead_inst_elimination_diamond
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK-NOT: integer_literal $Builtin.Int64, 48
+sil @dead_inst_elimination_diamond : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int64, 24
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 48
+  br bb3
+
+bb2:
+  %3 = integer_literal $Builtin.Int64, 96
+  br bb3
+
+bb3:
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil @random_counter : $@thin () -> Builtin.Int1
+
+// CHECK-LABEL: sil @dead_inst_elimination_loop
+// CHECK: bb0
+// CHECK-NOT: integer_literal
+// CHECK: bb1
+// CHECK: function_ref
+// CHECK: apply
+// CHECK-NOT: integer_literal
+// CHECK: bb2
+// CHECK-NOT: integer_literal
+// CHECK: tuple
+// CHECK: return
+sil @dead_inst_elimination_loop : $@thin () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 24
+  br bb1
+
+bb1:
+  %2 = function_ref @random_counter : $@thin () -> Builtin.Int1
+  %3 = apply %2() : $@thin () -> Builtin.Int1
+  %4 = integer_literal $Builtin.Int64, 48
+  cond_br %3, bb1, bb2
+
+bb2:
+  %5 = integer_literal $Builtin.Int64, 59
+  %6 = tuple()
+  return %6 : $()
+}
+
+// For now until the proper unreachable pruning code is committed for
+// SILCombine, we should not dce dead instructions in unreachable code.
+
+// CHECK-LABEL: sil @dead_inst_elimination_ignore_unreachable
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK: integer_literal $Builtin.Int64, 48
+sil @dead_inst_elimination_ignore_unreachable : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 24
+  br bb2
+
+bb1:
+  %1 = integer_literal $Builtin.Int64, 48
+  br bb2
+
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}
+
+//////////////////////////////////////////////////////////
+// Other DCE Tests taken from dead_code_elimination.sil //
+//////////////////////////////////////////////////////////
+
+class B { }
+class E : B { }
+
+sil @exit : $@thin @noreturn () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @removeTriviallyDeadInstructions
+// CHECK: store
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NOT: object_pointer_to_ref
+sil @removeTriviallyDeadInstructions : $@thin (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = load %1#1 : $*B
+  %4 = strong_retain %3 : $B
+  %5 = ref_to_object_pointer %3 : $B to $Builtin.ObjectPointer
+  %7 = strong_release %3 : $B
+  %8 = strong_release %1#0 : $Builtin.ObjectPointer
+  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@thin @noreturn () -> ()
+  %6 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B
+  %11 = tuple()
+  %12 = return %11 : $()
+}
+
+// CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
+// CHECK: cond_br
+// CHECK-NOT: object_pointer_to_ref
+// CHECK: }
+sil @removeTriviallyDeadCrossBasicBlocks : $@thin (@owned B, Builtin.Int1) -> () {
+bb0(%0: $B, %1: $Builtin.Int1):
+  %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer
+  %13 = cond_br %1, bb1, bb2
+bb1:
+  %22 = br bb2
+bb2:
+  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@thin @noreturn () -> ()
+  %21 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B
+  %32 = tuple ()
+  %33 = return %32 : $()
+}
+
+// CHECK-LABEL: sil @dead_use_of_alloc_stack
+// CHECK: bb
+// CHECK: alloc_stack
+// CHECK: dealloc_stack
+// CHECK: }
+sil @dead_use_of_alloc_stack : $@thin () -> () {
+bb0:
+  %1 = alloc_stack $((), (), ())
+  %2 = tuple_element_addr %1#1 : $*((), (), ()), 0
+  dealloc_stack %1#0 : $*@local_storage ((), (), ())
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @tuple_extract
+// CHECK: bb
+// CHECK-NEXT: return %0
+sil @tuple_extract : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = tuple (%0 : $Int64, %0 : $Int64)
+  return %0 : $Int64
+}
+
+// CHECK-LABEL: sil @fold_integer_literal
+// CHECK: bb
+// CHECK: cond_br
+// CHECK: {{^bb}}
+// CHECK-NOT: integer_literal
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NOT: integer_literal
+// CHECK-NEXT: br
+sil @fold_integer_literal : $@thin (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  br bb2(%1 : $Builtin.Int1)
+
+bb3:
+  %2 = integer_literal $Builtin.Int1, 0
+  br bb2(%2 : $Builtin.Int1)
+
+bb2(%3 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @do_not_fold_integer_literal
+// CHECK: bb
+// CHECK: cond_br
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br
+sil @do_not_fold_integer_literal : $@thin (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, 0
+  br bb2(%1 : $Builtin.Int1)
+
+bb3:
+  %2 = integer_literal $Builtin.Int1, -1
+  br bb2(%2 : $Builtin.Int1)
+
+bb2(%3 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+}
+
+enum BoolLike { case true, false }
+
+// CHECK-LABEL: sil @fold_enum
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br
+sil @fold_enum : $@thin (BoolLike) -> BoolLike {
+bb0(%0 : $BoolLike):
+  switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
+
+bb1:
+  %1 = enum $BoolLike, #BoolLike.true!enumelt
+  br bb3(%1 : $BoolLike)
+
+bb2:
+  %2 = enum $BoolLike, #BoolLike.false!enumelt
+  br bb3(%2 : $BoolLike)
+
+bb3(%3 : $BoolLike):
+  return %3 : $BoolLike
+}
+
+// CHECK-LABEL: sil @do_not_fold_enum
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br
+sil @do_not_fold_enum : $@thin (BoolLike) -> BoolLike {
+bb0(%0 : $BoolLike):
+  switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
+
+bb1:
+  %1 = enum $BoolLike, #BoolLike.false!enumelt
+  br bb3(%1 : $BoolLike)
+
+bb2:
+  %2 = enum $BoolLike, #BoolLike.true!enumelt
+  br bb3(%2 : $BoolLike)
+
+bb3(%3 : $BoolLike):
+  return %3 : $BoolLike
+}
+
+///////////////
+// CSE Tests //
+///////////////
+
+// Test simple instruction value numbering and usage of an available value in a single bb.
+//
+// Specifically we make sure that we only replace Int8 literals with
+// Int8 literals with the same value. Anything else is outside of scope for cse.
+//
+// CHECK-LABEL: sil @test0
+// CHECK: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT: [[DECOY1:%[0-9]+]] = integer_literal $Builtin.Int16, 8
+// CHECK-NEXT: [[DECOY2:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8, [[DECOY1]] : $Builtin.Int16, [[DECOY2]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test0 : $@thin () -> (Builtin.Int8, Builtin.Int8, Builtin.Int16,
+                           Builtin.Int8) {
+    %0 = integer_literal $Builtin.Int8, 8
+    %1 = integer_literal $Builtin.Int8, 8
+    %2 = integer_literal $Builtin.Int16, 8
+    %3 = integer_literal $Builtin.Int8, 1
+    %4 = tuple(%0 : $Builtin.Int8, %1 : $Builtin.Int8, %2 : $Builtin.Int16, %3 : $Builtin.Int8)
+    return %4 : $(Builtin.Int8, Builtin.Int8, Builtin.Int16, Builtin.Int8)
+}
+
+// Make sure that we can replace cse values in different basic blocks
+// assuming nothing has changed.
+
+// CHECK-LABEL: sil @test1
+// CHECK: bb0
+// CHECK-NEXT: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT: cond_br undef, bb1, bb2
+// CHECK: bb1
+// CHECK-NEXT: br bb3([[TARGET]] : $Builtin.Int8)
+// CHECK: bb2
+// CHECK-NEXT: [[DECOY:%[0-9]+]] = integer_literal $Builtin.Int8, 16
+// CHECK-NEXT: br bb3([[DECOY]] : $Builtin.Int8)
+// CHECK: bb3([[PHI:%[0-9]+]] : $Builtin.Int8):
+// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[PHI]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test1 : $@thin () -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
+bb0:
+    %0 = integer_literal $Builtin.Int8, 8
+    %1 = integer_literal $Builtin.Int8, 8
+    cond_br undef, bb1, bb2
+
+bb1:
+    %2 = integer_literal $Builtin.Int8, 8
+    br bb3(%2 : $Builtin.Int8)
+
+bb2:
+    %3 = integer_literal $Builtin.Int8, 16
+    br bb3(%3 : $Builtin.Int8)
+
+bb3(%4 : $Builtin.Int8):
+    %5 = tuple(%0 : $Builtin.Int8, %4 : $Builtin.Int8, %1 : $Builtin.Int8)
+    return %5 : $(Builtin.Int8, Builtin.Int8, Builtin.Int8)
+}
+
+// Make sure that we know how to value number values taken from loads
+// and replace loads from the same area.
+// CHECK-LABEL: sil @test2
+// CHECK: bb0([[P1:%[0-9]+]] : $*Builtin.Int8, [[P2:%[0-9]+]] : $*Builtin.Int8):
+// CHECK-NEXT: [[TARGET:%[0-9]+]] = load [[P1]]
+// CHECK-NEXT: [[DECOY:%[0-9]+]] = load [[P2]]
+// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8, [[DECOY]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test2 : $@thin (@inout Builtin.Int8, @inout Builtin.Int8) -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $*Builtin.Int8, %1 : $*Builtin.Int8):
+  %2 = load %0 : $*Builtin.Int8
+  %3 = load %0 : $*Builtin.Int8
+  %4 = load %1 : $*Builtin.Int8
+  %5 = tuple (%2 : $Builtin.Int8, %3 : $Builtin.Int8, %4 : $Builtin.Int8)
+  return %5 : $(Builtin.Int8, Builtin.Int8, Builtin.Int8)
+}
+
+// Make sure that writing to memory properly makes any loaded values
+// unavailable.
+// CHECK-LABEL: sil @test3
+// CHECK: bb0([[P1:%[0-9]+]] : $*Builtin.Int8, [[P2:%[0-9]+]] : $*Builtin.Int8):
+// CHECK-NEXT: [[TARGET:%[0-9]+]] = load [[P1]]
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: store {{%[0-9]+}} to {{%[0-9]+}}
+// CHECK-NEXT: [[FAIL_TARGET:%[0-9]+]] = load [[P1]]
+// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8, [[FAIL_TARGET]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test3 : $@thin (@inout Builtin.Int8, @inout Builtin.Int8) -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $*Builtin.Int8, %1 : $*Builtin.Int8):
+  %2 = load %0 : $*Builtin.Int8
+  %3 = load %0 : $*Builtin.Int8
+  %4 = integer_literal $Builtin.Int8, 2
+  store %4 to %1 : $*Builtin.Int8
+  %5 = load %0 : $*Builtin.Int8
+  %6 = tuple (%2 : $Builtin.Int8, %3 : $Builtin.Int8, %5 : $Builtin.Int8)
+  return %6 : $(Builtin.Int8, Builtin.Int8, Builtin.Int8)
+}
+
+// Test that simple store DSE works and that we know how to propagate
+// a stored value after invalidation.
+//
+// CHECK-LABEL: sil @test4
+// CHECK: bb0([[P1:%[0-9]+]] : $*Builtin.Int8, [[P2:%[0-9]+]] : $*Builtin.Int8):
+// CHECK-NEXT: %{{[0-9]+}} = integer_literal $Builtin.Int8, 2
+// CHECK-NEXT: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 3
+// CHECK-NEXT: [[STORE_FORWARD_TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 9
+// CHECK-NEXT: store
+// CHECK-NEXT: store %{{[0-9]+}} to %{{[0-9]+}} : $*Builtin.Int8
+// CHECK-NEXT: [[LOAD_OF_TARGET:%[0-9]+]] = load [[P1]]
+// CHECK-NEXT: tuple ([[LOAD_OF_TARGET]] : $Builtin.Int8, [[STORE_FORWARD_TARGET:%[0-9]+]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test4 : $@thin (@inout Builtin.Int8, @inout Builtin.Int8) -> (Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $*Builtin.Int8, %1 : $*Builtin.Int8):
+    %2 = integer_literal $Builtin.Int8, 2
+    %3 = integer_literal $Builtin.Int8, 3
+    store %2 to %0 : $*Builtin.Int8
+    %4 = integer_literal $Builtin.Int8, 9
+    store %3 to %0 : $*Builtin.Int8
+    store %4 to %1 : $*Builtin.Int8
+    %5 = load %0 : $*Builtin.Int8
+    %6 = load %1 : $*Builtin.Int8
+    %7 = tuple(%5 : $Builtin.Int8, %6 : $Builtin.Int8)
+    return %7 : $(Builtin.Int8, Builtin.Int8)
+}
+
+// Make sure that Simple Store DCE is disrupted by intervening reads.
+//
+// CHECK-LABEL: sil @test5
+// CHECK: bb0([[P1:%[0-9]+]] : $*Builtin.Int8, [[P2:%[0-9]+]] : $*Builtin.Int8):
+// CHECK-NEXT: %{{[0-9]+}} = integer_literal $Builtin.Int8, 2
+// CHECK-NEXT: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 3
+// CHECK-NEXT: store
+// CHECK-NEXT: [[FORWARD_SUCCESS_TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 9
+// CHECK-NEXT: [[BEFORE_STORE_TARGET:%[0-9]+]] = load [[P2]]
+// CHECK-NEXT: store
+// CHECK-NEXT: store
+// CHECK-NEXT: [[DISRUPTED_TARGET:%[0-9]+]] = load [[P1]] : $*Builtin.Int8
+// CHECK-NEXT: tuple ([[BEFORE_STORE_TARGET]] : $Builtin.Int8, [[DISRUPTED_TARGET]] : $Builtin.Int8, [[FORWARD_SUCCESS_TARGET]] : $Builtin.Int8)
+// CHECK-NEXT: return
+sil @test5 : $@thin (@inout Builtin.Int8, @inout Builtin.Int8) -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $*Builtin.Int8, %1 : $*Builtin.Int8):
+    %2 = integer_literal $Builtin.Int8, 2
+    %3 = integer_literal $Builtin.Int8, 3
+    store %2 to %0 : $*Builtin.Int8
+    %4 = integer_literal $Builtin.Int8, 9
+    %5 = load %1 : $*Builtin.Int8
+    store %3 to %0 : $*Builtin.Int8
+    store %4 to %1 : $*Builtin.Int8
+    %6 = load %0 : $*Builtin.Int8
+    %7 = load %1 : $*Builtin.Int8
+    %8 = tuple(%5 : $Builtin.Int8, %6 : $Builtin.Int8, %7 : $Builtin.Int8)
+    return %8 : $(Builtin.Int8, Builtin.Int8, Builtin.Int8)
+}
