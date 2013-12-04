@@ -12,6 +12,14 @@
       var maybeMutable = o as NSMutableString // has type NSMutableString?
     }
 
+* Operator precedence has been simplified:
+    "exponentiative:" <<, >>, **
+    "multiplicative:" *, /, %, &
+    "additive:" +, -, |, ^
+    "comparative:" ==, !=, <, <=, >=, >
+    "conjunctive:" &&
+    "disjunctive:" ||
+
 2013-12-04
 ----------
 
