@@ -682,7 +682,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
       if (auto base = dyn_cast<DeclRefExpr>(
                         memberRef->getBase()->getSemanticsProvidingExpr())) {
-        if (base->getDecl()->getName().str().equals("self")) {
+        if (base->getDecl()->getName() == Context.SelfIdentifier) {
           // Look for the member within this type.
           auto memberDecls
             = lookupMember(nominalDecl->getDeclaredTypeInContext(),
@@ -695,7 +695,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
       // If the left-hand side is 'self', we're initializing the
       // whole object.
-      if (declRef->getDecl()->getName().str().equals("self")) {
+      if (declRef->getDecl()->getName() == Context.SelfIdentifier) {
         allOfThisInitialized = true;
         break;
       }

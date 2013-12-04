@@ -174,6 +174,9 @@ public:
   /// The name of the standard library module "swift".
   Identifier StdlibModuleName;
 
+  /// The identifier "self".
+  Identifier SelfIdentifier;
+
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;
 

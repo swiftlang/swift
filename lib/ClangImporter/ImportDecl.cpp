@@ -342,7 +342,7 @@ namespace {
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetaType = MetaTypeType::get(selfType, context);
-      auto selfName = context.getIdentifier("self");
+      auto selfName = context.SelfIdentifier;
       auto selfDecl = new (context) VarDecl(/*static*/ false,
                                             SourceLoc(), selfName, selfType,
                                             structDecl);
@@ -1155,7 +1155,7 @@ namespace {
       auto selfTy = getSelfTypeForContext(dc);
       if (decl->isClassMethod())
         selfTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      SourceLoc(), selfName,
                                                      selfTy,
@@ -1431,7 +1431,7 @@ namespace {
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
       auto selfMetaTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                          SourceLoc(), selfName,
                                                          selfMetaTy,
@@ -1521,7 +1521,7 @@ namespace {
     /// \param args The set of arguments 
     VarDecl *addImplicitSelfParameter(Type selfTy,
                                       SmallVectorImpl<Pattern *> &args) {
-      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      SourceLoc(), selfName,
                                                      selfTy,

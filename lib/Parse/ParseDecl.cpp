@@ -1523,7 +1523,7 @@ static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
 Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
   VarDecl *D
     = new (Context) VarDecl(/*static*/ false,
-                            Loc, Context.getIdentifier("self"),
+                            Loc, Context.SelfIdentifier,
                             Type(), CurDeclContext);
   D->setImplicit();
   Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
@@ -2434,7 +2434,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
 
   VarDecl *SelfDecl
     = new (Context) VarDecl(/*static*/ false,
-                            SourceLoc(), Context.getIdentifier("self"),
+                            SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
@@ -2550,7 +2550,7 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
 
   VarDecl *SelfDecl
     = new (Context) VarDecl(/*static*/ false,
-                            SourceLoc(), Context.getIdentifier("self"),
+                            SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);

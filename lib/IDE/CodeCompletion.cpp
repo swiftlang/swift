@@ -736,7 +736,6 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
   OwnedResolver TypeResolver;
-  Identifier SelfIdent;
   const DeclContext *CurrDeclContext;
 
   enum class LookupKind {
@@ -802,7 +801,6 @@ public:
                    const DeclContext *CurrDeclContext)
       : Sink(Sink), Ctx(Ctx),
         TypeResolver(createLazyResolver(Ctx)),
-        SelfIdent(Ctx.getIdentifier("self")),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext && CurrDeclContext->isLocalContext()) {
@@ -911,7 +909,7 @@ public:
 
     // Add a type annotation.
     Type T = VD->getType();
-    if (VD->getName() == SelfIdent) {
+    if (VD->getName() == Ctx.SelfIdentifier) {
       // Strip [inout] from 'self'.  It is useful to show [inout] for function
       // parameters.  But for 'self' it is just noise.
       T = T->getRValueType();
@@ -1074,7 +1072,7 @@ public:
 
     if (IsImlicitlyCurriedInstanceMethod) {
       Builder.addLeftParen();
-      Builder.addCallParameter(Ctx.getIdentifier("self"),
+      Builder.addCallParameter(Ctx.SelfIdentifier,
                                FirstInputType.getString());
       Builder.addRightParen();
     } else {
