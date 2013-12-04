@@ -33,8 +33,14 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
     MemorySILType = ASI->getElementType();
   else {
     auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
-    IsSelfOfInitializer = MUI->getKind() != MarkUninitializedInst::GlobalVar;
     MemorySILType = MUI->getType().getObjectType();
+
+    // If this is a 'self' decl in an init method for a non-enum value, then we
+    // want to process the stored members of the struct/class elementwise.
+    if (MUI->getKind() != MarkUninitializedInst::GlobalVar) {
+      if (!isa<EnumDecl>(getType()->getAnyNominal()))
+        IsSelfOfInitializer = true;
+    }
   }
 }
 
@@ -42,109 +48,194 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return getFunction().begin()->begin();
 }
 
-static unsigned getElementCountRec(CanType T) {
-  CanTupleType TT = dyn_cast<TupleType>(T);
+static unsigned getElementCountRec(CanType T, bool IsSelfOfInitializer) {
+  // If this is a tuple, it is always recursively flattened.
+  if (CanTupleType TT = dyn_cast<TupleType>(T)) {
+    assert(!IsSelfOfInitializer && "self never has tuple type");
+    unsigned NumElements = 0;
+    for (auto EltTy : TT.getElementTypes())
+      NumElements += getElementCountRec(EltTy, false);
+    return NumElements;
+  }
 
-  // If this isn't a tuple, it is a single element.
-  if (!TT) return 1;
+  // If this is the top level of a 'self' value, we flatten structs and classes.
+  // Stored properties with tuple types are tracked with independent lifetimes
+  // for each of the tuple members.
+  if (IsSelfOfInitializer) {
+    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
+    unsigned NumElements = 0;
+    for (auto *VD : NTD->getStoredProperties())
+      NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
+                                        false);
+    return NumElements;
+  }
 
-  unsigned NumElements = 0;
-  for (auto EltTy : TT.getElementTypes())
-    NumElements += getElementCountRec(EltTy);
-  return NumElements;
+  // Otherwise, it is a single element.
+  return 1;
 }
 
 /// getElementCount - Return the number of elements in the flattened type.
 /// For tuples, this is the (recursive) count of the fields it contains,
-/// otherwise this is 1.
+/// otherwise this is 1.  For "self" in initializers, this is the number of
+/// stored members in the type (but not in superclasses).
 unsigned DIMemoryObjectInfo::getElementCount() const {
-  return ::getElementCountRec(getType());
+  return ::getElementCountRec(getType(), IsSelfOfInitializer);
 }
 
 /// Given a symbolic element number, return the type of the element.
-static CanType getElementType(CanType T, unsigned EltNo) {
-  TupleType *TT = T->getAs<TupleType>();
-  
-  // If this isn't a tuple, it is a leaf element.
-  if (!TT) {
-    assert(EltNo == 0);
-    return T;
+static CanType getElementTypeRec(CanType T, unsigned EltNo,
+                                 bool IsSelfOfInitializer) {
+  // If this is a tuple type, walk into it.
+  if (TupleType *TT = T->getAs<TupleType>()) {
+    assert(!IsSelfOfInitializer && "self never has tuple type");
+    for (auto &Elt : TT->getFields()) {
+      auto FieldType = Elt.getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      if (EltNo < NumFieldElements)
+        return getElementTypeRec(FieldType, EltNo, false);
+      EltNo -= NumFieldElements;
+    }
+    assert(0 && "invalid element number");
+    abort();
   }
-  
-  for (auto &Elt : TT->getFields()) {
-    auto FieldType = Elt.getType()->getCanonicalType();
-    unsigned NumFields = getElementCountRec(FieldType);
-    if (EltNo < NumFields)
-      return getElementType(FieldType, EltNo);
-    EltNo -= NumFields;
+
+  // If this is the top level of a 'self' value, we flatten structs and classes.
+  // Stored properties with tuple types are tracked with independent lifetimes
+  // for each of the tuple members.
+  if (IsSelfOfInitializer) {
+    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
+    for (auto *VD : NTD->getStoredProperties()) {
+      auto FieldType = VD->getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      if (EltNo < NumFieldElements)
+        return getElementTypeRec(FieldType, EltNo, false);
+      EltNo -= NumFieldElements;
+    }
+    assert(0 && "invalid element number");
+    abort();
   }
-  
-  assert(0 && "invalid element number");
-  abort();
+
+  // Otherwise, it is a leaf element.
+  assert(EltNo == 0);
+  return T;
+}
+
+/// getElementTypeRec - Return the swift type of the specified element.
+CanType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
+  return getElementTypeRec(getType(), EltNo, IsSelfOfInitializer);
 }
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
 /// sense) return a pointer to a leaf element of the specified number.
 SILValue DIMemoryObjectInfo::
-emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B) const {
+emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
   SILValue Ptr = getAddress();
   CanType PointeeType = getType();
+  bool IsSelf = IsSelfOfInitializer;
+
   while (1) {
-    // Have we gotten to our leaf element?
-    CanTupleType TT = dyn_cast<TupleType>(PointeeType);
-    if (TT == 0) {
-      assert(TupleEltNo == 0 && "Element count problem");
-      return Ptr;
-    }
-    
-    // Figure out which field we're walking into.
-    unsigned FieldNo = 0;
-    for (auto EltTy : TT.getElementTypes()) {
-      unsigned NumSubElt = getElementCountRec(EltTy);
-      if (TupleEltNo < NumSubElt) {
-        Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
-        PointeeType = EltTy;
-        break;
+    // If we have a tuple, flatten it.
+    if (CanTupleType TT = dyn_cast<TupleType>(PointeeType)) {
+      assert(!IsSelf && "self never has tuple type");
+
+      // Figure out which field we're walking into.
+      unsigned FieldNo = 0;
+      for (auto EltTy : TT.getElementTypes()) {
+        unsigned NumSubElt = getElementCountRec(EltTy, false);
+        if (EltNo < NumSubElt) {
+          Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
+          PointeeType = EltTy;
+          break;
+        }
+
+        EltNo -= NumSubElt;
+        ++FieldNo;
       }
-      
-      TupleEltNo -= NumSubElt;
-      ++FieldNo;
+      continue;
     }
+
+    // If this is the top level of a 'self' value, we flatten structs and classes.
+    // Stored properties with tuple types are tracked with independent lifetimes
+    // for each of the tuple members.
+    if (IsSelf) {
+      auto *NTD = cast<NominalTypeDecl>(PointeeType->getAnyNominal());
+      for (auto *VD : NTD->getStoredProperties()) {
+        auto FieldType = VD->getType()->getCanonicalType();
+        unsigned NumFieldElements = getElementCountRec(FieldType, false);
+        if (EltNo < NumFieldElements) {
+          if (isa<StructDecl>(NTD))
+            Ptr = B.createStructElementAddr(Loc, Ptr, VD);
+          else {
+            assert(isa<ClassDecl>(NTD));
+            Ptr = B.createRefElementAddr(Loc, Ptr, VD);
+          }
+
+          PointeeType = FieldType;
+          IsSelf = false;
+          break;
+        }
+        EltNo -= NumFieldElements;
+      }
+      continue;
+    }
+
+    // Have we gotten to our leaf element?
+    assert(EltNo == 0 && "Element count problem");
+    return Ptr;
   }
 }
 
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static void getPathStringToElement(CanType T, unsigned Element,
-                                   std::string &Result) {
-  CanTupleType TT = dyn_cast<TupleType>(T);
-  if (!TT) return;
-  
-  unsigned FieldNo = 0;
-  for (auto &Field : TT->getFields()) {
-    CanType FieldTy(Field.getType());
-    unsigned ElementsForField = getElementCountRec(FieldTy);
-    
-    if (Element < ElementsForField) {
-      Result += '.';
-      if (Field.hasName())
-        Result += Field.getName().str();
-      else
-        Result += llvm::utostr(FieldNo);
-      return getPathStringToElement(FieldTy, Element, Result);
+static void getPathStringToElementRec(CanType T, unsigned EltNo,
+                                      bool IsSelfOfInitializer,
+                                      std::string &Result) {
+  if (CanTupleType TT = dyn_cast<TupleType>(T)) {
+    assert(!IsSelfOfInitializer && "self never has tuple type");
+    unsigned FieldNo = 0;
+    for (auto &Field : TT->getFields()) {
+      CanType FieldTy = Field.getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldTy, false);
+      
+      if (EltNo < NumFieldElements) {
+        Result += '.';
+        if (Field.hasName())
+          Result += Field.getName().str();
+        else
+          Result += llvm::utostr(FieldNo);
+        return getPathStringToElementRec(FieldTy, EltNo, false, Result);
+      }
+      
+      EltNo -= NumFieldElements;
+      
+      ++FieldNo;
     }
-    
-    Element -= ElementsForField;
-    
-    ++FieldNo;
+    assert(0 && "Element number is out of range for this type!");
   }
-  assert(0 && "Element number is out of range for this type!");
+
+  // If this is indexing into a field of 'self', look it up.
+  if (IsSelfOfInitializer) {
+    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
+    for (auto *VD : NTD->getStoredProperties()) {
+      auto FieldType = VD->getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      if (EltNo < NumFieldElements) {
+        Result += '.';
+        Result += VD->getName().str();
+        return getPathStringToElementRec(FieldType, EltNo, false, Result);
+      }
+      EltNo -= NumFieldElements;
+    }
+  }
+
+  // Otherwise, there are no subelements.
+  assert(EltNo == 0 && "Element count problem");
 }
 
 void DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
                                                 std::string &Result) const {
-  ::getPathStringToElement(getType(), Element, Result);
+  getPathStringToElementRec(getType(), Element, IsSelfOfInitializer, Result);
 }
 
 
@@ -157,11 +248,10 @@ void DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 /// have trivial type.
 bool DIMemoryUse::
 onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
-  CanType MemoryType = MI.getType();
   auto &Module = Inst->getModule();
   
   for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
-    auto EltTy = getElementType(MemoryType, i);
+    auto EltTy = MI.getElementType(i);
     if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
       return false;
   }
@@ -230,6 +320,10 @@ namespace {
     /// and other ambiguous instructions into init vs assign classes.
     bool isDefiniteInitFinished;
 
+    /// IsSelfOfInitializer - This is true if we're looking at the top level of
+    /// a 'self' variable in an init method.
+    bool IsSelfOfInitializer;
+
     /// When walking the use list, if we index into a struct element, keep track
     /// of this, so that any indexes into tuple subelements don't affect the
     /// element we attribute an access to.
@@ -246,13 +340,10 @@ namespace {
         isDefiniteInitFinished(isDefiniteInitFinished) {
     }
 
-    void collectFromMarkUninitialized(MarkUninitializedInst *MUI) {
-      collectUses(SILValue(MUI, 0), 0);
-    }
-
     /// This is the main entry point for the use walker.  It collects uses from
     /// the address and the refcount result of the allocation.
     void collectFrom(const DIMemoryObjectInfo &MemInfo) {
+      IsSelfOfInitializer = MemInfo.IsSelfOfInitializer;
       collectUses(MemInfo.getAddress(), 0);
 
       if (!isa<MarkUninitializedInst>(MemInfo.MemoryInst)) {
@@ -270,12 +361,14 @@ namespace {
     }
 
   private:
-    void collectUses(SILValue Pointer, unsigned BaseTupleElt);
+    void collectUses(SILValue Pointer, unsigned BaseEltNo);
 
-    void addElementUses(unsigned BaseTupleElt, SILType UseTy,
+    void addElementUses(unsigned BaseEltNo, SILType UseTy,
                         SILInstruction *User, DIUseKind Kind);
     void collectTupleElementUses(TupleElementAddrInst *TEAI,
-                                 unsigned BaseTupleElt);
+                                 unsigned BaseEltNo);
+    void collectStructElementUses(StructElementAddrInst *SEAI,
+                                  unsigned BaseEltNo);
   };
 } // end anonymous namespace
 
@@ -283,44 +376,71 @@ namespace {
 /// acts on all of the aggregate elements in that value.  For example, a load
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
-void ElementUseCollector::addElementUses(unsigned BaseTupleElt, SILType UseTy,
+void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
                                          SILInstruction *User, DIUseKind Kind) {
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumTupleElements = 1;
   if (!InStructSubElement && !InEnumSubElement)
-    NumTupleElements = getElementCountRec(UseTy.getSwiftRValueType());
+    NumTupleElements = getElementCountRec(UseTy.getSwiftRValueType(),
+                                          IsSelfOfInitializer);
   
-  Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, NumTupleElements));
+  Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, NumTupleElements));
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new
-/// BaseTupleElt implicit in the selected member, and recursively add uses of
+/// BaseEltNo implicit in the selected member, and recursively add uses of
 /// the instruction.
 void ElementUseCollector::
-collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseTupleElt) {
+collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
 
   // If we're walking into a tuple within a struct or enum, don't adjust the
   // BaseElt.  The uses hanging off the tuple_element_addr are going to be
   // counted as uses of the struct or enum itself.
   if (InStructSubElement || InEnumSubElement)
-    return collectUses(SILValue(TEAI, 0), BaseTupleElt);
+    return collectUses(SILValue(TEAI, 0), BaseEltNo);
+
+  assert(!IsSelfOfInitializer && "self doesn't have tuple type");
 
   // tuple_element_addr P, 42 indexes into the current tuple element.
   // Recursively process its uses with the adjusted element number.
   unsigned FieldNo = TEAI->getFieldNo();
   auto *TT = TEAI->getTupleType();
-  unsigned NewBaseElt = BaseTupleElt;
   for (unsigned i = 0; i != FieldNo; ++i) {
     CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    NewBaseElt += getElementCountRec(EltTy);
+    BaseEltNo += getElementCountRec(EltTy, false);
   }
   
-  collectUses(SILValue(TEAI, 0), NewBaseElt);
+  collectUses(SILValue(TEAI, 0), BaseEltNo);
 }
 
+void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
+                                                   unsigned BaseEltNo) {
+  // Generally, we set the "InStructSubElement" flag and recursively process
+  // the uses so that we know that we're looking at something within the
+  // current element.
+  if (!IsSelfOfInitializer) {
+    llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+    collectUses(SILValue(SEAI, 0), BaseEltNo);
+    return;
+  }
 
-void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
+  // If this is the top level of 'self' in an init method, we treat each
+  // element of the struct as an element to be analyzed independently.
+  llvm::SaveAndRestore<bool> X(IsSelfOfInitializer, false);
+
+  for (auto *VD : SEAI->getStructDecl()->getStoredProperties()) {
+    if (SEAI->getField() == VD)
+      break;
+
+    auto FieldType = VD->getType()->getCanonicalType();
+    BaseEltNo += getElementCountRec(FieldType, false);
+  }
+
+  collectUses(SILValue(SEAI, 0), BaseEltNo);
+}
+
+void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer.getType().isAddress() &&
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer.getType().getObjectType();
@@ -336,15 +456,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
 
     // struct_element_addr P, #field indexes into the current element.
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
-      // Set the "InStructSubElement" flag and recursively process the uses.
-      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-      collectUses(SILValue(SEAI, 0), BaseTupleElt);
+      collectStructElementUses(SEAI, BaseEltNo);
       continue;
     }
 
     // Instructions that compute a subelement are handled by a helper.
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
-      collectTupleElementUses(TEAI, BaseTupleElt);
+      collectTupleElementUses(TEAI, BaseEltNo);
       continue;
     }
     
@@ -353,12 +471,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
-        Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
+        Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
       continue;
     }
 
     if (isa<LoadWeakInst>(User)) {
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
       continue;
     }
 
@@ -382,7 +500,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       else
         Kind = DIUseKind::Initialization;
       
-      Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
       continue;
     }
     
@@ -397,7 +515,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
           Kind = DIUseKind::Assign;
         else
           Kind = DIUseKind::InitOrAssign;
-        Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
+        Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
     
@@ -425,7 +543,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       else
         Kind = DIUseKind::InitOrAssign;
       
-      Uses.push_back(DIMemoryUse(CAI, Kind, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(CAI, Kind, BaseEltNo, 1));
       continue;
     }
     
@@ -434,7 +552,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     if (isa<InitializeVarInst>(User)) {
       auto Kind = InStructSubElement ?
         DIUseKind::PartialStore : DIUseKind::Initialization;
-      addElementUses(BaseTupleElt, PointeeType, User, Kind);
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
       continue;
     }
 
@@ -460,19 +578,19 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
-        addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::IndirectIn);
+        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
       // If this is an out-parameter, it is like a store.
       case ParameterConvention::Indirect_Out:
         assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseTupleElt, PointeeType, User,
+        addElementUses(BaseEltNo, PointeeType, User,
                        DIUseKind::Initialization);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
       case ParameterConvention::Indirect_Inout:
-        addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::InOutUse);
+        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
         continue;
       }
       llvm_unreachable("bad parameter convention");
@@ -489,7 +607,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(SILValue(User, 0), BaseTupleElt);
+      collectUses(SILValue(User, 0), BaseEltNo);
       continue;
     }
 
@@ -499,12 +617,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       assert(!InStructSubElement && !InEnumSubElement &&
              "init_existential should not apply to subelements");
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
-                                 BaseTupleElt, 1));
+                                 BaseEltNo, 1));
 
       // Set the "InEnumSubElement" flag (so we don't consider tuple indexes to
       // index across elements) and recursively process the uses.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(SILValue(User, 0), BaseTupleElt);
+      collectUses(SILValue(User, 0), BaseEltNo);
       continue;
     }
     
@@ -513,7 +631,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
       assert(!InStructSubElement &&
              "inject_enum_addr the subelement of a struct unless in a ctor");
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
-                                 BaseTupleElt, 1));
+                                 BaseEltNo, 1));
       continue;
     }
 
@@ -522,14 +640,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     if (isa<UpcastExistentialInst>(User)) {
       auto Kind = UI->getOperandNumber() == 1 ?
         DIUseKind::Initialization : DIUseKind::Load;
-      Uses.push_back(DIMemoryUse(User, Kind, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
       continue;
     }
     
     // project_existential is a use of the protocol value, so it is modeled as a
     // load.
     if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)) {
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseTupleElt, 1));
+      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
       // TODO: Is it safe to ignore all uses of the project_existential?
       continue;
     }
@@ -541,7 +659,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     }
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(BaseTupleElt, PointeeType, User, DIUseKind::Escape);
+    addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
   }
 
   // Now that we've walked all of the immediate uses, scalarize any operations
@@ -615,7 +733,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
     // element address computations to recursively process it.  This can cause
     // further scalarization.
     for (auto EltPtr : ElementAddrs)
-      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseTupleElt);
+      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseEltNo);
   }
 }
 

@@ -76,19 +76,24 @@ public:
 
   /// getElementCount - Return the number of elements in the flattened type.
   /// For tuples, this is the (recursive) count of the fields it contains,
-  /// otherwise this is 1.
+  /// otherwise this is 1.  For "self" in initializers, this is the number of
+  /// stored members in the type (but not in superclasses).
   unsigned getElementCount() const;
   
-  /// emitElementAddress - Given a tuple element number (in the flattened
-  /// sense) return a pointer to a leaf element of the specified number.
+  /// emitElementAddress - Given an element number (in the flattened sense)
+  /// return a pointer to a leaf element of the specified number.
   SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
                               SILBuilder &B) const;
+
+  /// getElementType - Return the swift type of the specified element.
+  CanType getElementType(unsigned EltNo) const;
 
   /// Push the symbolic path name to the specified element number onto the
   /// specified std::string.
   void getPathStringToElement(unsigned Element, std::string &Result) const;
 };
-  
+
+
 enum DIUseKind {
   // The instruction is a Load.
   Load,
@@ -108,7 +113,7 @@ enum DIUseKind {
   // The instruction is a store to a member of a larger struct value.
   PartialStore,
   
-  /// An indirecet 'inout' parameter of an Apply instruction.
+  /// An indirect 'inout' parameter of an Apply instruction.
   InOutUse,
   
   /// An indirect 'in' parameter of an Apply instruction.
