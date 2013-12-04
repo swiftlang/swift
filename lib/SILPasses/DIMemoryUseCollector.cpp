@@ -19,6 +19,31 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                  DIMemoryObjectInfo Implementation
+//===----------------------------------------------------------------------===//
+
+DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
+  MemoryInst = MI;
+  IsSelfOfInitializer = false;
+
+  // Compute the type of the memory object.
+  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
+    MemorySILType = ABI->getElementType();
+  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
+    MemorySILType = ASI->getElementType();
+  else {
+    auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+    IsSelfOfInitializer = MUI->getKind() != MarkUninitializedInst::GlobalVar;
+    MemorySILType = MUI->getType().getObjectType();
+  }
+}
+
+SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
+  return getFunction().begin()->begin();
+}
+
+
+//===----------------------------------------------------------------------===//
 //                  Tuple Element Flattening/Counting Logic
 //===----------------------------------------------------------------------===//
 
@@ -125,12 +150,13 @@ void TF::getPathStringToElement(CanType T, unsigned Element,
 
 /// onlyTouchesTrivialElements - Return true if all of the accessed elements
 /// have trivial type.
-bool DIMemoryUse::onlyTouchesTrivialElements(SILType MemoryType) const {
-  CanType MemoryCType = MemoryType.getSwiftRValueType();
+bool DIMemoryUse::
+onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
+  CanType MemoryType = MI.getType();
   auto &Module = Inst->getModule();
   
   for (unsigned i = FirstTupleElement, e = i+NumTupleElements; i != e; ++i){
-    auto EltTy = getElementType(MemoryCType, i);
+    auto EltTy = getElementType(MemoryType, i);
     if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
       return false;
   }
@@ -232,17 +258,19 @@ namespace {
 
     /// This is the main entry point for the use walker.  It collects uses from
     /// the address and the refcount result of the allocation.
-    void collectFromAllocation(SILInstruction *I) {
-      collectUses(SILValue(I, 1), 0);
+    void collectFrom(const DIMemoryObjectInfo &MemInfo) {
+      collectUses(MemInfo.getAddress(), 0);
 
-      // Collect information about the retain count result as well.
-      for (auto UI : SILValue(I, 0).getUses()) {
-        auto *User = UI->getUser();
+      if (!isa<MarkUninitializedInst>(MemInfo.MemoryInst)) {
+        // Collect information about the retain count result as well.
+        for (auto UI : SILValue(MemInfo.MemoryInst, 0).getUses()) {
+          auto *User = UI->getUser();
 
-        // If this is a release or dealloc_stack, then remember it as such.
-        if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-            isa<DeallocBoxInst>(User)) {
-          Releases.push_back(User);
+          // If this is a release or dealloc_stack, then remember it as such.
+          if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
+              isa<DeallocBoxInst>(User)) {
+            Releases.push_back(User);
+          }
         }
       }
     }
@@ -598,27 +626,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseTupleElt) {
 }
 
 
-/// collectDIElementUsesFromAllocation - Analyze all uses of the specified
-/// allocation instruction (alloc_box or alloc_stack), classifying them and
-/// storing the information found into the Uses and Releases lists.
-void swift::
-collectDIElementUsesFromAllocation(SILInstruction *AllocInst,
-                                   SmallVectorImpl<DIMemoryUse> &Uses,
-                                   SmallVectorImpl<SILInstruction*> &Releases,
-                                   bool isDefiniteInitFinished) {
-  ElementUseCollector(Uses, Releases, isDefiniteInitFinished)
-    .collectFromAllocation(AllocInst);
-}
-
-/// collectDIElementUsesFromMarkUninit - Analyze all uses of the specified
-/// mark_uninitialized instruction, classifying them and storing the information
-/// found into the Uses and Releases lists.
-void swift::
-collectDIElementUsesFromMarkUninit(MarkUninitializedInst *AllocInst,
-                                   SmallVectorImpl<DIMemoryUse> &Uses,
-                                   SmallVectorImpl<SILInstruction*> &Releases,
-                                   bool isDefiniteInitFinished) {
-  ElementUseCollector(Uses, Releases, isDefiniteInitFinished)
-    .collectFromMarkUninitialized(AllocInst);
-
+/// collectDIElementUsesFrom - Analyze all uses of the specified allocation
+/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
+/// and storing the information found into the Uses and Releases lists.
+void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
+                                     SmallVectorImpl<DIMemoryUse> &Uses,
+                                     SmallVectorImpl<SILInstruction*> &Releases,
+                                     bool isDIFinished) {
+  ElementUseCollector(Uses, Releases, isDIFinished).collectFrom(MemoryInfo);
 }

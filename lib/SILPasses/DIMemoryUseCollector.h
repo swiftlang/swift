@@ -27,7 +27,42 @@
 
 namespace swift {
   class SILBuilder;
+
+/// DIMemoryObjectInfo - This struct holds information about the memory object
+/// being analyzed that is required to correctly break it down into elements.
+class DIMemoryObjectInfo {
+public:
+  /// This is the instruction that represents the memory.  It is either an
+  /// allocation (alloc_box, alloc_stack) or a mark_uninitialized.
+  SILInstruction *MemoryInst;
+
+  /// This is the base type of the memory allocation.
+  SILType MemorySILType;
   
+  /// This is true if the memory being analyzed represents the 'self' value in
+  /// an initializer.
+  bool IsSelfOfInitializer;
+public:
+
+  DIMemoryObjectInfo(SILInstruction *MemoryInst);
+
+  SILLocation getLoc() const { return MemoryInst->getLoc(); }
+  SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
+
+  /// Return the first instruction of the function containing the memory object.
+  SILInstruction *getFunctionEntryPoint() const;
+
+  CanType getType() const {
+    return MemorySILType.getSwiftRValueType();
+  }
+
+  SILValue getAddress() const {
+    if (isa<MarkUninitializedInst>(MemoryInst))
+      return SILValue(MemoryInst, 0);
+    return SILValue(MemoryInst, 1);
+  }
+};
+
 /// This is a collection of utilities for reasoning about (potentially
 /// recursively) flattened tuples, and computing access paths and indexes into
 /// the flattened namespace.
@@ -113,7 +148,7 @@ struct DIMemoryUse {
   
   /// onlyTouchesTrivialElements - Return true if all of the accessed elements
   /// have trivial type.
-  bool onlyTouchesTrivialElements(SILType MemoryType) const;
+  bool onlyTouchesTrivialElements(const DIMemoryObjectInfo &MemoryInfo) const;
   
   /// getElementBitmask - Return a bitmask with the touched tuple elements
   /// set.
@@ -123,23 +158,14 @@ struct DIMemoryUse {
   }
 };
 
-/// collectDIElementUsesFromAllocation - Analyze all uses of the specified
-/// allocation instruction (alloc_box or alloc_stack), classifying them and
-/// storing the information found into the Uses and Releases lists.
-void collectDIElementUsesFromAllocation(SILInstruction *AllocInst,
-                                        SmallVectorImpl<DIMemoryUse> &Uses,
-                                    SmallVectorImpl<SILInstruction*> &Releases,
-                                        bool isDefiniteInitFinished);
-  
-/// collectDIElementUsesFromMarkUninit - Analyze all uses of the specified
-/// mark_uninitialized instruction, classifying them and storing the information
-/// found into the Uses and Releases lists.
-void collectDIElementUsesFromMarkUninit(MarkUninitializedInst *AllocInst,
-                                        SmallVectorImpl<DIMemoryUse> &Uses,
-                                    SmallVectorImpl<SILInstruction*> &Releases,
-                                        bool isDefiniteInitFinished);
-  
-  
+/// collectDIElementUsesFrom - Analyze all uses of the specified allocation
+/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
+/// and storing the information found into the Uses and Releases lists.
+void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
+                              SmallVectorImpl<DIMemoryUse> &Uses,
+                              SmallVectorImpl<SILInstruction*> &Releases,
+                              bool isDefiniteInitFinished);
+
 } // end namespace swift
 
 #endif

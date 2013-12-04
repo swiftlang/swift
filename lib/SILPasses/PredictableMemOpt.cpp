@@ -939,27 +939,29 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
       SILInstruction *Inst = I;
-      if (isa<AllocBoxInst>(Inst) || isa<AllocStackInst>(Inst)) {
-        DEBUG(llvm::errs() << "*** DI Optimize looking at: " << *Inst << "\n");
-        
-        // Set up the datastructure used to collect the uses of the allocation.
-        SmallVector<DIMemoryUse, 16> Uses;
-        SmallVector<SILInstruction*, 4> Releases;
-        
-        // Walk the use list of the pointer, collecting them.
-        collectDIElementUsesFromAllocation(Inst, Uses, Releases, true);
-        
-        AllocOptimize(Inst, Uses, Releases).doIt();
-        
-        // Carefully move iterator to avoid invalidation problems.
+      if (!isa<AllocBoxInst>(Inst) && !isa<AllocStackInst>(Inst)) {
         ++I;
-        if (Inst->use_empty()) {
-          Inst->eraseFromParent();
-          ++NumAllocRemoved;
-        }
         continue;
       }
+
+      DEBUG(llvm::errs() << "*** DI Optimize looking at: " << *Inst << "\n");
+      DIMemoryObjectInfo MemInfo(Inst);
+
+      // Set up the datastructure used to collect the uses of the allocation.
+      SmallVector<DIMemoryUse, 16> Uses;
+      SmallVector<SILInstruction*, 4> Releases;
+      
+      // Walk the use list of the pointer, collecting them.
+      collectDIElementUsesFrom(MemInfo, Uses, Releases, true);
+      
+      AllocOptimize(Inst, Uses, Releases).doIt();
+      
+      // Carefully move iterator to avoid invalidation problems.
       ++I;
+      if (Inst->use_empty()) {
+        Inst->eraseFromParent();
+        ++NumAllocRemoved;
+      }
     }
   }
 }

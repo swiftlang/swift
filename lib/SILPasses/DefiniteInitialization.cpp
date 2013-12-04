@@ -321,14 +321,10 @@ namespace {
   class LifetimeChecker {
     SILModule &Module;
 
-    /// TheMemory - This is either an alloc_box instruction or a
-    /// mark_uninitialized instruction.  This represents the start of the
-    /// lifetime of the value being analyzed.
-    SILInstruction *TheMemory;
+    /// TheMemory - This holds information about the memory object being
+    /// analyzed.
+    DIMemoryObjectInfo TheMemory;
     
-    /// This is the SILType of the memory object.
-    SILType MemoryType;
-
     /// The number of tuple elements in this memory object.
     unsigned NumTupleElements;
     
@@ -350,21 +346,14 @@ namespace {
     // location as a policy decision.
     std::vector<SILLocation> EmittedErrorLocs;
   public:
-    LifetimeChecker(SILInstruction *TheMemory,
+    LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                     SmallVectorImpl<DIMemoryUse> &Uses,
                     SmallVectorImpl<SILInstruction*> &Releases);
 
     void doIt();
 
   private:
-    SILValue getTheMemoryAddr() const {
-      if (isa<MarkUninitializedInst>(TheMemory))
-        return SILValue(TheMemory, 0);
-      return SILValue(TheMemory, 1);
-    }
-    
-    
-    
+
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
                         LiveOutBlockState(NumTupleElements)}).first->second;
@@ -394,23 +383,13 @@ namespace {
 } // end anonymous namespace
 
 
-LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
+LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  SmallVectorImpl<DIMemoryUse> &Uses,
                                  SmallVectorImpl<SILInstruction*> &Releases)
-  : Module(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses),
+  : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
 
-  // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-    MemoryType = ABI->getElementType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
-    MemoryType = ASI->getElementType();
-  else {
-    assert(isa<MarkUninitializedInst>(TheMemory) && "Unknown memory object");
-    MemoryType = TheMemory->getType(0).getObjectType();
-  }
-
-  NumTupleElements = TF::getElementCount(MemoryType.getSwiftRValueType());
+  NumTupleElements = TF::getElementCount(TheMemory.getType());
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -440,8 +419,8 @@ LifetimeChecker::LifetimeChecker(SILInstruction *TheMemory,
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
   // as a use so we see it in our dataflow walks.
-  NonLoadUses[TheMemory] = ~0U;
-  auto &MemBBInfo = getBlockInfo(TheMemory->getParent());
+  NonLoadUses[TheMemory.MemoryInst] = ~0U;
+  auto &MemBBInfo = getBlockInfo(TheMemory.MemoryInst->getParent());
   MemBBInfo.HasNonLoadUse = true;
 
   // There is no scanning required (or desired) for the block that defines the
@@ -468,14 +447,14 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // optionally an access path to the uninitialized element.
   std::string Name;
   if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheMemory->getLoc().getAsASTNode<Decl>()))
+        dyn_cast_or_null<ValueDecl>(TheMemory.getLoc().getAsASTNode<Decl>()))
     Name = VD->getName().str();
   else
     Name = "<unknown>";
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy = MemoryType.getSwiftRValueType();
+  CanType AllocTy = TheMemory.getType();
 
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
@@ -490,7 +469,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // TODO: The QoI could be improved in many different ways here.  For example,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
-  diagnose(Module, TheMemory->getLoc(), diag::variable_defined_here);
+  diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here);
 }
 
 void LifetimeChecker::doIt() {
@@ -573,7 +552,7 @@ void LifetimeChecker::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!MemoryType.isTrivial(Module)) {
+  if (!TheMemory.MemorySILType.isTrivial(Module)) {
     for (unsigned i = 0, e = Releases.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
@@ -622,7 +601,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     // it for later.   Once we've collected all of the conditional init/assigns,
     // we can insert a single control variable for the memory object for the
     // whole function.
-    if (!InstInfo.onlyTouchesTrivialElements(MemoryType))
+    if (!InstInfo.onlyTouchesTrivialElements(TheMemory))
       HasConditionalInitAssignOrDestroys = true;
     return;
   }
@@ -803,19 +782,19 @@ static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
 /// inserting a bitvector that tracks the liveness of each tuple element
 /// independently.
 SILValue LifetimeChecker::handleConditionalInitAssign() {
-  SILLocation Loc = TheMemory->getLoc();
+  SILLocation Loc = TheMemory.getLoc();
   Loc.markAutoGenerated();
   
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
-  SILBuilder B(TheMemory->getFunction()->begin()->begin());
+  SILBuilder B(TheMemory.getFunctionEntryPoint());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumTupleElements, Module.getASTContext());
   auto Alloc = B.createAllocStack(Loc, IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
-  for (auto &BB : *TheMemory->getFunction()) {
+  for (auto &BB : TheMemory.getFunction()) {
     if (auto *RI = dyn_cast<ReturnInst>(BB.getTerminator())) {
       B.setInsertionPoint(RI);
       B.createDeallocStack(Loc, SILValue(Alloc, 0));
@@ -823,7 +802,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   }
   
   // Before the memory allocation, store zero in the control variable.
-  B.setInsertionPoint(TheMemory->getNextNode());
+  B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
   SILValue AllocAddr = SILValue(Alloc, 1);
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, AllocAddr);
@@ -851,7 +830,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     case DIUseKind::Initialization:
       // If this is an initialization of only trivial elements, then we don't
       // need to update the bitvector.
-      if (Use.onlyTouchesTrivialElements(MemoryType))
+      if (Use.onlyTouchesTrivialElements(TheMemory))
         continue;
       
       // Get the integer constant.
@@ -864,7 +843,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       if (!Bitmask.isAllOnesValue()) {
         SILValue Tmp = B.createLoad(Loc, AllocAddr);
         if (!OrFn) {
-          SILBuilder FnB(TheMemory->getFunction()->begin()->begin());
+          SILBuilder FnB(TheMemory.getFunctionEntryPoint());
           OrFn = getBinaryFunction("or", Tmp.getType(), Loc, FnB);
         }
         
@@ -878,7 +857,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the
     // element precise.
-    if (Use.onlyTouchesTrivialElements(MemoryType))
+    if (Use.onlyTouchesTrivialElements(TheMemory))
       continue;
     
     B.setInsertionPoint(Use.Inst);
@@ -922,7 +901,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
       SILValue EltPtr =
-        TF::emitElementAddress(getTheMemoryAddr(), Elt, Loc, B);
+        TF::emitElementAddress(TheMemory.getAddress(), Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
         Releases.push_back(DA);
     }
@@ -946,7 +925,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
-  SILBuilder B(TheMemory);
+  SILBuilder B(TheMemory.MemoryInst);
   SILValue ShiftRightFn, TruncateFn;
   
   // After handling any conditional initializations, check to see if we have any
@@ -1013,7 +992,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // Shift the mask down to this element.
         if (Elt != 0) {
           if (!ShiftRightFn) {
-            SILBuilder FB(TheMemory->getFunction()->begin()->begin());
+            SILBuilder FB(TheMemory.getFunctionEntryPoint());
             ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
                                              DAI->getLoc(), FB);
           }
@@ -1024,7 +1003,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         }
         
         if (!TruncateFn) {
-          SILBuilder FB(TheMemory->getFunction()->begin()->begin());
+          SILBuilder FB(TheMemory.getFunctionEntryPoint());
           TruncateFn = getTruncateToI1Function(CondVal.getType(),
                                                DAI->getLoc(), FB);
         }
@@ -1186,7 +1165,8 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
         // is not defined at all yet.  Otherwise, we've found a definition, or
         // something else that will require that the memory is initialized at
         // this point.
-        Result.set(0, TheInst == TheMemory ? DIKind::No : DIKind::Yes);
+        Result.set(0,
+                   TheInst == TheMemory.MemoryInst ? DIKind::No : DIKind::Yes);
         return Result;
       }
     }
@@ -1216,7 +1196,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.  Scan no further.
-      if (TheInst == TheMemory) {
+      if (TheInst == TheMemory.MemoryInst) {
         // The result is perfectly decided locally.
         for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
           Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
@@ -1286,43 +1266,27 @@ DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processAllocation(SILInstruction *I) {
-  assert(isa<AllocBoxInst>(I) || isa<AllocStackInst>(I));
-
+static void processMemoryObject(SILInstruction *I) {
   // If the allocation's address has a single use, and it is a
   // mark_uninitialized, then we'll analyze it when we look at the
   // mark_uninitialized instruction itself.
-  if (SILValue(I, 1).hasOneUse() &&
+  if (!isa<MarkUninitializedInst>(I) &&
+      SILValue(I, 1).hasOneUse() &&
       isa<MarkUninitializedInst>(SILValue(I, 1).use_begin()->getUser()))
     return;
   
   DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
-  
+  DIMemoryObjectInfo MemInfo(I);
+
   // Set up the datastructure used to collect the uses of the allocation.
   SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFromAllocation(I, Uses, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, Releases, false);
 
-  LifetimeChecker(I, Uses, Releases).doIt();
+  LifetimeChecker(MemInfo, Uses, Releases).doIt();
 }
-
-static void processMarkUninitialized(MarkUninitializedInst *MUI) {
-  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *MUI << "\n");
-  
-  // Set up the datastructure used to collect the uses of the
-  // mark_uninitialized.
-  SmallVector<DIMemoryUse, 16> Uses;
-  SmallVector<SILInstruction*, 4> Releases;
-
-  // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFromMarkUninit(MUI, Uses, Releases, false);
-
-  assert(Releases.empty() && "Shouldn't have releases of MUIs");
-  LifetimeChecker(MUI, Uses, Releases).doIt();
-}
-
 
 /// checkDefiniteInitialization - Check that all memory objects that require
 /// initialization before use are properly set and transform the code as
@@ -1331,10 +1295,9 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
       SILInstruction *Inst = I;
-      if (isa<AllocBoxInst>(Inst) || isa<AllocStackInst>(Inst))
-        processAllocation(Inst);
-      else if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst))
-        processMarkUninitialized(MUI);
+      if (isa<AllocBoxInst>(Inst) || isa<AllocStackInst>(Inst) ||
+          isa<MarkUninitializedInst>(Inst))
+        processMemoryObject(Inst);
     }
   }
 }
