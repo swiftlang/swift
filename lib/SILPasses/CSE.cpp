@@ -59,6 +59,7 @@ namespace {
       switch(Inst->getKind()) {     
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
+      case ValueKind::GlobalAddrInst:
       case ValueKind::IntegerLiteralInst:
         return true;
       default:
@@ -94,6 +95,11 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
     auto *X = cast<BuiltinFunctionRefInst>(Inst);
     return llvm::hash_combine(unsigned(ValueKind::BuiltinFunctionRefInst),
                               X->getName().get());
+  }
+  case ValueKind::GlobalAddrInst: {
+    auto *X = cast<GlobalAddrInst>(Inst);
+    return llvm::hash_combine(unsigned(ValueKind::GlobalAddrInst),
+                              X->getGlobal());
   }
   case ValueKind::IntegerLiteralInst: {
     IntegerLiteralInst *IntLiteral = cast<IntegerLiteralInst>(Inst);

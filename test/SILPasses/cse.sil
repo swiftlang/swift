@@ -453,3 +453,21 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   %10 = tuple(%8 : $Builtin.Int64, %9 : $Builtin.Int64)
   return %10 : $(Builtin.Int64, Builtin.Int64)
 }
+
+var global_target : Builtin.Int64
+
+// CHECK-LABEL: globaladdr_inst
+// CHECK: global_addr #global_target
+// CHECK-NOT: global_addr
+
+sil @globaladdr_inst : $@thin () -> (Builtin.Int64) {
+  %0 = global_addr #global_target : $*Builtin.Int64
+  %1 = global_addr #global_target : $*Builtin.Int64
+  %2 = load %0 : $*Builtin.Int64
+  %3 = load %1 : $*Builtin.Int64
+  %4 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = integer_literal $Builtin.Int1, 0
+  %6 = apply %4(%2, %3, %5) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
+  return %7 : $(Builtin.Int64)
+}
