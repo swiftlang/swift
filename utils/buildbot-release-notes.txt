@@ -13,7 +13,7 @@
     }
 
 * Operator precedence has been simplified:
-    "exponentiative:" <<, >>, **
+    "exponentiative:" <<, >>
     "multiplicative:" *, /, %, &
     "additive:" +, -, |, ^
     "comparative:" ==, !=, <, <=, >=, >
