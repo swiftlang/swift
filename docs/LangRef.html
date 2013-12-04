@@ -3865,46 +3865,46 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <h3 id="stdlib-arithmetic">Arithmetic and Logical Operations</h3>
   <!-- ===================================================================== -->
 
-  <div class="commentary">
-    This is all eagerly awaiting the day when we have generics and overloading.
-    For now, Int is the only arithmetic type :)
-  </div>
-
   <h4 id="stdlib-arithmetic">Arithmetic Operators</h4>
-  
+
   <pre class="stdlib">
-    <i>// Simple binary operators, following the same precedence as C.</i>
-    func [infix_left=200] * (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=200] / (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=200] % (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=190] + (lhs: Int, rhs: Int) -&gt; Int
-    func [infix_left=190] - (lhs: Int, rhs: Int) -&gt; Int
-    <i>// In C, &lt;&lt;, &gt;&gt; is 180.</i>
+    func * (lhs: Int, rhs: Int) -&gt; Int
+    func / (lhs: Int, rhs: Int) -&gt; Int
+    func % (lhs: Int, rhs: Int) -&gt; Int
+    func + (lhs: Int, rhs: Int) -&gt; Int
+    func - (lhs: Int, rhs: Int) -&gt; Int
   </pre>
 
   <h4 id="stdlib-comparison">Relational and Equality Operators</h4>
 
   <pre class="stdlib">
-    func [infix_left=170] &lt;  : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &gt;  : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &lt;= : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=170] &gt;= : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=160] == : (lhs : Int, rhs : Int) -&gt; Bool
-    func [infix_left=160] != : (lhs : Int, rhs : Int) -&gt; Bool
-    <i>// In C, bitwise logical operators are 130,140,150.</i>
+    func &lt;  : (lhs : Int, rhs : Int) -&gt; Bool
+    func &gt;  : (lhs : Int, rhs : Int) -&gt; Bool
+    func &lt;= : (lhs : Int, rhs : Int) -&gt; Bool
+    func &gt;= : (lhs : Int, rhs : Int) -&gt; Bool
+    func == : (lhs : Int, rhs : Int) -&gt; Bool
+    func != : (lhs : Int, rhs : Int) -&gt; Bool
   </pre>
 
   <h4 id="stdlib-short-circuit-logical">Short Circuiting Logical Operators</h4>
-  
+
   <pre class="stdlib">
-    func [infix_left=120] &amp;&amp; (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
-    func [infix_left=110] || (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
-    <i>// In C, 100 is ?:</i>
-    <i>// In C, 90 is =, *=, += etc.</i>
+    func &amp;&amp; (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
+    func || (lhs: Bool, rhs: ()-&gt;Bool) -&gt; Bool
   </pre>
 
+  <p>Swift has a simplified precedence levels when compared with C.
+     From highest to lowest:</p>
 
-  
+  <pre class="stdlib">
+    "exponentiative:" <<, >>, **
+    "multiplicative:" *, /, %, &
+    "additive:" +, -, |, ^
+    "comparative:" ==, !=, <, <=, >=, >
+    "conjunctive:" &&
+    "disjunctive:" ||
+  </pre>
+
 <!-- *********************************************************************** -->
 <hr>
 <address>
