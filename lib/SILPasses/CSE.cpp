@@ -65,6 +65,7 @@ namespace {
       case ValueKind::StringLiteralInst:
       case ValueKind::StructInst:
       case ValueKind::StructExtractInst:
+      case ValueKind::StructElementAddrInst:
         return true;
       default:
         return false;
@@ -135,6 +136,13 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
   case ValueKind::StructExtractInst: {
     auto *X = cast<StructExtractInst>(Inst);
     return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
+                              X->getStructDecl(),
+                              X->getField(),
+                              X->getOperand());
+  }
+  case ValueKind::StructElementAddrInst: {
+    auto *X = cast<StructElementAddrInst>(Inst);
+    return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
                               X->getStructDecl(),
                               X->getField(),
                               X->getOperand());
