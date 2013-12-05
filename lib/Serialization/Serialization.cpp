@@ -331,12 +331,15 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(sil_block, SIL_INST_NO_OPERAND);
   RECORD(sil_block, SIL_VTABLE);
   RECORD(sil_block, SIL_VTABLE_ENTRY);
+  RECORD(sil_block, SIL_GLOBALVAR);
 
   BLOCK(SIL_INDEX_BLOCK);
   RECORD(sil_index_block, SIL_FUNC_NAMES);
   RECORD(sil_index_block, SIL_FUNC_OFFSETS);
   RECORD(sil_index_block, SIL_VTABLE_NAMES);
   RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
+  RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
+  RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) RECORD(index_block, Id);

@@ -40,7 +40,9 @@ namespace sil_index_block {
     SIL_FUNC_NAMES = 1,
     SIL_FUNC_OFFSETS,
     SIL_VTABLE_NAMES,
-    SIL_VTABLE_OFFSETS
+    SIL_VTABLE_OFFSETS,
+    SIL_GLOBALVAR_NAMES,
+    SIL_GLOBALVAR_OFFSETS
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -73,7 +75,8 @@ namespace sil_block {
     SIL_INST_APPLY,
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
-    SIL_VTABLE_ENTRY
+    SIL_VTABLE_ENTRY,
+    SIL_GLOBALVAR
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -90,6 +93,13 @@ namespace sil_block {
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
     BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using GlobalVarLayout = BCRecordLayout<
+    SIL_GLOBALVAR,
+    BCFixed<2>,        // linkage
+    BCFixed<1>,        // Optional attributes
+    TypeIDField
   >;
 
   using SILFunctionLayout = BCRecordLayout<

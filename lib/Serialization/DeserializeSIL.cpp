@@ -123,6 +123,26 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
           kind == sil_index_block::SIL_VTABLE_OFFSETS) &&
          "Expect a SIL_VTABLE_OFFSETS record.");
   VTables.assign(scratch.begin(), scratch.end());
+
+  // Read SIL_GLOBALVAR_NAMES record and update GlobalVarList.
+  next = cursor.advance();
+  if (next.Kind == llvm::BitstreamEntry::EndBlock)
+    return;
+  scratch.clear();
+  kind = cursor.readRecord(next.ID, scratch, &blobData);
+  assert((next.Kind == llvm::BitstreamEntry::Record &&
+          kind == sil_index_block::SIL_GLOBALVAR_NAMES) &&
+         "Expect a SIL_GLOBALVAR_NAMES record.");
+  GlobalVarList = readFuncTable(scratch, blobData);
+
+  // Read SIL_GLOBALVAR_OFFSETS record and initialize GlobalVars.
+  next = cursor.advance();
+  scratch.clear();
+  kind = cursor.readRecord(next.ID, scratch, &blobData);
+  assert((next.Kind == llvm::BitstreamEntry::Record &&
+          kind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
+         "Expect a SIL_GLOBALVAR_OFFSETS record.");
+  GlobalVars.assign(scratch.begin(), scratch.end());
 }
 
 std::unique_ptr<SILDeserializer::SerializedFuncTable>
@@ -340,8 +360,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
-  // SIL_VTABLE record also means the end of this SILFunction.
-  while (kind != SIL_FUNCTION && kind != SIL_VTABLE) {
+  // SIL_VTABLE or SIL_GLOBALVAR record also means the end of this SILFunction.
+  while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(Fn, scratch);
@@ -647,7 +667,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::SILGlobalAddrInst: {
-    llvm_unreachable("not implemented");
+    // Format: Name and type. Use SILOneOperandLayout.
+    auto Ty = MF->getType(TyID);
+    Identifier Name = MF->getIdentifier(ValID);
+
+    // Find the global variable.
+    SILGlobalVariable *g = readGlobalVar(Name);
+    assert(g && "Can't deserialize global variable");
+    assert(g->getLoweredType().getAddressType() ==
+           getSILType(Ty, (SILValueCategory)TyCategory) &&
+           "Type of a global variable does not match SILGlobalAddr.");
+
+    ResultVal = Builder.createSILGlobalAddr(Loc, g);
+    break;
   }
   case ValueKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
@@ -1203,6 +1235,54 @@ SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
   return Func;
+}
+
+SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
+  if (!GlobalVarList)
+    return nullptr;
+
+  // Find Id for the given name.
+  auto iter = GlobalVarList->find(Name);
+  if (iter == GlobalVarList->end())
+    return nullptr;
+  auto VId = *iter;
+  if (VId == 0)
+    return nullptr;
+
+  assert(VId <= GlobalVars.size() && "invalid GlobalVar ID");
+  auto &globalVarOrOffset = GlobalVars[VId-1];
+  if (globalVarOrOffset.isComplete())
+    return globalVarOrOffset;
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(globalVarOrOffset);
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_GLOBALVAR && "expect a sil global var");
+  (void)kind;
+
+  TypeID TyID;
+  unsigned Linkage, IsExternal;
+  GlobalVarLayout::readRecord(scratch, Linkage, IsExternal, TyID);
+  if (TyID == 0) {
+    DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
+    return nullptr;
+  }
+
+  auto Ty = MF->getType(TyID);
+  SILGlobalVariable *v = new (SILMod) SILGlobalVariable(
+                           SILMod, (SILLinkage)Linkage,
+                           Name.str(), getSILType(Ty, SILValueCategory::Object),
+                           !IsExternal);
+  globalVarOrOffset = v;
+  return v;
 }
 
 SILVTable *SILDeserializer::readVTable(DeclID VId) {

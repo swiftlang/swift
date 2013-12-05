@@ -4,6 +4,28 @@ import Builtin
 import swift
 import Foundation
 
+// Test SIL Global variable.
+// CHECK: sil_global internal @globalinit_token0 : $Builtin.Word
+sil_global internal @globalinit_token0 : $Builtin.Word
+
+var staticProp: Int64 = 0
+sil @globalinit_func0 : $@thin () -> ()
+
+// CHECK-LABEL: sil deserialized @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+bb0:
+  %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  // CHECK: sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = function_ref @globalinit_func0 : $@thin () -> ()
+  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
+  %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %6 = global_addr #staticProp : $*Int64
+  %7 = address_to_pointer %6 : $*Int64 to $Builtin.RawPointer
+  return %7 : $Builtin.RawPointer
+}
+
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -995,6 +1017,7 @@ sil_vtable Foo {
 
 sil @_T9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
+  %1 = function_ref @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@thin () -> ()
   %4 = function_ref @test2 : $@thin (Int64) -> ()
   %6 = function_ref @named_tuple : $@thin () -> (Builtin.Int64, Builtin.Int64)

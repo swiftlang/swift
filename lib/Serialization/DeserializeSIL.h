@@ -41,6 +41,9 @@ namespace swift {
     std::unique_ptr<SerializedFuncTable> VTableList;
     std::vector<ModuleFile::Serialized<SILVTable*>> VTables;
 
+    std::unique_ptr<SerializedFuncTable> GlobalVarList;
+    std::vector<ModuleFile::Serialized<SILGlobalVariable*>> GlobalVars;
+
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
     llvm::DenseMap<uint32_t, std::vector<SILValue>> ForwardMRVLocalValues;
@@ -79,6 +82,7 @@ namespace swift {
 
     SILFunction *lookupSILFunction(Identifier Name);
     SILVTable *readVTable(serialization::DeclID);
+    SILGlobalVariable *readGlobalVar(Identifier Name);
 
 public:
     SILFunction *lookupSILFunction(SILFunction *InFunc);

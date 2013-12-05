@@ -107,6 +107,12 @@ namespace {
     std::vector<BitOffset> VTableOffset;
     DeclID VTableID;
 
+    /// Maps global variable name to an ID.
+    Table GlobalVarList;
+    /// Holds the list of SIL global variables.
+    std::vector<BitOffset> GlobalVarOffset;
+    DeclID GlobalVarID;
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
@@ -134,6 +140,7 @@ namespace {
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
     void writeVTable(const SILVTable &vt);
+    void writeGlobalVar(const SILGlobalVariable &g);
     void writeTables();
 
   public:
@@ -147,7 +154,7 @@ namespace {
 SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                              llvm::BitstreamWriter &Out) :
                             S(S), Ctx(Ctx), Out(Out), FuncID(1),
-                            VTableID(1) {
+                            VTableID(1), GlobalVarID(1) {
 }
 
 /// We enumerate all values in a SILFunction beforehand to correctly
@@ -405,7 +412,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::SILGlobalAddrInst: {
-    llvm_unreachable("not implemented");
+    // Format: Name and type. Use SILOneOperandLayout.
+    const SILGlobalAddrInst *GAI = cast<SILGlobalAddrInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(GAI->getType().getSwiftRValueType()),
+        (unsigned)GAI->getType().getCategory(),
+        S.addIdentifierRef(
+            Ctx.getIdentifier(GAI->getReferencedGlobal()->getName())),
+        0);
+    break;
   }
   case ValueKind::BranchInst: {
     // Format: destination basic block ID, a list of arguments. Use
@@ -1072,14 +1089,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 }
 
-/// Depending on the RecordKind, we write either the SILFunction
-/// table or the table for SILVTable.
+/// Depending on the RecordKind, we write the SILFunction table, the global
+/// varaible table or the table for SILVTable.
 static void writeTable(const sil_index_block::ListLayout &List,
                        sil_index_block::RecordKind kind,
                        const SILSerializer::Table &table) {
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
-          kind == sil_index_block::SIL_VTABLE_NAMES) &&
-         "Only SIL function table and SIL vtable are supported");
+          kind == sil_index_block::SIL_VTABLE_NAMES ||
+          kind == sil_index_block::SIL_GLOBALVAR_NAMES) &&
+         "SIL function table, SIL global and SIL vtable are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -1109,6 +1127,23 @@ void SILSerializer::writeTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_VTABLE_OFFSETS,
                 VTableOffset);
   }
+
+  if (!GlobalVarList.empty()) {
+    writeTable(List, sil_index_block::SIL_GLOBALVAR_NAMES, GlobalVarList);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_GLOBALVAR_OFFSETS,
+                GlobalVarOffset);
+  }
+}
+
+void SILSerializer::writeGlobalVar(const SILGlobalVariable &g) {
+  GlobalVarList[Ctx.getIdentifier(g.getName())] = GlobalVarID++;
+  GlobalVarOffset.push_back(Out.GetCurrentBitNo());
+  TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
+  GlobalVarLayout::emitRecord(Out, ScratchRecord,
+                              SILAbbrCodes[GlobalVarLayout::Code],
+                              (unsigned)g.getLinkage(),
+                              (unsigned)g.isExternalDeclaration(),
+                              TyID);
 }
 
 void SILSerializer::writeVTable(const SILVTable &vt) {
@@ -1149,6 +1184,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
 
     registerSILAbbr<VTableLayout>();
     registerSILAbbr<VTableEntryLayout>();
+    registerSILAbbr<GlobalVarLayout>();
 
     // Register the abbreviation codes so these layouts can exist in both
     // decl blocks and sil blocks.
@@ -1159,6 +1195,9 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
     registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
     registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
     registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
+
+    for (const SILGlobalVariable &g : SILMod->getSILGlobals())
+      writeGlobalVar(g);
 
     // Write out VTables first because it may require serializations of
     // non-transparent SILFunctions (body is not needed).
