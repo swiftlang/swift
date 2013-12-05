@@ -127,6 +127,7 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
     // values of the values being used by the operand.
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(unsigned(ValueKind::StructInst),
+                              X->getStructDecl(),
                               llvm::hash_combine_range(Operands.begin(),
                                                        Operands.end()));
   }

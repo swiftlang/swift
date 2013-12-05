@@ -504,19 +504,33 @@ struct Interval {
   var start: Builtin.Int32
   var end: Builtin.Int32
 }
+struct FakeInterval {
+  var start: Builtin.Int32
+  var end: Builtin.Int32
+}
 
 sil @print_interval : $@thin (Interval) -> ()
+sil @print_fake_interval : $@thin (FakeInterval) -> ()
 
 // CHECK-LABEL: structliteral
-// CHECK: [[TARGET:%[0-9]+]] = struct $Interval ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
-// CHECK-NOT: struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+// CHECK: [[TARGET:%[0-9]+]] = struct $Interval ([[IN1:%[0-9]+]] : $Builtin.Int32, [[IN2:%[0-9]+]] : $Builtin.Int32)
+// CHECK-NOT: struct $Interval ([[IN1]] : $Builtin.Int32, [[IN2]] : $Builtin.Int32)
+// CHECK: [[DECOY:%[0-9]+]] = struct $FakeInterval ([[IN1]] : $Builtin.Int32, [[IN2]] : $Builtin.Int32)
+// CHECK: [[PRINT_INTERVAL_FUN:%[0-9]+]] = function_ref @print_interval
+// CHECK: apply [[PRINT_INTERVAL_FUN]]([[TARGET]])
+// CHECK: apply [[PRINT_INTERVAL_FUN]]([[TARGET]])
+// CHECK: [[PRINT_FAKEINTERVAL_FUN:%[0-9]+]] = function_ref @print_fake_interval
+// CHECK: apply [[PRINT_FAKEINTERVAL_FUN]]([[DECOY]])
 sil @structliteral : $@thin (Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
   %3 = struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
-  %4 = function_ref @print_interval : $@thin (Interval) -> ()
-  apply %4 (%2) : $@thin (Interval) -> ()
-  apply %4 (%3) : $@thin (Interval) -> ()
-  %5 = tuple()
-  return %5 : $()
+  %4 = struct $FakeInterval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+  %5 = function_ref @print_interval : $@thin (Interval) -> ()
+  apply %5 (%2) : $@thin (Interval) -> ()
+  apply %5 (%3) : $@thin (Interval) -> ()
+  %6 = function_ref @print_fake_interval : $@thin (FakeInterval) -> ()
+  apply %6 (%4) : $@thin (FakeInterval) -> ()
+  %9 = tuple()
+  return %9 : $()
 }
