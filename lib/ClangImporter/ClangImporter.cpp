@@ -602,18 +602,6 @@ public:
   }
 };
 
-/// Inserts found decls into an externally-owned SmallVector.
-class VectorDeclConsumer : public VisibleDeclConsumer {
-public:
-  SmallVectorImpl<ValueDecl *> &results;
-  explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
-    : results(decls) {}
-
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    results.push_back(VD);
-  }
-};
-
 } // unnamed namespace
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {

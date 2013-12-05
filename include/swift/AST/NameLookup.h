@@ -262,16 +262,30 @@ enum class DeclVisibilityKind {
   DynamicLookup,
 };
 
-/// VisibleDeclConsumer - An abstract base class for a visitor that consumes
-/// visible declarations found within a given context. Subclasses of this class
-/// can be used with lookupVisibleDecls().
+/// An abstract base class for a visitor that consumes declarations found within
+/// a given context.
 class VisibleDeclConsumer {
+  virtual void anchor();
 public:
-  virtual ~VisibleDeclConsumer();
+  virtual ~VisibleDeclConsumer() = default;
 
   /// This method is called by findVisibleDecls() every time it finds a decl.
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) = 0;
 };
+
+/// A consumer that inserts found decls into an externally-owned SmallVector.
+class VectorDeclConsumer : public VisibleDeclConsumer {
+  virtual void anchor();
+public:
+  SmallVectorImpl<ValueDecl *> &results;
+  explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
+    : results(decls) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    results.push_back(VD);
+  }
+};
+
 
 /// \brief Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.

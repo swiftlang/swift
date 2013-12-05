@@ -26,9 +26,8 @@
 
 using namespace swift;
 
-VisibleDeclConsumer::~VisibleDeclConsumer() {
-  // Anchor the vtable.
-}
+void VisibleDeclConsumer::anchor() {}
+void VectorDeclConsumer::anchor() {}
 
 namespace {
 struct LookupState {

@@ -238,16 +238,6 @@ void namelookup::lookupInModule(Module *startModule,
 }
 
 namespace {
-class VectorDeclConsumer : public VisibleDeclConsumer {
-public:
-  SmallVectorImpl<ValueDecl *> &results;
-  explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
-    : results(decls) {}
-
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    results.push_back(VD);
-  }
-};
 }
 
 void namelookup::lookupVisibleDeclsInModule(
