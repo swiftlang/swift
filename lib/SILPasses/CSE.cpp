@@ -62,6 +62,7 @@ namespace {
       case ValueKind::GlobalAddrInst:
       case ValueKind::IntegerLiteralInst:
       case ValueKind::FloatLiteralInst:
+      case ValueKind::StringLiteralInst:
         return true;
       default:
         return false;
@@ -113,6 +114,11 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
     return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
                               X->getType(),
                               X->getBits());
+  }
+  case ValueKind::StringLiteralInst: {
+    auto *X = cast<StringLiteralInst>(Inst);
+    return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
+                              X->getValue());
   }
   default:
     llvm_unreachable("Unhandled ValueKind.");
