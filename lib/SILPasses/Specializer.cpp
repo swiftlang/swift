@@ -18,8 +18,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -231,7 +231,7 @@ struct SILSpecializer {
   }
 
   /// Maps a function to all of the ApplyInst that call it.
-  llvm::DenseMap<SILFunction *, AIList> ApplyInstMap;
+  llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
 };
 
 } // end anonymous namespace.
