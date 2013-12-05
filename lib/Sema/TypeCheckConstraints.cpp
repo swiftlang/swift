@@ -3718,7 +3718,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 }
 
 Optional<unsigned>
-ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable) {
+ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
+                                   bool minimize) {
   if (viable.empty())
     return Nothing;
   if (viable.size() == 1)
@@ -3727,6 +3728,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable) {
   SolutionDiff diff(viable);
 
   // Find a potential best.
+  SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
     switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
@@ -3734,17 +3736,22 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable) {
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
     case SolutionCompareResult::Incomparable:
+        break;
+
     case SolutionCompareResult::Worse:
+      losers[i] = true;
       break;
 
     case SolutionCompareResult::Better:
+      losers[bestIdx] = true;
       bestIdx = i;
       break;
     }
   }
 
   // Make sure that our current best is better than all of the solved systems.
-  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
+  bool ambiguous = false;
+  for (unsigned i = 0, n = viable.size(); i != n && !ambiguous; ++i) {
     if (i == bestIdx)
       continue;
 
@@ -3752,20 +3759,80 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
-      SWIFT_FALLTHROUGH;
-    case SolutionCompareResult::Better:
       break;
 
-    case SolutionCompareResult::Incomparable:
+    case SolutionCompareResult::Better:
+      losers[i] = true;
+      break;
+
     case SolutionCompareResult::Worse:
-      return Nothing;
+      losers[bestIdx] = true;
+      SWIFT_FALLTHROUGH;
+
+    case SolutionCompareResult::Incomparable:
+      // If we're not supposed to minimize the result set, just return eagerly.
+      if (!minimize)
+        return Nothing;
+
+      ambiguous = true;
+      break;
     }
   }
 
-  // FIXME: If we lost our best, we should minimize the set of viable
-  // solutions.
+  // If the result was not ambiguous, we're done.
+  if (!ambiguous)
+    return bestIdx;
 
-  return bestIdx;
+  // The comparison was ambiguous. Identify any solutions that are worse than
+  // any other solution.
+  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
+    // If the first solution has already lost once, don't bother looking
+    // further.
+    if (losers[i])
+      continue;
+
+    for (unsigned j = i + 1; j != n; ++j) {
+      // If the second solution has already lost once, don't bother looking
+      // further.
+      if (losers[j])
+        continue;
+
+      switch (compareSolutions(*this, viable, diff, i, j)) {
+      case SolutionCompareResult::Identical:
+        // FIXME: Dub one of these the loser arbitrarily?
+        break;
+
+      case SolutionCompareResult::Better:
+        losers[j] = true;
+        break;
+
+      case SolutionCompareResult::Worse:
+        losers[i] = true;
+        break;
+
+      case SolutionCompareResult::Incomparable:
+        break;
+      }
+    }
+  }
+
+  // Remove any solution that is worse than some other solution.
+  unsigned outIndex = 0;
+  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
+    // Skip over the losing solutions.
+    if (losers[i])
+      continue;
+
+    // If we have skipped any solutions, move this solution into the next
+    // open position.
+    if (outIndex < i)
+      viable[outIndex] = std::move(viable[i]);
+
+    ++outIndex;
+  }
+  viable.erase(viable.begin() + outIndex, viable.end());
+
+  return Nothing;
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {

@@ -813,7 +813,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // If there is more than one viable system, attempt to pick the best
     // solution.
     if (solutions.size() > 1) {
-      if (auto best = findBestSolution(solutions)) {
+      if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
         if (*best != 0)
           solutions[0] = std::move(solutions[*best]);
         solutions.erase(solutions.begin() + 1, solutions.end());
@@ -990,10 +990,23 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Move the constraints back. The system is back in a normal state.
   returnAllConstraints();
-  
+
+  // When there are multiple partial solutions for a given connected component,
+  // rank those solutions to pick the best ones. This limits the number of
+  // combinations we need to produce; in the common case, down to a single
+  // combination.
+  for (unsigned component = 0; component != numComponents; ++component) {
+    auto &solutions = partialSolutions[component];
+    // If there's a single best solution, keep only that one.
+    // Otherwise, the set of solutions will at least have been minimized.
+    if (auto best = findBestSolution(solutions, /*minimize=*/true)) {
+      if (*best > 0)
+        solutions[0] = std::move(solutions[*best]);
+      solutions.erase(solutions.begin() + 1, solutions.end());
+    }
+  }
+
   // Produce all combinations of partial solutions.
-  // FIXME: Prune partial solutions that are worse than other partial
-  // solutions for their component?
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool done = false;
   do {

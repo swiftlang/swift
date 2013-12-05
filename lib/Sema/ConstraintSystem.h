@@ -1682,9 +1682,17 @@ public:
   /// \brief Given a set of viable solutions, find the best
   /// solution.
   ///
+  /// \param solutions The set of viable solutions to consider.
+  ///
+  /// \param minimize If true, then in the case where there is no single
+  /// best solution, minimize the set of solutions by removing any solutions
+  /// that are identical to or worse than some other solution. This operation
+  /// is quadratic.
+  ///
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
-  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions);
+  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
+                                      bool minimize);
 
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.
