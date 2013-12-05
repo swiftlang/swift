@@ -260,12 +260,12 @@ public:
       GeneratorTy = TC.getWitnessType(ContainerType, EnumerableProto,
                                       Conformance,
                                       TC.Context.getIdentifier("GeneratorType"),
-                                      diag::enumerable_protocol_broken);
+                                      diag::sequence_protocol_broken);
       
       Expr *GetGenerator
         = TC.callWitness(Container, DC, EnumerableProto, Conformance,
                          TC.Context.getIdentifier("enumerate"),
-                         {}, diag::enumerable_protocol_broken);
+                         {}, diag::sequence_protocol_broken);
       if (!GetGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
