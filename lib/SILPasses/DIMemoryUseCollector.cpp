@@ -344,7 +344,13 @@ namespace {
     /// the address and the refcount result of the allocation.
     void collectFrom(const DIMemoryObjectInfo &MemInfo) {
       IsSelfOfInitializer = MemInfo.IsSelfOfInitializer;
-      collectUses(MemInfo.getAddress(), 0);
+
+      // If this is a class pointer, we start collect uses specially.
+      if (IsSelfOfInitializer &&
+          MemInfo.getType()->getClassOrBoundGenericClass() != nullptr)
+        collectClassSelfUses(MemInfo);
+      else
+        collectUses(MemInfo.getAddress(), 0);
 
       if (!isa<MarkUninitializedInst>(MemInfo.MemoryInst)) {
         // Collect information about the retain count result as well.
@@ -362,6 +368,7 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
+    void collectClassSelfUses(const DIMemoryObjectInfo &MemInfo);
 
     void addElementUses(unsigned BaseEltNo, SILType UseTy,
                         SILInstruction *User, DIUseKind Kind);
@@ -736,6 +743,51 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseEltNo);
   }
 }
+
+
+/// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class
+/// constructor.  The memory object has class type.
+void ElementUseCollector::
+collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
+  assert(IsSelfOfInitializer &&
+         MemInfo.getType()->getClassOrBoundGenericClass() != nullptr);
+
+  // For efficiency of lookup below, compute a mapping of the local ivars in the
+  // class to their element number.
+  llvm::SmallDenseMap<VarDecl*, unsigned> EltNumbering;
+
+  {
+    auto *NTD = cast<NominalTypeDecl>(MemInfo.getType()->getAnyNominal());
+    unsigned NumElements = 0;
+    for (auto *VD : NTD->getStoredProperties()) {
+      EltNumbering[VD] = NumElements;
+      NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
+                                        false);
+    }
+  }
+
+  SILValue ClassPointer = MemInfo.getAddress();
+
+  for (auto UI : ClassPointer.getUses()) {
+    auto *User = UI->getUser();
+
+    // ref_element_addr P, #field lookups up a field.
+    if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
+      assert(EltNumbering.count(REAI->getField()) &&
+             "ref_element_addr not a local field?");;
+      // Recursively collect uses of the fields.  Note that fields of the class
+      // could be tuples, so they may be tracked as independent elements.
+      llvm::SaveAndRestore<bool> X(IsSelfOfInitializer, false);
+      collectUses(REAI, EltNumbering[REAI->getField()]);
+      continue;
+    }
+
+    // Otherwise, the use is something complicated, it escapes.
+    addElementUses(0, MemInfo.MemorySILType, User, DIUseKind::Escape);
+  }
+
+}
+
 
 
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation

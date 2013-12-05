@@ -518,4 +518,61 @@ bb2:
   return %23 : $()                                // id: %24
 }
 
+/// Root class tests.
 
+class RootClassWithIVars {
+  var x: Int
+  var y: Int
+  var z: (Int, Int)
+  init()
+}
+
+
+// CHECK-LABEL: sil @rootclass_test1
+sil @rootclass_test1 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #x
+  assign %1 to %10 : $*Int64
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  assign %1 to %11 : $*Int64
+
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #z
+  %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
+  assign %1 to %13 : $*Int64
+  %14 = tuple_element_addr %12 : $*(Int64, Int64), 1
+  assign %1 to %14 : $*Int64
+
+  return %3 : $RootClassWithIVars
+}
+
+// CHECK-LABEL: sil @rootclass_test2
+sil @rootclass_test2 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  // expected-note {{variable defined here}}
+
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #x
+  assign %1 to %10 : $*Int64
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  assign %1 to %11 : $*Int64
+
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #z
+  %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
+  assign %1 to %13 : $*Int64
+
+  return %3 : $RootClassWithIVars  // expected-error {{'<unknown>.z.1' captured by a closure before being initialized}}
+}
+
+// CHECK-LABEL: sil @rootclass_test3
+sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  // expected-note {{variable defined here}}
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  assign %1 to %11 : $*Int64
+
+  return %3 : $RootClassWithIVars    // expected-error {{'<unknown>.x' captured by a closure before being initialized}}
+}

@@ -431,7 +431,9 @@ public:
     SILValue Src = MU->getOperand();
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
-    require(Src.getType().isAddress(), "Must store to an address dest");
+    require(Src.getType().isAddress() ||
+            Src.getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
+            "mark_uninitialized must be an address or class");
     require(Src.getType() == MU->getType(0),"operand and result type mismatch");
   }
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
