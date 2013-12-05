@@ -32,8 +32,6 @@
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
-STATISTIC(NumCSELoad,  "Number of load instructions CSE'd");
-STATISTIC(NumDSE,      "Number of trivial dead stores removed");
 
 using namespace swift;
 
@@ -57,7 +55,7 @@ namespace {
     }
 
     static bool canHandle(SILInstruction *Inst) {
-      switch(Inst->getKind()) {     
+      switch(Inst->getKind()) {
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
       case ValueKind::GlobalAddrInst:
@@ -214,25 +212,6 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  /// AvailableLoads - This scoped hash table contains the current values
-  /// of loads.  This allows us to get efficient access to dominating loads when
-  /// we have a fully redundant load.  In addition to the most recent load, we
-  /// keep track of a generation count of the read, which is compared against
-  /// the current generation count.  The current generation count is
-  /// incremented after every possibly writing memory operation, which ensures
-  /// that we only CSE loads with other loads that have no intervening store.
-  typedef llvm::ScopedHashTableVal<ValueBase*,
-                                   std::pair<ValueBase*, unsigned>> ValueHTType;
-  typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator,
-                                   ValueHTType> LoadMapAllocator;
-  typedef llvm::ScopedHashTable<ValueBase*, std::pair<ValueBase*, unsigned>,
-                                llvm::DenseMapInfo<ValueBase*>,
-                                LoadMapAllocator> LoadHTType;
-  LoadHTType *AvailableLoads;
-
-  /// CurrentGeneration - This is the current generation of the memory value.
-  unsigned CurrentGeneration;
-
   explicit CSE(SILModule &M) : Module(M) { }
 
   bool runOnFunction(SILFunction &F);
@@ -244,8 +223,8 @@ private:
   // that the scope gets popped when the NodeScope is destroyed.
   class NodeScope {
    public:
-    NodeScope(ScopedHTType *availableValues, LoadHTType *availableLoads)
-      : Scope(*availableValues), LoadScope(*availableLoads) {
+    NodeScope(ScopedHTType *availableValues)
+      : Scope(*availableValues) {
     }
 
    private:
@@ -253,7 +232,6 @@ private:
     void operator=(const NodeScope&) = delete;
 
     ScopedHTType::ScopeTy Scope;
-    LoadHTType::ScopeTy LoadScope;
   };
 
   // StackNode - contains all the needed information to create a stack for doing
@@ -263,19 +241,14 @@ private:
   class StackNode {
    public:
     StackNode(ScopedHTType *availableValues,
-              LoadHTType *availableLoads,
-              unsigned cg, DominanceInfoNode *n,
+              DominanceInfoNode *n,
               DominanceInfoNode::iterator child,
               DominanceInfoNode::iterator end) :
-        CurrentGeneration(cg), ChildGeneration(cg), Node(n),
-        ChildIter(child), EndIter(end),
-        Scopes(availableValues, availableLoads),
-        Processed(false) {}
+      Node(n), ChildIter(child), EndIter(end),
+      Scopes(availableValues),
+      Processed(false) {}
 
     // Accessors.
-    unsigned currentGeneration() { return CurrentGeneration; }
-    unsigned childGeneration() { return ChildGeneration; }
-    void childGeneration(unsigned generation) { ChildGeneration = generation; }
     DominanceInfoNode *node() { return Node; }
     DominanceInfoNode::iterator childIter() { return ChildIter; }
     DominanceInfoNode *nextChild() {
@@ -292,8 +265,6 @@ private:
     void operator=(const StackNode&) = delete;
 
     // Members.
-    unsigned CurrentGeneration;
-    unsigned ChildGeneration;
     DominanceInfoNode *Node;
     DominanceInfoNode::iterator ChildIter;
     DominanceInfoNode::iterator EndIter;
@@ -317,21 +288,14 @@ bool CSE::runOnFunction(SILFunction &F) {
   // Tables that the pass uses when walking the domtree.
   ScopedHTType AVTable;
   AvailableValues = &AVTable;
-  LoadHTType LoadTable;
-  AvailableLoads = &LoadTable;
 
-  CurrentGeneration = 0;
   bool Changed = false;
 
   // Process the root node.
   nodesToProcess.push_back(
-    new StackNode(AvailableValues, AvailableLoads,
-                  CurrentGeneration, DT.getRootNode(),
+    new StackNode(AvailableValues, DT.getRootNode(),
                   DT.getRootNode()->begin(),
                   DT.getRootNode()->end()));
-
-  // Save the current generation.
-  unsigned LiveOutGeneration = CurrentGeneration;
 
   // Process the stack.
   while (!nodesToProcess.empty()) {
@@ -339,24 +303,17 @@ bool CSE::runOnFunction(SILFunction &F) {
     // the node from the stack, and process it.
     StackNode *NodeToProcess = nodesToProcess.back();
 
-    // Initialize class members.
-    CurrentGeneration = NodeToProcess->currentGeneration();
-
     // Check if the node needs to be processed.
     if (!NodeToProcess->isProcessed()) {
       // Process the node.
       Changed |= processNode(NodeToProcess->node());
-      NodeToProcess->childGeneration(CurrentGeneration);
       NodeToProcess->process();
 
     } else if (NodeToProcess->childIter() != NodeToProcess->end()) {
       // Push the next child onto the stack.
       DominanceInfoNode *child = NodeToProcess->nextChild();
       nodesToProcess.push_back(
-          new StackNode(AvailableValues,
-                        AvailableLoads,
-                        NodeToProcess->childGeneration(), child,
-                        child->begin(), child->end()));
+          new StackNode(AvailableValues, child, child->begin(), child->end()));
     } else {
       // It has been processed, and there are no more children to process,
       // so delete it and pop it off the stack.
@@ -365,30 +322,11 @@ bool CSE::runOnFunction(SILFunction &F) {
     }
   } // while (!nodes...)
 
-  // Reset the current generation.
-  CurrentGeneration = LiveOutGeneration;
-
   return Changed;
 }
 
 bool CSE::processNode(DominanceInfoNode *Node) {
   SILBasicBlock *BB = Node->getBlock();
-
-  // If this block has a single predecessor, then the predecessor is the parent
-  // of the domtree node and all of the live out memory values are still current
-  // in this block.  If this block has multiple predecessors, then they could
-  // have invalidated the live-out memory values of our parent value.  For now,
-  // just be conservative and invalidate memory if this block has multiple
-  // predecessors.
-  if (!BB->getSinglePredecessor())
-    ++CurrentGeneration;
-
-  /// LastStore - Keep track of the last store that we saw... for as long as
-  /// there in no instruction that reads memory.  If we see a store to the same
-  /// location, we delete the dead store.  This zaps trivial dead stores which
-  /// can occur in bitfield code among other things.
-  StoreInst *LastStore = 0;
-
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
@@ -412,7 +350,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      // All operands of SimplifyInstruction currently have only one result.
       Inst->replaceAllUsesWith(V.getDef());
       Inst->eraseFromParent();
       Changed = true;
@@ -420,90 +357,26 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       continue;
     }
 
-    // If this is a simple instruction that we can value number, process it.
-    if (SimpleValue::canHandle(Inst)) {
-      // See if the instruction has an available value.  If so, use it.
-      if (ValueBase *V = AvailableValues->lookup(Inst)) {
-        DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V
-              << '\n');
-        Inst->replaceAllUsesWith(V);
-        Inst->eraseFromParent();
-        Changed = true;
-        ++NumCSE;
-        continue;
-      }
+    // If this is not a simple instruction that we can value number, skip it.
+    if (!SimpleValue::canHandle(Inst))
+      continue;
 
-      // Otherwise, just remember that this value is available.
-      AvailableValues->insert(Inst, Inst);
-      DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
-            << " -> " << *Inst << "\n");
+    // Now that we know we have an instruction we understand see if the
+    // instruction has an available value.  If so, use it.
+    if (ValueBase *V = AvailableValues->lookup(Inst)) {
+      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V
+            << '\n');
+      Inst->replaceAllUsesWith(V);
+      Inst->eraseFromParent();
+      Changed = true;
+      ++NumCSE;
       continue;
     }
 
-    // If this is a load, process it.
-    if (isa<LoadInst>(Inst)) {
-      // If we have an available version of this load, and if it is the right
-      // generation, replace this instruction.
-      std::pair<ValueBase*, unsigned> InVal =
-        AvailableLoads->lookup(&*Inst->getOperand(0));
-      if (InVal.first != 0 && InVal.second == CurrentGeneration) {
-        DEBUG(llvm::dbgs() << "SILCSE CSE LOAD: " << *Inst << "  to: "
-              << *InVal.first << '\n');
-        if (!Inst->use_empty()) {
-          Inst->replaceAllUsesWith(InVal.first);
-        }
-        Inst->eraseFromParent();
-        Changed = true;
-        ++NumCSELoad;
-        continue;
-      }
-
-      // Otherwise, remember that we have this instruction.
-      AvailableLoads->insert(&*Inst->getOperand(0),
-                             std::make_pair(Inst, CurrentGeneration));
-      DEBUG(llvm::dbgs() << "SILCSE Adding to load table: " <<
-            *Inst->getOperand(0) << " -> " << *Inst << "\n");
-      LastStore = 0;
-      continue;
-    }
-
-    // If this instruction may read from memory, forget LastStore.
-    if (Inst->mayReadFromMemory())
-      LastStore = 0;
-
-    // Okay, this isn't something we can CSE at all.  Check to see if it is
-    // something that could modify memory.  If so, our available memory values
-    // cannot be used so bump the generation count.
-    if (Inst->mayWriteToMemory()) {
-      ++CurrentGeneration;
-
-      if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-        // We do a trivial form of DSE if there are two stores to the same
-        // location with no intervening loads.  Delete the earlier store.
-        if (LastStore &&
-            LastStore->getDest().getDef() == SI->getDest().getDef()) {
-          DEBUG(llvm::dbgs() << "SILCSE DEAD STORE: " << *LastStore <<
-                "  due to: " << *Inst << '\n');
-          LastStore->eraseFromParent();
-          Changed = true;
-          ++NumDSE;
-          LastStore = 0;
-          continue;
-        }
-
-        // Okay, we just invalidated anything we knew about loaded values.  Try
-        // to salvage *something* by remembering that the stored value is a live
-        // version of the pointer.
-        AvailableLoads->insert(&*SI->getDest(),
-                               std::make_pair(&*SI->getSrc(),
-                                              CurrentGeneration));
-
-        DEBUG(llvm::dbgs() << "SILCSE: Adding stored value to table: "
-              << *SI->getDest() << " -> " << *SI->getSrc() << "\n");
-
-        LastStore = SI;
-      }
-    }
+    // Otherwise, just remember that this value is available.
+    AvailableValues->insert(Inst, Inst);
+    DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
+          << " -> " << *Inst << "\n");
   }
 
   return Changed;
