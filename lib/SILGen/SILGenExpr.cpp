@@ -265,7 +265,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   assert(!LocalConstants.count(constant) &&
          "emitting ref to local constant without context?!");
   if (constant.hasDecl() &&
-      isa<BuiltinModule>(constant.getDecl()->getDeclContext())) {
+      isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
     return B.createBuiltinFunctionRef(loc, constant.getDecl()->getName(),
                                       constantInfo.getSILType());
   }

@@ -139,6 +139,12 @@ protected:
   : DeclContext(DeclContextKind::Module, nullptr),
     Kind(Kind), Ctx(Ctx), Name(Name) {}
 
+private:
+  template <typename FUMemFn, FUMemFn FULOOKUP,
+            typename MLMemFn, MLMemFn MLLOOKUP,
+            typename ...Args>
+  void forwardToSourceFiles(Args &&...args) const;
+
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
@@ -151,7 +157,7 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
-                   SmallVectorImpl<ValueDecl*> &Result);
+                   SmallVectorImpl<ValueDecl*> &Result) const;
   
   /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
   /// given consumer object.
@@ -243,7 +249,7 @@ public:
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
@@ -253,7 +259,7 @@ public:
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results);
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
   
   /// Perform an action for every module visible from this module.
   ///
@@ -324,6 +330,59 @@ public:
 };
 
 
+enum class FileUnitKind {
+  Source,
+  Builtin
+};
+
+class FileUnit : public DeclContext {
+protected:
+  FileUnit(FileUnitKind kind, TranslationUnit &tu);
+
+public:
+  const FileUnitKind Kind;
+
+  void lookupValue(Module::AccessPathTy AccessPath, Identifier Name,
+                   NLKind LookupKind,
+                   SmallVectorImpl<ValueDecl*> &Result) const;
+
+  void lookupVisibleDecls(Module::AccessPathTy AccessPath,
+                          VisibleDeclConsumer &Consumer,
+                          NLKind LookupKind) const;
+
+  /// Finds all class members defined in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupClassMembers(Module::AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer) const;
+
+  /// Finds class members defined in this file with the given name.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupClassMember(Module::AccessPathTy accessPath,
+                         Identifier name,
+                         SmallVectorImpl<ValueDecl*> &results) const;
+
+  /// Finds all top-level decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  Module *getParentModule() const {
+    return const_cast<Module *>(cast<Module>(getParent()));
+  }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::FileUnit;
+  }
+
+  /// Traverse the decls within this file.
+  ///
+  /// \returns true if traversal was aborted, false if it completed
+  /// successfully.
+  bool walk(ASTWalker &walker);
+};
+
 /// A file containing Swift source code; also, the smallest unit of code
 /// organization.
 ///
@@ -331,8 +390,8 @@ public:
 /// the REPL). Since it contains raw source, it must be parsed and name-bound
 /// before being used for anything; a full type-check is also necessary for
 /// IR generation.
-class SourceFile : public DeclContext {
-  friend class Module;
+class SourceFile : public FileUnit {
+  friend class FileUnit;
 
 public:
   class LookupCache;
@@ -439,12 +498,6 @@ public:
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
 
-  /// Traverse the decls within this file.
-  ///
-  /// \returns true if traversal was aborted, false if it completed
-  /// successfully.
-  bool walk(ASTWalker &walker);
-
   void dump() const;
   void dump(raw_ostream &os) const;
 
@@ -459,8 +512,11 @@ public:
   /// \param options Options controlling the printing process.
   void print(raw_ostream &os, const PrintOptions &options);
 
+  static bool classof(const FileUnit *file) {
+    return file->Kind == FileUnitKind::Source;
+  }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SourceFile;
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
 
 private:
@@ -489,31 +545,42 @@ class TranslationUnit : public Module {
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
 
-  TinyPtrVector<SourceFile *> SourceFiles;
+  TinyPtrVector<FileUnit *> SourceFiles;
 
 public:
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(ModuleKind::TranslationUnit, Name, C) {
   }
 
-  ArrayRef<SourceFile *> getSourceFiles() {
+  ArrayRef<FileUnit *> getSourceFiles() {
     return SourceFiles;
   }
-  ArrayRef<const SourceFile *> getSourceFiles() const {
+  ArrayRef<const FileUnit *> getSourceFiles() const {
     return { SourceFiles.begin(), SourceFiles.size() };
   }
 
-  void addSourceFile(SourceFile &newFile) {
+  void addSourceFile(FileUnit &newFile) {
     // Require Main and REPL files to be the first file added.
     assert(SourceFiles.empty() ||
-           newFile.Kind == SourceFile::Library ||
-           newFile.Kind == SourceFile::SIL);
+           !isa<SourceFile>(newFile) ||
+           cast<SourceFile>(newFile).Kind == SourceFile::Library ||
+           cast<SourceFile>(newFile).Kind == SourceFile::SIL);
     SourceFiles.push_back(&newFile);
   }
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile(SourceFile::SourceKind expectedKind) const {
+    assert(!SourceFiles.empty() && "No files added yet");
+    assert(cast<SourceFile>(SourceFiles.front())->Kind == expectedKind);
+    return *cast<SourceFile>(SourceFiles.front());
+  }
+
+  /// Convenience accessor for clients that know what kind of file they're
+  /// dealing with.
+  FileUnit &getMainFile(FileUnitKind expectedKind) const {
+    assert(expectedKind != FileUnitKind::Source &&
+           "must use specific source kind; see getMainSourceFile");
     assert(!SourceFiles.empty() && "No files added yet");
     assert(SourceFiles.front()->Kind == expectedKind);
     return *SourceFiles.front();
@@ -537,27 +604,27 @@ public:
   }
 };
 
-/// BuiltinModule - This module represents the compiler's implicitly generated
-/// declarations in the builtin module.
-class BuiltinModule : public Module {
-  friend class Module;
+/// This represents the compiler's implicitly generated declarations in the
+/// Builtin module.
+class BuiltinUnit : public FileUnit {
+  friend class FileUnit;
 
 public:
   class LookupCache;
 
 private:
-  LookupCache *Cache = nullptr;
+  std::unique_ptr<LookupCache> Cache;
+  LookupCache &getCache() const;
 
 public:
-  BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(ModuleKind::Builtin, Name, Ctx) {
+  explicit BuiltinUnit(TranslationUnit &TU);
+
+  static bool classof(const FileUnit *file) {
+    return file->Kind == FileUnitKind::Builtin;
   }
 
-  static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::Builtin;
-  }
   static bool classof(const DeclContext *DC) {
-    return isa<Module>(DC) && classof(cast<Module>(DC));
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
 };
 
@@ -612,6 +679,11 @@ public:
   /// \brief Get the debug name for the module.
   const char *getDebugModuleName() const { return DebugModuleName.c_str(); }
 };
+
+
+inline FileUnit::FileUnit(FileUnitKind kind, TranslationUnit &tu)
+    : DeclContext(DeclContextKind::FileUnit, &tu), Kind(kind) {
+}
 
 template <>
 PrefixOperatorDecl *

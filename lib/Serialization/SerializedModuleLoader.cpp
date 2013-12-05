@@ -200,7 +200,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   return module;
 }
 
-void SerializedModuleLoader::lookupValue(Module *module,
+void SerializedModuleLoader::lookupValue(const Module *module,
                                          Module::AccessPathTy accessPath,
                                          Identifier name, NLKind lookupKind,
                                          SmallVectorImpl<ValueDecl*> &results) {

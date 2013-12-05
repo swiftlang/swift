@@ -1043,7 +1043,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    case DeclContextKind::SourceFile:
+    case DeclContextKind::FileUnit:
       printDeclContext(DC->getParent());
       return;
 

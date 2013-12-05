@@ -36,7 +36,7 @@ ASTContext &DeclContext::getASTContext() {
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
@@ -55,7 +55,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
@@ -111,7 +111,7 @@ Type DeclContext::getSelfTypeInContext(bool isStatic,
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
     case DeclContextKind::Module:
-    case DeclContextKind::SourceFile:
+    case DeclContextKind::FileUnit:
     case DeclContextKind::TopLevelCodeDecl:
       return nullptr;
 
@@ -178,7 +178,7 @@ DeclContext *DeclContext::getModuleScopeContext() const {
   while (true) {
     switch (DC->getContextKind()) {
     case DeclContextKind::Module:
-    case DeclContextKind::SourceFile:
+    case DeclContextKind::FileUnit:
       return const_cast<DeclContext*>(DC);
     default:
       break;
@@ -192,7 +192,7 @@ bool DeclContext::isGenericContext() const {
   for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
     switch (dc->getContextKind()) {
     case DeclContextKind::Module:
-    case DeclContextKind::SourceFile:
+    case DeclContextKind::FileUnit:
       return false;
 
     case DeclContextKind::AbstractClosureExpr:
@@ -253,8 +253,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     }
     return false;
   }
-  case DeclContextKind::SourceFile:
-    return cast<SourceFile>(this)->walk(Walker);
+  case DeclContextKind::FileUnit:
+    return cast<FileUnit>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->walk(Walker);
   case DeclContextKind::NominalTypeDecl:
@@ -287,7 +287,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   const char *Kind;
   switch (getContextKind()) {
   case DeclContextKind::Module:           Kind = "Module"; break;
-  case DeclContextKind::SourceFile:       Kind = "SourceFile"; break;
+  case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
@@ -304,8 +304,15 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   case DeclContextKind::Module:
     OS << " name=" << cast<Module>(this)->Name;
     break;
-  case DeclContextKind::SourceFile:
-    // FIXME: print which source file.
+  case DeclContextKind::FileUnit:
+    switch (cast<FileUnit>(this)->Kind) {
+    case FileUnitKind::Builtin:
+      OS << " Builtin";
+      break;
+    case FileUnitKind::Source:
+      OS << " name=\"" << cast<SourceFile>(this)->getFilename() << "\"";
+      break;
+    }
     break;
   case DeclContextKind::AbstractClosureExpr:
     OS << " line=" << getLineNumber(cast<AbstractClosureExpr>(this));

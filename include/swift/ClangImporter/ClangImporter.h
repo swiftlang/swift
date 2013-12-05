@@ -116,7 +116,7 @@ public:
   /// lookup.
   ///
   /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(Module *module,
+  virtual void lookupValue(const Module *module,
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) override;

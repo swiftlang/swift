@@ -70,7 +70,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
         switch (dc->getContextKind()) {
         case DeclContextKind::Module:
-        case DeclContextKind::SourceFile:
+        case DeclContextKind::FileUnit:
         case DeclContextKind::TopLevelCodeDecl:
           break;
 

@@ -145,11 +145,12 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
 
   Pattern *ArgPattern = TuplePattern::createSimple(
       Context, SourceLoc(), ArgPatternElts, SourceLoc());
+  TranslationUnit *M = Context.TheBuiltinModule;
 
   return FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id, SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ArgPattern,
                           ArgPattern, TypeLoc::withoutLoc(ResType),
-                          Context.TheBuiltinModule);
+                          &M->getMainFile(FileUnitKind::Builtin));
 }
 
 /// Build a builtin function declaration.
@@ -192,11 +193,11 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
 
   Pattern *ArgPattern = TuplePattern::createSimple(
                           Context, SourceLoc(), ArgPatternElts, SourceLoc());
-
+  TranslationUnit *M = Context.TheBuiltinModule;
   auto func = FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id,
                                SourceLoc(), GenericParams, FnType, ArgPattern,
                                ArgPattern, TypeLoc::withoutLoc(ResBodyType),
-                               Context.TheBuiltinModule);
+                               &M->getMainFile(FileUnitKind::Builtin));
   func->setInterfaceType(InterfaceType);
   return func;
 }
@@ -389,6 +390,8 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
 /// an ArchetypeType*), and the generic parameter list.
 static std::tuple<Type, Type, GenericParamList*>
 getGenericParam(ASTContext &Context) {
+  TranslationUnit *M = Context.TheBuiltinModule;
+
   Identifier GenericName = Context.getIdentifier("T");
   ArchetypeType *Archetype
     = ArchetypeType::getNew(Context, nullptr,
@@ -396,8 +399,8 @@ getGenericParam(ASTContext &Context) {
                             GenericName,
                             ArrayRef<Type>(), Type(), 0);
   auto GenericTyDecl =
-    new (Context) GenericTypeParamDecl(Context.TheBuiltinModule, GenericName,
-                                       SourceLoc(), 0, 0);
+    new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
+                                       GenericName, SourceLoc(), 0, 0);
   GenericTyDecl->setArchetype(Archetype);
   GenericParam Param = GenericTyDecl;
   auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,

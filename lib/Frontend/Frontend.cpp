@@ -225,8 +225,9 @@ void swift::CompilerInstance::doIt() {
   if (!Invocation.getParseOnly()) {
     // Type-check each top-level input besides the main source file.
     auto InputSourceFiles = TU->getSourceFiles().slice(0, BufferIDs.size());
-    for (auto SF : InputSourceFiles)
-      performTypeChecking(*SF);
+    for (auto File : InputSourceFiles)
+      if (auto SF = dyn_cast<SourceFile>(File))
+        performTypeChecking(*SF);
   }
 
   if (DelayedCB) {

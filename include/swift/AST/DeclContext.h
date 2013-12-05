@@ -55,7 +55,7 @@ namespace swift {
 // allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
   Module,
-  SourceFile,
+  FileUnit,
   AbstractClosureExpr,
   NominalTypeDecl,
   ExtensionDecl,
@@ -117,7 +117,7 @@ public:
   /// or a source file.
   bool isModuleScopeContext() const {
     return getContextKind() == DeclContextKind::Module ||
-           getContextKind() == DeclContextKind::SourceFile;
+           getContextKind() == DeclContextKind::FileUnit;
   }
 
   /// \returns true if this is a type context, e.g., a struct, a class, an

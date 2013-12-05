@@ -29,8 +29,9 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/IR/TypeBuilder.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Path.h"
 
 #include "CallingConvention.h"
 #include "Explosion.h"
@@ -379,14 +380,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     // Create a global initializer for library modules.
     // FIXME: This is completely, utterly, wrong -- we don't want library
     // initializers at all.
-    // FIXME: In the mean time, it would be nice to include the /name/ of the
-    // source file, not just a number.
-    ArrayRef<SourceFile *> allSourceFiles = SF.TU.getSourceFiles();
-    auto pos = std::find(allSourceFiles.begin(), allSourceFiles.end(), &SF);
-    size_t which = pos - allSourceFiles.begin();
+    StringRef file = llvm::sys::path::filename(SF.getFilename());
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    SF.TU.Name.str() + Twine(".init.")
-                                                     + Twine(which),
+                                    SF.TU.Name.str() + Twine(".init.") + file,
                                     &Module);
     initFn->setAttributes(attrs);
     
@@ -1295,7 +1291,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   DeclContext *DC = value->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:

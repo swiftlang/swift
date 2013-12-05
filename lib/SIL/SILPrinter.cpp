@@ -148,12 +148,13 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   switch (Context->getContextKind()) {
   case DeclContextKind::Module:
-    if (auto BM = dyn_cast<BuiltinModule>(Context))
-      Buffer << BM->Name << ".";
+    if (Context == cast<Module>(Context)->Ctx.TheBuiltinModule)
+      Buffer << cast<Module>(Context)->Name << ".";
     return;
 
-  case DeclContextKind::SourceFile:
-    // Ignore the SourceFile; just print the module.
+  case DeclContextKind::FileUnit:
+    // Ignore the file; just print the module.
+    printFullContext(Context->getParent(), Buffer);
     return;
 
   case DeclContextKind::AbstractClosureExpr:
@@ -1232,7 +1233,8 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
   // Print the declarations and types from the translation unit.
-  if (TU) {
+  // FIXME: What about multi-file TUs?
+  if (TU && TU->getSourceFiles().size() == 1) {
     // Compute the list of emitted functions, whose AST Decls we do not need to
     // print.
     llvm::DenseSet<const Decl*> emittedFunctions;
@@ -1246,10 +1248,10 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.VarInitializers = true;
     Options.SkipImplicit = true;
 
-    // FIXME: What about the rest of the files in the TU?
-    for (auto ID = TU->getSourceFiles().front()->Decls.begin(),
-              ED = TU->getSourceFiles().front()->Decls.end(); ID != ED; ++ID) {
-      const Decl *D = *ID;
+    // FIXME: Use some kind of visitor interface here.
+    SmallVector<Decl *, 32> topLevelDecls;
+    TU->getSourceFiles().front()->getTopLevelDecls(topLevelDecls);
+    for (const Decl *D : topLevelDecls) {
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&
           !D->isImplicit()) {

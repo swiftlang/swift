@@ -631,9 +631,9 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     printName(os, cast<Module>(dc)->Name);
     break;
 
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
     // FIXME: print the file's basename?
-    os << "source file";
+    os << "(file)";
     break;
 
   case DeclContextKind::AbstractClosureExpr: {

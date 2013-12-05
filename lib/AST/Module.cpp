@@ -39,7 +39,7 @@ using namespace swift;
 // Builtin Module Name lookup
 //===----------------------------------------------------------------------===//
 
-class BuiltinModule::LookupCache {
+class BuiltinUnit::LookupCache {
   /// The cache of identifiers we've already looked up.  We use a
   /// single hashtable for both types and values as a minor
   /// optimization; this prevents us from having both a builtin type
@@ -47,42 +47,44 @@ class BuiltinModule::LookupCache {
   llvm::DenseMap<Identifier, ValueDecl*> Cache;
 
 public:
-  void lookupValue(Identifier Name, NLKind LookupKind, BuiltinModule &M, 
+  void lookupValue(Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
                    SmallVectorImpl<ValueDecl*> &Result);
 };
 
-static BuiltinModule::LookupCache &
-getBuiltinCachePimpl(BuiltinModule::LookupCache *&Ptr) {
-  // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
+BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
+  // FIXME: This leaks. Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
-  if (Ptr == 0)
-    Ptr = new BuiltinModule::LookupCache();
-  return *Ptr;
+  if (!Cache)
+    const_cast<BuiltinUnit *>(this)->Cache.reset(new LookupCache());
+  return *Cache;
 }
 
-void
-BuiltinModule::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
-                                        BuiltinModule &M,
-                                        SmallVectorImpl<ValueDecl*> &Result) {
+void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
+                                           const BuiltinUnit &M,
+                                           SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
   ValueDecl *&Entry = Cache[Name];
+  ASTContext &Ctx = M.getParentModule()->Ctx;
+  if (Entry == 0)
+    if (Type Ty = getBuiltinType(Ctx, Name.str()))
+      Entry = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+                                      TypeLoc::withoutLoc(Ty),
+                                      const_cast<BuiltinUnit*>(&M), {});
 
   if (Entry == 0)
-    if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
-      Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                        TypeLoc::withoutLoc(Ty),
-                                        M.Ctx.TheBuiltinModule,
-                                        MutableArrayRef<TypeLoc>());
-
-  if (Entry == 0)
-    Entry = getBuiltinValueDecl(M.Ctx, Name);
+    Entry = getBuiltinValueDecl(Ctx, Name);
 
   if (Entry)
     Result.push_back(Entry);
 }
-                       
+
+
+BuiltinUnit::BuiltinUnit(TranslationUnit &TU)
+   : FileUnit(FileUnitKind::Builtin, TU) {
+}
+
 //===----------------------------------------------------------------------===//
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
@@ -117,17 +119,17 @@ public:
 
   SmallVector<ValueDecl *, 0> AllVisibleValues;
 };
-using SOurceLookupCache = SourceFile::LookupCache;
+using SourceLookupCache = SourceFile::LookupCache;
 
-SOurceLookupCache &SourceFile::getCache() const {
+SourceLookupCache &SourceFile::getCache() const {
   // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (!Cache)
-    const_cast<SourceFile *>(this)->Cache.reset(new SOurceLookupCache(*this));
+    const_cast<SourceFile *>(this)->Cache.reset(new SourceLookupCache(*this));
   return *Cache;
 }
 
-void SOurceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
+void SourceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
@@ -140,7 +142,7 @@ void SOurceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
   }
 }
 
-void SOurceLookupCache::populateMemberCache(const SourceFile &SF) {
+void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   for (const Decl *D : SF.Decls) {
     if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addToMemberCache(NTD->getMembers());
@@ -150,7 +152,7 @@ void SOurceLookupCache::populateMemberCache(const SourceFile &SF) {
   }
 }
 
-void SOurceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
+void SourceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
   for (Decl *D : decls) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -167,12 +169,12 @@ void SOurceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
 }
 
 /// Populate our cache on the first name lookup.
-SOurceLookupCache::LookupCache(const SourceFile &SF) {
+SourceLookupCache::LookupCache(const SourceFile &SF) {
   doPopulateCache(SF.Decls, false);
 }
 
 
-void SOurceLookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
+void SourceLookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
                                     NLKind LookupKind,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -190,7 +192,7 @@ void SOurceLookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
     Result.push_back(Elt);
 }
 
-void SOurceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
+void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
                                            VisibleDeclConsumer &Consumer,
                                            NLKind LookupKind) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -210,7 +212,7 @@ void SOurceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 }
 
-void SOurceLookupCache::lookupClassMembers(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
                                            VisibleDeclConsumer &consumer,
                                            const SourceFile &SF) {
   if (!MemberCachePopulated)
@@ -236,7 +238,7 @@ void SOurceLookupCache::lookupClassMembers(AccessPathTy accessPath,
   }
 }
 
-void SOurceLookupCache::lookupClassMember(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
                                           Identifier name,
                                           SmallVectorImpl<ValueDecl*> &results,
                                           const SourceFile &SF) {
@@ -266,97 +268,129 @@ void SOurceLookupCache::lookupClassMember(AccessPathTy accessPath,
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
-                         NLKind LookupKind, 
-                         SmallVectorImpl<ValueDecl*> &Result) {
-  if (BuiltinModule *BM = dyn_cast<BuiltinModule>(this)) {
-    assert(AccessPath.empty() && "builtin module's access path always empty!");
-    return getBuiltinCachePimpl(BM->Cache)
-      .lookupValue(Name, LookupKind, *BM, Result);
-  }
-
+template <typename FUMemFn, FUMemFn FULOOKUP,
+          typename MLMemFn, MLMemFn MLLOOKUP,
+          typename ...Args>
+void Module::forwardToSourceFiles(Args &&...args) const {
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      SF->getCache().lookupValue(AccessPath, Name, LookupKind, Result);
+    for (const FileUnit *file : TU->getSourceFiles())
+      (file->*FULOOKUP)(args...);
     return;
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.lookupValue(this, AccessPath, Name, LookupKind, Result);
+  (owner.*MLLOOKUP)(this, args...);
+}
+
+#define FORWARD(name, args) \
+  forwardToSourceFiles<decltype(&FileUnit::name), &FileUnit::name, \
+                       decltype(&ModuleLoader::name), &ModuleLoader::name>args
+
+void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
+                         NLKind LookupKind, 
+                         SmallVectorImpl<ValueDecl*> &Result) const {
+  FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
+}
+
+void FileUnit::lookupValue(Module::AccessPathTy AccessPath, Identifier Name,
+                           NLKind LookupKind,
+                           SmallVectorImpl<ValueDecl*> &Result) const {
+  switch (Kind) {
+  case FileUnitKind::Builtin: {
+    auto BU = cast<BuiltinUnit>(this);
+    assert(AccessPath.empty() && "builtin module's access path always empty!");
+    BU->getCache().lookupValue(Name, LookupKind, *BU, Result);
+    return;
+  }
+
+  case FileUnitKind::Source: {
+    auto SF = cast<SourceFile>(this);
+    SF->getCache().lookupValue(AccessPath, Name, LookupKind, Result);
+    return;
+  }
+  }
 }
 
 void Module::lookupVisibleDecls(AccessPathTy AccessPath,
                                 VisibleDeclConsumer &Consumer,
                                 NLKind LookupKind) const {
-  if (auto BM = dyn_cast<BuiltinModule>(this)) {
+  FORWARD(lookupVisibleDecls, (AccessPath, Consumer, LookupKind));
+}
+
+void FileUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
+                                  VisibleDeclConsumer &Consumer,
+                                  NLKind LookupKind) const {
+  switch (Kind) {
+  case FileUnitKind::Builtin:
     // TODO Look through the Builtin module.
-    (void)BM;
+    return;
+
+  case FileUnitKind::Source: {
+    auto SF = cast<SourceFile>(this);
+    SF->getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
     return;
   }
-
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      SF->getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
-    return;
   }
-
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.lookupVisibleDecls(this, AccessPath, Consumer, LookupKind);
 }
 
 void Module::lookupClassMembers(AccessPathTy accessPath,
                                 VisibleDeclConsumer &consumer) const {
-  if (isa<BuiltinModule>(this)) {
+  FORWARD(lookupClassMembers, (accessPath, consumer));
+}
+
+void FileUnit::lookupClassMembers(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) const {
+  switch (Kind) {
+  case FileUnitKind::Builtin:
     // The Builtin module defines no classes.
     return;
-  }
 
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      SF->getCache().lookupClassMembers(accessPath, consumer, *SF);
+  case FileUnitKind::Source: {
+    auto SF = cast<SourceFile>(this);
+    SF->getCache().lookupClassMembers(accessPath, consumer, *SF);
     return;
   }
-
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.lookupClassMembers(this, accessPath, consumer);
+  }
 }
 
 void Module::lookupClassMember(AccessPathTy accessPath,
                                Identifier name,
                                SmallVectorImpl<ValueDecl*> &results) const {
-  if (isa<BuiltinModule>(this)) {
-    // The Builtin module defines no classes.
-    return;
-  }
-  
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      SF->getCache().lookupClassMember(accessPath, name, results, *SF);
-    return;
-  }
-  
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.lookupClassMember(this, accessPath, name, results);
+  FORWARD(lookupClassMember, (accessPath, name, results));
 }
 
-void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
-  if (isa<BuiltinModule>(this)) {
+void FileUnit::lookupClassMember(Module::AccessPathTy accessPath,
+                                 Identifier name,
+                                 SmallVectorImpl<ValueDecl*> &results) const {
+  switch (Kind) {
+  case FileUnitKind::Builtin:
+    // The Builtin module defines no classes.
+    return;
+
+  case FileUnitKind::Source: {
+    auto SF = cast<SourceFile>(this);
+    SF->getCache().lookupClassMember(accessPath, name, results, *SF);
     return;
   }
+  }
+}
 
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      Results.append(SF->Decls.begin(), SF->Decls.end());
+void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
+  FORWARD(getTopLevelDecls, (Results));
+}
+
+void FileUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
+  switch (Kind) {
+  case FileUnitKind::Builtin:
+    // The Builtin module defines no classes.
+    return;
+
+  case FileUnitKind::Source: {
+    auto SF = cast<SourceFile>(this);
+    Results.append(SF->Decls.begin(), SF->Decls.end());
     return;
   }
-
-  ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
-  return Owner.getTopLevelDecls(this, Results);
+  }
 }
 
 ArrayRef<Substitution> BoundGenericType::getSubstitutions(
@@ -807,18 +841,11 @@ LookupConformanceResult Module::lookupConformance(Type type,
   return { nominalConformance, ConformanceKind::Conforms };
 }
 
-void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
-  if (isa<BuiltinModule>(this)) {
-    // FIXME: The Builtin module isn't usually visible, but it would be nice
-    // to have the option to display its decls. Unfortunately those decls are
-    // lazily generated.
-    return;
-  }
-  
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Access control.
-    for (const SourceFile *SF : TU->getSourceFiles())
-      results.append(SF->Decls.begin(), SF->Decls.end());
+void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  if (isa<TranslationUnit>(this)) {
+    // FIXME: Include decls from a shadowed module.
+    // FIXME: Should this do extra access control filtering?
+    getTopLevelDecls(results);
     return;
   }
   
@@ -827,23 +854,32 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
 }
 
 namespace {
-
-template <typename T>
-using OperatorMap = SourceFile::OperatorMap<T>;
+  template <typename T>
+  using OperatorMap = SourceFile::OperatorMap<T>;
+}
 
 template<typename OP_DECL>
-Optional<OP_DECL *>
+static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP);
 
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
-Optional<OP_DECL *>
-lookupOperatorDeclForName(const SourceFile &SF, SourceLoc Loc, Identifier Name,
+static Optional<OP_DECL *>
+lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
                           bool includePrivate,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
+  switch (File.Kind) {
+  case FileUnitKind::Builtin:
+    // The Builtin module declares no operators.
+    return nullptr;
+  case FileUnitKind::Source:
+    break;
+  }
+
+  auto &SF = cast<SourceFile>(File);
   assert(SF.ASTStage >= SourceFile::NameBound);
 
   // Look for an operator declaration in the current module.
@@ -905,20 +941,18 @@ lookupOperatorDeclForName(const SourceFile &SF, SourceLoc Loc, Identifier Name,
 }
 
 template<typename OP_DECL>
-Optional<OP_DECL *>
+static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   if (auto loadedModule = dyn_cast<LoadedModule>(M))
     return loadedModule->lookupOperator<OP_DECL>(Name);
 
-  auto *TU = dyn_cast<TranslationUnit>(M);
-  if (!TU)
-    return nullptr;
+  auto *TU = cast<TranslationUnit>(M);
 
   OP_DECL *result = nullptr;
-  for (const SourceFile *SF : TU->getSourceFiles()) {
-    auto next = lookupOperatorDeclForName(*SF, Loc, Name, false, OP_MAP);
+  for (const FileUnit *File : TU->getSourceFiles()) {
+    auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);
     if (!next.hasValue())
       return next;
 
@@ -930,8 +964,6 @@ lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
   }
   return result;
 }
-
-} // end anonymous namespace
 
 #define LOOKUP_OPERATOR(Kind) \
 Kind##OperatorDecl * \
@@ -958,14 +990,21 @@ LOOKUP_OPERATOR(Postfix)
 void
 Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                            bool includePrivate) const {
-  if (isa<BuiltinModule>(this))
-    return;
-
+  // FIXME: Audit uses of this function and make sure they make sense in a
+  // multi-file TU world.
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (auto SF : TU->getSourceFiles())
-      for (auto importPair : SF->getImports())
-        if (includePrivate || importPair.second)
-          modules.push_back(importPair.first);
+    for (auto File : TU->getSourceFiles()) {
+      switch (File->Kind) {
+      case FileUnitKind::Builtin:
+        // The Builtin module has no imports.
+        break;
+      case FileUnitKind::Source:
+        for (auto importPair : cast<SourceFile>(File)->getImports())
+          if (includePrivate || importPair.second)
+            modules.push_back(importPair.first);
+        break;
+      }
+    }
     return;
   }
 
@@ -1003,14 +1042,15 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
 }
 
 StringRef Module::getModuleFilename() const {
-  if (isa<BuiltinModule>(this))
-    return StringRef();
-
+  // FIXME: Audit uses of this function and figure out how to migrate them to
+  // per-file names.
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
     // FIXME: Figure out what the right intent is here. Modules can consist of
     // more than one file.
-    if (TU->getSourceFiles().size() == 1)
-      return TU->getSourceFiles().front()->getFilename();
+    if (TU->getSourceFiles().size() == 1) {
+      if (auto File = dyn_cast<SourceFile>(TU->getSourceFiles().front()))
+        return File->getFilename();
+    }
     return StringRef();
   }
 
@@ -1154,14 +1194,23 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 
 SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
                        Optional<unsigned> bufferID, bool hasBuiltinModuleAccess)
-  : DeclContext(DeclContextKind::SourceFile, &tu),
+  : FileUnit(FileUnitKind::Source, tu),
     BufferID(bufferID ? *bufferID : -1), TU(tu), Kind(K) {
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 
-bool SourceFile::walk(ASTWalker &walker) {
-  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &TU);
-  for (Decl *D : Decls) {
+bool FileUnit::walk(ASTWalker &walker) {
+  switch (Kind) {
+  case FileUnitKind::Builtin:
+    return false;
+  case FileUnitKind::Source:
+    break;
+  }
+
+  auto SF = cast<SourceFile>(this);
+
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &SF->TU);
+  for (Decl *D : SF->Decls) {
     if (D->walk(walker))
       return true;
   }
@@ -1208,4 +1257,4 @@ LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
 //===----------------------------------------------------------------------===//
 // ModuleLoader Implementation
 //===----------------------------------------------------------------------===//
-ModuleLoader::~ModuleLoader() {}
+ModuleLoader::~ModuleLoader() = default;

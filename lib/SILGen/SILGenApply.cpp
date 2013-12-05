@@ -2060,7 +2060,7 @@ namespace {
     
     ValueDecl *decl = function.getDecl();
     
-    if (!isa<BuiltinModule>(decl->getDeclContext()))
+    if (!isa<BuiltinUnit>(decl->getDeclContext()))
       return nullptr;
 
     const BuiltinInfo &Builtin = SILM.getBuiltinInfo(decl->getName());

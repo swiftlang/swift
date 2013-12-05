@@ -171,9 +171,11 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
     IGM.emitSourceFile(*SF, StartElem);
   } else {
     assert(StartElem == 0 && "no explicit source file provided");
-    for (auto *SF : TU->getSourceFiles()) {
-      if (SF->ASTStage == SourceFile::TypeChecked)
-        IGM.emitSourceFile(*SF, 0);
+    for (auto *File : TU->getSourceFiles()) {
+      assert(isa<SourceFile>(File) && "can't IRGen a module from AST files");
+      auto nextSF = cast<SourceFile>(File);
+      if (nextSF->ASTStage == SourceFile::TypeChecked)
+        IGM.emitSourceFile(*nextSF, 0);
     }
   }
 

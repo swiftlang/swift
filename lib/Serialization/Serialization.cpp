@@ -108,7 +108,7 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     if (isa<TranslationUnit>(DC))
       return nullptr;
     llvm_unreachable("builtins & serialized modules should be handled");
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
     return getDeclForContext(DC->getParent());
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
@@ -402,8 +402,13 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  for (auto SF : TU->getSourceFiles()) {
+  for (auto file : TU->getSourceFiles()) {
     // FIXME: Do some uniquing.
+    // FIXME: Clean this up to handle mixed source/AST TUs.
+    auto SF = dyn_cast<swift::SourceFile>(file);
+    if (!SF)
+      continue;
+
     for (auto import : SF->getImports()) {
       if (import.first.second == TU->Ctx.TheBuiltinModule)
         continue;
@@ -2008,9 +2013,13 @@ void Serializer::writeTranslationUnit(TranslationUnitOrSourceFile DC,
   writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
-  ArrayRef<const SourceFile *> files = SF ? SF : TU->getSourceFiles();
+  ArrayRef<const FileUnit *> files = SF ? SF : TU->getSourceFiles();
   for (auto nextFile : files) {
-    for (auto D : nextFile->Decls) {
+    // FIXME: Switch to a visitor interface?
+    SmallVector<Decl *, 32> fileDecls;
+    nextFile->getTopLevelDecls(fileDecls);
+
+    for (auto D : fileDecls) {
       if (isa<ImportDecl>(D))
         continue;
       else if (auto VD = dyn_cast<ValueDecl>(D)) {

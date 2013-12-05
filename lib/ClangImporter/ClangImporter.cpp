@@ -424,7 +424,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 
 
 #pragma mark Name lookup
-void ClangImporter::lookupValue(Module *module,
+void ClangImporter::lookupValue(const Module *module,
                                 Module::AccessPathTy accessPath,
                                 Identifier name,
                                 NLKind lookupKind,

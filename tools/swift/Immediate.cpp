@@ -245,7 +245,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   // autolinking.
   TU->forAllVisibleModules(Nothing, [&](Module::ImportedModule ModPair) -> bool{
     TranslationUnit *SubTU = dyn_cast<TranslationUnit>(ModPair.second);
-    if (!SubTU)
+    if (!SubTU || SubTU == SubTU->Ctx.TheBuiltinModule)
       return true;
     if (!ImportedModules.insert(SubTU))
       return true;

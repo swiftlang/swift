@@ -64,6 +64,7 @@ namespace swift {
   class Module;
   class ModuleLoader;
   class NominalTypeDecl;
+  class TranslationUnit;
   class TupleTypeElt;
   class EnumElementDecl;
   class ProtocolDecl;
@@ -165,8 +166,8 @@ public:
   /// LoadedModules - The set of modules we have loaded.
   llvm::StringMap<Module*> LoadedModules;
 
-  /// TheBuiltinModule - The builtin module.
-  Module * const TheBuiltinModule;
+  /// The builtin module.
+  TranslationUnit * const TheBuiltinModule;
 
   /// The standard library module.
   mutable Module *TheStdlibModule = nullptr;

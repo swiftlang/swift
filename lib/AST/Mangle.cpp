@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
@@ -186,8 +187,6 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   case DeclContextKind::Module: {
     Module *module = cast<Module>(ctx);
 
-    assert(!isa<BuiltinModule>(module) && "mangling member of builtin module!");
-
     // Try the special 'swift' substitution.
     // context ::= 'Ss'
     if (module->isStdlibModule()) {
@@ -210,7 +209,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::SourceFile:
+  case DeclContextKind::FileUnit:
+    assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
     mangleDeclContext(ctx->getParent());
     return;
 
@@ -432,16 +432,21 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
   // Mangle the type if requested.
   if (result.first) {
     Type T = decl->getType();
-    if ((DWARFMangling && decl->getKind() == DeclKind::TypeAlias)
-        && !isa<BuiltinModule>(decl->getDeclContext())) {
-      // For the DWARF output we want to mangle the type alias + context.
-      Buffer << "a";
-      mangleContextOf(decl);
-      mangleIdentifier(decl->getName());
-    } else {
-      // Otherwise, mangle the canonical type.
-      mangleType(T->getCanonicalType(), explosion, uncurryLevel);
+
+    if (DWARFMangling && decl->getKind() == DeclKind::TypeAlias) {
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
+      Module *M = decl->getModuleContext();
+      if (M != M->Ctx.TheBuiltinModule) {
+        Buffer << "a";
+        mangleContextOf(decl);
+        mangleIdentifier(decl->getName());
+        return;
+      }
     }
+
+    // Otherwise, mangle the canonical type.
+    mangleType(T->getCanonicalType(), explosion, uncurryLevel);
   }
 }
 

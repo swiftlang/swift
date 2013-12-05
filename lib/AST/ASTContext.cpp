@@ -207,13 +207,19 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
     (ASTContext::Implementation::ConstraintSolverArena *)Data);
 }
 
+static TranslationUnit *createBuiltinModule(ASTContext &ctx) {
+  auto M = new (ctx) TranslationUnit(ctx.getIdentifier("Builtin"), ctx);
+  M->addSourceFile(*new (ctx) BuiltinUnit(*M));
+  return M;
+}
+
 ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
                        DiagnosticEngine &Diags)
   : Impl(*new Implementation()),
     LangOpts(langOpts),
     SourceMgr(SourceMgr),
     Diags(Diags),
-    TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
+    TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier("swift")),
     SelfIdentifier(getIdentifier("self")),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),

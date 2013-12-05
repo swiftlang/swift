@@ -614,7 +614,9 @@ std::unique_ptr<SILModule> SILModule::constructSIL(TranslationUnit *tu,
       sgm.visit(D);
   } else {
     assert(startElem == 0 && "no explicit source file");
-    for (auto nextSF : tu->getSourceFiles()) {
+    for (auto file : tu->getSourceFiles()) {
+      assert(isa<SourceFile>(file) && "can't SILGen a module from AST files");
+      auto nextSF = cast<SourceFile>(file);
       if (nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
       for (Decl *D : llvm::makeArrayRef(nextSF->Decls).slice(startElem))

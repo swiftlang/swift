@@ -478,9 +478,16 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
     auto importTU = dyn_cast<TranslationUnit>(import.second);
     if (!importTU)
       return;
+
+    SmallVector<Decl *, 32> topLevelDecls;
+
     // FIXME: Respect the access path?
     for (auto SF : importTU->getSourceFiles()) {
-      for (auto D : SF->Decls) {
+      // FIXME: Use some kind of visitor interface here.
+      topLevelDecls.clear();
+      SF->getTopLevelDecls(topLevelDecls);
+      
+      for (auto D : topLevelDecls) {
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           bindExtensionDecl(ED, TC);
           if (mayConformToKnownProtocol(ED))
