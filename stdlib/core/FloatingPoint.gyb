@@ -47,6 +47,63 @@ def cFuncSuffix(bits):
     if bits == 80:
         return 'l'
 
+def llvmIntrinsicSuffix(bits):
+    if bits == 32:
+        return 'f32'
+    if bits == 64:
+        return 'f64'
+    if bits == 80:
+        return 'f80'
+
+def getInfBitPattern(bits):
+    if bits == 32:
+        return '0x7f800000'
+    if bits == 64:
+        return '0x7ff0000000000000'
+    return 'error'
+
+def getQuietNaNBitPattern(bits):
+    if bits == 32:
+        return '0x7fc00000'
+    if bits == 64:
+        return '0x7ff8000000000000'
+    return 'error'
+
+def getSignalingNanBitPattern(bits):
+    if bits == 32:
+        return '0x7fa00000'
+    if bits == 64:
+        return '0x7ff4000000000000'
+    return 'error'
+
+def getMinNormalBitPattern(bits):
+    if bits == 32:
+        return '0x00800000'
+    if bits == 64:
+        return '0x0010000000000000'
+    return 'error'
+
+def getExponentBitCount(bits):
+    if bits == 32:
+        return '8'
+    if bits == 64:
+        return '11'
+    return 'error'
+
+def getSignificantBitCount(bits):
+    if bits == 32:
+        return '23'
+    if bits == 64:
+        return '52'
+    return 'error'
+
+def getInfinityExponent(bits):
+    if bits == 32:
+        return '0xff'
+    if bits == 64:
+        return '0x7ff'
+    return 'error'
+
 }@
 
 @ for bits in allFloatBits:
@@ -74,6 +131,150 @@ struct ${Self} : ReplPrintable {
 @end
   }
 }
+
+@ if bits in allIntBits:
+// Not transparent because the compiler crashes in that case.
+//@@transparent
+extension ${Self} : IEEEFloatingPointNumber {
+  typealias _BitsType = UInt${bits}
+
+  static func _fromBitPattern(bits: _BitsType) -> ${Self} {
+    return ${Self}(Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
+  }
+
+  func _toBitPattern() -> _BitsType {
+    return _BitsType(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
+  }
+
+  func __getSignBit() -> Int {
+    return Int(_toBitPattern() >> ${bits - 1}) & 1
+  }
+
+  func __getBiasedExponent() -> _BitsType {
+    return (_toBitPattern() >> ${getSignificantBitCount(bits)}) & ${getInfinityExponent(bits)}
+  }
+
+  func __getSignificand() -> _BitsType {
+    var mask: _BitsType = (1 << ${getSignificantBitCount(bits)}) - 1
+    return _toBitPattern() & mask
+  }
+
+  static func inf() -> ${Self} {
+    return _fromBitPattern(${getInfBitPattern(bits)})
+  }
+
+  static func NaN() -> ${Self} {
+    return quietNaN()
+  }
+
+  static func quietNaN() -> ${Self} {
+    return _fromBitPattern(${getQuietNaNBitPattern(bits)})
+  }
+
+  static func signalingNaN() -> ${Self} {
+    return _fromBitPattern(${getSignalingNanBitPattern(bits)})
+  }
+
+  func isSignMinus() -> Bool {
+    return __getSignBit() == 1
+  }
+
+  func isNormal() -> Bool {
+    var biasedExponent = __getBiasedExponent()
+    return biasedExponent != ${getInfinityExponent(bits)} &&
+           biasedExponent != 0
+  }
+
+  func isFinite() -> Bool {
+    return __getBiasedExponent() != ${getInfinityExponent(bits)}
+  }
+
+  func isZero() -> Bool {
+    // Mask out the sign bit.
+    var mask: _BitsType = (1 << (${bits} - 1)) - 1
+    return (_toBitPattern() & mask) == 0
+  }
+
+  func isSubnormal() -> Bool {
+    if __getBiasedExponent() == 0 {
+      return __getSignificand() != 0
+    }
+    return false
+
+    // Alternative implementation:
+    // return !isNan() &&
+    //     abs(self) < ${Self}._fromBitPattern(${getMinNormalBitPattern(bits)})
+    //
+    // But because we need to check for !isNan(), and do it safely in case of
+    // SNaN, we need to go down to the bit level, so open-coding the combined
+    // condition is going to be faster.
+  }
+
+  func isInfinite() -> Bool {
+    if __getBiasedExponent() == ${getInfinityExponent(bits)} {
+      return __getSignificand() == 0
+    }
+    return false
+
+    // Alternative implementation that is not safe in case of SNaN:
+    // return abs(self) == ${Self}.inf()
+  }
+
+  func isNaN() -> Bool {
+    if __getBiasedExponent() == ${getInfinityExponent(bits)} {
+      return __getSignificand() != 0
+    }
+    return false
+
+    // Alternative implementation that is not safe in case of SNaN:
+    // return self != self
+  }
+
+  func isSignaling() -> Bool {
+    if __getBiasedExponent() == ${getInfinityExponent(bits)} {
+      // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded
+      // with the first bit of the trailing significand being 0.  If the first
+      // bit of the trailing significand field is 0, some other bit of the
+      // trailing significand field must be non-zero to distinguish the NaN
+      // from infinity.
+      var significand = __getSignificand()
+      if significand != 0 {
+        return (significand >> (${getSignificantBitCount(bits)} - 1)) == 0
+      }
+    }
+    return false
+  }
+}
+
+// Not @transparent because the function is too complex.
+extension ${Self} /* : IEEEFloatingPointNumber */ {
+  var floatingPointClass: IEEEFloatingPointClass {
+  get:
+    var biasedExponent = __getBiasedExponent()
+    if biasedExponent == ${getInfinityExponent(bits)} {
+      var significand = __getSignificand()
+      // This is either +/-inf or NaN.
+      if significand == 0 {
+        return isSignMinus() ? .NegativeInfinity : .PositiveInfinity
+      }
+      var isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
+      return isQNaN ? .QuietNaN : .SignalingNaN
+    }
+
+    // OK, the number is finite.
+    var isMinus = isSignMinus()
+    if biasedExponent != 0 {
+      return isMinus ? .NegativeNormal : .PositiveNormal
+    }
+
+    // Exponent is zero.
+    if __getSignificand() == 0 {
+      return isMinus ? .NegativeZero : .PositiveZero
+    }
+    return isMinus ? .NegativeSubnormal : .PositiveSubnormal
+  }
+}
+@ end
 
 @@transparent
 extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
