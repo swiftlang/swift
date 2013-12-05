@@ -268,8 +268,8 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
+// FIXME: Remove this indirection.
 template <typename FUMemFn, FUMemFn FULOOKUP,
-          typename MLMemFn, MLMemFn MLLOOKUP,
           typename ...Args>
 void Module::forwardToSourceFiles(Args &&...args) const {
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
@@ -277,15 +277,10 @@ void Module::forwardToSourceFiles(Args &&...args) const {
       (file->*FULOOKUP)(args...);
     return;
   }
-
-  // FIXME: Remove this.
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  (owner.*MLLOOKUP)(this, args...);
 }
 
 #define FORWARD(name, args) \
-  forwardToSourceFiles<decltype(&FileUnit::name), &FileUnit::name, \
-                       decltype(&ModuleLoader::name), &ModuleLoader::name>args
+  forwardToSourceFiles<decltype(&FileUnit::name), &FileUnit::name>args
 
 void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
                          NLKind LookupKind, 
@@ -802,9 +797,6 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
     getTopLevelDecls(results);
     return;
   }
-  
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.getDisplayDecls(this, results);
 }
 
 namespace {
@@ -928,9 +920,6 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
-  if (auto loadedModule = dyn_cast<LoadedModule>(M))
-    return lookupOperator<OP_DECL>(*loadedModule, Name);
-
   auto *TU = cast<TranslationUnit>(M);
 
   OP_DECL *result = nullptr;
@@ -1029,8 +1018,7 @@ StringRef Module::getModuleFilename() const {
     return StringRef();
   }
 
-  ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
-  return Owner.getModuleFilename(this);
+  return StringRef();
 }
 
 bool Module::isStdlibModule() const {
@@ -1217,15 +1205,6 @@ StringRef SourceFile::getFilename() const  {
   if (BufferID == -1)
     return "";
   return TU.Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
-}
-
-
-//===----------------------------------------------------------------------===//
-// LoadedModule Implementation
-//===----------------------------------------------------------------------===//
-
-OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
-  return getOwner().lookupOperator(this, name, fixity);
 }
 
 

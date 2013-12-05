@@ -59,7 +59,8 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns a FailedImportModule object.
   virtual Module *
-  loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
+  loadModule(SourceLoc importLoc,
+             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
   /// \brief Register a memory buffer that contains the serialized
   /// module for the given access path. This API is intended to be

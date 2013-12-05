@@ -18,12 +18,14 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "swift/ClangImporter/ClangImporter.h"
-#include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/Optional.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <set>
 
 namespace clang {
@@ -45,12 +47,13 @@ namespace swift {
 class ASTContext;
 class ClangModuleUnit;
 class ClassDecl;
+class Decl;
+class DeclContext;
 class ExtensionDecl;
 class FuncDecl;
 class Identifier;
 class Pattern;
 class SubscriptDecl;
-class Type;
 class ValueDecl;
 
 /// \brief Describes the kind of conversion to apply to a constant value.

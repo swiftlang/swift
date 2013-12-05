@@ -17,8 +17,6 @@
 #define SWIFT_AST_MODULE_LOADER_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -49,24 +47,6 @@ public:
   Module *loadModule(SourceLoc importLoc,
                      ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
 
-  /// \brief Look for declarations associated with the given name.
-  ///
-  /// \param module The module to search.
-  ///
-  /// \param accessPath The access path used to refer to the name within this
-  /// (top-level) module.
-  ///
-  /// \param name The name we're searching for.
-  ///
-  /// \param lookupKind Whether we're performing qualified vs. unqualified
-  /// lookup.
-  ///
-  /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(const Module *module,
-                           Module::AccessPathTy accessPath, Identifier name,
-                           NLKind lookupKind,
-                           SmallVectorImpl<ValueDecl*> &result) { }
-  
   /// \brief Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
@@ -87,79 +67,6 @@ public:
   /// to and including this one.
   virtual void loadDeclsConformingTo(KnownProtocolKind kind,
                                      unsigned previousGeneration) { };
-
-  /// \brief Look for members of the given type.
-  ///
-  /// \param module The module to search.
-  ///
-  /// \param base The type into which we will look to find members.
-  ///
-  /// \param name The name of the members we are looking for.
-  ///
-  /// \param result Will be populated with the results of name lookup.
-  virtual void lookupMembers(Module *module, Type base, Identifier name,
-                             SmallVectorImpl<ValueDecl*> &result) { }
-
-  /// \brief Look for a declaration of the given operator.
-  ///
-  /// \returns The operator decl, or null if this module does not define the
-  /// operator in question.
-  virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
-                                       DeclKind fixity) {
-    return nullptr;
-  }
-
-  /// \brief Look for modules imported by the given module.
-  ///
-  /// Unless \p includePrivate is true, only re-exported modules are included.
-  virtual void
-  getImportedModules(const Module *module,
-                     SmallVectorImpl<Module::ImportedModule> &exports,
-                     bool includePrivate) { }
-
-  /// \brief Look for all visible top-level decls in the module.
-  virtual void lookupVisibleDecls(const Module *module,
-                                  Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer,
-                                  NLKind lookupKind) { }
-
-  /// \brief Look for all class members.
-  ///
-  /// This is used for id-style lookup.
-  virtual void lookupClassMembers(const Module *module,
-                                  Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer) { }
-
-  /// \brief Look for class members with the given name.
-  ///
-  /// Any decls found will be stored in \p results.
-  ///
-  /// This is used for id-style lookup.
-  virtual void lookupClassMember(const Module *module,
-                                 Module::AccessPathTy accessPath,
-                                 Identifier name,
-                                 SmallVectorImpl<ValueDecl*> &results) { }
-
-  /// \brief Find all libraries and frameworks that need to be linked with this
-  /// module.
-  ///
-  /// Does not include dependencies.
-  virtual void collectLinkLibraries(const Module *module,
-                                    Module::LinkLibraryCallback callback) { }
-  
-  /// \brief Get all top-level decls of the module.
-  virtual void getTopLevelDecls(const Module *Module,
-                                SmallVectorImpl<Decl*> &Results) { }
-
-  /// \brief Look for all top-level decls that should be displayed to a client
-  /// of the module.
-  virtual void getDisplayDecls(const Module *module,
-                               SmallVectorImpl<Decl*> &results) { }
-
-  /// \brief Get the path for the file that a module came from.
-  virtual StringRef getModuleFilename(const Module *Module) {
-    return StringRef();
-  }
 
   /// \brief Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

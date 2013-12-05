@@ -142,7 +142,6 @@ protected:
 
 private:
   template <typename FUMemFn, FUMemFn FULOOKUP,
-            typename MLMemFn, MLMemFn MLLOOKUP,
             typename ...Args>
   void forwardToSourceFiles(Args &&...args) const;
 
@@ -768,53 +767,10 @@ public:
 };
 
 
-
-/// Represents a serialized module that has been imported into Swift.
-///
-/// This may be a Swift module or a Clang module.
-class LoadedModule : public Module {
-  ModuleLoader &Owner;
-
-protected:
-  friend class Module;
-
-  LoadedModule(ModuleKind Kind, Identifier name,
-               StringRef DebugModuleName,
-               ASTContext &ctx, ModuleLoader &owner)
-    : Module(Kind, name, ctx), Owner(owner),
-      DebugModuleName(DebugModuleName) {
-  }
-
-  ModuleLoader &getOwner() const {
-    return Owner;
-  }
-
-  std::string DebugModuleName;
-
-public:
-  /// Look up an operator declaration.
-  ///
-  /// \param name The operator name ("+", ">>", etc.)
-  ///
-  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
-  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
-
-  static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::Serialized ||
-           M->getKind() == ModuleKind::Clang ||
-           M->getKind() == ModuleKind::FailedImport;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<Module>(DC) && classof(cast<Module>(DC));
-  }
-
-  /// \brief Get the debug name for the module.
-  const char *getDebugModuleName() const { return DebugModuleName.c_str(); }
-};
-
-
 inline FileUnit::FileUnit(FileUnitKind kind, TranslationUnit &tu)
     : DeclContext(DeclContextKind::FileUnit, &tu), Kind(kind) {
+  // Defined out-of-line because we need to know that TranslationUnit is a kind
+  // of DeclContext.
 }
 
 } // end namespace swift

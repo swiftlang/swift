@@ -30,6 +30,7 @@ class ASTContext;
 class ClangModuleUnit;
 class Module;
 class NominalTypeDecl;
+class VisibleDeclConsumer;
 
 /// \brief Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
