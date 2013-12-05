@@ -499,3 +499,24 @@ sil @stringliteral : $@thin () -> () {
   %4 = tuple()
   return %4 : $()
 }
+
+struct Interval {
+  var start: Builtin.Int32
+  var end: Builtin.Int32
+}
+
+sil @print_interval : $@thin (Interval) -> ()
+
+// CHECK-LABEL: structliteral
+// CHECK: [[TARGET:%[0-9]+]] = struct $Interval ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
+// CHECK-NOT: struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+sil @structliteral : $@thin (Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+  %3 = struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+  %4 = function_ref @print_interval : $@thin (Interval) -> ()
+  apply %4 (%2) : $@thin (Interval) -> ()
+  apply %4 (%3) : $@thin (Interval) -> ()
+  %5 = tuple()
+  return %5 : $()
+}

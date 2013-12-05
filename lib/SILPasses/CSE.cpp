@@ -63,6 +63,7 @@ namespace {
       case ValueKind::IntegerLiteralInst:
       case ValueKind::FloatLiteralInst:
       case ValueKind::StringLiteralInst:
+      case ValueKind::StructInst:
         return true;
       default:
         return false;
@@ -119,6 +120,15 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
     auto *X = cast<StringLiteralInst>(Inst);
     return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
                               X->getValue());
+  }
+  case ValueKind::StructInst: {
+    auto *X = cast<StructInst>(Inst);
+    // This is safe since we are hashing the operands using the actual pointer
+    // values of the values being used by the operand.
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(unsigned(ValueKind::StructInst),
+                              llvm::hash_combine_range(Operands.begin(),
+                                                       Operands.end()));
   }
   default:
     llvm_unreachable("Unhandled ValueKind.");
