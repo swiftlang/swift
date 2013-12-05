@@ -1223,6 +1223,11 @@ namespace {
                                   substParams, substResult, getASTContext());
     }
 
+    SILType subst(SILType type) {
+      return SILType::getPrimitiveType(visit(type.getSwiftRValueType()),
+                                       type.getCategory());
+    }
+
     SILResultInfo subst(SILResultInfo orig) {
       return SILResultInfo(visit(orig.getType()), orig.getConvention());
     }
@@ -1269,6 +1274,21 @@ namespace {
                .getSwiftRValueType();
     }
   };
+}
+
+SILType SILType::substType(SILModule &silModule, Module *astModule,
+                           TypeSubstitutionMap &subs, SILType SrcTy) {
+  SILTypeSubstituter STST(silModule, astModule, subs);
+  return STST.subst(SrcTy);
+}
+
+CanSILFunctionType SILType::substFuncType(SILModule &silModule,
+                                          Module *astModule,
+                                          TypeSubstitutionMap &subs,
+                                          CanSILFunctionType SrcTy,
+                                          bool dropGenerics) {
+  SILTypeSubstituter STST(silModule, astModule, subs);
+  return STST.visitSILFunctionType(SrcTy, dropGenerics);
 }
 
 CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,

@@ -34,7 +34,8 @@ public:
   ArchetypeType *Archetype;
   Type Replacement;
   ArrayRef<ProtocolConformance *> Conformance;
-  
+
+  bool operator!=(const Substitution &Other) const;
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 };

@@ -20,12 +20,13 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          Optional<SILLocation> Loc,
                          IsTransparent_t isTrans,
                          SILFunction *InsertBefore,
-                         SILDebugScope *DebugScope)
+                         SILDebugScope *DebugScope,
+                         DeclContext *DC)
   : ModuleAndLinkage(&Module, Linkage),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc),
-    DeclCtx(nullptr),
+    DeclCtx(DC),
     DebugScope(DebugScope),
     Transparent(isTrans) {
   if (InsertBefore)

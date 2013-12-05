@@ -39,6 +39,7 @@ enum class PassKind {
   PredictableMemoryOpt,
   SILCleanup,
   SILCombine,
+  SILSpecialization,
   SimplifyCFG,
 };
 
@@ -81,6 +82,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
                                    "Inline transparent functions"),
+                        clEnumValN(PassKind::SILSpecialization,
+                                   "specialize",
+                                   "Specialize generic functions"),
                         clEnumValN(PassKind::PredictableMemoryOpt,
                                    "predictable-memopt",
                                    "Predictable early memory optimization"),
@@ -194,6 +198,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::SILCombine:
       performSILCombine(CI.getSILModule());
+      break;
+    case PassKind::SILSpecialization:
+      performSILSpecialization(CI.getSILModule());
       break;
     case PassKind::SimplifyCFG:
       performSimplifyCFG(CI.getSILModule());

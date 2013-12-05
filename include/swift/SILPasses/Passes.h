@@ -54,6 +54,10 @@ namespace swift {
   /// \brief Simplify the CFG of SIL functions.
   void performSimplifyCFG(SILModule *M);
 
+  /// \brief Specialize generic functions by cloning them and replacing the
+  /// abstract type with the concrete type.
+  void performSILSpecialization(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   void performSILLinking(SILModule *M);

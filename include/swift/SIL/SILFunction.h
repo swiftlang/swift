@@ -86,7 +86,8 @@ public:
               Optional<SILLocation> Loc = Nothing,
               IsTransparent_t isTrans = IsNotTransparent,
               SILFunction *InsertBefore = nullptr,
-              SILDebugScope *DebugScope = nullptr);
+              SILDebugScope *DebugScope = nullptr,
+              DeclContext *DC = nullptr);
 
   ~SILFunction();
 

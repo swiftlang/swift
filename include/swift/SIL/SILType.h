@@ -111,6 +111,17 @@ public:
     return SILType(T, SILValueCategory::LocalStorage);
   }
 
+  ///  Apply a substitution to the type to produce another lowered SIL type.
+  static SILType substType(SILModule &silModule, Module *astModule,
+                           TypeSubstitutionMap &subs, SILType SrcTy);
+
+  ///  Apply a substitution to the function type.
+  static CanSILFunctionType substFuncType(SILModule &silModule,
+                                          Module *astModule,
+                                          TypeSubstitutionMap &subs,
+                                          CanSILFunctionType SrcTy,
+                                          bool dropGenerics);
+
   bool isNull() const { return bool(value.getPointer()); }
   explicit operator bool() const { return bool(value.getPointer()); }
 
