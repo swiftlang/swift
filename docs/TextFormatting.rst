@@ -290,7 +290,7 @@ complicated ``format(…)`` might be written::
       var nDigits = _writePositive(rest, &stream)
       var digit = UInt32((value % radix).toInt())
       var baseCharOrd : UInt32 = digit <= 9 ? '0'.value : 'A'.value - 10
-      stream.append(String(Char(baseCharOrd + digit)))
+      stream.append(String(UnicodeScalar(baseCharOrd + digit)))
       return nDigits + 1
     }
 

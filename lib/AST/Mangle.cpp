@@ -922,7 +922,7 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "Bool") {
     Buffer << "Sb";
     return true;
-  } else if (name == "Char") {
+  } else if (name == "UnicodeScalar") {
     Buffer << "Sc";
     return true;
   } else if (name == "Float64") {

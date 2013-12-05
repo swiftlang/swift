@@ -704,7 +704,7 @@ private:
     if (Mangled.nextIf('c')) {
       NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Char"));
+                            Node::makeNodePointer(Node::Kind::Structure,"UnicodeScalar"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('d')) {

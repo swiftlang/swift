@@ -202,20 +202,20 @@ namespace {
   /// any materializable components with fresh type variables.
   ///
   /// That is, if we have a substituted function type:
-  ///   (Char, (Int, Float), Double) -> Bool
+  ///   (UnicodeScalar, (Int, Float), Double) -> Bool
   /// then its most general form is
   ///   A -> B
   ///
   /// because there is a valid substitution
-  ///   A := (Char, (Int, Float), Double)
+  ///   A := (UnicodeScalar, (Int, Float), Double)
   ///   B := Bool
   ///
   /// But if we have a substituted function type:
-  ///   (Char, (Int, Float), @inout Double) -> Bool
+  ///   (UnicodeScalar, (Int, Float), @inout Double) -> Bool
   /// then its most general form is
   ///   (A, B, @inout C) -> D
   /// because the substitution
-  ///   X := (Char, (Int, Float), @inout Double)
+  ///   X := (UnicodeScalar, (Int, Float), @inout Double)
   /// is invalid substitution, ultimately because '@inout Double'
   /// is not materializable.
   class DestructureGeneralizedInputs

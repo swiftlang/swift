@@ -94,7 +94,7 @@ A tuple-style declaration matches a named application if:
   multiple times, and the same argument cannot be provided positionally and
   by keyword. All keyword arguments must follow all positional arguments::
 
-    func foo(x: Int, y: String, z: Char) {}
+    func foo(x: Int, y: String, z: UnicodeScalar) {}
     foo(1, "two", '3')          // matches
     foo(1, "two", z: '3')       // matches
     foo(1, y: "two", '3')       // invalid, positional arg after keyword arg
@@ -115,7 +115,7 @@ A tuple-style declaration matches a named application if:
   non-keyworded arguments. All arguments up to either the next keyword or
   the end of the argument list become that keyword's argument::
 
-    func foo(x: Int, y: String, z: Char...) {}
+    func foo(x: Int, y: String, z: UnicodeScalar...) {}
     foo(1, "two", '3', '4', '5')       // matches, z = ['3', '4', '5']
     foo(1, "two", z: '3', '4', '5')    // same
     foo(1, z: '3', '4', '5', y: "two") // same
@@ -136,7 +136,7 @@ A selector-style declaration matches a named application if:
 - The expression must provide keywords for all of its arguments but the first.
   It must *not* provide a keyword for the first argument::
 
-    func foo(x: Int) bar(y: String) bas(z: Char) {}
+    func foo(x: Int) bar(y: String) bas(z: UnicodeScalar) {}
     foo(1, "two", '3')              // doesn't match; no keywords
     foo(x: 1, bar: "two", bas: '3') // doesn't match; first keyword provided
     foo(1, bar: "two", bas: '3')    // matches
@@ -147,12 +147,12 @@ A selector-style declaration matches a named application if:
   to selector pieces with the same name. The argument values must be convertible
   to the declared types of each selector piece's parameter::
 
-    func foo(x: Int) bar(y: String) bas(z: Char) {}
+    func foo(x: Int) bar(y: String) bas(z: UnicodeScalar) {}
     foo(1, bar: "two", bas: '3') // matches
     foo(1, bas: '3', bar: "two") // doesn't match; wrong selector piece order
     foo(1, bar: '2', bas: "three") // doesn't match; wrong types
 
-    func foo(x: Int) foo(y: String) foo(z: Char) {}
+    func foo(x: Int) foo(y: String) foo(z: UnicodeScalar) {}
     foo(1, foo: "two", foo: '3') // matches
 
 - If the final selector piece declares a variadic parameter, then the keyword

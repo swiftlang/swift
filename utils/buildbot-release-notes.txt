@@ -26,7 +26,10 @@
     conjunctive: &&
     disjunctive: ||
 
-* The "Enumerable" protocol has been renamed "Sequence"
+* The "Enumerable" protocol has been renamed "Sequence".
+
+* The "Char" type has been renamed "UnicodeScalar".  The preferred
+  unit of string fragments for users is called "Character"
 
 2013-12-04
 ----------

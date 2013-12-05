@@ -49,7 +49,7 @@ enum class ImplicitConstructorKind {
 /// Character, string, float, and integer literals are all keyed by value.
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
-  enum class Kind : uint8_t { String, Char, Float, Int, Tombstone, Empty } kind;
+  enum class Kind : uint8_t { String, UnicodeScalar, Float, Int, Tombstone, Empty } kind;
   
   // FIXME: doesn't accommodate >64-bit or signed raw integer or float values.
   union {
@@ -78,7 +78,7 @@ struct RawValueKey {
       return;
     }
     case ExprKind::CharacterLiteral:
-      kind = Kind::Char;
+      kind = Kind::UnicodeScalar;
       charValue = cast<CharacterLiteralExpr>(expr)->getValue();
       return;
     case ExprKind::StringLiteral:
@@ -128,7 +128,7 @@ public:
     case RawValueKey::Kind::Int:
       return DenseMapInfo<int64_t>::getHashValue(k.intValue);
       return DenseMapInfo<int64_t>::getHashValue(k.intValue);
-    case RawValueKey::Kind::Char:
+    case RawValueKey::Kind::UnicodeScalar:
       return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
     case RawValueKey::Kind::String:
       return llvm::HashString(k.stringValue);
@@ -146,7 +146,7 @@ public:
       // equal.
     case RawValueKey::Kind::Int:
       return a.intValue == b.intValue;
-    case RawValueKey::Kind::Char:
+    case RawValueKey::Kind::UnicodeScalar:
       return a.charValue == b.charValue;
     case RawValueKey::Kind::String:
       return a.stringValue.equals(b.stringValue);

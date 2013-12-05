@@ -159,7 +159,7 @@ by the enum type become extra inhabitants of the enum type itself.
 
   enum CharOrSectionMarker { => LLVM i32
     case Paragraph            => i32 0x0020_0000
-    case Char(Char)           => i32 (zext i21 %Char to i32)
+    case Char(UnicodeScalar)  => i32 (zext i21 %Char to i32)
     case Chapter              => i32 0x0020_0001
   }
 
@@ -203,13 +203,13 @@ storage size in bits of the largest data type.
 
 ::
 
-  enum TerminalChar {   => LLVM i32
-    case Plain(Char)     => i32     (zext i21 %Plain     to i32)
-    case Bold(Char)      => i32 (or (zext i21 %Bold      to i32), 0x0020_0000)
-    case Underline(Char) => i32 (or (zext i21 %Underline to i32), 0x0040_0000)
-    case Blink(Char)     => i32 (or (zext i21 %Blink     to i32), 0x0060_0000)
-    case Empty           => i32 0x0080_0000
-    case Cursor          => i32 0x0080_0001
+  enum TerminalChar {             => LLVM i32
+    case Plain(UnicodeScalar)     => i32     (zext i21 %Plain     to i32)
+    case Bold(UnicodeScalar)      => i32 (or (zext i21 %Bold      to i32), 0x0020_0000)
+    case Underline(UnicodeScalar) => i32 (or (zext i21 %Underline to i32), 0x0040_0000)
+    case Blink(UnicodeScalar)     => i32 (or (zext i21 %Blink     to i32), 0x0060_0000)
+    case Empty                    => i32 0x0080_0000
+    case Cursor                   => i32 0x0080_0001
   }
 
 If there are not enough spare bits to contain the tag, then additional bits are
@@ -964,7 +964,7 @@ Predefined Substitutions
   known-module ::= 'Ss'                      // swift
   known-nominal-type ::= 'Sa'                // swift.Array
   known-nominal-type ::= 'Sb'                // swift.Bool
-  known-nominal-type ::= 'Sc'                // swift.Char
+  known-nominal-type ::= 'Sc'                // swift.UnicodeScalar
   known-nominal-type ::= 'Sd'                // swift.Float64
   known-nominal-type ::= 'Sf'                // swift.Float32
   known-nominal-type ::= 'Si'                // swift.Int64

@@ -908,14 +908,14 @@ in the ``apply`` instructions used by callers::
 Calling a function with trivial value types as inputs and outputs
 simply passes the arguments by value. This Swift function::
 
-  func foo(x:Int, y:Float) -> Char
+  func foo(x:Int, y:Float) -> UnicodeScalar
 
   foo(x, y)
 
 gets called in SIL as::
 
-  %foo = constant_ref $(Int, Float) -> Char, @foo
-  %z = apply %foo(%x, %y) : $(Int, Float) -> Char
+  %foo = constant_ref $(Int, Float) -> UnicodeScalar, @foo
+  %z = apply %foo(%x, %y) : $(Int, Float) -> UnicodeScalar
 
 Reference Counts
 ````````````````
@@ -2849,7 +2849,7 @@ input and result types are tuple types that, after destructuring, differ only
 in the following ways:
 
 - Corresponding tuple elements may add, remove, or change keyword names.
-  ``(a:Int, b:Float, Char) -> ()`` and ``(x:Int, Float, z:Char) -> ()`` are
+  ``(a:Int, b:Float, UnicodeScalar) -> ()`` and ``(x:Int, Float, z:UnicodeScalar) -> ()`` are
   ABI compatible.
 - A class tuple element of the destination type may be a superclass of the
   source type's corresponding tuple element.

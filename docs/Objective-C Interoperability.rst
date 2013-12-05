@@ -484,7 +484,7 @@ Overloading
     func foo(Int bar) qux(Int quux);
   
     // 4. foo:baz: (but different type!)
-    func foo(Int bar, Char baz);
+    func foo(Int bar, UnicodeScalar baz);
   
     a.foo(1, 2)      // ambiguous in Swift (#1 or #2?)
     a.foo(1, baz=2)  // calls #1

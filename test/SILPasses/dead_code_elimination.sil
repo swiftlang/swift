@@ -277,23 +277,23 @@ bb3:
 }
 
 enum Singleton {
-  case x(Int, Char)
+  case x(Int, UnicodeScalar)
 };
-sil @constant_fold_switch_enum_with_payload : $@thin (Int64, Char) -> (Int64, Char) {
-bb0(%6 : $Int64, %10 : $Char):
-  %11 = tuple (%6 : $Int64, %10 : $Char)
-  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int64, Char)
+sil @constant_fold_switch_enum_with_payload : $@thin (Int64, UnicodeScalar) -> (Int64, UnicodeScalar) {
+bb0(%6 : $Int64, %10 : $UnicodeScalar):
+  %11 = tuple (%6 : $Int64, %10 : $UnicodeScalar)
+  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int64, UnicodeScalar)
   switch_enum %12 : $Singleton, case #Singleton.x!enumelt.1: bb1
 
-bb1(%15 : $(Int64, Char)):
-  return %15 : $(Int64, Char)
+bb1(%15 : $(Int64, UnicodeScalar)):
+  return %15 : $(Int64, UnicodeScalar)
 
 b2:
-  %111 = tuple (%6 : $Int64, %10 : $Char)
-  br bb1(%111 : $(Int64, Char))
+  %111 = tuple (%6 : $Int64, %10 : $UnicodeScalar)
+  br bb1(%111 : $(Int64, UnicodeScalar))
 
 // CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
-// CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $Char):
+// CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $UnicodeScalar):
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   return

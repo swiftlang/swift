@@ -2825,7 +2825,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// An operator that operates on metatypes.</i>
     func @infix +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
     
-    var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;Char&gt;)
+    var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;UnicodeScalar&gt;)
     println(foo)
   </pre>
 
