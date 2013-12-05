@@ -402,7 +402,7 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  for (auto file : TU->getSourceFiles()) {
+  for (auto file : TU->getFiles()) {
     // FIXME: Do some uniquing.
     // FIXME: Clean this up to handle mixed source/AST TUs.
     auto SF = dyn_cast<swift::SourceFile>(file);
@@ -2013,7 +2013,7 @@ void Serializer::writeTranslationUnit(TranslationUnitOrSourceFile DC,
   writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
-  ArrayRef<const FileUnit *> files = SF ? SF : TU->getSourceFiles();
+  ArrayRef<const FileUnit *> files = SF ? SF : TU->getFiles();
   for (auto nextFile : files) {
     // FIXME: Switch to a visitor interface?
     SmallVector<Decl *, 32> fileDecls;

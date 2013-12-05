@@ -269,7 +269,7 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
 
 
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
-  : ModuleContext(nullptr),
+  : FileContext(nullptr),
     InputFile(std::move(input)),
     InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
                 reinterpret_cast<const uint8_t *>(InputFile->getBufferEnd())),
@@ -451,12 +451,12 @@ static NominalTypeDecl *getAnyNominal(Decl *D) {
   return dyn_cast_or_null<NominalTypeDecl>(D);
 }
 
-bool ModuleFile::associateWithModule(Module *module) {
+bool ModuleFile::associateWithFileContext(FileUnit *file) {
   assert(Status == ModuleStatus::Valid && "invalid module file");
-  assert(!ModuleContext && "already associated with an AST module");
-  ModuleContext = module;
+  assert(!FileContext && "already associated with an AST module");
+  FileContext = file;
 
-  ASTContext &ctx = module->Ctx;
+  ASTContext &ctx = getContext();
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
     assert(!dependency.isLoaded() && "already loaded?");
@@ -593,7 +593,7 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
   auto index = static_cast<unsigned>(kind);
   for (DeclID DID : KnownProtocolAdopters[index]) {
     Decl *D = getDecl(DID);
-    ModuleContext->Ctx.recordConformance(kind, D);
+    getContext().recordConformance(kind, D);
     if (auto nominal = getAnyNominal(D))
       loadExtensions(nominal);
   }
@@ -615,7 +615,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
     for (auto item : *iter) {
       auto vd = cast<ValueDecl>(getDecl(item.second));
       auto dc = vd->getDeclContext();
-      while (!dc->getParent()->isModuleContext())
+      while (!dc->getParent()->isModuleScopeContext())
         dc = dc->getParent();
       if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
         if (nominal->getName() == accessPath.front().first)
@@ -643,7 +643,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
       for (auto item : list) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
         auto dc = vd->getDeclContext();
-        while (!dc->getParent()->isModuleContext())
+        while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
           if (nominal->getName() == accessPath.front().first)
@@ -661,7 +661,8 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
   }
 }
 
-void ModuleFile::getLinkLibraries(Module::LinkLibraryCallback callback) const {
+void
+ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
     callback(lib);
 }

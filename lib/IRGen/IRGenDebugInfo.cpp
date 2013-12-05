@@ -143,8 +143,16 @@ Location getDeserializedLoc(Expr*)    { return {}; }
 Location getDeserializedLoc(Stmt*)    { return {}; }
 Location getDeserializedLoc(Decl* D)  {
   Location L = {};
-  if (auto LM = dyn_cast<LoadedModule>(D->getModuleContext())) {
+  const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
+  if (auto LM = dyn_cast<LoadedModule>(DC)) {
     L.Filename = LM->getDebugModuleName();
+    L.Line = 1;
+  } else if (auto LF = dyn_cast<LoadedFile>(DC)) {
+    // FIXME: Today, the subclasses of LoadedFile happen to return StringRefs
+    // that are backed by null-terminated strings, but that's certainly not
+    // guaranteed in the future.
+    L.Filename = LF->getFilename().data();
+    assert(L.Filename[LF->getFilename().size()] == '\0' && "not a C string");
     L.Line = 1;
   }
   return L;

@@ -273,11 +273,12 @@ template <typename FUMemFn, FUMemFn FULOOKUP,
           typename ...Args>
 void Module::forwardToSourceFiles(Args &&...args) const {
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (const FileUnit *file : TU->getSourceFiles())
+    for (const FileUnit *file : TU->getFiles())
       (file->*FULOOKUP)(args...);
     return;
   }
 
+  // FIXME: Remove this.
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
   (owner.*MLLOOKUP)(this, args...);
 }
@@ -292,23 +293,16 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
 
-void FileUnit::lookupValue(Module::AccessPathTy AccessPath, Identifier Name,
-                           NLKind LookupKind,
-                           SmallVectorImpl<ValueDecl*> &Result) const {
-  switch (Kind) {
-  case FileUnitKind::Builtin: {
-    auto BU = cast<BuiltinUnit>(this);
-    assert(AccessPath.empty() && "builtin module's access path always empty!");
-    BU->getCache().lookupValue(Name, LookupKind, *BU, Result);
-    return;
-  }
+void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                              NLKind lookupKind,
+                              SmallVectorImpl<ValueDecl*> &result) const {
+  getCache().lookupValue(name, lookupKind, *this, result);
+}
 
-  case FileUnitKind::Source: {
-    auto SF = cast<SourceFile>(this);
-    SF->getCache().lookupValue(AccessPath, Name, LookupKind, Result);
-    return;
-  }
-  }
+void SourceFile::lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                             NLKind lookupKind,
+                             SmallVectorImpl<ValueDecl*> &result) const {
+  getCache().lookupValue(accessPath, name, lookupKind, result);
 }
 
 void Module::lookupVisibleDecls(AccessPathTy AccessPath,
@@ -317,20 +311,10 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
   FORWARD(lookupVisibleDecls, (AccessPath, Consumer, LookupKind));
 }
 
-void FileUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
-                                  VisibleDeclConsumer &Consumer,
-                                  NLKind LookupKind) const {
-  switch (Kind) {
-  case FileUnitKind::Builtin:
-    // TODO Look through the Builtin module.
-    return;
-
-  case FileUnitKind::Source: {
-    auto SF = cast<SourceFile>(this);
-    SF->getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
-    return;
-  }
-  }
+void SourceFile::lookupVisibleDecls(Module::AccessPathTy AccessPath,
+                                    VisibleDeclConsumer &Consumer,
+                                    NLKind LookupKind) const {
+  getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
 }
 
 void Module::lookupClassMembers(AccessPathTy accessPath,
@@ -338,19 +322,9 @@ void Module::lookupClassMembers(AccessPathTy accessPath,
   FORWARD(lookupClassMembers, (accessPath, consumer));
 }
 
-void FileUnit::lookupClassMembers(Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer) const {
-  switch (Kind) {
-  case FileUnitKind::Builtin:
-    // The Builtin module defines no classes.
-    return;
-
-  case FileUnitKind::Source: {
-    auto SF = cast<SourceFile>(this);
-    SF->getCache().lookupClassMembers(accessPath, consumer, *SF);
-    return;
-  }
-  }
+void SourceFile::lookupClassMembers(Module::AccessPathTy accessPath,
+                                    VisibleDeclConsumer &consumer) const {
+  getCache().lookupClassMembers(accessPath, consumer, *this);
 }
 
 void Module::lookupClassMember(AccessPathTy accessPath,
@@ -359,38 +333,18 @@ void Module::lookupClassMember(AccessPathTy accessPath,
   FORWARD(lookupClassMember, (accessPath, name, results));
 }
 
-void FileUnit::lookupClassMember(Module::AccessPathTy accessPath,
-                                 Identifier name,
-                                 SmallVectorImpl<ValueDecl*> &results) const {
-  switch (Kind) {
-  case FileUnitKind::Builtin:
-    // The Builtin module defines no classes.
-    return;
-
-  case FileUnitKind::Source: {
-    auto SF = cast<SourceFile>(this);
-    SF->getCache().lookupClassMember(accessPath, name, results, *SF);
-    return;
-  }
-  }
+void SourceFile::lookupClassMember(Module::AccessPathTy accessPath,
+                                   Identifier name,
+                                   SmallVectorImpl<ValueDecl*> &results) const {
+  getCache().lookupClassMember(accessPath, name, results, *this);
 }
 
 void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
-void FileUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
-  switch (Kind) {
-  case FileUnitKind::Builtin:
-    // The Builtin module defines no classes.
-    return;
-
-  case FileUnitKind::Source: {
-    auto SF = cast<SourceFile>(this);
-    Results.append(SF->Decls.begin(), SF->Decls.end());
-    return;
-  }
-  }
+void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
+  Results.append(Decls.begin(), Decls.end());
 }
 
 ArrayRef<Substitution> BoundGenericType::getSubstitutions(
@@ -856,6 +810,32 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
 namespace {
   template <typename T>
   using OperatorMap = SourceFile::OperatorMap<T>;
+
+  template <typename T>
+  struct OperatorKind {
+    static_assert(static_cast<T*>(nullptr), "Only usable with operators");
+  };
+
+  template <>
+  struct OperatorKind<PrefixOperatorDecl> {
+    static const auto value = DeclKind::PrefixOperator;
+  };
+
+  template <>
+  struct OperatorKind<InfixOperatorDecl> {
+    static const auto value = DeclKind::InfixOperator;
+  };
+
+  template <>
+  struct OperatorKind<PostfixOperatorDecl> {
+    static const auto value = DeclKind::PostfixOperator;
+  };
+}
+
+template <typename Op, typename T>
+static Op *lookupOperator(T &container, Identifier name) {
+  return cast_or_null<Op>(container.lookupOperator(name,
+                                                   OperatorKind<Op>::value));
 }
 
 template<typename OP_DECL>
@@ -871,12 +851,14 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
                           bool includePrivate,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
-  switch (File.Kind) {
+  switch (File.getKind()) {
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
     return nullptr;
   case FileUnitKind::Source:
     break;
+  case FileUnitKind::Loaded:
+    return lookupOperator<OP_DECL>(cast<LoadedFile>(File), Name);
   }
 
   auto &SF = cast<SourceFile>(File);
@@ -886,7 +868,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   auto found = (SF.*OP_MAP).find(Name);
   if (found != (SF.*OP_MAP).end() && (includePrivate || found->second.getInt()))
     return found->second.getPointer();
-  
+
   // Look for imported operator decls.
   // Record whether they come from re-exported modules.
   // FIXME: We ought to prefer operators elsewhere in this TU before we check
@@ -946,12 +928,12 @@ lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   if (auto loadedModule = dyn_cast<LoadedModule>(M))
-    return loadedModule->lookupOperator<OP_DECL>(Name);
+    return lookupOperator<OP_DECL>(*loadedModule, Name);
 
   auto *TU = cast<TranslationUnit>(M);
 
   OP_DECL *result = nullptr;
-  for (const FileUnit *File : TU->getSourceFiles()) {
+  for (const FileUnit *File : TU->getFiles()) {
     auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);
     if (!next.hasValue())
       return next;
@@ -987,29 +969,19 @@ LOOKUP_OPERATOR(Infix)
 LOOKUP_OPERATOR(Postfix)
 #undef LOOKUP_OPERATOR
 
-void
-Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
-                           bool includePrivate) const {
+void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
+                                bool includePrivate) const {
   // FIXME: Audit uses of this function and make sure they make sense in a
   // multi-file TU world.
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (auto File : TU->getSourceFiles()) {
-      switch (File->Kind) {
-      case FileUnitKind::Builtin:
-        // The Builtin module has no imports.
-        break;
-      case FileUnitKind::Source:
-        for (auto importPair : cast<SourceFile>(File)->getImports())
-          if (includePrivate || importPair.second)
-            modules.push_back(importPair.first);
-        break;
-      }
-    }
-    return;
-  }
+  FORWARD(getImportedModules, (modules, includePrivate));
+}
 
-  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.getImportedModules(this, modules, includePrivate);
+void
+SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
+                               bool includePrivate) const {
+  for (auto importPair : getImports())
+    if (includePrivate || importPair.second)
+      modules.push_back(importPair.first);
 }
 
 namespace {
@@ -1047,9 +1019,11 @@ StringRef Module::getModuleFilename() const {
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
     // FIXME: Figure out what the right intent is here. Modules can consist of
     // more than one file.
-    if (TU->getSourceFiles().size() == 1) {
-      if (auto File = dyn_cast<SourceFile>(TU->getSourceFiles().front()))
-        return File->getFilename();
+    if (TU->getFiles().size() == 1) {
+      if (auto SF = dyn_cast<SourceFile>(TU->getFiles().front()))
+        return SF->getFilename();
+      if (auto LF = dyn_cast<LoadedFile>(TU->getFiles().front()))
+        return LF->getFilename();
     }
     return StringRef();
   }
@@ -1063,7 +1037,7 @@ bool Module::isStdlibModule() const {
 }
 
 template<bool respectVisibility, typename Callback>
-static void forAllImportedModules(Module *topLevel,
+static bool forAllImportedModules(Module *topLevel,
                                   Optional<Module::AccessPathTy> thisPath,
                                   const Callback &fn) {
   using ImportedModule = Module::ImportedModule;
@@ -1083,7 +1057,7 @@ static void forAllImportedModules(Module *topLevel,
 
   // Even if we're processing the top-level module like any other, we still want
   // to include non-exported modules.
-  topLevel->getImportedModules(queue, true);
+  topLevel->getImportedModules(queue, !respectVisibility);
 
   while (!queue.empty()) {
     auto next = queue.pop_back_val();
@@ -1104,41 +1078,46 @@ static void forAllImportedModules(Module *topLevel,
       continue;
 
     if (!fn(next))
-      break;
+      return false;
     next.second->getImportedModules(queue, !respectVisibility);
   }
+
+  return true;
 }
 
-void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
+bool Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
                                   std::function<bool(ImportedModule)> fn) {
-  forAllImportedModules<true>(this, thisPath, fn);
+  return forAllImportedModules<true>(this, thisPath, fn);
 }
 
-void
+bool
 FileUnit::forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn) {
-  getParentModule()->forAllVisibleModules(Module::AccessPathTy(), fn);
+  if (!getParentModule()->forAllVisibleModules(Module::AccessPathTy(), fn))
+    return false;
 
   if (auto SF = dyn_cast<SourceFile>(this)) {
     // Handle privately visible modules as well.
     for (auto importPair : SF->getImports()) {
-      if (!importPair.second)
-        importPair.first.second->forAllVisibleModules(importPair.first.first,
-                                                      fn);
+      if (importPair.second)
+        continue;
+      Module *M = importPair.first.second;
+      if (!M->forAllVisibleModules(importPair.first.first, fn))
+        return false;
     }
   }
+
+  return true;
 }
 
 void Module::collectLinkLibraries(LinkLibraryCallback callback) {
-  forAllImportedModules<false>(this, AccessPathTy(),
-                               [=](ImportedModule import) -> bool {
-    auto loadedModule = dyn_cast<LoadedModule>(import.second);
-    if (!loadedModule)
-      return true;
+  // FIXME: The proper way to do this depends on the decls used.
+  FORWARD(collectLinkLibraries, (callback));
+}
 
-    ModuleLoader &owner = loadedModule->getOwner();
-    owner.getLinkLibraries(loadedModule, callback);
-    return true;
-  });
+void
+SourceFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
+  for (auto importPair : Imports)
+    importPair.first.second->collectLinkLibraries(callback);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1159,8 +1138,6 @@ void SourceFile::print(raw_ostream &os, const PrintOptions &options) {
   }
 }
 
-SourceFile::~SourceFile() = default;
-
 void SourceFile::clearLookupCache() {
   Cache.reset();
 }
@@ -1178,7 +1155,7 @@ SourceFile::getCachedVisibleDecls() const {
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
-  for (auto SF : getSourceFiles())
+  for (auto SF : getFiles())
     if (SF->walk(Walker))
       return true;
   return false;
@@ -1213,18 +1190,22 @@ SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 
+
 bool FileUnit::walk(ASTWalker &walker) {
-  switch (Kind) {
-  case FileUnitKind::Builtin:
-    return false;
-  case FileUnitKind::Source:
-    break;
+  SmallVector<Decl *, 64> Decls;
+  getTopLevelDecls(Decls);
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
+                                                getParentModule());
+  for (Decl *D : Decls) {
+    if (D->walk(walker))
+      return true;
   }
+  return false;
+}
 
-  auto SF = cast<SourceFile>(this);
-
-  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &SF->TU);
-  for (Decl *D : SF->Decls) {
+bool SourceFile::walk(ASTWalker &walker) {
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &TU);
+  for (Decl *D : Decls) {
     if (D->walk(walker))
       return true;
   }
@@ -1246,29 +1227,16 @@ OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
   return getOwner().lookupOperator(this, name, fixity);
 }
 
-template<>
-PrefixOperatorDecl *
-LoadedModule::lookupOperator<PrefixOperatorDecl>(Identifier name) {
-  auto result = lookupOperator(name, DeclKind::PrefixOperator);
-  return cast_or_null<PrefixOperatorDecl>(result);
-}
-
-template<>
-PostfixOperatorDecl *
-LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name) {
-  auto result = lookupOperator(name, DeclKind::PostfixOperator);
-  return cast_or_null<PostfixOperatorDecl>(result);
-}
-
-template<>
-InfixOperatorDecl *
-LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
-  auto result = lookupOperator(name, DeclKind::InfixOperator);
-  return cast_or_null<InfixOperatorDecl>(result);
-}
-
 
 //===----------------------------------------------------------------------===//
-// ModuleLoader Implementation
+// Miscellaneous
 //===----------------------------------------------------------------------===//
-ModuleLoader::~ModuleLoader() = default;
+
+void FileUnit::anchor() {}
+void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
+StringRef LoadedFile::getFilename() const {
+  return "";
+}

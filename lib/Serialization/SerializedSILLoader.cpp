@@ -21,14 +21,16 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
                                          SILModule *SILMod) {
   // Get a list of SerializedModules from ASTContext.
   for (auto &CtxM : Ctx.LoadedModules) {
-    if (SerializedModule *LM = dyn_cast<SerializedModule>(CtxM.getValue())) {
-      auto Des = new SILDeserializer(&LM->File, *SILMod, Ctx);
-      LoadedSILSections.emplace_back(std::unique_ptr<SILDeserializer>(Des));
+    if (auto TU = dyn_cast<TranslationUnit>(CtxM.getValue())) {
+      for (auto File : TU->getFiles()) {
+        if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
+          auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx);
+          LoadedSILSections.emplace_back(Des);
+        }
+      }
     }
   }
 } 
-
-SerializedSILLoader::~SerializedSILLoader() = default;
 
 SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   for (auto &Des : LoadedSILSections) {

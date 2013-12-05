@@ -85,66 +85,11 @@ public:
     MemoryBuffers[AccessPath].reset(input.release());
   }
 
-  /// \brief Look for declarations associated with the given name.
-  ///
-  /// \param module The module to search.
-  ///
-  /// \param accessPath The access path used to refer to the name within this
-  /// (top-level) module.
-  ///
-  /// \param name The name we're searching for.
-  ///
-  /// \param lookupKind Whether we're performing qualified vs. unqualified
-  /// lookup.
-  ///
-  /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(const Module *module,
-                           Module::AccessPathTy accessPath, Identifier name,
-                           NLKind lookupKind,
-                           SmallVectorImpl<ValueDecl*> &result) override;
-
-  /// \brief Look for a declaration of the given operator.
-  ///
-  /// \returns The operator decl, or null if this module does not define the
-  /// operator in question.
-  virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
-                                       DeclKind fixity) override;
-
-  virtual void getImportedModules(
-    const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &imports,
-    bool includePrivate) override;
-
-  virtual void lookupVisibleDecls(const Module *module,
-                                  Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer,
-                                  NLKind lookupKind) override;
-
-  virtual void lookupClassMembers(const Module *module,
-                                  Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer) override;
-
-  virtual void lookupClassMember(const Module *module,
-                                 Module::AccessPathTy accessPath,
-                                 Identifier name,
-                                 SmallVectorImpl<ValueDecl*> &results) override;
-
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
   virtual void loadDeclsConformingTo(KnownProtocolKind kind,
                                      unsigned previousGeneration) override;
-
-  virtual void getLinkLibraries(const Module *module,
-                                Module::LinkLibraryCallback callback) override;
-  
-  virtual void getTopLevelDecls(const Module *Module,
-                                SmallVectorImpl<Decl*> &Results) override;
-
-  virtual void getDisplayDecls(const Module *module,
-                               SmallVectorImpl<Decl*> &results) override;
-
-  StringRef getModuleFilename(const Module *Module) override;
 };
 
 /// Describes whether a loaded module can be used.

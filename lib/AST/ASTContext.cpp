@@ -33,9 +33,9 @@
 
 using namespace swift;
 
-ASTMutationListener::~ASTMutationListener() { }
-
-LazyResolver::~LazyResolver() { }
+ASTMutationListener::~ASTMutationListener() = default;
+LazyResolver::~LazyResolver() = default;
+void ModuleLoader::anchor() {}
 
 llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   switch (kind) {
@@ -209,7 +209,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 
 static TranslationUnit *createBuiltinModule(ASTContext &ctx) {
   auto M = new (ctx) TranslationUnit(ctx.getIdentifier("Builtin"), ctx);
-  M->addSourceFile(*new (ctx) BuiltinUnit(*M));
+  M->addFile(*new (ctx) BuiltinUnit(*M));
   return M;
 }
 

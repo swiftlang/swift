@@ -305,13 +305,15 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     OS << " name=" << cast<Module>(this)->Name;
     break;
   case DeclContextKind::FileUnit:
-    switch (cast<FileUnit>(this)->Kind) {
+    switch (cast<FileUnit>(this)->getKind()) {
     case FileUnitKind::Builtin:
       OS << " Builtin";
       break;
     case FileUnitKind::Source:
-      OS << " name=\"" << cast<SourceFile>(this)->getFilename() << "\"";
+      OS << " file=\"" << cast<SourceFile>(this)->getFilename() << "\"";
       break;
+    case FileUnitKind::Loaded:
+      OS << " file=\"" << cast<LoadedFile>(this)->getFilename() << "\"";
     }
     break;
   case DeclContextKind::AbstractClosureExpr:

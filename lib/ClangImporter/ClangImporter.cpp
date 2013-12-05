@@ -477,10 +477,12 @@ void ClangImporter::lookupValue(const Module *module,
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
           // If the importer gave us a declaration from the stdlib, make sure
           // it does not show up in the lookup results for the imported module.
-          if (valueDecl->getDeclContext() != Impl.getSwiftModule()) {
-            results.push_back(valueDecl);
-            FoundType = FoundType || isa<TypeDecl>(valueDecl);
-          }
+          if (valueDecl->getDeclContext()->isModuleScopeContext() &&
+              valueDecl->getModuleContext() == Impl.getSwiftModule())
+            continue;
+
+          results.push_back(valueDecl);
+          FoundType = FoundType || isa<TypeDecl>(valueDecl);
         }
     }
   }
@@ -792,8 +794,9 @@ void ClangImporter::lookupClassMembers(const Module *module,
   lookupClassMembersImpl(Impl, consumer);
 }
 
-void ClangImporter::getLinkLibraries(const Module *module,
-                                     Module::LinkLibraryCallback callback) {
+void
+ClangImporter::collectLinkLibraries(const Module *module,
+                                    Module::LinkLibraryCallback callback) {
   auto underlying = cast<ClangModule>(module)->clangModule;
   for (auto clangLinkLib : underlying->LinkLibraries) {
     LibraryKind kind;

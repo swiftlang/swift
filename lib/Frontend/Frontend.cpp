@@ -150,7 +150,7 @@ void swift::CompilerInstance::doIt() {
   if (Kind == SourceFile::REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*TU, Kind, {}, Invocation.getParseStdlib());
-    TU->addSourceFile(*SingleInputFile);
+    TU->addFile(*SingleInputFile);
     return;
   }
 
@@ -178,7 +178,7 @@ void swift::CompilerInstance::doIt() {
     auto *SingleInputFile =
       new (*Context) SourceFile(*TU, Kind, BufferID,
                                 Invocation.getParseStdlib());
-    TU->addSourceFile(*SingleInputFile);
+    TU->addFile(*SingleInputFile);
   }
 
   // Parse all the library files first.
@@ -190,7 +190,7 @@ void swift::CompilerInstance::doIt() {
     auto *NextInput = new (*Context) SourceFile(*TU, SourceFile::Library,
                                                 BufferID,
                                                 Invocation.getParseStdlib());
-    TU->addSourceFile(*NextInput);
+    TU->addFile(*NextInput);
 
     bool Done;
     parseIntoTranslationUnit(*NextInput, BufferID, &Done, nullptr,
@@ -203,7 +203,7 @@ void swift::CompilerInstance::doIt() {
 
   // Parse the main file last.
   if (MainBufferIndex != NO_SUCH_BUFFER) {
-    SourceFile &MainFile = *TU->getSourceFiles().front();
+    SourceFile &MainFile = *cast<SourceFile>(TU->getFiles().front());
     SILParserState SILContext(TheSILModule.get());
 
     unsigned CurTUElem = 0;
@@ -224,7 +224,7 @@ void swift::CompilerInstance::doIt() {
 
   if (!Invocation.getParseOnly()) {
     // Type-check each top-level input besides the main source file.
-    auto InputSourceFiles = TU->getSourceFiles().slice(0, BufferIDs.size());
+    auto InputSourceFiles = TU->getFiles().slice(0, BufferIDs.size());
     for (auto File : InputSourceFiles)
       if (auto SF = dyn_cast<SourceFile>(File))
         performTypeChecking(*SF);

@@ -58,10 +58,10 @@ Pattern *ModuleFile::maybeReadPattern() {
     Pattern *subPattern = maybeReadPattern();
     assert(subPattern);
 
-    auto result = new (ModuleContext->Ctx) ParenPattern(SourceLoc(),
-                                                        subPattern,
-                                                        SourceLoc(),
-                                                        isImplicit);
+    auto result = new (getContext()) ParenPattern(SourceLoc(),
+                                                  subPattern,
+                                                  SourceLoc(),
+                                                  isImplicit);
     result->setType(subPattern->getType());
     return result;
   }
@@ -101,7 +101,7 @@ Pattern *ModuleFile::maybeReadPattern() {
                                          defaultArgKind));
     }
 
-    auto result = TuplePattern::create(ModuleContext->Ctx, SourceLoc(),
+    auto result = TuplePattern::create(getContext(), SourceLoc(),
                                        elements, SourceLoc(), hasVararg,
                                        SourceLoc(), isImplicit);
     result->setType(getType(tupleTypeID));
@@ -113,7 +113,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     NamedPatternLayout::readRecord(scratch, varID, isImplicit);
 
     auto var = cast<VarDecl>(getDecl(varID));
-    auto result = new (ModuleContext->Ctx) NamedPattern(var, isImplicit);
+    auto result = new (getContext()) NamedPattern(var, isImplicit);
     if (var->hasType())
       result->setType(var->getType());
     return result;
@@ -123,7 +123,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     bool isImplicit;
 
     AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
-    auto result = new (ModuleContext->Ctx) AnyPattern(SourceLoc(), isImplicit);
+    auto result = new (getContext()) AnyPattern(SourceLoc(), isImplicit);
     result->setType(getType(typeID));
     return result;
   }
@@ -136,7 +136,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     assert(subPattern);
 
     TypeLoc typeInfo = TypeLoc::withoutLoc(getType(typeID));
-    auto result = new (ModuleContext->Ctx) TypedPattern(subPattern, typeInfo,
+    auto result = new (getContext()) TypedPattern(subPattern, typeInfo,
                                                         isImplicit);
     result->setType(typeInfo.getType());
     return result;
@@ -222,7 +222,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
                                                      numSubstitutions,
                                                      rawIDs);
 
-    ASTContext &ctx = ModuleContext->Ctx;
+    ASTContext &ctx = getContext();
 
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
@@ -269,7 +269,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
                                                    typeID,
                                                    moduleID);
 
-    ASTContext &ctx = ModuleContext->Ctx;
+    ASTContext &ctx = getContext();
 
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
@@ -309,7 +309,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     inheritedConformances.insert(inherited.getValue());
   }
 
-  ASTContext &ctx = ModuleContext->Ctx;
+  ASTContext &ctx = getContext();
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
@@ -359,7 +359,8 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   lastRecordOffset.reset();
 
   return { proto,
-           ctx.getConformance(conformingType, proto, ModuleContext,
+           ctx.getConformance(conformingType, proto,
+                              FileContext->getParentModule(),
                               std::move(witnesses),
                               std::move(typeWitnesses),
                               std::move(inheritedConformances),
@@ -411,7 +412,7 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution(
   auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
-  ASTContext &ctx = ModuleContext->Ctx;
+  ASTContext &ctx = getContext();
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   while (numConformances--) {
@@ -555,10 +556,10 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
       break;
   }
 
-  auto paramList = GenericParamList::create(ModuleContext->Ctx, SourceLoc(),
+  auto paramList = GenericParamList::create(getContext(), SourceLoc(),
                                             params, SourceLoc(), requirements,
                                             SourceLoc());
-  paramList->setAllArchetypes(ModuleContext->Ctx.AllocateCopy(archetypes));
+  paramList->setAllArchetypes(getContext().AllocateCopy(archetypes));
   paramList->setOuterParameters(DC->getGenericParamsOfContext());
 
   return paramList;
@@ -653,7 +654,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   if (rawMemberIDs.empty())
     return MutableArrayRef<Decl *>();
 
-  ASTContext &ctx = ModuleContext->Ctx;
+  ASTContext &ctx = getContext();
   MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(rawMemberIDs.size()),
                                   rawMemberIDs.size());
   auto nextMember = members.begin();
@@ -684,12 +685,12 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   assert(terminatorOffset != StringRef::npos &&
          "unterminated identifier string data");
 
-  return ModuleContext->Ctx.getIdentifier(rawStrPtr.slice(0, terminatorOffset));
+  return getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
 }
 
 DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   if (DID == 0)
-    return ModuleContext;
+    return FileContext;
 
   Decl *D = getDecl(DID);
 
@@ -705,21 +706,21 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
 
 Module *ModuleFile::getModule(ModuleID MID) {
   if (MID == BUILTIN_MODULE_ID)
-    return ModuleContext->Ctx.TheBuiltinModule;
+    return getContext().TheBuiltinModule;
   if (MID == CURRENT_MODULE_ID)
-    return ModuleContext;
+    return FileContext->getParentModule();
   return getModule(getIdentifier(MID));
 }
 
 Module *ModuleFile::getModule(Identifier name) {
   if (name.empty())
-    return ModuleContext->Ctx.TheBuiltinModule;
+    return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from NameBinder::getModule
   // FIXME: provide a real source location.
-  if (name == ModuleContext->Name) {
+  if (name == FileContext->getParentModule()->Name) {
     if (!ShadowedModule) {
-      auto importer = ModuleContext->Ctx.getClangModuleLoader();
+      auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
                                             std::make_pair(name, SourceLoc()));
@@ -730,7 +731,7 @@ Module *ModuleFile::getModule(Identifier name) {
   }
 
   // FIXME: provide a real source location.
-  return ModuleContext->Ctx.getModule(std::make_pair(name, SourceLoc()));
+  return getContext().getModule(std::make_pair(name, SourceLoc()));
 }
 
 
@@ -776,7 +777,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     return nullptr;
   }
 
-  ASTContext &ctx = ModuleContext->Ctx;
+  ASTContext &ctx = getContext();
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
@@ -1634,21 +1635,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         rawAccessPath = rawAccessPath.slice(1);
       }
 
+      // We do a full qualified lookup from within the referenced module.
+      // This avoids inefficient access control restrictions from elsewhere in
+      // this module, but handles the case where a declaration is no longer
+      // *declared* in this module, merely re-exported. This also handles
+      // adapter modules for Clang frameworks.
       SmallVector<ValueDecl *, 8> values;
-      baseModule->lookupValue(Module::AccessPathTy(),
-                              getIdentifier(rawAccessPath.front()),
-                              NLKind::QualifiedLookup,
-                              values);
-      // FIXME: Yuck. The concept of a shadowed module needs to be moved up
-      // higher, and it needs to be clear whether they are always reexported.
-      if (auto loadedModule = dyn_cast<SerializedModule>(baseModule)) {
-        if (loadedModule->File.ShadowedModule) {
-          Module *shadowed = loadedModule->File.ShadowedModule;
-          shadowed->lookupValue(Module::AccessPathTy(),
-                                getIdentifier(rawAccessPath.front()),
-                                NLKind::QualifiedLookup, values);
-        }
-      }
+      baseModule->lookupQualified(ModuleType::get(baseModule),
+                                  getIdentifier(rawAccessPath.front()),
+                                  NL_QualifiedDefault,
+                                  /*typeResolver=*/nullptr,
+                                  values);
       rawAccessPath = rawAccessPath.slice(1);
 
       // Then, follow the chain of nested ValueDecls until we run out of
@@ -1858,7 +1855,7 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
-  ASTContext &ctx = ModuleContext->Ctx;
+  ASTContext &ctx = getContext();
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
@@ -2227,7 +2224,7 @@ Type ModuleFile::getType(TypeID TID) {
     }
 
     GenericParamList *paramList =
-      maybeGetOrReadGenericParams(genericContextID, ModuleContext);
+      maybeGetOrReadGenericParams(genericContextID, FileContext);
     assert(paramList && "missing generic params for polymorphic function");
 
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
@@ -2358,7 +2355,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     // Read the generic parameters.
     auto genericParams =
-      maybeGetOrReadGenericParams(genericContextID, ModuleContext);
+      maybeGetOrReadGenericParams(genericContextID, FileContext);
 
     typeOrOffset = SILFunctionType::get(genericParams, extInfo,
                                         calleeConvention.getValue(),

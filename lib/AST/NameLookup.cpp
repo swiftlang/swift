@@ -30,6 +30,16 @@ using namespace swift;
 
 void ExternalNameLookup::anchor() {}
 
+template <typename Fn>
+static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
+  DeclContext *moduleScope = DC->getModuleScopeContext();
+  if (auto file = dyn_cast<FileUnit>(moduleScope))
+    file->forAllVisibleModules(fn);
+  else
+    cast<Module>(moduleScope)->forAllVisibleModules(Module::AccessPathTy(), fn);
+}
+
+
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const Module *curModule,
                                 LazyResolver *typeResolver) {
@@ -510,10 +520,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     return;
   }
 
-  M.forAllVisibleModules(Nothing,
-                         [&](const Module::ImportedModule &ImpEntry) -> bool {
-    if (ImpEntry.second->Name == Name) {
-      Results.push_back(Result::getModuleName(ImpEntry.second));
+  forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
+    if (import.second->Name == Name) {
+      Results.push_back(Result::getModuleName(import.second));
       return false;
     }
     return true;
@@ -686,15 +695,6 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
 
   // We found something; return it.
   return { known->second.begin(), known->second.size() };
-}
-
-template <typename Fn>
-static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-  DeclContext *moduleScope = DC->getModuleScopeContext();
-  if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<Module>(moduleScope)->forAllVisibleModules(Module::AccessPathTy(), fn);
 }
 
 bool DeclContext::lookupQualified(Type type,

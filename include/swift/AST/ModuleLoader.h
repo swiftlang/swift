@@ -31,8 +31,10 @@ enum class KnownProtocolKind : uint8_t;
   
 /// \brief Abstract interface that loads named modules into the AST.
 class ModuleLoader : public llvm::RefCountedBaseVPTR {
+  virtual void anchor();
+
 public:
-  virtual ~ModuleLoader();
+  virtual ~ModuleLoader() = default;
 
   /// \brief Import a module with the given module path.
   ///
@@ -142,8 +144,8 @@ public:
   /// module.
   ///
   /// Does not include dependencies.
-  virtual void getLinkLibraries(const Module *module,
-                                Module::LinkLibraryCallback callback) { }
+  virtual void collectLinkLibraries(const Module *module,
+                                    Module::LinkLibraryCallback callback) { }
   
   /// \brief Get all top-level decls of the module.
   virtual void getTopLevelDecls(const Module *Module,

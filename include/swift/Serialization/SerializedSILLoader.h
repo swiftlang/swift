@@ -38,8 +38,6 @@ public:
   /// Deserialize all VTables in all SILModules.
   void getAllVTables();
 
-  ~SerializedSILLoader();
-
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;
   SerializedSILLoader &operator=(const SerializedSILLoader &) = delete;

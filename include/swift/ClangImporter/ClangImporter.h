@@ -163,8 +163,9 @@ public:
                                  Identifier name,
                                  SmallVectorImpl<ValueDecl*> &results) override;
 
-  virtual void getLinkLibraries(const Module *module,
-                                Module::LinkLibraryCallback callback) override;
+  virtual void
+  collectLinkLibraries(const Module *module,
+                       Module::LinkLibraryCallback callback) override;
 
   virtual void getTopLevelDecls(const Module *Module,
                                 SmallVectorImpl<Decl*> &Results) override;

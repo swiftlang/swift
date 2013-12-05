@@ -121,7 +121,6 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     }
 
   assert(inputFile);
-  StringRef DebugModuleName = inputFile->getBufferIdentifier();
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
@@ -140,105 +139,68 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Whether we succeed or fail, don't try to load this module again.
-  Module *&module = Ctx.LoadedModules[moduleID.first.str()];
+  Module *&moduleRef = Ctx.LoadedModules[moduleID.first.str()];
 
-  if (err == ModuleStatus::Valid) {
-    module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first,
-                                        DebugModuleName, *loadedModuleFile);
+  if (err != ModuleStatus::Valid) {
+    StringRef name = loadedModuleFile->getModuleFilename();
+    moduleRef = new (Ctx) FailedImportModule(moduleID.first, err, name,
+                                             Ctx, FailedImportLoader);
+    return moduleRef;
+  }
+
+  auto TU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
+  auto fileUnit = new (Ctx) SerializedASTFile(*TU, *loadedModuleFile);
+  TU->addFile(*fileUnit);
+  moduleRef = TU;
+
+  // moduleRef is no longer valid as soon as we start loading dependencies.
+
+  if (loadedModuleFile->associateWithFileContext(fileUnit)) {
+    LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
+                                   Ctx.getCurrentGeneration());
+    return TU;
+  }
+
+  // We failed to bring the module file into the AST.
+  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
+
+  SmallVector<ModuleFile::Dependency, 4> missing;
+  std::copy_if(loadedModuleFile->getDependencies().begin(),
+               loadedModuleFile->getDependencies().end(),
+               std::back_inserter(missing),
+               [](const ModuleFile::Dependency &dependency) {
+    return !dependency.isLoaded();
+  });
+
+  // FIXME: only show module part of RawAccessPath
+  assert(!missing.empty() && "unknown missing dependency?");
+  if (missing.size() == 1) {
+    Ctx.Diags.diagnose(moduleID.second,
+                       diag::serialization_missing_single_dependency,
+                       missing.front().RawAccessPath);
   } else {
-    module = new (Ctx) FailedImportModule(moduleID.first, err,
-                                          loadedModuleFile->getModuleFilename(),
-                                          Ctx, FailedImportLoader);
-    loadedModuleFile.reset();
+    llvm::SmallString<64> missingNames;
+    missingNames += '\'';
+    interleave(missing,
+               [&](const ModuleFile::Dependency &next) {
+                 missingNames += next.RawAccessPath;
+               },
+               [&] { missingNames += "', '"; });
+    missingNames += '\'';
+
+    Ctx.Diags.diagnose(moduleID.second,
+                       diag::serialization_missing_dependencies,
+                       missingNames);
   }
 
-  if (loadedModuleFile) {
-    assert(err == ModuleStatus::Valid);
-    bool success = loadedModuleFile->associateWithModule(module);
-    if (success) {
-      LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
-                                     Ctx.getCurrentGeneration());
-    } else {
-      assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
-
-      SmallVector<ModuleFile::Dependency, 4> missing;
-      std::copy_if(loadedModuleFile->getDependencies().begin(),
-                   loadedModuleFile->getDependencies().end(),
-                   std::back_inserter(missing),
-                   [](const ModuleFile::Dependency &dependency) {
-        return !dependency.isLoaded();
-      });
-
-      // FIXME: only show module part of RawAccessPath
-      assert(!missing.empty() && "unknown missing dependency?");
-      if (missing.size() == 1) {
-        Ctx.Diags.diagnose(moduleID.second,
-                           diag::serialization_missing_single_dependency,
-                           missing.front().RawAccessPath);
-      } else {
-        llvm::SmallString<64> missingNames;
-        missingNames += '\'';
-        interleave(missing,
-                   [&](const ModuleFile::Dependency &next) {
-                     missingNames += next.RawAccessPath;
-                   },
-                   [&] { missingNames += "', '"; });
-        missingNames += '\'';
-
-        Ctx.Diags.diagnose(moduleID.second,
-                           diag::serialization_missing_dependencies,
-                           missingNames);
-      }
-
-      module = new (Ctx) FailedImportModule(moduleID.first,
-                                            loadedModuleFile->getStatus(),
-                                          loadedModuleFile->getModuleFilename(),
-                                            Ctx, FailedImportLoader);
-    }
-  }
-
-  return module;
-}
-
-void SerializedModuleLoader::lookupValue(const Module *module,
-                                         Module::AccessPathTy accessPath,
-                                         Identifier name, NLKind lookupKind,
-                                         SmallVectorImpl<ValueDecl*> &results) {
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (accessPath.size() == 1 && accessPath.front().first != name)
-    return;
-
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.lookupValue(name, results);
-}
-
-OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
-                                                     Identifier name,
-                                                     DeclKind fixity) {
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  return moduleFile.lookupOperator(name, fixity);
-}
-
-void SerializedModuleLoader::getImportedModules(
-    const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &imports,
-    bool includePrivate) {
-
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.getImportedModules(imports, includePrivate);
-}
-
-void
-SerializedModuleLoader::lookupVisibleDecls(const Module *module,
-                                           Module::AccessPathTy accessPath,
-                                           VisibleDeclConsumer &consumer,
-                                           NLKind lookupKind) {
-
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.lookupVisibleDecls(accessPath, consumer, lookupKind);
+  // Don't try to load this module again.
+  Module *failedModule =
+    new (Ctx) FailedImportModule(moduleID.first,
+                                 loadedModuleFile->getStatus(),
+                                 loadedModuleFile->getModuleFilename(),
+                                 Ctx, FailedImportLoader);
+  Ctx.LoadedModules[moduleID.first.str()] = failedModule;
+  return failedModule;
 }
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
@@ -260,42 +222,62 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
   }
 }
 
-void SerializedModuleLoader::lookupClassMembers(const Module *module,
-                                                Module::AccessPathTy accessPath,
-                                                VisibleDeclConsumer &consumer) {
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.lookupClassMembers(accessPath, consumer);
+//-----------------------------------------------------------------------------
+// SerializedASTFile implementation
+//-----------------------------------------------------------------------------
+
+void SerializedASTFile::getImportedModules(
+    SmallVectorImpl<Module::ImportedModule> &imports,
+    bool includePrivate) const {
+  File.getImportedModules(imports, includePrivate);
+}
+
+void SerializedASTFile::collectLinkLibraries(
+    Module::LinkLibraryCallback callback) const {
+  File.collectLinkLibraries(callback);
+}
+
+void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
+                                    Identifier name, NLKind lookupKind,
+                                    SmallVectorImpl<ValueDecl*> &results) const{
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (accessPath.size() == 1 && accessPath.front().first != name)
+    return;
+
+  File.lookupValue(name, results);
+}
+
+OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
+                                                DeclKind fixity) const {
+  return File.lookupOperator(name, fixity);
+}
+
+void SerializedASTFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                           VisibleDeclConsumer &consumer,
+                                           NLKind lookupKind) const {
+  File.lookupVisibleDecls(accessPath, consumer, lookupKind);
+}
+
+void SerializedASTFile::lookupClassMembers(Module::AccessPathTy accessPath,
+                                           VisibleDeclConsumer &consumer) const{
+  File.lookupClassMembers(accessPath, consumer);
 }
 
 void
-SerializedModuleLoader::lookupClassMember(const Module *module,
-                                          Module::AccessPathTy accessPath,
-                                          Identifier name,
-                                          SmallVectorImpl<ValueDecl*> &decls) {
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.lookupClassMember(accessPath, name, decls);
+SerializedASTFile::lookupClassMember(Module::AccessPathTy accessPath,
+                                     Identifier name,
+                                     SmallVectorImpl<ValueDecl*> &decls) const {
+  File.lookupClassMember(accessPath, name, decls);
 }
 
-void
-SerializedModuleLoader::getLinkLibraries(const Module *module,
-                                         Module::LinkLibraryCallback callback) {
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.getLinkLibraries(callback);
+
+void SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const{
+  File.getTopLevelDecls(results);
 }
 
-void SerializedModuleLoader::getTopLevelDecls(const Module *Module,
-                                              SmallVectorImpl<Decl*> &Results) {
-  ModuleFile &ModuleFile = cast<SerializedModule>(Module)->File;
-  ModuleFile.getTopLevelDecls(Results);
-}
-
-void SerializedModuleLoader::getDisplayDecls(const Module *module,
-                                             SmallVectorImpl<Decl*> &results) {
-  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
-  moduleFile.getDisplayDecls(results);
-}
-
-StringRef SerializedModuleLoader::getModuleFilename(const Module *Module) {
-  ModuleFile &Mod = cast<SerializedModule>(Module)->File;
-  return Mod.getModuleFilename();
+StringRef SerializedASTFile::getFilename() const {
+  return File.getModuleFilename();
 }

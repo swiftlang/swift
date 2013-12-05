@@ -473,21 +473,18 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // extensions, so we'll need to be smarter here.
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.TU.forAllVisibleModules(Module::AccessPathTy(),
-                             [&](Module::ImportedModule import) {
+  SF.forAllVisibleModules([&](Module::ImportedModule import) {
     auto importTU = dyn_cast<TranslationUnit>(import.second);
     if (!importTU)
       return;
 
-    SmallVector<Decl *, 32> topLevelDecls;
-
     // FIXME: Respect the access path?
-    for (auto SF : importTU->getSourceFiles()) {
-      // FIXME: Use some kind of visitor interface here.
-      topLevelDecls.clear();
-      SF->getTopLevelDecls(topLevelDecls);
-      
-      for (auto D : topLevelDecls) {
+    for (auto file : importTU->getFiles()) {
+      auto SF = dyn_cast<SourceFile>(file);
+      if (!SF)
+        continue;
+
+      for (auto D : SF->Decls) {
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           bindExtensionDecl(ED, TC);
           if (mayConformToKnownProtocol(ED))

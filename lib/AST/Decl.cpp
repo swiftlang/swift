@@ -35,11 +35,6 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-void *SourceFile::operator new(size_t Bytes, ASTContext &C,
-                               unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Decl::getKindName(DeclKind K) {
   switch (K) {
 #define DECL(Id, Parent) case DeclKind::Id: return #Id;
@@ -1187,10 +1182,9 @@ static bool isObjCObjectOrBridgedType(Type type) {
   // library, rather than hard-coding them.
   if (auto structTy = type->getAs<StructType>()) {
     auto structDecl = structTy->getDecl();
-    if (auto module = dyn_cast<Module>(structDecl->getDeclContext())) {
-      if (module->isStdlibModule() &&
-          !structDecl->getName().empty() &&
-          structDecl->getName().str().equals("String"))
+    const DeclContext *DC = structDecl->getDeclContext();
+    if (DC->isModuleScopeContext() && DC->getParentModule()->isStdlibModule()) {
+      if (structDecl->getName().str() == "String")
         return true;
     }
    
@@ -1221,8 +1215,8 @@ static bool isIntegralType(Type type) {
   // integer type to be integral types.
   if (auto structTy = type->getAs<StructType>()) {
     auto structDecl = structTy->getDecl();
-    auto module = dyn_cast<Module>(structDecl->getDeclContext());
-    if (!module || !module->isStdlibModule())
+    const DeclContext *DC = structDecl->getDeclContext();
+    if (!DC->isModuleScopeContext() || !DC->getParentModule()->isStdlibModule())
       return false;
 
     // Find the single ivar.

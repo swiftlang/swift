@@ -856,13 +856,8 @@ namespace {
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
       // Find the module the extension is declared in.
-      DeclContext *ModuleDC = TheExtension;
-      do {
-        ModuleDC = ModuleDC->getParent();
-      } while (ModuleDC && !isa<Module>(ModuleDC));
+      Module *TheModule = TheExtension->getParentModule();
 
-      Module *TheModule = cast<Module>(ModuleDC);
-      
       os << TheModule->Name;
       
       unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;

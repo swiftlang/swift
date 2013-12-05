@@ -239,16 +239,16 @@ static bool IRGenImportedModules(CompilerInstance &CI,
                 addLinkLibrary);
   TU->collectLinkLibraries(addLinkLibrary);
 
-  // IRGen the modules this module depends on.
-  // FIXME: "all visible modules" may not actually include "all modules this
-  // module depends on". This is just a stopgap measure before we have real
-  // autolinking.
-  TU->forAllVisibleModules(Nothing, [&](Module::ImportedModule ModPair) -> bool{
-    TranslationUnit *SubTU = dyn_cast<TranslationUnit>(ModPair.second);
-    if (!SubTU || SubTU == SubTU->Ctx.TheBuiltinModule)
-      return true;
+  // IRGen the modules this module depends on. This is only really necessary
+  // for imported source, but that's a very convenient thing to do in -i mode.
+  // FIXME: Crawling all loaded modules is a hack.
+  ImportedModules.insert(TU);
+  for (auto &entry : CI.getASTContext().LoadedModules) {
+    TranslationUnit *SubTU = dyn_cast<TranslationUnit>(entry.getValue());
+    if (!SubTU)
+      continue;
     if (!ImportedModules.insert(SubTU))
-      return true;
+      continue;
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
@@ -256,14 +256,14 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
-      return false;
+      break;
     }
 
     performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
 
     if (TU->Ctx.hadError()) {
       hadError = true;
-      return false;
+      break;
     }
 
     std::string ErrorMessage;
@@ -273,7 +273,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
       llvm::errs() << "Error linking swift modules\n";
       llvm::errs() << ErrorMessage << "\n";
       hadError = true;
-      return false;
+      break;
     }
 
     // FIXME: This is an ugly hack; need to figure out how this should
@@ -283,9 +283,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
-    
-    return true;
-  });
+  }
 
   return hadError;
 }

@@ -47,8 +47,8 @@ class ProtocolConformance;
 
 /// A serialized module, along with the tools to access it.
 class ModuleFile {
-  /// A reference back to the AST representation of the module.
-  Module *ModuleContext = nullptr;
+  /// A reference back to the AST representation of the file.
+  FileUnit *FileContext = nullptr;
 
   /// The module shadowed by this module, if any.
   Module *ShadowedModule = nullptr;
@@ -183,6 +183,11 @@ private:
     Status = issue;
   }
 
+  ASTContext &getContext() const {
+    assert(FileContext && "no associated context yet");
+    return FileContext->getParentModule()->Ctx;
+  }
+
   /// Read an on-disk decl hash table stored in index_block::DeclListLayout
   /// format.
   std::unique_ptr<SerializedDeclTable>
@@ -268,7 +273,7 @@ public:
   /// Associates this module file with an AST module.
   ///
   /// Returns false if the association failed.
-  bool associateWithModule(Module *module);
+  bool associateWithFileContext(FileUnit *file);
 
   /// Checks whether this module can be used.
   ModuleStatus getStatus() const { return Status; }
@@ -327,7 +332,7 @@ public:
                          SmallVectorImpl<ValueDecl*> &results);
 
   /// Reports all link-time dependencies.
-  void getLinkLibraries(Module::LinkLibraryCallback callback) const;
+  void collectLinkLibraries(Module::LinkLibraryCallback callback) const;
   
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
@@ -385,22 +390,42 @@ public:
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 };
 
-class SerializedModule : public LoadedModule {
+/// A file-unit loaded from a serialized AST file.
+class SerializedASTFile final : public LoadedFile {
 public:
   ModuleFile &File;
 
-  SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
-                   Identifier name, StringRef DebugModuleName,
-                   ModuleFile &file)
-    : LoadedModule(ModuleKind::Serialized, name, DebugModuleName, ctx, owner),
-      File(file) {}
+  SerializedASTFile(TranslationUnit &TU, ModuleFile &file)
+    : LoadedFile(FileUnitKind::Loaded, TU), File(file) {}
 
-  static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::Serialized;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<Module>(DC) && classof(cast<Module>(DC));
-  }
+  virtual void lookupValue(Module::AccessPathTy accessPath,
+                           Identifier name, NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual OperatorDecl *lookupOperator(Identifier name,
+                                       DeclKind fixity) const override;
+
+  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) const override;
+
+  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) const override;
+
+  virtual void
+  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
+                    SmallVectorImpl<ValueDecl*> &decls) const override;
+
+  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
+                     bool includePrivate) const override;
+
+  virtual void
+  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+
+  virtual StringRef getFilename() const override;
 };
 
 } // end namespace swift

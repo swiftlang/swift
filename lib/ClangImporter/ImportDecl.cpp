@@ -2587,15 +2587,19 @@ Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
 
   SwiftDeclConverter converter(*this);
   auto result = converter.Visit(decl);
+  if (!result)
+    return nullptr;
+
   auto canon = decl->getCanonicalDecl();
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
-  if (result && result->getDeclContext() != getSwiftModule()) {
+  if (!result->getDeclContext()->isModuleScopeContext() ||
+      result->getModuleContext() != getSwiftModule()) {
     assert(!result->getClangDecl() ||
            result->getClangDecl()->getCanonicalDecl() == canon);
     result->setClangNode(decl);
   }
-  if (result || !converter.hadForwardDeclaration())
+  if (!converter.hadForwardDeclaration())
     ImportedDecls[canon] = result;
   return result;
 }

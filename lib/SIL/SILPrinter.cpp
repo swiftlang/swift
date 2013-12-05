@@ -1234,7 +1234,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 
   // Print the declarations and types from the translation unit.
   // FIXME: What about multi-file TUs?
-  if (TU && TU->getSourceFiles().size() == 1) {
+  if (TU && TU->getFiles().size() == 1) {
     // Compute the list of emitted functions, whose AST Decls we do not need to
     // print.
     llvm::DenseSet<const Decl*> emittedFunctions;
@@ -1250,7 +1250,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 
     // FIXME: Use some kind of visitor interface here.
     SmallVector<Decl *, 32> topLevelDecls;
-    TU->getSourceFiles().front()->getTopLevelDecls(topLevelDecls);
+    TU->getFiles().front()->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&

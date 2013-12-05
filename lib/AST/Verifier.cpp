@@ -87,7 +87,7 @@ struct ASTNodeBase {};
       DeclContext *topDC = D->getDeclContext()->getModuleScopeContext();
       if (auto SF = dyn_cast<SourceFile>(topDC))
         return Verifier(*SF);
-      return Verifier(cast<Module>(topDC));
+      return Verifier(topDC->getParentModule());
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {

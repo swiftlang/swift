@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace clang {
   class Module;
@@ -159,8 +160,7 @@ public:
   void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
                    SmallVectorImpl<ValueDecl*> &Result) const;
   
-  /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
-  /// given consumer object.
+  /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   void lookupVisibleDecls(AccessPathTy AccessPath,
@@ -216,8 +216,11 @@ public:
   LookupConformanceResult
   lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
 
-  /// Looks up which modules are re-exported by this module.
-  void getImportedModules(SmallVectorImpl<ImportedModule> &modules,
+  /// Looks up which modules are imported by this module.
+  ///
+  /// Unless \p includePrivate is true, only publicly re-exported modules are
+  /// included in \p imports.
+  void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           bool includePrivate = false) const;
 
   /// Finds all top-level decls of this module.
@@ -234,38 +237,50 @@ public:
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
-  
+
+  /// @{
+
   /// Perform an action for every module visible from this module.
   ///
-  /// For most modules this means any re-exports, but for a translation unit
-  /// all imports are considered.
+  /// This only includes modules with at least one declaration visible: if two
+  /// import access paths are incompatible, the indirect module will be skipped.
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///                           results, with the given access path.
-  /// \param fn A callback of type bool(ImportedModule). Return \c false to
-  ///           abort iteration.
-  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
+  ///           Return \c false to abort iteration.
+  ///
+  /// \return True if the traversal ran to completion, false if it ended early
+  ///         due to the callback.
+  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
                             std::function<bool(ImportedModule)> fn);
 
-  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
                             std::function<void(ImportedModule)> fn) {
     forAllVisibleModules(topLevelAccessPath,
                          [=](const ImportedModule &import) -> bool {
       fn(import);
       return true;
     });
+    return true;
   }
   
   template <typename Fn>
-  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
                             const Fn &fn) {
     using RetTy = typename as_function<Fn>::type::result_type;
     std::function<RetTy(ImportedModule)> wrapped = std::cref(fn);
-    forAllVisibleModules(topLevelAccessPath, wrapped);
+    return forAllVisibleModules(topLevelAccessPath, wrapped);
   }
+
+  /// @}
   
   using LinkLibraryCallback = std::function<void(LinkLibrary)>;
 
+  /// @{
+
+  /// Generate the list of libraries needed to link this module, based on its
+  /// imports.
   void collectLinkLibraries(LinkLibraryCallback callback);
   
   template <typename Fn>
@@ -273,6 +288,8 @@ public:
     LinkLibraryCallback wrapped = std::cref(fn);
     collectLinkLibraries(wrapped);
   }
+
+  /// @}
   
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
@@ -304,60 +321,120 @@ public:
 };
 
 
+/// Discriminator for file-units.
 enum class FileUnitKind {
+  /// For a .swift source file.
   Source,
-  Builtin
+  /// For the compiler Builtin module.
+  Builtin,
+  /// Any other loaded module.
+  Loaded
 };
 
+/// A container for module-scope declarations that itself provides a scope; the
+/// smallest unit of code organization.
+///
+/// FileUnit is an abstract base class; its subclasses represent different
+/// sorts of containers that can each provide a set of decls, e.g. a source
+/// file. A module can contain several file-units.
 class FileUnit : public DeclContext {
+  virtual void anchor();
+
+  // FIXME: Stick this in a PointerIntPair.
+  const FileUnitKind Kind;
+
 protected:
   FileUnit(FileUnitKind kind, TranslationUnit &tu);
 
 public:
-  const FileUnitKind Kind;
+  virtual ~FileUnit() = default;
 
-  void lookupValue(Module::AccessPathTy AccessPath, Identifier Name,
-                   NLKind LookupKind,
-                   SmallVectorImpl<ValueDecl*> &Result) const;
+  FileUnitKind getKind() const {
+    return Kind;
+  }
 
-  void lookupVisibleDecls(Module::AccessPathTy AccessPath,
-                          VisibleDeclConsumer &Consumer,
-                          NLKind LookupKind) const;
+  /// Look up a (possibly overloaded) value set at top-level scope
+  /// (but with the specified access path, which may come from an import decl)
+  /// within this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                           NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &result) const = 0;
+
+  /// Find ValueDecls in the module and pass them to the given consumer object.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) const {}
 
   /// Finds all class members defined in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupClassMembers(Module::AccessPathTy accessPath,
-                          VisibleDeclConsumer &consumer) const;
+  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) const {}
 
   /// Finds class members defined in this file with the given name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupClassMember(Module::AccessPathTy accessPath,
-                         Identifier name,
-                         SmallVectorImpl<ValueDecl*> &results) const;
+  virtual void lookupClassMember(Module::AccessPathTy accessPath,
+                                 Identifier name,
+                                 SmallVectorImpl<ValueDecl*> &results) const {}
 
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
-  void forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn);
+  /// Looks up which modules are imported by this file.
+  ///
+  /// Unless \p includePrivate is true, only modules that are publicly
+  /// re-exported are returned in \p imports.
+  virtual void
+  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
+                     bool includePrivate) const {}
 
-  void forAllVisibleModules(std::function<void(Module::ImportedModule)> fn) {
+  /// Generates the list of libraries needed to link this file, based on its
+  /// imports.
+  virtual void
+  collectLinkLibraries(Module::LinkLibraryCallback callback) const {}
+
+  /// @{
+
+  /// Perform an action for every module visible from this file.
+  ///
+  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
+  ///           Return \c false to abort iteration.
+  ///
+  /// \return True if the traversal ran to completion, false if it ended early
+  ///         due to the callback.
+  bool forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn);
+
+  bool forAllVisibleModules(std::function<void(Module::ImportedModule)> fn) {
     forAllVisibleModules([=](const Module::ImportedModule &import) -> bool {
       fn(import);
       return true;
     });
+    return true;
   }
   
   template <typename Fn>
-  void forAllVisibleModules(const Fn &fn) {
+  bool forAllVisibleModules(const Fn &fn) {
     using RetTy = typename as_function<Fn>::type::result_type;
     std::function<RetTy(Module::ImportedModule)> wrapped = std::cref(fn);
-    forAllVisibleModules(wrapped);
+    return forAllVisibleModules(wrapped);
   }
 
+  /// @}
+
+  /// Traverse the decls within this file.
+  ///
+  /// \returns true if traversal was aborted, false if it completed
+  /// successfully.
+  virtual bool walk(ASTWalker &walker);
+
+  // Efficiency override for DeclContext::getParentModule().
   Module *getParentModule() const {
     return const_cast<Module *>(cast<Module>(getParent()));
   }
@@ -366,23 +443,32 @@ public:
     return DC->getContextKind() == DeclContextKind::FileUnit;
   }
 
-  /// Traverse the decls within this file.
-  ///
-  /// \returns true if traversal was aborted, false if it completed
-  /// successfully.
-  bool walk(ASTWalker &walker);
+private:
+  // Make placement new and vanilla new/delete illegal for FileUnits.
+  void *operator new(size_t Bytes) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
+
+protected:
+  // Unfortunately we can't remove this altogether because the virtual
+  // destructor requires it to be accessible.
+  void operator delete(void *Data) throw() {
+    llvm_unreachable("Don't use operator delete on a SourceFile");
+  }
+
+public:
+  // Only allow allocation of FileUnits using the allocator in ASTContext
+  // or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = alignof(FileUnit));
 };
 
-/// A file containing Swift source code; also, the smallest unit of code
-/// organization.
+/// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
 /// the REPL). Since it contains raw source, it must be parsed and name-bound
 /// before being used for anything; a full type-check is also necessary for
 /// IR generation.
-class SourceFile : public FileUnit {
-  friend class FileUnit;
-
+class SourceFile final : public FileUnit {
 public:
   class LookupCache;
 
@@ -447,7 +533,6 @@ public:
 
   SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> bufferID,
              bool hasBuiltinModuleAccess = false);
-  ~SourceFile();
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SIL);
@@ -461,6 +546,31 @@ public:
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
+
+  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                           NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &result) const override;
+
+  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) const override;
+
+  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) const override;
+  virtual void
+  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
+                    SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
+                     bool includePrivate) const override;
+
+  virtual void
+  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+
+  virtual bool walk(ASTWalker &walker) override;
 
   /// @{
 
@@ -503,67 +613,56 @@ public:
   void print(raw_ostream &os, const PrintOptions &options);
 
   static bool classof(const FileUnit *file) {
-    return file->Kind == FileUnitKind::Source;
+    return file->getKind() == FileUnitKind::Source;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
-
-private:
-  // Make placement new and vanilla new/delete illegal for SourceFiles.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
-  // Only allow allocation of SourceFiles using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(SourceFile));
 };
 
   
-/// Represents a module composed of one or more input files.
+/// Represents a module composed of one or more file-units.
 ///
-/// A translation unit is made up of several input files, which all represent
+/// A translation unit is made up of several file-units, which all represent
 /// part of the same module. The intent is if all files in a translation unit
 /// were built and linked they would form a logical module (such as a single
 /// library or executable).
 ///
-/// \sa SourceFile
+/// \sa FileUnit
 class TranslationUnit : public Module {
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
 
-  TinyPtrVector<FileUnit *> SourceFiles;
+  TinyPtrVector<FileUnit *> Files;
 
 public:
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(ModuleKind::TranslationUnit, Name, C) {
   }
 
-  ArrayRef<FileUnit *> getSourceFiles() {
-    return SourceFiles;
+  ArrayRef<FileUnit *> getFiles() {
+    return Files;
   }
-  ArrayRef<const FileUnit *> getSourceFiles() const {
-    return { SourceFiles.begin(), SourceFiles.size() };
+  ArrayRef<const FileUnit *> getFiles() const {
+    return { Files.begin(), Files.size() };
   }
 
-  void addSourceFile(FileUnit &newFile) {
+  void addFile(FileUnit &newFile) {
     // Require Main and REPL files to be the first file added.
-    assert(SourceFiles.empty() ||
+    assert(Files.empty() ||
            !isa<SourceFile>(newFile) ||
            cast<SourceFile>(newFile).Kind == SourceFile::Library ||
            cast<SourceFile>(newFile).Kind == SourceFile::SIL);
-    SourceFiles.push_back(&newFile);
+    Files.push_back(&newFile);
   }
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile(SourceFile::SourceKind expectedKind) const {
-    assert(!SourceFiles.empty() && "No files added yet");
-    assert(cast<SourceFile>(SourceFiles.front())->Kind == expectedKind);
-    return *cast<SourceFile>(SourceFiles.front());
+    assert(!Files.empty() && "No files added yet");
+    assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
+    return *cast<SourceFile>(Files.front());
   }
 
   /// Convenience accessor for clients that know what kind of file they're
@@ -571,9 +670,9 @@ public:
   FileUnit &getMainFile(FileUnitKind expectedKind) const {
     assert(expectedKind != FileUnitKind::Source &&
            "must use specific source kind; see getMainSourceFile");
-    assert(!SourceFiles.empty() && "No files added yet");
-    assert(SourceFiles.front()->Kind == expectedKind);
-    return *SourceFiles.front();
+    assert(!Files.empty() && "No files added yet");
+    assert(Files.front()->getKind() == expectedKind);
+    return *Files.front();
   }
 
   ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
@@ -596,9 +695,7 @@ public:
 
 /// This represents the compiler's implicitly generated declarations in the
 /// Builtin module.
-class BuiltinUnit : public FileUnit {
-  friend class FileUnit;
-
+class BuiltinUnit final : public FileUnit {
 public:
   class LookupCache;
 
@@ -609,14 +706,48 @@ private:
 public:
   explicit BuiltinUnit(TranslationUnit &TU);
 
+  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                           NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &result) const override;
+
   static bool classof(const FileUnit *file) {
-    return file->Kind == FileUnitKind::Builtin;
+    return file->getKind() == FileUnitKind::Builtin;
   }
 
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
 };
+
+/// Represents an externally-loaded file of some kind.
+class LoadedFile : public FileUnit {
+protected:
+  LoadedFile(FileUnitKind Kind, TranslationUnit &TU) noexcept
+    : FileUnit(Kind, TU) {}
+
+public:
+  /// Returns an arbitrary string representing the storage backing this file.
+  ///
+  /// This is usually a filesystem path.
+  virtual StringRef getFilename() const;
+
+  /// Look up an operator declaration.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  ///
+  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
+  virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
+    return nullptr;
+  }
+
+  static bool classof(const FileUnit *M) {
+    return M->getKind() == FileUnitKind::Loaded;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
+  }
+};
+
 
 
 /// Represents a serialized module that has been imported into Swift.
@@ -649,14 +780,6 @@ public:
   /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
 
-  /// Look up an operator declaration.
-  template <typename T>
-  T *lookupOperator(Identifier name) {
-    // Make any non-specialized instantiations fail with a "nice" error message.
-    static_assert(static_cast<T*>(nullptr),
-                  "Must specify prefix, postfix, or infix operator decl");
-  }
-
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::Serialized ||
            M->getKind() == ModuleKind::Clang ||
@@ -674,18 +797,6 @@ public:
 inline FileUnit::FileUnit(FileUnitKind kind, TranslationUnit &tu)
     : DeclContext(DeclContextKind::FileUnit, &tu), Kind(kind) {
 }
-
-template <>
-PrefixOperatorDecl *
-LoadedModule::lookupOperator<PrefixOperatorDecl>(Identifier name);
-
-template <>
-PostfixOperatorDecl *
-LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name);
-
-template <>
-InfixOperatorDecl *
-LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name);
 
 } // end namespace swift
 
