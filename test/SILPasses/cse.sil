@@ -562,3 +562,19 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %5 = apply %4(%2, %3) : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
   return %5 : $(Builtin.Int32)
 }
+
+sil @generate_tuple : $@thin () -> ((Builtin.Int32, Builtin.Int32))
+// CHECK-LABEL: tupleextract_test
+// CHECK: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
+// CHECK-NOT: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
+sil @tupleextract_test : $@thin () -> (Builtin.Int32) {
+  %0 = function_ref @generate_tuple : $@thin () -> ((Builtin.Int32, Builtin.Int32))
+  %1 = apply %0() : $@thin () -> ((Builtin.Int32, Builtin.Int32))
+  %2 = tuple_extract %1 : $(Builtin.Int32, Builtin.Int32), 0
+  %3 = tuple_extract %1 : $(Builtin.Int32, Builtin.Int32), 0
+  %4 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %5 = integer_literal $Builtin.Int1, 0
+  %6 = apply %4 (%2, %3, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
+  return %7 : $(Builtin.Int32)
+}
