@@ -396,7 +396,7 @@ public:
   ModuleFile &File;
 
   SerializedASTFile(TranslationUnit &TU, ModuleFile &file)
-    : LoadedFile(FileUnitKind::Loaded, TU), File(file) {}
+    : LoadedFile(FileUnitKind::SerializedAST, TU), File(file) {}
 
   virtual void lookupValue(Module::AccessPathTy accessPath,
                            Identifier name, NLKind lookupKind,
@@ -426,6 +426,13 @@ public:
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
   virtual StringRef getFilename() const override;
+
+  static bool classof(const FileUnit *file) {
+    return file->getKind() == FileUnitKind::SerializedAST;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
+  }
 };
 
 } // end namespace swift

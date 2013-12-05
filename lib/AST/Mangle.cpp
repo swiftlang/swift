@@ -21,7 +21,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Punycode.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
@@ -173,9 +172,12 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
 
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'SC'
-  if (isa<ClangModule>(decl->getDeclContext())) {
-    Buffer << "SC";
-    return;
+  // Do a dance to avoid a layering dependency.
+  if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
+    if (file->getKind() == FileUnitKind::ClangModule) {
+      Buffer << "SC";
+      return;
+    }
   }
 
   // Otherwise, just mangle the decl's DC.

@@ -220,7 +220,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
   // Function-local declarations always have internal linkage.
   ValueDecl *d = constant.getDecl();
   DeclContext *dc = d->getDeclContext();
-  while (!dc->isModuleContext()) {
+  while (!dc->isModuleScopeContext()) {
     if (dc->isLocalContext())
       return SILLinkage::Internal;
     dc = dc->getParent();
@@ -232,7 +232,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
   
   // Declarations imported from Clang modules have thunk linkage.
   // FIXME: They shouldn't.
-  if(isa<ClangModule>(dc) &&
+  if(isa<ClangModuleUnit>(dc) &&
      (isa<ConstructorDecl>(d) ||
       isa<SubscriptDecl>(d) ||
       isa<EnumElementDecl>(d) ||

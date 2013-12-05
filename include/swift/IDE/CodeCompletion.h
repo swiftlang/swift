@@ -23,7 +23,6 @@
 
 namespace swift {
 class CodeCompletionCallbacksFactory;
-class ClangModule;
 class Decl;
 
 namespace ide {

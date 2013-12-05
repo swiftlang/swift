@@ -95,7 +95,7 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
-ClangNode Decl::getClangNodeSlow() {
+ClangNode Decl::getClangNodeSlow() const {
   return getASTContext().getClangNode(this);
 }
 

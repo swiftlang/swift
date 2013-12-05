@@ -312,7 +312,8 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     case FileUnitKind::Source:
       OS << " file=\"" << cast<SourceFile>(this)->getFilename() << "\"";
       break;
-    case FileUnitKind::Loaded:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::ClangModule:
       OS << " file=\"" << cast<LoadedFile>(this)->getFilename() << "\"";
     }
     break;

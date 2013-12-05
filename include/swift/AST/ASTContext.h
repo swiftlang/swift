@@ -49,7 +49,6 @@ namespace swift {
   class ASTContext;
   class ASTMutationListener;
   class BoundGenericType;
-  class ClangModule;
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
@@ -506,8 +505,8 @@ public:
 
 private:
   friend class Decl;
-  ClangNode getClangNode(Decl *decl);
-  void setClangNode(Decl *decl, ClangNode node);
+  ClangNode getClangNode(const Decl *decl);
+  void setClangNode(const Decl *decl, ClangNode node);
 
   friend class BoundGenericType;
 

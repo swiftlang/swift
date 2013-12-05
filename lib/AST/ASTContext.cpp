@@ -94,7 +94,7 @@ struct ASTContext::Implementation {
 
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
-  llvm::DenseMap<swift::Decl *, ClangNode> ClangNodes;
+  llvm::DenseMap<const Decl *, ClangNode> ClangNodes;
 
   /// \brief Map from local declarations to their discriminators.
   /// Missing entries implicitly have value 0.
@@ -701,13 +701,13 @@ Module *ASTContext::getStdlibModule() const {
   return TheStdlibModule;
 }
 
-ClangNode ASTContext::getClangNode(Decl *decl) {
+ClangNode ASTContext::getClangNode(const Decl *decl) {
   auto known = Impl.ClangNodes.find(decl);
   assert(known != Impl.ClangNodes.end() && "No Clang node?");
   return known->second;
 }
 
-void ASTContext::setClangNode(Decl *decl, ClangNode node) {
+void ASTContext::setClangNode(const Decl *decl, ClangNode node) {
   Impl.ClangNodes[decl] = node;
 }
 

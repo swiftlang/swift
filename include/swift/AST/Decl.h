@@ -299,7 +299,7 @@ protected:
     DeclBits.FromClang = false;
   }
 
-  ClangNode getClangNodeSlow();
+  ClangNode getClangNodeSlow() const;
 
 public:
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
@@ -394,7 +394,7 @@ public:
 
   /// \brief Retrieve the Clang AST node from which this declaration was
   /// synthesized, if any.
-  ClangNode getClangNode() {
+  ClangNode getClangNode() const {
     if (!DeclBits.FromClang)
       return ClangNode();
 
@@ -403,7 +403,7 @@ public:
 
   /// \brief Retrieve the Clang declaration from which this declaration was
   /// synthesized, if any.
-  const clang::Decl *getClangDecl() {
+  const clang::Decl *getClangDecl() const {
     if (!DeclBits.FromClang)
       return nullptr;
 

@@ -1936,9 +1936,8 @@ namespace {
       // reasons. Fix it.
       auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
-      Impl.firstClangModule->lookupQualified(containerTy, name,
-                                             NL_QualifiedDefault, nullptr,
-                                             lookup);
+      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
+                          lookup);
       Type unlabeledIndices;
       for (auto result : lookup) {
         auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -2406,9 +2405,8 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
-      Impl.firstClangModule->lookupQualified(containerTy, name,
-                                             NL_QualifiedDefault, nullptr,
-                                             lookup);
+      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
+                          lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result))
           return nullptr;

@@ -19,15 +19,9 @@ using namespace swift;
 using namespace namelookup;
 
 namespace {
-  /// A cache used by lookupInModule().
-  class ModuleLookupCache {
-  public:
-    using MapTy = llvm::SmallDenseMap<Module::ImportedModule,
-                                      TinyPtrVector<ValueDecl *>,
-                                      32>;
-    MapTy Map;
-    bool SearchedClangModule = false;
-  };
+  using ModuleLookupCache = llvm::SmallDenseMap<Module::ImportedModule,
+                                                TinyPtrVector<ValueDecl *>,
+                                                32>;
 
   class SortCanType {
   public:
@@ -36,7 +30,7 @@ namespace {
     }
   };
 
-  using CanTypeSet = llvm::SmallSet<CanType, 8, SortCanType>;
+  using CanTypeSet = llvm::SmallSet<CanType, 4, SortCanType>;
   using NamedCanTypeSet =
     llvm::DenseMap<Identifier, std::pair<ResolutionKind, CanTypeSet>>;
   static_assert(ResolutionKind() == ResolutionKind::Overloadable,
@@ -151,9 +145,9 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            ModuleLookupCache &cache,
                            ArrayRef<Module::ImportedModule> extraImports,
                            CallbackTy callback) {
-  ModuleLookupCache::MapTy::iterator iter;
+  ModuleLookupCache::iterator iter;
   bool isNew;
-  std::tie(iter, isNew) = cache.Map.insert({{accessPath, module}, {}});
+  std::tie(iter, isNew) = cache.insert({{accessPath, module}, {}});
   if (!isNew) {
     decls.append(iter->second.begin(), iter->second.end());
     return;
@@ -161,19 +155,8 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
 
   size_t initialCount = decls.size();
 
-  // Only perform unscoped searches once in Clang modules.
-  // FIXME: This is a weird hack. ClangImporter should just filter the results
-  // for us.
-  bool isClangModule = false;
-  if (accessPath.empty())
-    isClangModule = module->getKind() == ModuleKind::Clang;
-
   SmallVector<ValueDecl *, 4> localDecls;
-  if (!isClangModule || !cache.SearchedClangModule) {
-    callback(module, accessPath, localDecls);
-    if (isClangModule)
-      cache.SearchedClangModule = true;
-  }
+  callback(module, accessPath, localDecls);
 
   OverloadSetTy overloads;
   // FIXME: Pass TypeResolver down instead of getting it from the AST.
@@ -229,7 +212,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   auto afterUnique = std::unique(decls.begin() + initialCount, decls.end());
   decls.erase(afterUnique, decls.end());
 
-  auto &cachedValues = cache.Map[{accessPath, module}];
+  auto &cachedValues = cache[{accessPath, module}];
   cachedValues.insert(cachedValues.end(),
                       decls.begin() + initialCount,
                       decls.end());

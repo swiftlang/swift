@@ -35,12 +35,13 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        Identifier name,
                                        clang::Token const *signTok,
                                        clang::Token const &tok) {
+  // FIXME: This constant should live in the correct module for the macro.
   DeclContext *dc = Impl.firstClangModule;
   
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   clang::ActionResult<clang::Expr*> result =
-    Impl.Instance->getSema().ActOnNumericConstant(tok);
+    Impl.getClangSema().ActOnNumericConstant(tok);
   if (result.isUsable()) {
     clang::Expr *parsed = result.get();
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
@@ -124,7 +125,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       auto clangID = tok.getIdentifierInfo();
       // If it's an identifier that is itself a macro, look into that macro.
       if (clangID->hasMacroDefinition()) {
-        auto macroID = impl.Instance->getPreprocessor().getMacroInfo(clangID);
+        auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
         return impl.importMacro(name, macroID);
       }
 

@@ -43,7 +43,7 @@ class QualType;
 namespace swift {
 
 class ASTContext;
-class ClangModule;
+class ClangModuleUnit;
 class ClassDecl;
 class ExtensionDecl;
 class FuncDecl;
@@ -113,7 +113,10 @@ enum class SpecialMethodKind {
 };
 
 /// \brief Implementation of the Clang importer.
-struct ClangImporter::Implementation {
+class ClangImporter::Implementation {
+  friend class ClangImporter;
+
+public:
   /// \brief Describes how a particular C enumeration type will be imported
   /// into Swift. All of the possibilities have the same storage
   /// representation, but can be used in different ways.
@@ -138,6 +141,7 @@ struct ClangImporter::Implementation {
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
+private:
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
@@ -157,6 +161,7 @@ struct ClangImporter::Implementation {
   /// parser.
   std::unique_ptr<clang::SyntaxOnlyAction> Action;
 
+public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
 
@@ -179,6 +184,12 @@ struct ClangImporter::Implementation {
   /// \brief Mapping of already-imported macros.
   llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
 
+  // FIXME: An extra level of caching of visible decls, since lookup needs to
+  // be filtered by module after the fact.
+  SmallVector<ValueDecl *, 0> CachedVisibleDecls;
+  bool CacheIsValid = false;
+
+private:
   /// \brief Generation number that is used for crude versioning.
   ///
   /// This value is incremented every time a new module is imported.
@@ -220,6 +231,7 @@ struct ClangImporter::Implementation {
   /// \brief Cache of the class extensions.
   llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
 
+public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
@@ -230,14 +242,15 @@ struct ClangImporter::Implementation {
   /// \brief Keep track of enum constant values that have been imported.
   std::set<std::pair<const clang::EnumDecl *, llvm::APSInt>>
     EnumConstantValues;
-  
+
 private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
 
-  /// A pair containing a ClangModule and whether the adapters of its
-  /// re-exported modules have all been forced to load already.
-  using ModuleInitPair = llvm::PointerIntPair<ClangModule *, 1, bool>;
+  /// A pair containing a ClangModuleUnit,
+  /// and whether the adapters of its re-exported modules have all been forced
+  /// to load already.
+  using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
 
 public:
   /// A map from Clang modules to their Swift wrapper modules.
@@ -249,7 +262,7 @@ public:
   /// map from a Decl in the tree back to the appropriate Clang module.
   /// It also means building ClangModules for all of the dependencies of a
   /// Clang module.
-  ClangModule *firstClangModule = nullptr;
+  ClangModuleUnit *firstClangModule = nullptr;
 
   /// \brief Clang's objectAtIndexedSubscript: selector.
   clang::Selector objectAtIndexedSubscript;
@@ -272,9 +285,19 @@ public:
     return Instance->getASTContext();
   }
 
-  /// \brief Retrieve the imported ClangModule that should contain the given
+  /// \brief Retrieve the Clang Sema object.
+  clang::Sema &getClangSema() const {
+    return Instance->getSema();
+  }
+
+  /// \brief Retrieve the Clang AST context.
+  clang::Preprocessor &getClangPreprocessor() const {
+    return Instance->getPreprocessor();
+  }
+
+  /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
-  ClangModule *getClangModuleForDecl(const clang::Decl *D);
+  ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D);
 
   /// \brief Import the given Swift identifier into Clang.
   clang::DeclarationName importName(Identifier name);
@@ -369,8 +392,8 @@ public:
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModule *getWrapperModule(ClangImporter &importer,
-                                clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
+                                       clang::Module *underlying);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

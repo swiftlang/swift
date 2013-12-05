@@ -27,18 +27,20 @@ namespace clang {
 namespace swift {
 
 class ASTContext;
+class ClangModuleUnit;
 class Module;
 class NominalTypeDecl;
 
 /// \brief Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter : public ModuleLoader {
+  friend class ClangModuleUnit;
+
 public:
-  struct Implementation;
+  class Implementation;
 
 private:
   Implementation &Impl;
-  friend class ClangModule;
 
   ClangImporter(ASTContext &ctx);
 
@@ -105,21 +107,8 @@ public:
 
   /// \brief Look for declarations associated with the given name.
   ///
-  /// \param module The module to search.
-  ///
-  /// \param accessPath The access path used to refer to the name within this
-  /// (top-level) module.
-  ///
   /// \param name The name we're searching for.
-  ///
-  /// \param lookupKind Whether we're performing qualified vs. unqualified
-  /// lookup.
-  ///
-  /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(const Module *module,
-                           Module::AccessPathTy accessPath, Identifier name,
-                           NLKind lookupKind,
-                           SmallVectorImpl<ValueDecl*> &result) override;
+  void lookupValue(Identifier name, VisibleDeclConsumer &consumer);
   
   /// \brief Look for visible declarations in the Clang translation unit.
   ///
@@ -134,11 +123,6 @@ public:
   /// are found and imported.
   void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
 
-  void lookupVisibleDecls(const Module *M,
-                          Module::AccessPathTy AccessPath,
-                          VisibleDeclConsumer &Consumer,
-                          NLKind LookupKind) override;
-
   /// \brief Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
@@ -148,32 +132,6 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
-
-  virtual void getImportedModules(
-    const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &exports,
-    bool includePrivate) override;
-  
-  virtual void lookupClassMembers(const Module *module,
-                                  Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer) override;
-  
-  virtual void lookupClassMember(const Module *module,
-                                 Module::AccessPathTy accessPath,
-                                 Identifier name,
-                                 SmallVectorImpl<ValueDecl*> &results) override;
-
-  virtual void
-  collectLinkLibraries(const Module *module,
-                       Module::LinkLibraryCallback callback) override;
-
-  virtual void getTopLevelDecls(const Module *Module,
-                                SmallVectorImpl<Decl*> &Results) override;
-
-  virtual void getDisplayDecls(const Module *module,
-                               SmallVectorImpl<Decl*> &results) override;
-
-  StringRef getModuleFilename(const Module *Module) override;
 
   void verifyAllModules() override;
 

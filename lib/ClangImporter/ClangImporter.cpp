@@ -265,71 +265,90 @@ Module *ClangImporter::loadModule(
                                                /*IsInclusionDirective=*/false);
   if (!clangModule)
     return nullptr;
-  auto &cachedResult = Impl.ModuleWrappers[clangModule];
-  if (Module *result = cachedResult.getPointer()) {
-    if (!cachedResult.getInt()) {
+
+  // Bump the generation count.
+  ++Impl.Generation;
+  Impl.SwiftContext.bumpGeneration();
+  Impl.CachedVisibleDecls.clear();
+  Impl.CacheIsValid = false;
+
+  auto &cacheEntry = Impl.ModuleWrappers[clangModule];
+  if (ClangModuleUnit *cached = cacheEntry.getPointer()) {
+    Module *M = cached->getParentModule();
+    if (!cacheEntry.getInt()) {
       // Force load adapter modules for all imported modules.
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
-      cachedResult.setInt(true);
-      result->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
+      cacheEntry.setInt(true);
+      M->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
     }
-    return result;
+    return M;
   }
 
   // Build the representation of the Clang module in Swift.
   // FIXME: The name of this module could end up as a key in the ASTContext,
   // but that's not correct for submodules.
-  auto result = new (Impl.SwiftContext)
-    ClangModule(Impl.SwiftContext, (*clangModule).getFullModuleName(),
-                *this, clangModule);
-  cachedResult.setPointer(result);
+  Identifier name = Impl.SwiftContext.getIdentifier((*clangModule).Name);
+  auto result = new (Impl.SwiftContext) TranslationUnit(name,Impl.SwiftContext);
+
+  auto file = new (Impl.SwiftContext) ClangModuleUnit(*result, *this,
+                                                      clangModule);
+  result->addFile(*file);
+  cacheEntry.setPointerAndInt(file, true);
 
   // FIXME: Total hack.
   if (!Impl.firstClangModule)
-    Impl.firstClangModule = result;
+    Impl.firstClangModule = file;
 
   // Force load adapter modules for all imported modules.
   // FIXME: This forces the creation of wrapper modules for all imports as
   // well, and may do unnecessary work.
-  cachedResult.setInt(true);
   result->forAllVisibleModules(path, [](Module::ImportedModule import) {});
 
-  // Bump the generation count.
-  ++Impl.Generation;
-  Impl.SwiftContext.bumpGeneration();
-
   return result;
 }
 
-ClangModule *
-ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
-                                                clang::Module *underlying) {
+ClangModuleUnit *
+ClangImporter::Implementation::getWrapperForModule(ClangImporter &importer,
+                                                   clang::Module *underlying) {
   auto &cacheEntry = ModuleWrappers[underlying];
-  if (ClangModule *cachedModule = cacheEntry.getPointer())
-    return cachedModule;
+  if (ClangModuleUnit *cached = cacheEntry.getPointer())
+    return cached;
 
-  auto result = new (SwiftContext) ClangModule(SwiftContext,
-                                               underlying->getFullModuleName(),
-                                               importer, underlying);
-  cacheEntry.setPointer(result);
-  return result;
+  // FIXME: Handle hierarchical names better.
+  Identifier name = SwiftContext.getIdentifier(underlying->Name);
+  auto wrapper = new (SwiftContext) TranslationUnit(name, SwiftContext);
+
+  auto file = new (SwiftContext) ClangModuleUnit(*wrapper, importer,
+                                                 underlying);
+  wrapper->addFile(*file);
+  cacheEntry.setPointer(file);
+
+  return file;
 }
 
-ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
-    const clang::Decl *D) {
+static clang::Module *getBestOwningModule(const clang::Decl *D) {
   if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
     // Put the Objective-C class into the module that contains the @interface
     // definition, not just @class forward declaration.
     D = OID->getDefinition();
+  else if (auto RD = dyn_cast<clang::RecordDecl>(D))
+    D = RD->getDefinition();
   else
     D = D->getCanonicalDecl();
+
   if (!D)
     return nullptr;
 
-  clang::Module *M = D->getOwningModule();
+  return D->getOwningModule();
+}
+
+ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
+    const clang::Decl *D) {
+  clang::Module *M = getBestOwningModule(D);
   if (!M)
     return nullptr;
+
   // Get the parent module because currently we don't represent submodules with
   // ClangModule.
   // FIXME: this is just a workaround until we can import submodules.
@@ -337,7 +356,7 @@ ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
 
   auto &importer =
     static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  return getWrapperModule(importer, M);
+  return getWrapperForModule(importer, M);
 }
 
 #pragma mark Source locations
@@ -424,15 +443,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 
 
 #pragma mark Name lookup
-void ClangImporter::lookupValue(const Module *module,
-                                Module::AccessPathTy accessPath,
-                                Identifier name,
-                                NLKind lookupKind,
-                                SmallVectorImpl<ValueDecl*> &results) {
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  if (accessPath.size() == 1 && accessPath.front().first != name)
-    return;
-
+void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   auto &pp = Impl.Instance->getPreprocessor();
   auto &sema = Impl.Instance->getSema();
 
@@ -460,7 +471,7 @@ void ClangImporter::lookupValue(const Module *module,
   if (clangID && clangID->hasMacroDefinition()) {
     if (auto clangMacro = pp.getMacroInfo(clangID)) {
       if (auto valueDecl = Impl.importMacro(name, clangMacro)) {
-        results.push_back(valueDecl);
+        consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
       }
     }
   }
@@ -481,7 +492,7 @@ void ClangImporter::lookupValue(const Module *module,
               valueDecl->getModuleContext() == Impl.getSwiftModule())
             continue;
 
-          results.push_back(valueDecl);
+          consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
           FoundType = FoundType || isa<TypeDecl>(valueDecl);
         }
     }
@@ -498,7 +509,7 @@ void ClangImporter::lookupValue(const Module *module,
     for (auto decl : lookupResult) {
       if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
-          results.push_back(valueDecl);
+          consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
     }
   }
 }
@@ -511,79 +522,133 @@ ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
                           consumer);
 }
 
+static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
+                                const ValueDecl *VD) {
+  // Include a value from module X if:
+  // * no particular module was requested, or
+  // * module X was specifically requested.
+  if (!ModuleFilter)
+    return true;
+
+  auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
+  if (ModuleFilter == ContainingUnit)
+    return true;
+
+  auto Wrapper = dyn_cast<ClangModuleUnit>(ContainingUnit);
+  if (!Wrapper)
+    return false;
+
+  auto *ClangDecl = VD->getClangDecl();
+  assert(ClangDecl);
+
+  auto OwningClangModule = ClangDecl->getOwningModule();
+
+  // FIXME: This only triggers for implicitly-generated decls like
+  // __builtin_va_list, which we probably shouldn't be importing anyway.
+  // But it also includes the builtin declarations for 'id', 'Class', 'SEL',
+  // and '__int128_t'.
+  if (!OwningClangModule)
+    return true;
+
+  // FIXME: If this is in another module, we shouldn't really be considering
+  // it here, but the recursive lookup through exports doesn't seem to be
+  // working right yet.
+  return ModuleFilter->getClangModule()->isModuleVisible(OwningClangModule);
+}
+
+
 namespace {
 class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
-  ClangImporter &TheClangImporter;
   ClangImporter::Implementation &Impl;
   swift::VisibleDeclConsumer &NextConsumer;
-  const ClangModule *ModuleFilter = nullptr;
+  const ClangModuleUnit *ModuleFilter = nullptr;
 
 public:
-  ImportingVisibleDeclConsumer(ClangImporter &TheClangImporter,
-                               ClangImporter::Implementation &Impl,
+  ImportingVisibleDeclConsumer(ClangImporter::Implementation &Impl,
                                swift::VisibleDeclConsumer &NextConsumer)
-      : TheClangImporter(TheClangImporter), Impl(Impl),
-        NextConsumer(NextConsumer) {}
+      : Impl(Impl), NextConsumer(NextConsumer) {}
 
-  void filterByModule(const ClangModule *M) {
-    ModuleFilter = M;
+  void filterByModule(const ClangModuleUnit *CMU) {
+    ModuleFilter = CMU;
   }
 
   void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
                  clang::DeclContext *Ctx,
                  bool InBaseClass) override {
-    if (ND->getName().empty())
+    if (!ND->getIdentifier())
       return;
 
     if (ND->isModulePrivate())
       return;
 
-    SmallVector<ValueDecl *, 4> Results;
-    TheClangImporter.lookupValue(/*module*/ nullptr,
-                                 Module::AccessPathTy(),
-                                 Impl.SwiftContext.getIdentifier(ND->getName()),
-                                 NLKind::UnqualifiedLookup,
-                                 Results);
-    for (auto *VD : Results) {
-      // Include results from this module if:
-      // * no particular module was requested, or
-      // * this module was specifically requested, or
-      // * this module is re-exported from the requested module.
-      bool ShouldReport = !ModuleFilter ||
-                          VD->getModuleContext() == ModuleFilter;
-      if (!ShouldReport) {
-        clang::Module *ThisDeclClangModule = nullptr;
-        if (auto *ClangDecl = VD->getClangDecl()) {
-          ThisDeclClangModule = ClangDecl->getOwningModule();
-        }
-        if (!ThisDeclClangModule) {
-          ThisDeclClangModule =
-              cast<ClangModule>(VD->getModuleContext())->getClangModule();
-        }
-        ShouldReport = ModuleFilter->getClangModule()->isModuleVisible(
-            ThisDeclClangModule);
-      }
-      if (ShouldReport)
-        NextConsumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
+    if (auto Imported = cast_or_null<ValueDecl>(Impl.importDecl(ND)))
+      if (isVisibleFromModule(ModuleFilter, Imported))
+        NextConsumer.foundDecl(Imported, DeclVisibilityKind::VisibleAtTopLevel);
   }
 };
+
+class FilteringVisibleDeclConsumer : public swift::VisibleDeclConsumer {
+  swift::VisibleDeclConsumer &NextConsumer;
+  const ClangModuleUnit *ModuleFilter = nullptr;
+
+public:
+  FilteringVisibleDeclConsumer(swift::VisibleDeclConsumer &consumer,
+                               const ClangModuleUnit *CMU)
+      : NextConsumer(consumer), ModuleFilter(CMU) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (isVisibleFromModule(ModuleFilter, VD))
+      NextConsumer.foundDecl(VD, Reason);
+  }
+};
+
+/// Inserts found decls into an externally-owned SmallVector.
+class VectorDeclConsumer : public VisibleDeclConsumer {
+public:
+  SmallVectorImpl<ValueDecl *> &results;
+  explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
+    : results(decls) {}
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    results.push_back(VD);
+  }
+};
+
 } // unnamed namespace
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
-  ImportingVisibleDeclConsumer ImportingConsumer(
-      const_cast<ClangImporter &>(*this), Impl, Consumer);
-  lookupVisibleDecls(ImportingConsumer);
+  if (!Impl.CacheIsValid) {
+    VectorDeclConsumer CacheConsumer(Impl.CachedVisibleDecls);
+    ImportingVisibleDeclConsumer ImportingConsumer(Impl, Consumer);
+
+    auto &sema = Impl.getClangSema();
+    sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
+                            clang::Sema::LookupNameKind::LookupAnyName,
+                            ImportingConsumer);
+    Impl.CacheIsValid = true;
+  }
+
+  for (auto VD : Impl.CachedVisibleDecls)
+    Consumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
 }
 
-void ClangImporter::lookupVisibleDecls(const Module *M,
-                                       Module::AccessPathTy AccessPath,
-                                       VisibleDeclConsumer &Consumer,
-                                       NLKind LookupKind) {
-  ImportingVisibleDeclConsumer ImportingConsumer(
-      const_cast<ClangImporter &>(*this), Impl, Consumer);
-  ImportingConsumer.filterByModule(cast<ClangModule>(M));
-  lookupVisibleDecls(ImportingConsumer);
+void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
+                                         VisibleDeclConsumer &Consumer,
+                                         NLKind LookupKind) const {
+  FilteringVisibleDeclConsumer filterConsumer(Consumer, this);
+  owner.lookupVisibleDecls(filterConsumer);
+}
+
+void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
+                                  Identifier name, NLKind lookupKind,
+                                  SmallVectorImpl<ValueDecl*> &results) const {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+  if (accessPath.size() == 1 && accessPath.front().first != name)
+    return;
+
+  VectorDeclConsumer vectorWriter(results);
+  FilteringVisibleDeclConsumer filteringConsumer(vectorWriter, this);
+  owner.lookupValue(name, filteringConsumer);
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
@@ -602,30 +667,28 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
-void ClangImporter::getImportedModules(
-    const Module *module,
+void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
-    bool includePrivate) {
+    bool includePrivate) const {
 
-  auto underlying = cast<ClangModule>(module)->clangModule;
-  auto topLevelAdapter = cast<ClangModule>(module)->getAdapterModule();
+  auto topLevelAdapter = getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
   if (includePrivate) {
-    imported.append(underlying->Imports.begin(), underlying->Imports.end());
+    imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
     // FIXME: The parent module isn't exactly a private import, but it is
     // needed for link dependencies.
-    if (underlying->Parent)
-      imported.push_back(underlying->Parent);
+    if (clangModule->Parent)
+      imported.push_back(clangModule->Parent);
   } else
-    underlying->getExportedModules(imported);
+    clangModule->getExportedModules(imported);
 
   for (auto importMod : imported) {
-    auto wrapper = Impl.getWrapperModule(*this, importMod);
+    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
 
     auto actualMod = wrapper->getAdapterModule();
     if (!actualMod || actualMod == topLevelAdapter)
-      actualMod = wrapper;
+      actualMod = wrapper->getParentModule();
 
     imports.push_back({Module::AccessPathTy(), actualMod});
   }
@@ -636,24 +699,10 @@ static bool selectorStartsWithName(clang::Selector sel, Identifier name) {
   return sel.getNameForSlot(0) == name.str();
 }
 
-namespace {
-  /// Inserts found decls into an externally-owned SmallVector.
-  class VectorDeclConsumer : public VisibleDeclConsumer {
-  public:
-    SmallVectorImpl<ValueDecl *> &results;
-    explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
-      : results(decls) {}
-
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      results.push_back(VD);
-    }
-  };
-}
-
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
                                    VisibleDeclConsumer &consumer,
                                    Identifier name = Identifier()) {
-  clang::Sema &S = Impl.Instance->getSema();
+  clang::Sema &S = Impl.getClangSema();
   clang::ExternalASTSource *source = S.getExternalSource();
 
   // When looking for a subscript, we actually look for the getters
@@ -778,27 +827,24 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   }
 }
 
-void ClangImporter::lookupClassMember(const Module *module,
-                                      Module::AccessPathTy accessPath,
-                                      Identifier name,
-                                      SmallVectorImpl<ValueDecl*> &results) {
+void
+ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
+                                   Identifier name,
+                                   SmallVectorImpl<ValueDecl*> &results) const {
   // FIXME: Not limited by module.
   VectorDeclConsumer consumer(results);
-  lookupClassMembersImpl(Impl, consumer, name);
+  lookupClassMembersImpl(owner.Impl, consumer, name);
 }
 
-void ClangImporter::lookupClassMembers(const Module *module,
-                                       Module::AccessPathTy accessPath,
-                                       VisibleDeclConsumer &consumer) {
+void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
+                                         VisibleDeclConsumer &consumer) const {
   // FIXME: Not limited by module.
-  lookupClassMembersImpl(Impl, consumer);
+  lookupClassMembersImpl(owner.Impl, consumer);
 }
 
-void
-ClangImporter::collectLinkLibraries(const Module *module,
-                                    Module::LinkLibraryCallback callback) {
-  auto underlying = cast<ClangModule>(module)->clangModule;
-  for (auto clangLinkLib : underlying->LinkLibraries) {
+void ClangModuleUnit::collectLinkLibraries(
+    Module::LinkLibraryCallback callback) const {
+  for (auto clangLinkLib : clangModule->LinkLibraries) {
     LibraryKind kind;
     if (clangLinkLib.IsFramework)
       kind = LibraryKind::Framework;
@@ -809,9 +855,8 @@ ClangImporter::collectLinkLibraries(const Module *module,
   }
 }
 
-void ClangImporter::getTopLevelDecls(const Module *module,
-                                     SmallVectorImpl<Decl*> &results) {
-  clang::ASTContext &clangCtx = Impl.Instance->getASTContext();
+void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
+  clang::ASTContext &clangCtx = owner.Impl.getClangASTContext();
   const clang::TranslationUnitDecl *clangTU = clangCtx.getTranslationUnitDecl();
   
   // FIXME: Do we want a noload variant here?
@@ -820,21 +865,17 @@ void ClangImporter::getTopLevelDecls(const Module *module,
     auto named = dyn_cast<clang::NamedDecl>(D);
     if (!named)
        continue;
-    if (Impl.getClangModuleForDecl(D) != module)
+    // FIXME: We shouldn't have to jump up to the top-level module here.
+    clang::Module *owningModule = getBestOwningModule(D);
+    if (!owningModule || owningModule->getTopLevelModule() != clangModule)
       continue;
-    if (auto imported = Impl.importDecl(named))
+    if (auto imported = owner.Impl.importDecl(named))
       results.push_back(imported);
   }
 }
 
-void ClangImporter::getDisplayDecls(const Module *module,
-                                    SmallVectorImpl<Decl*> &results) {
-  return getTopLevelDecls(module, results);
-}
-
-StringRef ClangImporter::getModuleFilename(const Module *Module) {
-  auto Underlying = cast<ClangModule>(Module)->clangModule;
-  return Underlying->getASTFile()->getName();
+StringRef ClangModuleUnit::getFilename() const {
+  return clangModule->getASTFile()->getName();
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
@@ -853,49 +894,48 @@ void ClangImporter::verifyAllModules() {
     if (Decl *D = I.second)
       verify(D);
   }
-  Impl.ImportCounter = Impl.VerifiedImportCounter;
+  Impl.VerifiedImportCounter = Impl.ImportCounter;
 }
 
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
 
-ClangModule::ClangModule(ASTContext &ctx, StringRef DebugModuleName,
-                         ModuleLoader &owner, clang::Module *clangModule)
-  : LoadedModule(ModuleKind::Clang, ctx.getIdentifier(clangModule->Name),
-                 DebugModuleName, ctx, owner), clangModule(clangModule) {
+ClangModuleUnit::ClangModuleUnit(TranslationUnit &TU,
+                                 ClangImporter &owner,
+                                 clang::Module *clangModule)
+  : LoadedFile(FileUnitKind::ClangModule, TU), owner(owner),
+    clangModule(clangModule) {
 }
 
-bool ClangModule::isTopLevel() const {
+bool ClangModuleUnit::isTopLevel() const {
   return !clangModule->isSubModule();
 }
 
-StringRef ClangModule::getTopLevelModuleName() const {
-  return clangModule->getTopLevelModuleName();
-}
-
-Module *ClangModule::getAdapterModule() const {
+Module *ClangModuleUnit::getAdapterModule() const {
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
-    auto &importer = static_cast<ClangImporter&>(getOwner());
     auto topLevel = clangModule->getTopLevelModule();
-    auto wrapper = importer.Impl.getWrapperModule(importer, topLevel);
+    auto wrapper = owner.Impl.getWrapperForModule(owner, topLevel);
     return wrapper->getAdapterModule();
+
   }
 
   if (!adapterModule.getInt()) {
     // FIXME: Include proper source location.
-    auto adapter = Ctx.getModule(Module::AccessPathTy({Name, SourceLoc()}));
-    if (isa<ClangModule>(adapter)) {
+    Module *M = getParentModule();
+    ASTContext &Ctx = M->Ctx;
+    auto adapter = Ctx.getModule(Module::AccessPathTy({M->Name, SourceLoc()}));
+    if (adapter == M) {
       adapter = nullptr;
     } else {
-      auto &sharedModuleRef = Ctx.LoadedModules[Name.str()];
+      auto &sharedModuleRef = Ctx.LoadedModules[M->Name.str()];
       assert(!sharedModuleRef || sharedModuleRef == adapter ||
-             sharedModuleRef == this);
+             sharedModuleRef == M);
       sharedModuleRef = adapter;
     }
 
-    auto mutableThis = const_cast<ClangModule *>(this);
+    auto mutableThis = const_cast<ClangModuleUnit *>(this);
     mutableThis->adapterModule.setPointerAndInt(adapter, true);
   }
 

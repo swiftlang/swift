@@ -327,8 +327,10 @@ enum class FileUnitKind {
   Source,
   /// For the compiler Builtin module.
   Builtin,
-  /// Any other loaded module.
-  Loaded
+  /// A serialized Swift AST.
+  SerializedAST,
+  /// An imported Clang module.
+  ClangModule
 };
 
 /// A container for module-scope declarations that itself provides a scope; the
@@ -737,7 +739,9 @@ public:
 class LoadedFile : public FileUnit {
 protected:
   LoadedFile(FileUnitKind Kind, TranslationUnit &TU) noexcept
-    : FileUnit(Kind, TU) {}
+    : FileUnit(Kind, TU) {
+    assert(classof(this) && "invalid kind");
+  }
 
 public:
   /// Returns an arbitrary string representing the storage backing this file.
@@ -754,8 +758,9 @@ public:
     return nullptr;
   }
 
-  static bool classof(const FileUnit *M) {
-    return M->getKind() == FileUnitKind::Loaded;
+  static bool classof(const FileUnit *file) {
+    return file->getKind() == FileUnitKind::SerializedAST ||
+           file->getKind() == FileUnitKind::ClangModule;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
