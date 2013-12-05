@@ -534,3 +534,18 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %9 = tuple()
   return %9 : $()
 }
+
+// CHECK-LABEL: structextract_test
+// CHECK: struct_extract {{%[0-9]+}} : $Interval, #start
+// CHECK-NOT: struct_extract {{%[0-9]+}} : $Interval, #start
+sil @structextract_test : $@thin (Interval) -> (Builtin.Int32) {
+bb0(%0 : $Interval):
+  %1 = struct_extract %0 : $Interval, #start
+  %2 = struct_extract %0 : $Interval, #start
+  %3 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %3(%1, %2, %4) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0
+  return %6 : $(Builtin.Int32)
+}
+

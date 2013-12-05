@@ -64,6 +64,7 @@ namespace {
       case ValueKind::FloatLiteralInst:
       case ValueKind::StringLiteralInst:
       case ValueKind::StructInst:
+      case ValueKind::StructExtractInst:
         return true;
       default:
         return false;
@@ -130,6 +131,13 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
                               X->getStructDecl(),
                               llvm::hash_combine_range(Operands.begin(),
                                                        Operands.end()));
+  }
+  case ValueKind::StructExtractInst: {
+    auto *X = cast<StructExtractInst>(Inst);
+    return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
+                              X->getStructDecl(),
+                              X->getField(),
+                              X->getOperand());
   }
   default:
     llvm_unreachable("Unhandled ValueKind.");
