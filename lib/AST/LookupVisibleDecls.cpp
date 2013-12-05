@@ -190,9 +190,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   class DynamicLookupConsumer : public VisibleDeclConsumer {
     VisibleDeclConsumer &ChainedConsumer;
     LookupState LS;
-    std::set<std::pair<Identifier, CanType>> FunctionsReported;
-    std::set<CanType> SubscriptsReported;
-    std::set<std::pair<Identifier, CanType>> PropertiesReported;
+    llvm::DenseSet<std::pair<Identifier, CanType>> FunctionsReported;
+    llvm::DenseSet<CanType> SubscriptsReported;
+    llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
 
   public:
     explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,
@@ -218,20 +218,17 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                         ->getCanonicalType();
 
         auto Signature = std::make_pair(D->getName(), T);
-        if (FunctionsReported.count(Signature))
+        if (!FunctionsReported.insert(Signature).second)
           return;
-        FunctionsReported.insert(Signature);
       } else if (isa<SubscriptDecl>(D)) {
         auto Signature = D->getType()->getCanonicalType();
-        if (SubscriptsReported.count(Signature))
+        if (!SubscriptsReported.insert(Signature).second)
           return;
-        SubscriptsReported.insert(Signature);
       } else if (isa<VarDecl>(D)) {
         auto Signature =
             std::make_pair(D->getName(), D->getType()->getCanonicalType());
-        if (PropertiesReported.count(Signature))
+        if (!PropertiesReported.insert(Signature).second)
           return;
-        PropertiesReported.insert(Signature);
       } else {
         llvm_unreachable("unhandled decl kind");
       }
