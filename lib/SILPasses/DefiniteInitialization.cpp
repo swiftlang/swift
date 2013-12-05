@@ -452,14 +452,26 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   else
     Name = "<unknown>";
 
-  // If the overall memory allocation is a tuple with multiple elements,
-  // then dive in to explain *which* element is being used uninitialized.
-  //
+  // If the overall memory allocation has multiple elements, then dive in to
+  // explain *which* element is being used uninitialized.  Start by rerunning
+  // the query, to get a bitmask of exactly which elements are uninitialized.
+  // In a multi-element query, the first element may already be defined and
+  // we want to point to the second one.
+  AvailabilitySet Liveness =
+    getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
+
+  unsigned FirstUndefElement = Use.FirstElement;
+  while (Liveness.get(FirstUndefElement) == DIKind::Yes) {
+    ++FirstUndefElement;
+    assert(FirstUndefElement != Use.FirstElement+Use.NumElements &&
+           "No undef elements found?");
+  }
+
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
-  TheMemory.getPathStringToElement(Use.FirstElement, Name);
+  TheMemory.getPathStringToElement(FirstUndefElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
 
