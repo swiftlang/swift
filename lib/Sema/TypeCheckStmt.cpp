@@ -659,8 +659,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
                        ->getNominalOrBoundGenericNominal();
 
-  bool UseDIForThis =
-    isa<StructDecl>(nominalDecl) && !nominalDecl->hasClangNode();
+  bool UseDIForThis = isa<StructDecl>(nominalDecl);
 
   llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
   for (auto elt : body->getElements()) {

@@ -2666,6 +2666,11 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 
+  // Clang-imported types should never get a default constructor, just a
+  // memberwise one.
+  if (decl->hasClangNode())
+    return;
+
   // Verify that all of the instance variables of this type have default
   // constructors.
   for (auto member : decl->getMembers()) {
@@ -2690,7 +2695,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
       // We refuse to default construct struct members.  DI takes care of this.
       // FIXME: Classes too someday.
-      if (isa<StructDecl>(decl) && !decl->hasClangNode())
+      if (isa<StructDecl>(decl))
         return;
 
       // If this variable is not default-initializable, we're done: we can't

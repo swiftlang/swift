@@ -2005,34 +2005,25 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-  
-  // DI cannot handle autosynthesized ctors from clang AST nodes yet. 
-  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
-  bool UseDIForThisCtor = !ConstructedType->getAnyNominal()->hasClangNode();
-  
+
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
   emitLocalVariable(selfDecl);
   
-  // If DI is enabled, mark self as being uninitialized so that DI knows where
-  // it is and how to check for it.
-  if (UseDIForThisCtor) {
+  // Mark self as being uninitialized so that DI knows where it is and how to
+  // check for it.
+  SILValue selfLV;
+  {
     auto &VarLocAddrEntry = VarLocs[selfDecl].address;
     VarLocAddrEntry = B.createMarkUninitializedRootSelf(selfDecl,
                                                         VarLocAddrEntry);
+    selfLV = VarLocAddrEntry;
   }
-  
-  
-  SILValue selfLV = VarLocs[selfDecl].address;
 
   // Emit the prolog.
   emitProlog(ctor->getBodyParams(), ctor->getImplicitSelfDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
-  
-  // Emit a default initialization of the this value if DI isn't enabled.
-  if (!UseDIForThisCtor)
-    B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
   
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
