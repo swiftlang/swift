@@ -2280,7 +2280,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
     unsigned idx = 0;
     for (auto &arg : args) {
-      auto nativeTy = arg.getType().getSwiftType(); // FIXME: wrong for functions
+      auto nativeTy = arg.getType().getSwiftType();// FIXME: wrong for functions
       auto bridgedTy =
         objcFnType->getParameters()[idx++].getSILType().getSwiftType();
       arg = emitNativeToBridgedValue(Loc,
