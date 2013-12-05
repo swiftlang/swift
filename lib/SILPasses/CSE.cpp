@@ -17,18 +17,18 @@
 
 #define DEBUG_TYPE "sil-cse"
 #include "swift/SILPasses/Passes.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/ScopedHashTable.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/RecyclingAllocator.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/ScopedHashTable.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/RecyclingAllocator.h"
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
