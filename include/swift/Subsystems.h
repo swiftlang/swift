@@ -18,6 +18,7 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -142,58 +143,6 @@ namespace swift {
   std::unique_ptr<SILModule> performSILGeneration(SourceFile &SF,
                                                   unsigned StartElem = 0);
 
-  /// performSILDefiniteInitialization - Perform definitive initialization
-  /// analysis, applying flow sensitive analysis to the SILGen generated code
-  /// to determine whether unadorned assignment operations are actually
-  /// assignment or if they are initializations.
-  void performSILDefiniteInitialization(SILModule *M);
-
-  /// performSILPredictableMemoryOptimizations - Perform predictable memory
-  /// optimizations, including promoting operations to SSA form so that later
-  /// analysis can depend on SSA use-def chains.
-  void performSILPredictableMemoryOptimizations(SILModule *M);
-
-  /// performSILAllocBoxToStackPromotion - Promote alloc_box into stack
-  /// allocations.
-  void performSILAllocBoxToStackPromotion(SILModule *M);
-
-  /// \brief Fold instructions with constant operands. Diagnose overflows when
-  /// possible.
-  void performSILConstantPropagation(SILModule *M);
-
-  /// \brief Detect and remove unreachable code. Diagnose provably unreachable
-  /// user code.
-  void performSILDeadCodeElimination(SILModule *M);
-
-  /// \brief Combine instructions to form fewer, simple instructions via a
-  /// simple worklist driven algorithm.
-  void performSILCombine(SILModule *M);
-
-  /// \brief Perform constant subexpression elimination.
-  void performSILCSE(SILModule *M);
-
-  /// \brief Simplify the CFG of SIL functions.
-  void performSimplifyCFG(SILModule *M);
-
-  /// \brief Link a SILFunction declaration to the actual definition in the
-  /// serialized modules.
-  void performSILLinking(SILModule *M);
-
-  /// \brief Optimize away shadow variables for any inout arguments that don't
-  /// escape.
-  void performInOutDeshadowing(SILModule *M);
-
-  /// \brief Inline functions marked transparent. Diagnose attempts to
-  /// circularly inline
-  void performSILMandatoryInlining(SILModule *M);
-
-  /// \brief Promote closure captures from [inout] to by-value.
-  void performSILCapturePromotion(SILModule *M);
-
-  /// \brief Analyze the SIL module for correcntess and generate user
-  /// diagnostics if any.
-  void emitSILDataflowDiagnostics(SILModule *M);
-
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
@@ -208,9 +157,6 @@ namespace swift {
                          const SILModule *M = nullptr,
                          ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
-
-  /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
-  void performSILCleanup(SILModule *M);
 
   /// Turn the given module into either LLVM IR or native code.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
