@@ -17,7 +17,13 @@ typedef signed char BOOL;
 
 @end
 
-@interface NSString : NSObject
+@protocol NSCoding
+@end
+
+@protocol NSSecureCoding <NSCoding>
+@end
+
+@interface NSString : NSObject <NSSecureCoding>
 - (void)onlyOnNSString;
 @end
 

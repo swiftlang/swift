@@ -1991,6 +1991,19 @@ namespace {
       return dc->getDeclaredTypeOfContext();
     }
 
+    /// Recursively add the given protocol and its inherited protocols to the
+    /// given vector, guarded by the known set of protocols.
+    static void addProtocols(ProtocolDecl *protocol,
+                             SmallVectorImpl<ProtocolDecl *> &protocols,
+                             llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
+      if (!known.insert(protocol))
+        return;
+
+      protocols.push_back(protocol);
+      for (auto inherited : protocol->getProtocols())
+        addProtocols(inherited, protocols, known);
+    }
+
     // Import the given Objective-C protocol list and return a context-allocated
     // ArrayRef that can be passed to the declaration.
     MutableArrayRef<ProtocolDecl *>
@@ -2006,8 +2019,7 @@ namespace {
       for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
            cp != cpEnd; ++cp) {
         if (auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp))) {
-          if (knownProtocols.insert(proto))
-            protocols.push_back(proto);
+          addProtocols(proto, protocols, knownProtocols);
         }
       }
 

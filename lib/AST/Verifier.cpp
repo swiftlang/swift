@@ -924,6 +924,29 @@ struct ASTNodeBase {};
       verifyCheckedBase(var);
     }
 
+
+    void verifyChecked(NominalTypeDecl *nominal) {
+      // Make sure that the protocol list is fully expanded.
+      SmallVector<ProtocolDecl *, 4> nominalProtocols(
+                                       nominal->getProtocols().begin(),
+                                       nominal->getProtocols().end());
+      ProtocolType::canonicalizeProtocols(nominalProtocols);
+
+      SmallVector<Type, 4> protocolTypes;
+      for (auto proto : nominal->getProtocols())
+        protocolTypes.push_back(proto->getDeclaredType());
+      SmallVector<ProtocolDecl *, 4> canonicalProtocols;
+      ProtocolCompositionType::get(nominal->getASTContext(), protocolTypes)
+        ->isExistentialType(canonicalProtocols);
+      if (nominalProtocols != canonicalProtocols) {
+        nominal->dumpRef(Out);
+        Out << " doesn't have a complete set of protocols\n";
+        abort();
+      }
+
+      verifyCheckedBase(nominal);
+    }
+
     void verifyParsed(EnumElementDecl *UED) {
       if (!isa<EnumDecl>(UED->getDeclContext())) {
         Out << "EnumElementDecl has wrong DeclContext";
