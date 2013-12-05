@@ -610,7 +610,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 /// Find the ValueDecl given a type and a member name.
 static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
-  P.SF.TU.lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
+  P.SF.lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
   assert(Lookup.size() == 1);
   return Lookup[0];
 }

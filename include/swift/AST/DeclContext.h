@@ -19,6 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -28,9 +29,11 @@ namespace swift {
   class ASTWalker;
   class DeclContext;
   class GenericParamList;
+  class LazyResolver;
   class SourceFile;
   class Type;
   class Module;
+  class ValueDecl;
 }
 
 namespace llvm {
@@ -203,6 +206,33 @@ public:
 
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
+
+  /// Look for the set of declarations with the given name within a type,
+  /// its extensions and, optionally, its supertypes.
+  ///
+  /// This routine performs name lookup within a given type, its extensions
+  /// and, optionally, its supertypes and their extensions, from the perspective
+  /// of the current DeclContext. It can eliminate non-visible, hidden, and
+  /// overridden declarations from the result set. It does not, however, perform
+  /// any filtering based on the semantic usefulness of the results.
+  ///
+  /// \param type The type to look into.
+  ///
+  /// \param name The name to search for.
+  ///
+  /// \param options Options that control name lookup, based on the
+  /// \c NL_* constants in \c NameLookupOptions.
+  ///
+  /// \param typeResolver Used to resolve types, usually for overload purposes.
+  /// May be null.
+  ///
+  /// \param[out] decls Will be populated with the declarations found by name
+  /// lookup.
+  ///
+  /// \returns true if anything was found.
+  bool lookupQualified(Type type, Identifier name, unsigned options,
+                       LazyResolver *typeResolver,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// getASTContext - Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.

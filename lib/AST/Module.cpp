@@ -1114,6 +1114,20 @@ void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
   forAllImportedModules<true>(this, thisPath, fn);
 }
 
+void
+FileUnit::forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn) {
+  getParentModule()->forAllVisibleModules(Module::AccessPathTy(), fn);
+
+  if (auto SF = dyn_cast<SourceFile>(this)) {
+    // Handle privately visible modules as well.
+    for (auto importPair : SF->getImports()) {
+      if (!importPair.second)
+        importPair.first.second->forAllVisibleModules(importPair.first.first,
+                                                      fn);
+    }
+  }
+}
+
 void Module::collectLinkLibraries(LinkLibraryCallback callback) {
   forAllImportedModules<false>(this, AccessPathTy(),
                                [=](ImportedModule import) -> bool {

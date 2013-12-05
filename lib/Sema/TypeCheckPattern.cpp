@@ -886,11 +886,8 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
           continue;
         VarDecl *prop = nullptr;
         SmallVector<ValueDecl *, 4> members;
-        if (!dc->getParentModule()->lookupQualified(type,
-                                                    elt.getPropertyName(),
-                                                    NL_QualifiedDefault,
-                                                    this,
-                                                    members)) {
+        if (!dc->lookupQualified(type, elt.getPropertyName(),
+                                 NL_QualifiedDefault, this, members)) {
           diagnose(elt.getSubPattern()->getLoc(),
                    diag::nominal_type_pattern_property_not_found,
                    elt.getPropertyName().str(), patTy);

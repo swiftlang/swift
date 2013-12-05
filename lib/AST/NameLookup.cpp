@@ -385,8 +385,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         TypeResolver->resolveDeclSignature(BaseDecl);
 
       SmallVector<ValueDecl *, 4> Lookup;
-      M.lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
-                        TypeResolver, Lookup);
+      DC->lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
+                          TypeResolver, Lookup);
       bool isMetatypeType = ExtendedType->is<MetaTypeType>();
       bool FoundAny = false;
       for (auto Result : Lookup) {
@@ -688,11 +688,20 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
   return { known->second.begin(), known->second.size() };
 }
 
-bool Module::lookupQualified(Type type,
-                             Identifier name,
-                             unsigned options,
-                             LazyResolver *typeResolver,
-                             SmallVectorImpl<ValueDecl *> &decls) {
+template <typename Fn>
+static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
+  DeclContext *moduleScope = DC->getModuleScopeContext();
+  if (auto file = dyn_cast<FileUnit>(moduleScope))
+    file->forAllVisibleModules(fn);
+  else
+    cast<Module>(moduleScope)->forAllVisibleModules(Module::AccessPathTy(), fn);
+}
+
+bool DeclContext::lookupQualified(Type type,
+                                  Identifier name,
+                                  unsigned options,
+                                  LazyResolver *typeResolver,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
   if (type->is<ErrorType>()) {
     return false;
   }
@@ -713,8 +722,8 @@ bool Module::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>()) {
     Module *module = moduleTy->getModule();
     // Perform the lookup in all imports of this module.
-    forAllVisibleModules(AccessPathTy(),
-                         [&](const ImportedModule &import) -> bool {
+    forAllVisibleModules(this,
+                         [&](const Module::ImportedModule &import) -> bool {
       using namespace namelookup;
       if (import.second != module)
         return true;
@@ -725,6 +734,7 @@ bool Module::lookupQualified(Type type,
       // to keep going.
       return !import.first.empty();
     });
+
     std::sort(decls.begin(), decls.end());
     auto afterUnique = std::unique(decls.begin(), decls.end());
     decls.erase(afterUnique, decls.end());
@@ -845,8 +855,7 @@ bool Module::lookupQualified(Type type,
   if (wantLookupInAllClasses) {
     // Collect all of the visible declarations.
     SmallVector<ValueDecl *, 4> allDecls;
-    forAllVisibleModules(Module::AccessPathTy(),
-                         [&](Module::ImportedModule import) {
+    forAllVisibleModules(this, [&](Module::ImportedModule import) {
       import.second->lookupClassMember(import.first, name, allDecls);
     });
 
@@ -896,7 +905,7 @@ bool Module::lookupQualified(Type type,
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   if (options & NL_RemoveNonVisible) {
-    removeShadowedDecls(decls, this, typeResolver);
+    removeShadowedDecls(decls, getParentModule(), typeResolver);
   }
 
   // We're done. Report success/failure.
