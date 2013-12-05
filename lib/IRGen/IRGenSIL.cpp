@@ -326,6 +326,7 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
+  llvm::DenseMap<const VarDecl *, unsigned> ArgNo;
   
   SILFunction *CurSILFn;
   ExplosionKind CurSILFnExplosionLevel;
@@ -989,23 +990,24 @@ void IRGenSILFunction::emitSILFunction() {
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
-  if (!IGM.DebugInfo) return;
-  if (!BB->pred_empty()) return;
+  assert(BB->pred_empty());
+  if (!IGM.DebugInfo)
+    return;
+
   // This is the prologue of a function. Emit debug info for all
   // trivial arguments and any captured and promoted [inout]
   // variables.
-  int ArgNo = 0;
+  int N = 0;
   for (auto Arg : BB->getBBArgs()) {
-    ++ArgNo;
-
+    ++N;
+    const LoweredValue &LoweredArg = getLoweredValue(Arg);
     if (!Arg->getDecl())
       continue;
 
-    // These are handled in visitAllocStackInst.
+    // Generic types were already handled in visitAllocStackInst.
     if (Arg->getType().isExistentialType())
       continue;
 
-    const LoweredValue &LoweredArg = getLoweredValue(Arg);
     if (LoweredArg.isAddress()) {
       auto Name = Arg->getDecl()->getName().str();
       auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
@@ -1013,7 +1015,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                         getTypeInfo(Arg->getType()),
                         getDebugScope());
       IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
-                                                ArgNo, DirectValue);
+                                                N, DirectValue);
     }
   }
 }
@@ -1028,6 +1030,15 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
   bool InEntryBlock = BB->pred_empty();
   bool ArgsEmitted = false;
+
+  if (InEntryBlock) {
+    unsigned N = 1;
+    for (auto Arg : BB->getBBArgs()) {
+      if (auto VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
+        ArgNo.insert( {VD, N} );
+      ++N;
+    }
+  }
 
   // Generate the body.
   for (auto &I : *BB) {
@@ -2192,13 +2203,18 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     "";
 
   auto addr = type.allocateStack(*this, dbgname);
-  if (IGM.DebugInfo && Decl)
-    IGM.DebugInfo->emitStackVariableDeclaration(Builder,
-                                                addr.getAddressPointer(),
-                                                DebugTypeInfo(Decl, type,
-                                                              i->getDebugScope()),
-                                                Decl->getName().str(),
-                                                i, DirectValue);
+  if (IGM.DebugInfo && Decl) {
+    auto AddrIR = addr.getAddressPointer();
+    auto DTI = DebugTypeInfo(Decl, type, i->getDebugScope());
+    auto Name = Decl->getName().str();
+    auto N = ArgNo.find(cast<VarDecl>(Decl));
+    if (N != ArgNo.end())
+      IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
+                                                N->second, DirectValue);
+    else
+      IGM.DebugInfo->emitStackVariableDeclaration(Builder, AddrIR, DTI, Name,
+                                                  i, DirectValue);
+  }
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());

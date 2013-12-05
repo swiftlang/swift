@@ -89,11 +89,6 @@ class IRGenDebugInfo {
   // through the list of imports.
   std::map<StringRef, llvm::WeakVH> Functions;
 
-  // These are used by getArgNo.
-  SILFunction *LastFn;
-  SILBasicBlock::const_bbarg_iterator LastArg, LastEnd;
-  unsigned LastArgNo;
-
   llvm::SmallString<256> MainFilename;
   StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
@@ -194,7 +189,8 @@ public:
                                   DebugTypeInfo Ty,
                                   StringRef Name,
                                   unsigned ArgNo,
-                                  IndirectionKind Indirection = DirectValue,
+                                  IndirectionKind = DirectValue,
+                                  ArtificialKind = RealValue,
                                   IntrinsicKind = Declare);
 
   /// Emit debug metadata for a global variable.
@@ -245,7 +241,6 @@ private:
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
                                  DeclContext* DeclContext);
-  unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
   llvm::DIScope getOrCreateNamespace(llvm::DIScope Namespace,
                                      std::string MangledName,
@@ -278,13 +273,6 @@ private:
   createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl, StringRef Name,
                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
                   unsigned Flags);
-  bool emitVarDeclForSILArgOrNull(IRBuilder& Builder,
-                                  llvm::Value *Storage,
-                                  DebugTypeInfo Ty,
-                                  StringRef Name,
-                                  SILFunction *Fn,
-                                  SILValue Value,
-                                  IndirectionKind Indirection);
   TypeAliasDecl *getMetadataType();
 };
 

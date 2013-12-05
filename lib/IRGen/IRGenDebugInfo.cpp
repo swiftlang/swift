@@ -77,7 +77,6 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     M(M),
     DBuilder(M),
     IGM(IGM),
-    LastFn(nullptr),
     MetadataTypeDecl(nullptr),
     LastLoc({}),
     LastScope(nullptr)
@@ -646,53 +645,6 @@ void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
   setCurrentLoc(Builder, Scope);
 }
 
-/// Return the position of Arg in Fn's signature, counting from 1.
-unsigned IRGenDebugInfo::getArgNo(SILFunction *Fn, SILArgument *Arg) {
-  // Based on the assumption that arguments will appear in order in the
-  // instruction stream, make one attempt to reuse the last iterator.
-  // LastFn also acts as a sentinel for LastArg/End.
-  if (Fn == LastFn) {
-    ++LastArg; ++LastArgNo;
-    if (LastArg != LastEnd && *LastArg == Arg)
-      return LastArgNo;
-  }
-  // Otherwise perform a linear scan through all the arguments.
-  LastArgNo = 1;
-  if (!Fn->empty()) {
-    const SILBasicBlock &FirstBB = Fn->front();
-    LastArg = FirstBB.bbarg_begin();
-    LastEnd = FirstBB.bbarg_end();
-    LastFn = Fn;
-    while (LastArg != LastEnd) {
-      if (*LastArg == Arg)
-        return LastArgNo;
-
-      ++LastArg; ++LastArgNo;
-    }
-  }
-  LastFn = nullptr;
-  DEBUG(llvm::dbgs() << "Failed to find argument number for ";
-        Arg->dump(); llvm::dbgs() << "\nIn:"; Fn->dump());
-  return 0;
-}
-
-bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
-                                                llvm::Value *Storage,
-                                                DebugTypeInfo Ty,
-                                                StringRef Name,
-                                                SILFunction *Fn,
-                                                SILValue Value,
-                                                IndirectionKind Indirection) {
-  if (auto SILArg = dyn_cast<SILArgument>(Value)) {
-    if (unsigned ArgNo = getArgNo(Fn, SILArg)) {
-      emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                                 ArgNo, Indirection);
-      return true;
-    }
-  }
-  return false;
-}
-
 TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl)
     MetadataTypeDecl = new (IGM.Context)
@@ -717,24 +669,6 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
     Storage = llvm::ConstantInt::get(Int64Ty, 0);
     IntrinsicKind = Value;
   }
-  // Make a best effort to find out if this variable is actually an
-  // argument of the current function. This is done by looking at the
-  // source of the first store to this alloca.  Unless we start
-  // enriching SIL with debug metadata or debug intrinsics, that's the
-  // best we can do.
-  for (auto Use : I->getUses()) {
-    if (auto Store = dyn_cast<StoreInst>(Use->getUser())) {
-      auto Src = Store->getSrc();
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name,
-                                     I->getFunction(), Src, Indirection))
-        return;
-    } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
-                                     CopyAddr->getSrc(), Indirection))
-        return;
-    }
-  }
-
   emitVariableDeclaration(B, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable, 0, Indirection,
                           RealValue, IntrinsicKind);
@@ -764,13 +698,17 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 StringRef Name,
                                                 unsigned ArgNo,
                                                 IndirectionKind Indirection,
+                                                ArtificialKind IsArtificial,
                                                 IntrinsicKind Intrinsic) {
   assert(ArgNo > 0);
-  emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo,
-                          Indirection,
-                          Name == "self" ? ArtificialValue : RealValue,
-                          Intrinsic);
+  if (Name == IGM.Context.SelfIdentifier.str())
+    emitVariableDeclaration(Builder, Storage, Ty, Name,
+                            llvm::dwarf::DW_TAG_arg_variable, ArgNo,
+                            DirectValue, ArtificialValue, Intrinsic);
+  else
+    emitVariableDeclaration(Builder, Storage, Ty, Name,
+                            llvm::dwarf::DW_TAG_arg_variable, ArgNo,
+                            Indirection, IsArtificial, Intrinsic);
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -847,7 +785,6 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                               Unit, Line, DTy,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
-
   // Insert a debug intrinsic into the current block.
   auto Call = DbgValue
     ? DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor,
@@ -923,8 +860,8 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   for (auto ElemTy : TupleTy->getElementTypes()) {
     // Wrap the type in a fake VarDecl so we cann pass the DeclContext
     // to the Mangler.
-    VarDecl VD(/*static*/ false, SourceLoc(), Identifier::getEmptyKey(),
-               ElemTy, DeclContext);
+    VarDecl VD(/*static*/ false, SourceLoc(),
+               Identifier::getEmptyKey(), ElemTy, DeclContext);
     DebugTypeInfo DTI(&VD, IGM.getTypeInfoForUnlowered(ElemTy));
     Elements.push_back(createMemberType(DTI, StringRef(), OffsetInBits,
                                         Scope, File, Flags));
@@ -1033,8 +970,8 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                       llvm::DIDescriptor Scope)
 {
   if (auto Decl = DbgTy.getDecl()) {
-    VarDecl VD(/*static*/ false,
-               SourceLoc(), Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
+    VarDecl VD(/*static*/ false, SourceLoc(),
+               Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
     return getOrCreateType(DebugTypeInfo(&VD, DbgTy.size, DbgTy.align), Scope);
   }
   return getOrCreateType(DebugTypeInfo(Ty, DbgTy.size, DbgTy.align), Scope);

@@ -2323,7 +2323,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Emit the 'self' argument and store it to the lvalue.
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin());
+  SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
   B.createStore(ctor, selfArg, selfLV);
