@@ -303,7 +303,7 @@ private:
 //===----------------------------------------------------------------------===//
 
 bool CSE::runOnFunction(SILFunction &F) {
-  std::deque<StackNode *> nodesToProcess;
+  std::vector<StackNode *> nodesToProcess;
 
   DominanceInfo DT(&F);
 
@@ -317,7 +317,7 @@ bool CSE::runOnFunction(SILFunction &F) {
   bool Changed = false;
 
   // Process the root node.
-  nodesToProcess.push_front(
+  nodesToProcess.push_back(
     new StackNode(AvailableValues, AvailableLoads,
                   CurrentGeneration, DT.getRootNode(),
                   DT.getRootNode()->begin(),
@@ -330,7 +330,7 @@ bool CSE::runOnFunction(SILFunction &F) {
   while (!nodesToProcess.empty()) {
     // Grab the first item off the stack. Set the current generation, remove
     // the node from the stack, and process it.
-    StackNode *NodeToProcess = nodesToProcess.front();
+    StackNode *NodeToProcess = nodesToProcess.back();
 
     // Initialize class members.
     CurrentGeneration = NodeToProcess->currentGeneration();
@@ -345,7 +345,7 @@ bool CSE::runOnFunction(SILFunction &F) {
     } else if (NodeToProcess->childIter() != NodeToProcess->end()) {
       // Push the next child onto the stack.
       DominanceInfoNode *child = NodeToProcess->nextChild();
-      nodesToProcess.push_front(
+      nodesToProcess.push_back(
           new StackNode(AvailableValues,
                         AvailableLoads,
                         NodeToProcess->childGeneration(), child,
@@ -354,7 +354,7 @@ bool CSE::runOnFunction(SILFunction &F) {
       // It has been processed, and there are no more children to process,
       // so delete it and pop it off the stack.
       delete NodeToProcess;
-      nodesToProcess.pop_front();
+      nodesToProcess.pop_back();
     }
   } // while (!nodes...)
 
