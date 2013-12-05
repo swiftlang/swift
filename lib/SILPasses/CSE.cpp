@@ -66,6 +66,7 @@ namespace {
       case ValueKind::StructInst:
       case ValueKind::StructExtractInst:
       case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleInst:
         return true;
       default:
         return false;
@@ -146,6 +147,14 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
                               X->getStructDecl(),
                               X->getField(),
                               X->getOperand());
+  }
+  case ValueKind::TupleInst: {
+    auto *X = cast<TupleInst>(Inst);
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(unsigned(ValueKind::TupleInst),
+                              X->getTupleType(),
+                              llvm::hash_combine_range(Operands.begin(),
+                                                       Operands.end()));
   }
   default:
     llvm_unreachable("Unhandled ValueKind.");

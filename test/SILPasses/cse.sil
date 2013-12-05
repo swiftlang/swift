@@ -549,3 +549,16 @@ bb0(%0 : $*Interval):
   return %4 : $(Builtin.Int32)
 }
 
+sil @tuple_function : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
+
+// CHECK-LABEL: tuple_test
+// CHECK: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
+// CHECK-NOT: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
+sil @tuple_test : $@thin (Builtin.Int32, Builtin.Int32) -> (Builtin.Int32) {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+  %3 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)  
+  %4 = function_ref @tuple_function : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
+  %5 = apply %4(%2, %3) : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
+  return %5 : $(Builtin.Int32)
+}
