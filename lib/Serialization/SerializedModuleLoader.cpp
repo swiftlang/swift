@@ -33,11 +33,6 @@ typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
-StringRef SerializedModuleLoader::FailedImportModuleLoader::getModuleFilename(
-    const Module *Module) {
-  return cast<FailedImportModule>(Module)->ModuleFilename;
-}
-
 // FIXME: Copied from SourceLoader. Not bothering to fix until we decide that
 // the source loader search path should be the same as the module loader search
 // path.
@@ -139,21 +134,14 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Whether we succeed or fail, don't try to load this module again.
-  Module *&moduleRef = Ctx.LoadedModules[moduleID.first.str()];
-
-  if (err != ModuleStatus::Valid) {
-    StringRef name = loadedModuleFile->getModuleFilename();
-    moduleRef = new (Ctx) FailedImportModule(moduleID.first, err, name,
-                                             Ctx, FailedImportLoader);
-    return moduleRef;
-  }
-
   auto TU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
+  Ctx.LoadedModules[moduleID.first.str()] = TU;
+
+  if (err != ModuleStatus::Valid)
+    return TU;
+
   auto fileUnit = new (Ctx) SerializedASTFile(*TU, *loadedModuleFile);
   TU->addFile(*fileUnit);
-  moduleRef = TU;
-
-  // moduleRef is no longer valid as soon as we start loading dependencies.
 
   if (loadedModuleFile->associateWithFileContext(fileUnit)) {
     LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -162,6 +150,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // We failed to bring the module file into the AST.
+  TU->removeFile(*fileUnit);
   assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
 
   SmallVector<ModuleFile::Dependency, 4> missing;
@@ -194,13 +183,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Don't try to load this module again.
-  Module *failedModule =
-    new (Ctx) FailedImportModule(moduleID.first,
-                                 loadedModuleFile->getStatus(),
-                                 loadedModuleFile->getModuleFilename(),
-                                 Ctx, FailedImportLoader);
-  Ctx.LoadedModules[moduleID.first.str()] = failedModule;
-  return failedModule;
+  return TU;
 }
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,

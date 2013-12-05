@@ -27,20 +27,6 @@ class ModuleFile;
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public ModuleLoader {
 private:
-  /// This is only used to pass as owner of FailedImportModules so that the
-  /// rest of SerializedModuleLoader can assume that it is receiving valid
-  /// modules.
-  class FailedImportModuleLoader : public ModuleLoader {
-    Module *loadModule(SourceLoc importLoc,
-                     ArrayRef<std::pair<Identifier, SourceLoc>> path) override {
-      return nullptr;
-    }
-
-    StringRef getModuleFilename(const Module *Module) override;
-  };
-
-  FailedImportModuleLoader FailedImportLoader;
-
   ASTContext &Ctx;
   std::map<std::string, std::unique_ptr<llvm::MemoryBuffer> > MemoryBuffers;
   /// A { module, generation # } pair.
@@ -106,28 +92,6 @@ enum class ModuleStatus {
 
   /// The module file is malformed in some way.
   Malformed
-};
-
-/// Represents a module that failed to get imported.
-class FailedImportModule : public LoadedModule {
-public:
-  const ModuleStatus Status;
-  std::string ModuleFilename;
-
-  FailedImportModule(Identifier Name, ModuleStatus Status,
-                     StringRef ModuleFilename,
-                     ASTContext &Ctx, ModuleLoader &Owner)
-    : LoadedModule(ModuleKind::FailedImport, Name, {}, Ctx, Owner),
-      Status(Status) {
-    assert(Status != ModuleStatus::Valid && "module is valid ?");
-  }
-
-  static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::FailedImport;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<Module>(DC) && classof(cast<Module>(DC));
-  }
 };
 
 } // end namespace swift

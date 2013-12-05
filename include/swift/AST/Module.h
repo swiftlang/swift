@@ -634,6 +634,8 @@ class TranslationUnit : public Module {
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
 
+  // FIXME: This storage is never freed, because Modules are allocated on the
+  // ASTContext.
   TinyPtrVector<FileUnit *> Files;
 
 public:
@@ -655,6 +657,18 @@ public:
            cast<SourceFile>(newFile).Kind == SourceFile::Library ||
            cast<SourceFile>(newFile).Kind == SourceFile::SIL);
     Files.push_back(&newFile);
+  }
+
+  void removeFile(FileUnit &existingFile) {
+    // Do a reverse search; usually the file to be deleted will be at the end.
+    std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
+                                                     E(Files.begin());
+    I = std::find(I, E, &existingFile);
+    assert(I != E);
+
+    // Adjust for the std::reverse_iterator offset.
+    ++I;
+    Files.erase(I.base());
   }
 
   /// Convenience accessor for clients that know what kind of file they're
