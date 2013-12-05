@@ -74,7 +74,7 @@ public:
   /// True if this is a declaration of a variable defined in another module.
   bool isExternalDeclaration() const { return !IsDefinition; }
   /// True if this is a definition of the variable.
-  bool isDefinition() const { return !IsDefinition; }
+  bool isDefinition() const { return IsDefinition; }
   void setDefinition(bool b) { IsDefinition = b; }
   
   /// Get this function's linkage attribute.
