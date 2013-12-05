@@ -1408,7 +1408,7 @@ ERROR(assignment_lhs_not_settable,sema_tcs,none,
 
 // ForEach Stmt
 ERROR(enumerable_protocol_broken,sema_tcs,none,
-      "Enumerable protocol definition is broken", ())
+      "Sequence protocol definition is broken", ())
 ERROR(generator_protocol_broken,sema_tcs,none,
       "Generator protocol definition is broken", ())
 

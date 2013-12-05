@@ -231,9 +231,9 @@ public:
       return nullptr;
     S->setContainer(Container);
 
-    // Retrieve the 'Enumerable' protocol.
+    // Retrieve the 'Sequence' protocol.
     ProtocolDecl *EnumerableProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Enumerable);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
     if (!EnumerableProto) {
       return nullptr;
     }
@@ -245,7 +245,7 @@ public:
       return nullptr;
     }
     
-    // Verify that the container conforms to the Enumerable protocol, and
+    // Verify that the container conforms to the Sequence protocol, and
     // invoke getElements() on it container to retrieve the range of elements.
     Type GeneratorTy;
     VarDecl *Generator;

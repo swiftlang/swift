@@ -888,7 +888,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     // If the container expression turns out to be a closure, then it was not
     // the container expression, but the 'for' statement body.  We can not have
     // a bare closure as a container expression because closures don't conform
-    // to Enumerable.
+    // to Sequence.
     Container =
         makeParserErrorResult(new (Context) ErrorExpr(CE->getStartLoc()));
 

@@ -992,7 +992,7 @@ namespace index_block {
     FORCE_DESERIALIZATION,
 
     ArrayBound = 1,
-    Enumerable,
+    Sequence,
     // killed
     LogicValue = 4,
 
