@@ -96,6 +96,10 @@ struct ASTContext::Implementation {
   /// they were imported.
   llvm::DenseMap<swift::Decl *, ClangNode> ClangNodes;
 
+  /// \brief Map from local declarations to their discriminators.
+  /// Missing entries implicitly have value 0.
+  llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -699,6 +703,24 @@ ClangNode ASTContext::getClangNode(Decl *decl) {
 
 void ASTContext::setClangNode(Decl *decl, ClangNode node) {
   Impl.ClangNodes[decl] = node;
+}
+
+unsigned ValueDecl::getLocalDiscriminator() const {
+  assert(getDeclContext()->isLocalContext());
+  auto &discriminators = getASTContext().Impl.LocalDiscriminators;
+  auto it = discriminators.find(this);
+  if (it == discriminators.end())
+    return 0;
+  return it->second;
+}
+
+void ValueDecl::setLocalDiscriminator(unsigned index) {
+  assert(getDeclContext()->isLocalContext());
+  if (!index) {
+    assert(!getASTContext().Impl.LocalDiscriminators.count(this));
+    return;
+  }
+  getASTContext().Impl.LocalDiscriminators.insert({this, index});
 }
 
 void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {

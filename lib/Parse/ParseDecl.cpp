@@ -465,6 +465,18 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
   }
 }
 
+void Parser::setLocalDiscriminator(ValueDecl *D) {
+  // If we're not in a local context, this is unnecessary.
+  if (!LocalDiscriminators) return;
+
+  Identifier name = D->getName();
+  assert(!name.empty() &&
+         "setting a local discriminator on an anonymous decl; "
+         "maybe the name hasn't been set yet?");
+  unsigned discriminator = (*LocalDiscriminators)[name]++;
+  D->setLocalDiscriminator(discriminator);
+}
+
 /// \brief Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -1160,7 +1172,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
 
       // Establish the new context.
-      ContextChange CC(*this, Get);
+      ParseFunctionBody CC(*this, Get);
 
       SmallVector<ASTNode, 16> Entries;
       parseBraceItems(Entries, BraceItemListKind::Variable);
@@ -1281,7 +1293,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
     // Establish the new context.
-    ContextChange CC(*this, Set);
+    ParseFunctionBody CC(*this, Set);
     
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
@@ -1334,6 +1346,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
       diagnose(pattern.getLoc(), diag::getset_missing_type);
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
+
+  setLocalDiscriminator(PrimaryVar);
   
   SourceLoc LBLoc = consumeToken(tok::l_brace);
     
@@ -1684,6 +1698,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
 
     addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
     setVarContext(FD->getArgParamPatterns(), FD);
+    setLocalDiscriminator(FD);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -1694,7 +1709,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     }
 
     // Establish the new context.
-    ContextChange CC(*this, FD);
+    ParseFunctionBody CC(*this, FD);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -1762,7 +1777,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
-  ContextChange CC(*this, AFD);
+  ParseFunctionBody CC(*this, AFD);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -1810,6 +1825,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
 
   EnumDecl *UD = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
+  setLocalDiscriminator(UD);
 
   if (Attributes.isValid())
     UD->getMutableAttrs() = Attributes;
@@ -2068,6 +2084,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
                                             { },
                                             GenericParams,
                                             CurDeclContext);
+  setLocalDiscriminator(SD);
 
   if (Attributes.isValid())
     SD->getMutableAttrs() = Attributes;
@@ -2152,6 +2169,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext);
+  setLocalDiscriminator(CD);
 
   // Attach attributes.
   if (Attributes.isValid())
@@ -2238,6 +2256,7 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
                                  Context.AllocateCopy(InheritedProtocols));
+  // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   if (Attributes.isValid())
     Proto->getMutableAttrs() = Attributes;
@@ -2376,6 +2395,9 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
                                     SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy.get(), DefRange,
                                     Get, Set, CurDeclContext);
+    // No need to setLocalDiscriminator because subscripts cannot
+    // validly appear outside of type decls.
+
     if (Attributes.isValid())
       Subscript->getMutableAttrs() = Attributes;
 
@@ -2445,6 +2467,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
       new (Context) ConstructorDecl(Context.getIdentifier("init"),
                                     ConstructorLoc, ArgPattern, BodyPattern,
                                     SelfDecl, GenericParams, CurDeclContext);
+  // No need to setLocalDiscriminator.
 
   if (HasSelectorStyleSignature)
     CD->setHasSelectorStyleSignature();
@@ -2482,7 +2505,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
     }
   } else {
     // Parse the body.
-    ContextChange CC(*this, CD);
+    ParseFunctionBody CC(*this, CD);
 
     if (!isDelayedParsingEnabled()) {
       ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
@@ -2560,13 +2583,14 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   DestructorDecl *DD
     = new (Context) DestructorDecl(Context.getIdentifier("destructor"),
                                  DestructorLoc, SelfDecl, CurDeclContext);
+  // No need to setLocalDiscriminator.
 
   SelfDecl->setDeclContext(DD);
   addToScope(SelfDecl);
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {
-    ContextChange CC(*this, DD);
+    ParseFunctionBody CC(*this, DD);
     if (!isDelayedParsingEnabled()) {
       ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 

@@ -1155,6 +1155,14 @@ public:
   /// function requires capturing it.
   bool needsCapture() const;
 
+  /// Retrieve the context discriminator for this local value, which
+  /// is the index of this declaration in the sequence of
+  /// discriminated declarations with the same name in the current
+  /// context.  Only local functions and variables with getters and
+  /// setters have discriminators.
+  unsigned getLocalDiscriminator() const;
+  void setLocalDiscriminator(unsigned index);
+
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
 

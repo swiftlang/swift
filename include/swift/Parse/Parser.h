@@ -82,6 +82,9 @@ public:
   unsigned VarPatternDepth = 0;
   bool GreaterThanIsOperator = true;
 
+  typedef llvm::DenseMap<Identifier, unsigned> LocalDiscriminatorMap;
+  LocalDiscriminatorMap *LocalDiscriminators = nullptr;
+
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
   bool isDelayedParsingEnabled() const { return DelayedParseCB != nullptr; }
@@ -110,25 +113,49 @@ public:
   
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
+  protected:
     Parser &P;
     DeclContext *OldContext;
+    LocalDiscriminatorMap *OldDiscriminators;
   public:
-    ContextChange(Parser &P, DeclContext *DC)
-      : P(P), OldContext(P.CurDeclContext) {
+    ContextChange(Parser &P, DeclContext *DC,
+                  LocalDiscriminatorMap *discriminators = nullptr)
+      : P(P), OldContext(P.CurDeclContext),
+        OldDiscriminators(P.LocalDiscriminators) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
+      P.LocalDiscriminators = discriminators;
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
     /// Makes the destructor a no-op.
     void pop() {
       assert(OldContext && "already popped context!");
-      P.CurDeclContext = OldContext;
+      popImpl();
       OldContext = nullptr;
     }
 
     ~ContextChange() {
-      if (OldContext) P.CurDeclContext = OldContext;
+      if (OldContext) popImpl();
+    }
+
+  private:
+    void popImpl() {
+      P.CurDeclContext = OldContext;
+      P.LocalDiscriminators = OldDiscriminators;
+    }
+  };
+
+  /// A RAII object for parsing a new function/closure body.
+  class ParseFunctionBody {
+    LocalDiscriminatorMap LocalDiscriminators;
+    ContextChange CC;
+  public:
+    ParseFunctionBody(Parser &P, DeclContext *DC)
+      : CC(P, DC, &LocalDiscriminators) {}
+
+    void pop() {
+      CC.pop();
     }
   };
 
@@ -479,6 +506,8 @@ public:
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
                                             bool isAssociatedType,
                                             DeclAttributes &Attributes);
+
+  void setLocalDiscriminator(ValueDecl *D);
 
   /// \brief Add the variables in the given pattern to the current scope,
   /// collecting the variables in the vector \c Decls and applying
