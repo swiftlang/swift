@@ -1452,7 +1452,6 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         TypeMatchKind kind, unsigned flags,
                                         ConstraintLocatorBuilder locator) {
-  // FIXME: Should allow other conversions as well.
   SmallVector<ProtocolDecl *, 4> protocols;
 
   bool existential = type2->isExistentialType(protocols);
@@ -1563,10 +1562,24 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
 
   // Relate the output of the conversion function to the other type, using
   // the provided constraint kind.
-  cs.addConstraint(kind, outputTV, otherType,
-                   cs.getConstraintLocator(
-                     locator.withPathElement(
-                       ConstraintLocator::ConversionResult)));
+  // If the type we're converting to is existential, we can also have an
+  // existential conversion here, so introduce a disjunction.
+  auto resultLocator = cs.getConstraintLocator(
+                         locator.withPathElement(
+                           ConstraintLocator::ConversionResult));
+  if (otherType->isExistentialType()) {
+    Constraint *constraints[2] = {
+      new (cs) Constraint(kind, outputTV, otherType, Identifier(),
+                          resultLocator),
+      new (cs) Constraint(ConstraintKind::Conversion,
+                          ConversionRestrictionKind::Existential,
+                          outputTV, otherType, resultLocator)
+    };
+    cs.addConstraint(Constraint::createDisjunction(cs, constraints,
+                                                   resultLocator));
+  } else {
+    cs.addConstraint(kind, outputTV, otherType, resultLocator);
+  }
 
   return ConstraintSystem::SolutionKind::Solved;
 }
