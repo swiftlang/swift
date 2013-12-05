@@ -12,13 +12,19 @@
       var maybeMutable = o as NSMutableString // has type NSMutableString?
     }
 
-* Operator precedence has been simplified:
-    "exponentiative:" <<, >>
-    "multiplicative:" *, /, %, &
-    "additive:" +, -, |, ^
-    "comparative:" ==, !=, <, <=, >=, >
-    "conjunctive:" &&
-    "disjunctive:" ||
+* The precedence levels of binary operators has been redefined, with a much 
+  simpler model than C's.  This is with a goal to define away classes of bugs
+  such as those caught by Clang's -Wparentheses warnings, and to make it 
+  actually possible for normal humans to reason about the precedence 
+  relationships without having to look them up.
+  
+  We ended up with 6 levels, from tightest binding to loosest:
+    exponentiative: <<, >>
+    multiplicative: *, /, %, &
+    additive: +, -, |, ^
+    comparative: ==, !=, <, <=, >=, >
+    conjunctive: &&
+    disjunctive: ||
 
 2013-12-04
 ----------
