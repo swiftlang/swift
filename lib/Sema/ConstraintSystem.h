@@ -1682,8 +1682,9 @@ public:
   /// \brief Given a set of viable solutions, find the best
   /// solution.
   ///
-  /// \returns the best solution, or null if there is no best solution.
-  Solution *findBestSolution(SmallVectorImpl<Solution> &solutions);
+  /// \returns The index of the best solution, or nothing if there was no
+  /// best solution.
+  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.

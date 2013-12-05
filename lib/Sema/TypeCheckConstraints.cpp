@@ -3717,12 +3717,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                   : SolutionCompareResult::Incomparable;
 }
 
-Solution *
-ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
+Optional<unsigned>
+ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable) {
   if (viable.empty())
-    return nullptr;
+    return Nothing;
   if (viable.size() == 1)
-    return &viable[0];
+    return 0;
 
   SolutionDiff diff(viable);
 
@@ -3758,14 +3758,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
 
     case SolutionCompareResult::Incomparable:
     case SolutionCompareResult::Worse:
-      return nullptr;
+      return Nothing;
     }
   }
 
   // FIXME: If we lost our best, we should minimize the set of viable
   // solutions.
 
-  return &viable[bestIdx];
+  return bestIdx;
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {

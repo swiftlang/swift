@@ -814,8 +814,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // solution.
     if (solutions.size() > 1) {
       if (auto best = findBestSolution(solutions)) {
-        if (best != &solutions[0])
-          solutions[0] = std::move(*best);
+        if (*best != 0)
+          solutions[0] = std::move(solutions[*best]);
         solutions.erase(solutions.begin() + 1, solutions.end());
       }
     }
