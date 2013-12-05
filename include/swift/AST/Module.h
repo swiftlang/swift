@@ -42,6 +42,7 @@ namespace swift {
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class ExternalNameLookup;
+  class FileUnit;
   class InfixOperatorDecl;
   class LinkLibrary;
   class LookupCache;
@@ -55,7 +56,6 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
-  class TranslationUnit;
   class TupleType;
   class Type;
   class ValueDecl;
@@ -66,15 +66,6 @@ namespace swift {
   enum class NLKind {
     UnqualifiedLookup,
     QualifiedLookup
-  };
-
-  enum class ModuleKind {
-    TranslationUnit,
-    Builtin,
-    Serialized,
-    Clang,
-    /// A 'module' placeholder for failed imports.
-    FailedImport
   };
 
 /// Constants used to customize name lookup.
@@ -127,38 +118,87 @@ enum class ConformanceKind {
 typedef llvm::PointerIntPair<ProtocolConformance *, 2, ConformanceKind>
   LookupConformanceResult;
 
-/// Module - A unit of modularity.  The current translation unit is a
-/// module, as is an imported module.
+/// Discriminator for file-units.
+enum class FileUnitKind {
+  /// For a .swift source file.
+  Source,
+  /// For the compiler Builtin module.
+  Builtin,
+  /// A serialized Swift AST.
+  SerializedAST,
+  /// An imported Clang module.
+  ClangModule
+};
+
+enum class SourceFileKind {
+  Library,  ///< A normal .swift file.
+  Main,     ///< A .swift file that can have top-level code.
+  REPL,     ///< A virtual file that holds the user's input in the REPL.
+  SIL       ///< Came from a .sil file.
+};
+
+/// The minimum unit of compilation.
+///
+/// A module is made up of several file-units, which are all part of the same
+/// output binary and logical module (such as a single library or executable).
+///
+/// \sa FileUnit
 class Module : public DeclContext {
-  ModuleKind Kind;
-public:
-  ASTContext &Ctx;
-  Identifier Name;
-
-protected:
-  Module(ModuleKind Kind, Identifier Name, ASTContext &Ctx)
-  : DeclContext(DeclContextKind::Module, nullptr),
-    Kind(Kind), Ctx(Ctx), Name(Name) {}
-
-private:
-  template <typename FUMemFn, FUMemFn FULOOKUP,
-            typename ...Args>
-  void forwardToSourceFiles(Args &&...args) const;
-
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
 
-  ModuleKind getKind() const { return Kind; }
+public:
+  ASTContext &Ctx;
+  Identifier Name;
+
+private:
+  /// If non-NULL, an plug-in that should be used when performing external
+  /// lookups.
+  // FIXME: Do we really need to bloat all modules with this?
+  ExternalNameLookup *ExternalLookup = nullptr;
+
+  // FIXME: This storage is never freed, because Modules are allocated on the
+  // ASTContext.
+  TinyPtrVector<FileUnit *> Files;
+
+public:
+  Module(Identifier Name, ASTContext &C)
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(C), Name(Name) {
+  }
+
+  ArrayRef<FileUnit *> getFiles() {
+    return Files;
+  }
+  ArrayRef<const FileUnit *> getFiles() const {
+    return { Files.begin(), Files.size() };
+  }
+
+  void addFile(FileUnit &newFile);
+  void removeFile(FileUnit &existingFile);
+
+  /// Convenience accessor for clients that know what kind of file they're
+  /// dealing with.
+  SourceFile &getMainSourceFile(SourceFileKind expectedKind) const;
+
+  /// Convenience accessor for clients that know what kind of file they're
+  /// dealing with.
+  FileUnit &getMainFile(FileUnitKind expectedKind) const;
+
+  ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
+  void setExternalLookup(ExternalNameLookup *R) {
+    assert(!ExternalLookup && "Name resolver already set");
+    ExternalLookup = R;
+  }
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
+  void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
-  
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -258,12 +298,12 @@ public:
                             std::function<void(ImportedModule)> fn) {
     forAllVisibleModules(topLevelAccessPath,
                          [=](const ImportedModule &import) -> bool {
-      fn(import);
-      return true;
-    });
+                           fn(import);
+                           return true;
+                         });
     return true;
   }
-  
+
   template <typename Fn>
   bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
                             const Fn &fn) {
@@ -273,7 +313,7 @@ public:
   }
 
   /// @}
-  
+
   using LinkLibraryCallback = std::function<void(LinkLibrary)>;
 
   /// @{
@@ -281,7 +321,7 @@ public:
   /// Generate the list of libraries needed to link this module, based on its
   /// imports.
   void collectLinkLibraries(LinkLibraryCallback callback);
-  
+
   template <typename Fn>
   void collectLinkLibraries(const Fn &fn) {
     LinkLibraryCallback wrapped = std::cref(fn);
@@ -289,7 +329,7 @@ public:
   }
 
   /// @}
-  
+
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
   ///
@@ -302,6 +342,9 @@ public:
 
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
+
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(ASTWalker &Walker);
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::Module;
@@ -319,19 +362,6 @@ public:
                      unsigned Alignment = alignof(Module));
 };
 
-
-/// Discriminator for file-units.
-enum class FileUnitKind {
-  /// For a .swift source file.
-  Source,
-  /// For the compiler Builtin module.
-  Builtin,
-  /// A serialized Swift AST.
-  SerializedAST,
-  /// An imported Clang module.
-  ClangModule
-};
-
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -345,7 +375,9 @@ class FileUnit : public DeclContext {
   const FileUnitKind Kind;
 
 protected:
-  FileUnit(FileUnitKind kind, TranslationUnit &tu);
+  FileUnit(FileUnitKind kind, Module &M)
+    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
+  }
 
 public:
   virtual ~FileUnit() = default;
@@ -440,6 +472,11 @@ public:
     return const_cast<Module *>(cast<Module>(getParent()));
   }
 
+  // Efficiency override for DeclContext::getASTContext().
+  ASTContext &getASTContext() const {
+    return getParentModule()->Ctx;
+  }
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::FileUnit;
   }
@@ -489,10 +526,6 @@ private:
   int BufferID;
 
 public:
-  /// The translation unit that this file is a part of.
-  // FIXME: Redundant with the decl context parent, but definitely convenient.
-  TranslationUnit &TU;
-
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
@@ -503,16 +536,9 @@ public:
   OperatorMap<PostfixOperatorDecl*> PostfixOperators;
   OperatorMap<PrefixOperatorDecl*> PrefixOperators;
 
-  enum SourceKind {
-    Library,  ///< A normal .swift file.
-    Main,     ///< A .swift file that can have top-level code.
-    REPL,     ///< A virtual file that holds the user's input in the REPL.
-    SIL       ///< Came from a .sil file.
-  };
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
-  const SourceKind Kind;
+  const SourceFileKind Kind;
 
   enum ASTStage_t {
     /// Parsing is underway.
@@ -532,11 +558,11 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Parsing;
 
-  SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> bufferID,
+  SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
              bool hasBuiltinModuleAccess = false);
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
-    assert(ASTStage >= Parsed || Kind == SIL);
+    assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
     return Imports;
   }
   void setImports(ArrayRef<std::pair<Module::ImportedModule, bool>> IM) {
@@ -621,92 +647,6 @@ public:
   }
 };
 
-  
-/// Represents a module composed of one or more file-units.
-///
-/// A translation unit is made up of several file-units, which all represent
-/// part of the same module. The intent is if all files in a translation unit
-/// were built and linked they would form a logical module (such as a single
-/// library or executable).
-///
-/// \sa FileUnit
-class TranslationUnit : public Module {
-  /// If non-NULL, an plug-in that should be used when performing external
-  /// lookups.
-  ExternalNameLookup *ExternalLookup = nullptr;
-
-  // FIXME: This storage is never freed, because Modules are allocated on the
-  // ASTContext.
-  TinyPtrVector<FileUnit *> Files;
-
-public:
-  TranslationUnit(Identifier Name, ASTContext &C)
-    : Module(ModuleKind::TranslationUnit, Name, C) {
-  }
-
-  ArrayRef<FileUnit *> getFiles() {
-    return Files;
-  }
-  ArrayRef<const FileUnit *> getFiles() const {
-    return { Files.begin(), Files.size() };
-  }
-
-  void addFile(FileUnit &newFile) {
-    // Require Main and REPL files to be the first file added.
-    assert(Files.empty() ||
-           !isa<SourceFile>(newFile) ||
-           cast<SourceFile>(newFile).Kind == SourceFile::Library ||
-           cast<SourceFile>(newFile).Kind == SourceFile::SIL);
-    Files.push_back(&newFile);
-  }
-
-  void removeFile(FileUnit &existingFile) {
-    // Do a reverse search; usually the file to be deleted will be at the end.
-    std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-                                                     E(Files.begin());
-    I = std::find(I, E, &existingFile);
-    assert(I != E);
-
-    // Adjust for the std::reverse_iterator offset.
-    ++I;
-    Files.erase(I.base());
-  }
-
-  /// Convenience accessor for clients that know what kind of file they're
-  /// dealing with.
-  SourceFile &getMainSourceFile(SourceFile::SourceKind expectedKind) const {
-    assert(!Files.empty() && "No files added yet");
-    assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
-    return *cast<SourceFile>(Files.front());
-  }
-
-  /// Convenience accessor for clients that know what kind of file they're
-  /// dealing with.
-  FileUnit &getMainFile(FileUnitKind expectedKind) const {
-    assert(expectedKind != FileUnitKind::Source &&
-           "must use specific source kind; see getMainSourceFile");
-    assert(!Files.empty() && "No files added yet");
-    assert(Files.front()->getKind() == expectedKind);
-    return *Files.front();
-  }
-
-  ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
-  void setExternalLookup(ExternalNameLookup *R) {
-    assert(!ExternalLookup && "Name resolver already set");
-    ExternalLookup = R;
-  }
-
-  /// \returns true if traversal was aborted, false otherwise.
-  bool walk(ASTWalker &Walker);
-
-  static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::TranslationUnit;
-  }
-
-  static bool classof(const DeclContext *DC) {
-    return isa<Module>(DC) && classof(cast<Module>(DC));
-  }
-};
 
 /// This represents the compiler's implicitly generated declarations in the
 /// Builtin module.
@@ -719,7 +659,7 @@ private:
   LookupCache &getCache() const;
 
 public:
-  explicit BuiltinUnit(TranslationUnit &TU);
+  explicit BuiltinUnit(Module &M);
 
   virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
@@ -737,8 +677,8 @@ public:
 /// Represents an externally-loaded file of some kind.
 class LoadedFile : public FileUnit {
 protected:
-  LoadedFile(FileUnitKind Kind, TranslationUnit &TU) noexcept
-    : FileUnit(Kind, TU) {
+  LoadedFile(FileUnitKind Kind, Module &M) noexcept
+    : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");
   }
 
@@ -767,10 +707,18 @@ public:
 };
 
 
-inline FileUnit::FileUnit(FileUnitKind kind, TranslationUnit &tu)
-    : DeclContext(DeclContextKind::FileUnit, &tu), Kind(kind) {
-  // Defined out-of-line because we need to know that TranslationUnit is a kind
-  // of DeclContext.
+inline SourceFile &Module::getMainSourceFile(SourceFileKind expectedKind) const{
+  assert(!Files.empty() && "No files added yet");
+  assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
+  return *cast<SourceFile>(Files.front());
+}
+
+inline FileUnit &Module::getMainFile(FileUnitKind expectedKind) const {
+  assert(expectedKind != FileUnitKind::Source &&
+         "must use specific source kind; see getMainSourceFile");
+  assert(!Files.empty() && "No files added yet");
+  assert(Files.front()->getKind() == expectedKind);
+  return *Files.front();
 }
 
 } // end namespace swift

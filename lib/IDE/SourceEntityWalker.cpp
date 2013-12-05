@@ -258,22 +258,9 @@ bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   return SrcFile.walk(Annotator);
 }
 
-bool SourceEntityWalker::walk(TranslationUnit &TU) {
-  SemaAnnotator Annotator(*this);
-  return TU.walk(Annotator);
-}
-
 bool SourceEntityWalker::walk(Module &Mod) {
-  SmallVector<Decl *, 64> Decls;
-  Mod.getTopLevelDecls(Decls);
-
   SemaAnnotator Annotator(*this);
-  Annotator.Parent = &Mod;
-  for (Decl *D : Decls) {
-    if (D->walk(Annotator))
-      return true;
-  }
-  return false;
+  return Mod.walk(Annotator);
 }
 
 bool SourceEntityWalker::walk(Decl *D) {

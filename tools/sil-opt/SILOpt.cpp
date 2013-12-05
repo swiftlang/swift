@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
   Invocation.setImportSearchPaths(ImportPaths);
 
   Invocation.setModuleName("main");
-  Invocation.setInputKind(SourceFile::SIL);
+  Invocation.setInputKind(SourceFileKind::SIL);
   
   Invocation.addInputFilename(InputFilename);
 

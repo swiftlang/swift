@@ -234,12 +234,9 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
-  /// getASTContext - Return the ASTContext for a specified DeclContext by
+  /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
-  ASTContext &getASTContext();
-  const ASTContext &getASTContext() const {
-    return const_cast<DeclContext *>(this)->getASTContext();
-  }
+  ASTContext &getASTContext() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);

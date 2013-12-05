@@ -80,9 +80,9 @@ void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
     Result.push_back(Entry);
 }
 
-
-BuiltinUnit::BuiltinUnit(TranslationUnit &TU)
-   : FileUnit(FileUnitKind::Builtin, TU) {
+// Out-of-line because std::unique_ptr wants LookupCache to be complete.
+BuiltinUnit::BuiltinUnit(Module &M)
+   : FileUnit(FileUnitKind::Builtin, M) {
 }
 
 //===----------------------------------------------------------------------===//
@@ -268,19 +268,30 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-// FIXME: Remove this indirection.
-template <typename FUMemFn, FUMemFn FULOOKUP,
-          typename ...Args>
-void Module::forwardToSourceFiles(Args &&...args) const {
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (const FileUnit *file : TU->getFiles())
-      (file->*FULOOKUP)(args...);
-    return;
-  }
+void Module::addFile(FileUnit &newFile) {
+  // Require Main and REPL files to be the first file added.
+  assert(Files.empty() ||
+         !isa<SourceFile>(newFile) ||
+         cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
+         cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
+  Files.push_back(&newFile);
+}
+
+void Module::removeFile(FileUnit &existingFile) {
+  // Do a reverse search; usually the file to be deleted will be at the end.
+  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
+  E(Files.begin());
+  I = std::find(I, E, &existingFile);
+  assert(I != E);
+
+  // Adjust for the std::reverse_iterator offset.
+  ++I;
+  Files.erase(I.base());
 }
 
 #define FORWARD(name, args) \
-  forwardToSourceFiles<decltype(&FileUnit::name), &FileUnit::name>args
+  for (const FileUnit *file : getFiles()) \
+    file->name args;
 
 void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
                          NLKind LookupKind, 
@@ -791,12 +802,9 @@ LookupConformanceResult Module::lookupConformance(Type type,
 }
 
 void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  if (isa<TranslationUnit>(this)) {
-    // FIXME: Include decls from a shadowed module.
-    // FIXME: Should this do extra access control filtering?
-    getTopLevelDecls(results);
-    return;
-  }
+  // FIXME: Include decls from a shadowed module.
+  // FIXME: Should this do extra access control filtering?
+  getTopLevelDecls(results);
 }
 
 namespace {
@@ -864,8 +872,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
 
   // Look for imported operator decls.
   // Record whether they come from re-exported modules.
-  // FIXME: We ought to prefer operators elsewhere in this TU before we check
-  // imports.
+  // FIXME: We ought to prefer operators elsewhere in this module before we
+  // check imports.
   llvm::SmallDenseMap<OP_DECL*, bool, 16> importedOperators;
   for (auto &imported : SF.getImports()) {
     if (!includePrivate && !imported.second)
@@ -889,7 +897,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     for (++i; i != end; ++i) {
       if (i->first->conflictsWith(start->first)) {
         if (Loc.isValid()) {
-          ASTContext &C = SF.TU.getASTContext();
+          ASTContext &C = SF.getASTContext();
           C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
           C.Diags.diagnose(start->first->getLoc(),
                            diag::found_this_operator_decl);
@@ -920,10 +928,8 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
-  auto *TU = cast<TranslationUnit>(M);
-
   OP_DECL *result = nullptr;
-  for (const FileUnit *File : TU->getFiles()) {
+  for (const FileUnit *File : M->getFiles()) {
     auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);
     if (!next.hasValue())
       return next;
@@ -949,7 +955,7 @@ SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
   if (result.hasValue() && !result.getValue()) \
-    result = lookupOperatorDeclForName(&TU, loc, name, \
+    result = lookupOperatorDeclForName(getParentModule(), loc, name, \
                                        &SourceFile::Kind##Operators); \
   return result ? *result : nullptr; \
 }
@@ -962,7 +968,7 @@ LOOKUP_OPERATOR(Postfix)
 void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                 bool includePrivate) const {
   // FIXME: Audit uses of this function and make sure they make sense in a
-  // multi-file TU world.
+  // multi-file world.
   FORWARD(getImportedModules, (modules, includePrivate));
 }
 
@@ -1005,19 +1011,13 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
 
 StringRef Module::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
-  // per-file names.
-  if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // FIXME: Figure out what the right intent is here. Modules can consist of
-    // more than one file.
-    if (TU->getFiles().size() == 1) {
-      if (auto SF = dyn_cast<SourceFile>(TU->getFiles().front()))
-        return SF->getFilename();
-      if (auto LF = dyn_cast<LoadedFile>(TU->getFiles().front()))
-        return LF->getFilename();
-    }
-    return StringRef();
+  // per-file names. Modules can consist of more than one file.
+  if (getFiles().size() == 1) {
+    if (auto SF = dyn_cast<SourceFile>(getFiles().front()))
+      return SF->getFilename();
+    if (auto LF = dyn_cast<LoadedFile>(getFiles().front()))
+      return LF->getFilename();
   }
-
   return StringRef();
 }
 
@@ -1109,8 +1109,16 @@ SourceFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
     importPair.first.second->collectLinkLibraries(callback);
 }
 
+bool Module::walk(ASTWalker &Walker) {
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
+  for (auto SF : getFiles())
+    if (SF->walk(Walker))
+      return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
-// TranslationUnit Implementation
+// SourceFile Implementation
 //===----------------------------------------------------------------------===//
 
 void SourceFile::print(raw_ostream &os) {
@@ -1142,40 +1150,34 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-bool TranslationUnit::walk(ASTWalker &Walker) {
-  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
-  for (auto SF : getFiles())
-    if (SF->walk(Walker))
-      return true;
-  return false;
-}
-
 static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
-  if (SF.Kind == SourceFile::SIL)
+  if (SF.Kind == SourceFileKind::SIL)
     return;
 
   // If we're building the standard library, import the magic Builtin module,
   // otherwise, import the standard library.
-  SmallVector<std::pair<Module::ImportedModule, bool>, 2> Imports;
+  ASTContext &Ctx = SF.getASTContext();
   Module *M;
   if (hasBuiltinModuleAccess)
-    M = SF.TU.Ctx.TheBuiltinModule;
+    M = Ctx.TheBuiltinModule;
   else
-    M = SF.TU.Ctx.getModule({ {SF.TU.Ctx.StdlibModuleName, SourceLoc()} });
+    M = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
 
   if (!M)
     return;
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  Imports.push_back(std::make_pair(Module::ImportedModule({}, M), false));
-  SF.setImports(SF.TU.Ctx.AllocateCopy(Imports));
+  std::pair<Module::ImportedModule, bool> Imports[] = {
+    std::make_pair(Module::ImportedModule({}, M), false)
+  };
+  SF.setImports(Ctx.AllocateCopy(Imports));
 }
 
-SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
+SourceFile::SourceFile(Module &M, SourceFileKind K,
                        Optional<unsigned> bufferID, bool hasBuiltinModuleAccess)
-  : FileUnit(FileUnitKind::Source, tu),
-    BufferID(bufferID ? *bufferID : -1), TU(tu), Kind(K) {
+  : FileUnit(FileUnitKind::Source, M),
+    BufferID(bufferID ? *bufferID : -1), Kind(K) {
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 
@@ -1193,7 +1195,8 @@ bool FileUnit::walk(ASTWalker &walker) {
 }
 
 bool SourceFile::walk(ASTWalker &walker) {
-  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &TU);
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
+                                                getParentModule());
   for (Decl *D : Decls) {
     if (D->walk(walker))
       return true;
@@ -1204,7 +1207,8 @@ bool SourceFile::walk(ASTWalker &walker) {
 StringRef SourceFile::getFilename() const  {
   if (BufferID == -1)
     return "";
-  return TU.Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
+  SourceManager &SM = getASTContext().SourceMgr;
+  return SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
 }
 
 

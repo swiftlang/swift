@@ -19,7 +19,6 @@
 namespace swift {
   class DeclContext;
   class SourceFile;
-  class TranslationUnit;
   class Module;
   class Decl;
   class ValueDecl;
@@ -37,9 +36,6 @@ public:
   /// Walks the provided source file.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(SourceFile &SrcFile);
-  /// Walks the provided translation unit.
-  /// \returns true if traversal was aborted, false otherwise.
-  bool walk(TranslationUnit &TU);
   /// Walks the provided module.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Module &Mod);

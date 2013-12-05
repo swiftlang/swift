@@ -102,7 +102,7 @@ public:
   }
 
   bool allowTopLevelCode() const {
-    return SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL;
+    return SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL;
   }
 
   /// \brief This is the current token being considered by the parser.

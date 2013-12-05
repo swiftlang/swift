@@ -34,7 +34,7 @@ using namespace swift;
 /// \brief Main entrypoint for the parser.
 ///
 /// \verbatim
-///   translation-unit:
+///   top-level:
 ///     stmt-brace-item*
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
@@ -76,7 +76,7 @@ bool Parser::parseTopLevel() {
                                         : BraceItemListKind::TopLevelLibrary);
   }
 
-  // If this is a MainModule, determine if we found code that needs to be
+  // If this is a Main source file, determine if we found code that needs to be
   // executed (this is used by the repl to know whether to compile and run the
   // newly parsed stuff).
   bool FoundTopLevelCodeToExecute = false;
@@ -86,12 +86,12 @@ bool Parser::parseTopLevel() {
         FoundTopLevelCodeToExecute = true;
   }
 
-  // Add newly parsed decls to the translation unit.
+  // Add newly parsed decls to the module.
   for (auto Item : Items)
     if (Decl *D = Item.dyn_cast<Decl*>())
       SF.Decls.push_back(D);
 
-  // Note that the translation unit is fully parsed and verify it.
+  // Note that the source file is fully parsed and verify it.
   SF.ASTStage = SourceFile::Parsed;
   verify(SF);
 
@@ -1493,7 +1493,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     return Status;
   }
 
-  // If this is a var in the top-level of script/repl translation unit, then
+  // If this is a var in the top-level of script/repl source file, then
   // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represent
   // executable code.
   if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {

@@ -207,8 +207,8 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
     (ASTContext::Implementation::ConstraintSolverArena *)Data);
 }
 
-static TranslationUnit *createBuiltinModule(ASTContext &ctx) {
-  auto M = new (ctx) TranslationUnit(ctx.getIdentifier("Builtin"), ctx);
+static Module *createBuiltinModule(ASTContext &ctx) {
+  auto M = new (ctx) Module(ctx.getIdentifier("Builtin"), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
   return M;
 }

@@ -43,7 +43,6 @@ namespace swift {
   class SILTypeList;
   class SILUndef;
   class SourceFile;
-  class TranslationUnit;
 
   namespace Lowering {
     class SILGenModule;
@@ -142,13 +141,14 @@ public:
     return Types.getTypeLowering(t);
   }
   
-  /// Construct a SIL module from a translation unit. The module will be
-  /// constructed in the Raw stage. It is the caller's responsibility to
-  /// `delete` the module.
+  /// Construct a SIL module from an AST module.
+  ///
+  /// The module will be constructed in the Raw stage. The provided AST module
+  /// should contain source files.
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
-  static std::unique_ptr<SILModule> constructSIL(TranslationUnit *tu,
+  static std::unique_ptr<SILModule> constructSIL(Module *M,
                                                  SourceFile *sf = nullptr,
                                                  unsigned startElem = 0);
 
@@ -265,12 +265,11 @@ public:
   /// Pretty-print the module to the designated stream.
   ///
   /// \param Verbose Dump SIL location information in verbose mode.
-  /// \param TU Passing the optional translation unit will result in the types
-  ///        and the declarations from the corresponding unit to be printed. The
-  ///        TU usually would contain the types and Decls that the SIL Module
-  ///        depends on.
+  /// \param M If present, the types and declarations from this module will be
+  ///        printed. The module would usually contain the types and Decls that
+  ///        the SIL module depends on.
   void print(raw_ostream &OS, bool Verbose = false,
-             TranslationUnit *TU = nullptr) const;
+             Module *M = nullptr) const;
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {

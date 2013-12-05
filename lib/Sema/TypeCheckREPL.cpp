@@ -608,7 +608,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   E = TC->coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC->getNextResponseVariableName(&SF.TU);
+  Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
   VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
                                           E->getStartLoc(), name,
                                           E->getType(), &SF);
@@ -669,7 +669,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   SF.Decls.pop_back();
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC->getNextResponseVariableName(&SF.TU);
+  Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
   VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
                                           PBD->getStartLoc(), name,
                                           PBD->getPattern()->getType(), &SF);
@@ -715,7 +715,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
   SF.Decls.resize(FirstDecl);
 
   // Loop over each of the new decls, processing them, adding them back to
-  // the TU->Decls list.
+  // the Decls list.
   for (Decl *D : NewDecls) {
     SF.Decls.push_back(D);
 

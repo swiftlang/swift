@@ -267,7 +267,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   // FIXME: All SourceFiles currently write the same top_level_code.
   llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
 
-  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
+  if (SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL) {
     // Emit main().
     // FIXME: We should only emit this in non-JIT modes.
 
@@ -376,13 +376,14 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
       getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None,
                       attrs);
   llvm::Function *initFn = nullptr;
-  if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
+  if (SF.Kind != SourceFileKind::Main && SF.Kind != SourceFileKind::REPL) {
     // Create a global initializer for library modules.
     // FIXME: This is completely, utterly, wrong -- we don't want library
     // initializers at all.
     StringRef file = llvm::sys::path::filename(SF.getFilename());
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    SF.TU.Name.str() + Twine(".init.") + file,
+                                    SF.getParentModule()->Name.str() +
+                                      Twine(".init.") + file,
                                     &Module);
     initFn->setAttributes(attrs);
     
@@ -396,10 +397,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   }
   
   SmallVector<llvm::Constant *, 2> allInits;
-  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
+  if (SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL) {
     // We don't need global init to call main().
   } else if (isTrivialGlobalInit(topLevelCodeFn)) {
-    // Not all translation units need a global initialization function.
+    // Not all source files need a global initialization function.
     initFn->eraseFromParent();
     topLevelCodeFn->eraseFromParent();
   } else {
@@ -529,7 +530,7 @@ void IRGenModule::emitGlobalTopLevel() {
     DebugInfo->emitImport(Imp);
   }
 
-  // Emit external definitions used by this translation unit.
+  // Emit external definitions used by this module.
   for (auto def : Context.ExternalDefinitions) {
     emitExternalDefinition(def);
   }
@@ -678,7 +679,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   entity.mangle(result.Name);
 
   if (entity.isLocalLinkage()) {
-    // If an entity isn't visible outside this translation unit,
+    // If an entity isn't visible outside this module,
     // it has internal linkage.
     result.Linkage = llvm::GlobalValue::InternalLinkage;
     result.Visibility = llvm::GlobalValue::DefaultVisibility;

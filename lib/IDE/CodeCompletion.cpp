@@ -1575,12 +1575,12 @@ public:
         RequestedResultsTy::toplevelResults().onlyTypes();
   }
 
-  void getToplevelTUCompletions(bool OnlyTypes) {
+  void getToplevelCompletions(bool OnlyTypes) {
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    auto *TU = cast<TranslationUnit>(CurrDeclContext->getParentModule());
-    TU->lookupVisibleDecls({}, *this, NLKind::QualifiedLookup);
+    Module *M = CurrDeclContext->getParentModule();
+    M->lookupVisibleDecls({}, *this, NLKind::QualifiedLookup);
   }
 
   void getModuleImportCompletions(StringRef ModuleName,
@@ -1839,7 +1839,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           FillCacheCallback);
     } else {
       // Add results from current module.
-      Lookup.getToplevelTUCompletions(Request.OnlyTypes);
+      Lookup.getToplevelCompletions(Request.OnlyTypes);
 
       // Create helpers for result caching.
       auto &SwiftContext = P.Context;

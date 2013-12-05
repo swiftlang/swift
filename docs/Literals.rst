@@ -106,7 +106,7 @@ How about cases where there is no context? ::
   var str = "abc"
 
 Here we have nothing to go on, so instead the type checker looks for a global
-type named ``StringLiteralType`` in the current translation unit, and uses
+type named ``StringLiteralType`` in the current module-scope context, and uses
 that type if it is actually a StringLiteralConvertible type. This both allows
 different standard libraries to set different default literal types, and allows
 a user to *override* the default type in their own source file.

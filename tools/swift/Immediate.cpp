@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This is the implementation of the swift interpreter, which takes a
-// TranslationUnit and JITs it.
+// source file and JITs it.
 //
 //===----------------------------------------------------------------------===//
 
@@ -222,12 +222,12 @@ static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
 static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::Module &Module,
                                  const ProcessCmdLine &CmdLine,
-                                 llvm::SmallPtrSet<TranslationUnit*, 8>
+                                 llvm::SmallPtrSet<swift::Module *, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options,
                                  bool IsREPL = true) {
-  TranslationUnit *TU = CI.getTU();
+  swift::Module *M = CI.getMainModule();
   bool hadError = false;
 
   // Perform autolinking.
@@ -237,31 +237,29 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   };
   std::for_each(Options.LinkLibraries.begin(), Options.LinkLibraries.end(),
                 addLinkLibrary);
-  TU->collectLinkLibraries(addLinkLibrary);
+  M->collectLinkLibraries(addLinkLibrary);
 
   // IRGen the modules this module depends on. This is only really necessary
   // for imported source, but that's a very convenient thing to do in -i mode.
   // FIXME: Crawling all loaded modules is a hack.
-  ImportedModules.insert(TU);
+  ImportedModules.insert(M);
   for (auto &entry : CI.getASTContext().LoadedModules) {
-    TranslationUnit *SubTU = dyn_cast<TranslationUnit>(entry.getValue());
-    if (!SubTU)
-      continue;
-    if (!ImportedModules.insert(SubTU))
+    swift::Module *import = entry.getValue();
+    if (!ImportedModules.insert(import))
       continue;
 
     // FIXME: Need to check whether this is actually safe in general.
-    llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
-    std::unique_ptr<SILModule> SILMod = performSILGeneration(SubTU);
+    llvm::Module SubModule(import->Name.str(), Module.getContext());
+    std::unique_ptr<SILModule> SILMod = performSILGeneration(import);
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
       break;
     }
 
-    performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
+    performIRGeneration(Options, &SubModule, import, SILMod.get());
 
-    if (TU->Ctx.hadError()) {
+    if (CI.getASTContext().hadError()) {
       hadError = true;
       break;
     }
@@ -279,7 +277,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     // FIXME: This is an ugly hack; need to figure out how this should
     // actually work.
     SmallVector<char, 20> NameBuf;
-    StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
+    StringRef InitFnName = (import->Name.str() + ".init").toStringRef(NameBuf);
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
@@ -294,14 +292,14 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   
   // IRGen the main module.
   llvm::LLVMContext LLVMContext;
-  llvm::Module Module(CI.getTU()->Name.str(), LLVMContext);
-  performIRGeneration(Options, &Module, CI.getTU(), CI.getSILModule());
+  llvm::Module Module(CI.getMainModule()->Name.str(), LLVMContext);
+  performIRGeneration(Options, &Module, CI.getMainModule(), CI.getSILModule());
 
   if (Context.hadError())
     return;
 
   SmallVector<llvm::Function*, 8> InitFns;
-  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules,
                            InitFns, Options, /*IsREPL*/false))
     return;
@@ -402,10 +400,10 @@ public:
 /// thread and so shouldn't touch anything outside of the EditLine, History,
 /// and member object state.
 ///
-/// FIXME: Need the TU for completions! Currently REPLRunLoop uses
+/// FIXME: Need the module for completions! Currently REPLRunLoop uses
 /// synchronous messaging between the REPLInput thread and the main thread,
 /// and client code shouldn't have access to the AST, so only one thread will
-/// be accessing the TU at a time. However, if REPLRunLoop
+/// be accessing the module at a time. However, if REPLRunLoop
 /// (or a new REPL application) ever requires asynchronous messaging between
 /// REPLInput and REPLEnvironment, or if client code expected to be able to
 /// grovel into the REPL's AST, then locking will be necessary to serialize
@@ -920,7 +918,7 @@ public:
 private:
   bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
-  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
   llvm::LLVMContext LLVMContext;
@@ -938,8 +936,7 @@ private:
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
-    bool ShouldRun = swift::appendToREPLTranslationUnit(REPLInputFile, RC,
-                                                        InputBuf);
+    bool ShouldRun = swift::appendToREPLFile(REPLInputFile, RC, InputBuf);
     
     // SILGen the module and produce SIL diagnostics.
     std::unique_ptr<SILModule> sil;
@@ -952,7 +949,7 @@ private:
 
     if (CI.getASTContext().hadError()) {
       CI.getASTContext().Diags.resetHadAnyError();
-      while (REPLInputFile.Decls.size() > RC.CurTUElem)
+      while (REPLInputFile.Decls.size() > RC.CurElem)
         REPLInputFile.Decls.pop_back();
       
       // FIXME: Handling of "import" declarations?  Is there any other
@@ -961,7 +958,7 @@ private:
       return true;
     }
     
-    RC.CurTUElem = REPLInputFile.Decls.size();
+    RC.CurElem = REPLInputFile.Decls.size();
     
     DumpSource += Line;
     
@@ -975,7 +972,7 @@ private:
 
     performIRGeneration(Options, &LineModule, REPLInputFile, sil.get(),
                         RC.CurIRGenElem);
-    RC.CurIRGenElem = RC.CurTUElem;
+    RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
       return false;
@@ -1024,7 +1021,9 @@ public:
   REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine)
-    : CI(CI), REPLInputFile(CI.getTU()->getMainSourceFile(SourceFile::REPL)),
+    : CI(CI),
+      REPLInputFile(CI.getMainModule()->
+                      getMainSourceFile(SourceFileKind::REPL)),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
@@ -1033,7 +1032,7 @@ public:
       Input(*this),
       RC{
         /*BufferID*/ ~0U,
-        /*CurTUElem*/ 0,
+        /*CurElem*/ 0,
         /*CurIRGenElem*/ 0,
         /*RanREPLApplicationMain*/ false
       }
@@ -1070,20 +1069,22 @@ public:
     // statement is typed into the REPL.
     static const char WarmUpStmt[] = "Void()\n";
 
-    swift::appendToREPLTranslationUnit(
+    swift::appendToREPLFile(
         REPLInputFile, RC,
         llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                              "<REPL Initialization>"));
     if (CI.getASTContext().hadError())
       return;
     
-    RC.CurTUElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
+    RC.CurElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
     
     if (llvm::sys::Process::StandardInIsUserInput())
       printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");    
   }
   
-  TranslationUnit *getTranslationUnit() const { return &REPLInputFile.TU; }
+  swift::Module *getMainModule() const {
+    return REPLInputFile.getParentModule();
+  }
   StringRef getDumpSource() const { return DumpSource; }
   
   /// Get the REPLInput object owned by the REPL instance.

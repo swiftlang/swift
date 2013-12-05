@@ -19,8 +19,8 @@
 #include <vector>
 
 namespace swift {
+  class Module;
   class SourceManager;
-  class TranslationUnit;
 
 namespace ide {
 
@@ -93,11 +93,10 @@ public:
 class SyntaxModelContext {
   struct Implementation;
   Implementation &Impl;
-  TranslationUnit &TU;
+  Module &M;
 
 public:
-  SyntaxModelContext(SourceManager &SM, unsigned BufferID,
-                     TranslationUnit &TU);
+  SyntaxModelContext(SourceManager &SM, unsigned BufferID, Module &M);
   ~SyntaxModelContext();
 
   bool walk(SyntaxModelWalker &Walker);

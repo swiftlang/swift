@@ -41,7 +41,7 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
 {
   Context.addMutationListener(*this);
 
-  // Add any external definitions already part of the translation unit.
+  // Add any external definitions already part of the module.
   // Note: the underlying vector can get reallocated during this traversal.
   // We don't want to pick up the new external definitions.
   unsigned n = Context.ExternalDefinitions.size();
@@ -459,7 +459,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // checking.
   performNameBinding(SF, StartElem);
   
-  TypeChecker TC(SF.TU.Ctx);
+  TypeChecker TC(SF.getASTContext());
   auto &DefinedFunctions = TC.definedFunctions;
 
   // Lookup the swift module.  This ensures that we record all known protocols
@@ -474,12 +474,8 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
   SF.forAllVisibleModules([&](Module::ImportedModule import) {
-    auto importTU = dyn_cast<TranslationUnit>(import.second);
-    if (!importTU)
-      return;
-
     // FIXME: Respect the access path?
-    for (auto file : importTU->getFiles()) {
+    for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
       if (!SF)
         continue;
@@ -499,7 +495,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
 
   // FIXME: Check for cycles in class inheritance here?
 
-  // Type check the top-level elements of the translation unit.
+  // Type check the top-level elements of the source file.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (isa<TopLevelCodeDecl>(D))
       continue;
@@ -593,8 +589,8 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
     }
   }
 
-#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE, _, NATIVE_TYPE) \
-  if (Module *module = SF.TU.Ctx.LoadedModules.lookup(#BRIDGED_MODULE)) { \
+#define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE) \
+  if (Module *module = SF.getASTContext().LoadedModules.lookup(#BRIDGED_MOD)) {\
     checkBridgingFunctions(TC, module, #BRIDGED_TYPE, \
                            "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
                            "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
@@ -610,11 +606,11 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
-  if (SF.Kind == SourceFile::REPL && !TC.Context.hadError())
+  if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
     TC.processREPLTopLevel(SF, StartElem);
 
   // Check overloaded vars/funcs.
-  // FIXME: This is quadratic time for TUs with multiple chunks.
+  // FIXME: This is quadratic time for source files with multiple chunks.
   // FIXME: Can we make this more efficient?
   // FIXME: This check should be earlier to avoid ambiguous overload
   // errors etc.

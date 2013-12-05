@@ -59,7 +59,7 @@ class CompilerInvocation {
   bool ParseStdlib = false;
   bool ParseOnly = false;
   bool Immediate = false;
-  SourceFile::SourceKind InputKind = SourceFile::Main;
+  SourceFileKind InputKind = SourceFileKind::Main;
 
   std::string ModuleName;
 
@@ -188,11 +188,11 @@ public:
     return ParseOnly;
   }
 
-  void setInputKind(SourceFile::SourceKind K) {
+  void setInputKind(SourceFileKind K) {
     InputKind = K;
   }
 
-  SourceFile::SourceKind getInputKind() const {
+  SourceFileKind getInputKind() const {
     return InputKind;
   }
 
@@ -274,7 +274,7 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
-  TranslationUnit *TU = nullptr;
+  Module *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
 
   std::vector<unsigned> BufferIDs;
@@ -316,8 +316,8 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  TranslationUnit *getTU() {
-    return TU;
+  Module *getMainModule() {
+    return MainModule;
   }
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }

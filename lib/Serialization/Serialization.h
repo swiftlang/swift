@@ -26,7 +26,6 @@
 
 namespace swift {
   class SILModule;
-  class TranslationUnit;
 
 namespace serialization {
 
@@ -39,17 +38,14 @@ class Serializer {
   /// A reusable buffer for emitting records.
   SmallVector<uint64_t, 64> ScratchRecord;
 
-  /// The TranslationUnit currently being serialized.
-  const TranslationUnit *TU = nullptr;
+  /// The module currently being serialized.
+  const Module *M = nullptr;
 
   /// The SourceFile currently being serialized, if any.
   ///
   /// If this is non-null, only decls actually from this SourceFile will be
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
-
-  /// The SILModule currently being serialized.
-  const SILModule *M = nullptr;
 
 public:    
   /// Stores a declaration or a type to be written to the AST file.
@@ -168,12 +164,12 @@ private:
   void writeBlockInfoBlock();
 
   /// Writes the Swift module file header, BLOCKINFO block, and
-  /// non-TU-specific metadata.
+  /// non-module-specific metadata.
   void writeHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputFiles(const TranslationUnit *TU, FilenamesTy inputFiles,
+  void writeInputFiles(const Module *M, FilenamesTy inputFiles,
                        StringRef moduleLinkName);
 
   /// Writes the given pattern, recursively.
@@ -264,14 +260,14 @@ private:
   /// Serializes all transparent SIL functions in the SILModule.
   void writeSILFunctions(const SILModule *M);
 
-  /// Top-level entry point for serializing a translation unit module.
-  void writeTranslationUnit(TranslationUnitOrSourceFile DC, const SILModule *M);
+  /// Top-level entry point for serializing a module.
+  void writeModule(ModuleOrSourceFile DC, const SILModule *M);
 
 public:
   Serializer() = default;
 
-  /// Serialize a translation unit to the given stream.
-  void writeToStream(raw_ostream &os, TranslationUnitOrSourceFile DC,
+  /// Serialize a module to the given stream.
+  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                      const SILModule *M, FilenamesTy inputFiles,
                      StringRef moduleLinkName);
 

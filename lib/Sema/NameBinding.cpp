@@ -45,7 +45,7 @@ namespace {
     SourceFile &SF;
     ASTContext &Context;
 
-    NameBinder(SourceFile &SF) : SF(SF), Context(SF.TU.Ctx) {}
+    NameBinder(SourceFile &SF) : SF(SF), Context(SF.getASTContext()) {}
 
     template<typename ...ArgTypes>
     InFlightDiagnostic diagnose(ArgTypes... Args) {
@@ -68,14 +68,14 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
-  if ((SF.Kind == SourceFile::SIL || SF.Kind == SourceFile::REPL) &&
+  if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
       moduleID.first.str() == "Builtin")
     return Context.TheBuiltinModule;
 
-  // If the imported module name is the same as the current translation unit,
+  // If the imported module name is the same as the current module,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
-  if (moduleID.first == SF.TU.Name && modulePath.size() == 1) {
+  if (moduleID.first == SF.getParentModule()->Name && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
       return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
@@ -278,7 +278,7 @@ static void insertOperatorDecl(NameBinder &Binder,
 
 namespace {
   /// \brief AST mutation listener that captures any added declarations and
-  /// types, then adds them to the translation unit.
+  /// types, then adds them to the list of used externals.
   class CaptureExternalsListener : public ASTMutationListener {
     ASTContext &Ctx;
 
@@ -311,13 +311,13 @@ namespace {
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
-  // translation unit is empty.
+  // source file is empty.
   if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
     SF.ASTStage = SourceFile::NameBound;
     return;
   }
 
-  CaptureExternalsListener Capture(SF.TU.Ctx);
+  CaptureExternalsListener Capture(SF.getASTContext());
   
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
@@ -345,7 +345,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   }
 
   if (ImportedModules.size() > SF.getImports().size())
-    SF.setImports(SF.TU.Ctx.AllocateCopy(ImportedModules));
+    SF.setImports(SF.getASTContext().AllocateCopy(ImportedModules));
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)

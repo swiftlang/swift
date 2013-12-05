@@ -104,7 +104,7 @@ public:
   StmtChecker(TypeChecker &TC, DeclContext *DC)
     : TC(TC), TheFunc(), DC(DC), IsREPL(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
-      if (SF->Kind == SourceFile::REPL)
+      if (SF->Kind == SourceFileKind::REPL)
         IsREPL = true;
   }
 

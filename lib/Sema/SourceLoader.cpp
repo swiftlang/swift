@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file A simple module loader that loads .swift source files as
-/// TranslationUnit modules.
+/// \file
+/// \brief A simple module loader that loads .swift source files.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -120,24 +120,23 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take());
 
-  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
-  Ctx.LoadedModules[moduleID.first.str()] = importTU;
+  auto *importMod = new (Ctx) Module(moduleID.first, Ctx);
+  Ctx.LoadedModules[moduleID.first.str()] = importMod;
 
-  auto *importFile = new (Ctx) SourceFile(*importTU, SourceFile::Library,
+  auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
                                           bufferID);
-  importTU->addFile(*importFile);
+  importMod->addFile(*importFile);
 
   bool done;
   PersistentParserState persistentState;
   SkipNonTransparentFunctions delayCallbacks;
-  parseIntoTranslationUnit(*importFile, bufferID, &done, nullptr,
-                           &persistentState,
-                           SkipBodies ? &delayCallbacks : nullptr);
+  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
+                      SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;
   
   if (SkipBodies)
-    performDelayedParsing(importTU, persistentState, nullptr);
+    performDelayedParsing(importMod, persistentState, nullptr);
 
   // FIXME: Support recursive definitions in immediate modes by making type
   // checking even lazier.
@@ -146,7 +145,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   else
     performTypeChecking(*importFile);
 
-  return importTU;
+  return importMod;
 }
 
 void SourceLoader::loadExtensions(NominalTypeDecl *nominal,

@@ -80,8 +80,8 @@ struct ASTNodeBase {};
     Verifier(Module *M)
       : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {}
     Verifier(SourceFile &SF)
-      : M(&SF), Ctx(SF.TU.Ctx), Out(llvm::errs()),
-        HadError(SF.TU.Ctx.hadError()) {}
+      : M(&SF), Ctx(SF.getASTContext()), Out(llvm::errs()),
+        HadError(SF.getASTContext().hadError()) {}
 
     static Verifier forDecl(const Decl *D) {
       DeclContext *topDC = D->getDeclContext()->getModuleScopeContext();

@@ -840,8 +840,8 @@ public:
 
   /// Get the module appropriate for looking up standard library types.
   ///
-  /// This is "swift", if that module is imported, or the current translation
-  /// unit if we're parsing the standard library.
+  /// This is "swift", if that module is imported, or the current module if
+  /// we're parsing the standard library.
   Module *getStdlibModule(const DeclContext *dc);
 
   /// \name AST Mutation Listener Implementation

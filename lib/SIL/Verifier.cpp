@@ -308,7 +308,7 @@ public:
             AI->getSubstCalleeType()->getAbstractCC(),
             "calling convention difference between types");
     
-    // FIXME: This doesn't work across TUs because of poly func type
+    // FIXME: This doesn't work across modules because of poly func type
     // canonicalization issues.
     // require(ti == AI->getSubstCalleeType(),
     //         "substituted callee type does not match substitutions");

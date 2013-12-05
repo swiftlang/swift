@@ -43,8 +43,7 @@ enum class LayoutStrategy {
   /// Compute an optimal layout;  there are no constraints at all.
   Optimal,
 
-  /// The 'universal' strategy: all translation units must agree on
-  /// the layout.
+  /// The 'universal' strategy: all modules must agree on the layout.
   Universal
 };
 

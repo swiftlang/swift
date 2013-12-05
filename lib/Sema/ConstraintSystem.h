@@ -1057,7 +1057,7 @@ public:
   /// system, to avoid.
   ///
   /// FIXME: This caching should almost certainly be performed at the
-  /// translation unit level, since type checking occurs after name binding,
+  /// module level, since type checking occurs after name binding,
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.

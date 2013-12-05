@@ -140,7 +140,7 @@ namespace {
     SILSerializer(Serializer &S, ASTContext &Ctx,
                   llvm::BitstreamWriter &Out);
 
-    void writeAllSILFunctions(const SILModule *M);
+    void writeAllSILFunctions(const SILModule *SILMod);
   };
 } // end anonymous namespace
 
@@ -1131,7 +1131,7 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   }
 }
 
-void SILSerializer::writeAllSILFunctions(const SILModule *M) {
+void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
   if (!EnableSerialize && !EnableSerializeAll)
     return;
   {
@@ -1162,18 +1162,18 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
 
     // Write out VTables first because it may require serializations of
     // non-transparent SILFunctions (body is not needed).
-    // Go through all SILVTables in M, and if it is fragile, write out the
+    // Go through all SILVTables in SILMod, and if it is fragile, write out the
     // VTable.
-    for (const SILVTable &vt : M->getVTables()) {
+    for (const SILVTable &vt : SILMod->getVTables()) {
       const ClassDecl *cd = vt.getClass();
       if (EnableSerializeAll ||
           cd->getAttrs().getResilienceKind() == Resilience::Fragile)
         writeVTable(vt);
     }
 
-    // Go through all SILFunctions in M, and if it is transparent,
+    // Go through all SILFunctions in SILMod, and if it is transparent,
     // write out the SILFunction.
-    for (const SILFunction &F : *M) {
+    for (const SILFunction &F : *SILMod) {
       if ((EnableSerializeAll || F.isTransparent())
           && !F.empty()) {
         writeSILFunction(F);
@@ -1193,11 +1193,11 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
   }
 }
 
-void Serializer::writeSILFunctions(const SILModule *M) {
-  if (!M)
+void Serializer::writeSILFunctions(const SILModule *SILMod) {
+  if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, TU->Ctx, Out);
-  SILSer.writeAllSILFunctions(M);
+  SILSerializer SILSer(*this, M->Ctx, Out);
+  SILSer.writeAllSILFunctions(SILMod);
 
 }

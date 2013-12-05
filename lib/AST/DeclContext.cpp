@@ -24,13 +24,8 @@ void *DeclContext::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-/// getASTContext - Return the ASTContext for a specified DeclContetx by
-/// walking up to the translation unit and returning its ASTContext.
-ASTContext &DeclContext::getASTContext() {
-  if (Module *M = dyn_cast<Module>(this))
-    return M->Ctx;
-  
-  return getParent()->getASTContext();
+ASTContext &DeclContext::getASTContext() const {
+  return getParentModule()->Ctx;
 }
 
 Type DeclContext::getDeclaredTypeOfContext() const {
@@ -239,20 +234,8 @@ bool DeclContext::isInnermostContextGeneric() const {
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
-  case DeclContextKind::Module: {
-    Module *Mod = cast<Module>(this);
-    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(Mod))
-      return TU->walk(Walker);
-
-    SmallVector<Decl *, 64> Decls;
-    Mod->getTopLevelDecls(Decls);
-    llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, Mod);
-    for (Decl *D : Decls) {
-      if (D->walk(Walker))
-        return true;
-    }
-    return false;
-  }
+  case DeclContextKind::Module:
+    return cast<Module>(this)->walk(Walker);
   case DeclContextKind::FileUnit:
     return cast<FileUnit>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:

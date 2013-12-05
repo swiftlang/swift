@@ -134,13 +134,13 @@
      are:</p>
   
   <ul>
-  <li><a href="#lexical">Lexing</a>: A translation unit is broken into tokens
+  <li><a href="#lexical">Lexing</a>: A source file is broken into tokens
     according to a (nearly, /**/ comments can be nested) regular grammar.</li>
   <li>Parsing and AST Building: The tokens are parsed according to the grammar
     set out below.  The grammar is context free and does not require any "type
     feedback" from the lexer or later stages.  During parsing, name binding for
     references to local variables and other declarations that are not at
-    translation unit (and eventually namespace) scope are bound.
+    module (and eventually namespace) scope are bound.
   </li>
   <li><a href="#namebind">Name Binding</a>: At this phase, references to
       non-local types and values are bound, and <a href="#decl-import">import
@@ -157,7 +157,7 @@
   </ul>
   
   <p>
-  FIXME: "import swift" implicitly added as the last import in translation unit.
+  FIXME: "import swift" implicitly added as the last import in a source file.
   </p>
   
   <!-- ********************************************************************* -->
@@ -617,17 +617,16 @@
 
 
   <!-- ===================================================================== -->
-  <h3 id="decl-translation-unit">Translation Unit</h3>
+  <h3 id="decl-top-level">Module-Scope Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    translation-unit ::= <a href="#brace-item-list">brace-item</a>*
+    top-level ::= <a href="#brace-item-list">brace-item</a>*
   </pre>
   
   <p>The top level of a swift source file is grammatically identical to the
-  contents of a func decl.  Some declarations
-  have semantic restrictions that only allow them within a translation unit
-  though.
+  contents of a func decl.  Some declarations, however, are restricted to
+  module scope.
   </p>
   
   <!-- _____________________________________________________________________ -->
@@ -644,7 +643,7 @@
   <p>The brace item list provides a sequencing operation which evaluates the
   members of its body in order.  Function bodies and the bodies of control
   flow statements use braces.  Also, the <a
-    href="#decl-translation-unit">translation unit</a> itself is effectively a
+    href="#decl-top-level">source file</a> itself is effectively a
   brace item list, but without the braces.
   </p>
 
@@ -670,9 +669,9 @@
   local names, even when they are defined in other modules and namespaces.  See
   the section on <a href="#namebind">name binding</a> for more
   information on how these work.  import declarations are only allowed at
-  translation unit scope.</p>
+  module scope.</p>
   
-  <p>'import' directives only impact a single translation unit: imports in one
+  <p>'import' directives only impact a single source file: imports in one
   swift file do not affect name lookup in another file. import directives can
   only occur at the top level of a file, not within a function or namespace.</p>
   
@@ -731,7 +730,7 @@
   </pre>
 
   <p>'extension' declarations allow adding member declarations to existing
-     types, even in other translation units and modules.  There are different
+     types, even in other source files and modules.  There are different
      semantic rules for each type that is extended.
   </p>
   
@@ -3727,7 +3726,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <li>Search the current scope tree for a local name.  Local names cannot be
       forward referenced.</li>
   <li>Bind to names defined in the current component, including the current
-      translation unit. TODO: is this a good thing?  We could require explicit
+      module. TODO: is this a good thing?  We could require explicit
       imports if we wanted to.</li>
   <li>Bind to identifiers that are imported with an import directive.  Imports
       are searched in order of introduction (top-down).  The location of an
@@ -3785,7 +3784,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
      the library.</p>
     
   <p>All of this code is published by the 'swift' module, which is
-     implicitly imported into each translation unit, unless some sort of pragma
+     implicitly imported into each source file, unless some sort of pragma
      in the code (attribute on an import?) is used to change or disable this
      behavior.</p>
   

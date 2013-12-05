@@ -45,8 +45,7 @@ namespace Lowering {
   class RValueSource;
   class TemporaryInitialization;
 
-/// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
-/// in a translation unit.
+/// An ASTVisitor for generating SIL from top-level declarations in a module.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
   /// The Module being constructed.

@@ -31,8 +31,8 @@
 using namespace swift;
 
 void swift::CompilerInstance::createSILModule() {
-  assert(getTU());
-  TheSILModule = SILModule::createEmptyModule(getTU());
+  assert(getMainModule());
+  TheSILModule = SILModule::createEmptyModule(getMainModule());
 }
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -91,8 +91,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                                      CodeCompletePoint.second);
   }
 
-  bool MainMode = (Invocation.getInputKind() == SourceFile::Main);
-  bool SILMode = (Invocation.getInputKind() == SourceFile::SIL);
+  bool MainMode = (Invocation.getInputKind() == SourceFileKind::Main);
+  bool SILMode = (Invocation.getInputKind() == SourceFileKind::SIL);
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
@@ -136,21 +136,22 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 }
 
 void swift::CompilerInstance::doIt() {
-  const SourceFile::SourceKind Kind = Invocation.getInputKind();
+  const SourceFileKind Kind = Invocation.getInputKind();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  TU = new (*Context) TranslationUnit(ID, *Context);
-  Context->LoadedModules[ID.str()] = TU;
+  MainModule = new (*Context) Module(ID, *Context);
+  Context->LoadedModules[ID.str()] = MainModule;
 
-  if (Kind == SourceFile::SIL) {
+  if (Kind == SourceFileKind::SIL) {
     assert(BufferIDs.size() == 1);
     assert(MainBufferIndex != NO_SUCH_BUFFER);
     createSILModule();
   }
 
-  if (Kind == SourceFile::REPL) {
+  if (Kind == SourceFileKind::REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*TU, Kind, {}, Invocation.getParseStdlib());
-    TU->addFile(*SingleInputFile);
+      new (*Context) SourceFile(*MainModule, Kind, {},
+                                Invocation.getParseStdlib());
+    MainModule->addFile(*SingleInputFile);
     return;
   }
 
@@ -169,16 +170,16 @@ void swift::CompilerInstance::doIt() {
   // We parse it last, though, to make sure that it can use decls from other
   // files in the module.
   if (MainBufferIndex != NO_SUCH_BUFFER) {
-    assert(Kind == SourceFile::Main || Kind == SourceFile::SIL);
+    assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::SIL);
 
     unsigned BufferID = BufferIDs[MainBufferIndex];
-    if (Kind == SourceFile::Main)
+    if (Kind == SourceFileKind::Main)
       SourceMgr.setHashbangBufferID(BufferID);
 
     auto *SingleInputFile =
-      new (*Context) SourceFile(*TU, Kind, BufferID,
+      new (*Context) SourceFile(*MainModule, Kind, BufferID,
                                 Invocation.getParseStdlib());
-    TU->addFile(*SingleInputFile);
+    MainModule->addFile(*SingleInputFile);
   }
 
   // Parse all the library files first.
@@ -187,14 +188,15 @@ void swift::CompilerInstance::doIt() {
       continue;
     auto BufferID = BufferIDs[i];
 
-    auto *NextInput = new (*Context) SourceFile(*TU, SourceFile::Library,
+    auto *NextInput = new (*Context) SourceFile(*MainModule,
+                                                SourceFileKind::Library,
                                                 BufferID,
                                                 Invocation.getParseStdlib());
-    TU->addFile(*NextInput);
+    MainModule->addFile(*NextInput);
 
     bool Done;
-    parseIntoTranslationUnit(*NextInput, BufferID, &Done, nullptr,
-                             &PersistentState, DelayedCB.get());
+    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
+                        &PersistentState, DelayedCB.get());
     assert(Done && "Parser returned early?");
     (void) Done;
 
@@ -203,7 +205,7 @@ void swift::CompilerInstance::doIt() {
 
   // Parse the main file last.
   if (MainBufferIndex != NO_SUCH_BUFFER) {
-    SourceFile &MainFile = *cast<SourceFile>(TU->getFiles().front());
+    SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
     SILParserState SILContext(TheSILModule.get());
 
     unsigned CurTUElem = 0;
@@ -213,9 +215,9 @@ void swift::CompilerInstance::doIt() {
       // after parsing any top level code in a main module, or in SIL mode when
       // there are chunks of swift decls (e.g. imports and types) interspersed
       // with 'sil' definitions.
-      parseIntoTranslationUnit(MainFile, MainFile.getBufferID().getValue(),
-                               &Done, TheSILModule ? &SILContext : nullptr,
-                               &PersistentState, DelayedCB.get());
+      parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
+                          TheSILModule ? &SILContext : nullptr,
+                          &PersistentState, DelayedCB.get());
       if (!Invocation.getParseOnly())
         performTypeChecking(MainFile, CurTUElem);
       CurTUElem = MainFile.Decls.size();
@@ -224,14 +226,14 @@ void swift::CompilerInstance::doIt() {
 
   if (!Invocation.getParseOnly()) {
     // Type-check each top-level input besides the main source file.
-    auto InputSourceFiles = TU->getFiles().slice(0, BufferIDs.size());
+    auto InputSourceFiles = MainModule->getFiles().slice(0, BufferIDs.size());
     for (auto File : InputSourceFiles)
       if (auto SF = dyn_cast<SourceFile>(File))
         performTypeChecking(*SF);
   }
 
   if (DelayedCB) {
-    performDelayedParsing(TU, PersistentState,
+    performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
 }

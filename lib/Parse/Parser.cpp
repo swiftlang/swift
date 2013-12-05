@@ -72,7 +72,7 @@ private:
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
-    SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
+    SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState);
 
@@ -94,7 +94,7 @@ void parseDelayedDecl(PersistentParserState &ParserState,
     return;
 
   SourceFile &SF = *ParserState.getDelayedDeclContext()->getParentSourceFile();
-  SourceManager &SourceMgr = SF.TU.Ctx.SourceMgr;
+  SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState);
@@ -121,12 +121,12 @@ void parseDelayedDecl(PersistentParserState &ParserState,
 }
 } // unnamed namespace
 
-bool swift::parseIntoTranslationUnit(SourceFile &SF,
-                                     unsigned BufferID,
-                                     bool *Done,
-                                     SILParserState *SIL,
-                                     PersistentParserState *PersistentState,
-                                     DelayedParsingCallbacks *DelayedParseCB) {
+bool swift::parseIntoSourceFile(SourceFile &SF,
+                                unsigned BufferID,
+                                bool *Done,
+                                SILParserState *SIL,
+                                PersistentParserState *PersistentState,
+                                DelayedParsingCallbacks *DelayedParseCB) {
   Parser P(BufferID, SF, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
@@ -240,14 +240,15 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                PersistentParserState *PersistentState)
-  : SourceMgr(SF.TU.Ctx.SourceMgr),
+  : SourceMgr(SF.getASTContext().SourceMgr),
     BufferID(BufferID),
-    Diags(SF.TU.Ctx.Diags),
+    Diags(SF.getASTContext().Diags),
     SF(SF),
-    L(new Lexer(SF.TU.Ctx.SourceMgr, BufferID, &SF.TU.Ctx.Diags,
+    L(new Lexer(SF.getASTContext().SourceMgr, BufferID,
+                &SF.getASTContext().Diags,
                 /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false)),
     SIL(SIL),
-    Context(SF.TU.Ctx) {
+    Context(SF.getASTContext()) {
 
   State = PersistentState;
   if (!State) {

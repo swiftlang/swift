@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This is the entry point to the swift immediate mode, which takes a
-// TranslationUnit, and runs it immediately using the JIT.
+// source file, and runs it immediately using the JIT.
 //
 //===----------------------------------------------------------------------===//
 
@@ -41,11 +41,11 @@ namespace swift {
     /// The SourceMgr buffer ID of the REPL input.
     unsigned CurBufferID;
     
-    /// The index into the TranslationUnit's Decls at which to start
+    /// The index into the source file's Decls at which to start
     /// typechecking the next REPL input.
-    unsigned CurTUElem;
+    unsigned CurElem;
 
-    /// The index into the TranslationUnit's Decls at which to start
+    /// The index into the source file's Decls at which to start
     /// irgenning the next REPL input.
     unsigned CurIRGenElem;
 

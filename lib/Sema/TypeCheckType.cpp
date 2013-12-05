@@ -806,11 +806,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_inout);
   }
 
-  // In SIL translation units *only*, permit @weak and @unowned to
-  // apply directly to types.
+  // In SIL files *only*, permit @weak and @unowned to apply directly to types.
   if (attrs.hasOwnership() && ty->hasReferenceSemantics()) {
     if (auto SF = DC->getParentSourceFile()) {
-      if (SF->Kind == SourceFile::SIL) {
+      if (SF->Kind == SourceFileKind::SIL) {
         ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
         attrs.clearOwnership();
       }
@@ -819,7 +818,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Diagnose @local_storage in nested positions.
   if (attrs.has(TAK_local_storage)) {
-    assert(DC->getParentSourceFile()->Kind == SourceFile::SIL);
+    assert(DC->getParentSourceFile()->Kind == SourceFileKind::SIL);
     TC.diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
     attrs.clearAttribute(TAK_local_storage);
   }

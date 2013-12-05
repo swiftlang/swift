@@ -31,8 +31,8 @@ public:
   virtual ~ExternalNameLookup() = default;
 
   /// ExternalNameLookup is consulted at two times during name
-  /// lookup.  This is the first time: after all names in the
-  /// TranslationUnit have been checked but before external
+  /// lookup.  This is the first time: after all names in a
+  /// source file have been checked but before external
   /// Modules are checked.  The results in the ResultVector will
   /// be consulted first.  Return true if results have been added
   /// to RV.

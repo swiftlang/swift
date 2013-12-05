@@ -347,7 +347,7 @@ static bool isGlobalLazilyInitialized(VarDecl *var) {
          "not a stored global variable!");
 
   return !isa<SourceFile>(var->getDeclContext())
-    || cast<SourceFile>(var->getDeclContext())->Kind != SourceFile::Main;
+    || cast<SourceFile>(var->getDeclContext())->Kind != SourceFileKind::Main;
 }
 
 static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,

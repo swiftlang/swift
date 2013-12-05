@@ -145,7 +145,7 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
 
   Pattern *ArgPattern = TuplePattern::createSimple(
       Context, SourceLoc(), ArgPatternElts, SourceLoc());
-  TranslationUnit *M = Context.TheBuiltinModule;
+  Module *M = Context.TheBuiltinModule;
 
   return FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id, SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ArgPattern,
@@ -193,7 +193,7 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
 
   Pattern *ArgPattern = TuplePattern::createSimple(
                           Context, SourceLoc(), ArgPatternElts, SourceLoc());
-  TranslationUnit *M = Context.TheBuiltinModule;
+  Module *M = Context.TheBuiltinModule;
   auto func = FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id,
                                SourceLoc(), GenericParams, FnType, ArgPattern,
                                ArgPattern, TypeLoc::withoutLoc(ResBodyType),
@@ -390,7 +390,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
 /// an ArchetypeType*), and the generic parameter list.
 static std::tuple<Type, Type, GenericParamList*>
 getGenericParam(ASTContext &Context) {
-  TranslationUnit *M = Context.TheBuiltinModule;
+  Module *M = Context.TheBuiltinModule;
 
   Identifier GenericName = Context.getIdentifier("T");
   ArchetypeType *Archetype

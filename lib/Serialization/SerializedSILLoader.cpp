@@ -20,13 +20,11 @@ using namespace swift;
 SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
                                          SILModule *SILMod) {
   // Get a list of SerializedModules from ASTContext.
-  for (auto &CtxM : Ctx.LoadedModules) {
-    if (auto TU = dyn_cast<TranslationUnit>(CtxM.getValue())) {
-      for (auto File : TU->getFiles()) {
-        if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-          auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx);
-          LoadedSILSections.emplace_back(Des);
-        }
+  for (auto &Entry : Ctx.LoadedModules) {
+    for (auto File : Entry.getValue()->getFiles()) {
+      if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx);
+        LoadedSILSections.emplace_back(Des);
       }
     }
   }

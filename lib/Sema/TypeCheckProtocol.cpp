@@ -1241,10 +1241,11 @@ static void suggestExplicitConformance(TypeChecker &tc,
     if (!witnessOwner || witnessOwner == owner)
       continue;
 
-    // If the witness owner is not this translation unit, then we don't want
-    // to suggest it as a place to hang the explicit conformance.
+    // If the witness owner is not a source file in this module, then we don't
+    // want to suggest it as a place to hang the explicit conformance.
     // FIXME: Distinguish user source files from imported source files.
-    if (!isa<TranslationUnit>(witnessOwner->getModuleContext()))
+    auto ownerDC = witnessOwner->getDeclContext();
+    if (!isa<SourceFile>(ownerDC->getModuleScopeContext()))
       continue;
 
     // We have an owner.
@@ -1256,8 +1257,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
     }
 
     // We have two potential owners. Keep the owner that occurs earlier in the
-    // translation unit
-    // FIXME: < on character pointers is a horrible hack.
+    // source file.
     assert(owner != witnessOwner && "Owners cannot match here.");
 
     if (tc.Context.SourceMgr.isBeforeInBuffer(witnessOwner->getLoc(),

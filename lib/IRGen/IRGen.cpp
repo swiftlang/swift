@@ -67,7 +67,7 @@ static void addSwiftExpandPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCExpandPass());
 }
 
-static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU,
+static void emitModuleLinkOptions(llvm::Module &module, swift::Module *M,
                                   ArrayRef<LinkLibrary> LinkLibraries) {
   // FIXME: This constant should be vended by LLVM somewhere.
   static const char * const LinkerOptionsFlagName = "Linker Options";
@@ -97,7 +97,7 @@ static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU,
     }
   };
 
-  TU->collectLinkLibraries(addLinkLibrary);
+  M->collectLinkLibraries(addLinkLibrary);
   std::for_each(LinkLibraries.begin(), LinkLibraries.end(), addLinkLibrary);
   
   module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
@@ -106,10 +106,10 @@ static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU,
 
 
 static void performIRGeneration(Options &Opts, llvm::Module *Module,
-                                TranslationUnit *TU, SILModule *SILMod,
+                                swift::Module *M, SILModule *SILMod,
                                 SourceFile *SF = nullptr,
                                 unsigned StartElem = 0) {
-  assert(!TU->Ctx.hadError());
+  assert(!M->Ctx.hadError());
 
   std::unique_ptr<LLVMContext> Context;
   std::unique_ptr<llvm::Module> ModuleOwner;
@@ -129,8 +129,8 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
   const Target *Target =
     TargetRegistry::lookupTarget(Opts.Triple, Error);
   if (!Target) {
-    TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                           Opts.Triple, Error);
+    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
+                          Opts.Triple, Error);
     return;
   }
 
@@ -153,8 +153,8 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
                                   TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
-    TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                           Opts.Triple, "no LLVM target machine");
+    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
+                          Opts.Triple, "no LLVM target machine");
     return;
   }
 
@@ -163,15 +163,15 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
   assert(DataLayout && "target machine didn't set DataLayout?");
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
-  // Emit the translation unit.
-  IRGenModule IGM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
+  // Emit the module contents.
+  IRGenModule IGM(M->Ctx, Opts, *Module, *DataLayout, SILMod);
   IGM.emitGlobalTopLevel();
 
   if (SF) {
     IGM.emitSourceFile(*SF, StartElem);
   } else {
     assert(StartElem == 0 && "no explicit source file provided");
-    for (auto *File : TU->getFiles()) {
+    for (auto *File : M->getFiles()) {
       auto nextSF = dyn_cast<SourceFile>(File);
       if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
         continue;
@@ -198,13 +198,13 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
                         "Objective-C Garbage Collection", (uint32_t)0);
   // FIXME: Simulator flag.
 
-  emitModuleLinkOptions(*Module, TU, Opts.LinkLibraries);
+  emitModuleLinkOptions(*Module, M, Opts.LinkLibraries);
 
   DEBUG(llvm::dbgs() << "module before passes:\n";
         IGM.Module.dump());
 
   // Bail out if there are any errors.
-  if (TU->Ctx.hadError()) return;
+  if (M->Ctx.hadError()) return;
 
   llvm::OwningPtr<raw_fd_ostream> RawOS;
   formatted_raw_ostream FormattedOS;
@@ -217,8 +217,8 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
     RawOS.reset(new raw_fd_ostream(Opts.OutputFilename.c_str(),
                                    Error, OSFlags));
     if (RawOS->has_error() || !Error.empty()) {
-      TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                             Opts.OutputFilename, Error);
+      M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                            Opts.OutputFilename, Error);
       RawOS->clear_error();
       return;
     }
@@ -295,14 +295,14 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
       // Use our own wrapper for TargetMachine which schedules a
       // SwiftASTStreamerPass to be run after the code generation.
       swift::irgen::TargetMachine
-        PatchedTargetMachine(TargetMachine, TU, IGM.DebugInfo);
+        PatchedTargetMachine(TargetMachine, M, IGM.DebugInfo);
       fail = PatchedTargetMachine.
         addPassesToEmitFile(EmitPasses, FormattedOS, FileType, !Opts.Verify);
     } else
       fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
                                                 FileType, !Opts.Verify);
     if (fail) {
-      TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
+      M->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return;
     }
     break;
@@ -313,12 +313,13 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
 }
 
 void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
-                                TranslationUnit *TU, SILModule *SILMod) {
-  ::performIRGeneration(Opts, Module, TU, SILMod);
+                                swift::Module *M, SILModule *SILMod) {
+  ::performIRGeneration(Opts, Module, M, SILMod);
 }
 
 void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
                                 SourceFile &SF, SILModule *SILMod,
                                 unsigned StartElem) {
-  ::performIRGeneration(Opts, Module, &SF.TU, SILMod, &SF, StartElem);
+  ::performIRGeneration(Opts, Module, SF.getParentModule(), SILMod, &SF,
+                        StartElem);
 }

@@ -492,10 +492,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         extraImports.push_back(importPair.first);
   }
     
-  ExternalNameLookup *ExternalLookup = nullptr;
-  if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M))
-    ExternalLookup = TU->getExternalLookup();
-
+  ExternalNameLookup *ExternalLookup = M.getExternalLookup();
   if (ExternalLookup && ExternalLookup->lookupOverrides(Name, DC, Loc,
                                                         IsTypeLookup, Results))
     return;

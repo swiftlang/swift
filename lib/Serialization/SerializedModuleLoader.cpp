@@ -134,23 +134,23 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Whether we succeed or fail, don't try to load this module again.
-  auto TU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
-  Ctx.LoadedModules[moduleID.first.str()] = TU;
+  auto M = new (Ctx) Module(moduleID.first, Ctx);
+  Ctx.LoadedModules[moduleID.first.str()] = M;
 
   if (err != ModuleStatus::Valid)
-    return TU;
+    return M;
 
-  auto fileUnit = new (Ctx) SerializedASTFile(*TU, *loadedModuleFile);
-  TU->addFile(*fileUnit);
+  auto fileUnit = new (Ctx) SerializedASTFile(*M, *loadedModuleFile);
+  M->addFile(*fileUnit);
 
   if (loadedModuleFile->associateWithFileContext(fileUnit)) {
     LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                    Ctx.getCurrentGeneration());
-    return TU;
+    return M;
   }
 
   // We failed to bring the module file into the AST.
-  TU->removeFile(*fileUnit);
+  M->removeFile(*fileUnit);
   assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
 
   SmallVector<ModuleFile::Dependency, 4> missing;
@@ -183,7 +183,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Don't try to load this module again.
-  return TU;
+  return M;
 }
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,

@@ -32,11 +32,10 @@ struct SyntaxModelContext::Implementation {
   std::vector<SyntaxNode> TokenNodes;
 };
 
-SyntaxModelContext::SyntaxModelContext(SourceManager &SM,
-                                             unsigned BufferID,
-                                             TranslationUnit &TU)
+SyntaxModelContext::SyntaxModelContext(SourceManager &SM, unsigned BufferID,
+                                       Module &M)
   : Impl(*new Implementation()),
-    TU(TU) {
+    M(M) {
   std::vector<Token> Tokens = swift::tokenize(SM, BufferID, /*Offset=*/0,
                                               /*EndOffset=*/0,
                                               /*KeepComments=*/true,
@@ -95,7 +94,7 @@ public:
   ModelASTWalker(const SourceManager &SM, SyntaxModelWalker &Walker)
       : SM(SM), Walker(Walker) { }
 
-  void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
+  void visitModule(Module &M, ArrayRef<SyntaxNode> Tokens);
 
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPost(Decl *D) override;
@@ -140,15 +139,14 @@ CharSourceRange charSourceRangeFromSourceRange(SourceManager &SM,
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
-  ModelASTWalker ASTWalk(TU.Ctx.SourceMgr, Walker);
-  ASTWalk.visitTranslationUnit(TU, Impl.TokenNodes);
+  ModelASTWalker ASTWalk(M.Ctx.SourceMgr, Walker);
+  ASTWalk.visitModule(M, Impl.TokenNodes);
   return true;
 }
 
-void ModelASTWalker::visitTranslationUnit(TranslationUnit &TU,
-                                          ArrayRef<SyntaxNode> Tokens) {
+void ModelASTWalker::visitModule(Module &M, ArrayRef<SyntaxNode> Tokens) {
   TokenNodes = Tokens;
-  TU.walk(*this);
+  M.walk(*this);
 
   // Pass the rest of the token nodes.
   for (auto &TokNode : TokenNodes)

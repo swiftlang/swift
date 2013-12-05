@@ -109,7 +109,7 @@ static void
 doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
-  ASTContext &Ctx = SF.TU.Ctx;
+  ASTContext &Ctx = SF.getASTContext();
   auto DiagnosticConsumers = Ctx.Diags.takeConsumers();
 
   std::string AugmentedCode = EnteredCode.str();
@@ -126,16 +126,16 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  unsigned CurTUElem = OriginalDeclCount;
+  unsigned CurElem = OriginalDeclCount;
   PersistentParserState PersistentState;
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
-    parseIntoTranslationUnit(SF, *BufferID, &Done,
-                             nullptr, &PersistentState, DelayedCB.get());
-    performTypeChecking(SF, CurTUElem);
-    CurTUElem = SF.Decls.size();
+    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
+                        DelayedCB.get());
+    performTypeChecking(SF, CurElem);
+    CurElem = SF.Decls.size();
   } while (!Done);
 
   performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
@@ -159,13 +159,13 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   CompletionStrings.clear();
   CompletionInsertableStrings.clear();
 
-  assert(SF.Kind == SourceFile::REPL && "Can't append to a non-REPL TU");
+  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,
                    CompletionCallbacksFactory.get());
 
-  ASTContext &Ctx = SF.TU.Ctx;
+  ASTContext &Ctx = SF.getASTContext();
   std::vector<Token> Tokens = tokenize(Ctx.SourceMgr, BufferID);
 
   if (!Tokens.empty() && Tokens.back().is(tok::code_complete))

@@ -37,7 +37,7 @@ class ClangModuleUnit final : public LoadedFile {
   Module *getAdapterModule() const;
 
 public:
-  ClangModuleUnit(TranslationUnit &TU, ClangImporter &owner,
+  ClangModuleUnit(Module &M, ClangImporter &owner,
                   clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.

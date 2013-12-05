@@ -529,7 +529,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 
 /// Construct ArchetypeType from Generic Params.
 bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
-  ArchetypeBuilder Builder(P.SF.TU, P.Diags);
+  ArchetypeBuilder Builder(*P.SF.getParentModule(), P.Diags);
   unsigned Index = 0;
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();
@@ -1975,8 +1975,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SmallVector<ValueDecl*, 4> CurModuleResults;
     // Perform a module level lookup on the first component of the
     // fully-qualified name.
-    P.SF.TU.lookupValue(Module::AccessPathTy(), GlobalName,
-                        NLKind::UnqualifiedLookup, CurModuleResults);
+    P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), GlobalName,
+                                        NLKind::UnqualifiedLookup,
+                                        CurModuleResults);
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
@@ -2231,7 +2232,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (!subs.empty()) {
       auto silFnTy = FnTy.castTo<SILFunctionType>();
       FnTy = SILType::getPrimitiveObjectType(
-           silFnTy->substGenericArgs(SILMod, &P.SF.TU, subs));
+           silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(), subs));
     }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
@@ -2258,7 +2259,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (!subs.empty()) {
       auto silFnTy = FnTy.castTo<SILFunctionType>();
       FnTy = SILType::getPrimitiveObjectType(
-           silFnTy->substGenericArgs(SILMod, &P.SF.TU, subs));
+           silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(), subs));
     }
     
     SILType closureTy =
@@ -2515,8 +2516,9 @@ bool Parser::parseSILVTable() {
 
   // Find the class decl.
   SmallVector<ValueDecl*, 4> CurModuleResults;
-  SF.TU.lookupValue(Module::AccessPathTy(), Name,
-                    NLKind::UnqualifiedLookup, CurModuleResults);
+  SF.getParentModule()->lookupValue(Module::AccessPathTy(), Name,
+                                    NLKind::UnqualifiedLookup,
+                                    CurModuleResults);
   if (CurModuleResults.size() != 1) {
     diagnose(Loc, diag::sil_vtable_class_not_found, Name);
     return true;

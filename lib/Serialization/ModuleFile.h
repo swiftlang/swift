@@ -395,8 +395,8 @@ class SerializedASTFile final : public LoadedFile {
 public:
   ModuleFile &File;
 
-  SerializedASTFile(TranslationUnit &TU, ModuleFile &file)
-    : LoadedFile(FileUnitKind::SerializedAST, TU), File(file) {}
+  SerializedASTFile(Module &M, ModuleFile &file)
+    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
 
   virtual void lookupValue(Module::AccessPathTy accessPath,
                            Identifier name, NLKind lookupKind,

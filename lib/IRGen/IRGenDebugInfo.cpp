@@ -482,7 +482,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   auto LinkageName = Fn->getName();
   auto File = getOrCreateFile(L.Filename);
   // This placeholder scope gets RAUW'd when the namespaces are
-  // created after we are finished with the entire translation unit.
+  // created after we are finished with the entire module.
   auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
                                           LinkageName, File, File, 0);
   auto Line = L.Line;

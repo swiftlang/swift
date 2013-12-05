@@ -29,9 +29,8 @@ namespace swift {
   class SILModule;
   class SourceFile;
 
-  bool appendToREPLTranslationUnit(SourceFile &SF,
-                                   REPLContext &RC,
-                                   llvm::MemoryBuffer *Buffer);
+  bool appendToREPLFile(SourceFile &SF, REPLContext &RC,
+                        llvm::MemoryBuffer *Buffer);
 
   bool runSILDiagnosticPasses(SILModule &Module);
 

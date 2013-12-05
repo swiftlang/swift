@@ -31,19 +31,19 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
-  class TranslationUnit;
+  class CodeCompletionCallbacksFactory;
   class Decl;
   class DeclContext;
-  class SILModule;
-  struct TypeLoc;
-  class SILParserTUState;
-  class Parser;
-  class SourceFile;
-  class Token;
-  class CodeCompletionCallbacksFactory;
-  class PersistentParserState;
   class DelayedParsingCallbacks;
+  class Module;
+  class Parser;
+  class PersistentParserState;
+  class SILModule;
+  class SILParserTUState;
+  class SourceFile;
   class SourceManager;
+  class Token;
+  struct TypeLoc;
 
   namespace irgen {
     class Options;
@@ -62,7 +62,7 @@ namespace swift {
 
   /// @{
 
-  /// \brief Check that the translation unit is well formed, aborting and spewing
+  /// \brief Check that the source file is well formed, aborting and spewing
   /// errors if not.
   ///
   /// "Well-formed" here means following the invariants of the AST, not that the
@@ -77,7 +77,7 @@ namespace swift {
   /// If the source file is the main file, stop parsing after the next
   /// stmt-brace-item with side-effects.
   ///
-  /// \param SF the file within the translation unit being parsed.
+  /// \param SF the file within the module being parsed.
   ///
   /// \param BufferID the buffer to parse from.
   ///
@@ -92,8 +92,7 @@ namespace swift {
   /// bodies.
   ///
   /// \return true if the parser found code with side effects.
-  bool
-  parseIntoTranslationUnit(SourceFile &SF, unsigned BufferID, bool *Done,
+  bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
                            DelayedParsingCallbacks *DelayedParseCB = nullptr);
@@ -126,16 +125,18 @@ namespace swift {
 
   /// \brief Recursively validate the specified type.
   ///
-  /// This is used when dealing with partial translation units (e.g. SIL
-  /// parsing, code completion).
+  /// This is used when dealing with partial source files (e.g. SIL parsing,
+  /// code completion).
   ///
   /// \returns false on success, true on error.
   bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                               bool isSILType, DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
-  /// Turn the given translation unit into SIL IR.
-  std::unique_ptr<SILModule> performSILGeneration(TranslationUnit *TU);
+  /// Turn the given module into SIL IR.
+  ///
+  /// The module must contain source files.
+  std::unique_ptr<SILModule> performSILGeneration(Module *M);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule> performSILGeneration(SourceFile &SF,
@@ -193,17 +194,16 @@ namespace swift {
   /// diagnostics if any.
   void emitSILDataflowDiagnostics(SILModule *M);
 
-  using TranslationUnitOrSourceFile =
-    PointerUnion<TranslationUnit *, SourceFile *>;
+  using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 
-  /// Serializes a translation unit to the given output file.
-  void serialize(TranslationUnitOrSourceFile DC, const SILModule *M,
+  /// Serializes a module or single source file to the given output file.
+  void serialize(ModuleOrSourceFile DC, const SILModule *M,
                  const char *outputPath,
                  ArrayRef<std::string> inputFilenames = {},
                  StringRef moduleLinkName = {});
 
-  /// Serializes a translation unit to a stream.
-  void serializeToStream(TranslationUnitOrSourceFile DC,
+  /// Serializes a module or single source file to a stream.
+  void serializeToStream(ModuleOrSourceFile DC,
                          llvm::raw_ostream &out,
                          const SILModule *M = nullptr,
                          ArrayRef<std::string> inputFilenames = {},
@@ -212,9 +212,9 @@ namespace swift {
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
   void performSILCleanup(SILModule *M);
 
-  /// Turn the given translation unit into either LLVM IR or native code.
+  /// Turn the given module into either LLVM IR or native code.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
-                           TranslationUnit *TU, SILModule *SILMod);
+                           swift::Module *M, SILModule *SILMod);
 
   /// Turn the given source file into either LLVM IR or native code.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,

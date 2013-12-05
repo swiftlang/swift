@@ -1219,7 +1219,7 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
-                      TranslationUnit *TU) const {
+                      Module *M) const {
   OS << "sil_stage ";
   switch (Stage) {
   case SILStage::Raw:
@@ -1232,9 +1232,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
-  // Print the declarations and types from the translation unit.
-  // FIXME: What about multi-file TUs?
-  if (TU && TU->getFiles().size() == 1) {
+  // Print the declarations and types from the origin module.
+  // FIXME: What about multi-file modules?
+  if (M && M->getFiles().size() == 1) {
     // Compute the list of emitted functions, whose AST Decls we do not need to
     // print.
     llvm::DenseSet<const Decl*> emittedFunctions;
@@ -1250,7 +1250,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 
     // FIXME: Use some kind of visitor interface here.
     SmallVector<Decl *, 32> topLevelDecls;
-    TU->getFiles().front()->getTopLevelDecls(topLevelDecls);
+    M->getFiles().front()->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&
