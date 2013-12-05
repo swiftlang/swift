@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "predictable-memopt"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "DIMemoryUseCollector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"

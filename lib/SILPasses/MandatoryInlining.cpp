@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "mandatory-inlining"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SILPasses/Utils/Local.h"

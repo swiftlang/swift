@@ -18,7 +18,6 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 

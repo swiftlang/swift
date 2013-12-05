@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"

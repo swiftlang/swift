@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -27,7 +28,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/Subsystems.h"
 using namespace swift;
 using namespace swift::PatternMatch;
 

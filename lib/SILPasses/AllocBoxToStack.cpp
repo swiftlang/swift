@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"

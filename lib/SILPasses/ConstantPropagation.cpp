@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "constant-propagation"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"

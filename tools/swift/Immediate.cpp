@@ -33,6 +33,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/SmallString.h"

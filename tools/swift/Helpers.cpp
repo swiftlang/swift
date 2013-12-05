@@ -18,6 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 using namespace swift;
 
 bool swift::appendToREPLFile(SourceFile &SF, REPLContext &RC,

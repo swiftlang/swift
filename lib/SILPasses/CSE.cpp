@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-cse"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"

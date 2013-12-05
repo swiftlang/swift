@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-code-elimination"
+#include "swift/SILPasses/Passes.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/Subsystems.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"

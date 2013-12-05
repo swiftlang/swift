@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"

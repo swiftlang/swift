@@ -23,7 +23,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "inout-deshadow"
-#include "swift/Subsystems.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"

@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "capture-promotion"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/Subsystems.h"
 using namespace swift;
 
 typedef llvm::SmallSet<unsigned, 4> IndicesSet;
