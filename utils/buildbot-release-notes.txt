@@ -26,6 +26,8 @@
     conjunctive: &&
     disjunctive: ||
 
+* The "Enumerable" protocol has been renamed "Sequence"
+
 2013-12-04
 ----------
 
