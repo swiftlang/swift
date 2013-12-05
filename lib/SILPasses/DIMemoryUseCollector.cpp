@@ -471,7 +471,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
-        Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
       continue;
     }
 
@@ -500,7 +500,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       else
         Kind = DIUseKind::Initialization;
       
-      Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
       continue;
     }
     
@@ -543,7 +543,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       else
         Kind = DIUseKind::InitOrAssign;
       
-      Uses.push_back(DIMemoryUse(CAI, Kind, BaseEltNo, 1));
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
       continue;
     }
     
