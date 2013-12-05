@@ -218,7 +218,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           Tok.isNot(tok::r_brace)) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
-         Tok.isNot(tok::kw_sil_vtable) &&
+         Tok.isNot(tok::kw_sil_vtable) && Tok.isNot(tok::kw_sil_global) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
     if (Kind == BraceItemListKind::TopLevelLibrary &&
         skipExtraTopLevelRBraces())

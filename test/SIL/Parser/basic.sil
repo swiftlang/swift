@@ -5,6 +5,9 @@ sil_stage raw // CHECK: sil_stage raw
 import Builtin
 import swift
 
+// CHECK: sil_global internal @globalinit_token0 : $Builtin.Word
+sil_global internal @globalinit_token0 : $Builtin.Word
+
 // Linkage types.
 
 // CHECK-LABEL: sil thunk @clang_thunk : $() -> ()
@@ -1023,6 +1026,32 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
+var staticProp: Int64 = 0
+
+// CHECK-LABEL: sil internal @globalinit_func0 : $@thin () -> () {
+sil internal @globalinit_func0 : $@thin () -> () {
+bb0:
+  %0 = global_addr #staticProp : $*Int64
+  %1 = mark_uninitialized [globalvar] %0 : $*Int64
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+bb0:
+  %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  // CHECK: sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = function_ref @globalinit_func0 : $@thin () -> ()
+  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
+  %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %6 = global_addr #staticProp : $*Int64
+  %7 = address_to_pointer %6 : $*Int64 to $Builtin.RawPointer
+  return %7 : $Builtin.RawPointer
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
@@ -1037,4 +1066,3 @@ bb0:
   store undef to undef : $*Builtin.Int1
   unreachable
 }
-

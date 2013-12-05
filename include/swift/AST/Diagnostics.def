@@ -440,6 +440,10 @@ ERROR(sil_vtable_func_not_found, decl_parsing,none,
 ERROR(sil_vtable_class_not_found, decl_parsing,none,
       "sil class not found %0", (Identifier))
 
+// SIL Global
+ERROR(sil_global_variable_not_found, decl_parsing,none,
+      "sil global not found %0", (Identifier))
+
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------

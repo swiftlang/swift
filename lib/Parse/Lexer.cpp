@@ -526,7 +526,8 @@ void Lexer::lexIdentifier() {
 
   // These keywords are only active in SIL mode.
   if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
-       Kind == tok::kw_sil_vtable || Kind == tok::kw_undef) && !InSILMode)
+       Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
+       Kind == tok::kw_undef) && !InSILMode)
     Kind = tok::identifier;
   
   return formToken(Kind, TokStart);

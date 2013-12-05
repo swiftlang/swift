@@ -1191,9 +1191,6 @@ void SILFunction::printName(raw_ostream &OS) const {
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
   
-  // FIXME: Parsing support for sil_global.
-  OS << "/* ";
-
   OS << "sil_global ";
   printLinkage(OS, getLinkage());
 
@@ -1202,9 +1199,6 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   
   if (isExternalDeclaration())
     OS << "external";
-  
-  // FIXME: Parsing support for sil_global.
-  OS << " */";
   
   OS << "\n\n";
 }

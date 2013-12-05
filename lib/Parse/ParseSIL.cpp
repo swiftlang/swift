@@ -915,6 +915,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
+    .Case("sil_global_addr", ValueKind::SILGlobalAddrInst)
     .Case("strong_release", ValueKind::StrongReleaseInst)
     .Case("strong_retain", ValueKind::StrongRetainInst)
     .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
@@ -1981,9 +1982,37 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
-  case ValueKind::SILGlobalAddrInst:
-    llvm_unreachable("not implemented");
+  case ValueKind::SILGlobalAddrInst: {
+    Identifier GlobalName;
+    SourceLoc IdLoc;
+    SILType Ty;
+    if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
+        parseSILIdentifier(GlobalName, IdLoc, diag::expected_sil_value_name) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(Ty))
+      return true;
 
+    // Go through list of global variables in the SILModule.
+    SILGlobalVariable *Global = nullptr;
+    for (SILGlobalVariable &g : SILMod.getSILGlobals())
+      if (g.getName().equals(GlobalName.str())) {
+        if (g.getLoweredType().getAddressType() != Ty) {
+          P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
+                     g.getLoweredType().getSwiftRValueType());
+          return true;
+        }
+        Global = &g;
+        break;
+      }
+
+    if (!Global) {
+      P.diagnose(IdLoc, diag::sil_global_variable_not_found, GlobalName);
+      return true;
+    }
+
+    ResultVal = B.createSILGlobalAddr(InstLoc, Global);
+    break;
+  }
   case ValueKind::SwitchEnumInst:
   case ValueKind::DestructiveSwitchEnumAddrInst: {
     if (parseTypedValueRef(Val))
@@ -2434,6 +2463,36 @@ bool Parser::parseDeclSILStage() {
   
   SIL->M->setStage(stage);
   SIL->S->DidParseSILStage = true;
+  return false;
+}
+
+/// decl-sil-global: [[only in SIL mode]]
+///   'sil_global' sil-linkage @name : sil-type [external]
+bool Parser::parseSILGlobal() {
+  consumeToken(tok::kw_sil_global);
+  SILLinkage GlobalLinkage;
+  Identifier GlobalName;
+  SILType GlobalType;
+  SourceLoc NameLoc;
+
+  // Inform the lexer that we're lexing the body of the SIL declaration.
+  Lexer::SILBodyRAII Tmp(*L);
+  if (parseSILLinkage(GlobalLinkage, *this) ||
+      parseToken(tok::at_sign, diag::expected_sil_value_name) ||
+      parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
+      parseToken(tok::colon, diag::expected_sil_type))
+    return true;
+
+  SILParser State(*this);
+  if (State.parseSILType(GlobalType))
+    return true;
+
+  bool IsExternal = false;
+  if (parseSILOptional(IsExternal, State, "external"))
+    return true;
+  new (*SIL->M) SILGlobalVariable(*SIL->M, GlobalLinkage, GlobalName.str(),
+                                  GlobalType, !IsExternal,
+                                  SILFileLocation(NameLoc));
   return false;
 }
 
