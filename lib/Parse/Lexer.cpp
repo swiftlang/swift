@@ -1299,7 +1299,7 @@ void Lexer::getStringLiteralSegments(
 
 void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
-         CurPtr <= BufferEnd && "Cur UnicodeScalar Pointer out of range!");
+         CurPtr <= BufferEnd && "Current pointer out of range!");
 
   NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
