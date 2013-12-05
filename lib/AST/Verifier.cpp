@@ -921,7 +921,7 @@ struct ASTNodeBase {};
         var->getType().print(Out);
         abort();
       }
-      verifyParsedBase(var);
+      verifyCheckedBase(var);
     }
 
     void verifyParsed(EnumElementDecl *UED) {
