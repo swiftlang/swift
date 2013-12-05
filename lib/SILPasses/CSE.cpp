@@ -172,14 +172,10 @@ unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
 bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
                                               SimpleValue RHS) {
   SILInstruction *LHSI = LHS.Inst, *RHSI = RHS.Inst;
-
   if (LHS.isSentinel() || RHS.isSentinel())
     return LHSI == RHSI;
 
-  if (LHSI->getKind() != RHSI->getKind()) return false;
-  if (LHSI->isIdenticalTo(RHSI)) return true;
-
-  return false;
+  return LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI);
 }
 
 //===----------------------------------------------------------------------===//
@@ -241,10 +237,9 @@ private:
   // that the scope gets popped when the NodeScope is destroyed.
   class NodeScope {
    public:
-    NodeScope(ScopedHTType *availableValues,
-              LoadHTType *availableLoads) :
-        Scope(*availableValues),
-        LoadScope(*availableLoads) { }
+    NodeScope(ScopedHTType *availableValues, LoadHTType *availableLoads)
+      : Scope(*availableValues), LoadScope(*availableLoads) {
+    }
 
    private:
     NodeScope(const NodeScope&) = delete;
@@ -301,7 +296,7 @@ private:
 
   bool processNode(DominanceInfoNode *Node);
 };
-}
+}  // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                             CSE Implementation
