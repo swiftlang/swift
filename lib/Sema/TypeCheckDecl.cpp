@@ -2390,16 +2390,16 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // variable.
   bool FoundConstructor = false;
   bool FoundInstanceVar = false;
+
   for (auto member : decl->getMembers()) {
     if (isa<ConstructorDecl>(member)) {
       FoundConstructor = true;
       break;
     }
 
-    if (auto var = dyn_cast<VarDecl>(member)) {
+    if (auto var = dyn_cast<VarDecl>(member))
       if (!var->isComputed() && !var->isStatic())
         FoundInstanceVar = true;
-    }
   }
 
   // If we found a constructor, don't add any implicit constructors.
@@ -2687,6 +2687,11 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     for (auto var : variables) {
       if (var->isStatic() || var->isComputed() || var->isInvalid())
         continue;
+
+      // We refuse to default construct struct members.  DI takes care of this.
+      // FIXME: Classes too someday.
+      if (isa<StructDecl>(decl) && !decl->hasClangNode())
+        return;
 
       // If this variable is not default-initializable, we're done: we can't
       // add the default constructor because it will be ill-formed.

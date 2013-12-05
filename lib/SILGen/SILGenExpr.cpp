@@ -2006,9 +2006,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   
-  // DI can only handle Enums so far.
+  // DI cannot handle autosynthesized ctors from clang AST nodes yet. 
   Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
-  bool UseDIForThisCtor = isa<EnumDecl>(ConstructedType->getAnyNominal());
+  bool UseDIForThisCtor = !ConstructedType->getAnyNominal()->hasClangNode();
   
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be

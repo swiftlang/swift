@@ -658,6 +658,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   bool allOfThisInitialized = false;
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
                        ->getNominalOrBoundGenericNominal();
+
+  bool UseDIForThis =
+    isa<StructDecl>(nominalDecl) && !nominalDecl->hasClangNode();
+
   llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
   for (auto elt : body->getElements()) {
     auto expr = elt.dyn_cast<Expr *>();
@@ -695,6 +699,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
       // If the left-hand side is 'self', we're initializing the
       // whole object.
+      if (!UseDIForThis)
       if (declRef->getDecl()->getName() == Context.SelfIdentifier) {
         allOfThisInitialized = true;
         break;
@@ -754,6 +759,11 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
         diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
         diagnose(patternBind->getLoc(), diag::decl_init_here);
       }
+
+      // If this is a struct, don't do any default initialization of members.
+      // DI will take care of this. Classes will be implemented soon.
+      if (UseDIForThis)
+        continue;
 
       // Find the variables in the pattern. They'll each need to be
       // default-initialized.
