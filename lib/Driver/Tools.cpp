@@ -77,6 +77,7 @@ darwin::Linker::constructJob(const JobAction &JA,
                              const ActionList &InputActions,
                              const ArgList &Args,
                              StringRef LinkingOutput) const {
+  assert(Output->getType() == types::TY_Image && "Invalid linker output type.");
   ArgStringList Arguments;
   Arguments.push_back("-v");
 
