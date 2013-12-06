@@ -488,8 +488,8 @@ sil @tupleextract_test : $@thin () -> (Builtin.Int32) {
 sil @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
 
 // CHECK-LABEL: tupleelementaddr_test
-// CHECK: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
-// CHECK-NOT: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
+// CHECK: tuple_element_addr {{%[0-9]#1}} : $*(Builtin.Int32, Builtin.Int32), 0
+// CHECK-NOT: tuple_element_addr {{%[0-9]#1}} : $*(Builtin.Int32, Builtin.Int32), 0
 sil @tupleelementaddr_test : $@thin () -> (Builtin.Int32) {
   %0 = alloc_stack $(Builtin.Int32, Builtin.Int32)
   %1 = function_ref @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
