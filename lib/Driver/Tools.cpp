@@ -13,8 +13,10 @@
 #include "Tools.h"
 #include "ToolChains.h"
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/Options.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -25,6 +27,20 @@ using namespace llvm::opt;
 
 /// Swift Tool
 
+namespace swift {
+static void addInputArgumentsForInputJob(const Job *J, ArgStringList Arguments){
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    Arguments.push_back(Cmd->getOutput().getFilename().data());
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    for (const Job *J : *JL) {
+      addInputArgumentsForInputJob(J, Arguments);
+    }
+  } else {
+    llvm_unreachable("Unable to add input arguments for unknown Job class");
+  }
+}
+}
+
 std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
                                          std::unique_ptr<JobList> Inputs,
                                          std::unique_ptr<CommandOutput> Output,
@@ -33,9 +49,56 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
                                          StringRef LinkingOutput) const {
   ArgStringList Arguments;
 
-  Arguments.push_back("--version");
+  StringRef ExecRef = getToolChain().getDriver().getSwiftProgramPath();
+  
+  // Invoke ourselves in -frontend mode.
+  // TODO: remove once the frontend is integrated, and pass -frontend instead
+  ExecRef = ExecRef.drop_back(7);
 
-  const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
+  const char *Exec = Args.MakeArgString(ExecRef);
+
+  Arguments.push_back("-triple");
+  std::string TripleStr = getToolChain().getTripleString();
+  Arguments.push_back(Args.MakeArgString(TripleStr));
+  
+  const char *OutputOption = nullptr;
+  switch (Output->getType()) {
+  case types::TY_Object:
+    OutputOption = "-c";
+    break;
+  case types::TY_RawSIL:
+    OutputOption = "-emit-silgen";
+    break;
+  case types::TY_SIL:
+    OutputOption = "-emit-sil";
+    break;
+  default:
+    llvm_unreachable("Invalid output type");
+  }
+  
+  assert(OutputOption != nullptr && "No output option specified!");
+  
+  Arguments.push_back(OutputOption);
+  
+  for (const Job *J : *Inputs) {
+    addInputArgumentsForInputJob(J, Arguments);
+  }
+  
+  for (const Action *A : InputActions) {
+    assert(isa<InputAction>(A) && "Only InputActions may be passed");
+    const InputAction *IA = cast<InputAction>(A);
+    
+    Arguments.push_back(IA->getInputArg().getValue());
+  }
+  
+  Args.AddLastArg(Arguments, options::OPT_g);
+  
+  // Set the SDK for the frontend.
+  Args.AddLastArg(Arguments, options::OPT_sdk);
+  
+  // Add the output file argument.
+  Arguments.push_back("-o");
+  Arguments.push_back(Output->getFilename().data());
 
   std::unique_ptr<Job> Cmd(new Command(JA, *this, std::move(Inputs),
                                        std::move(Output),
