@@ -1032,6 +1032,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   bool ArgsEmitted = false;
 
   if (InEntryBlock) {
+    // Establish a mapping from VarDecl -> ArgNo to be used by
+    // visitAllocStackInst().
     unsigned N = 1;
     for (auto Arg : BB->getBBArgs()) {
       if (auto VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
