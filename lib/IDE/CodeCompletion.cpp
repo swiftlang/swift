@@ -888,12 +888,24 @@ public:
       Builder.addTypeAnnotation(T.getString());
   }
 
+  static bool isBoringBoundGenericType(Type T) {
+    BoundGenericType *BGT = T->getAs<BoundGenericType>();
+    if (!BGT)
+      return false;
+    for (Type Arg : BGT->getGenericArgs()) {
+      if (!Arg->is<GenericTypeParamType>())
+        return false;
+    }
+    return true;
+  }
+
   Type getTypeOfMember(const ValueDecl *VD) {
     if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredTypeOfContext();
       if (ContextTy) {
         Type MaybeNominalType = ExprType->getRValueInstanceType();
-        if (ContextTy->getAnyNominal() == MaybeNominalType->getAnyNominal())
+        if (ContextTy->getAnyNominal() == MaybeNominalType->getAnyNominal() &&
+            !isBoringBoundGenericType(MaybeNominalType))
           return MaybeNominalType->getTypeOfMember(
               CurrDeclContext->getParentModule(), VD, TypeResolver.get());
       }
