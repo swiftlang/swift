@@ -158,11 +158,14 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
 
-  /// The kind of restricrion placed on this constraint.
+  /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 7;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
+
+  /// Whether this constraint is currently active, i.e., stored in the worklist.
+  unsigned IsActive : 1;
 
   union {
     struct {
@@ -199,7 +202,8 @@ class Constraint : public llvm::ilist_node<Constraint> {
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> disjunction,
              ConstraintLocator *locator)
-    : Kind(kind), HasRestriction(false), Nested(disjunction), Locator(locator) {
+    : Kind(kind), HasRestriction(false), IsActive(false), Nested(disjunction),
+      Locator(locator) {
     assert(kind == ConstraintKind::Conjunction ||
            kind == ConstraintKind::Disjunction);
   }
@@ -212,13 +216,13 @@ public:
   /// Construct a new overload-binding constraint.
   Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator)
     : Kind(ConstraintKind::BindOverload), HasRestriction(false),
-      Overload{type, choice}, Locator(locator) { }
+      IsActive(false), Overload{type, choice}, Locator(locator) { }
 
   /// Constraint a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator)
     : Kind(kind), Restriction(restriction), HasRestriction(true),
-      Types{ first, second, Identifier() }, Locator(locator) { }
+      IsActive(false), Types{ first, second, Identifier() }, Locator(locator) { }
 
   /// Create a new conjunction constraint.
   static Constraint *createConjunction(ConstraintSystem &cs,
@@ -240,6 +244,12 @@ public:
 
     return Restriction;
   }
+
+  /// Whether this constraint is active, i.e., in the worklist.
+  bool isActive() const { return IsActive; }
+
+  /// Set whether this constraint is active or not.
+  void setActive(bool active) { IsActive = active; }
 
   /// \brief Determine the classification of this constraint, providing
   /// a broader categorization than \c getKind().

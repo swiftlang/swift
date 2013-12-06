@@ -890,10 +890,6 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   ConstraintList Constraints;
 
-  // Constraints that are known to be "Active", meaning that they are already
-  // in the worklist.
-  llvm::SmallPtrSet<Constraint *, 4> ActiveConstraints;
-
   /// The worklist of constraints that should be revisited due to a change.
   /// FIXME: This is a crappy data structure. We want to bounce between
   /// two ConstraintLists so there's no memory allocation needed.

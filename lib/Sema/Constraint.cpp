@@ -25,8 +25,8 @@ using namespace constraints;
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
                        Identifier Member,
                        ConstraintLocator *locator)
-  : Kind(Kind), HasRestriction(false), Types { First, Second, Member },
-    Locator(locator)
+  : Kind(Kind), HasRestriction(false), IsActive(false),
+    Types { First, Second, Member }, Locator(locator)
 {
   switch (Kind) {
   case ConstraintKind::Bind:

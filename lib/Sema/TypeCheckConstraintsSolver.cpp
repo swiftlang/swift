@@ -406,7 +406,9 @@ bool ConstraintSystem::simplify() {
       // Grab the next constraint from the worklist.
       auto constraint = Worklist.front();
       Worklist.pop_front();
+      assert(constraint->isActive() && "Worklist constraint is not active?");
 
+      // Simplify this constraint.
       switch (simplifyConstraint(*constraint)) {
       case SolutionKind::Error:
         if (!failedConstraint) {
@@ -422,7 +424,6 @@ bool ConstraintSystem::simplify() {
 
         // Remove the constraint from the constraint graph.
         CG->removeConstraint(constraint);
-
         break;
 
       case SolutionKind::Unsolved:
@@ -430,8 +431,20 @@ bool ConstraintSystem::simplify() {
         break;
       }
 
+      // This constraint is not active. We delay this operation until
+      // after simplification to avoid re-insertion.
+      constraint->setActive(false);
+
       // Check whether a constraint failed. If so, we're done.
       if (failedConstraint) {
+        // Mark all of the remaining constraints in the worklist inactive.
+        while (!Worklist.empty()) {
+          auto constraint = Worklist.front();
+          Worklist.pop_front();
+          assert(constraint->isActive()&&"Worklist constraint is not active?");
+          constraint->setActive(false);
+        }
+
         // Retire all of the constraints.
         if (solverState)
           solverState->retiredConstraints.splice(
@@ -441,16 +454,9 @@ bool ConstraintSystem::simplify() {
           Constraints.clear();
 
         // Clear out the worklist. There's nothing to do now.
-        ActiveConstraints.clear();
-        Worklist.clear();
         return true;
       }
-
-      // Remove this constraint from the set of active constraints.
-      // We delay this to prevent immediate re-insertion of the constraint.
-      ActiveConstraints.erase(constraint);
     }
-    assert(ActiveConstraints.empty() && "Still have active constraints?");
 
     // Transfer any retired constraints to the retired list.
     for (auto i = Constraints.begin(), end = Constraints.end();

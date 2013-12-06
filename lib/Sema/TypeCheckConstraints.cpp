@@ -92,7 +92,7 @@ ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
 
   // Create the constraint graph.
   // FIXME: Enable this by default.
-  //   CG = new ConstraintGraph(*this);
+  // CG = new ConstraintGraph(*this);
 }
 
 ConstraintSystem::~ConstraintSystem() {
@@ -154,8 +154,10 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
 
   // Add any constraints that aren't already active to the worklist.
   for (auto constraint : constraints) {
-    if (ActiveConstraints.insert(constraint))
+    if (!constraint->isActive()) {
       Worklist.push_back(constraint);
+      constraint->setActive(true);
+    }
   }
 }
 
