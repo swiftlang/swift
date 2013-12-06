@@ -17,7 +17,7 @@
 #ifndef SCOPE_H
 #define SCOPE_H
 
-#include "SILGen.h"
+#include "SILGenFunction.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 

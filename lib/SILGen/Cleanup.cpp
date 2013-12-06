@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Cleanup.h"
-#include "SILGen.h"
+#include "SILGenFunction.h"
 using namespace swift;
 using namespace Lowering;
 

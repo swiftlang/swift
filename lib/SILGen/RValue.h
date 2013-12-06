@@ -22,7 +22,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "SILGen.h"
+#include "SILGenFunction.h"
 
 namespace swift {
   class SILValue;

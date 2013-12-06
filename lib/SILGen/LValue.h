@@ -17,7 +17,7 @@
 #ifndef SWIFT_LOWERING_LVALUE_H
 #define SWIFT_LOWERING_LVALUE_H
 
-#include "SILGen.h"
+#include "SILGenFunction.h"
 #include "swift/Basic/DiverseList.h"
 
 namespace swift {

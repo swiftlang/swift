@@ -13,7 +13,6 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "SILGen.h"
 #include "Initialization.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"

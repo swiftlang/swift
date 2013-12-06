@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "SILGenFunction.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
