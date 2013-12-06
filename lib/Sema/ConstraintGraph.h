@@ -121,9 +121,6 @@ public:
     /// Remove an adjacency from the list of adjacencies.
     void removeAdjacency(TypeVariableType *typeVar);
 
-    /// Add the given type variable to this node's equivalence class.
-    void addToEquivalenceClass(TypeVariableType *otherTypeVar);
-
     /// Add the given type variables to this node's equivalence class.
     void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 

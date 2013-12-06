@@ -251,17 +251,6 @@ void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
   });
 }
 
-void
-ConstraintGraph::Node::addToEquivalenceClass(TypeVariableType *otherTypeVar) {
-  assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
-         "Can't extend equivalence class of non-representative type var");
-  assert(TypeVar == otherTypeVar->getImpl().getRepresentative(nullptr) &&
-         "Type variables are not equivalent");
-  if (EquivalenceClass.empty())
-    EquivalenceClass.push_back(TypeVar);
-  EquivalenceClass.push_back(otherTypeVar);
-}
-
 void ConstraintGraph::Node::addToEquivalenceClass(
        ArrayRef<TypeVariableType *> typeVars) {
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
