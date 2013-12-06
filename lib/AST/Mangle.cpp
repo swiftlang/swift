@@ -761,21 +761,23 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     // Mangle generic parameter archetypes.
 
     // Find the archetype information.
+    llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
+    DeclContext *DC = DeclCtx;
     auto it = Archetypes.find(archetype);
     while (it == Archetypes.end()) {
       // This should be treated like an error, but we don't want
       // clients like lldb to crash because of corrupted input.
-      assert(DeclCtx && "empty decl context");
-      if (!DeclCtx) return;
+      assert(DC && "empty decl context");
+      if (!DC) return;
 
       // This Archetype comes from an enclosing context -- proceed to
       // bind the generic params form all parent contexts.
       GenericParamList *GenericParams = nullptr;
       do { // Skip over empty parent contexts.
-        DeclCtx = DeclCtx->getParent();
-        assert(DeclCtx && "no decl context for archetype found");
-        if (!DeclCtx) return;
-        GenericParams = DeclCtx->getGenericParamsOfContext();
+        DC = DC->getParent();
+        assert(DC && "no decl context for archetype found");
+        if (!DC) return;
+        GenericParams = DC->getGenericParamsOfContext();
       } while (!GenericParams);
 
       bindGenericParameters(GenericParams);
@@ -794,7 +796,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       SmallVector<void *, 4> SortedSubsts(Substitutions.size());
       for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
       for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-      ContextMangler.mangleDeclContext(DeclCtx);
+      ContextMangler.mangleDeclContext(DC);
     } else {
       unsigned relativeDepth = ArchetypesDepth - info.Depth;
       if (relativeDepth != 0) {
