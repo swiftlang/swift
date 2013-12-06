@@ -849,15 +849,16 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Build a constraint graph.
   ConstraintGraph cg(*this);
+  for (auto typeVar : TypeVariables)
+    (void)cg[typeVar];
   for (auto &constraint : Constraints)
     cg.addConstraint(&constraint);
 
   // Compute the connected components of the constraint graph. We only want to
   // look at the smallest one.
+  SmallVector<TypeVariableType *, 16> typeVars;
   SmallVector<unsigned, 16> components;
-  SmallVector<unsigned, 4> componentSizes;
-  unsigned numComponents = cg.computeConnectedComponents(components,
-                                                         &componentSizes);
+  unsigned numComponents = cg.computeConnectedComponents(typeVars, components);
 
   // If we don't have more than one component, just solve the whole
   // system.
@@ -874,7 +875,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     log << "---Constraint graph---\n";
     cg.print(log);
 
-    ArrayRef<TypeVariableType *> typeVars = cg.getTypeVariables();
     log << "---Connected components---\n";
     for (unsigned component = 0; component != numComponents; ++component) {
       log.indent(2);
@@ -893,7 +893,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // owning component.
   llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
   llvm::DenseMap<Constraint *, unsigned> constraintComponent;
-  auto typeVars = cg.getTypeVariables();
   for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
     // Record the component of this type variable.
     typeVarComponent[typeVars[i]] = components[i];
@@ -939,7 +938,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     llvm::SmallVector<TypeVariableType *, 16> allTypeVariables 
       = std::move(TypeVariables);
     for (auto typeVar : allTypeVariables) {
-      auto known = typeVarComponent.find(getRepresentative(typeVar));
+      auto known = typeVarComponent.find(typeVar);
       if (known != typeVarComponent.end() && known->second != component)
         continue;
 

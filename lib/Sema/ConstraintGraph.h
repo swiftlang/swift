@@ -66,6 +66,16 @@ public:
       return Adjacencies;
     }
 
+    /// Retrieve all of the type variables in the same equivalence class
+    /// as this type variable.
+    ArrayRef<TypeVariableType *> getEquivalenceClass() const;
+
+    /// Retrieve the set of type variables related to this type variable
+    /// through fixed bindings.
+    ArrayRef<TypeVariableType *> getFixedBindings() const {
+      return FixedBindings;
+    }
+
   private:
     /// Add a constraint to the list of constraints.
     void addConstraint(Constraint *constraint);
@@ -88,9 +98,15 @@ public:
     /// variables are no longer adjacent.
     void removeAdjacency(TypeVariableType *typeVar,
                          bool allAdjacencies = false);
-    
-    /// Collapse this node into the given node.
-    void collapseInto(ConstraintGraph &cg, Node &combined);
+
+    /// Add the given type variable to this node's equivalence class.
+    void addToEquivalenceClass(TypeVariableType *otherTypeVar);
+
+    /// Add a type variable related to this type variable through fixed
+    /// bindings.
+    void addFixedBinding(TypeVariableType *otherTypeVar) {
+      FixedBindings.push_back(otherTypeVar);
+    }
 
     /// The type variable this node represents.
     TypeVariableType *TypeVar;
@@ -121,6 +137,16 @@ public:
     /// \c Adjacencies.
     llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
 
+    /// All of the type variables in the same equivalence class as this
+    /// representative type variable.
+    ///
+    /// Note that this field is only valid for type variables that
+    /// are representatives of their equivalence classes.
+    mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
+
+    /// The type variables related to this type variable via fixed bindings.
+    SmallVector<TypeVariableType *, 2> FixedBindings;
+
     /// Print this graph node.
     void print(llvm::raw_ostream &out, unsigned indent);
 
@@ -142,8 +168,13 @@ public:
   ConstraintGraph(const ConstraintGraph &) = delete;
   ConstraintGraph &operator=(const ConstraintGraph &) = delete;
 
+  /// Retrieve the constraint system this graph describes.
+  ConstraintSystem &getConstraintSystem() const { return CS; }
+
   /// Access the node corresponding to the given type variable.
-  Node &operator[](TypeVariableType *typeVar);
+  Node &operator[](TypeVariableType *typeVar) {
+    return lookupNode(typeVar).first;
+  }
 
   /// Retrieve the node and index corresponding to the given type variable.
   std::pair<Node &, unsigned> lookupNode(TypeVariableType *typeVar);
@@ -153,14 +184,6 @@ public:
 
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
-
-  /// Combine the node for the first type variable into the node for
-  /// the second type variable (due to the type variables being
-  /// unified).
-  ///
-  /// The two type variables must be representatives of their
-  /// corresponding sets.
-  void mergeNodes(TypeVariableType *typeVar1, TypeVariableType *typeVar2);
 
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
@@ -172,17 +195,16 @@ public:
 
   /// Compute the connected components of the graph.
   ///
-  /// \param components Receives the component number in which each type
-  /// variable resides. The indices of this vector correspond to the indices
-  /// of each type variable in \c getTypeVariables().
+  /// \param typeVars The type variables that occur within the
+  /// connected components.
   ///
-  /// \param componentSizes If non-null, receives a count of the number of type
-  /// variables within each connected component.
+  /// \param components Receives the component numbers for each type variable
+  /// in \c typeVars.
   ///
   /// \returns the number of connected components in the graph.
   unsigned computeConnectedComponents(
-             SmallVectorImpl<unsigned> &components,
-             SmallVectorImpl<unsigned> *componentSizes);
+             SmallVectorImpl<TypeVariableType *> &typeVars,
+             SmallVectorImpl<unsigned> &components);
 
   /// Print the graph.
   void print(llvm::raw_ostream &out);
