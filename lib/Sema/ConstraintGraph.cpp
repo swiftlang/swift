@@ -133,6 +133,11 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
 ArrayRef<TypeVariableType *> ConstraintGraph::Node::getEquivalenceClass() const{
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
          "Can't request equivalence class from non-representative type var");
+  return getEquivalenceClassUnsafe();
+}
+
+ArrayRef<TypeVariableType *>
+ConstraintGraph::Node::getEquivalenceClassUnsafe() const{
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(TypeVar);
   return EquivalenceClass;
@@ -357,7 +362,8 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
 
   // Merge equivalence class from the non-representative type variable.
-  repNode.addToEquivalenceClass((*this)[typeVarNonRep].getEquivalenceClass());
+  auto &nonRepNode = (*this)[typeVarNonRep];
+  repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -558,6 +564,27 @@ void ConstraintGraph::dump() {
   print(llvm::dbgs());
 }
 
+void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
+  SmallVector<TypeVariableType *, 16> typeVars;
+  SmallVector<unsigned, 16> components;
+  unsigned numComponents = computeConnectedComponents(typeVars, components);
+  for (unsigned component = 0; component != numComponents; ++component) {
+    out.indent(2);
+    out << component << ":";
+    for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+      if (components[i] == component) {
+        out << ' ';
+        typeVars[i]->print(out);
+      }
+    }
+    out << '\n';
+  }
+}
+
+void ConstraintGraph::dumpConnectedComponents() {
+  printConnectedComponents(llvm::dbgs());
+}
+
 #pragma mark Verification of graph invariants
 
 /// Require that the given condition evaluate true.
@@ -710,16 +737,23 @@ void ConstraintGraph::verify() {
   // FIXME: Also check to make sure the equivalence classes aren't too large?
   for (auto typeVar : TypeVariables) {
     auto typeVarRep = CS.getRepresentative(typeVar);
-    if (typeVar == typeVarRep)
-      continue;
-
-    // This type variable should be in the equivalence class of its
-    // representative.
     auto &repNode = (*this)[typeVarRep];
-    require(std::find(repNode.getEquivalenceClass().begin(),
-                      repNode.getEquivalenceClass().end(),
-                      typeVar) != repNode.getEquivalenceClass().end(),
-            "type variable is not present in its representative's equiv class");
+    if (typeVar != typeVarRep) {
+      // This type variable should be in the equivalence class of its
+      // representative.
+      require(std::find(repNode.getEquivalenceClass().begin(),
+                        repNode.getEquivalenceClass().end(),
+                        typeVar) != repNode.getEquivalenceClass().end(),
+              "type variable not present in its representative's equiv class");
+    } else {
+      // Each of the type variables in the same equivalence class as this type
+      // should have this type variable as their representative.
+      for (auto equiv : repNode.getEquivalenceClass()) {
+        requireSameValue(
+          typeVar, equiv->getImpl().getRepresentative(nullptr),
+          "representative and an equivalent type variable's representative");
+      }
+    }
   }
 
   // Verify that our type variable map/vector are in sync.

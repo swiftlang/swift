@@ -90,6 +90,10 @@ public:
     ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
   private:
+    /// Retrieve all of the type variables in the same equivalence class
+    /// as this type variable.
+    ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
+
     /// Add a constraint to the list of constraints.
     void addConstraint(Constraint *constraint);
 
@@ -232,6 +236,12 @@ public:
   void print(llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
+  /// Print the connected components of the graph.
+  void printConnectedComponents(llvm::raw_ostream &out);
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dumpConnectedComponents() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Verify the invariants of the graph.

@@ -43,6 +43,7 @@ class Expr;
 
 namespace constraints {
 
+class ConstraintGraph;
 class ConstraintSystem;
 
 } // end namespace constraints
@@ -847,7 +848,7 @@ public:
   DeclContext *DC;
 private:
   Constraint *failedConstraint = nullptr;
-
+  
   /// \brief Allocator used for all of the related constraint systems.
   llvm::BumpPtrAllocator Allocator;
 
@@ -885,6 +886,9 @@ private:
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
   ConstraintList Constraints;
+
+  /// The currently-active constraint graph, if there is one.
+  ConstraintGraph *CG = nullptr;
 
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
     RepresentativeOrFixed;
@@ -1028,6 +1032,9 @@ private:
     return solverState? &solverState->savedBindings : nullptr;
   }
 
+  /// Add a new type variable that was already created.
+  void addTypeVariable(TypeVariableType *typeVar);
+
 public:
   /// \brief Lookup for a member with the given name in the given base type.
   ///
@@ -1046,8 +1053,13 @@ public:
                                        unsigned options) {
     auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
                                        locator, options);
-    TypeVariables.push_back(tv);
+    addTypeVariable(tv);
     return tv;
+  }
+
+  /// Retrieve the set of active type variables.
+  ArrayRef<TypeVariableType *> getTypeVariables() const {
+    return TypeVariables;
   }
 
   /// \brief Retrieve the constraint locator for the given anchor and
@@ -1228,6 +1240,9 @@ public:
                                          locator));
   }
 
+  /// Retrieve the list of active constraints.
+  ConstraintList &getConstraints() { return Constraints; }
+
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
@@ -1240,14 +1255,7 @@ public:
   /// representatives of their equivalence classes, and must be
   /// distinct.
   void mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                               TypeVariableType *typeVar2) {
-    assert(typeVar1 == getRepresentative(typeVar1) &&
-           "typeVar1 is not the representative");
-    assert(typeVar2 == getRepresentative(typeVar2) &&
-           "typeVar2 is not the representative");
-    assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-    typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
-  }
+                               TypeVariableType *typeVar2);
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
@@ -1256,9 +1264,7 @@ public:
   }
 
   /// \brief Assign a fixed type to the given type variable.
-  void assignFixedType(TypeVariableType *typeVar, Type type) {
-    typeVar->getImpl().assignFixedType(type, getSavedBindings());
-  }
+  void assignFixedType(TypeVariableType *typeVar, Type type);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -1615,7 +1621,7 @@ public:
   /// no fixed type. Such type variables are left to the solver to bind.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool simplify();
+  bool simplify(ConstraintGraph *cg = nullptr);
 
 private:
   /// \brief Solve the system of constraints after it has already been

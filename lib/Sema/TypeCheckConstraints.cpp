@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "ConstraintGraph.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ArchetypeBuilder.h"
@@ -101,6 +102,36 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   }
   
   return false;
+}
+
+void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
+  TypeVariables.push_back(typeVar);
+  
+  // Notify the constraint graph.
+  if (CG)
+    (void)(*CG)[typeVar];
+}
+
+void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
+                                               TypeVariableType *typeVar2) {
+  assert(typeVar1 == getRepresentative(typeVar1) &&
+         "typeVar1 is not the representative");
+  assert(typeVar2 == getRepresentative(typeVar2) &&
+         "typeVar2 is not the representative");
+  assert(typeVar1 != typeVar2 && "cannot merge type with itself");
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
+
+  // Merge nodes in the constraint graph.
+  if (CG)
+    CG->mergeNodes(typeVar1, typeVar2);
+}
+
+void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type) {
+  typeVar->getImpl().assignFixedType(type, getSavedBindings());
+  
+  // Notify the constraint graph.
+  if (CG)
+    CG->bindTypeVariable(typeVar, type);
 }
 
 /// Retrieve a uniqued selector ID for the given declaration.
@@ -246,12 +277,22 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
       if (!simplifyExisting && solverState->generatedConstraints)
         solverState->generatedConstraints->insert(constraint);
     }
+
+    // Remove the constraint from the constraint graph.
+    if (simplifyExisting && CG)
+      CG->removeConstraint(constraint);
+
     return true;
 
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
-    if (!isExternallySolved)
-      Constraints.push_back(constraint);
+    if (!isExternallySolved) {
+      Constraints.push_back(constraint);        
+    }
+
+    // Add this constraint to the constraint graph.
+    if (!simplifyExisting && CG)
+      CG->addConstraint(constraint);
 
     if (!simplifyExisting && solverState && solverState->generatedConstraints) {
       solverState->generatedConstraints->insert(constraint);
