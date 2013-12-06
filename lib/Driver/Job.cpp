@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -85,6 +86,12 @@ int Command::execute(const StringRef **Redirects, std::string *ErrMsg,
                      bool *ExecutionFailed) const {
   // TODO: this needs to be replaced with something which we can dispatch
   // multiple at a time.
+  
+  llvm::errs() << Executable << ' ';
+  for (const char *Arg : Arguments) {
+    llvm::errs() << Arg << ' ';
+  }
+  llvm::errs() << '\n';
 
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Executable);
