@@ -27,6 +27,7 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
@@ -73,6 +74,7 @@ public:
   using FunctionListType = llvm::ilist<SILFunction>;
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
+  using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   
 private:
   friend class SILBasicBlock;
@@ -81,6 +83,7 @@ private:
   friend class SILType;
   friend class SILVTable;
   friend class SILUndef;
+  friend class SILWitnessTable;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
 
@@ -96,6 +99,9 @@ private:
   
   /// The list of SILVTables in the module.
   VTableListType vtables;
+  
+  /// The list of SILWitnessTables in the module.
+  WitnessTableListType witnessTables;
   
   /// The list of SILGlobalVariables in the module.
   /// FIXME: Merge with 'globals'.
@@ -205,6 +211,20 @@ public:
   }
   Range<vtable_const_iterator> getVTables() const {
     return {vtables.begin(), vtables.end()};
+  }
+
+  using witness_table_iterator = WitnessTableListType::iterator;
+  using witness_table_const_iterator = WitnessTableListType::const_iterator;
+  WitnessTableListType &getWitnessTableList() { return witnessTables; }
+  witness_table_iterator witness_table_begin() { return witnessTables.begin(); }
+  witness_table_iterator witness_table_end() { return witnessTables.end(); }
+  witness_table_const_iterator witness_table_begin() const { return witnessTables.begin(); }
+  witness_table_const_iterator witness_table_end() const { return witnessTables.end(); }
+  Range<witness_table_iterator> getWitnessTables() {
+    return {witnessTables.begin(), witnessTables.end()};
+  }
+  Range<witness_table_const_iterator> getWitnessTables() const {
+    return {witnessTables.begin(), witnessTables.end()};
   }
   
   using sil_global_iterator = GlobalListType::iterator;

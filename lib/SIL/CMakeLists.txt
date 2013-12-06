@@ -13,6 +13,7 @@ add_swift_library(swiftSIL
   SILPrinter.cpp
   SILSuccessor.cpp
   SILVTable.cpp
+  SILWitnessTable.cpp
   TypeLowering.cpp
   Verifier.cpp
   DEPENDS swiftAST)

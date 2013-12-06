@@ -1666,6 +1666,13 @@ void SILVTable::verify(const SILModule &M) const {
 #endif
 }
 
+/// Verify that a witness table follows invariants.
+void SILWitnessTable::verify(const SILModule &M) const {
+#ifndef DEBUG
+  // TODO
+#endif
+}
+
 /// Verify that a global variable follows invariants.
 void SILGlobalVariable::verify() const {
 #ifndef DEBUG
@@ -1706,6 +1713,17 @@ void SILModule::verify() const {
       assert(false && "triggering standard assertion failure routine");
     }
     vt.verify(*this);
+  }
+  
+  // Check all witness tables.
+  llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
+  for (const SILWitnessTable &wt : getWitnessTables()) {
+    auto conformance = wt.getConformance();
+    if (!wtableConformances.insert(conformance).second) {
+      llvm::errs() << "Witness table redefined: ";
+      conformance->printName(llvm::errs());
+    }
+    wt.verify(*this);
   }
 #endif
 }

@@ -1270,6 +1270,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   for (const SILVTable &vt : getVTables())
     vt.print(OS, Verbose);
   
+  for (const SILWitnessTable &wt : getWitnessTables())
+    wt.print(OS, Verbose);
+  
   OS << "\n\n";
 }
 
@@ -1291,5 +1294,59 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 }
 
 void SILVTable::dump() const {
+  print(llvm::errs());
+}
+
+void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  // FIXME: Implement SILWitnessTable parsing
+  OS << "/*\n";
+  
+  OS << "sil_witness_table ";
+  getConformance()->printName(OS);
+  OS << " {\n";
+  
+  for (auto &witness : getEntries()) {
+    OS << "  ";
+    switch (witness.getKind()) {
+    case Invalid:
+      llvm_unreachable("invalid witness?!");
+    case Method: {
+      // method #declref: @function
+      auto &methodWitness = witness.getMethodWitness();
+      OS << "method ";
+      methodWitness.Requirement.print(OS);
+      OS << ": ";
+      methodWitness.Witness->printName(OS);
+      break;
+    }
+    case AssociatedType: {
+      // associated_type AssociatedTypeName: ConformingType
+      auto &assocWitness = witness.getAssociatedTypeWitness();
+      OS << "associated_type ";
+      OS << assocWitness.Requirement->getName() << ": ";
+      assocWitness.Witness->print(OS);
+      break;
+    }
+    case AssociatedTypeProtocol: {
+      // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
+      auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
+      OS << "associated_type_protocol ("
+         << assocProtoWitness.Requirement.first->getName() << ": "
+         << assocProtoWitness.Requirement.second->getName() << "): ";
+      assocProtoWitness.Witness->printName(OS);
+      break;
+    }
+    }
+    OS << '\n';
+  }
+  
+  OS << "}\n";
+  
+  // FIXME: Implement SILWitnessTable parsing
+  OS << "*/\n";
+  OS << "\n";
+}
+
+void SILWitnessTable::dump() const {
   print(llvm::errs());
 }
