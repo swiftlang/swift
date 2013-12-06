@@ -128,6 +128,121 @@ void SILInstruction::destroy(SILInstruction *I) {
   InstructionDestroyer().visit(I);
 }
 
+namespace {
+  /// Given a pair of instructions that are already known to have the same kind,
+  /// type, and operands check any special state in the two instructions that
+  /// could disrupt equality.
+  class InstructionIdentityComparer :
+    public SILInstructionVisitor<InstructionIdentityComparer, bool> {
+  public:
+
+    InstructionIdentityComparer(const SILInstruction *L) : LHS(L) { }
+
+    /// Make sure we only process instructions we know how to process.
+    bool visitValueBase(const ValueBase *RHS) {
+      llvm_unreachable("Unimplemented comparison.");
+    }
+
+    bool visitFunctionRefInst(const FunctionRefInst *RHS) {
+      auto *X = cast<FunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+
+    bool visitBuiltinFunctionRefInst(const BuiltinFunctionRefInst *RHS) {
+      auto *X = cast<BuiltinFunctionRefInst>(LHS);
+      return X->getName() == RHS->getName();
+    }
+
+    bool visitGlobalAddrInst(const GlobalAddrInst *RHS) {
+      auto *X = cast<GlobalAddrInst>(LHS);
+      return X->getGlobal() == RHS->getGlobal();
+    }
+
+    bool visitIntegerLiteralInst(const IntegerLiteralInst *RHS) {
+      APInt X = cast<IntegerLiteralInst>(LHS)->getValue();
+      APInt Y = RHS->getValue();
+      return X.getBitWidth() == Y.getBitWidth() &&
+        X == Y;
+    }
+
+    bool visitFloatLiteralInst(const FloatLiteralInst *RHS) {
+      // Avoid floating point comparison issues by doing a bitwise comparison.
+      APInt X = cast<FloatLiteralInst>(LHS)->getBits();
+      APInt Y = RHS->getBits();
+      return X.getBitWidth() == Y.getBitWidth() &&
+        X == Y;
+    }
+
+    bool visitStringLiteralInst(const StringLiteralInst *RHS) {
+      StringRef X = cast<StringLiteralInst>(LHS)->getValue();
+      return X.equals(RHS->getValue());
+    }
+
+    bool visitStructInst(const StructInst *RHS) {
+      // We have already checked the operands. Make sure that the StructDecls
+      // match up.
+      StructDecl *S1 = cast<StructInst>(LHS)->getStructDecl();
+      return S1 == RHS->getStructDecl();
+    }
+
+    bool visitStructExtractInst(const StructExtractInst *RHS) {
+      // We have already checked that the operands of our struct_extracts
+      // match. Thus we need to check the field/struct decl which are not
+      // operands.
+      auto *X = cast<StructExtractInst>(LHS);
+      if (X->getStructDecl() != RHS->getStructDecl())
+        return false;
+      if (X->getField() != RHS->getField())
+        return false;
+      return true;
+    }
+
+    bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
+      // We have already checked that the operands of our struct_element_addrs
+      // match. Thus we only need to check the field/struct decl which are not
+      // operands.
+      auto *X = cast<StructElementAddrInst>(LHS);
+      if (X->getStructDecl() != RHS->getStructDecl())
+        return false;
+      if (X->getField() != RHS->getField())
+        return false;
+      return true;
+    }
+
+    bool visitTupleInst(const TupleInst *RHS) {
+      // We have already checked the operands. Make sure that the tuple types
+      // match up.
+      TupleType *TT1 = cast<TupleInst>(LHS)->getTupleType();
+      return TT1 == RHS->getTupleType();;
+    }
+
+    bool visitTupleExtractInst(const TupleExtractInst *RHS) {
+      // We have already checked that the operands match. Thus we only need to
+      // check the field no and tuple type which are not represented as operands.
+      auto *X = cast<TupleExtractInst>(LHS);
+      if (X->getTupleType() != RHS->getTupleType())
+        return false;
+      if (X->getFieldNo() != RHS->getFieldNo())
+        return false;
+      return true;
+    }
+
+    bool visitTupleElementAddrInst(const TupleElementAddrInst *RHS) {
+      // We have already checked that the operands match. Thus we only need to
+      // check the field no and tuple type which are not represented as operands.
+      auto *X = cast<TupleElementAddrInst>(LHS);
+      if (X->getTupleType() != RHS->getTupleType())
+        return false;
+      if (X->getFieldNo() != RHS->getFieldNo())
+        return false;
+      return true;
+    }
+
+  private:
+    const SILInstruction *LHS;
+  };
+}
+
 bool SILInstruction::isIdenticalTo(const SILInstruction *RHS) const {
   // Quick check if both instructions have the same kind, number of operands,
   // and number of types. This should filter out most cases.
@@ -154,104 +269,8 @@ bool SILInstruction::isIdenticalTo(const SILInstruction *RHS) const {
   // that we can ensure that every instruction in this switch statement has been
   // audited and more importantly that as this method is used on more
   // instructions, it is updated appropriately.
-  switch (RHS->getKind()) {
-  case ValueKind::FunctionRefInst: {
-    auto *X = cast<FunctionRefInst>(this);
-    auto *Y = cast<FunctionRefInst>(RHS);
-    return X->getReferencedFunction() == Y->getReferencedFunction();
-  }
-  case ValueKind::BuiltinFunctionRefInst: {
-    auto *X = cast<BuiltinFunctionRefInst>(this);
-    auto *Y = cast<BuiltinFunctionRefInst>(RHS);
-    return X->getName() == Y->getName();
-  }
-  case ValueKind::GlobalAddrInst: {
-    auto *X = cast<GlobalAddrInst>(this);
-    auto *Y = cast<GlobalAddrInst>(RHS);
-    return X->getGlobal() == Y->getGlobal();
-  }
-  case ValueKind::IntegerLiteralInst: {
-    APInt X = cast<IntegerLiteralInst>(this)->getValue();
-    APInt Y = cast<IntegerLiteralInst>(RHS)->getValue();
-    return X.getBitWidth() == Y.getBitWidth() &&
-      X == Y;
-  }
-  case ValueKind::FloatLiteralInst: {
-    // Avoid floating point comparison issues by doing a bitwise comparison.
-    APInt X = cast<FloatLiteralInst>(this)->getBits();
-    APInt Y = cast<FloatLiteralInst>(RHS)->getBits();
-    return X.getBitWidth() == Y.getBitWidth() &&
-      X == Y;
-  }
-  case ValueKind::StringLiteralInst: {
-    StringRef X = cast<StringLiteralInst>(this)->getValue();
-    StringRef Y = cast<StringLiteralInst>(RHS)->getValue();
-    return X.equals(Y);
-  }
-  case ValueKind::StructInst: {
-    // We have already checked the operands. Make sure that the StructDecls
-    // match up.
-    StructDecl *S1 = cast<StructInst>(this)->getStructDecl();
-    StructDecl *S2 = cast<StructInst>(RHS)->getStructDecl();
-    return S1 == S2;
-  }
-  case ValueKind::StructExtractInst: {
-    // We have already checked that the operands of our struct_extracts
-    // match. Thus we need to check the field/struct decl which are not
-    // operands.
-    auto *X = cast<StructExtractInst>(this);
-    auto *Y = cast<StructExtractInst>(RHS);    
-    if (X->getStructDecl() != Y->getStructDecl())
-      return false;
-    if (X->getField() != Y->getField())
-      return false;
-    return true;
-  }
-  case ValueKind::StructElementAddrInst: {
-    // We have already checked that the operands of our struct_element_addrs
-    // match. Thus we only need to check the field/struct decl which are not
-    // operands.
-    auto *X = cast<StructElementAddrInst>(this);
-    auto *Y = cast<StructElementAddrInst>(RHS);
-    if (X->getStructDecl() != Y->getStructDecl())
-      return false;
-    if (X->getField() != Y->getField())
-      return false;
-    return true;
-  }
-  case ValueKind::TupleInst: {
-    // We have already checked the operands. Make sure that the tuple types
-    // match up.
-    TupleType *TT1 = cast<TupleInst>(this)->getTupleType();
-    TupleType *TT2 = cast<TupleInst>(RHS)->getTupleType();
-    return TT1 == TT2;
-  }
-  case ValueKind::TupleExtractInst: {
-    // We have already checked that the operands match. Thus we only need to
-    // check the field no and tuple type which are not represented as operands.
-    auto *X = cast<TupleExtractInst>(this);
-    auto *Y = cast<TupleExtractInst>(RHS);
-    if (X->getTupleType() != Y->getTupleType())
-      return false;
-    if (X->getFieldNo() != Y->getFieldNo())
-      return false;
-    return true;
-  }
-  case ValueKind::TupleElementAddrInst: {
-    // We have already checked that the operands match. Thus we only need to
-    // check the field no and tuple type which are not represented as operands.
-    auto *X = cast<TupleElementAddrInst>(this);
-    auto *Y = cast<TupleElementAddrInst>(RHS);
-    if (X->getTupleType() != Y->getTupleType())
-      return false;
-    if (X->getFieldNo() != Y->getFieldNo())
-      return false;
-    return true;
-  }
-  // Ensure we do not process types that have not been audited.
-  default:
-    llvm_unreachable("Unhandled value kind.");
-  }
+  SILInstruction *UnconstRHS = const_cast<SILInstruction *>(RHS);
+  return InstructionIdentityComparer(this).visit(UnconstRHS);
 }
 
 namespace {
