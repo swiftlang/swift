@@ -588,7 +588,7 @@ void ConstraintGraph::Node::verify(ConstraintGraph &cg) {
             "adjacency index out-of-range");
     requireSameValue(info.first, Adjacencies[info.second.Index],
                      "adjacency map provides wrong index into vector");
-    require(info.second.NumConstraints > 0,
+    require(!info.second.empty(),
             "adjacency information should have been removed");
     require(info.second.NumConstraints <= Constraints.size(),
             "adjacency information has higher degree than # of constraints");
