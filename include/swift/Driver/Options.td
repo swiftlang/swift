@@ -80,6 +80,9 @@ def o : JoinedOrSeparate<["-"], "o">, Flags<[DriverOption]>,
 
 def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
+def sdk : Separate<["-"], "sdk">, Flags<[DriverOption]>,
+  HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
+def g : Flag<["-"], "g">, HelpText<"Emit debug info">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 
