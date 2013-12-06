@@ -18,6 +18,7 @@ Contents
    StoredAndComputedVariables
    SIL
    TypeChecker
+   DriverInternals
 
 
 

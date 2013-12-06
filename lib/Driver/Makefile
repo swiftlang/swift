@@ -1,4 +1,4 @@
-##===- tools/Makefile --------------------------------------*- Makefile -*-===##
+##===- swift/lib/Driver/Makefile ---------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,9 +10,16 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ..
-PARALLEL_DIRS := swift driver sil-opt swift-ide-test lldb-moduleimport-test swift-demangle
-
+SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
+LIBRARYNAME := swiftDriver
+
+# BUILT_SOURCES = FrontendOptions.inc
+# TABLEGEN_INC_FILES_COMMON = 1
+
 include $(SWIFT_LEVEL)/Makefile
+
+# $(ObjDir)/FrontendOptions.inc.tmp : FrontendOptions.td $(LLVM_TBLGEN) $(ObjDir)/.dir
+# 	$(Echo) "Building Frontend Option tables with tblgen"
+#	$(Verb) $(LLVMTableGen) -gen-opt-parser-defs -o $(call SYSPATH, $@) $<

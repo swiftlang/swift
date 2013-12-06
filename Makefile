@@ -18,7 +18,7 @@ ifndef SWIFT_LEVEL
 IS_TOP_LEVEL := 1
 SWIFT_LEVEL := .
 
-DIRS := lib tools   # include docs
+DIRS := include lib tools # docs
 PARALLEL_DIRS :=
 
 # See compiler-rt/Makefile for a description of the problems with building 

@@ -1,4 +1,4 @@
-##===- tools/Makefile --------------------------------------*- Makefile -*-===##
+##===- include/Swift/Makefile ------------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,9 +10,7 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ..
-PARALLEL_DIRS := swift driver sil-opt swift-ide-test lldb-moduleimport-test swift-demangle
-
-include $(SWIFT_LEVEL)/../../Makefile.config
+SWIFT_LEVEL := ../..
+DIRS := Driver
 
 include $(SWIFT_LEVEL)/Makefile

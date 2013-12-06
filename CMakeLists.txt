@@ -409,9 +409,13 @@ macro(add_swift_library name)
     list( GET split_path -1 dir)
     file( GLOB_RECURSE SWIFTLIB_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def)
-    set(SWIFTLIB_SOURCES ${SWIFTLIB_SOURCES} ${SWIFTLIB_HEADERS})
+
+    file( GLOB_RECURSE SWIFTLIB_TDS
+      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
+    source_group("TableGen descriptions" FILES ${SWIFTLIB_TDS})
+
+    set(SWIFTLIB_SOURCES ${SWIFTLIB_SOURCES} ${SWIFTLIB_HEADERS} ${SWIFTLIB_TDS})
   endif(MSVC_IDE OR XCODE)
 
   if (MODULE)
@@ -674,6 +678,7 @@ include_directories(BEFORE
 
 # Add all of the subdirectories, where we actually do work.
 if (SWIFT_BUILD_TOOLS)
+  add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
 endif (SWIFT_BUILD_TOOLS)

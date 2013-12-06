@@ -12,6 +12,7 @@
 SWIFT_LEVEL := ..
 
 PARALLEL_DIRS = Basic AST Sema Parse SIL SILGen SILPasses IRGen ClangImporter \
-                NullClangImporter ASTSectionImporter Serialization IDE Frontend
+                NullClangImporter ASTSectionImporter Serialization IDE \
+                Frontend Driver
 
 include $(SWIFT_LEVEL)/Makefile
