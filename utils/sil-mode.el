@@ -23,7 +23,7 @@
    ;; Statements
    `(,(regexp-opt '("if" "in" "else" "for" "do" "while" "return" "break"
                     "continue" "switch" "case")
-                  'words) . font-lock-keyword-face)   
+                  'words) . font-lock-keyword-face)
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
    ;; SIL Function
@@ -161,7 +161,7 @@
   (interactive)
   (kill-all-local-variables)
   (use-local-map sil-mode-map)         ; Provides the local keymap.
-  (setq major-mode 'sil-mode)          
+  (setq major-mode 'sil-mode)
 
   (make-local-variable 'font-lock-defaults)
   (setq major-mode 'sil-mode           ; This is how describe-mode
