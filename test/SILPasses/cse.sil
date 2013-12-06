@@ -506,3 +506,19 @@ sil @tupleelementaddr_test : $@thin () -> (Builtin.Int32) {
   return %9 : $(Builtin.Int32)
 }
 
+sil @metatype_user : $@thin (String.metatype) -> ()
+
+// CHECK-LABEL: metatype_test
+// CHECK: [[TARGET:%[0-9]+]] = metatype $String.metatype
+// CHECK-NOT: {{%[0-9]+}} = metatype $String.metatype
+// CHECK: apply {{%[0-9]+}}([[TARGET]])
+// CHECK: apply {{%[0-9]+}}([[TARGET]])
+sil @metatype_test : $@thin () -> () {
+    %0 = metatype $String.metatype    
+    %1 = metatype $String.metatype
+    %2 = function_ref @metatype_user : $@thin (String.metatype) -> ()
+    apply %2(%0) : $@thin (String.metatype) -> ()
+    apply %2(%1) : $@thin (String.metatype) -> ()
+    %3 = tuple()
+    return %3 : $()
+}

@@ -68,6 +68,7 @@ namespace {
       case ValueKind::TupleInst:
       case ValueKind::TupleExtractInst:
       case ValueKind::TupleElementAddrInst:
+      case ValueKind::MetatypeInst:
         return true;
       default:
         return false;
@@ -175,6 +176,12 @@ namespace {
                                 X->getFieldNo(),
                                 X->getOperand());
     }
+
+    hash_code visitMetatypeInst(MetatypeInst *X) {
+      return llvm::hash_combine(unsigned(ValueKind::MetatypeInst),
+                                X->getType());
+    }
+
   };
 } // end anonymous namespace
 
