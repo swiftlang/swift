@@ -484,3 +484,25 @@ sil @tupleextract_test : $@thin () -> (Builtin.Int32) {
   %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
   return %7 : $(Builtin.Int32)
 }
+
+sil @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
+
+// CHECK-LABEL: tupleelementaddr_test
+// CHECK: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
+// CHECK-NOT: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
+sil @tupleelementaddr_test : $@thin () -> (Builtin.Int32) {
+  %0 = alloc_stack $(Builtin.Int32, Builtin.Int32)
+  %1 = function_ref @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
+  apply %1(%0#1) : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()  
+  %2 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
+  %3 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
+  %4 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %5 = integer_literal $Builtin.Int1, 0
+  %6 = load %2 : $*Builtin.Int32
+  %7 = load %3 : $*Builtin.Int32
+  %8 = apply %4 (%6, %7, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0
+  dealloc_stack %0#0 : $* @local_storage (Builtin.Int32, Builtin.Int32)
+  return %9 : $(Builtin.Int32)
+}
+

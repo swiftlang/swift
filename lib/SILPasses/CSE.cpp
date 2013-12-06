@@ -67,6 +67,7 @@ namespace {
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleInst:
       case ValueKind::TupleExtractInst:
+      case ValueKind::TupleElementAddrInst:
         return true;
       default:
         return false;
@@ -163,6 +164,13 @@ namespace {
 
     hash_code visitTupleExtractInst(TupleExtractInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::TupleExtractInst),
+                                X->getTupleType(),
+                                X->getFieldNo(),
+                                X->getOperand());
+    }
+
+    hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
+      return llvm::hash_combine(unsigned(ValueKind::TupleElementAddrInst),
                                 X->getTupleType(),
                                 X->getFieldNo(),
                                 X->getOperand());
