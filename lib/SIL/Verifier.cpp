@@ -769,11 +769,26 @@ public:
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
                                         "result of archetype_method");
-    require(methodType->isThin()
-              == AMI->getLookupArchetype().castTo<ArchetypeType>()
-                  ->requiresClass(),
-            "result method must be thin function type if class archetype, "
-            "thick if not class");
+    
+    if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
+      require(methodType->isThin(),
+              "result of archetype_method must be thin function");
+      auto *protocol
+        = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
+      require(protocol,
+              "archetype_method method must be a protocol method");
+      
+      require(methodType->getAbstractCC()
+                == F.getModule().Types.getProtocolWitnessCC(protocol),
+              "result of archetype_method must have correct @cc for protocol");
+    } else {
+      require(methodType->isThin()
+                == AMI->getLookupArchetype().castTo<ArchetypeType>()
+                    ->requiresClass(),
+              "result method must be thin function type if class archetype, "
+              "thick if not class");
+    }
+    
     CanType operandType = AMI->getLookupArchetype().getSwiftRValueType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
@@ -816,15 +831,24 @@ public:
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
     auto methodType = requireObjectType(SILFunctionType, EMI,
                                         "result of protocol_method");
-    SILType operandType = EMI->getOperand().getType();
-    require(methodType->isThin()
-              == operandType.isClassExistentialType(),
-            "result method must be thin function type if class protocol, or "
-            "thick if not class");
     
     auto proto = dyn_cast<ProtocolDecl>(EMI->getMember().getDecl()
-                                          ->getDeclContext());
+                                        ->getDeclContext());
     require(proto, "protocol_method must take a method of a protocol");
+    SILType operandType = EMI->getOperand().getType();
+    
+    if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
+      require(methodType->isThin(),
+              "result of protocol_method must be thin function");
+      require(methodType->getAbstractCC()
+                == F.getModule().Types.getProtocolWitnessCC(proto),
+              "result of protocol_method must have correct @cc for protocol");
+    } else {
+      require(methodType->isThin()
+                == operandType.isClassExistentialType(),
+              "result method must be thin function type if class protocol, or "
+              "thick if not class");
+    }
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),

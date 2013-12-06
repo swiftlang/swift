@@ -396,6 +396,21 @@ public:
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
 
+  /// Get the calling convention used by witnesses of a protocol.
+  static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
+    // Class protocols can use the regular class method CC...
+    if (P->requiresClass()) {
+      // ...except for ObjC protocols, which use the objc method
+      // convention.
+      if (P->isObjC())
+        return AbstractCC::ObjCMethod;
+      return AbstractCC::Method;
+    }
+    
+    // Opaque protocols use the witness calling convention.
+    return AbstractCC::WitnessMethod;
+  }
+  
   /// Is the given declaration resilient from the current context?
   bool isResilient(Decl *D) {
     // FIXME
