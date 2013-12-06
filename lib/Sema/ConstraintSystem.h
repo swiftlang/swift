@@ -244,36 +244,14 @@ public:
   /// not performed.
   Type getFixedType(constraints::SavedTypeVariableBindings *record) {
     // Find the representative type variable.
-    Implementation *impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+    auto rep = getRepresentative(record);
+    Implementation &repImpl = rep->getImpl();
 
-      // If we found the representative, there is no fixed type.
-      if (nextTV == impl->getTypeVariable()) {
-        return Type();
-      }
+    // Check whether it has a fixed type.
+    if (auto type = repImpl.ParentOrFixed.dyn_cast<TypeBase *>())
+      return type;
 
-      impl = &nextTV->getImpl();
-    }
-
-    Type result = impl->ParentOrFixed.get<TypeBase *>();
-    if (impl == this || !record)
-      return result;
-
-    // Perform path compression.
-    impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
-      // Extract the representative.
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
-      if (nextTV == impl->getTypeVariable())
-        return result;
-
-      impl->recordBinding(*record);
-      impl->ParentOrFixed = result.getPointer();
-      impl = &nextTV->getImpl();
-    }
-
-    return result;
+    return Type();
   }
 
   /// \brief Assign a fixed type to this equivalence class.
