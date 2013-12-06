@@ -1586,3 +1586,39 @@ bool Substitution::operator!=(const Substitution &Other) const {
     Conformance.equals(Other.Conformance);
 }
 
+void ProtocolConformance::printName(llvm::raw_ostream &os) const {
+  getType()->print(os);
+  os << ": ";
+  
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal: {
+    auto normal = cast<NormalProtocolConformance>(this);
+    os << normal->getProtocol()->getName()
+       << " module " << normal->getContainingModule()->Name;
+    break;
+  }
+  case ProtocolConformanceKind::Specialized: {
+    auto spec = cast<SpecializedProtocolConformance>(this);
+    os << " specialize <";
+    interleave(spec->getGenericSubstitutions(),
+               [&](const Substitution &s) { s.print(os); },
+               [&] { os << ", "; });
+    os << "> (";
+    spec->getGenericConformance()->printName(os);
+    os << ")";
+  }
+  case ProtocolConformanceKind::Inherited: {
+    auto inherited = cast<InheritedProtocolConformance>(this);
+    os << " inherit (";
+    inherited->getInheritedConformance()->printName(os);
+    os << ")";
+  }
+  }
+}
+
+void ProtocolConformance::dump() const {
+  // FIXME: If we ever write a full print() method for ProtocolConformance, use
+  // that.
+  printName(llvm::errs());
+  llvm::errs() << '\n';
+}

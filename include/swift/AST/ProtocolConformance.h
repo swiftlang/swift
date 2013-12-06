@@ -148,6 +148,12 @@ public:
     assert(mem);
     return mem;
   }
+  
+  /// Print a parsable and human-readable description of the identifying
+  /// information of the protocol conformance.
+  void printName(raw_ostream &os) const;
+  
+  void dump() const;
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol
