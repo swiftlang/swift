@@ -172,6 +172,8 @@
   (setq local-abbrev-table sil-mode-abbrev-table)
   (set-syntax-table sil-mode-syntax-table)
   (setq comment-start "//")
+  (setq tab-stop-list (number-sequence 2 120 2))
+  (setq tab-width 2)
   (run-hooks 'sil-mode-hook))          ; Finally, this permits the user to
                                         ;   customize the mode with a hook.
 
