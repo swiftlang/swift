@@ -20,6 +20,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleInterfacePrinting.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
@@ -1600,5 +1602,41 @@ void TypeBase::dump() const {
 
 void TypeBase::print(raw_ostream &OS, const PrintOptions &PO) const {
   Type(const_cast<TypeBase *>(this)).print(OS, PO);
+}
+
+void swift::printModuleInterface(Module *M, raw_ostream &OS,
+                                 const PrintOptions &Options) {
+  auto AdjustedOptions = Options;
+  // Don't print empty curly braces while printing the module interface.
+  AdjustedOptions.FunctionDefinitions = false;
+
+  SmallVector<ValueDecl *, 32> Decls;
+  VectorDeclConsumer Consumer(Decls);
+
+  M->lookupVisibleDecls(Module::AccessPathTy(), Consumer,
+                        NLKind::UnqualifiedLookup);
+
+  // Sort the declarations so that we print them in a consistent order.
+  std::sort(Decls.begin(), Decls.end(),
+            [](ValueDecl *LHS, ValueDecl *RHS) {
+    StringRef LHSName = LHS->getName().str();
+    StringRef RHSName = RHS->getName().str();
+    if (LHSName.compare(RHSName) < 0)
+      return true;
+    // FIXME: this is not sufficient to establish a total order for overloaded
+    // decls.
+    return RHS->getKind() < RHS->getKind();
+  });
+
+  for (auto *VD : Decls) {
+    VD->print(OS, AdjustedOptions);
+    OS << '\n';
+    if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+      for (auto Ext : NTD->getExtensions()) {
+        Ext->print(OS, AdjustedOptions);
+        OS << '\n';
+      }
+    }
+  }
 }
 
