@@ -15,7 +15,7 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "destructor" "extension" "func"
                     "import" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where")
+                    "typealias" "enum" "var" "where"  "sil_vtable")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
