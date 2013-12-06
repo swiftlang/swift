@@ -102,7 +102,7 @@
 
 ;; ---------------------- Syntax table ---------------------------
 
-(if (not sil-mode-syntax-table)
+(unless sil-mode-syntax-table
     (progn
       (setq sil-mode-syntax-table (make-syntax-table))
       (mapcar (function (lambda (n)
@@ -148,13 +148,11 @@
 (defvar sil-mode-hook nil)
 (defvar sil-mode-map nil)   ; Create a mode-specific keymap.
 
-(if (not sil-mode-map)
-    ()  ; Do not change the keymap if it is already set up.
+(unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
   (define-key sil-mode-map "\t" 'tab-to-tab-stop)
   (define-key sil-mode-map "\es" 'center-line)
   (define-key sil-mode-map "\eS" 'center-paragraph))
-
 
 (defun sil-mode ()
   "Major mode for editing SIL source files.
@@ -168,7 +166,7 @@
   (make-local-variable 'font-lock-defaults)
   (setq major-mode 'sil-mode           ; This is how describe-mode
                                          ;   finds the doc string to print.
-  mode-name "Sil"                      ; This name goes into the modeline.
+  mode-name "SIL"                      ; This name goes into the modeline.
   font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
