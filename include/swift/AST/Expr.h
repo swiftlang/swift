@@ -2605,9 +2605,10 @@ public:
 /// to another constructor. The result of the subexpression is assigned to
 /// 'self', and the expression returns void.
 ///
-/// When a super.constructor or delegating constructor is invoked, 'self' is
-/// reassigned to the result of the constructor (after being downcast in the
-/// case of super.constructor).
+/// When a super.init or delegating initializer is invoked, 'self' is
+/// reassigned to the result of the initializer (after being downcast in the
+/// case of super.init).
+///
 /// This is needed for reference types with ObjC interop, where
 /// reassigning 'self' is a supported feature, and for value type delegating
 /// constructors, where the delegatee constructor is responsible for
