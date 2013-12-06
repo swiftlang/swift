@@ -609,10 +609,12 @@ Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
   } else if ((OutputModeArg = Args.getLastArg(options::OPT_S))) {
     // The user has requested an assembly file.
     CompileOutputType = types::TY_Assembly;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_sil)) ||
-             (OutputModeArg = Args.getLastArg(options::OPT_emit_silgen))) {
-    // The user has requested a SIL file (either raw or canonical).
+  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_sil))) {
+    // The user has requested a SIL file.
     CompileOutputType = types::TY_SIL;
+  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_silgen))) {
+    // The user has requested a raw SIL file.
+    CompileOutputType = types::TY_RawSIL;
   } else if ((OutputModeArg = Args.getLastArg(options::OPT_parse)) ||
              (OutputModeArg = Args.getLastArg(options::OPT_dump_parse)) ||
              (OutputModeArg = Args.getLastArg(options::OPT_dump_ast)) ||
