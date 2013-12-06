@@ -306,9 +306,7 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
     ArchetypeInfo info;
     info.Depth = ArchetypesDepth;
     info.Index = index++;
-    // When mangling for DWARF we will visit the same generic
-    // parameter a second time wile mangling its declcontext.
-    assert(DWARFMangling || !Archetypes.count(archetype));
+    assert(!Archetypes.count(archetype));
     Archetypes.insert(std::make_pair(archetype, info));
 
     if (!mangle) continue;
@@ -786,10 +784,16 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     assert(ArchetypesDepth >= info.Depth);
 
     if (DWARFMangling) {
-      // The DWARF output created by swift is intentionally flat,
-      // therefore archetypes are emitted with their DeclContext.
       Buffer << 'q' << Index(info.Index);
-      mangleDeclContext(DeclCtx);
+      // The DWARF output created by Swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext if
+      // they appear at the top level of a type (_Tt).
+      // Clone a new, non-DWARF Mangler for the DeclContext.
+      Mangler ContextMangler(Buffer, /*DWARFMangling=*/false);
+      SmallVector<void *, 4> SortedSubsts(Substitutions.size());
+      for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
+      for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+      ContextMangler.mangleDeclContext(DeclCtx);
     } else {
       unsigned relativeDepth = ArchetypesDepth - info.Depth;
       if (relativeDepth != 0) {

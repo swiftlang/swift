@@ -68,8 +68,8 @@ class Mangler {
   bool DWARFMangling;
   
 public:
-  /// \param DWARFMangling - use the 'QC' mangling format for
-  /// archetypes and the 'a' amgnling for alias types.
+  /// \param DWARFMangling - use the 'Qq' mangling format for
+  /// archetypes and the 'a' mangling for alias types.
   Mangler(raw_ostream &buffer, bool DWARFMangling = false)
     : Buffer(buffer), DWARFMangling(DWARFMangling) {}
   void mangleContextOf(ValueDecl *decl);
@@ -86,6 +86,7 @@ public:
   void mangleProtocolConformance(ProtocolConformance *conformance);
   void bindGenericParameters(const GenericParamList *genericParams,
                              bool mangleParameters);
+  void addSubstitution(void *ptr);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,
@@ -100,7 +101,6 @@ private:
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(NominalTypeDecl *type);
   bool tryMangleSubstitution(void *ptr);
-  void addSubstitution(void *ptr);
 };
   
 } // end namespace Mangle
