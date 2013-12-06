@@ -56,13 +56,18 @@ def internal_debug_Group :
 
 class InternalDebugOpt : Group<internal_debug_Group>,
   Flags<[DriverOption, HelpHidden]>;
+
 def driver_print_actions : Flag<["-"], "driver-print-actions">,
   InternalDebugOpt, HelpText<"Dump list of actions to perform">;
 def driver_print_bindings : Flag<["-"], "driver-print-bindings">,
   InternalDebugOpt, HelpText<"Dump list of bindings">;
+def driver_print_jobs : Flag<["-"], "driver-print-jobs">, InternalDebugOpt,
+  HelpText<"Dump list of jobs to execute">;
 
 def help : Flag<["-", "--"], "help">, HelpText<"Display available options">;
-def _help_hidden : Flag<["--"], "help-hidden">, HelpText<"Display available options, including hidden options">, Flags<[HelpHidden]>;
+def _help_hidden : Flag<["--"], "help-hidden">,
+  HelpText<"Display available options, including hidden options">,
+  Flags<[HelpHidden]>;
 def v : Flag<["-"], "v">,
   HelpText<"Show commands to run and use verbose output">;
 def _version : Flag<["--"], "version">;

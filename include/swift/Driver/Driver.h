@@ -64,6 +64,9 @@ class Driver {
   /// Default target triple.
   std::string DefaultTargetTriple;
 
+  /// Indicates whether the driver should print bindings.
+  bool DriverPrintBindings;
+
   /// \brief Cache of all the ToolChains in use by the driver.
   ///
   /// This maps from the string representation of a triple to a ToolChain

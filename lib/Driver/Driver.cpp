@@ -67,9 +67,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
 
-  bool DriverPrintBindings =
-    ArgList->hasArg(options::OPT_driver_print_bindings);
   bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
+  DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
+  bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -100,6 +100,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   buildJobs(*C, Actions);
   if (DriverPrintBindings) {
+    return nullptr;
+  }
+
+  if (DriverPrintJobs) {
     printJobs(C->getJobs());
     return nullptr;
   }
@@ -337,6 +341,21 @@ static StringRef getBaseInputForJob(Job *J) {
   }
 }
 
+static void printJobOutputs(const Job *J) {
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    llvm::outs() << '"' << Cmd->getOutput().getFilename() << '"';
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    for (unsigned long i = 0, e = JL->size(); i != e; ++i) {
+      printJobOutputs(JL->getJobs()[i]);
+      if (i+1 != e) {
+        llvm::outs() << ", ";
+      }
+    }
+  } else {
+    llvm_unreachable("Unknown Job class");
+  }
+}
+
 std::unique_ptr<Job> Driver::buildJobsForAction(const Compilation &C,
                                                 const Action *A,
                                                 const ToolChain &TC,
@@ -420,6 +439,21 @@ std::unique_ptr<Job> Driver::buildJobsForAction(const Compilation &C,
   }
 
   assert(Output && "No CommandOutput was created!");
+
+  if (DriverPrintBindings) {
+    llvm::outs() << "# \"" << T->getToolChain().getTripleString() << '"'
+                 << " - \"" << T->getName()
+                 << "\", inputs: [";
+    // print inputs
+    for (unsigned i = 0, e = InputActions.size(); i != e; ++i) {
+      const InputAction *IA = cast<InputAction>(InputActions[i]);
+      llvm::outs() << '"' << IA->getInputArg().getValue() << '"';
+      if (i+1 != e || !InputJobs->empty())
+        llvm::outs() << ", ";
+    }
+    printJobOutputs(InputJobs.get());
+    llvm::outs() << "], output: \"" << Output->getFilename() << "\"\n";
+  }
 
   // 4. Construct a Job which produces the right CommandOutput.
   return T->constructJob(*JA, std::move(InputJobs), std::move(Output),
