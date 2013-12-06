@@ -345,7 +345,7 @@ namespace {
     void collectFrom(const DIMemoryObjectInfo &MemInfo) {
       IsSelfOfInitializer = MemInfo.IsSelfOfInitializer;
 
-      // If this is a class pointer, we start collect uses specially.
+      // If this is a class pointer, we need to look through ref_element_addrs.
       if (IsSelfOfInitializer &&
           MemInfo.getType()->getClassOrBoundGenericClass() != nullptr)
         collectClassSelfUses(MemInfo);
