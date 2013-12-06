@@ -39,6 +39,9 @@ namespace swift {
     
     /// \brief Enable codegen of lazy global initializers in SILGen.
     bool EmitLazyGlobalInitializers = false;
+    
+    /// \brief Enable generation of SIL protocol witness tables.
+    bool EmitSILProtocolWitnessTables = false;
   };
 }
 

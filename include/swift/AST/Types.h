@@ -1294,7 +1294,9 @@ enum class AbstractCC : unsigned char {
   /// The calling convention used for calling an instance method.
   Method,
   
-  /// The calling convention used for calling protocol witnesses.
+  /// The calling convention used for calling opaque protocol witnesses.
+  /// Note that methods of class-constrained protocols use the normal
+  /// Method cc.
   WitnessMethod,
   
   Last_AbstractCC = WitnessMethod,
