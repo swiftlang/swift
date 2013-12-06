@@ -39,12 +39,13 @@ namespace swift {
     public:
       /// Every Decl also has a type, but is otherwise preferred.
       PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
+      llvm::Type *StorageType;
       Size size;
       Alignment align;
       SILDebugScope *DebugScope;
 
       DebugTypeInfo()
-        : size(0), align(1) {
+        : StorageType(nullptr), size(0), align(1), DebugScope(nullptr) {
       }
       // FIXME: retire the Type versions, they were useful for
       // bootstrapping, but don't work for generics.
@@ -53,7 +54,7 @@ namespace swift {
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                     SILDebugScope *DS = nullptr);
-      DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align,
+      DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
                     SILDebugScope *DS = nullptr);
       inline TypeBase* getHash() const { return getType(); }
       inline TypeBase* getType() const {

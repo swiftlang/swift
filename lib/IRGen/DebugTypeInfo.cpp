@@ -25,20 +25,27 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes)
-  : DeclOrType(Ty.getPointer()), size(SizeInBytes), align(AlignInBytes),
+  : DeclOrType(Ty.getPointer()),
+    StorageType(nullptr),
+    size(SizeInBytes),
+    align(AlignInBytes),
     DebugScope(nullptr) {
   assert(align.getValue() != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align)
   : DeclOrType(Ty.getPointer()),
-    size(size), align(align),
+    StorageType(nullptr),
+    size(size),
+    align(align),
     DebugScope(nullptr) {
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
-  : DeclOrType(Ty.getPointer()), DebugScope(nullptr) {
+static void
+initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
+                 const TypeInfo &Info) {
+  StorageType = Info.getStorageType();
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     size = FixTy.getFixedSize();
@@ -48,27 +55,25 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
     align = Info.getBestKnownAlignment();
   }
   assert(align.getValue() != 0);
+}
+
+DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
+  : DeclOrType(Ty.getPointer()),
+    DebugScope(nullptr) {
+  initFromTypeInfo(size, align, StorageType, Info);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                              SILDebugScope *DS)
   : DeclOrType(Decl),
     DebugScope(DS) {
-  // Same as above.
-  if (Info.isFixedSize()) {
-    const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
-    size = FixTy.getFixedSize();
-    align = FixTy.getBestKnownAlignment();
-  } else {
-    size = Size(0);
-    align = Info.getBestKnownAlignment();
-  }
-  assert(align.getValue() != 0);
+  initFromTypeInfo(size, align, StorageType, Info);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
                              SILDebugScope *DS)
   : DeclOrType(Decl),
+    StorageType(nullptr),
     size(size),
     align(align),
     DebugScope(DS)  {
@@ -104,6 +109,7 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
 }
 
 void DebugTypeInfo::dump() const {
+  llvm::errs()<<"[Size "<<size.getValue()<<" Alignment "<<align.getValue()<<"] ";
   if (getDecl())
     getDecl()->dump(llvm::errs());
   else

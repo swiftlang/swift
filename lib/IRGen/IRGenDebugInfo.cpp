@@ -978,6 +978,20 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
   return getOrCreateType(DebugTypeInfo(Ty, DbgTy.size, DbgTy.align), Scope);
 }
 
+uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
+  uint64_t BitWidth = DbgTy.size.getValue() * SizeOfByte;
+  llvm::Type *StorageType = DbgTy.StorageType
+    ? DbgTy.StorageType
+    : IGM.DataLayout.getSmallestLegalIntType(IGM.getLLVMContext(), BitWidth);
+
+  if (StorageType)
+    return IGM.DataLayout.getTypeSizeInBits(StorageType);
+
+  // This type is too large to fit in a register.
+  assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSize());
+  return BitWidth;
+}
 
 /// Construct a DIType from a DebugTypeInfo object.
 ///
@@ -988,7 +1002,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
 /// For this reason we emit the fully qualified (=mangled) name for
 /// each type whenever possible.
 ///
-/// The final goal, once we forked LLVM, is to emit something like a
+/// The ultimate goal is to emit something like a
 /// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
 /// local reference to the type.
 llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
@@ -1020,20 +1034,17 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinInteger: {
     auto IntegerTy = BaseTy->castTo<BuiltinIntegerType>();
     if (IntegerTy->isFixedWidth()) {
-      SizeInBits = IntegerTy->getFixedWidth();
       llvm::SmallString<24> buf("Builtin.Int");
       llvm::raw_svector_ostream s(buf);
-      s << SizeInBits;
+      s << IntegerTy->getFixedWidth();
       Name = BumpAllocatedString(s.str());
-      // An integer needs to be at least byte-sized, or the DWARF
-      // backend gets confused.
-      SizeInBits = std::max(SizeInBits, SizeOfByte);
     } else if (IntegerTy->getWidth().isPointerWidth()) {
       Name = "Builtin.Word";
     } else {
       llvm_unreachable("impossible width value");
     }
     Encoding = llvm::dwarf::DW_ATE_unsigned;
+    SizeInBits = getSizeOfBasicType(DbgTy);
     break;
   }
 
