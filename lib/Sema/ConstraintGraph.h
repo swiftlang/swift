@@ -205,6 +205,14 @@ public:
   /// Bind the given type variable to the given fixed type.
   void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
+  /// Gather the set of constraints that involve the given type variable,
+  /// i.e., those constraints that will be affected when the type variable
+  /// gets merged or bound to a fixed type.
+  ///
+  /// The resulting set of constraints may contain duplicates.
+  void gatherConstraints(TypeVariableType *typeVar,
+                         SmallVectorImpl<Constraint *> &constraints);
+
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
   /// The subscript operator can be used to retrieve the nodes that

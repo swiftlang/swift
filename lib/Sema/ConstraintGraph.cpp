@@ -513,6 +513,17 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   }
 }
 
+void ConstraintGraph::gatherConstraints(
+       TypeVariableType *typeVar,
+       SmallVectorImpl<Constraint *> &constraints) {
+  auto equivClass
+    = (*this)[CS.getRepresentative(typeVar)].getEquivalenceClass();
+  for (auto typeVar : equivClass) {
+    for (auto constraint : (*this)[typeVar].getConstraints())
+      constraints.push_back(constraint);
+  }
+}
+
 #pragma mark Algorithms
 
 /// Depth-first search for connected components

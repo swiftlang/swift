@@ -92,7 +92,7 @@ ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
 
   // Create the constraint graph.
   // FIXME: Enable this by default.
-  //  CG = new ConstraintGraph(*this);
+  //   CG = new ConstraintGraph(*this);
 }
 
 ConstraintSystem::~ConstraintSystem() {
@@ -128,16 +128,35 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
 
   // Merge nodes in the constraint graph.
-  if (CG)
+  if (CG) {
     CG->mergeNodes(typeVar1, typeVar2);
+    addTypeVariableConstraintsToWorkList(typeVar1);
+  }
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type) {
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
   
   // Notify the constraint graph.
-  if (CG)
+  if (CG) {
     CG->bindTypeVariable(typeVar, type);
+    addTypeVariableConstraintsToWorkList(typeVar);
+  }
+}
+
+void ConstraintSystem::addTypeVariableConstraintsToWorkList(
+       TypeVariableType *typeVar) {
+  assert(CG && "No constraint graph available");
+
+  // Gather the constraints affected by a change to this type variable.
+  SmallVector<Constraint *, 8> constraints;
+  CG->gatherConstraints(typeVar, constraints);
+
+  // Add any constraints that aren't already active to the worklist.
+  for (auto constraint : constraints) {
+    if (ActiveConstraints.insert(constraint))
+      Worklist.push_back(constraint);
+  }
 }
 
 /// Retrieve a uniqued selector ID for the given declaration.

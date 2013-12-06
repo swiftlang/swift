@@ -396,6 +396,88 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 }
 
 bool ConstraintSystem::simplify() {
+  // If there is a constraint graph, use the worklist implementation.
+  if (CG) {
+    // The set of constraints that we retired.
+    llvm::SetVector<Constraint *> retiredConstraints;
+
+    // While we have a constraint in the worklist, process it.
+    while (!Worklist.empty()) {
+      // Grab the next constraint from the worklist.
+      auto constraint = Worklist.front();
+      Worklist.pop_front();
+
+      switch (simplifyConstraint(*constraint)) {
+      case SolutionKind::Error:
+        if (!failedConstraint) {
+          failedConstraint = constraint;
+        }
+        break;
+
+      case SolutionKind::Solved:
+        ++solverState->NumSimplifiedConstraints;
+
+        // This constraint has already been solved; retire it.
+        retiredConstraints.insert(constraint);
+
+        // Remove the constraint from the constraint graph.
+        CG->removeConstraint(constraint);
+
+        break;
+
+      case SolutionKind::Unsolved:
+        ++solverState->NumUnsimplifiedConstraints;
+        break;
+      }
+
+      // Check whether a constraint failed. If so, we're done.
+      if (failedConstraint) {
+        // Retire all of the constraints.
+        if (solverState)
+          solverState->retiredConstraints.splice(
+            solverState->retiredConstraints.begin(),
+            Constraints);
+        else
+          Constraints.clear();
+
+        // Clear out the worklist. There's nothing to do now.
+        ActiveConstraints.clear();
+        Worklist.clear();
+        return true;
+      }
+
+      // Remove this constraint from the set of active constraints.
+      // We delay this to prevent immediate re-insertion of the constraint.
+      ActiveConstraints.erase(constraint);
+    }
+    assert(ActiveConstraints.empty() && "Still have active constraints?");
+
+    // Transfer any retired constraints to the retired list.
+    for (auto i = Constraints.begin(), end = Constraints.end();
+         i != end; /*increment in loop*/) {
+      // If it's not retired, do nothing.
+      if (retiredConstraints.count(&*i) == 0) {
+        ++i;
+        continue;
+      }
+
+      // If there is no list of retired constraints, just erase it.
+      // FIXME: This is weird.
+      if (!solverState) {
+        i = Constraints.erase(i);
+        continue;
+      }
+
+      // If we have a list of retired constraints, move it there.
+      auto victim = i++;
+      solverState->retiredConstraints.splice(solverState->retiredConstraints.begin(),
+                                             Constraints,
+                                             victim);
+    }
+    return false;
+  }
+
+
   bool solvedAny;
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to

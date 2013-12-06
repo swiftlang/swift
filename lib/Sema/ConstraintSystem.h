@@ -37,6 +37,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
+#include <deque> // FIXME: Eliminate reliance on deque
 #include <functional>
 
 namespace swift {
@@ -889,6 +890,15 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   ConstraintList Constraints;
 
+  // Constraints that are known to be "Active", meaning that they are already
+  // in the worklist.
+  llvm::SmallPtrSet<Constraint *, 4> ActiveConstraints;
+
+  /// The worklist of constraints that should be revisited due to a change.
+  /// FIXME: This is a crappy data structure. We want to bounce between
+  /// two ConstraintLists so there's no memory allocation needed.
+  std::deque<Constraint *> Worklist;
+
   /// The constraint graph, if there is one.
   ConstraintGraph *CG = nullptr;
 
@@ -1273,6 +1283,13 @@ public:
 
   /// \brief Assign a fixed type to the given type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type);
+
+private:
+  /// Introduce the constraints associated with the given type variable
+  /// into the worklist.
+  void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
+
+public:
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
