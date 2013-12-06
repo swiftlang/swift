@@ -1000,7 +1000,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // in the LLVM IR. For all types that are boxed in a struct, we are
   // emitting the storage size of the struct, but it may be necessary
   // to emit the (target!) size of the underlying basic type.
-  unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
@@ -1019,14 +1019,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
     auto IntegerTy = BaseTy->castTo<BuiltinIntegerType>();
-    // FIXME: Translate this into the actually allocated number of
-    // bits using TargetInfo.
     if (IntegerTy->isFixedWidth()) {
       SizeInBits = IntegerTy->getFixedWidth();
       llvm::SmallString<24> buf("Builtin.Int");
       llvm::raw_svector_ostream s(buf);
       s << SizeInBits;
       Name = BumpAllocatedString(s.str());
+      // An integer needs to be at least byte-sized, or the DWARF
+      // backend gets confused.
+      SizeInBits = std::max(SizeInBits, SizeOfByte);
     } else if (IntegerTy->getWidth().isPointerWidth()) {
       Name = "Builtin.Word";
     } else {
