@@ -102,6 +102,7 @@ namespace irgen {
   void emitArchetypeMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
                                 SILDeclRef member,
+                                ProtocolConformance *conformance,
                                 Explosion &out);
   
   /// Extract the method pointer and metadata from an opaque existential

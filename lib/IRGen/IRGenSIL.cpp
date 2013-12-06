@@ -2700,7 +2700,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   SILDeclRef member = i->getMember();
 
   Explosion lowered(ExplosionKind::Maximal);
-  emitArchetypeMethodValue(*this, baseTy, member, lowered);
+  emitArchetypeMethodValue(*this, baseTy, member, nullptr, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
 }

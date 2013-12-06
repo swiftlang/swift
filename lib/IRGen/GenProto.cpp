@@ -1245,8 +1245,7 @@ namespace {
   /// Return the ArchetypeTypeInfoBase information from the TypeInfo for any
   /// archetype.
   static const ArchetypeTypeInfoBase &
-  getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t) {
-    const TypeInfo &ti = IGF.getTypeInfoForLowered(t);
+  getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t, const TypeInfo &ti) {
     if (t->requiresClass())
       return ti.as<ClassArchetypeTypeInfo>();
     return ti.as<OpaqueArchetypeTypeInfo>();
@@ -3730,7 +3729,8 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
   // If it's an archetype, we'll need to grab from the local context.
   if (auto archetype = dyn_cast<ArchetypeType>(replType)) {
-    auto &archTI = getArchetypeInfo(IGF, archetype);
+    auto &archTI = getArchetypeInfo(IGF, archetype,
+                                    IGF.getTypeInfoForLowered(archetype));
 
     for (auto proto : archetypeProtos) {
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
@@ -3850,7 +3850,8 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
 
       // If the target is an archetype, go to the type info.
       if (auto archetype = dyn_cast<ArchetypeType>(argType)) {
-        auto &archTI = getArchetypeInfo(IGF, archetype);
+        auto &archTI = getArchetypeInfo(IGF, archetype,
+                                        IGF.getTypeInfoForLowered(archetype));
 
         ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
         auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
@@ -3914,6 +3915,36 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
   ExpandPolymorphicSignature(IGM, polyFn).expand(out);
 }
 
+/// Retrieve the protocol witness table for a conformance.
+static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
+                                            SILType srcType,
+                                            const TypeInfo &srcTI,
+                                            ProtocolEntry protoEntry,
+                                            ProtocolConformance *conformance) {
+  auto proto = protoEntry.getProtocol();
+  assert(requiresProtocolWitnessTable(proto)
+         && "protocol does not have witness tables?!");
+  
+  // If the source type is an archetype, look at what's locally bound.
+  if (auto archetype = srcType.getAs<ArchetypeType>()) {
+    assert(!conformance
+           && "should not have concrete conformance info for archetype");
+    auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
+    ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+    llvm::Value *rootTable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+    return path.apply(IGF, rootTable);
+  }
+  
+  // All other source types should be concrete enough that we have conformance
+  // info for them.
+  assert(conformance && "no conformance for concrete type?!");
+  auto &protoI = protoEntry.getInfo();
+  const ConformanceInfo &conformanceI
+    = protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(),
+                            srcTI, proto, *conformance);
+  return conformanceI.getTable(IGF);
+}
+
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
@@ -3939,40 +3970,11 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
   
-  
-  // If the source type is an archetype, look at what's locally bound.
-  if (auto archetype = srcType.getAs<ArchetypeType>()) {
-    auto &archTI = getArchetypeInfo(IGF, archetype);
-    
-    for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-      ProtocolDecl *proto = protocols[i].getProtocol();
-      
-      ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-      
-      llvm::Value *ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
-      ptable = path.apply(IGF, ptable);
-      
-      body(i, ptable);
-    }
-    
-    return;
-  }
-  
-  // All other source types should be concrete enough that we have conformance
-  // info for them.
   auto &srcTI = IGF.getTypeInfo(srcType);
-
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    ProtocolDecl *proto = protocols[i].getProtocol();
-    auto &protoI = protocols[i].getInfo();
-    auto astConformance = witnessConformances[i];
-    assert(astConformance);
-    
-    // Compute the conformance information.
-    const ConformanceInfo &conformance =
-      protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(), srcTI, proto,
-                            *astConformance);
-    body(i, conformance.getTable(IGF));
+    auto table = getProtocolWitnessTable(IGF, srcType, srcTI,
+                                         protocols[i], witnessConformances[i]);
+    body(i, table);
   }
 }
 
@@ -4197,6 +4199,7 @@ void
 irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
                                 SILDeclRef member,
+                                ProtocolConformance *conformance,
                                 Explosion &out) {
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -4205,23 +4208,19 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
   ValueDecl *vd = member.getDecl();
   FuncDecl *fn = cast<FuncDecl>(vd);
   
-  // Find the archetype we're calling on.
-  // FIXME: static methods
-  auto archetype = baseTy.castTo<ArchetypeType>();
-  
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
   // Find the witness table.
-  auto &archetypeTI = getArchetypeInfo(IGF, archetype);
-  ProtocolPath path(IGF.IGM, archetypeTI.getProtocols(), fnProto);
-  llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
-  llvm::Value *wtable = path.apply(IGF, origin);
+  auto &baseTI = IGF.getTypeInfo(baseTy);
+  llvm::Value *wtable = getProtocolWitnessTable(IGF, baseTy, baseTI,
+                      ProtocolEntry(fnProto, IGF.IGM.getProtocolInfo(fnProto)),
+                      conformance); // FIXME conformance for concrete type
   
   // Acquire the archetype metadata for fully opaque archetype methods.
   llvm::Value *metadata = nullptr;
-  if (!archetype->requiresClass())
-    metadata = archetypeTI.getMetadataRef(IGF);
+  if (!fnProto->requiresClass())
+    metadata = IGF.emitTypeMetadataRef(baseTy.getSwiftRValueType());
   
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
@@ -4232,7 +4231,8 @@ irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                        Address addr,
                                        SILType type) {
   auto archetype = type.castTo<ArchetypeType>();
-  auto &archetypeTI = getArchetypeInfo(IGF, archetype);
+  auto &archetypeTI = getArchetypeInfo(IGF, archetype,
+                                       IGF.getTypeInfoForLowered(archetype));
   
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
