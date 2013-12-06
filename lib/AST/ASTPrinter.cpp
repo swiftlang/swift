@@ -1301,6 +1301,9 @@ public:
     case AbstractCC::ObjCMethod:
       OS << "@cc(objc_method) ";
       break;
+    case AbstractCC::WitnessMethod:
+      OS << "@cc(witness_method) ";
+      break;
     }
 
     if (info.isBlock())

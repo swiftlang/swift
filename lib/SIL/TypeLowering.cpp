@@ -1345,6 +1345,7 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // No bridging needed for native CCs.
     return t;
   case AbstractCC::C:

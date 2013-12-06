@@ -12,8 +12,8 @@
 //
 // This file defines the SILVTable class, which is used to map dynamically
 // dispatchable class methods and properties to their concrete implementations
-// for a dynamic type. This information (FIXME) will be used by IRGen to lay
-// out class vtables, and can be used by devirtualization passes to lower
+// for a dynamic type. This information is (FIXME will be) used by IRGen to lay
+// out class vtables, and can be used by devirtualization passes to promote
 // class_method instructions to static function_refs.
 //
 //===----------------------------------------------------------------------===//

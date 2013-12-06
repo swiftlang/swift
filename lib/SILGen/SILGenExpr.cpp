@@ -2883,6 +2883,7 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
   switch (destCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // No additional bridging needed for native functions.
     return v;
   case AbstractCC::C:
@@ -2905,6 +2906,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   switch (srcCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // No additional bridging needed for native functions.
     return v;
 

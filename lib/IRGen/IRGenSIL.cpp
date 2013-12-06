@@ -603,19 +603,7 @@ public:
 }
 
 llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
-  switch (cc) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    // FIXME: Thunk foreign functions to Swift's CC when producing function
-    // values.
-    assert(false && "thunking C functions not yet implemented");
-    return nullptr;
-
-  case AbstractCC::Method:
-  case AbstractCC::Freestanding:
-    return IGF.Builder.CreateBitCast(function, IGF.IGM.Int8PtrTy);
-  }
-  
+  return IGF.Builder.CreateBitCast(function, IGF.IGM.Int8PtrTy);
 }
 
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
@@ -917,6 +905,8 @@ void IRGenSILFunction::emitSILFunction() {
   case AbstractCC::Method:
     emitEntryPointArgumentsNativeCC(*this, entry->first, params, funcTy);
     break;
+  case AbstractCC::WitnessMethod:
+    llvm_unreachable("@cc(witness_method) not implemented");
   case AbstractCC::ObjCMethod:
     emitEntryPointArgumentsObjCMethodCC(*this, entry->first, params, funcTy);
     break;
@@ -1591,6 +1581,10 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     case AbstractCC::C:
     case AbstractCC::ObjCMethod:
       assert(false && "partial_apply of foreign functions not implemented");
+      break;
+        
+    case AbstractCC::WitnessMethod:
+      assert(false && "partial_apply of witness functions not implemented");
       break;
       
     case AbstractCC::Freestanding:

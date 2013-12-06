@@ -865,6 +865,7 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
   switch (t->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // No bridging needed for native functions.
     if (t->getExtInfo() == extInfo)
       return t;
@@ -931,6 +932,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // Native functions don't need bridging.
     break;
   

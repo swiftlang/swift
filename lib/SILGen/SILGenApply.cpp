@@ -1070,6 +1070,8 @@ static bool isNative(AbstractCC cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
     return true;
+  case AbstractCC::WitnessMethod:
+    llvm_unreachable("@cc(witness_method) not implemented");
   }
   llvm_unreachable("bad CC");
 }

@@ -94,10 +94,11 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   if (Attrs.has(TAK_objc_block))   OS << "@objc_block ";
   if (Attrs.cc.hasValue()) {
     switch (Attrs.cc.getValue()) {
-    case AbstractCC::C:            OS << "@cc(cdecl)"; break;
-    case AbstractCC::ObjCMethod:   OS << "@cc(objc_method)"; break;
-    case AbstractCC::Freestanding: OS << "@cc(freestanding)"; break;
-    case AbstractCC::Method:       OS << "@cc(method)"; break;
+    case AbstractCC::C:             OS << "@cc(cdecl)"; break;
+    case AbstractCC::ObjCMethod:    OS << "@cc(objc_method)"; break;
+    case AbstractCC::Freestanding:  OS << "@cc(freestanding)"; break;
+    case AbstractCC::Method:        OS << "@cc(method)"; break;
+    case AbstractCC::WitnessMethod: OS << "@cc(witness_method)"; break;
     }
   }
 }

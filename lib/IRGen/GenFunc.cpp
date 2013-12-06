@@ -155,6 +155,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
     return llvm::CallingConv::C;
 
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     //   TODO: maybe add 'inreg' to the first non-result argument.
     SWIFT_FALLTHROUGH;
   case AbstractCC::Freestanding:
@@ -607,10 +608,14 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       }
       SWIFT_FALLTHROUGH;
     case AbstractCC::Freestanding:
-    case AbstractCC::Method:
+    case AbstractCC::Method: {
       auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
       schema.addToArgTypes(IGM, ParamIRTypes);
       return;
+    }
+        
+    case AbstractCC::WitnessMethod:
+      llvm_unreachable("@cc(witness_method) not implemented");
     }
     llvm_unreachable("bad abstract CC");
   }
@@ -644,6 +649,7 @@ void SignatureExpansion::expandParameters() {
   switch (FnType->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
   case AbstractCC::C:
     break;
 
@@ -1607,6 +1613,8 @@ void CallEmission::addArg(Explosion &arg) {
   case AbstractCC::Method:
     // Nothing to do.
     break;
+  case AbstractCC::WitnessMethod:
+    llvm_unreachable("@cc(witness_method) not implemented)");
   }
 
   // Add the given number of arguments.

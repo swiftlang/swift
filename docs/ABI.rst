@@ -804,6 +804,7 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-function-attribute ::= 'Cc'            // compatible with C global function
   impl-function-attribute ::= 'Cm'            // compatible with Swift method
   impl-function-attribute ::= 'CO'            // compatible with ObjC method
+  impl-function-attribute ::= 'Cw'            // compatible with protocol witness
   impl-function-attribute ::= 'N'             // noreturn
   impl-function-attribute ::= 'G'             // generic
   impl-parameter ::= impl-convention type

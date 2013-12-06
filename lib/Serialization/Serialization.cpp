@@ -1410,6 +1410,7 @@ static uint8_t getRawStableCC(swift::AbstractCC cc) {
   SIMPLE_CASE(AbstractCC, ObjCMethod)
   SIMPLE_CASE(AbstractCC, Freestanding)
   SIMPLE_CASE(AbstractCC, Method)
+  SIMPLE_CASE(AbstractCC, WitnessMethod)
   }
   llvm_unreachable("bad calling convention");
 }

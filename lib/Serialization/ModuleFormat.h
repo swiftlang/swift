@@ -69,9 +69,10 @@ enum AbstractCC : uint8_t {
   C = 0,
   ObjCMethod,
   Freestanding,
-  Method
+  Method,
+  WitnessMethod,
 };
-using AbstractCCField = BCFixed<2>;
+using AbstractCCField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.

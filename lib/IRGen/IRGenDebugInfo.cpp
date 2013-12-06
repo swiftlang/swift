@@ -525,6 +525,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
     break;
   case AbstractCC::Method:
   case AbstractCC::Freestanding:
+  case AbstractCC::WitnessMethod:
     IsLocalToUnit = false;
   }
 

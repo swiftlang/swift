@@ -1294,7 +1294,10 @@ enum class AbstractCC : unsigned char {
   /// The calling convention used for calling an instance method.
   Method,
   
-  Last_AbstractCC = Method,
+  /// The calling convention used for calling protocol witnesses.
+  WitnessMethod,
+  
+  Last_AbstractCC = WitnessMethod,
 };
   
 /// AnyFunctionType - A function type has a single input and result, but

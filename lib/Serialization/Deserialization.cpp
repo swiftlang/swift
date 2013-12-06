@@ -1783,6 +1783,7 @@ static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
   CASE(ObjCMethod)
   CASE(Freestanding)
   CASE(Method)
+  CASE(WitnessMethod)
 #undef CASE
   default:
     return Nothing;

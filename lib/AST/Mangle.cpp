@@ -692,6 +692,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       case AbstractCC::C: Buffer << "Cc"; break;
       case AbstractCC::ObjCMethod: Buffer << "CO"; break;
       case AbstractCC::Method: Buffer << "Cm"; break;
+      case AbstractCC::WitnessMethod: Buffer << "Cw"; break;
       }
     }
     if (fn->isNoReturn()) Buffer << 'N';
