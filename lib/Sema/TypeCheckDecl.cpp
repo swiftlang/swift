@@ -3042,13 +3042,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                     diag::transparent_on_invalid_extension);
         D->getMutableAttrs().clearAttribute(AK_transparent);
       }
-    } else if (AFD->getGenericParams()) {
-      // FIXME: We don't yet support transparent on generic functions.
-      TC.diagnose(Attrs.getLoc(AK_transparent),
-                  diag::transparent_generic_not_supported);
-      D->getMutableAttrs().clearAttribute(AK_transparent);
-
-    // Protocol method declarations cannot be transparent.
     } else if (isa<ProtocolDecl>(AFD->getParent())) {
       TC.diagnose(Attrs.getLoc(AK_transparent),
                   diag::transparent_in_protocols_not_supported);

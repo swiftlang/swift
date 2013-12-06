@@ -1068,8 +1068,6 @@ ERROR(transparent_not_valid,sema_tcd,none,
       "'transparent' attribute cannot be applied to this declaration", ())
 ERROR(transparent_on_invalid_extension,sema_tcd,none,
       "'transparent' attribute is only supported on struct and enum extensions", ())
-ERROR(transparent_generic_not_supported,sema_tcd,none,
-      "'transparent' attribute is not supported for generic declarations", ())
 ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
       "'transparent' attribute is not supported on declarations within protocols",
       ())
