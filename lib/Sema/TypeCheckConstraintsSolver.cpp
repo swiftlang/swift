@@ -395,10 +395,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   }
 }
 
-bool ConstraintSystem::simplify(ConstraintGraph *cg) {
-  // Temporarily set the constraint graph.
-  llvm::SaveAndRestore<ConstraintGraph *> temporaryCG(CG, cg);
-
+bool ConstraintSystem::simplify() {
   bool solvedAny;
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to
@@ -500,6 +497,9 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   cs.solverState->generatedConstraints = &generatedConstraints;
 
   ++cs.solverState->NumStatesExplored;
+
+  if (cs.CG)
+    CGScope.emplace(*cs.CG);
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
@@ -884,26 +884,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return solutions.size() != 1;
   }
 
-  // If we already failed, return.
-  if (failedConstraint)
-    return true;
-
-  // FIXME: Temporary hack to make it easy to turn off the "evolving"
-  // constraint graph during development. In its current form, it's
-  // too slow to enable for everyone.
-  static bool evolveConstraintGraph = false;
-  ConstraintGraph cg(*this);
-
-  if (evolveConstraintGraph) {
-    // Build a constraint graph.
-    for (auto typeVar : TypeVariables)
-      (void)cg[typeVar];
-    for (auto &constraint : Constraints)
-      cg.addConstraint(&constraint);
-  }
-
-  // If simplification fails, return.
-  if (simplify(evolveConstraintGraph? &cg : nullptr))
+  // If we already failed, or simplification fails, we're done.
+  if (failedConstraint || simplify())
     return true;
 
   // If there are no constraints remaining, we're done. Save this solution.
@@ -924,20 +906,27 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return false;
   }
 
-  if (!evolveConstraintGraph) {
-    // Build the constraint graph now.
+  // If there's no global constraint graph, build one locally.
+  Optional<ConstraintGraph> localCG;
+  if (!CG) {
+    localCG.emplace(*this);
     for (auto typeVar : TypeVariables)
-      (void)cg[typeVar];
+      (void)(*localCG)[typeVar];
     for (auto &constraint : Constraints)
-      cg.addConstraint(&constraint);
+      localCG->addConstraint(&constraint);
   }
 
-  // Compute the connected components of the constraint graph. We only want to
-  // look at the smallest one.
-  SmallVector<TypeVariableType *, 16> typeVars;
+  // The constraint graph we're working with.
+  auto &cg = CG? *CG : *localCG;
+
+  // Compute the connected components of the constraint graph.
+  // FIXME: We're seeding typeVars with TypeVariables so that the
+  // connected-components algorithm only considers those type variables within
+  // our component. There are clearly better ways to do this.
+  SmallVector<TypeVariableType *, 16> typeVars(TypeVariables);
   SmallVector<unsigned, 16> components;
   unsigned numComponents = cg.computeConnectedComponents(typeVars, components);
-  
+
   // If we don't have more than one component, just solve the whole
   // system.
   if (numComponents < 2) {
@@ -1213,6 +1202,8 @@ bool ConstraintSystem::solveSimplified(
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = Constraints.erase(disjunction);
+  if (CG)
+    CG->removeConstraint(disjunction);
 
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
@@ -1251,6 +1242,8 @@ bool ConstraintSystem::solveSimplified(
 
     case SolutionKind::Unsolved:
       Constraints.push_back(constraint);
+      if (CG)
+        CG->addConstraint(constraint);
       break;
     }
 
@@ -1287,6 +1280,8 @@ bool ConstraintSystem::solveSimplified(
 
   // Put the disjunction constraint back in its place.
   Constraints.insert(afterDisjunction, disjunction);
+  if (CG)
+    CG->addConstraint(disjunction);
 
   return !anySolved;
 }

@@ -21,10 +21,12 @@
 
 #include "TypeChecker.h"
 #include "Constraint.h"
+#include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
@@ -887,7 +889,7 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   ConstraintList Constraints;
 
-  /// The currently-active constraint graph, if there is one.
+  /// The constraint graph, if there is one.
   ConstraintGraph *CG = nullptr;
 
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
@@ -982,6 +984,12 @@ public:
 
     /// \brief The length of \c constraintRestrictions.
     unsigned numConstraintRestrictions;
+
+    /// Constraint graph scope associated with this solver scope.
+    ///
+    /// FIXME: This is optional so we can easily enabled/disable the
+    /// constraint graph globally.
+    Optional<ConstraintGraphScope> CGScope;
 
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;
@@ -1621,7 +1629,7 @@ public:
   /// no fixed type. Such type variables are left to the solver to bind.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool simplify(ConstraintGraph *cg = nullptr);
+  bool simplify();
 
 private:
   /// \brief Solve the system of constraints after it has already been

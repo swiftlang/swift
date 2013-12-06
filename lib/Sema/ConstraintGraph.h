@@ -27,12 +27,15 @@
 #include <utility>
 
 namespace swift {
+
 class Type;
+class TypeBase;
 class TypeVariableType;
 
 namespace constraints {
 
 class Constraint;
+class ConstraintGraphScope;
 class ConstraintSystem;
 
 /// A graph that describes the relationships among the various type variables
@@ -178,6 +181,7 @@ public:
   ConstraintGraph(const ConstraintGraph &) = delete;
   ConstraintGraph &operator=(const ConstraintGraph &) = delete;
 
+
   /// Retrieve the constraint system this graph describes.
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
@@ -188,13 +192,6 @@ public:
 
   /// Retrieve the node and index corresponding to the given type variable.
   std::pair<Node &, unsigned> lookupNode(TypeVariableType *typeVar);
-
-  /// Remove the node corresponding to the given type variable.
-  ///
-  /// This operation assumes that the any constraints that refer to
-  /// this type variable have been or will be removed before other
-  /// graph queries are performed.
-  void removeNode(TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
@@ -222,7 +219,8 @@ public:
   /// Compute the connected components of the graph.
   ///
   /// \param typeVars The type variables that occur within the
-  /// connected components.
+  /// connected components. If a non-empty vector is passed in, the algorithm
+  /// will only consider type variables reachable from the initial set.
   ///
   /// \param components Receives the component numbers for each type variable
   /// in \c typeVars.
@@ -248,6 +246,22 @@ public:
   void verify();
 
 private:
+  /// Remove the node corresponding to the given type variable.
+  ///
+  /// This operation assumes that the any constraints that refer to
+  /// this type variable have been or will be removed before other
+  /// graph queries are performed.
+  ///
+  /// Note that this change is not recorded and cannot be undone. Use with
+  /// caution.
+  void removeNode(TypeVariableType *typeVar);
+
+  /// Unbind the given type variable from the given fixed type.
+  ///
+  /// Note that this change is not recorded and cannot be undone. Use with
+  /// caution.
+  void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+
   /// The constraint system.
   ConstraintSystem &CS;
 
@@ -269,6 +283,85 @@ private:
   /// A mapping from the type variables in the graph to their corresponding
   /// nodes along with the index
   llvm::DenseMap<TypeVariableType *, StoredNode> Nodes;
+
+  /// The kind of change made to the graph.
+  enum class ChangeKind {
+    /// Added a type variable.
+    AddedTypeVariable,
+    /// Added a new constraint.
+    AddedConstraint,
+    /// Removed an existing constraint
+    RemovedConstraint,
+    /// Extended the equivalence class of a type variable.
+    ExtendedEquivalenceClass,
+    /// Added a fixed binding for a type variable.
+    BoundTypeVariable
+  };
+
+  /// A change made to the constraint graph.
+  ///
+  /// Each change can be undone (once, and in reverse order) by calling the
+  /// undo() method.
+  class Change {
+    /// The kind of change.
+    ChangeKind Kind;
+
+    union {
+      TypeVariableType *TypeVar;
+      Constraint *TheConstraint;
+
+      struct {
+        /// The type variable whose equivalence class was extended.
+        TypeVariableType *TypeVar;
+
+        /// The previous size of the equivalence class.
+        unsigned PrevSize;
+      } EquivClass;
+
+      struct {
+        /// The type variable being bound to a fixed type.
+        TypeVariableType *TypeVar;
+
+        /// The fixed type to which the type variable was bound.
+        TypeBase *FixedType;
+      } Binding;
+    };
+
+  public:
+    /// Create a change that added a type variable.
+    static Change addedTypeVariable(TypeVariableType *typeVar);
+
+    /// Create a change that added a constraint.
+    static Change addedConstraint(Constraint *constraint);
+
+    /// Create a change that removed a constraint.
+    static Change removedConstraint(Constraint *constraint);
+
+    /// Create a change that extended an equivalence class.
+    static Change extendedEquivalenceClass(TypeVariableType *typeVar,
+                                           unsigned prevSize);
+
+    /// Create a change that bound a type variable to a fixed type.
+    static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
+
+    /// Undo this change, reverting the constraint graph to the state it
+    /// had prior to this change.
+    ///
+    /// Changes must be undone in stack order.
+    void undo(ConstraintGraph &cg);
+  };
+
+  /// The currently active scope, or null if we aren't tracking changes made
+  /// to the constraint graph.
+  ConstraintGraphScope *ActiveScope = nullptr;
+
+  /// The set of changes made to this constraint graph.
+  ///
+  /// As the constraint graph is extended and mutated, additional changes are
+  /// introduced into this vector. Each scope
+  llvm::SmallVector<Change, 4> Changes;
+
+  friend class ConstraintGraphScope;
 };
 
 } // end namespace swift::constraints

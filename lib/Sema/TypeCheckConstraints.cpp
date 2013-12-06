@@ -89,9 +89,15 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
   : TC(tc), DC(dc), Arena(tc.Context, Allocator) {
   assert(DC && "context required");
+
+  // Create the constraint graph.
+  // FIXME: Enable this by default.
+  //  CG = new ConstraintGraph(*this);
 }
 
-ConstraintSystem::~ConstraintSystem() { }
+ConstraintSystem::~ConstraintSystem() {
+  delete CG;
+}
 
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
@@ -281,7 +287,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // Remove the constraint from the constraint graph.
     if (simplifyExisting && CG)
       CG->removeConstraint(constraint);
-
+    
     return true;
 
   case SolutionKind::Unsolved:

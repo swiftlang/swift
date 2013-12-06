@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintGraph.h"
+#include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -30,6 +32,8 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
+  assert(Changes.empty() && "Scope stack corrupted");
+
   for (auto node : Nodes) {
     delete node.second.NodePtr;
   }
@@ -117,11 +121,15 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::addedTypeVariable(typeVar));
+
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
   auto typeVarRep = CS.getRepresentative(typeVar);
   if (typeVar != typeVarRep)
-    (*this)[typeVarRep].addToEquivalenceClass(typeVar);
+    mergeNodes(typeVar, typeVarRep);
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
@@ -277,6 +285,102 @@ void ConstraintGraph::Node::removeFixedBinding(TypeVariableType *typeVar) {
   });
 }
 
+#pragma mark Graph scope management
+ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
+  : CG(CG), ParentScope(CG.ActiveScope), NumChanges(CG.Changes.size())
+{
+  CG.ActiveScope = this;
+}
+
+ConstraintGraphScope::~ConstraintGraphScope() {
+  // Pop changes off the stack until we hit the change could we had prior to
+  // introducing this scope.
+  assert(CG.Changes.size() >= NumChanges && "Scope stack corrupted");
+  while (CG.Changes.size() > NumChanges) {
+    CG.Changes.back().undo(CG);
+    CG.Changes.pop_back();
+  }
+
+  // The active scope is now the parent scope.
+  CG.ActiveScope = ParentScope;
+}
+
+ConstraintGraph::Change
+ConstraintGraph::Change::addedTypeVariable(TypeVariableType *typeVar) {
+  Change result;
+  result.Kind = ChangeKind::AddedTypeVariable;
+  result.TypeVar = typeVar;
+  return result;
+}
+
+ConstraintGraph::Change
+ConstraintGraph::Change::addedConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::AddedConstraint;
+  result.TheConstraint = constraint;
+  return result;
+}
+
+ConstraintGraph::Change
+ConstraintGraph::Change::removedConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::RemovedConstraint;
+  result.TheConstraint = constraint;
+  return result;
+}
+
+ConstraintGraph::Change
+ConstraintGraph::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
+                                                  unsigned prevSize) {
+  Change result;
+  result.Kind = ChangeKind::ExtendedEquivalenceClass;
+  result.EquivClass.TypeVar = typeVar;
+  result.EquivClass.PrevSize = prevSize;
+  return result;
+}
+
+ConstraintGraph::Change
+ConstraintGraph::Change::boundTypeVariable(TypeVariableType *typeVar,
+                                           Type fixed) {
+  Change result;
+  result.Kind = ChangeKind::BoundTypeVariable;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.FixedType = fixed.getPointer();
+  return result;
+}
+
+void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
+  /// Temporarily change the active scope to null, so we don't record
+  /// any changes made while performing the undo operation.
+  llvm::SaveAndRestore<ConstraintGraphScope *> prevActiveScope(cg.ActiveScope,
+                                                               nullptr);
+
+  switch (Kind) {
+  case ChangeKind::AddedTypeVariable:
+    cg.removeNode(TypeVar);
+    break;
+
+  case ChangeKind::AddedConstraint:
+    cg.removeConstraint(TheConstraint);
+    break;
+
+  case ChangeKind::RemovedConstraint:
+    cg.addConstraint(TheConstraint);
+    break;
+
+  case ChangeKind::ExtendedEquivalenceClass: {
+    Node &node = cg[EquivClass.TypeVar];
+    node.EquivalenceClass.erase(
+      node.EquivalenceClass.begin() + EquivClass.PrevSize,
+      node.EquivalenceClass.end());
+    break;
+   }
+
+  case ChangeKind::BoundTypeVariable:
+    cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
+    break;
+  }
+}
 
 #pragma mark Graph mutation
 
@@ -320,6 +424,10 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
       node.addAdjacency(otherTypeVar);
     }
   }
+
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::addedConstraint(constraint));
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
@@ -344,7 +452,11 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
 
       node.removeAdjacency(otherTypeVar);
     }
-  }  
+  }
+
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::removedConstraint(constraint));
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
@@ -360,6 +472,12 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   assert((typeVar1 == typeVarRep || typeVar2 == typeVarRep) &&
          "neither type variable is the new representative?");
   auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
+
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::extendedEquivalenceClass(
+                        typeVarRep,
+                        repNode.getEquivalenceClass().size()));
 
   // Merge equivalence class from the non-representative type variable.
   auto &nonRepNode = (*this)[typeVarNonRep];
@@ -381,8 +499,30 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
       node.addFixedBinding(otherTypeVar);
     }
   }
+
+  // Record the change, if there are active scopes.
+  // FIXME: If we ever use this to undo the actual variable binding,
+  // we'll need to store the change along the early-exit path as well.
+  if (ActiveScope)
+    Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
 }
 
+void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
+  // If there are no type variables in the fixed type, there's nothing to do.
+  if (!fixed->hasTypeVariable())
+    return;
+
+  SmallVector<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
+  fixed->getTypeVariables(typeVars);
+  Node &node = (*this)[typeVar];
+  for (auto otherTypeVar : typeVars) {
+    if (knownTypeVars.insert(otherTypeVar)) {
+      (*this)[otherTypeVar].removeFixedBinding(typeVar);
+      node.removeFixedBinding(otherTypeVar);
+    }
+  }
+}
 
 #pragma mark Algorithms
 
@@ -426,6 +566,10 @@ static void connectedComponentsDFS(ConstraintGraph &cg,
 unsigned ConstraintGraph::computeConnectedComponents(
            SmallVectorImpl<TypeVariableType *> &typeVars,
            SmallVectorImpl<unsigned> &components) {
+  // Track those type variables that the caller cares about.
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVarSubset(typeVars.begin(),
+                                                         typeVars.end());
+  typeVars.clear();
 
   // Initialize the components with component == # of type variables,
   // a sentinel value indicating
@@ -460,6 +604,11 @@ unsigned ConstraintGraph::computeConnectedComponents(
   for (unsigned i = 0; i != numTypeVariables; ++i) {
     // If this type variable has a fixed type, skip it.
     if (CS.getFixedType(TypeVariables[i]))
+      continue;
+
+    // If we only care about a subset, and this type variable isn't in that
+    // subset, skip it.
+    if (!typeVarSubset.empty() && typeVarSubset.count(TypeVariables[i]) == 0)
       continue;
 
     componentHasUnboundTypeVar[components[i]] = true;
@@ -504,7 +653,10 @@ void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
   if (!Constraints.empty()) {
     out.indent(indent + 2);
     out << "Constraints:\n";
-    for (auto constraint : Constraints) {
+    SmallVector<Constraint *, 4> sortedConstraints(Constraints.begin(),
+                                                   Constraints.end());
+    std::sort(sortedConstraints.begin(), sortedConstraints.end());
+    for (auto constraint : sortedConstraints) {
       out.indent(indent + 4);
       constraint->print(out, /*FIXME:*/nullptr);
       out << "\n";
@@ -515,7 +667,14 @@ void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
   if (!Adjacencies.empty()) {
     out.indent(indent + 2);
     out << "Adjacencies:";
-    for (auto adj : Adjacencies) {
+    SmallVector<TypeVariableType *, 4> sortedAdjacencies(Adjacencies.begin(),
+                                                         Adjacencies.end());
+    std::sort(sortedAdjacencies.begin(), sortedAdjacencies.end(),
+              [&](TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
+                return typeVar1->getID() < typeVar2->getID();
+              });
+
+    for (auto adj : sortedAdjacencies) {
       out << ' ';
       adj->print(out);
 
@@ -729,7 +888,11 @@ void ConstraintGraph::verify() {
   _require(condition, complaint, *this, nullptr, context)
 #define requireSameValue(value1, value2, complaint)             \
   _require(value1 == value2, complaint, *this, nullptr, [&] {   \
-    llvm::dbgs() << "  " << value1 << " != " << value2 << '\n'; \
+    llvm::dbgs() << "  ";                                       \
+    printValue(llvm::dbgs(), value1);                           \
+    llvm::dbgs() << " != ";                                     \
+    printValue(llvm::dbgs(), value2);                           \
+    llvm::dbgs() << '\n';                                       \
   })
 
   // Verify that the type variables are either representatives or represented
@@ -771,9 +934,59 @@ void ConstraintGraph::verify() {
     node.second.NodePtr->verify(*this);
   }
 
-  // FIXME: Verify that all of the constraints in the constraint system
+  // Collect all of the constraints known to the constraint graph.
+  llvm::SmallPtrSet<Constraint *, 4> knownConstraints;
+  for (auto typeVar : getTypeVariables()) {
+    for (auto constraint : (*this)[typeVar].getConstraints())
+      knownConstraints.insert(constraint);
+  }
+
+  // Verify that all of the constraints in the constraint system
   // are accounted for. This requires a better abstraction for tracking
   // the set of constraints that are live.
+  for (auto &constraint : CS.getConstraints()) {
+
+    // Gather the set of type variables referenced by this constraint.
+    SmallVector<TypeVariableType *, 8> referencedTypeVars;
+    gatherReferencedTypeVars(CS, &constraint, referencedTypeVars);
+
+    // Check whether the constraint graph knows about this constraint.
+    requireWithContext((knownConstraints.count(&constraint) ||
+                        referencedTypeVars.empty()),
+                       "constraint graph doesn't know about constraint",
+                       [&] {
+                         llvm::dbgs() << "constraint = ";
+                         printValue(llvm::dbgs(), &constraint);
+                         llvm::dbgs() << "\n";
+                       });
+
+    // Make sure each of the type variables referenced knows about this
+    // constraint.
+    for (auto typeVar : referencedTypeVars) {
+      auto nodePos = Nodes.find(typeVar);
+      requireWithContext(nodePos != Nodes.end(),
+                         "type variable in constraint not known",
+                         [&] {
+                           llvm::dbgs() << "type variable = ";
+                           printValue(llvm::dbgs(), typeVar);
+                           llvm::dbgs() << ", constraint = ";
+                           printValue(llvm::dbgs(), &constraint);
+                           llvm::dbgs() << "\n";
+                         });
+
+      Node &node = *nodePos->second.NodePtr;
+      auto constraintPos = node.ConstraintIndex.find(&constraint);
+      requireWithContext(constraintPos != node.ConstraintIndex.end(),
+                         "type variable doesn't know about constraint",
+                         [&] {
+                           llvm::dbgs() << "type variable = ";
+                           printValue(llvm::dbgs(), typeVar);
+                           llvm::dbgs() << ", constraint = ";
+                           printValue(llvm::dbgs(), &constraint);
+                           llvm::dbgs() << "\n";
+                         });
+    }
+  }
 
 #undef requireSameValue
 #undef requireWithContext
