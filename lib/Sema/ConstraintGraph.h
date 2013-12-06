@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
+#include <functional>
 #include <utility>
 
 namespace swift {
@@ -46,6 +47,23 @@ class ConstraintGraph {
 public:
   /// A single node in the constraint graph, which represents a type variable.
   class Node {
+    /// Describes information about an adjacency between two type variables.
+    struct Adjacency {
+      /// Index into the vector of adjacent type variables, \c Adjacencies.
+      unsigned Index : 31;
+
+      /// Whether a fixed type binding relates the two type variables.
+      unsigned FixedBinding : 1;
+
+      /// The number of constraints that link this type variable to the
+      /// enclosing node.
+      unsigned NumConstraints;
+
+      bool empty() const {
+        return !FixedBinding && !NumConstraints;
+      }
+    };
+
   public:
     explicit Node(TypeVariableType *typeVar) : TypeVar(typeVar) { }
 
@@ -70,12 +88,6 @@ public:
     /// as this type variable.
     ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-    /// Retrieve the set of type variables related to this type variable
-    /// through fixed bindings.
-    ArrayRef<TypeVariableType *> getFixedBindings() const {
-      return FixedBindings;
-    }
-
   private:
     /// Add a constraint to the list of constraints.
     void addConstraint(Constraint *constraint);
@@ -85,6 +97,15 @@ public:
     /// Note that this only removes the constraint itself; it does not
     /// remove the corresponding adjacencies.
     void removeConstraint(Constraint *constraint);
+
+    /// Retrieve adjacency information for the given type variable.
+    Adjacency &getAdjacency(TypeVariableType *typeVar);
+
+    /// Modify the adjacency information for the given type variable
+    /// directly. If the adjacency becomes empty afterward, it will be
+    /// removed.
+    void modifyAdjacency(TypeVariableType *typeVar,
+                         std::function<void(Adjacency& adj)> modify);
 
     /// Add an adjacency to the list of adjacencies.
     void addAdjacency(TypeVariableType *typeVar);
@@ -97,9 +118,10 @@ public:
 
     /// Add a type variable related to this type variable through fixed
     /// bindings.
-    void addFixedBinding(TypeVariableType *otherTypeVar) {
-      FixedBindings.push_back(otherTypeVar);
-    }
+    void addFixedBinding(TypeVariableType *typeVar);
+    
+    /// Remove a type variable from the fixed-binding relationship.
+    void removeFixedBinding(TypeVariableType *typeVar);
 
     /// The type variable this node represents.
     TypeVariableType *TypeVar;
@@ -115,16 +137,6 @@ public:
     /// The set of adjacent type variables, in a stable order.
     SmallVector<TypeVariableType *, 2> Adjacencies;
 
-    /// Describes information about an adjacency between two type variables.
-    struct Adjacency {
-      /// Index into the vector of adjacent type variables, \c Adjacencies.
-      unsigned Index;
-
-      /// The number of constraints that link this type variable to the
-      /// enclosing node.
-      unsigned NumConstraints;
-    };
-
     /// A mapping from each of the type variables adjacent to this
     /// type variable to the index of the adjacency information in
     /// \c Adjacencies.
@@ -136,9 +148,6 @@ public:
     /// Note that this field is only valid for type variables that
     /// are representatives of their equivalence classes.
     mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
-
-    /// The type variables related to this type variable via fixed bindings.
-    SmallVector<TypeVariableType *, 2> FixedBindings;
 
     /// Print this graph node.
     void print(llvm::raw_ostream &out, unsigned indent);

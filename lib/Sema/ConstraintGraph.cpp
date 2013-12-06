@@ -117,24 +117,28 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  // If this type variable has a fixed type binding that involves other
-  // type variables, notify those type variables.
-  if (auto fixed = CS.getFixedType(typeVar)) {
-    if (fixed->hasTypeVariable()) {
-      SmallVector<TypeVariableType *, 4> typeVars;
-      fixed->getTypeVariables(typeVars);
-      for (auto otherTypeVar : typeVars) {
-        (*this)[otherTypeVar].addFixedBinding(typeVar);
-        stored.NodePtr->addFixedBinding(otherTypeVar);
-      }
-    }
-  }
-
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
   auto typeVarRep = CS.getRepresentative(typeVar);
   if (typeVar != typeVarRep)
     (*this)[typeVarRep].addToEquivalenceClass(typeVar);
+  else {
+    // If this type variable has a fixed type binding that involves other
+    // type variables, notify those type variables.
+    if (auto fixed = CS.getFixedType(typeVarRep)) {
+      if (fixed->hasTypeVariable()) {
+        SmallVector<TypeVariableType *, 4> typeVars;
+        llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
+        fixed->getTypeVariables(typeVars);
+        for (auto otherTypeVar : typeVars) {
+          if (knownTypeVars.insert(otherTypeVar)) {
+            (*this)[otherTypeVar].addFixedBinding(typeVar);
+            stored.NodePtr->addFixedBinding(otherTypeVar);
+          }
+        }
+      }
+    }
+  }
   return { *stored.NodePtr, stored.Index };
 }
 
@@ -178,38 +182,38 @@ void ConstraintGraph::Node::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
+ConstraintGraph::Node::Adjacency &
+ConstraintGraph::Node::getAdjacency(TypeVariableType *typeVar) {
   assert(typeVar != TypeVar && "Cannot be adjacent to oneself");
 
   // Look for existing adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
 
+  if (pos != AdjacencyInfo.end())
+    return pos->second;
+
   // If we weren't already adjacent to this type variable, add it to the
   // list of adjacencies.
-  if (pos == AdjacencyInfo.end()) {
-    pos = AdjacencyInfo.insert(
-            { typeVar, { static_cast<unsigned>(Adjacencies.size()), 0 } })
-            .first;
-    Adjacencies.push_back(typeVar);
-  }
-
-  // Bump the degree of the adjacency.
-  ++pos->second.NumConstraints;
+  pos = AdjacencyInfo.insert(
+          { typeVar, { static_cast<unsigned>(Adjacencies.size()), 0, 0 } })
+         .first;
+  Adjacencies.push_back(typeVar);
+  return pos->second;
 }
 
-void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
-  // Find the adjacency information.
+void ConstraintGraph::Node::modifyAdjacency(
+       TypeVariableType *typeVar,
+       std::function<void(Adjacency& adj)> modify) {
+   // Find the adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
   assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");
   assert(Adjacencies[pos->second.Index] == typeVar && "Mismatched adjacency");
 
-  // Decrement the number of constraints that make these two type variables
-  // adjacent.
-  --pos->second.NumConstraints;
-  
-  // If there are other constraints that make these type variables
-  // adjacent,
-  if (pos->second.NumConstraints > 0)
+  // Perform the modification .
+  modify(pos->second);
+
+  // If the adjacency is not empty, leave the information in there.
+  if (!pos->second.empty())
     return;
 
   // Remove this adjacency from the mapping.
@@ -232,6 +236,20 @@ void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
   Adjacencies.pop_back();
 }
 
+void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
+  auto &adjacency = getAdjacency(typeVar);
+
+  // Bump the degree of the adjacency.
+  ++adjacency.NumConstraints;
+}
+
+void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
+  modifyAdjacency(typeVar, [](Adjacency &adj) {
+    assert(adj.NumConstraints > 0 && "No adjacency to remove?");
+    --adj.NumConstraints;
+  });
+}
+
 void
 ConstraintGraph::Node::addToEquivalenceClass(TypeVariableType *otherTypeVar) {
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
@@ -242,6 +260,21 @@ ConstraintGraph::Node::addToEquivalenceClass(TypeVariableType *otherTypeVar) {
     EquivalenceClass.push_back(TypeVar);
   EquivalenceClass.push_back(otherTypeVar);
 }
+
+void ConstraintGraph::Node::addFixedBinding(TypeVariableType *typeVar) {
+  auto &adjacency = getAdjacency(typeVar);
+
+  assert(!adjacency.FixedBinding && "Already marked as a fixed binding?");
+  adjacency.FixedBinding = true;
+}
+
+void ConstraintGraph::Node::removeFixedBinding(TypeVariableType *typeVar) {
+  modifyAdjacency(typeVar, [](Adjacency &adj) {
+    assert(adj.FixedBinding && "Not a fixed binding?");
+    adj.FixedBinding = false;
+  });
+}
+
 
 #pragma mark Graph mutation
 
@@ -320,10 +353,6 @@ static void connectedComponentsDFS(ConstraintGraph &cg,
 
   // Recurse to mark adjacent nodes as part of this connected component.
   visitAdjacencies(node.getAdjacencies());
-
-  // Recurse into those type variables that mentioned this type variable in
-  // their bindings.
-  visitAdjacencies(node.getFixedBindings());
 
   // Figure out the representative for this type variable.
   auto &cs = cg.getConstraintSystem();
@@ -434,9 +463,19 @@ void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
       out << ' ';
       adj->print(out);
 
-      auto degree = AdjacencyInfo[adj].NumConstraints;
-      if (degree > 1)
-        out << " (" << degree << ")";
+      auto &info = AdjacencyInfo[adj];
+      auto degree = info.NumConstraints;
+      if (degree > 1 || info.FixedBinding) {
+        out << " (";
+        if (degree > 1) {
+          out << degree;
+          if (info.FixedBinding)
+            out << ", fixed";
+        } else {
+          out << "fixed";
+        }
+        out << ")";
+      }
     }
     out << "\n";
   }
@@ -449,17 +488,6 @@ void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
     for (unsigned i = 1, n = EquivalenceClass.size(); i != n; ++i) {
       out << ' ';
       EquivalenceClass[i]->print(out);
-    }
-    out << "\n";
-  }
-
-  // Print type variables related to this type variable via fixed bindings.
-  if (!FixedBindings.empty()) {
-    out.indent(indent + 2);
-    out << "Occurs in fixed bindings:";
-    for (auto inFixed : FixedBindings) {
-      out << ' ';
-      inFixed->print(out);
     }
     out << "\n";
   }
