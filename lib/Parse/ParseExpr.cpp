@@ -1238,13 +1238,21 @@ Expr *Parser::parseExprClosure() {
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
+  // TODO: what should we do for discriminators when we're in a
+  // non-local context, e.g. in a field initializer or default argument?
+  unsigned discriminator = ClosureExpr::InvalidDiscriminator;
+  if (CurFunction) {
+    discriminator = CurFunction->CurClosureDiscriminator++;
+  }
+
   // Create the closure expression and enter its context.
   ClosureExpr *closure = new (Context) ClosureExpr(params, arrowLoc,
                                                    explicitResultType,
+                                                   discriminator,
                                                    CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
-  ContextChange cc(*this, closure);
+  ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
   if (params) {

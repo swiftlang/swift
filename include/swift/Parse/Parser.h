@@ -82,8 +82,8 @@ public:
   unsigned VarPatternDepth = 0;
   bool GreaterThanIsOperator = true;
 
-  typedef llvm::DenseMap<Identifier, unsigned> LocalDiscriminatorMap;
-  LocalDiscriminatorMap *LocalDiscriminators = nullptr;
+  class ParseFunctionBody;
+  ParseFunctionBody *CurFunction = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
@@ -116,15 +116,14 @@ public:
   protected:
     Parser &P;
     DeclContext *OldContext;
-    LocalDiscriminatorMap *OldDiscriminators;
+    ParseFunctionBody *OldFunction;
   public:
     ContextChange(Parser &P, DeclContext *DC,
-                  LocalDiscriminatorMap *discriminators = nullptr)
-      : P(P), OldContext(P.CurDeclContext),
-        OldDiscriminators(P.LocalDiscriminators) {
+                  ParseFunctionBody *newFunction = nullptr)
+      : P(P), OldContext(P.CurDeclContext), OldFunction(P.CurFunction) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
-      P.LocalDiscriminators = discriminators;
+      P.CurFunction = newFunction;
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
@@ -142,17 +141,20 @@ public:
   private:
     void popImpl() {
       P.CurDeclContext = OldContext;
-      P.LocalDiscriminators = OldDiscriminators;
+      P.CurFunction = OldFunction;
     }
   };
 
   /// A RAII object for parsing a new function/closure body.
   class ParseFunctionBody {
+  public:
+    typedef llvm::DenseMap<Identifier, unsigned> LocalDiscriminatorMap;
     LocalDiscriminatorMap LocalDiscriminators;
+    unsigned CurClosureDiscriminator = 0;
+  private:
     ContextChange CC;
   public:
-    ParseFunctionBody(Parser &P, DeclContext *DC)
-      : CC(P, DC, &LocalDiscriminators) {}
+    ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {}
 
     void pop() {
       CC.pop();

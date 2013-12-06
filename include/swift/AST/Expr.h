@@ -92,8 +92,13 @@ class alignas(8) Expr {
   class AbstractClosureExprBitfields {
     friend class AbstractClosureExpr;
     unsigned : NumExprBits;
+    unsigned Discriminator : 16;
+
+    enum : unsigned {
+      InvalidDiscriminator = 0xFFFF
+    };
   };
-  enum { NumAbstractClosureExprBits = NumExprBits + 0 };
+  enum { NumAbstractClosureExprBits = NumExprBits + 16 };
   static_assert(NumAbstractClosureExprBits <= 32, "fits in an unsigned");
 
   class ClosureExprBitfields {
@@ -1854,11 +1859,12 @@ class AbstractClosureExpr : public Expr, public DeclContext {
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
-                      DeclContext *Parent)
+                      unsigned Discriminator, DeclContext *Parent)
       : Expr(Kind, Implicit, FnType),
         DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
-        ParamPattern(nullptr)
-  {}
+        ParamPattern(nullptr) {
+    AbstractClosureExprBits.Discriminator = Discriminator;
+  }
 
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
@@ -1867,6 +1873,34 @@ public:
   Pattern *getParams() { return ParamPattern; }
   const Pattern *getParams() const { return ParamPattern; }
   void setParams(Pattern *P) { ParamPattern = P; }
+
+  /// Returns a discriminator which determines this expression's index
+  /// in the sequence of closure expressions within the current
+  /// function.
+  ///
+  /// There are separate sequences for explicit and implicit closures.
+  /// This allows explicit closures to maintain a stable numbering
+  /// across simple edits that introduce auto closures above them,
+  /// which is the best we can reasonably do.
+  ///
+  /// (Autoclosures are likely to be eliminated immediately, even in
+  /// unoptimized builds, so their names are fairly unimportant.  It's
+  /// much more likely that explicit closures will survive
+  /// optimization and therefore make it into e.g. stack traces.
+  /// Having their symbol names be stable across minor code changes is
+  /// therefore pretty useful for debugging.)
+  unsigned getDiscriminator() const {
+    return AbstractClosureExprBits.Discriminator;
+  }
+  void setDiscriminator(unsigned discriminator) {
+    assert(getDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    AbstractClosureExprBits.Discriminator = discriminator;
+  }
+  enum : unsigned {
+    InvalidDiscriminator =
+      decltype(AbstractClosureExprBits)::InvalidDiscriminator
+  };
 
   ArrayRef<Pattern *> getParamPatterns() { return ParamPattern; }
   ArrayRef<const Pattern *> getParamPatterns() const { return ParamPattern; }
@@ -1907,12 +1941,14 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> body;
   
 public:
-  ClosureExpr(Pattern *Params, SourceLoc arrowLoc,
-              TypeLoc explicitResultType, DeclContext *Parent)
-    : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false, Parent),
+  ClosureExpr(Pattern *params, SourceLoc arrowLoc,
+              TypeLoc explicitResultType, unsigned discriminator,
+              DeclContext *parent)
+    : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
+                          discriminator, parent),
       arrowLoc(arrowLoc), explicitResultType(explicitResultType),
       body(nullptr) {
-    setParams(Params);
+    setParams(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
   }
 
@@ -2001,9 +2037,10 @@ class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
 public:
-  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
+  AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
+                  DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
-                            Parent) {
+                            Discriminator, Parent) {
     setBody(Body);
   }
 

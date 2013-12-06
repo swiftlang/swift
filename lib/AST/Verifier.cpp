@@ -502,6 +502,18 @@ struct ASTNodeBase {};
       verifyParsedBase(E);
     }
 
+    void verifyChecked(AbstractClosureExpr *E) {
+      // This only applies in local contexts because we don't know how
+      // to contextualize closures in other contexts.
+      if (E->getDiscriminator() == AbstractClosureExpr::InvalidDiscriminator &&
+          E->getParent()->isLocalContext()) {
+        Out << "a closure expression should have a valid discriminator\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+
     void verifyChecked(RequalifyExpr *E) {
       LValueType::Qual dstQuals, srcQuals;
       Type dstObj = checkLValue(E->getType(), dstQuals,

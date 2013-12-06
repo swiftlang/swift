@@ -2692,7 +2692,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
-      auto Closure = new (tc.Context) AutoClosureExpr(expr, toType, dc);
+      // We'll set discriminator values on all the autoclosures in a
+      // later pass.
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+      auto Closure = new (tc.Context) AutoClosureExpr(expr, toType,
+                                                      discriminator, dc);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());

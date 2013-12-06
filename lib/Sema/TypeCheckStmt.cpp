@@ -37,6 +37,46 @@
 using namespace swift;
 
 namespace {
+  class SetDiscriminators : public ASTWalker {
+    unsigned NextDiscriminator = 0;
+  public:
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // Number all the autoclosures.
+      if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
+        assert(CE->getDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
+        CE->setDiscriminator(NextDiscriminator++);
+
+        // Any sub-closures of the autoclosure follow the same sequence.
+
+      // Explicit closures start their own sequence.
+      } else if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        // If the closure has a single expression body, we need to
+        // walk into it with a new sequence.  Otherwise, it'll have
+        // been separately type-checked.
+        if (CE->hasSingleExpressionBody())
+          CE->getBody()->walk(SetDiscriminators());
+
+        // In neither case do we need to continue the *current* walk.
+        return { false, E };
+      }
+
+      return { true, E };
+    }
+
+    /// We don't want to recurse into most local declarations.
+    bool walkToDeclPre(Decl *D) override {
+      // But we do want to walk into the initializers of local
+      // variables.
+      return isa<PatternBindingDecl>(D);
+    }
+  };
+}
+
+static void setAutoClosureDiscriminators(Stmt *S) {
+  S->walk(SetDiscriminators());
+}
+
+namespace {
 /// StmtChecker - This class implements 
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
@@ -118,6 +158,13 @@ public:
     if (S2 == 0) return true;
     S = S2;
     performStmtDiagnostics(TC, S);
+    return false;
+  }
+
+  /// Type-check an entire function body.
+  bool typeCheckBody(BraceStmt *&S) {
+    if (typeCheckStmt(S)) return true;
+    setAutoClosureDiscriminators(S);
     return false;
   }
   
@@ -569,7 +616,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
 
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  bool HadError = SC.typeCheckStmt(BS);
+  bool HadError = SC.typeCheckBody(BS);
 
   FD->setBody(BS);
   return HadError;
@@ -648,7 +695,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   // Type-check the body.
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(ctor));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  bool HadError = SC.typeCheckStmt(body);
+  bool HadError = SC.typeCheckBody(body);
 
   // Figure out which members already have initializers. We don't
   // default-initialize those members.
@@ -826,7 +873,7 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   if (!Body)
     return false;
 
-  bool HadError = SC.typeCheckStmt(Body);
+  bool HadError = SC.typeCheckBody(Body);
 
   DD->setBody(Body);
   return HadError;
@@ -834,7 +881,7 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
 
 void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
-  StmtChecker(*this, closure).typeCheckStmt(body);
+  StmtChecker(*this, closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
@@ -842,6 +889,6 @@ void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
-  StmtChecker(*this, TLCD).typeCheckStmt(Body);
+  StmtChecker(*this, TLCD).typeCheckBody(Body);
   TLCD->setBody(Body);
 }

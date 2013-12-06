@@ -537,7 +537,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
   ClosureExpr *CE =
-      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &SF);
+      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
+                          /*discriminator*/ 0, &SF);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   CE->setType(FuncTy);
