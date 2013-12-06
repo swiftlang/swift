@@ -122,23 +122,11 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   auto typeVarRep = CS.getRepresentative(typeVar);
   if (typeVar != typeVarRep)
     (*this)[typeVarRep].addToEquivalenceClass(typeVar);
-  else {
-    // If this type variable has a fixed type binding that involves other
-    // type variables, notify those type variables.
-    if (auto fixed = CS.getFixedType(typeVarRep)) {
-      if (fixed->hasTypeVariable()) {
-        SmallVector<TypeVariableType *, 4> typeVars;
-        llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
-        fixed->getTypeVariables(typeVars);
-        for (auto otherTypeVar : typeVars) {
-          if (knownTypeVars.insert(otherTypeVar)) {
-            (*this)[otherTypeVar].addFixedBinding(typeVar);
-            stored.NodePtr->addFixedBinding(otherTypeVar);
-          }
-        }
-      }
-    }
+  else if (auto fixed = CS.getFixedType(typeVarRep)) {
+    // Bind the type variable.
+    bindTypeVariable(typeVar, fixed);
   }
+
   return { *stored.NodePtr, stored.Index };
 }
 
@@ -255,10 +243,19 @@ ConstraintGraph::Node::addToEquivalenceClass(TypeVariableType *otherTypeVar) {
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
          "Can't extend equivalence class of non-representative type var");
   assert(TypeVar == otherTypeVar->getImpl().getRepresentative(nullptr) &&
-         "Type variables are equivalent");
+         "Type variables are not equivalent");
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(TypeVar);
   EquivalenceClass.push_back(otherTypeVar);
+}
+
+void ConstraintGraph::Node::addToEquivalenceClass(
+       ArrayRef<TypeVariableType *> typeVars) {
+  assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
+         "Can't extend equivalence class of non-representative type var");
+  if (EquivalenceClass.empty())
+    EquivalenceClass.push_back(TypeVar);
+  EquivalenceClass.append(typeVars.begin(), typeVars.end());
 }
 
 void ConstraintGraph::Node::addFixedBinding(TypeVariableType *typeVar) {
@@ -277,6 +274,23 @@ void ConstraintGraph::Node::removeFixedBinding(TypeVariableType *typeVar) {
 
 
 #pragma mark Graph mutation
+
+void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
+  // Find the node to remove.
+  auto pos = Nodes.find(typeVar);
+  assert(pos != Nodes.end() && "No node for this type variable");
+  
+  // Remove this node.
+  unsigned index = pos->second.Index;
+  delete pos->second.NodePtr;
+  Nodes.erase(pos);
+
+  // Remove this type variable from the list.
+  unsigned lastIndex = TypeVariables.size()-1;
+  if (index < lastIndex)
+    TypeVariables[index] = TypeVariables[lastIndex];
+  TypeVariables.pop_back();
+}
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
   // Gather the set of type variables referenced by this constraint.
@@ -327,6 +341,42 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     }
   }  
 }
+
+void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
+                                 TypeVariableType *typeVar2) {
+  assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
+         "type representatives don't match");
+  
+  // Retrieve the node for the representative that we're merging into.
+  auto typeVarRep = CS.getRepresentative(typeVar1);
+  auto &repNode = (*this)[typeVarRep];
+
+  // Retrieve the node for the non-representative.
+  assert((typeVar1 == typeVarRep || typeVar2 == typeVarRep) &&
+         "neither type variable is the new representative?");
+  auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
+
+  // Merge equivalence class from the non-representative type variable.
+  repNode.addToEquivalenceClass((*this)[typeVarNonRep].getEquivalenceClass());
+}
+
+void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
+  // If there are no type variables in the fixed type, there's nothing to do.
+  if (!fixed->hasTypeVariable())
+    return;
+
+  SmallVector<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
+  fixed->getTypeVariables(typeVars);
+  Node &node = (*this)[typeVar];
+  for (auto otherTypeVar : typeVars) {
+    if (knownTypeVars.insert(otherTypeVar)) {
+      (*this)[otherTypeVar].addFixedBinding(typeVar);
+      node.addFixedBinding(otherTypeVar);
+    }
+  }
+}
+
 
 #pragma mark Algorithms
 

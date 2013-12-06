@@ -27,6 +27,7 @@
 #include <utility>
 
 namespace swift {
+class Type;
 class TypeVariableType;
 
 namespace constraints {
@@ -116,6 +117,9 @@ public:
     /// Add the given type variable to this node's equivalence class.
     void addToEquivalenceClass(TypeVariableType *otherTypeVar);
 
+    /// Add the given type variables to this node's equivalence class.
+    void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
+
     /// Add a type variable related to this type variable through fixed
     /// bindings.
     void addFixedBinding(TypeVariableType *typeVar);
@@ -181,11 +185,27 @@ public:
   /// Retrieve the node and index corresponding to the given type variable.
   std::pair<Node &, unsigned> lookupNode(TypeVariableType *typeVar);
 
+  /// Remove the node corresponding to the given type variable.
+  ///
+  /// This operation assumes that the any constraints that refer to
+  /// this type variable have been or will be removed before other
+  /// graph queries are performed.
+  void removeNode(TypeVariableType *typeVar);
+
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
 
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
+
+  /// Merge the two nodes for the two given type variables.
+  ///
+  /// The type variables must actually have been merged already; this
+  /// operation merges the two nodes.
+  void mergeNodes(TypeVariableType *typeVar1, TypeVariableType *typeVar2);
+
+  /// Bind the given type variable to the given fixed type.
+  void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
