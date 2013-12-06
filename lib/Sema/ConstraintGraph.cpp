@@ -178,8 +178,7 @@ void ConstraintGraph::Node::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar, 
-                                         unsigned degree) {
+void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
   assert(typeVar != TypeVar && "Cannot be adjacent to oneself");
 
   // Look for existing adjacency information.
@@ -195,26 +194,23 @@ void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar,
   }
 
   // Bump the degree of the adjacency.
-  pos->second.NumConstraints += degree;
+  ++pos->second.NumConstraints;
 }
 
-void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar,
-                                            bool allAdjacencies) {
+void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
   // Find the adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
   assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");
   assert(Adjacencies[pos->second.Index] == typeVar && "Mismatched adjacency");
 
-  if (!allAdjacencies) {
-    // Decrement the number of constraints that make these two type variables
-    // adjacent.
-    --pos->second.NumConstraints;
-    
-    // If there are other constraints that make these type variables
-    // adjacent,
-    if (pos->second.NumConstraints > 0)
-      return;
-  }
+  // Decrement the number of constraints that make these two type variables
+  // adjacent.
+  --pos->second.NumConstraints;
+  
+  // If there are other constraints that make these type variables
+  // adjacent,
+  if (pos->second.NumConstraints > 0)
+    return;
 
   // Remove this adjacency from the mapping.
   unsigned index = pos->second.Index;

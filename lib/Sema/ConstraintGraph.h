@@ -87,17 +87,10 @@ public:
     void removeConstraint(Constraint *constraint);
 
     /// Add an adjacency to the list of adjacencies.
-    void addAdjacency(TypeVariableType *typeVar, unsigned degree = 1);
+    void addAdjacency(TypeVariableType *typeVar);
 
     /// Remove an adjacency from the list of adjacencies.
-    ///
-    /// \param allAdjacencies When true, remove all adjacencies with
-    /// the given type variable. Otherwise (the default), removes a
-    /// single instance of the adjacency between two type
-    /// variables. If it was the last adjacency, then the two type
-    /// variables are no longer adjacent.
-    void removeAdjacency(TypeVariableType *typeVar,
-                         bool allAdjacencies = false);
+    void removeAdjacency(TypeVariableType *typeVar);
 
     /// Add the given type variable to this node's equivalence class.
     void addToEquivalenceClass(TypeVariableType *otherTypeVar);
