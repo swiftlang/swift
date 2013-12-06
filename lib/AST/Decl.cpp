@@ -116,6 +116,13 @@ bool Decl::isTransparent() const {
       return ED->isTransparent();
   }
 
+  // If this is a getter or a seter, check if the transparent attribute was set
+  // on the value decl.
+  if (const FuncDecl *FD = dyn_cast<FuncDecl>(this)) {
+    if (ValueDecl *VD = FD->getGetterOrSetterDecl())
+      return VD->isTransparent();
+  }
+
   return false;
 }
 

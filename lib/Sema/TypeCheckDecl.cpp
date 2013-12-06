@@ -3026,11 +3026,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   if (Attrs.isTransparent()) {
-    // Only abstract functions can be 'transparent'.
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     auto *ED = dyn_cast<ExtensionDecl>(D);
+    auto *VD = dyn_cast<VarDecl>(D);
 
-    if (!AFD && !ED) {
+    if ((!AFD && !ED & !VD) || (VD && !VD->isComputed())) {
       TC.diagnose(Attrs.getLoc(AK_transparent), diag::transparent_not_valid);
       D->getMutableAttrs().clearAttribute(AK_transparent);
 
@@ -3042,16 +3042,20 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                     diag::transparent_on_invalid_extension);
         D->getMutableAttrs().clearAttribute(AK_transparent);
       }
-    } else if (isa<ProtocolDecl>(AFD->getParent())) {
-      TC.diagnose(Attrs.getLoc(AK_transparent),
-                  diag::transparent_in_protocols_not_supported);
-      D->getMutableAttrs().clearAttribute(AK_transparent);
-
-    // Class methods cannot be transparent.
-    } else if (isa<ClassDecl>(AFD->getParent())) {
-      TC.diagnose(Attrs.getLoc(AK_transparent),
-                  diag::transparent_in_classes_not_supported);
-      D->getMutableAttrs().clearAttribute(AK_transparent);
+    } else {
+      assert(AFD || VD);
+      DeclContext *Ctx = AFD ? AFD->getParent() : VD->getDeclContext();
+      // Protocol declarations cannot be transparent.
+      if (isa<ProtocolDecl>(Ctx)) {
+        TC.diagnose(Attrs.getLoc(AK_transparent),
+                    diag::transparent_in_protocols_not_supported);
+        D->getMutableAttrs().clearAttribute(AK_transparent);
+      // Class declarations cannot be transparent.
+      } else if (isa<ClassDecl>(Ctx)) {
+        TC.diagnose(Attrs.getLoc(AK_transparent),
+                    diag::transparent_in_classes_not_supported);
+        D->getMutableAttrs().clearAttribute(AK_transparent);
+      }
     }
   }
 
