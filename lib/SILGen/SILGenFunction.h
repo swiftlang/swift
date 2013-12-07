@@ -226,11 +226,11 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
     
-  /// LocalConstants - Entries in this map are generated when a local constant
+  /// LocalFunctions - Entries in this map are generated when a local function
   /// declaration that requires local context, such as a func closure, is
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
   /// to a local constant.
-  llvm::DenseMap<SILDeclRef, SILValue> LocalConstants;
+  llvm::DenseMap<SILDeclRef, SILValue> LocalFunctions;
 
   /// Mapping from active opaque value expressions to their values,
   /// along with a bit for each indicating whether it has been consumed yet.

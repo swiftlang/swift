@@ -89,8 +89,8 @@ enum class CaptureKind {
   None,
   /// A local value captured as a mutable box.
   Box,
-  /// A local value captured by value.
-  Constant,
+  /// A local function captured by value.
+  LocalFunction,
   /// A getter-only property.
   Getter,
   /// A settable property.

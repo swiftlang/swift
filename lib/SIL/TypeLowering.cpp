@@ -78,7 +78,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
     // self can be reassigned within a init by a super.init() call, it cannot be
     // live in a closure.
     if (var->isImplicit() && var->getName().str() == "self")
-      return CaptureKind::Constant;
+      return CaptureKind::LocalFunction;
 #endif
 
     return CaptureKind::Box;
@@ -89,7 +89,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (isa<TypeAliasDecl>(capture))
     return CaptureKind::None;
   
-  return CaptureKind::Constant;
+  return CaptureKind::LocalFunction;
 }
 
 enum class LoweredTypeKind {
@@ -1214,8 +1214,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::None:
       break;
         
-    case CaptureKind::Constant:
-      // Constants are captured by value.
+    case CaptureKind::LocalFunction:
+      // Local functions are captured by value.
       assert(!capture->isReferencedAsLValue() &&
              "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(captureType));

@@ -131,7 +131,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
                                         getForwardingSubstitutions(), fd)
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
-    LocalConstants[SILDeclRef(fd)] = closure;
+    LocalFunctions[SILDeclRef(fd)] = closure;
   }
 }
 
@@ -661,14 +661,14 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
     break;
   }
-  case CaptureKind::Constant: {
-    // Constants are captured by value.
+  case CaptureKind::LocalFunction: {
+    // Local functions are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
            "capturing inout by value?!");
     const TypeLowering &ti = gen.getTypeLowering(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                                  gen.F.begin(), capture);
-    gen.LocalConstants[SILDeclRef(capture)] = value;
+    gen.LocalFunctions[SILDeclRef(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }
@@ -681,7 +681,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
       setTy = cast<VarDecl>(capture)->getSetterType();
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
-    gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
+    gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     SWIFT_FALLTHROUGH;
   }
@@ -694,7 +694,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
       getTy = cast<VarDecl>(capture)->getGetterType();
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
-    gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
+    gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }

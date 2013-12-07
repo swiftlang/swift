@@ -262,7 +262,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                                                SILConstantInfo constantInfo) {
   assert(constantInfo == getConstantInfo(constant));
 
-  assert(!LocalConstants.count(constant) &&
+  assert(!LocalFunctions.count(constant) &&
          "emitting ref to local constant without context?!");
   if (constant.hasDecl() &&
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
@@ -312,8 +312,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
                                                SILDeclRef constant) {
   // If this is a reference to a local constant, grab it.
-  if (LocalConstants.count(constant)) {
-    return LocalConstants[constant];
+  if (LocalFunctions.count(constant)) {
+    return LocalFunctions[constant];
   }
   
   // Otherwise, use a global FunctionRefInst.
@@ -329,8 +329,8 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILDeclRef constant,
                                              SILConstantInfo constantInfo) {
   // If this is a reference to a local constant, grab it.
-  if (LocalConstants.count(constant)) {
-    SILValue v = LocalConstants[constant];
+  if (LocalFunctions.count(constant)) {
+    SILValue v = LocalFunctions[constant];
     return emitManagedRetain(loc, v);
   }
   
@@ -1617,7 +1617,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       capturedArgs.push_back(vl.getAddress());
       break;
     }
-    case CaptureKind::Constant: {
+    case CaptureKind::LocalFunction: {
       // SILValue is a constant such as a local func. Pass on the reference.
       ManagedValue v = emitReferenceToDecl(loc, capture);
       capturedArgs.push_back(v.forward(*this));
@@ -2418,7 +2418,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     addSILArgument(ty);
     break;
   }
-  case CaptureKind::Constant: {
+  case CaptureKind::LocalFunction: {
     // Forward the captured value.
     SILType ty = gen.getLoweredType(capture->getType());
     addSILArgument(ty);

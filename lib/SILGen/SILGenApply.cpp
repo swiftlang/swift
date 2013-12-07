@@ -720,7 +720,7 @@ public:
                          gen.SGM.requiresObjCDispatch(e->getDecl()));
 
     // Obtain a reference for a local closure.
-    if (gen.LocalConstants.count(constant)) {
+    if (gen.LocalFunctions.count(constant)) {
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDeclRef());
       auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
       setCallee(Callee::forIndirect(localFn, type, type, false, e));
@@ -2212,8 +2212,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
-  if (gen.LocalConstants.count(constant)) {
-    SILValue v = gen.LocalConstants[constant];
+  if (gen.LocalFunctions.count(constant)) {
+    SILValue v = gen.LocalFunctions[constant];
     auto formalType =
       gen.SGM.Types.getConstantFormalTypeWithoutCaptures(constant);
     return Callee::forIndirect(gen.emitManagedRetain(loc, v),
