@@ -610,6 +610,7 @@ namespace decls_block {
     DeclIDField,       // context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
+    BCFixed<1>,        // IBLiveView?
     BCFixed<2>,        // Resilience kind
     TypeIDField        // superclass
     // Trailed by the generic parameters (if any), conformance info (if any),

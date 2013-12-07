@@ -1208,6 +1208,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclRef(DC),
                             theClass->isImplicit(),
                             theClass->isObjC(),
+                            theClass->getAttrs().isIBLiveView(),
                             (unsigned)theClass->getAttrs().getResilienceKind(),
                             addTypeRef(theClass->getSuperclass()));
 

@@ -1343,12 +1343,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC;
+    bool isImplicit, isObjC, isIBLiveView;
     TypeID superclassID;
     unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, isObjC, resilienceKind,
-                                         superclassID);
+                                         isImplicit, isObjC, isIBLiveView,
+                                         resilienceKind, superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1389,6 +1389,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setGenericSignature(paramTypes, requirements);
     }
     theClass->setIsObjC(isObjC);
+    if (isIBLiveView)
+      theClass->getMutableAttrs().setAttr(AK_IBLiveView, SourceLoc());
     theClass->computeType();
 
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
