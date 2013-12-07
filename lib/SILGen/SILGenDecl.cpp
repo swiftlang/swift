@@ -766,7 +766,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   assert((!selfDecl || getLoweredLoadableType(selfDecl->getType()) == selfType)
          && "decl type doesn't match destructor's implicit this type");
   
-  SILValue selfValue = new (SGM.M) SILArgument(selfType, F.begin());
+  SILValue selfValue = new (SGM.M) SILArgument(selfType, F.begin(), selfDecl);
   VarLocs[selfDecl] = VarLoc::getConstant(selfValue);
   return selfValue;
 }

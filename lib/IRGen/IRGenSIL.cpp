@@ -998,14 +998,21 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     if (Arg->getType().isExistentialType())
       continue;
 
-    if (LoweredArg.isAddress()) {
-      auto Name = Arg->getDecl()->getName().str();
-      auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
-      DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
-                        getTypeInfo(Arg->getType()),
-                        getDebugScope());
-      IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
-                                                N, DirectValue);
+    auto Name = Arg->getDecl()->getName().str();
+    DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
+                      getTypeInfo(Arg->getType()),
+                      getDebugScope());
+    if (LoweredArg.isAddress())
+      IGM.DebugInfo->
+        emitArgVariableDeclaration(Builder,
+                                   emitShadowCopy(LoweredArg.getAddress(), Name),
+                                   DTI, Name, N, DirectValue);
+    else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
+      // FIXME: Handle multi-value explosions.
+      auto Vals = getLoweredExplosion(Arg).claimAll();
+      if (Vals.size() == 1)
+        IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI, Name, N,
+                                                  DirectValue, RealValue, Value);
     }
   }
 }
