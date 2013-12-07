@@ -1275,13 +1275,12 @@ DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
 //===----------------------------------------------------------------------===//
 
 static void processMemoryObject(SILInstruction *I) {
-  // If the allocation's address has a single use, and it is a
-  // mark_uninitialized, then we'll analyze it when we look at the
-  // mark_uninitialized instruction itself.
-  if (!isa<MarkUninitializedInst>(I) &&
-      SILValue(I, 1).hasOneUse() &&
-      isa<MarkUninitializedInst>(SILValue(I, 1).use_begin()->getUser()))
-    return;
+  // If the allocation's address has a mark_uninitialized use, then we'll
+  // analyze it when we look at the mark_uninitialized instruction itself.
+  if (!isa<MarkUninitializedInst>(I))
+    for (auto UI : SILValue(I, 1).getUses())
+      if (isa<MarkUninitializedInst>(UI->getUser()))
+        return;
   
   DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);

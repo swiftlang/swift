@@ -40,8 +40,8 @@ bb0:
 sil @multi_strong_release : $() -> Int64 {
 bb0:
   %1 = alloc_box $Int64
-  %2 = initialize_var %1#1 : $*Int64
-  %3 = load %1#1 : $*Int64
+  %2 = mark_uninitialized [rootself] %1#1 : $*Int64
+  %3 = load %2 : $*Int64
   %x = strong_retain %1#0 : $Builtin.ObjectPointer
   %y = strong_release %1#0 : $Builtin.ObjectPointer
   %b = br bb1
