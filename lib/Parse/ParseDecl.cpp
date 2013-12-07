@@ -2461,6 +2461,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
     = new (Context) VarDecl(/*static*/ false,
                             SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
+  SelfDecl->setImplicit();
 
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
@@ -2578,6 +2579,7 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
     = new (Context) VarDecl(/*static*/ false,
                             SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
+  SelfDecl->setImplicit();
 
   Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD

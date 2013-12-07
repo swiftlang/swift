@@ -140,9 +140,8 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   isCurried = uncurryLevel != naturalUncurryLevel;
 }
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                         unsigned atUncurryLevel,
-                         bool asForeign) 
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
+                       bool asForeign) 
  : defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
