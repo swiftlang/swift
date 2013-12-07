@@ -1,4 +1,5 @@
 add_swift_library(swiftAST
+  ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTNode.cpp

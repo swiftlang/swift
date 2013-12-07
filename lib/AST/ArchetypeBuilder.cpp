@@ -15,10 +15,14 @@
 // those requirements.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
+
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -213,12 +217,46 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 }
 
+/// The identifying information for a generic parameter.
+
+namespace {
+struct GenericTypeParamKey {
+  unsigned Depth : 16;
+  unsigned Index : 16;
+  
+  static GenericTypeParamKey forDecl(GenericTypeParamDecl *d) {
+    return {d->getDepth(), d->getIndex()};
+  }
+  
+  static GenericTypeParamKey forType(GenericTypeParamType *t) {
+    return {t->getDepth(), t->getIndex()};
+  }
+};
+}
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<GenericTypeParamKey> {
+  static inline GenericTypeParamKey getEmptyKey() { return {~0U, ~0U}; }
+  static inline GenericTypeParamKey getTombstoneKey() { return {~1U, ~1U}; }
+  static inline unsigned getHashValue(GenericTypeParamKey k) {
+    return DenseMapInfo<unsigned>::getHashValue(k.Depth << 16 | k.Index);
+  }
+  static bool isEqual(GenericTypeParamKey a, GenericTypeParamKey b) {
+    return a.Depth == b.Depth && a.Index == b.Index;
+  }
+};
+  
+}
+
 struct ArchetypeBuilder::Implementation {
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
   std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo;
-  SmallVector<AbstractTypeParamDecl *, 4> GenericParams;
-  DenseMap<AbstractTypeParamDecl *, PotentialArchetype *> PotentialArchetypes;
-  DenseMap<AbstractTypeParamDecl *, ArchetypeType *> PrimaryArchetypeMap;
+  SmallVector<GenericTypeParamKey, 4> GenericParams;
+  DenseMap<GenericTypeParamKey, std::pair<ProtocolDecl*, PotentialArchetype*>>
+    PotentialArchetypes;
+  DenseMap<GenericTypeParamKey, ArchetypeType *> PrimaryArchetypeMap;
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 
   SmallVector<std::pair<PotentialArchetype *, PotentialArchetype *>, 4>
@@ -255,17 +293,17 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     return;
 
   for (auto PA : Impl->PotentialArchetypes)
-    delete PA.second;
+    delete PA.second.second;
 }
 
 auto ArchetypeBuilder::resolveType(Type type) -> PotentialArchetype * {
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    // FIXME: Shouldn't have to rely on getDecl() here...
-    auto known = Impl->PotentialArchetypes.find(genericParam->getDecl());
+    auto known
+      = Impl->PotentialArchetypes.find(GenericTypeParamKey::forType(genericParam));
     if (known == Impl->PotentialArchetypes.end())
       return nullptr;
 
-    return known->second;
+    return known->second.second;
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
@@ -279,15 +317,36 @@ auto ArchetypeBuilder::resolveType(Type type) -> PotentialArchetype * {
   return nullptr;
 }
 
-bool ArchetypeBuilder::addGenericParameter(AbstractTypeParamDecl *GenericParam,
-                                           Optional<unsigned> Index) {
-  Impl->GenericParams.push_back(GenericParam);
+auto ArchetypeBuilder::addGenericParameter(ProtocolDecl *RootProtocol,
+                                           Identifier ParamName,
+                                           unsigned ParamDepth,
+                                           unsigned ParamIndex,
+                                           Optional<unsigned> Index)
+  -> PotentialArchetype *
+{
+  GenericTypeParamKey Key{ParamDepth, ParamIndex};
+  
+  Impl->GenericParams.push_back(Key);
 
   // Create a potential archetype for this type parameter.
-  assert(!Impl->PotentialArchetypes[GenericParam]);
-  auto PA = new PotentialArchetype(nullptr, GenericParam->getName(), Index);
-  Impl->PotentialArchetypes[GenericParam] = PA;
+  assert(!Impl->PotentialArchetypes[Key].second);
+  auto PA = new PotentialArchetype(nullptr, ParamName, Index);
+  Impl->PotentialArchetypes[Key] = {RootProtocol, PA};
+  
+  return PA;
+}
 
+bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam,
+                                           Optional<unsigned> Index) {
+  PotentialArchetype *PA
+    = addGenericParameter(dyn_cast<ProtocolDecl>(GenericParam->getDeclContext()),
+                          GenericParam->getName(),
+                          GenericParam->getDepth(),
+                          GenericParam->getIndex(), Index);
+  
+  if (!PA)
+    return true;
+  
   // Add each of the conformance requirements placed on this type parameter.
   for (auto Proto : GenericParam->getProtocols()) {
     if (addConformanceRequirement(PA, Proto))
@@ -301,6 +360,15 @@ bool ArchetypeBuilder::addGenericParameter(AbstractTypeParamDecl *GenericParam,
   }
 
   return false;
+}
+
+bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
+                                           Optional<unsigned> Index) {
+  PotentialArchetype *PA = addGenericParameter(nullptr,
+                                               GenericParam->getName(),
+                                               GenericParam->getDepth(),
+                                               GenericParam->getIndex());
+  return !PA;
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
@@ -519,10 +587,11 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
   llvm_unreachable("Unhandled requirement?");
 }
 
-bool ArchetypeBuilder::addImplicitConformance(AbstractTypeParamDecl *Param,
+bool ArchetypeBuilder::addImplicitConformance(GenericTypeParamDecl *Param,
                                               ProtocolDecl *Proto) {
-  assert(Impl->PotentialArchetypes[Param] != nullptr && "Unknown parameter");
-  return addConformanceRequirement(Impl->PotentialArchetypes[Param], Proto);
+  auto Key = GenericTypeParamKey::forDecl(Param);
+  assert(Impl->PotentialArchetypes[Key].second != nullptr && "Unknown parameter");
+  return addConformanceRequirement(Impl->PotentialArchetypes[Key].second, Proto);
 }
 
 /// Determine whether this archetype is a protocol's 'Self' archetype or
@@ -631,18 +700,33 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype = PA.second->getArchetype(
-                       dyn_cast<ProtocolDecl>(PA.first->getDeclContext()),
+    auto Archetype = PA.second.second->getArchetype(
+                       PA.second.first,
                        Mod);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }
 
 ArchetypeType *
-ArchetypeBuilder::getArchetype(AbstractTypeParamDecl *GenericParam) const {
-  auto Pos = Impl->PrimaryArchetypeMap.find(GenericParam);
+ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) const {
+  auto Key = GenericTypeParamKey::forDecl(GenericParam);
+  auto Pos = Impl->PrimaryArchetypeMap.find(Key);
   assert(Pos != Impl->PrimaryArchetypeMap.end() && "Not a parameter!");
   return Pos->second;
+}
+
+ArchetypeType *
+ArchetypeBuilder::getArchetype(GenericTypeParamType *GenericParam) const {
+  auto Key = GenericTypeParamKey::forType(GenericParam);
+  auto Pos = Impl->PrimaryArchetypeMap.find(Key);
+  assert(Pos != Impl->PrimaryArchetypeMap.end() && "Not a parameter!");
+  return Pos->second;
+}
+
+ArchetypeType *
+ArchetypeBuilder::getArchetype(DependentMemberType *AssocType) {
+  // FIXME: root protocol?
+  return resolveType(AssocType)->getArchetype(nullptr, Mod);
 }
 
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
@@ -675,7 +759,7 @@ ArchetypeBuilder::getSameTypeRequirements() const {
 void ArchetypeBuilder::dump() {
   llvm::errs() << "Archetypes to build:\n";
   for (const auto& PA : Impl->PotentialArchetypes) {
-    PA.second->dump(llvm::errs(), 2);
+    PA.second.second->dump(llvm::errs(), 2);
   }
 }
 
@@ -686,9 +770,19 @@ Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
 
   auto genericParams = dc->getGenericParamsOfContext();
   assert(genericParams && "Missing generic parameters for dependent context");
+  
+  return mapTypeIntoContext(dc->getASTContext(), genericParams, type);
+}
+
+Type ArchetypeBuilder::mapTypeIntoContext(ASTContext &C,
+                                          GenericParamList *genericParams,
+                                          Type type) {
+  // If the type is not dependent, there's nothing to map.
+  if (!type->isDependentType())
+    return type;
+
   unsigned genericParamsDepth = genericParams->getDepth();
-  return type.transform(dc->getASTContext(),
-                        [&](Type type) -> Type {
+  return type.transform(C, [&](Type type) -> Type {
     // Map a generic parameter type to its archetype.
     if (auto gpType = type->getAs<GenericTypeParamType>()) {
       auto index = gpType->getIndex();
@@ -713,7 +807,8 @@ Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
 
     // Map a dependent member to the corresponding nested archetype.
     if (auto dependentMember = type->getAs<DependentMemberType>()) {
-      auto base = mapTypeIntoContext(dc, dependentMember->getBase());
+      auto base = mapTypeIntoContext(C, genericParams,
+                                     dependentMember->getBase());
       auto baseArchetype = base->castTo<ArchetypeType>();
       return baseArchetype->getNestedType(dependentMember->getName());
     }

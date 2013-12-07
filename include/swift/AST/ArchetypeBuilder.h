@@ -16,6 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_ARCHETYPEBUILDER_H
+#define SWIFT_ARCHETYPEBUILDER_H
+
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
@@ -31,6 +34,10 @@ class AbstractTypeParamDecl;
 class ArchetypeType;
 class AssociatedTypeDecl;
 class DeclContext;
+class DependentMemberType;
+class GenericParamList;
+class GenericTypeParamDecl;
+class GenericTypeParamType;
 class Module;
 class Pattern;
 class ProtocolDecl;
@@ -111,12 +118,25 @@ public:
   /// Retrieve the module.
   Module &getModule() const { return Mod; }
 
+private:
+  PotentialArchetype *addGenericParameter(ProtocolDecl *RootProtocol,
+                           Identifier ParamName,
+                           unsigned ParamDepth, unsigned ParamIndex,
+                           Optional<unsigned> Index = Nothing);
+
+public:
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(AbstractTypeParamDecl *GenericParam,
+  bool addGenericParameter(GenericTypeParamDecl *GenericParam,
                            Optional<unsigned> Index = Nothing);
 
+  /// \brief Add a new generic parameter for which there may be requirements.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool addGenericParameter(GenericTypeParamType *GenericParam,
+                           Optional<unsigned> Index = Nothing);
+  
   /// \brief Add a new requirement.
   ///
   /// \returns true if this requirement makes the set of requirements
@@ -131,7 +151,7 @@ public:
 
   /// \brief Add a new, implicit conformance requirement for one of the
   /// parameters.
-  bool addImplicitConformance(AbstractTypeParamDecl *Param,
+  bool addImplicitConformance(GenericTypeParamDecl *Param,
                               ProtocolDecl *Proto);
 
   /// Infer requirements from the given type representation, recursively.
@@ -186,8 +206,16 @@ public:
 
   /// \brief Retrieve the archetype that corresponds to the given generic
   /// parameter.
-  ArchetypeType *getArchetype(AbstractTypeParamDecl *GenericParam) const;
+  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam) const;
 
+  /// \brief Retrieve the archetype that corresponds to the given generic
+  /// parameter.
+  ArchetypeType *getArchetype(GenericTypeParamType *GenericParam) const;
+  
+  /// \brief Retrieve the archetype that corresponds to the given associated
+  /// type.
+  ArchetypeType *getArchetype(DependentMemberType *DepType);
+  
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
@@ -211,11 +239,20 @@ public:
   /// \returns the mapped type, which will involve archetypes rather than
   /// dependent types.
   static Type mapTypeIntoContext(DeclContext *dc, Type type);
-
+  
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
       "only for use within the debugger");
+  
+private:
+  /// FIXME: Share the guts of our mapTypeIntoContext implementation with
+  /// SILFunction::mapTypeIntoContext.
+  friend class SILFunction;
+  
+  static Type mapTypeIntoContext(ASTContext &C,
+                                 GenericParamList *genericParams,
+                                 Type type);
 };
 
 class ArchetypeBuilder::PotentialArchetype {
@@ -304,3 +341,5 @@ public:
 };
 
 } // end namespace swift
+
+#endif

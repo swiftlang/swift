@@ -802,8 +802,17 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   // parameters as dependent, unresolved.
   DependentGenericTypeResolver dependentResolver;
   bool invalid = false;
+  
+  DeclContext *dc;
+  // Ignore the decl context of protocol declarations. Protocols aren't valid
+  // in nested generic contexts.
+  if (isa<ProtocolDecl>(nominal))
+    dc = nullptr;
+  else
+    dc = nominal->getDeclContext();
+  
   if (checkGenericParameters(*this, &builder, nominal->getGenericParams(),
-                             nominal->getDeclContext(), dependentResolver)) {
+                             dc, dependentResolver)) {
     invalid = true;
   }
 
@@ -813,7 +822,7 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   revertGenericParamList(nominal->getGenericParams(), nominal);
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (checkGenericParameters(*this, nullptr, nominal->getGenericParams(),
-                             nominal->getDeclContext(), completeResolver)) {
+                             dc, completeResolver)) {
     invalid = true;
   }
 
