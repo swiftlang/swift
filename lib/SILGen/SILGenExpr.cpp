@@ -407,10 +407,13 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     assert(!var->isComputed() &&
            "computed variables should be handled elsewhere");
     
-    // For local decls, use the address we allocated.
+    // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
-    if (It != VarLocs.end())
-      return ManagedValue(It->second.address, ManagedValue::LValue);
+    if (It != VarLocs.end()) {
+      if (It->second.isConstant())
+        return ManagedValue(It->second.getConstant(), ManagedValue::Unmanaged);
+      return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
+    }
 
     // If this is a global variable, invoke its accessor function to get its
     // address.
@@ -543,6 +546,27 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
+  // If this is a load of a local constant decl, just produce the value.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      auto It = SGF.VarLocs.find(VD);
+      if (It != SGF.VarLocs.end() && It->second.isConstant())
+        return RValue(SGF, E, ManagedValue(It->second.getConstant(),
+                                           ManagedValue::Unmanaged));
+    }
+  }
+
+  // If this is a use of super that is a constant, just produce the value.
+  if (auto *SRE = dyn_cast<SuperRefExpr>(E->getSubExpr())) {
+    if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
+      auto It = SGF.VarLocs.find(VD);
+      if (It != SGF.VarLocs.end() && It->second.isConstant())
+        return RValue(SGF, E, ManagedValue(It->second.getConstant(),
+                                           ManagedValue::Unmanaged));
+    }
+  }
+
+
   LValue lv = SGF.emitLValue(E->getSubExpr());
   auto result = SGF.emitLoadOfLValue(E, lv, C);
   return (result ? RValue(SGF, E, result) : RValue());
@@ -1584,12 +1608,13 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       assert(VarLocs.count(capture) &&
              "no location for captured var!");
       
-      VarLoc const &vl = VarLocs[capture];
+      const VarLoc &vl = VarLocs[capture];
       assert(vl.box && "no box for captured var!");
-      assert(vl.address && "no address for captured var!");
+      assert(vl.isAddress() && vl.getAddress() &&
+             "no address for captured var!");
       B.createStrongRetain(loc, vl.box);
       capturedArgs.push_back(vl.box);
-      capturedArgs.push_back(vl.address);
+      capturedArgs.push_back(vl.getAddress());
       break;
     }
     case CaptureKind::Constant: {
@@ -2015,10 +2040,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // check for it.
   SILValue selfLV;
   {
-    auto &VarLocAddrEntry = VarLocs[selfDecl].address;
-    VarLocAddrEntry = B.createMarkUninitializedRootSelf(selfDecl,
-                                                        VarLocAddrEntry);
-    selfLV = VarLocAddrEntry;
+    auto &SelfVarLoc = VarLocs[selfDecl];
+    selfLV = B.createMarkUninitializedRootSelf(selfDecl,
+                                               SelfVarLoc.getAddress());
+    SelfVarLoc = VarLoc::getAddress(selfLV, SelfVarLoc.box);
   }
 
   // Emit the prolog.
@@ -2311,23 +2336,39 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // If there's no body, this is the implicit constructor.
   assert(ctor->getBody() && "Class constructor without a body?");
 
-  // Emit the 'self' argument and make an lvalue for it.
   // FIXME: The (potentially partially initialized) value here would need to be
   // cleaned up on a constructor failure unwinding.
-  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  emitLocalVariable(selfDecl);
-  SILValue selfLV = VarLocs[selfDecl].address;
 
-  // Emit the prolog for the non-this arguments.
+  // Set up the 'self' argument.  If this class has a superclass, we set up
+  // self as a box.  This allows "self reassignment" to happen in super init
+  // method chains, which is important for interoperating with Objective-C
+  // classes.
+  // TODO: If we could require Objective-C classes to have an attribute to get
+  // this behavior, we could avoid runtime overhead here.
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
+    ->getNominalOrBoundGenericNominal();
+  bool NeedsBoxForSelf = cast<ClassDecl>(nominalDecl)->hasSuperclass();
+
+  if (NeedsBoxForSelf)
+    emitLocalVariable(selfDecl);
+
+  // Emit the prolog for the non-self arguments.
   emitProlog(ctor->getBodyParams(), TupleType::getEmpty(F.getASTContext()));
 
-  // Emit the 'self' argument and store it to the lvalue.
+
+
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-  B.createStore(ctor, selfArg, selfLV);
-  
+
+  if (NeedsBoxForSelf) {
+    B.createStore(ctor, selfArg, VarLocs[selfDecl].getAddress());
+  } else {
+    VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
+  }
+
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type(), CleanupLocation(ctor));
@@ -2339,16 +2380,20 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!emitEpilogBB(ctor).first)
     return;
 
-  // Load and return the final 'self'.
-  SILValue selfValue = B.createLoad(ctor, selfLV);
-  SILValue selfBox = VarLocs[selfDecl].box;
-  assert(selfBox);
+  // If we're using a box for self, reload the value at the end of the init
+  // method.
+  if (NeedsBoxForSelf) {
+    selfArg = B.createLoad(ctor, VarLocs[selfDecl].getAddress());
+    SILValue selfBox = VarLocs[selfDecl].box;
+    assert(selfBox);
 
-  // We have to do a retain because someone else may be using the box.
-  selfValue = B.emitCopyValueOperation(ctor, selfValue);
-  B.emitStrongRelease(ctor, selfBox);
+    // We have to do a retain because someone else may be using the box.
+    selfArg = B.emitCopyValueOperation(ctor, selfArg);
+    B.emitStrongRelease(ctor, selfBox);
+  }
 
-  B.createReturn(ctor, selfValue);
+  // Return the final 'self'.
+  B.createReturn(ctor, selfArg);
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,

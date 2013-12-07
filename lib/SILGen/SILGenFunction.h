@@ -181,13 +181,44 @@ public:
                               SILValue base,
                               Materialize temp);
 
-  /// VarLoc - representation of an emitted local variable.
+  /// VarLoc - representation of an emitted local variable.  Local variables can
+  /// either have a singular constant value that is always returned (in which
+  /// case VarLoc holds that value), or may be emitted into a box.  If they are
+  /// emitted into a box, the retainable pointer is also stored.
   struct VarLoc {
-    /// box - the retainable box for the variable, or invalid if no box was
-    /// made for the value.
+    /// addressOrValue - the address at which the variable is stored, or the
+    /// value of the decl if it is a constant.
+    llvm::PointerIntPair<SILValue, 1, bool> addressOrValue;
+  public:
+    /// box - For a non-constant value, this is the retainable box for the
+    /// variable.  It may be invalid if no box was made for the value (e.g.,
+    /// because it was an @inout value, or constant).
     SILValue box;
-    /// address - the address at which the variable is stored.
-    SILValue address;
+
+    bool isConstant() const { return addressOrValue.getInt(); }
+    bool isAddress() const { return !isConstant(); }
+
+    SILValue getAddress() const {
+      assert(isAddress() && "Can't get the address of a constant");
+      return addressOrValue.getPointer();
+    }
+
+    SILValue getConstant() const {
+      assert(isConstant() && "Emit a load to get the value of an address");
+      return addressOrValue.getPointer();
+    }
+
+    static VarLoc getConstant(SILValue Val) {
+      VarLoc Result;
+      Result.addressOrValue.setPointerAndInt(Val, true);
+      return Result;
+    }
+    static VarLoc getAddress(SILValue Addr, SILValue Box = SILValue()) {
+      VarLoc Result;
+      Result.addressOrValue.setPointerAndInt(Addr, false);
+      Result.box = Box;
+      return Result;
+    }
   };
     
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is

@@ -69,12 +69,20 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
 #include "swift/SIL/BridgedTypes.def"
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
-  if (VarDecl *var = dyn_cast<VarDecl>(capture))
+  if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
     if (var->isComputed())
       return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
 
-  if (capture->isReferencedAsLValue())
+#if 0  // FIXME.
+    // Self is always capture by value, never by address.  Even in the case when
+    // self can be reassigned within a init by a super.init() call, it cannot be
+    // live in a closure.
+    if (var->isImplicit() && var->getName().str() == "self")
+      return CaptureKind::Constant;
+#endif
+
     return CaptureKind::Box;
+  }
   
   // "Captured" local typealiases require no context.
   // FIXME: Is this true for dependent typealiases?
@@ -1208,8 +1216,6 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
         
     case CaptureKind::Constant:
       // Constants are captured by value.
-      assert(!capture->isReferencedAsLValue() &&
-             "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::GetterSetter: {
@@ -1246,7 +1252,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     }
   }
   
-  CanType capturedInputs = TupleType::get(inputFields, Context)->getCanonicalType();
+  CanType capturedInputs =
+    TupleType::get(inputFields, Context)->getCanonicalType();
 
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           /*thin*/ true,
