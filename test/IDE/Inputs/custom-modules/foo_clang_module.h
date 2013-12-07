@@ -1,3 +1,5 @@
+#import <foo_clang_dep_module.h>
+
 // Types.
 
 enum FooEnum1 { FooEnum1X };

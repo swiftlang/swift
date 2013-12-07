@@ -522,6 +522,12 @@ ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
                           consumer);
 }
 
+static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
+                               const ValueDecl *VD) {
+  auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
+  return ModuleFilter == ContainingUnit;
+}
+
 static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
                                 const ValueDecl *VD) {
   // Include a value from module X if:
@@ -602,6 +608,21 @@ public:
   }
 };
 
+class FilteringDeclaredDeclConsumer : public swift::VisibleDeclConsumer {
+  swift::VisibleDeclConsumer &NextConsumer;
+  const ClangModuleUnit *ModuleFilter = nullptr;
+
+public:
+  FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
+                                const ClangModuleUnit *CMU)
+      : NextConsumer(consumer), ModuleFilter(CMU) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (isDeclaredInModule(ModuleFilter, VD))
+      NextConsumer.foundDecl(VD, Reason);
+  }
+};
+
 } // unnamed namespace
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
@@ -625,6 +646,25 @@ void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
                                          NLKind LookupKind) const {
   FilteringVisibleDeclConsumer filterConsumer(Consumer, this);
   owner.lookupVisibleDecls(filterConsumer);
+}
+
+namespace {
+class VectorDeclPtrConsumer : public swift::VisibleDeclConsumer {
+public:
+  SmallVectorImpl<Decl *> &Results;
+  explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
+    : Results(Decls) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    Results.push_back(VD);
+  }
+};
+} // unnamed namespace
+
+void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
+  VectorDeclPtrConsumer Consumer(results);
+  FilteringDeclaredDeclConsumer FilterConsumer(Consumer, this);
+  owner.lookupVisibleDecls(FilterConsumer);
 }
 
 void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
@@ -841,25 +881,6 @@ void ClangModuleUnit::collectLinkLibraries(
     
     callback(LinkLibrary(clangLinkLib.Library, kind));
   }
-}
-
-namespace {
-class VectorDeclPtrConsumer : public swift::VisibleDeclConsumer {
-public:
-  SmallVectorImpl<Decl *> &Results;
-  explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
-    : Results(Decls) {}
-
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    Results.push_back(VD);
-  }
-};
-} // unnamed namespace
-
-void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
-  VectorDeclPtrConsumer Consumer(results);
-  lookupVisibleDecls(Module::AccessPathTy(), Consumer,
-                     NLKind::QualifiedLookup);
 }
 
 StringRef ClangModuleUnit::getFilename() const {
