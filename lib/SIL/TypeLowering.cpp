@@ -73,13 +73,12 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
     if (var->isComputed())
       return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
 
-#if 0  // FIXME.
-    // Self is always capture by value, never by address.  Even in the case when
-    // self can be reassigned within a init by a super.init() call, it cannot be
-    // live in a closure.
-    if (var->isImplicit() && var->getName().str() == "self")
-      return CaptureKind::LocalFunction;
-#endif
+    // self for classes is always capture by value, never by address.  Even in
+    // the case when self can be reassigned within a init by a super.init()
+    // call, it cannot be live in a closure.
+    if (var->isImplicit() && var->getName().str() == "self" &&
+        var->getType()->hasReferenceSemantics())
+      return CaptureKind::Constant;
 
     return CaptureKind::Box;
   }
@@ -1241,7 +1240,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
-    case CaptureKind::Box:
+    case CaptureKind::Box: {
       // Capture the owning ObjectPointer and the address of the value.
       assert(capture->isReferencedAsLValue() &&
              "lvalue capture not an lvalue?!");
@@ -1250,6 +1249,11 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                        LValueType::Qual::DefaultForType,
                                        Context);
       inputFields.push_back(TupleTypeElt(lvType));
+      break;
+    }
+    case CaptureKind::Constant:
+      // Capture the value directly.
+      inputFields.push_back(TupleTypeElt(captureType));
       break;
     }
   }

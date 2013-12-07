@@ -546,8 +546,14 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
+  Expr *SubExpr = E->getSubExpr();
+
+  // Look through parens.
+  while (auto *PE = dyn_cast<ParenExpr>(SubExpr))
+    SubExpr = PE->getSubExpr();
+
   // If this is a load of a local constant decl, just produce the value.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
       auto It = SGF.VarLocs.find(VD);
       if (It != SGF.VarLocs.end() && It->second.isConstant())
@@ -557,7 +563,7 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   }
 
   // If this is a use of super that is a constant, just produce the value.
-  if (auto *SRE = dyn_cast<SuperRefExpr>(E->getSubExpr())) {
+  if (auto *SRE = dyn_cast<SuperRefExpr>(SubExpr)) {
     if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
       auto It = SGF.VarLocs.find(VD);
       if (It != SGF.VarLocs.end() && It->second.isConstant())
@@ -567,7 +573,7 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   }
 
 
-  LValue lv = SGF.emitLValue(E->getSubExpr());
+  LValue lv = SGF.emitLValue(SubExpr);
   auto result = SGF.emitLoadOfLValue(E, lv, C);
   return (result ? RValue(SGF, E, result) : RValue());
 }
@@ -1605,9 +1611,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
       // address of the value.
-      assert(VarLocs.count(capture) &&
-             "no location for captured var!");
-      
+      assert(VarLocs.count(capture) && "no location for captured var!");
       const VarLoc &vl = VarLocs[capture];
       assert(vl.box && "no box for captured var!");
       assert(vl.isAddress() && vl.getAddress() &&
@@ -1615,6 +1619,23 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       B.createStrongRetain(loc, vl.box);
       capturedArgs.push_back(vl.box);
       capturedArgs.push_back(vl.getAddress());
+      break;
+    }
+    case CaptureKind::Constant: {
+      // LValues captured by value.
+      auto &Entry = VarLocs[cast<VarDecl>(capture)];
+      ManagedValue v;
+      if (Entry.isConstant()) {
+        SILValue Val = B.createCopyValue(loc, Entry.getConstant());
+        v = ManagedValue(Val, ManagedValue::Unmanaged);
+      } else {
+        SILValue addr = Entry.getAddress();
+        B.createStrongRetain(loc, Entry.box);
+        auto &TL = getTypeLowering(capture->getType());
+        v = emitLoad(loc, addr, TL, SGFContext(), IsNotTake);
+      }
+
+      capturedArgs.push_back(v.forward(*this));
       break;
     }
     case CaptureKind::LocalFunction: {
@@ -2418,12 +2439,13 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     addSILArgument(ty);
     break;
   }
-  case CaptureKind::LocalFunction: {
-    // Forward the captured value.
-    SILType ty = gen.getLoweredType(capture->getType());
-    addSILArgument(ty);
+  case CaptureKind::Constant:
+    addSILArgument(gen.getLoweredType(capture->getType()));
     break;
-  }
+  case CaptureKind::LocalFunction:
+    // Forward the captured value.
+    addSILArgument(gen.getLoweredType(capture->getType()));
+    break;
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
     Type setTy;

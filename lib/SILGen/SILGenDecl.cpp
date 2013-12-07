@@ -661,6 +661,14 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
     break;
   }
+  case CaptureKind::Constant: {
+    // Constant decls are captured by value.
+    SILType ty = gen.getLoweredType(capture->getType());
+    SILValue val = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
+    gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
+    gen.Cleanups.pushCleanup<CleanupCaptureValue>(val);
+    break;
+  }
   case CaptureKind::LocalFunction: {
     // Local functions are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
