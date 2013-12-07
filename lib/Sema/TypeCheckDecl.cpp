@@ -2911,6 +2911,13 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
+  // Only classes can be IBLiveViews.
+  if (Attrs.isIBLiveView() && !isa<ClassDecl>(D)) {
+    TC.diagnose(Attrs.getLoc(AK_IBLiveView), diag::invalid_ibliveview_decl);
+    D->getMutableAttrs().clearAttribute(AK_IBLiveView);
+    return;
+  }
+
   if (Attrs.isInfix()) {
     // Only operator functions can be infix.
     if (!isOperator) {

@@ -1087,6 +1087,8 @@ ERROR(invalid_ibaction_decl,sema_tcd,none,
       "only methods can be declared 'IBAction'", ())
 ERROR(invalid_ibaction_result,sema_tcd,none,
       "methods declared 'IBAction' must return 'Void' (not %0)", (Type))
+ERROR(invalid_ibliveview_decl,sema_tcd,none,
+      "only classes can be declared 'IBLiveView'", ())
 ERROR(class_protocol_not_protocol,sema_tcd,none,
       "'class_protocol' attribute can only be applied to protocols", ())
       

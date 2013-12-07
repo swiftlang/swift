@@ -249,6 +249,7 @@ public:
   bool isObjC() const { return has(AK_objc); }
   bool isIBOutlet() const { return has(AK_IBOutlet); }
   bool isIBAction() const { return has(AK_IBAction); }
+  bool isIBLiveView() const { return has(AK_IBLiveView); }
   bool isClassProtocol() const { return has(AK_class_protocol); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }

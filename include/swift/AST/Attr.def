@@ -72,6 +72,7 @@ ATTR(weak)
 
 IB_ATTR(IBOutlet)
 IB_ATTR(IBAction)
+IB_ATTR(IBLiveView)
 
 #undef IB_ATTR
 #undef BOTH_ATTR
