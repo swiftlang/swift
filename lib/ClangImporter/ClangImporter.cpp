@@ -607,7 +607,7 @@ public:
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
   if (!Impl.CacheIsValid) {
     VectorDeclConsumer CacheConsumer(Impl.CachedVisibleDecls);
-    ImportingVisibleDeclConsumer ImportingConsumer(Impl, Consumer);
+    ImportingVisibleDeclConsumer ImportingConsumer(Impl, CacheConsumer);
 
     auto &sema = Impl.getClangSema();
     sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
