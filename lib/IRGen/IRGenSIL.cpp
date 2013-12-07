@@ -1033,29 +1033,53 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   // Generate the body.
-  for (auto &I : *BB) {
+  bool InCleanupBlock = false;
+  bool KeepCurrentLocation = false;
+
+  for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
+    auto &I = *InsnIter;
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
       auto ILoc = I.getLoc();
+      // Handle cleanup locations.
       if (ILoc.getKind() == SILLocation::CleanupKind) {
         // Cleanup locations point to the decl of the the value that
-        // is being destroyed (for diagnostic generation). For the
-        // linetable they should point to the cleanup location, which
+        // is being destroyed (for diagnostic generation). As far as
+        // the linetable is concerned, cleanups at the end of a
+        // lexical scope should point to the cleanup location, which
         // is the location of the last instruction in the basic block.
-        assert(BB->getTerminator());
-        ILoc = BB->getTerminator()->getLoc();
-      }
-      if (auto DS = I.getDebugScope())
-        IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-      else {
-        if (auto FnDS = CurSILFn->getDebugScope())
-          IGM.DebugInfo->setCurrentLoc(Builder, FnDS, ILoc);
-        else
-          // We don't expect a scope from transparent functions. They
-          // should be elided during IR generation anyway.
-          assert(CurSILFn->isTransparent() && "function without a debug scope");
+        if (!InCleanupBlock) {
+          InCleanupBlock = true;
+          // Scan ahead to see if this is the final cleanup block in
+          // this basic block.
+          auto It = InsnIter;
+          do ++It; while (It != BB->end() &&
+                          It->getLoc().getKind() == SILLocation::CleanupKind);
+          // We are still in the middle of a basic block?
+          if (It != BB->end() && !isa<TermInst>(It))
+            KeepCurrentLocation = true;
+        }
+
+        // Assign the cleanup location to this instruction.
+        if (!KeepCurrentLocation) {
+          assert(BB->getTerminator());
+          ILoc = BB->getTerminator()->getLoc();
+        }
+      } else if (InCleanupBlock) {
+        KeepCurrentLocation = false;
+        InCleanupBlock = false;
       }
 
+      auto DS = I.getDebugScope();
+      if (!DS) DS = CurSILFn->getDebugScope();
+      if (!DS)
+        // We don't expect a scope from transparent functions. They
+        // should be elided during IR generation anyway.
+        assert(CurSILFn->isTransparent() && "function without a debug scope");
+      else if (!KeepCurrentLocation)
+        IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+
+      // Function argument handling.
       if (InEntryBlock && !ArgsEmitted) {
         if (!I.getLoc().isInPrologue()) {
           if (I.getLoc().getSourceLoc().isValid()) {
