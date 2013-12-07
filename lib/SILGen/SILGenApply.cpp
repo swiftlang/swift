@@ -465,8 +465,9 @@ public:
 
       SILValue fn = gen.B.createArchetypeMethod(Loc,
                                     SILType::getPrimitiveObjectType(archetype),
-                                                constant,
-                                                closureType,
+                                            /*conformance*/ nullptr,
+                                            constant,
+                                            closureType,
                                             /*volatile*/ constant.isForeign);
       mv = ManagedValue(fn, ManagedValue::Unmanaged);
       break;

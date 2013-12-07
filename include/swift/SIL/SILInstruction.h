@@ -1527,18 +1527,23 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// ArchetypeMethodInst - Given an archetype type and a protocol method
-/// constant, extracts the implementation of that method for the archetype.
+/// ArchetypeMethodInst - Given a type, a protocol conformance,
+/// and a protocol method constant, extracts the implementation of that method
+/// for the type.
 class ArchetypeMethodInst : public MethodInst {
   SILType LookupType;
+  ProtocolConformance *Conformance;
 public:
-  ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILDeclRef Member,
+  ArchetypeMethodInst(SILLocation Loc, SILType LookupType,
+                      ProtocolConformance *Conformance,
+                      SILDeclRef Member,
                       SILType Ty, bool Volatile = false)
     : MethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member, Volatile),
-      LookupType(LookupType)
+      LookupType(LookupType), Conformance(Conformance)
   {}
   
-  SILType getLookupArchetype() const { return LookupType; }
+  SILType getLookupType() const { return LookupType; }
+  ProtocolConformance *getConformance() const { return Conformance; }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

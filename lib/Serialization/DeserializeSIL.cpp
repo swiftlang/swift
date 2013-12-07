@@ -1130,6 +1130,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
     // and an operand.
+    // ArchetypeMethodInst is additionally optionally followed by a
+    // ProtocolConformance record.
     assert(ListOfValues.size() >= 7 &&
            "Expect at least 7 numbers for MethodInst");
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, 1);
@@ -1137,12 +1139,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType operandTy = getSILType(MF->getType(ListOfValues[5]),
                                    (SILValueCategory)ListOfValues[6]);
     bool IsVolatile = ListOfValues[0] > 0;
+    
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ArchetypeMethodInst:
-      ResultVal = Builder.createArchetypeMethod(Loc, Ty, DRef, 
-                    operandTy, IsVolatile);
+    case ValueKind::ArchetypeMethodInst: {
+      auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
+                                                      SILCursor);
+      ProtocolConformance *conformance
+        = conformancePair ? conformancePair->second : nullptr;
+
+      ResultVal = Builder.createArchetypeMethod(Loc, Ty,
+                                                conformance, DRef,
+                                                operandTy, IsVolatile);
       break;
+    }
     case ValueKind::ProtocolMethodInst:
       ResultVal = Builder.createProtocolMethod(Loc,
                     getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),

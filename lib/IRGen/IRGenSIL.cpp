@@ -2696,11 +2696,12 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
     return;
   }
 
-  SILType baseTy = i->getLookupArchetype();
+  SILType baseTy = i->getLookupType();
+  ProtocolConformance *conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
   Explosion lowered(ExplosionKind::Maximal);
-  emitArchetypeMethodValue(*this, baseTy, member, nullptr, lowered);
+  emitArchetypeMethodValue(*this, baseTy, member, conformance, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
 }

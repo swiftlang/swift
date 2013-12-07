@@ -58,6 +58,9 @@ protected:
   // called afterwards on the result.
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   SILType remapType(SILType Ty) { return Ty; }
+  ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
+    return C;
+  }
   SILValue remapValue(SILValue Value);
   SILFunction *remapFunction(SILFunction *Func) { return Func; }
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
@@ -68,6 +71,10 @@ protected:
   }
   SILType getOpType(SILType Ty) {
     return static_cast<ImplClass*>(this)->remapType(Ty);
+  }
+  ProtocolConformance *getOpConformance(SILType Ty,
+                                        ProtocolConformance *Conformance) {
+    return static_cast<ImplClass*>(this)->remapConformance(Ty, Conformance);
   }
   SILValue getOpValue(SILValue Value) {
     return static_cast<ImplClass*>(this)->remapValue(Value);
@@ -700,7 +707,9 @@ void
 SILCloner<ImplClass>::visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
   doPostProcess(Inst,
     Builder.createArchetypeMethod(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getLookupArchetype()),
+                                  getOpType(Inst->getLookupType()),
+                                  getOpConformance(Inst->getLookupType(),
+                                                   Inst->getConformance()),
                                   Inst->getMember(),
                                   getOpType(Inst->getType()),
                                   Inst->isVolatile()));

@@ -769,32 +769,30 @@ public:
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
                                         "result of archetype_method");
-    
+
+    auto *protocol
+      = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
+    require(protocol,
+            "archetype_method method must be a protocol method");
+
     if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
       require(methodType->isThin(),
               "result of archetype_method must be thin function");
-      auto *protocol
-        = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
-      require(protocol,
-              "archetype_method method must be a protocol method");
       
       require(methodType->getAbstractCC()
                 == F.getModule().Types.getProtocolWitnessCC(protocol),
               "result of archetype_method must have correct @cc for protocol");
     } else {
       require(methodType->isThin()
-                == AMI->getLookupArchetype().castTo<ArchetypeType>()
-                    ->requiresClass(),
+                == protocol->requiresClass(),
               "result method must be thin function type if class archetype, "
               "thick if not class");
     }
     
-    CanType operandType = AMI->getLookupArchetype().getSwiftRValueType();
+    CanType operandType = AMI->getLookupType().getSwiftRValueType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
           llvm::dbgs() << "\n");
-    require(isa<ArchetypeType>(operandType),
-            "operand type must be an archetype");
     
     SILType selfType = getMethodSelfType(methodType);
     if (auto selfMT = selfType.getAs<MetaTypeType>()) {
@@ -805,9 +803,22 @@ public:
     } else {
       require(selfType.getSwiftRValueType() == operandType,
               "archetype_method must apply to an archetype or archetype metatype");
-      require(selfType.isObject() ==
-                selfType.castTo<ArchetypeType>()->requiresClass(),
+      require(selfType.isObject() == protocol->requiresClass(),
               "archetype_method should take class archetypes by value");
+    }
+    
+    bool isArchetype = AMI->getLookupType().is<ArchetypeType>();
+    if (isArchetype) {
+      require(AMI->getConformance() == nullptr,
+              "archetypes should not have conformance");
+    } else {
+      require(AMI->getConformance(),
+              "archetype_method for concrete type must have conformance");
+      require(AMI->getConformance()->getProtocol() == protocol,
+              "archetype_method conformance is not for method's protocol");
+      require(AMI->getConformance()->getType()
+                ->isEqual(AMI->getLookupType().getSwiftRValueType()),
+              "archetype_method conformance is not for type");
     }
   }
   

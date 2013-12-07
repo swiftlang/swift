@@ -968,7 +968,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.
     const ArchetypeMethodInst *AMI = cast<ArchetypeMethodInst>(&SI);
-    SILType Ty = AMI->getLookupArchetype();
+    SILType Ty = AMI->getLookupType();
     SILType Ty2 = AMI->getType(0);
 
     SmallVector<ValueID, 7> ListOfValues;
@@ -981,6 +981,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
         S.addTypeRef(Ty.getSwiftRValueType()),
         (unsigned)Ty.getCategory(), ListOfValues);
+    
+    if (AMI->getConformance())
+      S.writeConformance(
+               cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext()),
+               AMI->getConformance(),
+               nullptr,
+               SILAbbrCodes);
+    
     break;
   }
   case ValueKind::ProtocolMethodInst: {

@@ -198,12 +198,6 @@ private:
                                    DeclID &typeID,
                                    IdentifierID &moduleID);
 
-  /// Writes a protocol conformance.
-  void writeConformance(const ProtocolDecl *protocol,
-                        const ProtocolConformance *conformance,
-                        const Decl *associatedDecl,
-                        const std::array<unsigned, 256> &abbrCodes);
-
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                          ArrayRef<ProtocolConformance *> conformances,
@@ -304,6 +298,12 @@ public:
   /// usage out of decl block.
   void writeSubstitutions(ArrayRef<Substitution> substitutions,
                           const std::array<unsigned, 256> &abbrCodes);
+  
+  /// Writes a protocol conformance.
+  void writeConformance(const ProtocolDecl *protocol,
+                        const ProtocolConformance *conformance,
+                        const Decl *associatedDecl,
+                        const std::array<unsigned, 256> &abbrCodes);
 };
 } // end namespace serialization
 } // end namespace swift

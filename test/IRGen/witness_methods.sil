@@ -1,0 +1,27 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+
+import Builtin
+
+protocol P {
+  func foo()
+}
+
+struct S : P {
+  func foo()
+}
+
+// CHECK: [[S_P_WITNESS:@.*]] = internal constant [1 x i8*] [i8* bitcast (void (%V15witness_methods1S*)* @_TV15witness_methods1S3foofRS0_FT_T_ to i8*)]
+
+// CHECK: define void @concrete_type_witness(%V15witness_methods1S* noalias) {
+// CHECK: entry:
+// CHECK:   %1 = load i8** getelementptr inbounds ([1 x i8*]* [[S_P_WITNESS]], i64 0, i64 0), align 8
+// CHECK:   %2 = bitcast i8* %1 to void (%V15witness_methods1S*, %swift.type*)*
+// CHECK:   call void %2(%V15witness_methods1S* %0, %swift.type* getelementptr inbounds (%swift.full_type* bitcast ({ i8**, i64, { i64, i8*, i64, i64, i8*, i64, i64 }*, %swift.type* }* @_TMdV15witness_methods1S to %swift.full_type*), i32 0, i32 1))
+// CHECK:   ret void
+// CHECK: }
+sil @concrete_type_witness : $@thin (@in S) -> () {
+entry(%s : $*S):
+  %m = archetype_method $S, #P.foo : $@cc(method) (@in S) -> ()
+  %t = apply %m(%s) : $@cc(method) (@in S) -> ()
+  return %t : $()
+}

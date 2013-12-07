@@ -214,16 +214,6 @@ private:
                             serialization::IdentifierID moduleID,
                             llvm::BitstreamCursor &Cursor);
 
-  /// Recursively reads a protocol conformance from \c DeclTypeCursor.
-  ///
-  /// The conformance will be newly-created; it's likely that it already exists
-  /// in the AST, and will need to be canonicalized.
-  ///
-  /// If the record at the cursor is not a protocol conformance, returns
-  /// Nothing. Note that a null pointer is a valid conformance value.
-  Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
-  maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
-
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
@@ -388,6 +378,16 @@ public:
   ///
   /// If the record at the cursor is not a substitution, returns Nothing.
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
+  
+  /// Recursively reads a protocol conformance from \c DeclTypeCursor.
+  ///
+  /// The conformance will be newly-created; it's likely that it already exists
+  /// in the AST, and will need to be canonicalized.
+  ///
+  /// If the record at the cursor is not a protocol conformance, returns
+  /// Nothing. Note that a null pointer is a valid conformance value.
+  Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
+  maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 };
 
 /// A file-unit loaded from a serialized AST file.

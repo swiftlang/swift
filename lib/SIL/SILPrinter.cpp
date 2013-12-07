@@ -877,7 +877,7 @@ public:
     OS << "archetype_method ";
     if (AMI->isVolatile())
       OS << "[volatile] ";
-    AMI->getLookupArchetype().print(OS);
+    AMI->getLookupType().print(OS);
     OS << ", ";
     AMI->getMember().print(OS);
     OS << " : " << AMI->getType(0);

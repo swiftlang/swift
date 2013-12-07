@@ -1797,7 +1797,26 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(MethodTy, TyLoc)
        )
       return true;
-    ResultVal = B.createArchetypeMethod(InstLoc, LookupTy, Member,
+
+    // If LookupTy is a non-archetype, look up its conformance.
+    ProtocolDecl *proto
+      = dyn_cast<ProtocolDecl>(Member.getDecl()->getDeclContext());
+    if (!proto) {
+      P.diagnose(TyLoc, diag::sil_archetype_method_not_protocol);
+      return true;
+    }
+    ProtocolConformance *Conformance = nullptr;
+    if (!LookupTy.is<ArchetypeType>()) {
+      auto lookup = P.SF.getParentModule()->lookupConformance(
+                                LookupTy.getSwiftRValueType(), proto, nullptr);
+      if (lookup.getInt() != ConformanceKind::Conforms) {
+        P.diagnose(TyLoc, diag::sil_archetype_method_type_does_not_conform);
+        return true;
+      }
+      Conformance = lookup.getPointer();
+    }
+    
+    ResultVal = B.createArchetypeMethod(InstLoc, LookupTy, Conformance, Member,
                                         MethodTy, IsVolatile);
     break;
   }
