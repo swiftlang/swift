@@ -1216,6 +1216,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
         
     case CaptureKind::Constant:
       // Constants are captured by value.
+      assert(!capture->isReferencedAsLValue() &&
+             "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::GetterSetter: {
