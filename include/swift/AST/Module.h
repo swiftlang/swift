@@ -420,6 +420,15 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+  /// Adds all top-level decls to the given vector.
+  ///
+  /// This includes all decls that should be displayed to clients of the module.
+  /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
+  /// shadowed clang module.
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+    getTopLevelDecls(results);
+  }
+
   /// Looks up which modules are imported by this file.
   ///
   /// Unless \p includePrivate is true, only modules that are publicly

@@ -843,23 +843,23 @@ void ClangModuleUnit::collectLinkLibraries(
   }
 }
 
-void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
-  clang::ASTContext &clangCtx = owner.Impl.getClangASTContext();
-  const clang::TranslationUnitDecl *clangTU = clangCtx.getTranslationUnitDecl();
-  
-  // FIXME: Do we want a noload variant here?
-  for (auto D : make_range(clangTU->decls_begin(),
-                           clangTU->decls_end())) {
-    auto named = dyn_cast<clang::NamedDecl>(D);
-    if (!named)
-       continue;
-    // FIXME: We shouldn't have to jump up to the top-level module here.
-    clang::Module *owningModule = getBestOwningModule(D);
-    if (!owningModule || owningModule->getTopLevelModule() != clangModule)
-      continue;
-    if (auto imported = owner.Impl.importDecl(named))
-      results.push_back(imported);
+namespace {
+class VectorDeclPtrConsumer : public swift::VisibleDeclConsumer {
+public:
+  SmallVectorImpl<Decl *> &Results;
+  explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
+    : Results(Decls) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    Results.push_back(VD);
   }
+};
+} // unnamed namespace
+
+void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
+  VectorDeclPtrConsumer Consumer(results);
+  lookupVisibleDecls(Module::AccessPathTy(), Consumer,
+                     NLKind::QualifiedLookup);
 }
 
 StringRef ClangModuleUnit::getFilename() const {

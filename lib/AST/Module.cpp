@@ -353,6 +353,11 @@ void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
 }
 
+void Module::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
+  // FIXME: Should this do extra access control filtering?
+  FORWARD(getDisplayDecls, (Results));
+}
+
 ArrayRef<Substitution> BoundGenericType::getSubstitutions(
                                            Module *module,
                                            LazyResolver *resolver) {
@@ -799,12 +804,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // Record and return the simple conformance.
   ctx.ConformsTo[key] = ConformanceEntry(nominalConformance, true);
   return { nominalConformance, ConformanceKind::Conforms };
-}
-
-void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  // FIXME: Include decls from a shadowed module.
-  // FIXME: Should this do extra access control filtering?
-  getTopLevelDecls(results);
 }
 
 namespace {

@@ -286,6 +286,10 @@ void SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const{
   File.getTopLevelDecls(results);
 }
 
+void SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  File.getDisplayDecls(results);
+}
+
 StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }

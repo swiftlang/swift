@@ -1610,28 +1610,33 @@ void swift::printModuleInterface(Module *M, raw_ostream &OS,
   // Don't print empty curly braces while printing the module interface.
   AdjustedOptions.FunctionDefinitions = false;
 
-  SmallVector<ValueDecl *, 32> Decls;
-  VectorDeclConsumer Consumer(Decls);
-
-  M->lookupVisibleDecls(Module::AccessPathTy(), Consumer,
-                        NLKind::UnqualifiedLookup);
+  SmallVector<Decl *, 1> Decls;
+  M->getDisplayDecls(Decls);
 
   // Sort the declarations so that we print them in a consistent order.
   std::sort(Decls.begin(), Decls.end(),
-            [](ValueDecl *LHS, ValueDecl *RHS) {
-    StringRef LHSName = LHS->getName().str();
-    StringRef RHSName = RHS->getName().str();
-    if (LHSName.compare(RHSName) < 0)
-      return true;
+            [](Decl *LHS, Decl *RHS) {
+    auto *LHSValue = dyn_cast<ValueDecl>(LHS);
+    auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+    if (!LHSValue || !RHSValue) {
+      return LHS->getKind() < RHS->getKind();
+    }
+    StringRef LHSName = LHSValue->getName().str();
+    StringRef RHSName = RHSValue->getName().str();
+    if (int Ret = LHSName.compare(RHSName))
+      return Ret < 0;
     // FIXME: this is not sufficient to establish a total order for overloaded
     // decls.
-    return RHS->getKind() < RHS->getKind();
+    return LHS->getKind() < RHS->getKind();
   });
 
-  for (auto *VD : Decls) {
-    VD->print(OS, AdjustedOptions);
+  for (auto *D : Decls) {
+    if (isa<ExtensionDecl>(D))
+      continue;
+
+    D->print(OS, AdjustedOptions);
     OS << '\n';
-    if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       for (auto Ext : NTD->getExtensions()) {
         Ext->print(OS, AdjustedOptions);
         OS << '\n';
