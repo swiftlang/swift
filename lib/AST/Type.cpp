@@ -860,6 +860,29 @@ unsigned GenericTypeParamType::getIndex() const {
   return fixedNum & 0xFFFF;
 }
 
+Identifier GenericTypeParamType::getName() const {
+  // Use the declaration name if we still have that sugar.
+  if (auto decl = getDecl())
+    return decl->getName();
+  
+  // Otherwise, we're canonical. Produce an anonymous '$T_n_n' name.
+  assert(isCanonical());
+  // getASTContext() doesn't actually mutate an already-canonical type.
+  auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
+  auto &names = C.CanonicalGenericTypeParamTypeNames;
+  unsigned depthIndex = ParamOrDepthIndex.get<Fixnum<31>>();
+  auto cached = names.find(depthIndex);
+  if (cached != names.end())
+    return cached->second;
+  
+  llvm::SmallString<10> nameBuf;
+  llvm::raw_svector_ostream os(nameBuf);
+  os << "$T_" << getDepth() << '_' << getIndex();
+  Identifier name = C.getIdentifier(os.str());
+  names.insert({depthIndex, name});
+  return name;
+}
+
 TypeBase *AssociatedTypeType::getDesugaredType() {
   return getDecl()->getArchetype()->getDesugaredType();
 }

@@ -202,6 +202,10 @@ public:
   llvm::DenseMap<ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
      ConformingDeclMap;
 
+  /// Cache for names of canonical GenericTypeParamTypes.
+  mutable llvm::DenseMap<unsigned, Identifier>
+    CanonicalGenericTypeParamTypeNames;
+  
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.

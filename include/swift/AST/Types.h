@@ -2525,6 +2525,9 @@ public:
     return ParamOrDepthIndex.dyn_cast<GenericTypeParamDecl *>();
   }
 
+  /// Get the name of the generic type parameter.
+  Identifier getName() const;
+  
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
   ///
@@ -3492,6 +3495,10 @@ inline Type TupleTypeElt::getVarargBaseTy() const {
 inline Identifier SubstitutableType::getName() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->getName();
+  if (auto GenericParam = dyn_cast<GenericTypeParamType>(this))
+    return GenericParam->getName();
+  if (auto DepMem = dyn_cast<DependentMemberType>(this))
+    return DepMem->getName();
 
   llvm_unreachable("Not a substitutable type");
 }
