@@ -2292,9 +2292,21 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
   
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ProtocolLoc, diag::disallowed_type);
+
+    // Proactively give the decl an ErrorType so we don't try to check it.
+    // The depth of the implicit 'Self' generic parameters is fixed at zero and
+    // won't properly nest with enclosing generic parameters
+    Proto->setType(ErrorType::get(Context));
+
     Status.setIsParseError();
   } else if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ProtocolLoc, diag::decl_inner_scope);
+    
+    // Proactively give the decl an ErrorType so we don't try to check it.
+    // The depth of the implicit 'Self' generic parameters is fixed at zero and
+    // won't properly nest with enclosing generic parameters
+    Proto->setType(ErrorType::get(Context));
+    
     Status.setIsParseError();
   }
 

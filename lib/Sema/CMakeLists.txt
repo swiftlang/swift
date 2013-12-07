@@ -1,5 +1,4 @@
 add_swift_library(swiftSema
-  ArchetypeBuilder.cpp
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp
