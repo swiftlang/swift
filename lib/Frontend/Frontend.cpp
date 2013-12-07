@@ -182,11 +182,24 @@ void CompilerInstance::performParse() {
     MainModule->addFile(*SingleInputFile);
   }
 
+  bool hadLoadError = false;
+
   // Parse all the library files first.
   for (size_t i = 0, e = BufferIDs.size(); i < e; ++i) {
     if (i == MainBufferIndex)
       continue;
     auto BufferID = BufferIDs[i];
+
+    auto Buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(BufferID);
+    if (SerializedModuleLoader::isValidSerializedAST(*Buffer)) {
+      std::unique_ptr<llvm::MemoryBuffer> Input(
+        llvm::MemoryBuffer::getMemBuffer(Buffer->getBuffer(),
+                                         Buffer->getBufferIdentifier(),
+                                         false));
+      if (!SML->loadAST(*MainModule, SourceLoc(), std::move(Input)))
+        hadLoadError = true;
+      continue;
+    }
 
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,
@@ -202,6 +215,9 @@ void CompilerInstance::performParse() {
 
     performNameBinding(*NextInput);
   }
+
+  if (hadLoadError)
+    return;
 
   // Parse the main file last.
   if (MainBufferIndex != NO_SUCH_BUFFER) {

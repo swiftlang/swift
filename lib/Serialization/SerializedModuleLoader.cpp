@@ -37,12 +37,13 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 // the source loader search path should be the same as the module loader search
 // path.
 static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
-           llvm::OwningPtr<llvm::MemoryBuffer> &buffer){
+                                   std::unique_ptr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
   llvm::SmallString<128> inputFilename;
+  llvm::OwningPtr<llvm::MemoryBuffer> bufferRef;
 
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
@@ -57,28 +58,105 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
       inputFilename = currentDirectory;
       llvm::sys::path::append(inputFilename, moduleFilename.str());
       llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                                         buffer);
-      if (!err)
+                                                         bufferRef);
+      if (!err) {
+        buffer.reset(bufferRef.take());
         return err;
+      }
     }
   }
 
   // Second, search in the current directory.
   llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename.str(),
-                                                     buffer);
-  if (!err)
+                                                     bufferRef);
+  if (!err) {
+    buffer.reset(bufferRef.take());
     return err;
+  }
 
   // If we fail, search each import search path.
   for (auto Path : ctx.ImportSearchPaths) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
-    err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err)
+    err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
+    if (!err) {
+      buffer.reset(bufferRef.take());
       return err;
+    }
   }
 
   return err;
+}
+
+FileUnit *
+SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
+                                std::unique_ptr<llvm::MemoryBuffer> input) {
+  assert(input);
+
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  ModuleStatus err = ModuleFile::load(std::move(input), loadedModuleFile);
+  switch (err) {
+  case ModuleStatus::Valid:
+    Ctx.bumpGeneration();
+    break;
+  case ModuleStatus::FormatTooNew:
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new);
+    return nullptr;
+  case ModuleStatus::Malformed:
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
+    return nullptr;
+  case ModuleStatus::MissingDependency:
+    llvm_unreachable("dependencies haven't been loaded yet");
+  }
+
+  // Create the FileUnit wrapper.
+  auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+  M.addFile(*fileUnit);
+
+  if (loadedModuleFile->associateWithFileContext(fileUnit)) {
+    LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
+                                   Ctx.getCurrentGeneration());
+    return fileUnit;
+  }
+
+  // We failed to bring the module file into the AST.
+  M.removeFile(*fileUnit);
+  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
+
+  if (!diagLoc)
+    return nullptr;
+
+  // Figure out /which/ dependencies are missing.
+  SmallVector<ModuleFile::Dependency, 4> missing;
+  std::copy_if(loadedModuleFile->getDependencies().begin(),
+               loadedModuleFile->getDependencies().end(),
+               std::back_inserter(missing),
+               [](const ModuleFile::Dependency &dependency) {
+    return !dependency.isLoaded();
+  });
+
+  // FIXME: only show module part of RawAccessPath
+  assert(!missing.empty() && "unknown missing dependency?");
+  if (missing.size() == 1) {
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_single_dependency,
+                       missing.front().RawAccessPath);
+  } else {
+    llvm::SmallString<64> missingNames;
+    missingNames += '\'';
+    interleave(missing,
+               [&](const ModuleFile::Dependency &next) {
+                 missingNames += next.RawAccessPath;
+               },
+               [&] { missingNames += "', '"; });
+    missingNames += '\'';
+
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_dependencies,
+                       missingNames);
+  }
+
+  return nullptr;
 }
 
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
@@ -89,7 +167,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto moduleID = path[0];
 
-  llvm::OwningPtr<llvm::MemoryBuffer> inputFile;
+  std::unique_ptr<llvm::MemoryBuffer> inputFile;
   // First see if we find it in the registered memory buffers.
   if (!MemoryBuffers.empty()) {
     // FIXME: Right now this works only with access paths of length 1.
@@ -105,7 +183,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   // Otherwise look on disk.
-  if (!inputFile)
+  if (!inputFile) {
     if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
       if (err.value() != llvm::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
@@ -114,75 +192,14 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
       return nullptr;
     }
+  }
 
   assert(inputFile);
 
-  std::unique_ptr<ModuleFile> loadedModuleFile;
-  ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
-  switch (err) {
-  case ModuleStatus::Valid:
-    Ctx.bumpGeneration();
-    break;
-  case ModuleStatus::FormatTooNew:
-    Ctx.Diags.diagnose(moduleID.second, diag::serialization_module_too_new);
-    break;
-  case ModuleStatus::Malformed:
-    Ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
-    break;
-  case ModuleStatus::MissingDependency:
-    llvm_unreachable("dependencies haven't been loaded yet");
-  }
-
-  // Whether we succeed or fail, don't try to load this module again.
   auto M = new (Ctx) Module(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = M;
 
-  if (err != ModuleStatus::Valid)
-    return M;
-
-  auto fileUnit = new (Ctx) SerializedASTFile(*M, *loadedModuleFile);
-  M->addFile(*fileUnit);
-
-  if (loadedModuleFile->associateWithFileContext(fileUnit)) {
-    LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
-                                   Ctx.getCurrentGeneration());
-    return M;
-  }
-
-  // We failed to bring the module file into the AST.
-  M->removeFile(*fileUnit);
-  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
-
-  SmallVector<ModuleFile::Dependency, 4> missing;
-  std::copy_if(loadedModuleFile->getDependencies().begin(),
-               loadedModuleFile->getDependencies().end(),
-               std::back_inserter(missing),
-               [](const ModuleFile::Dependency &dependency) {
-    return !dependency.isLoaded();
-  });
-
-  // FIXME: only show module part of RawAccessPath
-  assert(!missing.empty() && "unknown missing dependency?");
-  if (missing.size() == 1) {
-    Ctx.Diags.diagnose(moduleID.second,
-                       diag::serialization_missing_single_dependency,
-                       missing.front().RawAccessPath);
-  } else {
-    llvm::SmallString<64> missingNames;
-    missingNames += '\'';
-    interleave(missing,
-               [&](const ModuleFile::Dependency &next) {
-                 missingNames += next.RawAccessPath;
-               },
-               [&] { missingNames += "', '"; });
-    missingNames += '\'';
-
-    Ctx.Diags.diagnose(moduleID.second,
-                       diag::serialization_missing_dependencies,
-                       missingNames);
-  }
-
-  // Don't try to load this module again.
+  (void)loadAST(*M, moduleID.second, std::move(inputFile));
   return M;
 }
 
@@ -203,6 +220,14 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
       continue;
     modulePair.first->loadDeclsConformingTo(kind);
   }
+}
+
+bool
+SerializedModuleLoader::isValidSerializedAST(const llvm::MemoryBuffer &input) {
+  using serialization::SIGNATURE;
+  StringRef signatureStr(reinterpret_cast<const char *>(SIGNATURE),
+                         llvm::array_lengthof(SIGNATURE));
+  return input.getBuffer().startswith(signatureStr);
 }
 
 //-----------------------------------------------------------------------------

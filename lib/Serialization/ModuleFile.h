@@ -54,7 +54,7 @@ class ModuleFile {
   Module *ShadowedModule = nullptr;
 
   /// The module file data.
-  llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
+  std::unique_ptr<llvm::MemoryBuffer> InputFile;
 
   /// The reader attached to InputFile.
   llvm::BitstreamReader InputReader;
@@ -175,7 +175,7 @@ private:
   ModuleStatus Status;
 
   /// Constructs an new module and validates it.
-  ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input);
+  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input);
 
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
@@ -251,7 +251,7 @@ public:
   /// \param[out] module The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
-  static ModuleStatus load(llvm::OwningPtr<llvm::MemoryBuffer> &&input,
+  static ModuleStatus load(std::unique_ptr<llvm::MemoryBuffer> input,
                            std::unique_ptr<ModuleFile> &module) {
     module.reset(new ModuleFile(std::move(input)));
     return module->getStatus();
@@ -388,51 +388,6 @@ public:
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
-};
-
-/// A file-unit loaded from a serialized AST file.
-class SerializedASTFile final : public LoadedFile {
-public:
-  ModuleFile &File;
-
-  SerializedASTFile(Module &M, ModuleFile &file)
-    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
-
-  virtual void lookupValue(Module::AccessPathTy accessPath,
-                           Identifier name, NLKind lookupKind,
-                           SmallVectorImpl<ValueDecl*> &results) const override;
-
-  virtual OperatorDecl *lookupOperator(Identifier name,
-                                       DeclKind fixity) const override;
-
-  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer,
-                                  NLKind lookupKind) const override;
-
-  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
-                                  VisibleDeclConsumer &consumer) const override;
-
-  virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
-                    SmallVectorImpl<ValueDecl*> &decls) const override;
-
-  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
-
-  virtual void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     bool includePrivate) const override;
-
-  virtual void
-  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
-
-  virtual StringRef getFilename() const override;
-
-  static bool classof(const FileUnit *file) {
-    return file->getKind() == FileUnitKind::SerializedAST;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
-  }
 };
 
 } // end namespace swift

@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
 #include "swift/Basic/Dwarf.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -62,6 +63,16 @@ public:
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
+  /// Returns true if the memory buffer contains a serialized AST.
+  static bool isValidSerializedAST(const llvm::MemoryBuffer &input);
+
+  /// Attempt to load a serialized AST into the given module.
+  ///
+  /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
+  /// printed. (Note that \p diagLoc is allowed to be invalid.)
+  FileUnit *loadAST(Module &M, Optional<SourceLoc> diagLoc,
+                    std::unique_ptr<llvm::MemoryBuffer> input);
+
   /// \brief Register a memory buffer that contains the serialized
   /// module for the given access path. This API is intended to be
   /// used by LLDB to add swiftmodules discovered in the __apple_ast
@@ -94,6 +105,56 @@ enum class ModuleStatus {
   /// The module file is malformed in some way.
   Malformed
 };
+
+
+/// A file-unit loaded from a serialized AST file.
+class SerializedASTFile final : public LoadedFile {
+  friend class SerializedModuleLoader;
+  friend class SerializedSILLoader;
+
+  ModuleFile &File;
+
+  SerializedASTFile(Module &M, ModuleFile &file)
+    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
+
+public:
+  virtual void lookupValue(Module::AccessPathTy accessPath,
+                           Identifier name, NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual OperatorDecl *lookupOperator(Identifier name,
+                                       DeclKind fixity) const override;
+
+  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) const override;
+
+  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) const override;
+
+  virtual void
+  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
+                    SmallVectorImpl<ValueDecl*> &decls) const override;
+
+  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
+                     bool includePrivate) const override;
+
+  virtual void
+  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+
+  virtual StringRef getFilename() const override;
+
+  static bool classof(const FileUnit *file) {
+    return file->getKind() == FileUnitKind::SerializedAST;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
+  }
+};
+
 
 } // end namespace swift
 

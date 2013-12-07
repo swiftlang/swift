@@ -268,7 +268,7 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
 }
 
 
-ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
+ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
   : FileContext(nullptr),
     InputFile(std::move(input)),
     InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
