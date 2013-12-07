@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
 
   if (CI.setup(Invocation))
     return 1;
-  CI.doIt();
+  CI.performParse();
   
   // If parsing produced an error, don't run any passes.
   if (CI.getASTContext().hadError())

@@ -331,7 +331,8 @@ public:
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
-  void doIt();
+  /// Parses and type-checks all input files.
+  void performParse();
 };
 
 } // namespace swift
