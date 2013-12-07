@@ -748,21 +748,6 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
     emitPattern(p);
 }
 
-namespace {
-  class CleanupDestructorSelf : public Cleanup {
-    VarDecl *selfDecl;
-  public:
-    CleanupDestructorSelf(VarDecl *selfDecl) : selfDecl(selfDecl) {
-    }
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      // 'self' is passed in at +0 (and will be deallocated when we return),
-      // so don't release the value, only deallocate the variable.
-      gen.deallocateUninitializedLocalVariable(l, selfDecl);
-    }
-  };
-} // end anonymous namespace
-
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                               DestructorDecl *DD) {
   // Emit the implicit 'self' argument.
