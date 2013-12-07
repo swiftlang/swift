@@ -733,19 +733,16 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                                     F.begin());
   }
   
-  auto emitPattern = [&](Pattern *p) {
+  // Emit the argument variables in calling convention order.
+  for (Pattern *p : reversed(paramPatterns)) {
     // Allocate the local mutable argument storage and set up an Initialization.
     InitializationPtr argInit
       = InitializationForPattern(*this, InitializationForPattern::Argument)
-        .visit(p);
+         .visit(p);
     // Add the SILArguments and use them to initialize the local argument
     // values.
     ArgumentInitVisitor(*this, F).visit(p, argInit.get());
-  };
-  
-  // Emit the argument variables in calling convention order.
-  for (Pattern *p : reversed(paramPatterns))
-    emitPattern(p);
+  }
 }
 
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
