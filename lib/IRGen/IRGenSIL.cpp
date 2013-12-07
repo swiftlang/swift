@@ -2588,11 +2588,32 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   Explosion indexValues = getLoweredExplosion(i->getIndex());
   llvm::Value *index = indexValues.claimNext();
   
-  // We don't expose a non-inbounds GEP operation.
-  llvm::Value *destValue = Builder.CreateInBoundsGEP(base.getAddress(),
-                                                     index);
+  // The stride of a Swift type may not match its LLVM size. If we know we have
+  // a fixed stride different from our size, or we have a dynamic size,
+  // do a byte-level GEP with the proper stride.
+  auto &ti = getTypeInfo(i->getBase().getType());
+  const FixedTypeInfo *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   
-  setLoweredAddress(SILValue(i, 0), Address(destValue, base.getAlignment()));
+  Address dest;
+  if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
+    llvm::Value *byteAddr = Builder.CreateBitCast(base.getAddress(),
+                                                  IGM.Int8PtrTy);
+    llvm::Value *size = ti.getStride(*this);
+    if (size->getType() != index->getType())
+      size = Builder.CreateZExtOrTrunc(size, index->getType());
+    llvm::Value *distance = Builder.CreateMul(index, size, "",
+                                              /*NUW*/ true);
+    llvm::Value *destValue = Builder.CreateInBoundsGEP(byteAddr, distance);
+    destValue = Builder.CreateBitCast(destValue, base.getType());
+    dest = Address(destValue, base.getAlignment());
+  } else {
+    // We don't expose a non-inbounds GEP operation.
+    llvm::Value *destValue = Builder.CreateInBoundsGEP(base.getAddress(),
+                                                       index);
+    dest = Address(destValue, base.getAlignment());
+  }
+  
+  setLoweredAddress(SILValue(i, 0), dest);
 }
 
 void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
