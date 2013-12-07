@@ -139,13 +139,44 @@ static void destroyRValue(SILGenFunction &SGF, CleanupLocation loc,
   }
 }
 
+/// getLoadPropagatedValue - If a LoadExpr of the specified subexpression will
+/// be folded into a constant, return that value.  Otherwise, it returns a null
+/// SILValue.
+static SILValue getLoadPropagatedValue(Expr *SubExpr, SILGenFunction &SGF) {
+  
+  // Look through parens.
+  while (auto *PE = dyn_cast<ParenExpr>(SubExpr))
+    SubExpr = PE->getSubExpr();
+  
+  // If this is a load of a local constant decl, just produce the value.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      auto It = SGF.VarLocs.find(VD);
+      if (It != SGF.VarLocs.end() && It->second.isConstant())
+        return It->second.getConstant();
+    }
+  }
+  
+  // If this is a use of super that is a constant, just produce the value.
+  if (auto *SRE = dyn_cast<SuperRefExpr>(SubExpr)) {
+    if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
+      auto It = SGF.VarLocs.find(VD);
+      if (It != SGF.VarLocs.end() && It->second.isConstant())
+        return It->second.getConstant();
+    }
+  }
+  
+  return SILValue();
+}
+
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
-  if (auto load = dyn_cast<LoadExpr>(E)) {
-    auto lv = emitLValue(load->getSubExpr());
-    emitCopyLValueInto(E, lv, I);
-    return;
-  }
+  if (auto load = dyn_cast<LoadExpr>(E))
+    if (!getLoadPropagatedValue(load->getSubExpr(), *this)) {
+      auto lv = emitLValue(load->getSubExpr());
+      emitCopyLValueInto(E, lv, I);
+      return;
+    }
   
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
@@ -546,34 +577,11 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
-  Expr *SubExpr = E->getSubExpr();
+  // If we can and must fold this, do so.
+  if (SILValue V = getLoadPropagatedValue(E->getSubExpr(), SGF))
+    return RValue(SGF, E, ManagedValue(V, ManagedValue::Unmanaged));
 
-  // Look through parens.
-  while (auto *PE = dyn_cast<ParenExpr>(SubExpr))
-    SubExpr = PE->getSubExpr();
-
-  // If this is a load of a local constant decl, just produce the value.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
-    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      auto It = SGF.VarLocs.find(VD);
-      if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return RValue(SGF, E, ManagedValue(It->second.getConstant(),
-                                           ManagedValue::Unmanaged));
-    }
-  }
-
-  // If this is a use of super that is a constant, just produce the value.
-  if (auto *SRE = dyn_cast<SuperRefExpr>(SubExpr)) {
-    if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
-      auto It = SGF.VarLocs.find(VD);
-      if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return RValue(SGF, E, ManagedValue(It->second.getConstant(),
-                                           ManagedValue::Unmanaged));
-    }
-  }
-
-
-  LValue lv = SGF.emitLValue(SubExpr);
+  LValue lv = SGF.emitLValue(E->getSubExpr());
   auto result = SGF.emitLoadOfLValue(E, lv, C);
   return (result ? RValue(SGF, E, result) : RValue());
 }
@@ -3025,18 +3033,19 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 
   // Handle lvalue-to-lvalue assignments with a high-level copy_addr instruction
   // if possible.
-  if (!isa<TupleExpr>(E->getDest())
-      && isa<LoadExpr>(E->getSrc())
-      && E->getDest()->getType()
-        ->isEqual(cast<LoadExpr>(E->getSrc())->getSubExpr()->getType())) {
-    SGF.emitAssignLValueToLValue(E,
+  if (auto *LE = dyn_cast<LoadExpr>(E->getSrc())) {
+    if (!isa<TupleExpr>(E->getDest())
+        && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType()) &&
+        !getLoadPropagatedValue(LE->getSubExpr(), SGF)) {
+      SGF.emitAssignLValueToLValue(E,
                    SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr()),
                    SGF.emitLValue(E->getDest()));
-  } else {
-    // Handle tuple destinations by destructuring them if present.
-    emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
+      return SGF.emitEmptyTupleRValue(E);
+    }
   }
-  
+
+  // Handle tuple destinations by destructuring them if present.
+  emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
   return SGF.emitEmptyTupleRValue(E);
 }
 

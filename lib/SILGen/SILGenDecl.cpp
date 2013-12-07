@@ -555,12 +555,7 @@ struct ArgumentInitVisitor :
     return visit(P->getSubPattern(), I);
   }
   SILValue visitTypedPattern(TypedPattern *P, Initialization *I) {
-    // FIXME: work around a bug in visiting the "self" argument of methods
-    if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
-      return makeArgumentInto(P->getType(), f.begin(),
-                              np->getDecl(), I);
-    else
-      return visit(P->getSubPattern(), I);
+    return visit(P->getSubPattern(), I);
   }
 
   SILValue visitTuplePattern(TuplePattern *P, Initialization *I) {
