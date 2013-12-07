@@ -30,6 +30,8 @@ namespace swift {
   class DeclContext;
   class GenericParamList;
   class LazyResolver;
+  class GenericTypeParamType;
+  class Requirement;
   class SourceFile;
   class Type;
   class Module;
@@ -143,6 +145,11 @@ public:
   /// type of the context as visible from within the context. Returns a null
   /// type for non-type contexts.
   Type getDeclaredTypeInContext();
+  
+  /// getDeclaredInterfaceType - For a type context, retrieves the interface
+  /// type of the context as seen from outside the context. Returns a null
+  /// type for non-type contexts.
+  Type getDeclaredInterfaceType();
 
   /// Determine the type of 'self' within the given context.
   ///
@@ -151,7 +158,7 @@ public:
   ///
   /// \param isConstructor Whether we're producing the 'self' type for a
   /// constructor.
-
+  ///
   /// \param outerGenericParams If non-null, receives the generic parameters
   /// corresponding to this declaration (if any).
   ///
@@ -159,11 +166,28 @@ public:
   Type getSelfTypeInContext(bool isStatic, bool isConstructor,
                             GenericParamList **outerGenericParams);
 
+  /// Determine the interface type of 'self' as seen outside of the given
+  /// context.
+  ///
+  /// \param isStatic Whether we're referring to a static method or some other
+  /// static entity, for which the 'self' type will be a metatype.
+  ///
+  /// \param isConstructor Whether we're producing the 'self' type for a
+  /// constructor.
+  ///
+  /// \returns the type of the 'self' parameter.
+  Type getInterfaceSelfType(bool isStatic, bool isConstructor);
+  
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not
   /// directly dependent on any generic parameters.
   GenericParamList *getGenericParamsOfContext() const;
 
+  /// \brief Retrieve the interface generic type parameters and requirements
+  /// exposed by this context.
+  std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
+  getGenericSignatureOfContext() const;
+  
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();

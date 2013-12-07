@@ -64,17 +64,33 @@ Type DeclContext::getDeclaredTypeInContext() {
   }
 }
 
-Type DeclContext::getSelfTypeInContext(bool isStatic,
-                                       bool isConstructor,
-                                       GenericParamList **outerGenericParams) {
+Type DeclContext::getDeclaredInterfaceType() {
+  switch (getContextKind()) {
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+    return Type();
+
+  case DeclContextKind::ExtensionDecl:
+    // FIXME: Need a getExtendedInterfaceType for extensions
+    assert(false && "not implemented for ExtensionDecls");
+    return Type();
+
+  case DeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getDeclaredInterfaceType();
+  }
+}
+
+static Type getSelfTypeForContainer(DeclContext *dc,
+                                    Type containerTy,
+                                    bool isStatic,
+                                    bool isConstructor,
+                                    GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
-
-  // Determine the type of the container.
-  Type containerTy = getDeclaredTypeInContext();
-  if (!containerTy)
-    return nullptr;
-
+  
   // For a protocol, the type of 'self' is the parameter type 'Self', not
   // the protocol itself.
   if (auto proto = containerTy->getAs<ProtocolType>()) {
@@ -85,11 +101,11 @@ Type DeclContext::getSelfTypeInContext(bool isStatic,
 
   // Capture the generic parameters, if requested.
   if (outerGenericParams)
-    *outerGenericParams = getGenericParamsOfContext();
+    *outerGenericParams = dc->getGenericParamsOfContext();
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return MetaTypeType::get(containerTy, getASTContext());
+    return MetaTypeType::get(containerTy, dc->getASTContext());
 
   // Reference types have 'self' of type T.
   //
@@ -100,50 +116,104 @@ Type DeclContext::getSelfTypeInContext(bool isStatic,
   // All other types have 'self' of @inout T.
   return LValueType::get(containerTy,
                          LValueType::Qual::DefaultForInOutSelf,
-                         getASTContext());
+                         dc->getASTContext());
+}
+
+Type DeclContext::getSelfTypeInContext(bool isStatic,
+                                       bool isConstructor,
+                                       GenericParamList **outerGenericParams) {
+  // Determine the type of the container.
+  Type containerTy = getDeclaredTypeInContext();
+  if (!containerTy)
+    return nullptr;
+
+  return getSelfTypeForContainer(this, containerTy, isStatic, isConstructor,
+                                 outerGenericParams);
+}
+
+Type DeclContext::getInterfaceSelfType(bool isStatic,
+                                       bool isConstructor) {
+  // Determine the type of the container.
+  Type containerTy = getDeclaredInterfaceType();
+  if (!containerTy)
+    return nullptr;
+  
+  return getSelfTypeForContainer(this, containerTy, isStatic, isConstructor,
+                                 nullptr);
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return nullptr;
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::TopLevelCodeDecl:
+    return nullptr;
 
-    case DeclContextKind::AbstractClosureExpr:
-      return nullptr;
+  case DeclContextKind::AbstractClosureExpr:
+    return nullptr;
 
-    case DeclContextKind::AbstractFunctionDecl: {
-      auto *AFD = cast<AbstractFunctionDecl>(this);
-      if (auto GP = AFD->getGenericParams())
-        return GP;
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto *AFD = cast<AbstractFunctionDecl>(this);
+    if (auto GP = AFD->getGenericParams())
+      return GP;
 
-      return AFD->getDeclContext()->getGenericParamsOfContext();
-    }
-
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(this);
-      if (auto gp = nominal->getGenericParams())
-        return gp;
-
-      return nominal->getDeclContext()->getGenericParamsOfContext();
-    }
-
-    case DeclContextKind::ExtensionDecl: {
-      auto extension = cast<ExtensionDecl>(this);
-      auto extendedType = extension->getExtendedType();
-      if (auto bound = extendedType->getAs<BoundGenericType>()) {
-        return bound->getDecl()->getGenericParams();
-      }
-      if (auto nominalTy = extendedType->getAs<NominalType>()) {
-        auto nominalDecl = nominalTy->getDecl();
-        return nominalDecl->getDeclContext()->getGenericParamsOfContext();
-      }
-      return nullptr;
-    }
+    return AFD->getDeclContext()->getGenericParamsOfContext();
   }
 
-  llvm_unreachable("Unhandled declaration context kind");
+  case DeclContextKind::NominalTypeDecl: {
+    auto nominal = cast<NominalTypeDecl>(this);
+    if (auto gp = nominal->getGenericParams())
+      return gp;
+
+    return nominal->getDeclContext()->getGenericParamsOfContext();
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    auto extension = cast<ExtensionDecl>(this);
+    auto extendedType = extension->getExtendedType();
+    if (auto bound = extendedType->getAs<BoundGenericType>()) {
+      return bound->getDecl()->getGenericParams();
+    }
+    if (auto nominalTy = extendedType->getAs<NominalType>()) {
+      auto nominalDecl = nominalTy->getDecl();
+      return nominalDecl->getDeclContext()->getGenericParamsOfContext();
+    }
+    return nullptr;
+  }
+  }
+}
+
+std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
+DeclContext::getGenericSignatureOfContext()const {
+  switch (getContextKind()) {
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractClosureExpr:
+    return {{}, {}};
+
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto *AFD = cast<AbstractFunctionDecl>(this);
+    if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>()) {
+      return {GFT->getGenericParams(), GFT->getRequirements()};
+    }
+    return {{}, {}};
+  }
+
+  case DeclContextKind::NominalTypeDecl: {
+    auto nominal = cast<NominalTypeDecl>(this);
+    return {nominal->getGenericParamTypes(), nominal->getGenericRequirements()};
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    auto extension = cast<ExtensionDecl>(this);
+    auto extendedType = extension->getExtendedType();
+    // FIXME: What if the extended type is bound, or the extension has
+    // constraints?
+    auto nomDecl = extendedType->getNominalOrBoundGenericNominal();
+    return {nomDecl->getGenericParamTypes(), nomDecl->getGenericRequirements()};
+  }
+  }
 }
 
 DeclContext *DeclContext::getLocalContext() {

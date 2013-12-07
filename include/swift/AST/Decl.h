@@ -1728,6 +1728,8 @@ public:
   /// conform, such as DynamicLookup (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  using TypeDecl::getDeclaredInterfaceType;
+  
 private:
   /// Predicate used to filter StoredPropertyRange.
   static bool isStoredProperty(VarDecl *vd); // at end of file
