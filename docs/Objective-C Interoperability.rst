@@ -331,7 +331,7 @@ Methods marked as "overrideable API" have only Swift entry points:
 Attributes for Objective-C Support
 ==================================
 
-``[objc]``
+``@objc``
   - When applied to classes, directs the compiler to emit Objective-C metadata
     for this class. Additionally, if no superclass is specified, the superclass
     is implicitly ``NSObject`` rather than the default ``swift.Object``.
@@ -346,28 +346,28 @@ Attributes for Objective-C Support
 
   This attribute is inherited (in all contexts).
 
-``[iboutlet]``
+``@IBOutlet``
   Can only be applied to properties. This marks the property as being exposed
   as an outlet in Interface Builder. **In most cases,**
   `outlets should be weak properties`__.
 
-  *The simplest implementation of this is to have* ``[iboutlet]`` *cause an*
+  *The simplest implementation of this is to have* ``@IBOutlet`` *cause an*
   *Objective-C getter and setter to be emitted, but this is* not *part of*
-  ``[iboutlet]``'s *contract.*
+  ``@IBOutlet``'s *contract.*
 
   This attribute is inherited.
 
-``[ibaction]``
+``@IBAction``
   Can only be applied to methods, which must have a signature matching the
   requirements for target/action methods on the current platform.
   This marks the method as being a potential action in Interface Builder.
 
-  *The simplest implementation of this is to have* ``[ibaction]`` *imply*
-  ``[objc]``, *and this may be the* only *viable implementation given how the*
+  *The simplest implementation of this is to have* ``@IBAction`` *imply*
+  ``@objc``, *and this may be the* only *viable implementation given how the*
   *responder chain works. For example, a window's delegate is part of the*
   *responder chain, even though it does not subclass* ``NSResponder`` *and may*
   *not be an Objective-C class at all. Still, this is* not *part of*
-  ``[ibaction]``'s *contract.*
+  ``@IBAction``'s *contract.*
 
   This attribute is inherited.
 

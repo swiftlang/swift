@@ -171,9 +171,9 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
   if (Attrs.isObjC())
     OS << "@objc ";
   if (Attrs.isIBOutlet())
-    OS << "@iboutlet ";
+    OS << "@IBOutlet ";
   if (Attrs.isIBAction())
-    OS << "@ibaction ";
+    OS << "@IBAction ";
   if (Attrs.isClassProtocol())
     OS << "@class_protocol ";
   if (Attrs.isExported())

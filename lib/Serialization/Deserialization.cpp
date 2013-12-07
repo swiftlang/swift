@@ -1086,7 +1086,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->setImplicit();
     var->setIsObjC(isObjC);
     if (isIBOutlet)
-      var->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
+      var->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     
@@ -1179,7 +1179,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     }
     fn->setIsObjC(isObjC);
     if (isIBAction)
-      fn->getMutableAttrs().setAttr(AK_ibaction, SourceLoc());
+      fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     if (isOptional)

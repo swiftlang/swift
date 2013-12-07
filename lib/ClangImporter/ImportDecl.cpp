@@ -1050,7 +1050,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
+        result->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
       // FIXME: Handle IBOutletCollection.
 
       return result;
@@ -1266,7 +1266,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
-        result->getMutableAttrs().setAttr(AK_ibaction, SourceLoc());
+        result->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
 
       // Check whether there's some special method to import.
       result->setClangNode(decl);
@@ -2467,7 +2467,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
+        result->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
       if (decl->getPropertyImplementation() == clang::ObjCPropertyDecl::Optional
           && isa<ProtocolDecl>(dc))
         result->getMutableAttrs().setAttr(AK_optional, SourceLoc());

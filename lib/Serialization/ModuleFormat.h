@@ -647,7 +647,7 @@ namespace decls_block {
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // iboutlet?
+    BCFixed<1>,   // IBOutlet?
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
     TypeIDField,  // type
@@ -666,7 +666,7 @@ namespace decls_block {
     BCFixed<1>,   // class method?
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // ibaction?
+    BCFixed<1>,   // IBAction?
     BCFixed<1>,   // transparent?
     BCFixed<1>,   // optional?
     BCVBR<5>,     // number of parameter patterns

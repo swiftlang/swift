@@ -247,8 +247,8 @@ public:
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
   bool isObjC() const { return has(AK_objc); }
-  bool isIBOutlet() const { return has(AK_iboutlet); }
-  bool isIBAction() const { return has(AK_ibaction); }
+  bool isIBOutlet() const { return has(AK_IBOutlet); }
+  bool isIBAction() const { return has(AK_IBAction); }
   bool isClassProtocol() const { return has(AK_class_protocol); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }

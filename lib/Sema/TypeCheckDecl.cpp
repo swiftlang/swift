@@ -2883,8 +2883,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // FIXME: This could do some type validation as well (all IBOutlets refer
     // to objects).
     if (!(isa<VarDecl>(D) && isInClassContext(D))) {
-      TC.diagnose(Attrs.getLoc(AK_iboutlet), diag::invalid_iboutlet);
-      D->getMutableAttrs().clearAttribute(AK_iboutlet);
+      TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
+      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
       return;
     }
   }
@@ -2894,8 +2894,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD || !isa<ClassDecl>(D->getDeclContext()) || FD->isStatic() ||
         FD->isGetterOrSetter()) {
-      TC.diagnose(Attrs.getLoc(AK_ibaction), diag::invalid_ibaction_decl);
-      D->getMutableAttrs().clearAttribute(AK_ibaction);
+      TC.diagnose(Attrs.getLoc(AK_IBAction), diag::invalid_ibaction_decl);
+      D->getMutableAttrs().clearAttribute(AK_IBAction);
       return;
     }
 
@@ -2906,7 +2906,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
     if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
       TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
-      D->getMutableAttrs().clearAttribute(AK_ibaction);
+      D->getMutableAttrs().clearAttribute(AK_IBAction);
       return;
     }
   }

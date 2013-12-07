@@ -1247,7 +1247,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_iboutlet, AK_objc, AK_optional, AK_unowned, AK_weak, AK_transparent
+      AK_IBOutlet, AK_objc, AK_optional, AK_unowned, AK_weak, AK_transparent
     >(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
@@ -1273,7 +1273,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_asmname, AK_assignment, AK_conversion, AK_ibaction, AK_infix,
+      AK_asmname, AK_assignment, AK_conversion, AK_IBAction, AK_infix,
       AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent
     >(fn);
 

@@ -26,6 +26,10 @@
 #define BOTH_ATTR(X) ATTR(X) TYPE_ATTR(X)
 #endif
 
+#ifndef IB_ATTR
+#define IB_ATTR(X) ATTR(X)
+#endif
+
 // Type attributes
 TYPE_ATTR(auto_closure)
 TYPE_ATTR(inout)
@@ -62,12 +66,14 @@ ATTR(prefix)
 ATTR(postfix)
 ATTR(objc)
 ATTR(optional)
-ATTR(iboutlet)
-ATTR(ibaction)
 ATTR(transparent)
 ATTR(unowned)
 ATTR(weak)
 
+IB_ATTR(IBOutlet)
+IB_ATTR(IBAction)
+
+#undef IB_ATTR
 #undef BOTH_ATTR
 #undef TYPE_ATTR
 #undef ATTR
