@@ -139,40 +139,38 @@ static void destroyRValue(SILGenFunction &SGF, CleanupLocation loc,
   }
 }
 
-/// getLoadPropagatedValue - If a LoadExpr of the specified subexpression will
-/// be folded into a constant, return that value.  Otherwise, it returns a null
-/// SILValue.
-static SILValue getLoadPropagatedValue(Expr *SubExpr, SILGenFunction &SGF) {
-  
-  // Look through parens.
+static VarDecl *isLoadPropagatedValue(Expr *SubExpr, SILGenFunction &SGF) {
+    // Look through parens.
   while (auto *PE = dyn_cast<ParenExpr>(SubExpr))
     SubExpr = PE->getSubExpr();
   
   // If this is a load of a local constant decl, just produce the value.
   if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      // FIXME: This should be a bit on vardecl, not presence in VarLocs.
       auto It = SGF.VarLocs.find(VD);
       if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return It->second.getConstant();
+        return VD;
     }
   }
   
   // If this is a use of super that is a constant, just produce the value.
   if (auto *SRE = dyn_cast<SuperRefExpr>(SubExpr)) {
     if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
+      // FIXME: This should be a bit on vardecl, not presence in VarLocs.
       auto It = SGF.VarLocs.find(VD);
       if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return It->second.getConstant();
+        return VD;
     }
   }
-  
-  return SILValue();
+  return nullptr;
 }
+
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E))
-    if (!getLoadPropagatedValue(load->getSubExpr(), *this)) {
+    if (!isLoadPropagatedValue(load->getSubExpr(), *this)) {
       auto lv = emitLValue(load->getSubExpr());
       emitCopyLValueInto(E, lv, I);
       return;
@@ -578,8 +576,16 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // If we can and must fold this, do so.
-  if (SILValue V = getLoadPropagatedValue(E->getSubExpr(), SGF))
-    return RValue(SGF, E, ManagedValue(V, ManagedValue::Unmanaged));
+  if (VarDecl *VD = isLoadPropagatedValue(E->getSubExpr(), SGF)) {
+    auto &Entry = SGF.VarLocs[VD];
+    assert(Entry.isConstant() && "Not a load propagated vardecl");
+    SILValue V = Entry.getConstant();
+
+    auto &TL = SGF.getTypeLowering(VD->getType());
+    // The value must be copied for the duration of the expression.
+    V = TL.emitLoweredCopyValue(SGF.B, E, V, false);
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(V, TL));
+  }
 
   LValue lv = SGF.emitLValue(E->getSubExpr());
   auto result = SGF.emitLoadOfLValue(E, lv, C);
@@ -3036,7 +3042,7 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   if (auto *LE = dyn_cast<LoadExpr>(E->getSrc())) {
     if (!isa<TupleExpr>(E->getDest())
         && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType()) &&
-        !getLoadPropagatedValue(LE->getSubExpr(), SGF)) {
+        !isLoadPropagatedValue(LE->getSubExpr(), SGF)) {
       SGF.emitAssignLValueToLValue(E,
                    SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr()),
                    SGF.emitLValue(E->getDest()));

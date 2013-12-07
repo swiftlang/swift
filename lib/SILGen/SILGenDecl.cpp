@@ -414,6 +414,14 @@ struct InitializationForPattern
     if (isa<LValueType>(varType))
       return InitializationPtr(new InOutInitialization(vd));
 
+    // If this is a 'self' argument for a class method (not struct method), emit
+    // it as a constant value.  Since it is a constant value, there is no memory
+    // location associated with it, and thus we don't need an initialization -
+    // the store will provide the value directly into the VarLocs map.
+    if (vd->isImplicit() && vd->getName().str() == "self" &&
+        vd->getType()->hasReferenceSemantics())
+      return InitializationPtr(new BlackHoleInitialization());
+    
     // Otherwise, we have a normal local-variable initialization.
     auto varInit = Gen.emitLocalVariableWithCleanup(vd);
 
@@ -483,6 +491,26 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
   Cleanups.pushCleanup<DeallocStack>(loc, temp);
   return Cleanups.getTopCleanup();
 }
+
+
+class CleanupCaptureBox : public Cleanup {
+  SILValue box;
+public:
+  CleanupCaptureBox(SILValue box) : box(box) {}
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.emitStrongRelease(l, box);
+  }
+};
+
+class CleanupCaptureValue : public Cleanup {
+  SILValue v;
+public:
+  CleanupCaptureValue(SILValue v) : v(v) {}
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.emitDestroyValueOperation(l, v);
+  }
+};
+
 
 namespace {
 
@@ -608,8 +636,25 @@ struct ArgumentInitVisitor :
   }
 
   SILValue visitNamedPattern(NamedPattern *P, Initialization *I) {
-    return makeArgumentInto(P->getType(), f.begin(),
-                            P->getDecl(), I);
+    VarDecl *vd = P->getDecl();
+    
+    // If this is a 'self' argument for a class method (not struct method), emit
+    // it as a constant value.  Since it is a constant value, there is no memory
+    // location associated with it, and thus we don't need an initialization -
+    // the store will provide the value directly into the VarLocs map.
+    if (vd->isImplicit() && vd->getName().str() == "self" &&
+        vd->getType()->hasReferenceSemantics()) {
+      SILLocation loc = vd;
+      loc.markAsPrologue();
+      SILValue arg = makeArgument(P->getType(), f.begin(), loc);
+      assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
+      gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(arg);
+      gen.Cleanups.pushCleanup<CleanupCaptureValue>(arg);
+      I->finishInitialization(gen);
+      return arg;
+    }
+    
+    return makeArgumentInto(P->getType(), f.begin(), vd, I);
   }
   
 #define PATTERN(Id, Parent)
@@ -621,25 +666,7 @@ struct ArgumentInitVisitor :
 
 };
 
-class CleanupCaptureBox : public Cleanup {
-  SILValue box;
-public:
-  CleanupCaptureBox(SILValue box) : box(box) {}
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitStrongRelease(l, box);
-  }
-};
-  
-class CleanupCaptureValue : public Cleanup {
-  SILValue v;
-public:
-  CleanupCaptureValue(SILValue v) : v(v) {}
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitDestroyValueOperation(l, v);
-  }
-};
-  
-static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
+static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::None:
