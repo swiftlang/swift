@@ -1371,6 +1371,39 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
       llvm::makeArrayRef(replacements).slice(0, getGenericParameters().size()));
 }
 
+FunctionType *
+GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
+  auto params = getGenericParams();
+  assert(args.size() == params.size());
+  
+  TypeSubstitutionMap subs;
+  for (size_t i = 0, e = args.size(); i != e; ++i) {
+    subs.insert(std::make_pair(params[i], args[i]));
+  }
+  
+  Type input = getInput().subst(M, subs, true, nullptr);
+  Type result = getResult().subst(M, subs, true, nullptr);
+  return FunctionType::get(input, result, getExtInfo(),
+                           M->getASTContext());
+}
+
+FunctionType *
+GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args)
+const {
+  auto params = getGenericParams();
+  assert(args.size() == params.size());
+  
+  TypeSubstitutionMap subs;
+  for (size_t i = 0, e = args.size(); i != e; ++i) {
+    subs.insert(std::make_pair(params[i], args[i].Replacement));
+  }
+
+  Type input = getInput().subst(M, subs, true, nullptr);
+  Type result = getResult().subst(M, subs, true, nullptr);
+  return FunctionType::get(input, result, getExtInfo(),
+                           M->getASTContext());
+}
+
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
   return transform(module->getASTContext(), [&](Type type) -> Type {

@@ -1618,6 +1618,16 @@ public:
     return { reinterpret_cast<const Requirement *>(genericParams),
              NumRequirements };
   }
+                              
+  /// Substitute the given generic arguments into this generic
+  /// function type and return the resulting non-generic type.
+  FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args) const;
+
+  /// Substitute the given generic arguments into this generic
+  /// function type and return the resulting non-generic type.
+  ///
+  /// The order of Substitutions must match the order of generic parameters.
+  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements(), getInput(), getResult(),
@@ -1636,7 +1646,16 @@ public:
   }
 };
 
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
+BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
+  static CanGenericFunctionType get(ArrayRef<GenericTypeParamType*> params,
+                                    ArrayRef<Requirement> reqts,
+                                    CanType input, CanType result,
+                                    const ExtInfo &info,
+                                    const ASTContext &C) {
+    return CanGenericFunctionType(
+              GenericFunctionType::get(params, reqts, input, result, info, C));
+  }
+END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 /// Conventions for passing arguments as parameters.
 enum class ParameterConvention {
