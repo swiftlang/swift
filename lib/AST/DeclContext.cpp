@@ -39,7 +39,9 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 
   case DeclContextKind::ExtensionDecl: {
     auto type = cast<ExtensionDecl>(this)->getExtendedType();
-    return type->getNominalOrBoundGenericNominal()->getDeclaredType();
+    if (auto ND = type->getNominalOrBoundGenericNominal())
+      return ND->getDeclaredType();
+    return Type();
   }
 
   case DeclContextKind::NominalTypeDecl:
