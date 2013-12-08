@@ -8,6 +8,9 @@ def import_search_path : Separate<["-"], "I">,
 def framework_search_path : Separate<["-"], "F">,
   HelpText<"Add a directory to the framework search path">;
 
+def module_name : Separate<["-"], "module-name">,
+  HelpText<"Name of the module to build">;
+
 def sdk : Separate<["-"], "sdk">,
   HelpText<"Path to the SDK to build against">;
 

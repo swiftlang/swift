@@ -100,6 +100,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       FrameworkSearchPaths.push_back(InputArg->getValue());
       break;
 
+    case OPT_module_name:
+      setModuleName(InputArg->getValue());
+      break;
+
     case OPT_sdk:
       setSDKPath(InputArg->getValue());
       break;
