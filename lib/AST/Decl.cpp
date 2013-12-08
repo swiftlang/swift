@@ -886,8 +886,40 @@ Type VarDecl::getGetterType() const {
   return getterTy;
 }
 
-Type VarDecl::getSetterType() const {
+Type VarDecl::getGetterInterfaceType() const {
   // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getInterfaceType();
+
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
+                                                       /*isConstructor=*/false);
+
+  // Form the getter type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx),
+                                    getInterfaceType(), ctx);
+
+  // Add 'self', if we have one.
+  if (selfTy) {
+    ArrayRef<GenericTypeParamType*> genericParams;
+    ArrayRef<Requirement> requirements;
+    std::tie(genericParams, requirements)
+      = getDeclContext()->getGenericSignatureOfContext();
+    
+    if (genericParams.empty() && requirements.empty())
+      getterTy = FunctionType::get(selfTy, getterTy, ctx);
+    else
+      getterTy = GenericFunctionType::get(genericParams, requirements,
+                                          selfTy, getterTy,
+                                          AnyFunctionType::ExtInfo(), ctx);
+  }
+
+  return getterTy;
+}
+
+Type VarDecl::getSetterType() const {
+  // If we have a setter, use its type.
   if (auto setter = getSetter())
     return setter->getType();
 
@@ -915,6 +947,41 @@ Type VarDecl::getSetterType() const {
 
   return setterTy;
 }
+
+Type VarDecl::getSetterInterfaceType() const {
+  // If we have a getter, use its type.
+  if (auto setter = getSetter())
+    return setter->getInterfaceType();
+  
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
+                                                       /*isConstructor=*/false);
+  
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  TupleTypeElt valueElt(getInterfaceType(), ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx),
+                                    TupleType::getEmpty(ctx),
+                                    ctx);
+  
+  // Add the 'self' type, if we have one.
+  if (selfTy) {
+    ArrayRef<GenericTypeParamType*> genericParams;
+    ArrayRef<Requirement> requirements;
+    std::tie(genericParams, requirements)
+      = getDeclContext()->getGenericSignatureOfContext();
+    
+    if (genericParams.empty() && requirements.empty())
+      setterTy = FunctionType::get(selfTy, setterTy, ctx);
+    else
+      setterTy = GenericFunctionType::get(genericParams, requirements,
+                                          selfTy, setterTy,
+                                          AnyFunctionType::ExtInfo(), ctx);
+  }
+  
+  return setterTy;
+}
+
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();
   if (name.empty())
@@ -1273,8 +1340,45 @@ Type SubscriptDecl::getGetterType() const {
   return getterTy;
 }
 
-Type SubscriptDecl::getSetterType() const {
+Type SubscriptDecl::getGetterInterfaceType() const {
   // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getInterfaceType();
+
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
+                                                       /*isConstructor=*/false);
+
+  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
+  auto indicesTy = interfaceTy->getInput();
+  auto elementTy = interfaceTy->getResult();
+  
+  // Form the () -> element function type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), elementTy,
+                                    ctx);
+
+  // Prepend the indices.
+  getterTy = FunctionType::get(indicesTy, getterTy, ctx);
+  
+  // Prepend the 'self' type.
+  ArrayRef<GenericTypeParamType*> genericParams;
+  ArrayRef<Requirement> requirements;
+  std::tie(genericParams, requirements)
+    = getDeclContext()->getGenericSignatureOfContext();
+  
+  if (genericParams.empty() && requirements.empty())
+    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+  else
+    getterTy = GenericFunctionType::get(genericParams, requirements,
+                                        selfTy, getterTy,
+                                        AnyFunctionType::ExtInfo(), ctx);
+
+  return getterTy;
+}
+
+Type SubscriptDecl::getSetterType() const {
+  // If we have a setter, use its type.
   if (auto setter = getSetter())
     return setter->getType();
 
@@ -1299,6 +1403,45 @@ Type SubscriptDecl::getSetterType() const {
     setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams, ctx);
   else
     setterTy = FunctionType::get(selfTy, setterTy, ctx);
+
+  return setterTy;
+}
+
+Type SubscriptDecl::getSetterInterfaceType() const {
+  // If we have a setter, use its type.
+  if (auto setter = getSetter())
+    return setter->getInterfaceType();
+
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
+                                                       /*isConstructor=*/false);
+
+  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
+  auto indicesTy = interfaceTy->getInput();
+  auto elementTy = interfaceTy->getResult();
+
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  TupleTypeElt valueElt(elementTy, ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
+                                    TupleType::getEmpty(ctx),
+                                    ctx);
+
+  // Prepend the indices.
+  setterTy = FunctionType::get(indicesTy, setterTy, ctx);
+
+  // Prepend the 'self' type.
+  ArrayRef<GenericTypeParamType*> genericParams;
+  ArrayRef<Requirement> requirements;
+  std::tie(genericParams, requirements)
+    = getDeclContext()->getGenericSignatureOfContext();
+  
+  if (genericParams.empty() && requirements.empty())
+    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+  else
+    setterTy = GenericFunctionType::get(genericParams, requirements,
+                                        selfTy, setterTy,
+                                        AnyFunctionType::ExtInfo(), ctx);
 
   return setterTy;
 }

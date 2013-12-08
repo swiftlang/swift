@@ -2090,9 +2090,11 @@ public:
 
   /// Retrieve the type of the getter.
   Type getGetterType() const;
+  Type getGetterInterfaceType() const;
 
   /// Retrieve the type of the setter.
   Type getSetterType() const;
+  Type getSetterInterfaceType() const;
 
   /// \brief Returns whether the var is settable, either because it is a
   /// stored var or because it has a custom setter.
@@ -2769,9 +2771,11 @@ public:
 
   /// Retrieve the type of the getter.
   Type getGetterType() const;
+  Type getGetterInterfaceType() const;
 
   /// Retrieve the type of the setter.
   Type getSetterType() const;
+  Type getSetterInterfaceType() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
