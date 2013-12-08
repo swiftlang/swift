@@ -430,6 +430,9 @@ Type ValueDecl::getInterfaceType() const {
 
   // If the type involves a type variable, don't cache it.
   auto type = getType();
+  assert((type.isNull() || !type->is<PolymorphicFunctionType>())
+         && "decl has polymorphic function type but no interface type");
+
   if (type->hasTypeVariable())
     return type;
 
@@ -440,6 +443,9 @@ Type ValueDecl::getInterfaceType() const {
 void ValueDecl::setInterfaceType(Type type) {
   assert((type.isNull() || !type->hasTypeVariable()) &&
          "Type variable in interface type");
+  assert((type.isNull() || !type->is<PolymorphicFunctionType>()) &&
+         "setting polymorphic function type as interface type");
+  
   InterfaceTy = type;
 }
 
