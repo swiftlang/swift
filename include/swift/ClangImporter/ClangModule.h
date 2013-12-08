@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 
 namespace clang {
+  class ASTContext;
   class Module;
 }
 
@@ -71,6 +72,8 @@ public:
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
   virtual StringRef getFilename() const override;
+
+  clang::ASTContext &getClangASTContext() const;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::ClangModule;

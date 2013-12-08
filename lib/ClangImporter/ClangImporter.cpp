@@ -528,6 +528,18 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
   return ModuleFilter == ContainingUnit;
 }
 
+static const clang::Module *getClangOwningModule(ClangNode Node,
+                                            const clang::ASTContext &ClangCtx) {
+  auto ExtSource = ClangCtx.getExternalSource();
+  assert(ExtSource);
+  if (const clang::Decl *D = Node.getAsDecl())
+    return ExtSource->getModule(D->getOwningModuleID());
+  if (const clang::MacroInfo *MI = Node.getAsMacro())
+    return ExtSource->getModule(MI->getOwningModuleID());
+
+  return nullptr;
+}
+
 static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
                                 const ValueDecl *VD) {
   // Include a value from module X if:
@@ -544,10 +556,11 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (!Wrapper)
     return false;
 
-  auto *ClangDecl = VD->getClangDecl();
-  assert(ClangDecl);
+  auto ClangNode = VD->getClangNode();
+  assert(ClangNode);
 
-  auto OwningClangModule = ClangDecl->getOwningModule();
+  auto OwningClangModule = getClangOwningModule(ClangNode,
+                                            ModuleFilter->getClangASTContext());
 
   // FIXME: This only triggers for implicitly-generated decls like
   // __builtin_va_list, which we probably shouldn't be importing anyway.
@@ -918,6 +931,10 @@ ClangModuleUnit::ClangModuleUnit(Module &M, ClangImporter &owner,
 
 bool ClangModuleUnit::isTopLevel() const {
   return !clangModule->isSubModule();
+}
+
+clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
+  return owner.getClangASTContext();
 }
 
 Module *ClangModuleUnit::getAdapterModule() const {
