@@ -7,6 +7,9 @@ def import_search_path : Separate<["-"], "I">,
   HelpText<"Add a directory to the import search path">;
 def framework_search_path : Separate<["-"], "F">,
   HelpText<"Add a directory to the framework search path">;
+// FIXME: Use a single format for options (space separated) ?
+def import_search_path_EQ : Joined<["-"], "I=">, Alias<import_search_path>;
+def framework_search_path_EQ : Joined<["-"], "F=">, Alias<framework_search_path>;
 
 def module_name : Separate<["-"], "module-name">,
   HelpText<"Name of the module to build">;
