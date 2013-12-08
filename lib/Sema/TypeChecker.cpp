@@ -236,6 +236,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
       continue;
     if (MemberVD->getName().empty())
       continue;
+    if (MemberVD->getType()->is<ErrorType>())
+      continue;
     auto FoundDeclResult = FoundDecls.insert({ MemberVD->getName(),
                                                std::vector<ValueDecl*>() });
     auto& CurDecls = FoundDeclResult.first->second;
@@ -266,6 +268,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
           continue;
         bool isTypeEqual = false;
         Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
+        if (BaseMemberTy->is<ErrorType>())
+          continue;
         if (isa<FuncDecl>(MemberVD)) {
           AnyFunctionType *MemberFTy =
               MemberVD->getType()->getAs<AnyFunctionType>();
