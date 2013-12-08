@@ -66,7 +66,25 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
 
-  typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
+/// Represents a clang declaration or a macro.
+class ClangNode {
+  llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> Ptr;
+
+public:
+  ClangNode() = default;
+  ClangNode(const clang::Decl *D) : Ptr(D) {}
+  ClangNode(clang::MacroInfo *MI) : Ptr(MI) {}
+
+  bool isNull() const { return Ptr.isNull(); }
+  explicit operator bool() const { return !isNull(); }
+
+  const clang::Decl *getAsDecl() const {
+    return Ptr.dyn_cast<const clang::Decl *>();
+  }
+  clang::MacroInfo *getAsMacro() const {
+    return Ptr.dyn_cast<clang::MacroInfo *>();
+  }
+};
   
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -407,7 +425,7 @@ public:
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangNodeSlow().dyn_cast<const clang::Decl *>();
+    return getClangNodeSlow().getAsDecl();
   }
 
   /// \brief Retrieve the Clang macro from which this declaration was
@@ -416,7 +434,7 @@ public:
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangNodeSlow().dyn_cast<clang::MacroInfo *>();
+    return getClangNodeSlow().getAsMacro();
   }
 
   /// \brief Set the Clang node associated with this declaration.

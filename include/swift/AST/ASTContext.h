@@ -49,6 +49,7 @@ namespace swift {
   class ASTContext;
   class ASTMutationListener;
   class BoundGenericType;
+  class ClangNode;
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
@@ -74,8 +75,6 @@ namespace swift {
   class TypeCheckerDebugConsumer;
 
   enum class KnownProtocolKind : uint8_t;
-
-  typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
 
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
