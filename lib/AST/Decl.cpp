@@ -1602,6 +1602,27 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   return out.str();
 }
 
+Type ConstructorDecl::getInitializerInterfaceType() {
+  if (!InitializerInterfaceType) {
+    assert((!InitializerType || !InitializerType->is<PolymorphicFunctionType>())
+           && "polymorphic function type is invalid interface type");
+    
+    // Don't cache type variable types.
+    if (InitializerType->hasTypeVariable())
+      return InitializerType;
+    
+    InitializerInterfaceType = InitializerType;
+  }
+  
+  return InitializerInterfaceType;
+}
+
+void ConstructorDecl::setInitializerInterfaceType(Type t) {
+  assert(!t->is<PolymorphicFunctionType>()
+         && "polymorphic function type is invalid interface type");
+  InitializerInterfaceType = t;
+}
+
 SourceRange DestructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)

@@ -2863,8 +2863,8 @@ public:
   void setInitializerType(Type t) { InitializerType = t; }
 
   /// Get the interface type of the initializing constructor.
-  Type getInitializerInterfaceType() const { return InitializerInterfaceType; }
-  void setInitializerInterfaceType(Type t) { InitializerInterfaceType = t; }
+  Type getInitializerInterfaceType();
+  void setInitializerInterfaceType(Type t);
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
