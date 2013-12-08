@@ -571,8 +571,10 @@ sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> 
 bb0(%0 : $RootClassWithIVars, %1 : $Int64):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  // expected-note {{variable defined here}}
 
+  strong_retain %3 : $RootClassWithIVars             // id: %11
   %11 = ref_element_addr %3 : $RootClassWithIVars, #y
   assign %1 to %11 : $*Int64
+  strong_release %3 : $RootClassWithIVars            // id: %14
 
   return %3 : $RootClassWithIVars    // expected-error {{'<unknown>.x' captured by a closure before being initialized}}
 }

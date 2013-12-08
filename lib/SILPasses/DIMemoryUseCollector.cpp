@@ -781,6 +781,10 @@ collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
       collectUses(REAI, EltNumbering[REAI->getField()]);
       continue;
     }
+    
+    // We ignore retains and releases of self.
+    if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
+      continue;
 
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(0, MemInfo.MemorySILType, User, DIUseKind::Escape);
