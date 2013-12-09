@@ -11,6 +11,7 @@ add_swift_library(swiftSema
   TypeCheckConstraintsApply.cpp
   TypeCheckConstraintsDiag.cpp
   TypeCheckConstraintsGen.cpp
+  TypeCheckConstraintsSimplify.cpp
   TypeCheckConstraintsSolver.cpp
   TypeCheckExpr.cpp
   TypeCheckDecl.cpp

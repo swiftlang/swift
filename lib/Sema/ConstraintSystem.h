@@ -1303,6 +1303,20 @@ public:
     return typeVar->getImpl().getFixedType(getSavedBindings());
   }
 
+  /// Retrieve the fixed type corresponding to a given type variable,
+  /// recursively, until we hit something that isn't a type variable
+  /// or a type variable that doesn't have a fixed type.
+  ///
+  /// \param type The type to simplify.
+  ///
+  /// \param typeVar Will receive the type variable at which simplification 
+  /// stopped, which has no fixed type.
+  ///
+  /// \param wantRValue Whether this routine should look through
+  /// lvalues at each step.
+  Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
+                             bool wantRValue);
+
   /// \brief Assign a fixed type to the given type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type);
 
