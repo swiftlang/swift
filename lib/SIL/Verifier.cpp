@@ -556,13 +556,6 @@ public:
     }
   }
   
-  void checkBuiltinZeroInst(BuiltinZeroInst *ZI) {
-    // FIXME: We don't want reference types to be nullable.
-    require(ZI->getType().is<BuiltinType>()
-            || ZI->getType().hasReferenceSemantics(),
-            "builtin_zero result must be a builtin or reference type");
-  }
-  
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType(0).is<MetaTypeType>(),
             "metatype instruction must be of metatype type");

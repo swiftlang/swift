@@ -339,15 +339,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)ASI->getElementType().getCategory());
     break;
   }
-  case ValueKind::BuiltinZeroInst: {
-    const BuiltinZeroInst *BZI = cast<BuiltinZeroInst>(&SI);
-    unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
-    SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                      (unsigned)SI.getKind(),
-                      S.addTypeRef(BZI->getType().getSwiftRValueType()),
-                      (unsigned)BZI->getType().getCategory());
-    break;
-  }
   case ValueKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for

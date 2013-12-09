@@ -852,10 +852,6 @@ public:
     OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #"
        << EI->getField()->getName().get();
   }
-  
-  void visitBuiltinZeroInst(BuiltinZeroInst *ZI) {
-    OS << "builtin_zero " << ZI->getType();
-  }
 
   void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {
     OS << Name << " ";

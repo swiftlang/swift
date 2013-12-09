@@ -589,14 +589,6 @@ SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
   
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitBuiltinZeroInst(BuiltinZeroInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createBuiltinZero(getOpLocation(Inst->getLoc()),
-                              getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitMetatypeInst(MetatypeInst *Inst) {
   doPostProcess(Inst,
     Builder.createMetatype(getOpLocation(Inst->getLoc()),

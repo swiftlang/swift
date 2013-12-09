@@ -1825,28 +1825,6 @@ the string contains only ASCII characters.  In any case, the referenced string
 is null-terminated. The string literal value is specified using Swift's string
 literal syntax (though ``\()`` interpolations are not allowed).
 
-builtin_zero
-````````````
-::
-
-  sil-instruction ::= 'builtin_zero' sil-type
-
-  %1 = builtin_zero $T
-  // $T must be either a reference type, or a Builtin type.
-  // %1 has type $T
-
-Creates the "zero" value of a builtin or reference type:
-
-- For builtin integer types, this is equivalent to 0.
-- For builtin floating-point types, this is equivalent to +0.0.
-- For ``Builtin.RawPointer`` and ``Builtin.ObjectPointer``, this produces a
-  null pointer.
-- For reference types, this produces a null reference.
-
-TODO: ``builtin_zero`` is a temporary hack to support our current AST-level 
-default initialization implementation. Definitive assignment analysis in SIL
-will supersede this.
-
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 

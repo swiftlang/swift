@@ -592,10 +592,6 @@ public:
     return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));
   }
   
-  BuiltinZeroInst *createBuiltinZero(SILLocation Loc, SILType Type) {
-    return insert(new (F.getModule()) BuiltinZeroInst(Loc, Type));
-  }
-  
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }

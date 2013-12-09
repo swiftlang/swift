@@ -865,7 +865,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
     .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst)
-    .Case("builtin_zero", ValueKind::BuiltinZeroInst)
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
@@ -1927,13 +1926,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     else
       ResultVal = B.createStructExtract(InstLoc, Val, Field,
                                   SILType::getPrimitiveObjectType(ResultTy));
-    break;
-  }
-  case ValueKind::BuiltinZeroInst: {
-    SILType Ty;
-    if (parseSILType(Ty))
-      return true;
-    ResultVal = B.createBuiltinZero(InstLoc, Ty);
     break;
   }
   case ValueKind::RefElementAddrInst: {

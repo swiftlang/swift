@@ -526,7 +526,6 @@ public:
   void visitEnumInst(EnumInst *i);
   void visitEnumDataAddrInst(EnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
-  void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
@@ -2061,14 +2060,6 @@ void IRGenSILFunction::visitInjectEnumAddrInst(swift::InjectEnumAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
   emitStoreEnumTagToAddress(*this, i->getOperand().getType(),
                              enumAddr, i->getElement());
-}
-
-void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
-  auto &ti = getTypeInfo(i->getType());
-  llvm::Value *zeroValue = llvm::Constant::getNullValue(ti.getStorageType());
-  Explosion out(ExplosionKind::Maximal);
-  out.add(zeroValue);
-  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitTupleExtractInst(swift::TupleExtractInst *i) {
