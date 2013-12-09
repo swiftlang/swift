@@ -562,7 +562,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int64):
   %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
   assign %1 to %13 : $*Int64
 
-  return %3 : $RootClassWithIVars  // expected-error {{'<unknown>.z.1' captured by a closure before being initialized}}
+  return %3 : $RootClassWithIVars  // expected-error {{instance variable '<unknown>.z.1' not initialized at end of initializer}}
 }
 
 // CHECK-LABEL: sil @rootclass_test3
@@ -575,7 +575,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int64):
   assign %1 to %11 : $*Int64
   strong_release %3 : $RootClassWithIVars            // id: %14
 
-  return %3 : $RootClassWithIVars    // expected-error {{'<unknown>.x' captured by a closure before being initialized}}
+  return %3 : $RootClassWithIVars    // expected-error {{instance variable '<unknown>.x' not initialized at end of initializer}}
 }
 
 class DerivedClassWithIVars : RootClassWithIVars {

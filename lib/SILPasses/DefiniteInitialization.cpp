@@ -568,6 +568,8 @@ void LifetimeChecker::doIt() {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
+        else if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer)
+          DiagMessage = diag::ivar_not_initialized_at_init_return;
         else
           DiagMessage = diag::variable_escape_before_initialized;
 
@@ -655,12 +657,17 @@ void LifetimeChecker::handleSuperclassUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
   if (getLivenessAtUse(InstInfo) == DIKind::Yes) return;
 
+  auto *Inst = InstInfo.Inst;
+
   if (InstInfo.isSuperInitUse())
     return diagnoseInitError(InstInfo, diag::ivar_not_initialized_at_superinit);
 
-  auto BaseType = InstInfo.Inst->getType(0).getSwiftRValueType().getString();
-  diagnose(Module, InstInfo.Inst->getLoc(),
-           diag::base_object_use_before_initialized, BaseType);
+  // If we've already emitted an error at this instruction, don't emit more.
+  if (shouldEmitError(Inst)) {
+    auto BaseType = Inst->getType(0).getSwiftRValueType().getString();
+    diagnose(Module, Inst->getLoc(),
+             diag::base_object_use_before_initialized, BaseType);
+  }
 }
 
 
