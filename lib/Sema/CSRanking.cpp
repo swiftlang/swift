@@ -16,9 +16,16 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "llvm/ADT/Statistic.h"
 
 using namespace swift;
 using namespace constraints;
+
+//===--------------------------------------------------------------------===//
+// Statistics
+//===--------------------------------------------------------------------===//
+#define DEBUG_TYPE "Constraint solver overall"
+STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
 
 /// \brief Remove the initializers from any tuple types within the
 /// given type.
@@ -685,8 +692,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   // If the result was not ambiguous, we're done.
-  if (!ambiguous)
+  if (!ambiguous) {
+    NumDiscardedSolutions += viable.size() - 1;
     return bestIdx;
+  }
 
   // The comparison was ambiguous. Identify any solutions that are worse than
   // any other solution.
@@ -736,6 +745,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     ++outIndex;
   }
   viable.erase(viable.begin() + outIndex, viable.end());
+  NumDiscardedSolutions += viable.size() - outIndex;
 
   return Nothing;
 }
