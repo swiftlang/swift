@@ -800,9 +800,8 @@ static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
   SILResultInfo Result(IntTy, ResultConvention::Unowned);
   
   auto FnType = SILFunctionType::get(nullptr, extInfo,
-                                            ParameterConvention::Direct_Owned,
-                                            Params, Result,
-                                            B.getASTContext());
+                                     ParameterConvention::Direct_Owned,
+                                     Params, Result, B.getASTContext());
   auto Ty = SILType::getPrimitiveObjectType(FnType);
   return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
 }

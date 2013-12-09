@@ -786,7 +786,30 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
 
   // If it's not present, just create a null value.
   gen.B.emitBlock(isNotPresentBB);
-  SILValue null = gen.B.createBuiltinZero(loc, refType);
+
+  // %1 = integer_literal $Builtin.Int64, 0
+  auto Int64Ty = SILType::getBuiltinIntegerType(64, gen.getASTContext());
+  SILValue null = gen.B.createIntegerLiteral(loc, Int64Ty, 0);
+
+  // %2 = builtin_function_ref "inttoptr_Int64" : $@thin (Int64) -> RawPointer
+  auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false,
+                                          /*autoclosure*/ false,
+                                          /*block*/ false);
+  SILParameterInfo Param(Int64Ty.getSwiftRValueType(),
+                         ParameterConvention::Direct_Unowned);
+  SILResultInfo Result(gen.getASTContext().TheRawPointerType,
+                       ResultConvention::Unowned);
+  auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
+                                        ParameterConvention::Direct_Owned,
+                                        Param, Result, gen.getASTContext());
+  auto bfr = gen.B.createBuiltinFunctionRef(loc, "inttoptr_Int64",
+                                    SILType::getPrimitiveObjectType(bfrFnType));
+  // %3 = apply %2(%1) : $@thin (Builtin.Int64) -> Builtin.RawPointer
+  null = gen.B.createApply(loc, bfr, null);
+
+  null = gen.B.createRawPointerToRef(loc, null, refType);
   optTL.emitDestroyValue(gen.B, loc, opt); // destroy the nothing value
   gen.B.createBranch(loc, contBB, null);
 
