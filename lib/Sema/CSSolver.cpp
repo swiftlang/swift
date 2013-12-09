@@ -75,6 +75,12 @@ Solution ConstraintSystem::finalize(
   // Create the solution.
   Solution solution(*this, CurrentScore);
 
+  // Update the best score we've seen so far.
+  if (solverState) {
+    assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
+    solverState->BestScore = CurrentScore;
+  }
+
   // For any of the type variables that has no associated fixed type, assign a
   // fresh generic type parameters.
   // FIXME: We could gather the requirements on these as well.
@@ -459,6 +465,11 @@ bool ConstraintSystem::simplify() {
         // Clear out the worklist. There's nothing to do now.
         return true;
       }
+
+      // If the current score is worse than the best score we've seen so far,
+      // there's no point in continuing. So don't.
+      if (worseThanBestSolution())
+        return true;
     }
 
     // Transfer any retired constraints to the retired list.
@@ -930,6 +941,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // If there are no constraints remaining, we're done. Save this solution.
   if (Constraints.empty()) {
+    // If this solution is worse than the best solution we've seen so far,
+    // skipt it.
+    if (worseThanBestSolution())
+      return true;
+
     // If any free type variables remain and we're not allowed to have them,
     // fail.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow &&
@@ -1015,6 +1031,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Compute the partial solutions produced for each connected component.
   std::unique_ptr<SmallVector<Solution, 4>[]> 
     partialSolutions(new SmallVector<Solution, 4>[numComponents]);
+  Optional<Score> PreviousBestScore = solverState->BestScore;
   for (unsigned component = 0; component != numComponents; ++component) {
     assert(Constraints.empty() && "Some constraints were not transferred?");
     ++solverState->NumComponentsSplit;
@@ -1082,6 +1099,9 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // It doesn't contribute.
     for (auto &solution : partialSolutions[component])
       solution.getFixedScore() -= CurrentScore;
+
+    // Restore the previous best score.
+    solverState->BestScore = PreviousBestScore;
   }
 
   // Move the constraints back. The system is back in a normal state.
@@ -1105,6 +1125,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Produce all combinations of partial solutions.
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool done = false;
+  bool anySolutions = false;
   do {
     // Create a new solver scope in which we apply all of the partial
     // solutions.
@@ -1112,17 +1133,23 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     for (unsigned i = 0; i != numComponents; ++i)
       applySolution(partialSolutions[i][indices[i]]);
 
-    // Finalize this solution.
-    auto solution = finalize(allowFreeTypeVariables);
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2)
-        << "(composed solution " << CurrentScore << ")\n";
+    // This solution might be worse than the best solution found so far. If so,
+    // skip it.
+    if (!worseThanBestSolution()) {
+      // Finalize this solution.
+      auto solution = finalize(allowFreeTypeVariables);
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log.indent(solverState->depth * 2)
+          << "(composed solution " << CurrentScore << ")\n";
+      }
+
+      // Save this solution.
+      solutions.push_back(std::move(solution));
+
+      anySolutions = true;
     }
-
-    // Save this solution.
-    solutions.push_back(std::move(solution));
-
+    
     // Find the next combination.
     for (unsigned n = numComponents; n > 0; --n) {
       ++indices[n-1];
@@ -1143,7 +1170,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     }
   } while (!done);
 
-  return false;
+  return !anySolutions;
 }
 
 bool ConstraintSystem::solveSimplified(
@@ -1207,6 +1234,11 @@ bool ConstraintSystem::solveSimplified(
         anyNonConformanceConstraints = true;
         break;
       }
+
+      // If this solution is worse than the best solution we've seen so far,
+      // skipt it.
+      if (worseThanBestSolution())
+        return true;
 
       if (!anyNonConformanceConstraints) {
         auto solution = finalize(allowFreeTypeVariables);

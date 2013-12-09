@@ -32,6 +32,20 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
   ++CurrentScore.Data[index];
 }
 
+bool ConstraintSystem::worseThanBestSolution() const {
+  if (!solverState || !solverState->BestScore ||
+      CurrentScore <= *solverState->BestScore)
+    return false;
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log.indent(solverState->depth * 2)
+    << "(solution is worse than the best solution)\n";
+  }
+
+  return true;
+}
+
 llvm::raw_ostream &constraints::operator<<(llvm::raw_ostream &out,
                                            const Score &score) {
   for (unsigned i = 0; i != NumScoreKinds; ++i) {

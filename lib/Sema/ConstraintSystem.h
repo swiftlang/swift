@@ -679,7 +679,7 @@ struct Score {
         return false;
     }
 
-    return true;
+    return false;
   }
 
   friend bool operator<=(const Score &x, const Score &y) {
@@ -1042,6 +1042,9 @@ private:
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
+
+    /// The best solution computed so far.
+    Optional<Score> BestScore;
 
     /// The number of the solution attempt we're looking at.
     unsigned SolutionAttempt;
@@ -1813,6 +1816,10 @@ public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the.
   void increaseScore(ScoreKind kind);
+
+  /// Determine whether this solution is guaranteed to be worse than the best
+  /// solution found so far.
+  bool worseThanBestSolution() const;
 
   /// \brief Given a set of viable solutions, find the best
   /// solution.
