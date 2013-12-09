@@ -1009,6 +1009,14 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                                    DTI, Name, N, DirectValue);
     else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
       // FIXME: Handle multi-value explosions.
+      //
+      // In theory, it would be nice to encode them using DW_OP_piece,
+      // but this is not possible with the current LLVM debugging
+      // infrastructure.  We can piece together a DWARF expression
+      // using DIBuilder::createComplexVariable(), but we can only
+      // associate it with a single llvm::Value via a dbg.value or
+      // dbg.declare intrinsic. An we can't reference an llvm::Value
+      // from within a DWARF expression MDNode.
       auto Vals = getLoweredExplosion(Arg).claimAll();
       if (Vals.size() == 1)
         IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI, Name, N,
