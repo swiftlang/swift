@@ -238,8 +238,8 @@ namespace llvm {
 
 template<>
 struct DenseMapInfo<GenericTypeParamKey> {
-  static inline GenericTypeParamKey getEmptyKey() { return {~0U, ~0U}; }
-  static inline GenericTypeParamKey getTombstoneKey() { return {~1U, ~1U}; }
+  static inline GenericTypeParamKey getEmptyKey() { return {0xFFFF, 0xFFFF}; }
+  static inline GenericTypeParamKey getTombstoneKey() { return {0xFFFE, 0xFFFE}; }
   static inline unsigned getHashValue(GenericTypeParamKey k) {
     return DenseMapInfo<unsigned>::getHashValue(k.Depth << 16 | k.Index);
   }
