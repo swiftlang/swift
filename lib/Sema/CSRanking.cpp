@@ -460,13 +460,6 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
-/// Simplify a score into a single integer.
-/// FIXME: Temporary hack.
-static int simplifyScore(const Score &score) {
-  return (int)score.Data[SK_UserConversion] * -3
-      + (int)score.Data[SK_NonDefaultLiteral] * -1;
-}
-
 SolutionCompareResult ConstraintSystem::compareSolutions(
                         ConstraintSystem &cs,
                         ArrayRef<Solution> solutions,
@@ -476,11 +469,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Whether the solutions are identical.
   bool identical = true;
 
-  // Solution comparison uses a scoring system to determine whether one
-  // solution is better than the other. Retrieve the fixed scores for each of
-  // the solutions, which we'll modify with relative scoring.
-  int score1 = simplifyScore(solutions[idx1].getFixedScore());
-  int score2 = simplifyScore(solutions[idx2].getFixedScore());
+  // Compare the fixed scores by themselves.
+  if (solutions[idx1].getFixedScore() != solutions[idx2].getFixedScore()) {
+    return solutions[idx1].getFixedScore() < solutions[idx2].getFixedScore()
+             ? SolutionCompareResult::Better
+             : SolutionCompareResult::Worse;
+  }
+
+  // Compute relative score.
+  unsigned score1 = 0;
+  unsigned score2 = 0;
 
   // Compare overload sets.
   for (auto &overload : diff.overloads) {
