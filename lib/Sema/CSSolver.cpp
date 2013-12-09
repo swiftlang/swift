@@ -859,13 +859,7 @@ static bool tryTypeVariableBindings(
           continue;
 
         KnownProtocolKind knownKind = *proto->getKnownProtocolKind();
-        for (auto decl : tc.Context.getTypesThatConformTo(knownKind)) {
-          Type type;
-          if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
-            type = nominal->getDeclaredTypeOfContext();
-          else
-            type = cast<ExtensionDecl>(decl)->getDeclaredTypeOfContext();
-          
+        for (auto type : cs.getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(type->getCanonicalType()))
             newBindings.push_back({type, true});
         }

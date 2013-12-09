@@ -221,6 +221,65 @@ LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   return *result;
 }
 
+ArrayRef<Type> ConstraintSystem::getAlternativeLiteralTypes(
+                  KnownProtocolKind kind) {
+  unsigned index;
+
+  switch (kind) {
+#define PROTOCOL(Protocol) \
+  case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
+#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#include "swift/AST/KnownProtocols.def"
+
+  case KnownProtocolKind::ArrayLiteralConvertible:
+    index = 0;
+    break;
+
+  case KnownProtocolKind::CharacterLiteralConvertible:
+    index = 1;
+    break;
+
+  case KnownProtocolKind::DictionaryLiteralConvertible:
+    index = 2;
+    break;
+
+  case KnownProtocolKind::FloatLiteralConvertible:
+    index = 3;
+    break;
+
+  case KnownProtocolKind::IntegerLiteralConvertible:
+    index = 4;
+    break;
+
+  case KnownProtocolKind::StringInterpolationConvertible:
+    index = 5;
+    break;
+
+  case KnownProtocolKind::StringLiteralConvertible:
+    index = 6;
+    break;
+  }
+
+  // If we already looked for alternative literal types, return those results.
+  if (AlternativeLiteralTypes[index])
+    return *AlternativeLiteralTypes[index];
+
+  // Collect all of the types that conform to the given literal protocol.
+  SmallVector<Type, 4> types;
+  for (auto decl : TC.Context.getTypesThatConformTo(kind)) {
+    Type type;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+      type = nominal->getDeclaredTypeOfContext();
+    else
+      type = cast<ExtensionDecl>(decl)->getDeclaredTypeOfContext();
+
+    types.push_back(type);
+  }
+
+  AlternativeLiteralTypes[index] = allocateCopy(types);
+  return *AlternativeLiteralTypes[index];
+}
+
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
                      Expr *anchor,
                      ArrayRef<ConstraintLocator::PathElement> path) {

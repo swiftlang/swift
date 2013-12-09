@@ -40,7 +40,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
-    << "(solution is worse than the best solution)\n";
+      << "(solution is worse than the best solution)\n";
   }
 
   return true;

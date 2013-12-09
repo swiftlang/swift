@@ -968,6 +968,9 @@ private:
   llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
     MemberLookups;
 
+  /// Cached sets of "alternative" literal types.
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[7];
+
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
   llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
@@ -1170,6 +1173,10 @@ public:
   ///
   /// \returns A reference to the member-lookup result.
   LookupResult &lookupMember(Type base, Identifier name);
+
+  /// Retrieve the set of "alternative" literal types that we'll explore
+  /// for a given literal protocol kind.
+  ArrayRef<Type> getAlternativeLiteralTypes(KnownProtocolKind kind);
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
@@ -1543,6 +1550,11 @@ public:
   template<typename T>
   ArrayRef<T> allocateCopy(ArrayRef<T> array) {
     return allocateCopy(array.begin(), array.end());
+  }
+
+  template<typename T>
+  ArrayRef<T> allocateCopy(SmallVectorImpl<T> &vec) {
+    return allocateCopy(vec.begin(), vec.end());
   }
 
   /// \brief Generate constraints for the given (unchecked) expression.
