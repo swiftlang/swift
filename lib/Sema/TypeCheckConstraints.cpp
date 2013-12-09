@@ -1114,7 +1114,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
 
   SmallVector<Constraint *, 4> overloads;
   for (auto choice : choices) {
-    overloads.push_back(new (*this) Constraint(boundType, choice, locator));
+    overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
+                                                       locator));
   }
   addConstraint(Constraint::createDisjunction(*this, overloads,
                                               locator));
@@ -1636,11 +1637,11 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                            ConstraintLocator::ConversionResult));
   if (otherType->isExistentialType()) {
     Constraint *constraints[2] = {
-      new (cs) Constraint(kind, outputTV, otherType, Identifier(),
-                          resultLocator),
-      new (cs) Constraint(ConstraintKind::Conversion,
-                          ConversionRestrictionKind::Existential,
-                          outputTV, otherType, resultLocator)
+      Constraint::create(cs, kind, outputTV, otherType, Identifier(),
+                         resultLocator),
+      Constraint::createRestricted(cs, ConstraintKind::Conversion,
+                                   ConversionRestrictionKind::Existential,
+                                   outputTV, otherType, resultLocator)
     };
     cs.addConstraint(Constraint::createDisjunction(cs, constraints,
                                                    resultLocator));
@@ -2077,8 +2078,8 @@ commit_to_conversions:
         constraintKind = ConstraintKind::Equal;
 
       constraints.push_back(
-        new (*this) Constraint(constraintKind, potential, type1, type2,
-                               fixedLocator));
+        Constraint::createRestricted(*this, constraintKind, potential, 
+                                     type1, type2, fixedLocator));
     }
     addConstraint(Constraint::createDisjunction(*this, constraints,
                                                 fixedLocator));
@@ -4342,10 +4343,10 @@ namespace {
         auto fromType = expr->getType();
         auto locator = cs.getConstraintLocator(expr, { });
         Constraint *constraints[2] = {
-          new (cs) Constraint(ConstraintKind::Conversion, fromType, ToType,
-                              Identifier(), locator),
-          new (cs) Constraint(ConstraintKind::CheckedCast, fromType, ToType,
-                              Identifier(), locator),
+          Constraint::create(cs, ConstraintKind::Conversion, fromType, ToType,
+                             Identifier(), locator),
+          Constraint::create(cs, ConstraintKind::CheckedCast, fromType, ToType,
+                             Identifier(), locator),
         };
         cs.addConstraint(Constraint::createDisjunction(cs, constraints,
                                                        locator));

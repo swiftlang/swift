@@ -1240,14 +1240,15 @@ public:
                      ConstraintLocator *locator = nullptr) {
     assert(first && "Missing first type");
     assert(second && "Missing second type");
-    addConstraint(new (*this) Constraint(kind, first, second, Identifier(),
-                                         locator));
+    addConstraint(Constraint::create(*this, kind, first, second, Identifier(),
+                                     locator));
   }
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator) {
-    addConstraint(new (*this) Constraint(boundTy, choice, locator));
+    addConstraint(Constraint::createBindOverload(*this, boundTy, choice, 
+                                                 locator));
   }
 
   /// \brief Add a value member constraint to the constraint system.
@@ -1256,8 +1257,8 @@ public:
     assert(baseTy);
     assert(memberTy);
     assert(!name.empty());
-    addConstraint(new (*this) Constraint(ConstraintKind::ValueMember,
-                                         baseTy, memberTy, name, locator));
+    addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
+                                     baseTy, memberTy, name, locator));
   }
 
   /// \brief Add a type member constraint to the constraint system.
@@ -1267,15 +1268,15 @@ public:
     assert(memberTy);
     assert(!name.empty());
     
-    addConstraint(new (*this) Constraint(ConstraintKind::TypeMember,
-                                         baseTy, memberTy, name, locator));
+    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
+                                     baseTy, memberTy, name, locator));
   }
 
   /// \brief Add an archetype constraint.
   void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator = nullptr) {
     assert(baseTy);
-    addConstraint(new (*this) Constraint(ConstraintKind::Archetype,
-                                         baseTy, Type(), Identifier(),
+    addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
+                                     baseTy, Type(), Identifier(),
                                          locator));
   }
 

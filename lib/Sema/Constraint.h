@@ -208,9 +208,8 @@ class Constraint : public llvm::ilist_node<Constraint> {
            kind == ConstraintKind::Disjunction);
   }
 
-public:
   /// Constraint a new constraint.
-  Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
+  Constraint(ConstraintKind kind, Type first, Type second, Identifier member,
              ConstraintLocator *locator);
 
   /// Construct a new overload-binding constraint.
@@ -223,6 +222,23 @@ public:
              Type first, Type second, ConstraintLocator *locator)
     : Kind(kind), Restriction(restriction), HasRestriction(true),
       IsActive(false), Types{ first, second, Identifier() }, Locator(locator) { }
+
+public:
+  /// Create a new constraint.
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
+                            Type First, Type Second, Identifier Member,
+                            ConstraintLocator *locator);
+
+  /// Create an overload-binding constraint.
+  static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
+                                        OverloadChoice choice, 
+                                        ConstraintLocator *locator);
+
+  /// Create a restricted relational constraint.
+  static Constraint *createRestricted(ConstraintSystem &cs, ConstraintKind kind,
+                                      ConversionRestrictionKind restriction,
+                                      Type first, Type second, 
+                                      ConstraintLocator *locator);
 
   /// Create a new conjunction constraint.
   static Constraint *createConjunction(ConstraintSystem &cs,

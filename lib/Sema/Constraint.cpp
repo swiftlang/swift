@@ -208,6 +208,29 @@ void Constraint::dump(SourceManager *sm) const {
   print(llvm::errs(), sm);
 }
 
+Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
+                               Type first, Type second, Identifier member,
+                               ConstraintLocator *locator) {
+  // Create the constraint.
+  return new (cs) Constraint(kind, first, second, member, locator);
+}
+
+Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
+                                           OverloadChoice choice, 
+                                           ConstraintLocator *locator) {
+  // Create the constraint.
+  return new (cs) Constraint(type, choice, locator);
+}
+
+Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
+                                         ConstraintKind kind, 
+                                         ConversionRestrictionKind restriction,
+                                         Type first, Type second, 
+                                         ConstraintLocator *locator) {
+  // Create the constraint.
+  return new (cs) Constraint(kind, restriction, first, second, locator);
+}
+
 Constraint *Constraint::createConjunction(ConstraintSystem &cs,
                                           ArrayRef<Constraint *> constraints,
                                           ConstraintLocator *locator) {
