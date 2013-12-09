@@ -2412,16 +2412,12 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
   // on ivars.
-  // FIXME: ObjC classes too.
-  if (!cast<ClassDecl>(nominalDecl)->isObjC()) {
-    auto Kind = cast<ClassDecl>(nominalDecl)->hasSuperclass()
+  auto MUKind = cast<ClassDecl>(nominalDecl)->hasSuperclass()
           ? MarkUninitializedInst::DerivedSelf :
             MarkUninitializedInst::RootSelf;
-    selfArg = B.createMarkUninitialized(selfDecl, selfArg, Kind);
-  }
+  selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
 
-  assert(selfTy.hasReferenceSemantics() &&
-         "can't emit a value type ctor here");
+  assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
 
   if (NeedsBoxForSelf) {
     B.createStore(ctor, selfArg, VarLocs[selfDecl].getAddress());

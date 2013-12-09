@@ -2695,14 +2695,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       if (var->isStatic() || var->isComputed() || var->isInvalid())
         continue;
 
-      // We refuse to default construct struct members.  DI takes care of this.
-      if (isa<StructDecl>(decl))
-        return;
-
-      // FIXME: ObjC classes too someday.
-      if (auto *CD = dyn_cast<ClassDecl>(decl))
-        if (!CD->isObjC())
-          return;
+      // FIXME: remove dead code.
+      return;
 
       // If this variable is not default-initializable, we're done: we can't
       // add the default constructor because it will be ill-formed.
