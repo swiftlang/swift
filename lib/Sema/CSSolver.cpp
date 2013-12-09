@@ -1,4 +1,4 @@
-//===--- TypeCheckConstraintsSolver.cpp - Constraint Solver ---------------===//
+//===--- CSSolver.cpp - Constraint Solver ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

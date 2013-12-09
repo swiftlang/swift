@@ -1,4 +1,4 @@
-//===--- TypeCheckConstraintsGen.cpp - Constraint Generator ---------------===//
+//===--- CSGen.cpp - Constraint Generator ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- TypeCheckConstraintsDiag.cpp - Constraint Diagnostics ------------===//
+//===--- CSDiag.cpp - Constraint Diagnostics ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
