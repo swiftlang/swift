@@ -33,9 +33,10 @@ ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
   assert(Changes.empty() && "Scope stack corrupted");
-
-  for (auto node : Nodes) {
-    delete node.second.NodePtr;
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto &impl = TypeVariables[i]->getImpl();
+    delete impl.getGraphNode();
+    impl.setGraphNode(0);
   }
 }
 
@@ -107,16 +108,19 @@ gatherReferencedTypeVars(ConstraintSystem &cs,
 std::pair<ConstraintGraphNode &, unsigned>
 ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Check whether we've already created a node for this type variable.
-  auto known = Nodes.find(typeVar);
-  if (known != Nodes.end()) {
-    assert(known->second.NodePtr && "Missing node pointer?");
-    return { *known->second.NodePtr, known->second.Index };
+  auto &impl = typeVar->getImpl();
+  if (auto nodePtr = impl.getGraphNode()) {
+    assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
+    assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
+           "Type variable mismatch");
+    return { *nodePtr, impl.getGraphIndex() };
   }
 
   // Allocate the new node.
-  StoredNode &stored = Nodes[typeVar];
-  stored.NodePtr = new ConstraintGraphNode(typeVar);
-  stored.Index = TypeVariables.size();
+  auto nodePtr = new ConstraintGraphNode(typeVar);
+  unsigned index = TypeVariables.size();
+  impl.setGraphNode(nodePtr);
+  impl.setGraphIndex(index);
 
   // Record this type variable.
   TypeVariables.push_back(typeVar);
@@ -135,7 +139,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
     bindTypeVariable(typeVar, fixed);
   }
 
-  return { *stored.NodePtr, stored.Index };
+  return { *nodePtr, index };
 }
 
 ArrayRef<TypeVariableType *> ConstraintGraphNode::getEquivalenceClass() const{
@@ -374,14 +378,11 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
 #pragma mark Graph mutation
 
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
-  // Find the node to remove.
-  auto pos = Nodes.find(typeVar);
-  assert(pos != Nodes.end() && "No node for this type variable");
-  
   // Remove this node.
-  unsigned index = pos->second.Index;
-  delete pos->second.NodePtr;
-  Nodes.erase(pos);
+  auto &impl = typeVar->getImpl();
+  unsigned index = impl.getGraphIndex();
+  delete impl.getGraphNode();
+  impl.setGraphNode(0);
 
   // Remove this type variable from the list.
   unsigned lastIndex = TypeVariables.size()-1;
@@ -921,18 +922,18 @@ void ConstraintGraph::verify() {
   }
 
   // Verify that our type variable map/vector are in sync.
-  requireSameValue(TypeVariables.size(), Nodes.size(),
-                   "type variables vector and node map have different sizes");
-  for (auto node : Nodes) {
-    require(node.second.Index < TypeVariables.size(),
-            "out of bounds node index");
-    requireSameValue(node.first, TypeVariables[node.second.Index],
-                     "node map provides wrong index into type variable vector");
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto typeVar = TypeVariables[i];
+    auto &impl = typeVar->getImpl();
+    requireSameValue(impl.getGraphIndex(), i, "wrong graph node index");
+    require(impl.getGraphNode(), "null graph node");
   }
 
   // Verify consistency of all of the nodes in the graph.
-  for (auto node : Nodes) {
-    node.second.NodePtr->verify(*this);
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto typeVar = TypeVariables[i];
+    auto &impl = typeVar->getImpl();
+    impl.getGraphNode()->verify(*this);
   }
 
   // Collect all of the constraints known to the constraint graph.
@@ -964,8 +965,8 @@ void ConstraintGraph::verify() {
     // Make sure each of the type variables referenced knows about this
     // constraint.
     for (auto typeVar : referencedTypeVars) {
-      auto nodePos = Nodes.find(typeVar);
-      requireWithContext(nodePos != Nodes.end(),
+      auto nodePtr = typeVar->getImpl().getGraphNode();
+      requireWithContext(nodePtr,
                          "type variable in constraint not known",
                          [&] {
                            llvm::dbgs() << "type variable = ";
@@ -975,7 +976,7 @@ void ConstraintGraph::verify() {
                            llvm::dbgs() << "\n";
                          });
 
-      auto &node = *nodePos->second.NodePtr;
+      auto &node = *nodePtr;
       auto constraintPos = node.ConstraintIndex.find(&constraint);
       requireWithContext(constraintPos != node.ConstraintIndex.end(),
                          "type variable doesn't know about constraint",

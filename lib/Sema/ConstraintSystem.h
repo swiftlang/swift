@@ -47,6 +47,7 @@ class Expr;
 namespace constraints {
 
 class ConstraintGraph;
+class ConstraintGraphNode;
 class ConstraintSystem;
 
 } // end namespace constraints
@@ -113,6 +114,13 @@ class TypeVariableType::Implementation {
   /// type is bound.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  /// The corresponding node in the constraint graph.
+  constraints::ConstraintGraphNode *GraphNode = nullptr;
+
+  ///  Index into the list of type variables, as used by the
+  ///  constraint graph.
+  unsigned GraphIndex;
+
   friend class constraints::SavedTypeVariableBinding;
 
 public:
@@ -143,6 +151,23 @@ public:
     return reinterpret_cast<const TypeVariableType *>(this) - 1;
   }
 
+  /// Retrieve the corresponding node in the constraint graph.
+  constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
+
+  /// Set the corresponding node in the constraint graph.
+  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
+    GraphNode = newNode; 
+  }
+
+  /// Retrieve the index into the constraint graph's list of type variables.
+  unsigned getGraphIndex() const { 
+    assert(GraphNode && "Graph node isn't set");
+    return GraphIndex; 
+  }
+
+  /// Set the index into the constraint graph's list of type variables.
+  void setGraphIndex(unsigned newIndex) { GraphIndex = newIndex; }
+  
   /// \brief Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
   bool hasRepresentativeOrFixed() const {

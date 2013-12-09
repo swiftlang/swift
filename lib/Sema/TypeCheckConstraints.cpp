@@ -91,7 +91,6 @@ ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
   assert(DC && "context required");
 
   // Create the constraint graph.
-  // FIXME: Enable this by default.
   CG = new ConstraintGraph(*this);
 }
 

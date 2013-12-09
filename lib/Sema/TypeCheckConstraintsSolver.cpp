@@ -890,61 +890,6 @@ static bool tryTypeVariableBindings(
   return !anySolved;
 }
 
-/// Verify that the connected components we computed are identical to
-/// what we would have computed had the constraint graph been built
-/// from scratch right now.
-static void LLVM_ATTRIBUTE_USED verifyConnectedComponents(ConstraintGraph &cg1,
-                                      ArrayRef<TypeVariableType *> typeVars1, 
-                                      ArrayRef<unsigned> components1) {
-  // Build a new constraint graph from scratch.
-  auto &cs = cg1.getConstraintSystem();
-  ConstraintGraph cg2(cs);
-  for (auto typeVar : cs.getTypeVariables())
-    (void)cg2[typeVar];
-  for (auto &constraint : cs.getConstraints())
-    cg2.addConstraint(&constraint);
-
-  // Compute connected components for the newly-created constraint
-  // graph.
-  SmallVector<TypeVariableType *, 16> typeVars2;
-  SmallVector<unsigned, 16> components2;
-  cg2.computeConnectedComponents(typeVars2, components2);
-  
-  // Create a mapping from type variables to components.
-  llvm::SmallDenseMap<TypeVariableType *, unsigned, 4> typeVarToComponentMap1;
-  for (unsigned i = 0, n = typeVars1.size(); i != n; ++i)
-    typeVarToComponentMap1[typeVars1[i]] = components1[i];
-
-  // Create a mapping from components to components
-  llvm::SmallDenseMap<unsigned, unsigned> componentsMap;
-  for (unsigned i = 0, n = typeVars2.size(); i != n; ++i) {
-    // Find the from/to components for this type variable.
-    auto typeVar = typeVars2[i];
-    assert(typeVarToComponentMap1.count(typeVar) && "Missing type variable?");
-    unsigned fromComponent = typeVarToComponentMap1[typeVar];
-    unsigned toComponent = components2[i];
-    
-    // If we haven't mapped the 'from' component yet, add the mapping.
-    auto known = componentsMap.find(fromComponent);
-    if (known == componentsMap.end()) {
-      componentsMap[fromComponent] = toComponent;
-      continue;
-    }
-
-    // Check the mapping.
-    if (known->second != toComponent) {
-      llvm::errs() << "Inconsistent connected components in constraint graphs\n";
-      llvm::errs() << "Evolved constraint graph:\n";
-      cg1.print(llvm::errs());
-      cg1.printConnectedComponents(llvm::errs());
-      llvm::errs() << "Newly-constructed constraint graph:\n";
-      cg2.print(llvm::errs());
-      cg2.printConnectedComponents(llvm::errs());
-      abort();
-    }
-  }
-}
-
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // If there is no solver state, this is the top-level call. Create solver
@@ -1026,7 +971,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     // Verify that the constraint graph is valid.
     cg.verify();
-    verifyConnectedComponents(cg, typeVars, components);
 
     log << "---Constraint graph---\n";
     cg.print(log);

@@ -275,22 +275,6 @@ private:
   /// The type variables in this graph, in stable order.
   SmallVector<TypeVariableType *, 4> TypeVariables;
 
-  /// A stored node within the node mapping, containing both the node pointer
-  /// and the
-  struct StoredNode {
-    /// \brief The node itself, stored as a pointer so we can efficiently
-    /// copy/move \c StoredNodes.
-    ConstraintGraphNode *NodePtr;
-
-    /// \brief The index in the \c TypeVariables vector where the corresponding
-    /// type variable is stored.
-    unsigned Index;
-  };
-
-  /// A mapping from the type variables in the graph to their corresponding
-  /// nodes along with the index
-  llvm::DenseMap<TypeVariableType *, StoredNode> Nodes;
-
   /// The kind of change made to the graph.
   enum class ChangeKind {
     /// Added a type variable.
