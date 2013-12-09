@@ -939,18 +939,12 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return false;
   }
 
-  // If there's no global constraint graph, build one locally.
+  // If there's no global constraint graph, just simplify all of the
+  // constraints.
   Optional<ConstraintGraph> localCG;
   if (!CG) {
-    localCG.emplace(*this);
-    for (auto typeVar : TypeVariables)
-      (void)(*localCG)[typeVar];
-    for (auto &constraint : Constraints)
-      localCG->addConstraint(&constraint);
+    return solveSimplified(solutions, allowFreeTypeVariables);
   }
-
-  // The constraint graph we're working with.
-  auto &cg = CG? *CG : *localCG;
 
   // Compute the connected components of the constraint graph.
   // FIXME: We're seeding typeVars with TypeVariables so that the
@@ -958,7 +952,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // our component. There are clearly better ways to do this.
   SmallVector<TypeVariableType *, 16> typeVars(TypeVariables);
   SmallVector<unsigned, 16> components;
-  unsigned numComponents = cg.computeConnectedComponents(typeVars, components);
+  unsigned numComponents = CG->computeConnectedComponents(typeVars, components);
 
   // If we don't have more than one component, just solve the whole
   // system.
@@ -970,13 +964,13 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     auto &log = getASTContext().TypeCheckerDebug->getStream();
 
     // Verify that the constraint graph is valid.
-    cg.verify();
+    CG->verify();
 
     log << "---Constraint graph---\n";
-    cg.print(log);
+    CG->print(log);
 
     log << "---Connected components---\n";
-    cg.printConnectedComponents(log);
+    CG->printConnectedComponents(log);
   }
 
   // Construct a mapping from type variables and constraints to their
@@ -988,7 +982,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     typeVarComponent[typeVars[i]] = components[i];
 
     // Record the component of each of the constraints.
-    for (auto constraint : cg[typeVars[i]].getConstraints())
+    for (auto constraint : (*CG)[typeVars[i]].getConstraints())
       constraintComponent[constraint] = components[i];
   }
 
