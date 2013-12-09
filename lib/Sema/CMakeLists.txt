@@ -3,17 +3,17 @@ add_swift_library(swiftSema
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
+  CSApply.cpp
+  CSDiag.cpp
+  CSGen.cpp
+  CSSimplify.cpp
+  CSSolver.cpp
   NameBinding.cpp
   SourceLoader.cpp
   DerivedConformanceRawRepresentable.cpp
   MiscDiagnostics.cpp
   TypeChecker.cpp
   TypeCheckConstraints.cpp
-  TypeCheckConstraintsApply.cpp
-  TypeCheckConstraintsDiag.cpp
-  TypeCheckConstraintsGen.cpp
-  TypeCheckConstraintsSimplify.cpp
-  TypeCheckConstraintsSolver.cpp
   TypeCheckExpr.cpp
   TypeCheckDecl.cpp
   TypeCheckGeneric.cpp
