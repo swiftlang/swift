@@ -365,6 +365,7 @@ namespace {
     DIKind getLivenessAtUse(const DIMemoryUse &Use);
 
     void handleStoreUse(unsigned UseID);
+    void handleSuperclassUse(unsigned UseID);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
@@ -378,6 +379,7 @@ namespace {
     AvailabilitySet getLiveOutN(SILBasicBlock *BB);
     void getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result);
 
+    bool shouldEmitError(SILInstruction *Inst);
     void diagnoseInitError(const DIMemoryUse &Use, Diag<StringRef> DiagMessage);
   };
 } // end anonymous namespace
@@ -432,16 +434,25 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   MemBBInfo.LOState = LiveOutBlockState::IsKnown;
 }
 
-void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
-                                        Diag<StringRef> DiagMessage) {
-  auto *Inst = Use.Inst;
-
+/// shouldEmitError - Check to see if we've already emitted an error at the
+/// specified instruction.  If so, return false.  If not, remember the
+/// instruction and return true.
+bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
   // Check to see if we've already emitted an error at this location.  If so,
   // swallow the error.
   for (auto L : EmittedErrorLocs)
     if (L == Inst->getLoc())
-      return;
+      return false;
   EmittedErrorLocs.push_back(Inst->getLoc());
+  return true;
+}
+
+void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
+                                        Diag<StringRef> DiagMessage) {
+  auto *Inst = Use.Inst;
+
+  if (!shouldEmitError(Inst))
+    return;
 
   // If the definition is a declaration, try to reconstruct a name and
   // optionally an access path to the uninitialized element.
@@ -474,12 +485,12 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   TheMemory.getPathStringToElement(FirstUndefElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
-  
+
   // As a debugging hack, print the instruction itself if there is no location
   // information.  This should never happen.
   if (Inst->getLoc().isNull())
     llvm::errs() << "  the instruction: " << *Inst << "\n";
-  
+
   // Provide context as note diagnostics.
 
   // TODO: The QoI could be improved in many different ways here.  For example,
@@ -551,12 +562,19 @@ void LifetimeChecker::doIt() {
       
     case DIUseKind::Escape:
       if (getLivenessAtUse(Use) != DIKind::Yes) {
+        Diag<StringRef> DiagMessage;
+
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
-          diagnoseInitError(Use, diag::global_variable_function_use_uninit);
+          DiagMessage = diag::global_variable_function_use_uninit;
         else
-          diagnoseInitError(Use, diag::variable_escape_before_initialized);
+          DiagMessage = diag::variable_escape_before_initialized;
+
+        diagnoseInitError(Use, DiagMessage);
       }
+      break;
+    case DIUseKind::Superclass:
+      handleSuperclassUse(i);
       break;
     }
   }
@@ -626,6 +644,24 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // itself is tagged properly.
   updateInstructionForInitState(InstInfo);
 }
+
+
+/// handleSuperclassUse - When processing a 'self' argument on a class, this is
+/// called on any conversions to base classes.  These are effectively escape
+/// points, but we have additional semantics we want to apply and want to make
+/// the diagnostics a lot better.
+void LifetimeChecker::handleSuperclassUse(unsigned UseID) {
+  DIMemoryUse &InstInfo = Uses[UseID];
+  if (getLivenessAtUse(InstInfo) == DIKind::Yes) return;
+
+  if (InstInfo.isSuperInitUse())
+    return diagnoseInitError(InstInfo, diag::ivar_not_initialized_at_superinit);
+
+  auto BaseType = InstInfo.Inst->getType(0).getSwiftRValueType().getString();
+  diagnose(Module, InstInfo.Inst->getLoc(),
+           diag::base_object_use_before_initialized, BaseType);
+}
+
 
 /// updateInstructionForInitState - When an instruction being analyzed moves
 /// from being InitOrAssign to some concrete state, update it for that state.

@@ -619,12 +619,12 @@ bb0(%0 : $DerivedClassWithIVars):
 sil @derived_test2 :  $@cc(method) @thin (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
   %1 = alloc_box $DerivedClassWithIVars
-  %3 = mark_uninitialized [derivedself] %0 : $DerivedClassWithIVars  // expected-note {{variable defined here}}
+  %3 = mark_uninitialized [derivedself] %0 : $DerivedClassWithIVars
   store %3 to %1#1 : $*DerivedClassWithIVars
 
   %11 = load %1#1 : $*DerivedClassWithIVars
   strong_retain %11 : $DerivedClassWithIVars
-  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{variable '<unknown>.a' captured by a closure before being initialized}}
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{use of base object 'RootClassWithIVars' before super.init call initializes it}}
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

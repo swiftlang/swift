@@ -121,7 +121,11 @@ enum DIUseKind {
   
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
-  Escape
+  Escape,
+
+  /// This instruction is the start of an access to the superclass when we are
+  /// analyzing 'self'.
+  Superclass
 };
 
 /// This struct represents a single classified access to the memory object
@@ -147,7 +151,11 @@ struct DIMemoryUse {
   
   bool isInvalid() const { return Inst == nullptr; }
   bool isValid() const { return Inst != nullptr; }
-  
+
+  /// isSuperInitUse - Return true if this is a "Superclass" use which is part
+  /// of a call to super.init.
+  bool isSuperInitUse() const;
+
   bool usesElement(unsigned i) const {
     return i >= FirstElement && i < FirstElement+NumElements;
   }

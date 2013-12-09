@@ -503,8 +503,8 @@ public:
   }
 };
   
-/// A reference to another constructor from within a constructor body,
-/// either to a delegating constructor or to a super.constructor invocation.
+/// A reference to another initializer from within a constructor body,
+/// either to a delegating initializer or to a super.init invocation.
 /// For a reference type, this semantically references a different constructor
 /// entry point, called the 'initializing constructor', from the 'allocating
 /// constructor' entry point referenced by a 'new' expression.

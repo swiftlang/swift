@@ -258,6 +258,44 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   return true;
 }
 
+/// isSuperInitUse - Return true if this is a "Superclass" use which is part
+/// of a call to super.init.
+bool DIMemoryUse::isSuperInitUse() const {
+  if (Kind != Superclass) return false;
+
+  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
+  // that came from a call to super.init.
+  for (auto UI : Inst->getUses()) {
+    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
+    if (!AI) continue;
+
+    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+    if (!LocExpr) continue;
+
+    // This is a super.init call if structured like this:
+    // (call_expr type='SomeClass'
+    //   (dot_syntax_call_expr type='() -> SomeClass' super
+    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
+    //     (load_expr implicit type='SomeClass'
+    //       (super_ref_expr type='@inout (implicit)SomeClass')))
+    //   (tuple_expr type='()'))
+    if (!isa<TupleExpr>(LocExpr->getArg()))
+      continue;
+    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
+    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
+      continue;
+
+    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
+    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
+      return true;
+  }
+
+  return false;
+}
+
+
+
+
 //===----------------------------------------------------------------------===//
 //                          Scalarization Logic
 //===----------------------------------------------------------------------===//
@@ -266,7 +304,7 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
 /// add them to the ElementAddrs vector.
 static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                           SILLocation Loc,
-                                          SmallVectorImpl<SILValue> &ElementAddrs) {
+                                      SmallVectorImpl<SILValue> &ElementAddrs) {
   CanType AggType = Pointer.getType().getSwiftRValueType();
   TupleType *TT = AggType->castTo<TupleType>();
   for (auto &Field : TT->getFields()) {
@@ -834,6 +872,15 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // We ignore retains and releases of self.
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
       continue;
+
+
+    // upcast instructions are accesses into the base class.  These are
+    // effectively escapes for DI's purposes, but we classify them differently
+    // since the diagnostics are pretty different.
+    if (isa<UpcastInst>(User)) {
+      addElementUses(0, MemorySILType, User, DIUseKind::Superclass);
+      continue;
+    }
 
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(0, MemorySILType, User, DIUseKind::Escape);

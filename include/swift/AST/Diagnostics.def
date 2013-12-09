@@ -1559,6 +1559,21 @@ ERROR(variable_inout_before_initialized,sil_analysis,none,
 ERROR(variable_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",
       (StringRef))
+ERROR(base_object_use_before_initialized,sil_analysis,none,
+      "use of base object '%0' before super.init call initializes it",
+      (StringRef))
+ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
+      "instance variable '%0' not initialized at super.init call",
+      (StringRef))
+ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
+      "instance variable '%0' not initialized at end of initializer",
+      (StringRef))
+ERROR(superinit_multiple_times,sil_analysis,none,
+      "super.init called multiple times in initializer", ())
+ERROR(superinit_not_called_before_return,sil_analysis,none,
+      "super.init isn't called before returning from initializer", ())
+
+
 ERROR(global_variable_function_use_uninit,sil_analysis,none,
       "variable '%0' used by function definition before being initialized",
       (StringRef))
