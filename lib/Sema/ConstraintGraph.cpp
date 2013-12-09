@@ -40,69 +40,6 @@ ConstraintGraph::~ConstraintGraph() {
   }
 }
 
-#pragma mark Helper functions
-
-/// Recursively gather the set of type variables referenced by this constraint.
-static void
-gatherReferencedTypeVarsRec(ConstraintSystem &cs,
-                            Constraint *constraint,
-                            SmallVectorImpl<TypeVariableType *> &typeVars) {
-  switch (constraint->getKind()) {
-  case ConstraintKind::Conjunction:
-  case ConstraintKind::Disjunction:
-    for (auto nested : constraint->getNestedConstraints())
-      gatherReferencedTypeVarsRec(cs, nested, typeVars);
-    return;
-
-  case ConstraintKind::ApplicableFunction:
-  case ConstraintKind::Bind:
-  case ConstraintKind::Construction:
-  case ConstraintKind::Conversion:
-  case ConstraintKind::CheckedCast:
-  case ConstraintKind::Equal:
-  case ConstraintKind::Subtype:
-  case ConstraintKind::TrivialSubtype:
-  case ConstraintKind::TypeMember:
-  case ConstraintKind::ValueMember:
-    constraint->getSecondType()->getTypeVariables(typeVars);
-    SWIFT_FALLTHROUGH;
-
-  case ConstraintKind::Archetype:
-  case ConstraintKind::BindOverload:
-  case ConstraintKind::Class:
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::DynamicLookupValue:
-  case ConstraintKind::SelfObjectOfProtocol:
-    constraint->getFirstType()->getTypeVariables(typeVars);
-
-    // Special case: the base type of an overloading binding.
-    if (constraint->getKind() == ConstraintKind::BindOverload) {
-      if (auto baseType = constraint->getOverloadChoice().getBaseType()) {
-        baseType->getTypeVariables(typeVars);
-      }
-    }
-
-    break;
-  }
-}
-
-/// Gather and unique the set of type variables referenced by this constraint.
-static void
-gatherReferencedTypeVars(ConstraintSystem &cs,
-                         Constraint *constraint,
-                         SmallVectorImpl<TypeVariableType *> &typeVars) {
-  // Gather all of the referenced type variables.
-  gatherReferencedTypeVarsRec(cs, constraint, typeVars);
-
-  // Remove any duplicate type variables.
-  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
-  typeVars.erase(std::remove_if(typeVars.begin(), typeVars.end(),
-                                [&](TypeVariableType *typeVar) {
-                                  return !knownTypeVars.insert(typeVar);
-                                }),
-                 typeVars.end());
-}
-
 #pragma mark Graph accessors
 
 std::pair<ConstraintGraphNode &, unsigned>
@@ -392,11 +329,8 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
 }
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
-  // Gather the set of type variables referenced by this constraint.
-  SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  gatherReferencedTypeVars(CS, constraint, referencedTypeVars);
-
   // For the nodes corresponding to each type variable...
+  auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Find the node for this type variable.
     auto &node = (*this)[typeVar];
@@ -421,11 +355,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
-  // Gather the set of type variables referenced by this constraint.
-  SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  gatherReferencedTypeVars(CS, constraint, referencedTypeVars);
-
   // For the nodes corresponding to each type variable...
+  auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Find the node for this type variable.
     auto &node = (*this)[typeVar];
@@ -835,11 +766,7 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
   // we expect the adjacencies to look like.
   llvm::DenseMap<TypeVariableType *, unsigned> expectedAdjacencies;
   for (auto constraint : Constraints) {
-    SmallVector<TypeVariableType *, 4> referencedTypeVars;
-    gatherReferencedTypeVars(cg.getConstraintSystem(), constraint, 
-                             referencedTypeVars);
-
-    for (auto adjTypeVar : referencedTypeVars) {
+    for (auto adjTypeVar : constraint->getTypeVariables()) {
       if (adjTypeVar == TypeVar)
         continue;
 
@@ -948,11 +875,8 @@ void ConstraintGraph::verify() {
   // the set of constraints that are live.
   for (auto &constraint : CS.getConstraints()) {
 
-    // Gather the set of type variables referenced by this constraint.
-    SmallVector<TypeVariableType *, 8> referencedTypeVars;
-    gatherReferencedTypeVars(CS, &constraint, referencedTypeVars);
-
     // Check whether the constraint graph knows about this constraint.
+    auto referencedTypeVars = constraint.getTypeVariables();
     requireWithContext((knownConstraints.count(&constraint) ||
                         referencedTypeVars.empty()),
                        "constraint graph doesn't know about constraint",

@@ -21,6 +21,7 @@
 #include "OverloadChoice.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 
@@ -34,6 +35,7 @@ namespace swift {
 
 class ProtocolDecl;
 class SourceManager;
+class TypeVariableType;
 
 namespace constraints {
 
@@ -159,13 +161,18 @@ class Constraint : public llvm::ilist_node<Constraint> {
   ConstraintKind Kind : 8;
 
   /// The kind of restriction placed on this constraint.
-  ConversionRestrictionKind Restriction : 7;
+  ConversionRestrictionKind Restriction : 8;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
 
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
+
+  /// The number of type variables referenced by this constraint.
+  ///
+  /// The type variables themselves are tail-allocated.
+  unsigned NumTypeVariables : 30;
 
   union {
     struct {
@@ -200,28 +207,26 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// system.
   void *operator new(size_t) = delete;
 
-  Constraint(ConstraintKind kind, ArrayRef<Constraint *> disjunction,
-             ConstraintLocator *locator)
-    : Kind(kind), HasRestriction(false), IsActive(false), Nested(disjunction),
-      Locator(locator) {
-    assert(kind == ConstraintKind::Conjunction ||
-           kind == ConstraintKind::Disjunction);
-  }
+  Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Constraint a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, Identifier member,
-             ConstraintLocator *locator);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint.
-  Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator)
-    : Kind(ConstraintKind::BindOverload), HasRestriction(false),
-      IsActive(false), Overload{type, choice}, Locator(locator) { }
+  Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Constraint a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
-             Type first, Type second, ConstraintLocator *locator)
-    : Kind(kind), Restriction(restriction), HasRestriction(true),
-      IsActive(false), Types{ first, second, Identifier() }, Locator(locator) { }
+             Type first, Type second, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
+  /// Retrieve the type variables buffer, for internal mutation.
+  MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
+    return { reinterpret_cast<TypeVariableType **>(this + 1), NumTypeVariables };
+  }
 
 public:
   /// Create a new constraint.
@@ -266,6 +271,12 @@ public:
 
   /// Set whether this constraint is active or not.
   void setActive(bool active) { IsActive = active; }
+
+  /// Retrieve the set of type variables referenced by this constraint.
+  ArrayRef<TypeVariableType *> getTypeVariables() const {
+    return { reinterpret_cast<TypeVariableType * const *>(this + 1), 
+             NumTypeVariables };
+  }
 
   /// \brief Determine the classification of this constraint, providing
   /// a broader categorization than \c getKind().
@@ -361,6 +372,9 @@ public:
                      size_t alignment = alignof(Constraint));
 
   inline void operator delete(void *, const ConstraintSystem &cs, size_t) {}
+
+  void *operator new(size_t bytes, void *mem) { return mem; }
+  void operator delete(void *mem) { }
 };
 
 } } // end namespace swift::constraints
