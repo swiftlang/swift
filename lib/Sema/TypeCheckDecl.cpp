@@ -2490,180 +2490,6 @@ void TypeChecker::addRawRepresentableConformance(EnumDecl *ED) {
     .checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
 }
 
-bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
-                                         DeclContext *dc,
-                                         bool useConstructor) {
-  CanType canTy = ty->getCanonicalType();
-  switch (canTy->getKind()) {
-  case TypeKind::Archetype:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-    // Break to look for constructors.
-    break;
-
-  case TypeKind::Array:
-    // Arrays are default-initializable if their element types are.
-    // FIXME: We don't implement this rule yet, so just fail.
-    return false;
-
-#define ARTIFICIAL_TYPE(ID, BASE) \
-  case TypeKind::ID:
-#define TYPE(ID, BASE)
-#include "swift/AST/TypeNodes.def"
-    llvm_unreachable("should not be asking whether an artificial type "
-                     "is default-initializable");
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::Class:
-    // If we were asked to use a constructor, do so below.
-    if (useConstructor)
-      break;
-
-    // Classes are default-initializable (with 0).
-    // FIXME: This may not be what we want in the long term.
-    if (initializer) {
-      *initializer = new (Context) ZeroValueExpr(ty);
-    }
-    return true;
-
-  case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
-    // Existentials are not default-initializable.
-    return false;
-
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinVector:
-    // Built-in types are default-initializable.
-    if (initializer) {
-      *initializer = new (Context) ZeroValueExpr(ty);
-    }
-    return true;
-
-  case TypeKind::Tuple: {
-    // Check whether all fields either have an initializer or have
-    // default-initializable types.
-    SmallVector<Expr *, 4> eltInits;
-    SmallVector<Identifier, 4> eltNames;
-    for (auto &elt : ty->castTo<TupleType>()->getFields()) {
-      assert(!elt.hasInit() && "Initializers can't appear here");
-
-      // Check whether the element is default-initializable.
-      Expr *eltInit = nullptr;
-      if (!isDefaultInitializable(elt.getType(),
-                                  initializer? &eltInit : nullptr,
-                                  dc))
-        return false;
-
-      // If we need to produce an initializer, add this element.
-      if (initializer) {
-        assert(eltInit && "Missing initializer?");
-        eltInits.push_back(eltInit);
-        eltNames.push_back(elt.getName());
-      }
-    }
-
-    // If we need to build an initializer, build a TupleExpr or use the
-    // sole initializer (if all others are unnamed).
-    if (initializer) {
-      if (eltInits.size() == 1 && eltNames[0].empty())
-        *initializer = eltInits[0];
-      else
-        *initializer
-          = new (Context) TupleExpr(SourceLoc(),
-                                    Context.AllocateCopy(eltInits),
-                                    Context.AllocateCopy(eltNames).data(),
-                                    SourceLoc(),
-                                    /*hasTrailingClosure=*/false,
-                                    /*Implicit=*/true);
-    }
-    return true;
-  }
-
-  case TypeKind::GenericFunction:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-    llvm_unreachable("Should never ask about dependent types");
-
-  case TypeKind::Function:
-  case TypeKind::LValue:
-  case TypeKind::PolymorphicFunction:
-  case TypeKind::MetaType:
-  case TypeKind::Module:
-      return false;
-
-  // Sugar types.
-#define TYPE(Id, Parent)
-#define SUGARED_TYPE(Id, Parent) case TypeKind::Id:
-#include "swift/AST/TypeNodes.def"
-    llvm_unreachable("Not using the canonical type?");
-
-#define TYPE(Id, Parent)
-#define UNCHECKED_TYPE(Id, Parent) case TypeKind::Id:
-#include "swift/AST/TypeNodes.def"
-    // Error cases.
-    return false;
-  }
-
-  // We need to look for a default constructor.
-  auto ctors = lookupConstructors(ty, dc);
-  if (!ctors)
-    return false;
-
-  // Check whether we have a constructor that can be called with an empty
-  // tuple.
-  bool foundDefaultConstructor = false;
-  for (auto member : ctors) {
-    // Dig out the parameter tuple for this constructor.
-    auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor || ctor->isInvalid())
-      continue;
-
-    auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
-    if (!paramTuple)
-      continue;
-
-    // Check whether any of the tuple elements are missing an initializer.
-    bool missingInit = false;
-    for (auto &elt : paramTuple->getFields()) {
-      if (elt.hasInit())
-        continue;
-
-      missingInit = true;
-      break;
-    }
-    if (missingInit)
-      continue;
-
-    // We found a constructor that can be invoked with an empty tuple.
-    if (foundDefaultConstructor) {
-      // We found two constructors that can be invoked with an empty tuple.
-      return false;
-    }
-
-    foundDefaultConstructor = true;
-  }
-
-  if (!foundDefaultConstructor || !initializer)
-    return foundDefaultConstructor;
-
-  // We found a default constructor. Construct the initializer expression.
-  // FIXME: As an optimization, we could build a fully type-checked AST here.
-  Expr *arg = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/true);
-  Expr *metatype = new (Context) MetatypeExpr(nullptr, SourceLoc(),
-                                              MetaTypeType::get(ty, Context));
-  *initializer = new (Context) CallExpr(metatype, arg, /*Implicit=*/true);
-
-  return true;
-}
-
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
@@ -2702,10 +2528,50 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // For a class, check whether the superclass (if it exists) is
   // default-initializable.
   if (isa<ClassDecl>(decl)) {
+    // We need to look for a default constructor.
     if (auto superTy = getSuperClassOf(decl->getDeclaredTypeInContext())) {
-      if (!isDefaultInitializable(superTy, nullptr, decl,
-                                  /*useConstructor=*/true))
+      // If there are no default ctors for our supertype, we can't do anything.
+      auto ctors = lookupConstructors(superTy, decl);
+      if (!ctors)
         return;
+
+      // Check whether we have a constructor that can be called with an empty
+      // tuple.
+      bool foundDefaultConstructor = false;
+      for (auto member : ctors) {
+        // Dig out the parameter tuple for this constructor.
+        auto ctor = dyn_cast<ConstructorDecl>(member);
+        if (!ctor || ctor->isInvalid())
+          continue;
+
+        auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
+        if (!paramTuple)
+          continue;
+
+        // Check whether any of the tuple elements are missing an initializer.
+        bool missingInit = false;
+        for (auto &elt : paramTuple->getFields()) {
+          if (elt.hasInit())
+            continue;
+
+          missingInit = true;
+          break;
+        }
+        if (missingInit)
+          continue;
+
+        // We found a constructor that can be invoked with an empty tuple.
+        if (foundDefaultConstructor) {
+          // We found two constructors that can be invoked with an empty tuple.
+          foundDefaultConstructor = false;
+          break;
+        }
+
+        foundDefaultConstructor = true;
+      }
+
+      // If our superclass isn't default constructible, we aren't either.
+      if (!foundDefaultConstructor) return;
     }
   }
 

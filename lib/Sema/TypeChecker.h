@@ -489,20 +489,6 @@ private:
   Optional<Type> boolType;
   
 public:
-  /// \brief Determine whether the given type can be default-initialized.
-  ///
-  /// \param ty The type we are checking.
-  ///
-  /// \param initializer If non-null, we will assigned an initializer expression
-  /// that performs the default initialization.
-  ///
-  /// \param dc The context in which default-initialization is needed.
-  ///
-  /// \param useConstructor Whether we must use a constructor for a class
-  /// (rather than default-initializing to zero).
-  bool isDefaultInitializable(Type ty, Expr **initializer, DeclContext *dc,
-                              bool useConstructor = false);
-
   /// \brief Define the default constructor for the given struct or class.
   void defineDefaultConstructor(NominalTypeDecl *decl);
 
