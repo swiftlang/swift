@@ -338,11 +338,9 @@ bb0(%0 : $Aleph.metatype):
   %2 = alloc_box $Aleph       // CHECK: alloc_box
   // CHECK: initialize_var [no_default_construct]
   %3 = initialize_var [no_default_construct] %2#1 : $*Aleph
-  %4 = builtin_zero $Ref      // CHECK: builtin_zero $Ref
   // CHECK: struct_element_addr {{.*}} : $*Aleph, #a
   %5 = struct_element_addr %2#1 : $*Aleph, #a
   %6 = load %5 : $*Ref
-  %7 = store %4 to %5 : $*Ref
   %8 = strong_release %6 : $Ref
   %14 = load %2#1 : $*Aleph
   // CHECK: struct_extract {{%.*}} : $Aleph, #a
