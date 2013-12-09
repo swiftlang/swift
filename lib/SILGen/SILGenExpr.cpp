@@ -2391,18 +2391,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the prolog for the non-self arguments.
   emitProlog(ctor->getBodyParams(), TupleType::getEmpty(F.getASTContext()));
 
-
-
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
 
-  // If the class has no super classes, DI will take care of it.
-  // FIXME: Handle classes with superclasses.
-
-  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
-  if (!cast<ClassDecl>(ConstructedType->getAnyNominal())->hasSuperclass() &&
-      !cast<ClassDecl>(ConstructedType->getAnyNominal())->isObjC())
-    selfArg = B.createMarkUninitializedRootSelf(selfDecl, selfArg);
+  // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
+  // on ivars.
+  // FIXME: ObjC classes too.
+  if (!cast<ClassDecl>(nominalDecl)->isObjC()) {
+    auto Kind = cast<ClassDecl>(nominalDecl)->hasSuperclass()
+          ? MarkUninitializedInst::DerivedSelf :
+            MarkUninitializedInst::RootSelf;
+    selfArg = B.createMarkUninitialized(selfDecl, selfArg, Kind);
+  }
 
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");

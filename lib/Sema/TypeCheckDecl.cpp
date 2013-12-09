@@ -2699,9 +2699,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       if (isa<StructDecl>(decl))
         return;
 
-      // FIXME: Classes with super classes too someday.
+      // FIXME: ObjC classes too someday.
       if (auto *CD = dyn_cast<ClassDecl>(decl))
-        if (!CD->hasSuperclass() && !CD->isObjC())
+        if (!CD->isObjC())
           return;
 
       // If this variable is not default-initializable, we're done: we can't
