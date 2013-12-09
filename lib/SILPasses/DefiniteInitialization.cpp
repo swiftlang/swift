@@ -668,6 +668,11 @@ void LifetimeChecker::handleSuperclassUse(unsigned UseID) {
     diagnose(Module, Inst->getLoc(),
              diag::base_object_use_before_initialized, BaseType);
   }
+
+
+  // superinit_multiple_times
+  // superinit_not_called_before_return
+
 }
 
 

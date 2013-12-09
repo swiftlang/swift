@@ -2673,35 +2673,29 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   if (decl->hasClangNode())
     return;
 
+  SmallVector<VarDecl *, 4> variables;
+
   // Verify that all of the instance variables of this type have default
   // constructors.
   for (auto member : decl->getMembers()) {
-    // We only care about pattern bindings.
+    // We only care about pattern bindings, and if the pattern has an
+    // initializer, it can get a default initializer.
     auto patternBind = dyn_cast<PatternBindingDecl>(member);
-    if (!patternBind)
-      continue;
-
-    // If the pattern has an initializer, we don't need any default
-    // initialization for its variables.
-    if (patternBind->getInit())
+    if (!patternBind || patternBind->getInit())
       continue;
 
     // Find the variables in the pattern. They'll each need to be
     // default-initialized.
-    SmallVector<VarDecl *, 4> variables;
+    variables.clear();
     patternBind->getPattern()->collectVariables(variables);
 
     for (auto var : variables) {
       if (var->isStatic() || var->isComputed() || var->isInvalid())
         continue;
 
-      // FIXME: remove dead code.
+      // Otherwise, there is a stored ivar without an initializer.  We can't
+      // generate a default initializer for this.
       return;
-
-      // If this variable is not default-initializable, we're done: we can't
-      // add the default constructor because it will be ill-formed.
-      if (!isDefaultInitializable(getTypeOfRValue(var), nullptr, decl))
-        return;
     }
   }
 
