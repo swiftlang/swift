@@ -524,9 +524,6 @@ ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
 
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const ValueDecl *VD) {
-  if (VD->getName().str() == "windowGroupInvalidErr") {
-    VD->getName();
-  }
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   return ModuleFilter == ContainingUnit;
 }
