@@ -685,7 +685,7 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                     IGF.getDebugScope());
   emitVariableDeclaration(IGF.Builder, Metadata, DTI,
                           TName, llvm::dwarf::DW_TAG_auto_variable, 0,
-                          // swift.type is already pointer type,
+                          // swift.type is a already pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
                           DirectValue, ArtificialValue,
@@ -1021,6 +1021,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   unsigned Flags = 0;
 
   TypeBase* BaseTy = DbgTy.getType();
+  // In here, we actually want the sugared version of the type, if there is one.
+  if (auto Decl = DbgTy.getDecl())
+    if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
+      BaseTy = AliasDecl->getAliasType();
+
   if (!BaseTy) {
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();
           llvm::dbgs() << "\n");
@@ -1030,6 +1035,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                       DW_LANG_Swift, SizeInBits, AlignInBits);
   }
 
+  // Here goes!
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
     auto IntegerTy = BaseTy->castTo<BuiltinIntegerType>();
@@ -1349,8 +1355,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // We cannot use BaseTy->castTo<>(), because it will use the desugared type!
     auto NameAliasTy = cast<NameAliasType>(BaseTy);
     if (auto Decl = NameAliasTy->getDecl()) {
-      Name = getMangledName(Decl);
       Location L = getLoc(SM, Decl);
+      if (Decl->getModuleContext() == IGM.Context.TheBuiltinModule)
+        // It's not possible to mangle the context of a builtin module.
+        Name = Decl->getName().str();
+      else
+        Name = getMangledName(Decl);
+
       auto AliasedTy = Decl->getUnderlyingType();
       auto File = getOrCreateFile(L.Filename);
       // For NameAlias types, the DeclContext for the aliasED type is

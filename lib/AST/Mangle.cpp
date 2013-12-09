@@ -436,13 +436,12 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
     if (DWARFMangling && decl->getKind() == DeclKind::TypeAlias) {
       // For the DWARF output we want to mangle the type alias + context,
       // unless the type alias references a builtin type.
-      Module *M = decl->getModuleContext();
-      if (M != M->Ctx.TheBuiltinModule) {
-        Buffer << "a";
-        mangleContextOf(decl);
-        mangleIdentifier(decl->getName());
-        return;
-      }
+      assert(decl->getModuleContext() !=
+             decl->getModuleContext()->Ctx.TheBuiltinModule);
+      Buffer << "a";
+      mangleContextOf(decl);
+      mangleIdentifier(decl->getName());
+      return;
     }
 
     // Otherwise, mangle the canonical type.
