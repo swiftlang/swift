@@ -922,9 +922,6 @@ private:
   /// The constraint graph, if there is one.
   ConstraintGraph *CG = nullptr;
 
-  typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
-    RepresentativeOrFixed;
-
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
