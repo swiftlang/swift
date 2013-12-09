@@ -6,6 +6,7 @@ add_swift_library(swiftSema
   CSApply.cpp
   CSDiag.cpp
   CSGen.cpp
+  CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
   NameBinding.cpp
