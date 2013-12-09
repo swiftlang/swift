@@ -861,14 +861,8 @@ namespace {
         // The enumeration was simply mapped to an integral type. Create a
         // constant with that integral type.
 
-        // FIXME: These should be able to end up in a record, but Swift
-        // can't represent that now.
-        auto clangDC = clangEnum->getDeclContext();
-        while (!clangDC->isFileContext())
-          clangDC = clangDC->getParent();
-
         // The context where the constant will be introduced.
-        auto dc = Impl.importDeclContext(clangDC);
+        auto dc = Impl.importDeclContextOf(clangEnum);
         if (!dc)
           return nullptr;
 
@@ -893,18 +887,12 @@ namespace {
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
-          
+
       case EnumKind::Unknown: {
         // The enumeration was mapped to a struct containining the integral
         // type. Create a constant with that struct type.
 
-        // FIXME: These should be able to end up in a record, but Swift
-        // can't represent that now.
-        auto clangDC = clangEnum->getDeclContext();
-        while (!clangDC->isFileContext())
-          clangDC = clangDC->getParent();
-
-        auto dc = Impl.importDeclContext(clangDC);
+        auto dc = Impl.importDeclContextOf(clangEnum);
         if (!dc)
           return nullptr;
 
@@ -2541,7 +2529,7 @@ namespace {
   };
 }
 
-/// \brief Classify the given Clang enumeration to describe how it
+/// \brief Classify the given Clang enumeration to describe how to import it.
 EnumKind ClangImporter::Implementation::
 classifyEnum(const clang::EnumDecl *decl) {
   Identifier name;
