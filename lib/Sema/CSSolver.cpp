@@ -73,7 +73,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 Solution ConstraintSystem::finalize(
            FreeTypeVariableBinding allowFreeTypeVariables) {
   // Create the solution.
-  Solution solution(*this);
+  Solution solution(*this, CurrentScore);
 
   // For any of the type variables that has no associated fixed type, assign a
   // fresh generic type parameters.
@@ -123,6 +123,9 @@ Solution ConstraintSystem::finalize(
 }
 
 void ConstraintSystem::applySolution(const Solution &solution) {
+  // Update the score.
+  CurrentScore += solution.getFixedScore();
+
   // Assign fixed types to the type variables solved by this solution.
   llvm::SmallPtrSet<TypeVariableType *, 4> 
     knownTypeVariables(TypeVariables.begin(), TypeVariables.end());
@@ -134,7 +137,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second);
+      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
   }
 
   // Register overload choices.
@@ -583,6 +586,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
   oldGeneratedConstraints = cs.solverState->generatedConstraints;
   cs.solverState->generatedConstraints = &generatedConstraints;
+  PreviousScore = cs.CurrentScore;
 
   ++cs.solverState->NumStatesExplored;
 
@@ -617,6 +621,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Reset the prior generated-constraints pointer.
   cs.solverState->generatedConstraints = oldGeneratedConstraints;
+
+  // Reset the previous score.
+  cs.CurrentScore = PreviousScore;
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
@@ -932,7 +939,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     auto solution = finalize(allowFreeTypeVariables);
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "(found solution)\n";
+      log.indent(solverState->depth * 2)
+        << "(found solution " << CurrentScore << ")\n";
     }
 
     solutions.push_back(std::move(solution));
@@ -1069,6 +1077,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Move the type variables back, clear out constraints; we're
     // ready for the next component.
     TypeVariables = std::move(allTypeVariables);
+
+    // For each of the partial solutions, substract off the current score.
+    // It doesn't contribute.
+    for (auto &solution : partialSolutions[component])
+      solution.getFixedScore() -= CurrentScore;
   }
 
   // Move the constraints back. The system is back in a normal state.
@@ -1103,7 +1116,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     auto solution = finalize(allowFreeTypeVariables);
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "(composed solution)\n";
+      log.indent(solverState->depth * 2)
+        << "(composed solution " << CurrentScore << ")\n";
     }
 
     // Save this solution.

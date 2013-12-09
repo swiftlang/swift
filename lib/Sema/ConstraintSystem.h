@@ -611,6 +611,94 @@ struct SelectedOverload {
   Type openedType;
 };
 
+/// Describes an aspect of a solution that affects is overall score, i.e., a
+/// user-defined conversions.
+enum ScoreKind {
+  /// A user-defined conversion.
+  SK_UserConversion = 0,
+  /// A literal expression bound to a non-default literal type.
+  SK_NonDefaultLiteral = 1
+};
+
+/// The number of score kinds.
+const unsigned NumScoreKinds = 2;
+
+/// Describes the fixed score of a solution to the constraint system.
+struct Score {
+  unsigned Data[NumScoreKinds] = { 0, 0 };
+
+  friend Score &operator+=(Score &x, const Score &y) {
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      x.Data[i] += y.Data[i];
+    }
+    return x;
+  }
+
+  friend Score operator+(const Score &x, const Score &y) {
+    Score result;
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      result.Data[i] = x.Data[i] + y.Data[i];
+    }
+    return result;
+  }
+
+  friend Score operator-(const Score &x, const Score &y) {
+    Score result;
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      result.Data[i] = x.Data[i] - y.Data[i];
+    }
+    return result;
+  }
+
+  friend Score &operator-=(Score &x, const Score &y) {
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      x.Data[i] -= y.Data[i];
+    }
+    return x;
+  }
+
+  friend bool operator==(const Score &x, const Score &y) {
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      if (x.Data[i] != y.Data[i])
+        return false;
+    }
+
+    return true;
+  }
+
+  friend bool operator!=(const Score &x, const Score &y) {
+    return !(x == y);
+  }
+
+  friend bool operator<(const Score &x, const Score &y) {
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      if (x.Data[i] < y.Data[i])
+        return true;
+
+      if (x.Data[i] > y.Data[i])
+        return false;
+    }
+
+    return true;
+  }
+
+  friend bool operator<=(const Score &x, const Score &y) {
+    return !(y < x);
+  }
+
+  friend bool operator>(const Score &x, const Score &y) {
+    return y < x;
+  }
+
+  friend bool operator>=(const Score &x, const Score &y) {
+    return !(x < y);
+  }
+
+};
+
+/// Display a score.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
+
 /// \brief A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -622,31 +710,19 @@ class Solution {
   ConstraintSystem *constraintSystem;
 
   /// \brief The fixed score for this solution.
-  mutable Optional<int> fixedScore;
+  Score FixedScore;
 
 public:
   /// \brief Create a solution for the given constraint system.
-  Solution(ConstraintSystem &cs) : constraintSystem(&cs) {}
+  Solution(ConstraintSystem &cs, const Score &score)
+    : constraintSystem(&cs), FixedScore(score) {}
 
   // Solution is a non-copyable type for performance reasons.
   Solution(const Solution &other) = delete;
   Solution &operator=(const Solution &other) = delete;
 
-  Solution(Solution &&other)
-    : constraintSystem(other.constraintSystem),
-      typeBindings(std::move(other.typeBindings)),
-      overloadChoices(std::move(other.overloadChoices)),
-      constraintRestrictions(std::move(other.constraintRestrictions))
-  {
-  }
-
-  Solution &operator=(Solution &&other) {
-    constraintSystem = other.constraintSystem;
-    typeBindings = std::move(other.typeBindings);
-    overloadChoices = std::move(other.overloadChoices);
-    constraintRestrictions = std::move(other.constraintRestrictions);
-    return *this;
-  }
+  Solution(Solution &&other) = default;
+  Solution &operator=(Solution &&other) = default;
 
   /// \brief Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
@@ -726,10 +802,12 @@ public:
                             Type openedType,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
-  /// \brief Retrieve the fixed score of this solution, which considers
-  /// the number of user-defined conversions.
-  int getFixedScore() const;
-  
+  /// \brief Retrieve the fixed score of this solution
+  const Score &getFixedScore() const { return FixedScore; }
+
+  /// \brief Retrieve the fixed score of this solution
+  Score &getFixedScore() { return FixedScore; }
+
   /// \brief Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
@@ -911,6 +989,10 @@ private:
   /// \brief The overload sets that have been resolved along the current path.
   ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
 
+  /// The current fixed score for this constraint system and the (partial)
+  /// solution it represents.
+  Score CurrentScore;
+
   SmallVector<TypeVariableType *, 16> TypeVariables;
   ConstraintList Constraints;
 
@@ -1011,6 +1093,9 @@ public:
 
     /// \brief The length of \c constraintRestrictions.
     unsigned numConstraintRestrictions;
+
+    /// The previous score.
+    Score PreviousScore;
 
     /// Constraint graph scope associated with this solver scope.
     ///
@@ -1314,7 +1399,12 @@ public:
                              bool wantRValue);
 
   /// \brief Assign a fixed type to the given type variable.
-  void assignFixedType(TypeVariableType *typeVar, Type type);
+  ///
+  /// \param typeVar The type variable to bind.
+  /// \param type The fixed type to which the type variable will be bound.
+  /// \param updateScore Whether to update the score based on this binding.
+  void assignFixedType(TypeVariableType *typeVar, Type type,
+                       bool updateScore = true);
 
 private:
   /// Introduce the constraints associated with the given type variable
@@ -1720,6 +1810,10 @@ private:
                                                 unsigned idx2);
 
 public:
+  /// Increase the score of the given kind for the current (partial) solution
+  /// along the.
+  void increaseScore(ScoreKind kind);
+
   /// \brief Given a set of viable solutions, find the best
   /// solution.
   ///

@@ -27,6 +27,20 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
 
+void ConstraintSystem::increaseScore(ScoreKind kind) {
+  unsigned index = static_cast<unsigned>(kind);
+  ++CurrentScore.Data[index];
+}
+
+llvm::raw_ostream &constraints::operator<<(llvm::raw_ostream &out,
+                                           const Score &score) {
+  for (unsigned i = 0; i != NumScoreKinds; ++i) {
+    if (i) out << ' ';
+    out << score.Data[i];
+  }
+  return out;
+}
+
 /// \brief Remove the initializers from any tuple types within the
 /// given type.
 static Type stripInitializers(TypeChecker &tc, Type origType) {
@@ -446,6 +460,13 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
+/// Simplify a score into a single integer.
+/// FIXME: Temporary hack.
+static int simplifyScore(const Score &score) {
+  return (int)score.Data[SK_UserConversion] * -3
+      + (int)score.Data[SK_NonDefaultLiteral] * -1;
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
                         ConstraintSystem &cs,
                         ArrayRef<Solution> solutions,
@@ -458,8 +479,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Solution comparison uses a scoring system to determine whether one
   // solution is better than the other. Retrieve the fixed scores for each of
   // the solutions, which we'll modify with relative scoring.
-  int score1 = solutions[idx1].getFixedScore();
-  int score2 = solutions[idx2].getFixedScore();
+  int score1 = simplifyScore(solutions[idx1].getFixedScore());
+  int score2 = simplifyScore(solutions[idx2].getFixedScore());
 
   // Compare overload sets.
   for (auto &overload : diff.overloads) {

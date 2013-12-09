@@ -1504,7 +1504,8 @@ void Solution::dump(SourceManager *sm) const {
 }
 
 void Solution::dump(SourceManager *sm, raw_ostream &out) const {
-  out << "Fixed score: " << getFixedScore() << "\n\n";
+  out << "Fixed score: " << FixedScore << "\n";
+
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
     out.indent(2);
@@ -1552,6 +1553,7 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::dump(raw_ostream &out) {
+  out << "Score: " << CurrentScore << "\n";
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);

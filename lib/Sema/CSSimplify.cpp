@@ -526,6 +526,9 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
     cs.addConstraint(kind, outputTV, otherType, resultLocator);
   }
 
+  // We're adding a user-defined conversion.
+  cs.increaseScore(SK_UserConversion);
+
   return ConstraintSystem::SolutionKind::Solved;
 }
 

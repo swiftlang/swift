@@ -111,6 +111,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   if (isa<InterpolatedStringLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::StringInterpolationConvertible);
+
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
@@ -124,7 +125,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     }
   }
   
-  llvm_unreachable("Unhandled literal kind");
+  return nullptr;
 }
 
 Module *TypeChecker::getStdlibModule(const DeclContext *dc) {

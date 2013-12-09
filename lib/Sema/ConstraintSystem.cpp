@@ -69,9 +69,51 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   }
 }
 
-void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type) {
+void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
+                                       bool updateScore) {
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
-  
+
+  if (updateScore && !type->is<TypeVariableType>()) {
+    // If this type variable represents a literal, check whether we picked the
+    // default literal type. First, find the corresponding protocol.
+    ProtocolDecl *literalProtocol = nullptr;
+    if (CG) {
+      // If we have the constraint graph, we can check all type variables in
+      // the equivalence class. This is the More Correct path.
+      // FIXME: Eliminate the less-correct path.
+      auto typeVarRep = getRepresentative(typeVar);
+      for (auto tv : (*CG)[typeVarRep].getEquivalenceClass()) {
+        auto locator = tv->getImpl().getLocator();
+        if (!locator || !locator->getPath().empty())
+          continue;
+
+        auto anchor = locator->getAnchor();
+        if (!anchor)
+          continue;
+
+        literalProtocol = TC.getLiteralProtocol(anchor);
+        if (literalProtocol)
+          break;
+      }
+    } else {
+      // FIXME: This is the less-correct path.
+      auto locator = typeVar->getImpl().getLocator();
+      if (locator && locator->getPath().empty() && locator->getAnchor()) {
+        literalProtocol = TC.getLiteralProtocol(locator->getAnchor());
+      }
+    }
+
+    // If the protocol has a default type, check it.
+    if (literalProtocol) {
+      if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
+        // Check whether the nominal types match. This makes sure that we
+        // properly handle Slice vs. Slice<T>.
+        if (defaultType->getAnyNominal() != type->getAnyNominal())
+          increaseScore(SK_NonDefaultLiteral);
+      }
+    }
+  }
+
   // Notify the constraint graph.
   if (CG) {
     CG->bindTypeVariable(typeVar, type);
