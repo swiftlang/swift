@@ -369,6 +369,8 @@ namespace {
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
     void collectClassSelfUses(const DIMemoryObjectInfo &MemInfo);
+    void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
+                              llvm::SmallDenseMap<VarDecl*, unsigned> &EN);
 
     void addElementUses(unsigned BaseEltNo, SILType UseTy,
                         SILInstruction *User, DIUseKind Kind);
@@ -766,8 +768,55 @@ collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
     }
   }
 
-  SILValue ClassPointer = MemInfo.getAddress();
+  // If we are looking at the init method for a root class, just walk the
+  // MUI use-def chain directly to find our uses.
+  auto *MUI = cast<MarkUninitializedInst>(MemInfo.MemoryInst);
+  if (MUI->getKind() == MarkUninitializedInst::RootSelf) {
+    collectClassSelfUses(MemInfo.getAddress(), MemInfo.MemorySILType,
+                         EltNumbering);
+    return;
+  }
 
+  // Otherwise, things are more complicated.  Because super.init is allows to
+  // change self, SILGen is producing a box for 'self'.  This means that we need
+  // to see through this box to find the uses of 'self'.  We handle this by
+  // pattern matching: we allow only a single use of MUI, which must be a store
+  // to an alloc_box/alloc_stack.
+  assert(MUI->hasOneUse());
+  auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
+  SILValue SelfBox = TheStore->getOperand(1);
+  assert(isa<AllocBoxInst>(SelfBox) || isa<AllocStackInst>(SelfBox));
+
+  // Okay, given that we have a proper setup, we walk the use chains of the self
+  // box to find any accesses to it.  The possible uses are one of:
+  //   1) The initialization store (TheStore).
+  //   2) Loads of the box, which have uses of self hanging off of them.
+  //   3) An assign to the box, which happens at super.init.
+  //   4) Potential escapes after super.init, if self is closed over.
+  // Handle each of these in turn.
+  //
+  for (auto UI : SelfBox.getUses()) {
+    SILInstruction *User = UI->getUser();
+
+    // Ignore the initialization store.
+    if (User == TheStore) continue;
+
+    // Loads of the box produce self, so collect uses from them.
+    if (auto *LI = dyn_cast<LoadInst>(User)) {
+      collectClassSelfUses(LI, MemInfo.MemorySILType, EltNumbering);
+      continue;
+    }
+
+    // We can safely handle anything else as an escape.  They should all happen
+    // after super.init is invoked.
+    addElementUses(0, MemInfo.MemorySILType, User, DIUseKind::Escape);
+  }
+}
+
+
+void ElementUseCollector::
+collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
+                     llvm::SmallDenseMap<VarDecl*, unsigned> &EltNumbering) {
   for (auto UI : ClassPointer.getUses()) {
     auto *User = UI->getUser();
 
@@ -787,9 +836,8 @@ collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
       continue;
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(0, MemInfo.MemorySILType, User, DIUseKind::Escape);
+    addElementUses(0, MemorySILType, User, DIUseKind::Escape);
   }
-
 }
 
 

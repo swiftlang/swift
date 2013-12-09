@@ -1413,6 +1413,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       Kind = MarkUninitializedInst::GlobalVar;
     else if (KindId.str() == "rootself")
       Kind = MarkUninitializedInst::RootSelf;
+    else if (KindId.str() == "derivedself")
+      Kind = MarkUninitializedInst::DerivedSelf;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
                  "globalvar or rootself");
