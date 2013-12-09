@@ -545,7 +545,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // If this is a stored variable not reflected as an Objective-C
   // property, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    if (!var->isComputed() && !gen.SGM.requiresObjCDispatch(var)) {
+    if (!var->isComputed()
+        && (gen.AlwaysDirectStoredPropertyAccess
+            || !gen.SGM.requiresObjCDispatch(var))) {
       // Find the substituted storage type.
       SILType varStorageType =
         gen.SGM.Types.getSubstitutedStorageType(var, e->getType());

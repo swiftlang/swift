@@ -33,6 +33,7 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F), LastInsnWithoutScope(0),
     B(createBasicBlock(), &InsertedInstrs),
     ReturnDest(CleanupLocation::getCleanupLocation(F.getLocation())),
+    NeedsReturn(false), AlwaysDirectStoredPropertyAccess(false),
     CurrentSILLoc(F.getLocation()), Cleanups(*this)
 {
 }
