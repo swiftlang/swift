@@ -496,7 +496,8 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // TODO: The QoI could be improved in many different ways here.  For example,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
-  diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here);
+  if (!TheMemory.IsSelfOfInitializer)
+    diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here);
 }
 
 void LifetimeChecker::doIt() {
