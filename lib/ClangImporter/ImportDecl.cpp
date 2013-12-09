@@ -2624,8 +2624,8 @@ importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
   return result;
 }
 
-DeclContext *
-ClangImporter::Implementation::importDeclContext(const clang::DeclContext *dc) {
+DeclContext *ClangImporter::Implementation::importDeclContextImpl(
+    const clang::DeclContext *dc) {
   // FIXME: Should map to the module we want to import into (?).
   if (dc->isTranslationUnit())
     return firstClangModule;
@@ -2656,7 +2656,7 @@ ClangImporter::Implementation::importDeclContextOf(const clang::Decl *D) {
     if (auto *M = getClangModuleForDecl(D))
       return M;
 
-  return importDeclContext(DC);
+  return importDeclContextImpl(DC);
 }
 
 ValueDecl *

@@ -352,9 +352,11 @@ public:
 
   /// \brief Import the given Clang declaration context into Swift.
   ///
+  /// Usually one will use \c importDeclContextOf instead.
+  ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContext(const clang::DeclContext *dc);
+  DeclContext *importDeclContextImpl(const clang::DeclContext *dc);
 
   /// \brief Import the declaration context of a given Clang declaration into
   /// Swift.
