@@ -474,7 +474,12 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   TheMemory.getPathStringToElement(FirstUndefElement, Name);
 
   diagnose(Module, Inst->getLoc(), DiagMessage, Name);
-
+  
+  // As a debugging hack, print the instruction itself if there is no location
+  // information.  This should never happen.
+  if (Inst->getLoc().isNull())
+    llvm::errs() << "  the instruction: " << *Inst << "\n";
+  
   // Provide context as note diagnostics.
 
   // TODO: The QoI could be improved in many different ways here.  For example,
@@ -1065,7 +1070,7 @@ Optional<DIKind> LifetimeChecker::getLiveOut1(SILBasicBlock *BB) {
 }
 
 void LifetimeChecker::getPredsLiveOut1(SILBasicBlock *BB,
-                                             Optional<DIKind> &Result) {
+                                       Optional<DIKind> &Result) {
   bool LiveInAny = false, LiveInAll = true;
 
   // If we have a starting point, incorporate it into our state.
@@ -1114,8 +1119,18 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   // is required to handle cycles properly.
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
 
-  auto Result = BBState.getAvailabilitySet();
+  auto Result = AvailabilitySet(NumElements);
   getPredsLiveOutN(BB, Result);
+
+  // Anything that our initial pass knew as a definition is still a definition
+  // live out of this block.  Something known to be not-defined in a predecessor
+  // does not drop it to "partial".
+  auto &LocalAV = BBState.getAvailabilitySet();
+  for (unsigned i = 0, e = NumElements; i != e; ++i) {
+    auto EV = LocalAV.getConditional(i);
+    if (EV.hasValue() && EV.getValue() == DIKind::Yes)
+      Result.set(i, DIKind::Yes);
+  }
 
   // Finally, cache and return our result.
   getBlockInfo(BB).setBlockAvailability(Result);
