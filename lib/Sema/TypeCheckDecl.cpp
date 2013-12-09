@@ -2696,9 +2696,13 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
         continue;
 
       // We refuse to default construct struct members.  DI takes care of this.
-      // FIXME: Classes too someday.
       if (isa<StructDecl>(decl))
         return;
+
+      // FIXME: Classes with super classes too someday.
+      if (auto *CD = dyn_cast<ClassDecl>(decl))
+        if (!CD->hasSuperclass() && !CD->isObjC())
+          return;
 
       // If this variable is not default-initializable, we're done: we can't
       // add the default constructor because it will be ill-formed.

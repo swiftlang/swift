@@ -705,7 +705,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
                        ->getNominalOrBoundGenericNominal();
 
-  bool UseDIForThis = isa<StructDecl>(nominalDecl);
+  bool UseDIForThis = true;
+  if (auto *CD = dyn_cast<ClassDecl>(nominalDecl))
+    UseDIForThis = !CD->hasSuperclass() && !CD->isObjC();
 
   llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
   for (auto elt : body->getElements()) {

@@ -2395,6 +2395,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
+
+  // If the class has no super classes, DI will take care of it.
+  // FIXME: Handle classes with superclasses.
+
+  Type ConstructedType = ctor->getDeclContext()->getDeclaredTypeOfContext();
+  if (!cast<ClassDecl>(ConstructedType->getAnyNominal())->hasSuperclass() &&
+      !cast<ClassDecl>(ConstructedType->getAnyNominal())->isObjC())
+    selfArg = B.createMarkUninitializedRootSelf(selfDecl, selfArg);
+
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
 
