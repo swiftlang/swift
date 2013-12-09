@@ -167,10 +167,25 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
       continue;
     }
 
-    // Scan past simple memory accesses.
+    // Scan past simple memory accesses.  These cannot reduce refcounts.
     if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
         isa<CopyValueInst>(Inst))
       continue;
+
+    // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
+    // never can either.  Nontrivial ones can though, because the overwritten
+    // value drops a retain.  We would have to do more alias analysis to be able
+    // to safely ignore one of those.
+    if (auto AI = dyn_cast<AssignInst>(Inst)) {
+      if (AI->getOperand(0).getType().isTrivial(getModule()))
+        continue;
+    }
+
+    if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
+      if (CAI->isInitializationOfDest() ||
+          CAI->getOperand(0).getType().getObjectType().isTrivial(getModule()))
+        continue;
+    }
 
     // This code doesn't try to prove tricky validity constraints about whether
     // it is safe to push the release past interesting instructions.
