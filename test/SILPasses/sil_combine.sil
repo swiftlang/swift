@@ -303,3 +303,16 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @copy_value_test
+// CHECK: bb0([[TRIVIAL_TARGET:%[0-9]+]] : $Builtin.Int8, [[REFCOUNT_TARGET:%[0-9]+]] : $Builtin.ObjectPointer):
+// CHECK-NEXT: strong_retain [[REFCOUNT_TARGET]] : $Builtin.ObjectPointer
+// CHECK-NEXT: tuple ([[TRIVIAL_TARGET]] : $Builtin.Int8, [[REFCOUNT_TARGET]] : $Builtin.ObjectPointer)
+// CHECK-NEXT: return
+sil @copy_value_test : $@thin (Builtin.Int8, Builtin.ObjectPointer) -> (Builtin.Int8, Builtin.ObjectPointer) {
+bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
+  %2 = copy_value %0 : $Builtin.Int8
+  %3 = copy_value %1 : $Builtin.ObjectPointer
+  %4 = tuple(%2 : $Builtin.Int8, %3 : $Builtin.ObjectPointer)
+  return %4 : $(Builtin.Int8, Builtin.ObjectPointer)
+}

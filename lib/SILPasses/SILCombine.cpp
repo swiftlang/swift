@@ -251,6 +251,7 @@ public:
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
   SILInstruction *visitStructExtractInst(StructExtractInst *V);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
+  SILInstruction *visitCopyValueInst(CopyValueInst *CI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -477,6 +478,31 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
   // DestroyValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics()) {
     return new (Module) StrongReleaseInst(DI->getLoc(), Operand);
+  }
+
+  // Do nothing for non-trivial non-reference types.
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
+  SILValue Operand = CI->getOperand();
+  SILType OperandTy = Operand.getType();
+
+  // CopyValueInst of a trivial type is a no-op + use propogation.
+  if (OperandTy.isTrivial(Module)) {
+    // We need to use eraseInstFromFunction + RAUW here since a copy value can
+    // never be trivially dead since it touches reference counts.
+    replaceInstUsesWith(*CI, Operand.getDef(), 0);
+    return eraseInstFromFunction(*CI);
+  }
+
+  // CopyValueInst of a reference type is a strong_release.
+  if (OperandTy.hasReferenceSemantics()) {
+    Builder->createStrongRetain(CI->getLoc(), Operand);
+    // We need to use eraseInstFromFunction + RAUW here since a copy value can
+    // never be trivially dead since it touches reference counts.
+    replaceInstUsesWith(*CI, Operand.getDef(), 0);
+    return eraseInstFromFunction(*CI);
   }
 
   // Do nothing for non-trivial non-reference types.
