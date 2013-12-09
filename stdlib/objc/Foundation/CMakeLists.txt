@@ -1,7 +1,6 @@
 set(SHARED_LIBRARY ON)
 set(SWIFTFOUNDATION_SOURCES
     Foundation.swift
-    NSStringAPI.swift
     BridgeNSString.mm
     Misc.mm
 )
