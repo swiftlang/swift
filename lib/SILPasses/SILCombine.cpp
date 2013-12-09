@@ -147,7 +147,8 @@ namespace swift {
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
 public:
-  SILCombiner() : Worklist(), MadeChange(false), Iteration(0), Builder(0) { }
+  SILCombiner(SILModule &M) : Module(M), Worklist(), MadeChange(false),
+                              Iteration(0), Builder(0) { }
 
   void runOnFunction(SILFunction &F) {
     Iteration = 0;
@@ -249,11 +250,14 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
   SILInstruction *visitStructExtractInst(StructExtractInst *V);
+  SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
 
 private:
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
 
+  /// Module currently being processed.
+  SILModule &Module;
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
   /// Variable to track if the SILCombiner made any changes.
@@ -461,12 +465,30 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
+  SILValue Operand = DI->getOperand();
+  SILType OperandTy = Operand.getType();
+
+  // DestroyValueInst of a trivial type is a no-op.
+  if (OperandTy.isTrivial(Module)) {
+    return eraseInstFromFunction(*DI);
+  }
+
+  // DestroyValueInst of a reference type is a strong_release.
+  if (OperandTy.hasReferenceSemantics()) {
+    return new (Module) StrongReleaseInst(DI->getLoc(), Operand);
+  }
+
+  // Do nothing for non-trivial non-reference types.
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
 void swift::performSILCombine(SILModule *M) {
-  SILCombiner Combiner;
+  SILCombiner Combiner(*M);
 
   // Process each function in M.
   for (SILFunction &F : *M) {
