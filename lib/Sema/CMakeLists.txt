@@ -2,6 +2,7 @@ add_swift_library(swiftSema
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp
+  ConstraintSystem.cpp
   NameBinding.cpp
   SourceLoader.cpp
   DerivedConformanceRawRepresentable.cpp
