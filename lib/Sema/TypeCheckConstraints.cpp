@@ -92,7 +92,7 @@ ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
 
   // Create the constraint graph.
   // FIXME: Enable this by default.
-  // CG = new ConstraintGraph(*this);
+  CG = new ConstraintGraph(*this);
 }
 
 ConstraintSystem::~ConstraintSystem() {

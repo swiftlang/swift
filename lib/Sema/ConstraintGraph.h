@@ -35,8 +35,129 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+class ConstraintGraph;
 class ConstraintGraphScope;
 class ConstraintSystem;
+
+/// A single node in the constraint graph, which represents a type variable.
+class ConstraintGraphNode {
+  /// Describes information about an adjacency between two type variables.
+  struct Adjacency {
+    /// Index into the vector of adjacent type variables, \c Adjacencies.
+    unsigned Index : 31;
+
+    /// Whether a fixed type binding relates the two type variables.
+    unsigned FixedBinding : 1;
+
+    /// The number of constraints that link this type variable to the
+    /// enclosing node.
+    unsigned NumConstraints;
+
+    bool empty() const {
+      return !FixedBinding && !NumConstraints;
+    }
+  };
+
+public:
+  explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
+
+  ConstraintGraphNode(const ConstraintGraphNode&) = delete;
+  ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
+
+  /// Retrieve the type variable this node represents.
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
+
+  /// Retrieve the set of constraints that mention this type variable.
+  ///
+  /// These are the hyperedges of the graph, connecting this node to
+  /// various other nodes.
+  ArrayRef<Constraint *> getConstraints() const { return Constraints; }
+
+  /// Retrieve the set of type variables to which this node is adjacent.
+  ArrayRef<TypeVariableType *> getAdjacencies() const {
+    return Adjacencies;
+  }
+
+  /// Retrieve all of the type variables in the same equivalence class
+  /// as this type variable.
+  ArrayRef<TypeVariableType *> getEquivalenceClass() const;
+
+private:
+  /// Retrieve all of the type variables in the same equivalence class
+  /// as this type variable.
+  ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
+
+  /// Add a constraint to the list of constraints.
+  void addConstraint(Constraint *constraint);
+
+  /// Remove a constraint from the list of constraints.
+  ///
+  /// Note that this only removes the constraint itself; it does not
+  /// remove the corresponding adjacencies.
+  void removeConstraint(Constraint *constraint);
+
+  /// Retrieve adjacency information for the given type variable.
+  Adjacency &getAdjacency(TypeVariableType *typeVar);
+
+  /// Modify the adjacency information for the given type variable
+  /// directly. If the adjacency becomes empty afterward, it will be
+  /// removed.
+  void modifyAdjacency(TypeVariableType *typeVar,
+                       std::function<void(Adjacency& adj)> modify);
+
+  /// Add an adjacency to the list of adjacencies.
+  void addAdjacency(TypeVariableType *typeVar);
+
+  /// Remove an adjacency from the list of adjacencies.
+  void removeAdjacency(TypeVariableType *typeVar);
+
+  /// Add the given type variables to this node's equivalence class.
+  void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
+
+  /// Add a type variable related to this type variable through fixed
+  /// bindings.
+  void addFixedBinding(TypeVariableType *typeVar);
+  
+  /// Remove a type variable from the fixed-binding relationship.
+  void removeFixedBinding(TypeVariableType *typeVar);
+
+  /// The type variable this node represents.
+  TypeVariableType *TypeVar;
+
+  /// The vector of constraints that mention this type variable, in a stable
+  /// order for iteration.
+  SmallVector<Constraint *, 2> Constraints;
+
+  /// A mapping from the set of constraints that mention this type variable
+  /// to the index within the vector of constraints.
+  llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
+
+  /// The set of adjacent type variables, in a stable order.
+  SmallVector<TypeVariableType *, 2> Adjacencies;
+
+  /// A mapping from each of the type variables adjacent to this
+  /// type variable to the index of the adjacency information in
+  /// \c Adjacencies.
+  llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
+
+  /// All of the type variables in the same equivalence class as this
+  /// representative type variable.
+  ///
+  /// Note that this field is only valid for type variables that
+  /// are representatives of their equivalence classes.
+  mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
+
+  /// Print this graph node.
+  void print(llvm::raw_ostream &out, unsigned indent);
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
+  /// Verify the invariants of this node within the given constraint graph.
+  void verify(ConstraintGraph &cg);
+
+  friend class ConstraintGraph;
+};
 
 /// A graph that describes the relationships among the various type variables
 /// and constraints within a constraint system.
@@ -49,126 +170,6 @@ class ConstraintSystem;
 /// its adjacencies (the type variables) separately.
 class ConstraintGraph {
 public:
-  /// A single node in the constraint graph, which represents a type variable.
-  class Node {
-    /// Describes information about an adjacency between two type variables.
-    struct Adjacency {
-      /// Index into the vector of adjacent type variables, \c Adjacencies.
-      unsigned Index : 31;
-
-      /// Whether a fixed type binding relates the two type variables.
-      unsigned FixedBinding : 1;
-
-      /// The number of constraints that link this type variable to the
-      /// enclosing node.
-      unsigned NumConstraints;
-
-      bool empty() const {
-        return !FixedBinding && !NumConstraints;
-      }
-    };
-
-  public:
-    explicit Node(TypeVariableType *typeVar) : TypeVar(typeVar) { }
-
-    Node(const Node&) = delete;
-    Node &operator=(const Node&) = delete;
-
-    /// Retrieve the type variable this node represents.
-    TypeVariableType *getTypeVariable() const { return TypeVar; }
-
-    /// Retrieve the set of constraints that mention this type variable.
-    ///
-    /// These are the hyperedges of the graph, connecting this node to
-    /// various other nodes.
-    ArrayRef<Constraint *> getConstraints() const { return Constraints; }
-
-    /// Retrieve the set of type variables to which this node is adjacent.
-    ArrayRef<TypeVariableType *> getAdjacencies() const {
-      return Adjacencies;
-    }
-
-    /// Retrieve all of the type variables in the same equivalence class
-    /// as this type variable.
-    ArrayRef<TypeVariableType *> getEquivalenceClass() const;
-
-  private:
-    /// Retrieve all of the type variables in the same equivalence class
-    /// as this type variable.
-    ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
-
-    /// Add a constraint to the list of constraints.
-    void addConstraint(Constraint *constraint);
-
-    /// Remove a constraint from the list of constraints.
-    ///
-    /// Note that this only removes the constraint itself; it does not
-    /// remove the corresponding adjacencies.
-    void removeConstraint(Constraint *constraint);
-
-    /// Retrieve adjacency information for the given type variable.
-    Adjacency &getAdjacency(TypeVariableType *typeVar);
-
-    /// Modify the adjacency information for the given type variable
-    /// directly. If the adjacency becomes empty afterward, it will be
-    /// removed.
-    void modifyAdjacency(TypeVariableType *typeVar,
-                         std::function<void(Adjacency& adj)> modify);
-
-    /// Add an adjacency to the list of adjacencies.
-    void addAdjacency(TypeVariableType *typeVar);
-
-    /// Remove an adjacency from the list of adjacencies.
-    void removeAdjacency(TypeVariableType *typeVar);
-
-    /// Add the given type variables to this node's equivalence class.
-    void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
-
-    /// Add a type variable related to this type variable through fixed
-    /// bindings.
-    void addFixedBinding(TypeVariableType *typeVar);
-    
-    /// Remove a type variable from the fixed-binding relationship.
-    void removeFixedBinding(TypeVariableType *typeVar);
-
-    /// The type variable this node represents.
-    TypeVariableType *TypeVar;
-
-    /// The vector of constraints that mention this type variable, in a stable
-    /// order for iteration.
-    SmallVector<Constraint *, 2> Constraints;
-
-    /// A mapping from the set of constraints that mention this type variable
-    /// to the index within the vector of constraints.
-    llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
-
-    /// The set of adjacent type variables, in a stable order.
-    SmallVector<TypeVariableType *, 2> Adjacencies;
-
-    /// A mapping from each of the type variables adjacent to this
-    /// type variable to the index of the adjacency information in
-    /// \c Adjacencies.
-    llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
-
-    /// All of the type variables in the same equivalence class as this
-    /// representative type variable.
-    ///
-    /// Note that this field is only valid for type variables that
-    /// are representatives of their equivalence classes.
-    mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
-
-    /// Print this graph node.
-    void print(llvm::raw_ostream &out, unsigned indent);
-
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
-                              "only for use within the debugger");
-
-    /// Verify the invariants of this node within the given constraint graph.
-    void verify(ConstraintGraph &cg);
-
-    friend class ConstraintGraph;
-  };
-
   /// Constraint a constraint graph for the given constraint system.
   ConstraintGraph(ConstraintSystem &cs);
 
@@ -183,12 +184,13 @@ public:
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
   /// Access the node corresponding to the given type variable.
-  Node &operator[](TypeVariableType *typeVar) {
+  ConstraintGraphNode &operator[](TypeVariableType *typeVar) {
     return lookupNode(typeVar).first;
   }
 
   /// Retrieve the node and index corresponding to the given type variable.
-  std::pair<Node &, unsigned> lookupNode(TypeVariableType *typeVar);
+  std::pair<ConstraintGraphNode &, unsigned> 
+  lookupNode(TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
@@ -278,7 +280,7 @@ private:
   struct StoredNode {
     /// \brief The node itself, stored as a pointer so we can efficiently
     /// copy/move \c StoredNodes.
-    Node *NodePtr;
+    ConstraintGraphNode *NodePtr;
 
     /// \brief The index in the \c TypeVariables vector where the corresponding
     /// type variable is stored.

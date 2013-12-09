@@ -104,7 +104,7 @@ gatherReferencedTypeVars(ConstraintSystem &cs,
 
 #pragma mark Graph accessors
 
-std::pair<ConstraintGraph::Node &, unsigned>
+std::pair<ConstraintGraphNode &, unsigned>
 ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Check whether we've already created a node for this type variable.
   auto known = Nodes.find(typeVar);
@@ -115,7 +115,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
 
   // Allocate the new node.
   StoredNode &stored = Nodes[typeVar];
-  stored.NodePtr = new Node(typeVar);
+  stored.NodePtr = new ConstraintGraphNode(typeVar);
   stored.Index = TypeVariables.size();
 
   // Record this type variable.
@@ -138,27 +138,27 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   return { *stored.NodePtr, stored.Index };
 }
 
-ArrayRef<TypeVariableType *> ConstraintGraph::Node::getEquivalenceClass() const{
+ArrayRef<TypeVariableType *> ConstraintGraphNode::getEquivalenceClass() const{
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
          "Can't request equivalence class from non-representative type var");
   return getEquivalenceClassUnsafe();
 }
 
 ArrayRef<TypeVariableType *>
-ConstraintGraph::Node::getEquivalenceClassUnsafe() const{
+ConstraintGraphNode::getEquivalenceClassUnsafe() const{
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(TypeVar);
   return EquivalenceClass;
 }
 
 #pragma mark Node mutation
-void ConstraintGraph::Node::addConstraint(Constraint *constraint) {
+void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
 }
 
-void ConstraintGraph::Node::removeConstraint(Constraint *constraint) {
+void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto pos = ConstraintIndex.find(constraint);
   assert(pos != ConstraintIndex.end());
 
@@ -183,8 +183,8 @@ void ConstraintGraph::Node::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-ConstraintGraph::Node::Adjacency &
-ConstraintGraph::Node::getAdjacency(TypeVariableType *typeVar) {
+ConstraintGraphNode::Adjacency &
+ConstraintGraphNode::getAdjacency(TypeVariableType *typeVar) {
   assert(typeVar != TypeVar && "Cannot be adjacent to oneself");
 
   // Look for existing adjacency information.
@@ -202,7 +202,7 @@ ConstraintGraph::Node::getAdjacency(TypeVariableType *typeVar) {
   return pos->second;
 }
 
-void ConstraintGraph::Node::modifyAdjacency(
+void ConstraintGraphNode::modifyAdjacency(
        TypeVariableType *typeVar,
        std::function<void(Adjacency& adj)> modify) {
    // Find the adjacency information.
@@ -237,21 +237,21 @@ void ConstraintGraph::Node::modifyAdjacency(
   Adjacencies.pop_back();
 }
 
-void ConstraintGraph::Node::addAdjacency(TypeVariableType *typeVar) {
+void ConstraintGraphNode::addAdjacency(TypeVariableType *typeVar) {
   auto &adjacency = getAdjacency(typeVar);
 
   // Bump the degree of the adjacency.
   ++adjacency.NumConstraints;
 }
 
-void ConstraintGraph::Node::removeAdjacency(TypeVariableType *typeVar) {
+void ConstraintGraphNode::removeAdjacency(TypeVariableType *typeVar) {
   modifyAdjacency(typeVar, [](Adjacency &adj) {
     assert(adj.NumConstraints > 0 && "No adjacency to remove?");
     --adj.NumConstraints;
   });
 }
 
-void ConstraintGraph::Node::addToEquivalenceClass(
+void ConstraintGraphNode::addToEquivalenceClass(
        ArrayRef<TypeVariableType *> typeVars) {
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
          "Can't extend equivalence class of non-representative type var");
@@ -260,14 +260,14 @@ void ConstraintGraph::Node::addToEquivalenceClass(
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
 }
 
-void ConstraintGraph::Node::addFixedBinding(TypeVariableType *typeVar) {
+void ConstraintGraphNode::addFixedBinding(TypeVariableType *typeVar) {
   auto &adjacency = getAdjacency(typeVar);
 
   assert(!adjacency.FixedBinding && "Already marked as a fixed binding?");
   adjacency.FixedBinding = true;
 }
 
-void ConstraintGraph::Node::removeFixedBinding(TypeVariableType *typeVar) {
+void ConstraintGraphNode::removeFixedBinding(TypeVariableType *typeVar) {
   modifyAdjacency(typeVar, [](Adjacency &adj) {
     assert(adj.FixedBinding && "Not a fixed binding?");
     adj.FixedBinding = false;
@@ -358,7 +358,7 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
-    Node &node = cg[EquivClass.TypeVar];
+    auto &node = cg[EquivClass.TypeVar];
     node.EquivalenceClass.erase(
       node.EquivalenceClass.begin() + EquivClass.PrevSize,
       node.EquivalenceClass.end());
@@ -398,7 +398,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   for (auto typeVar : referencedTypeVars) {
     // Find the node for this type variable.
-    Node &node = (*this)[typeVar];
+    auto &node = (*this)[typeVar];
 
     // Note the constraint within the node for that type variable.
     node.addConstraint(constraint);
@@ -427,7 +427,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   for (auto typeVar : referencedTypeVars) {
     // Find the node for this type variable.
-    Node &node = (*this)[typeVar];
+    auto &node = (*this)[typeVar];
 
     // Remove the constraint.
     node.removeConstraint(constraint);
@@ -481,7 +481,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   SmallVector<TypeVariableType *, 4> typeVars;
   llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
   fixed->getTypeVariables(typeVars);
-  Node &node = (*this)[typeVar];
+  auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
     if (knownTypeVars.insert(otherTypeVar)) {
       (*this)[otherTypeVar].addFixedBinding(typeVar);
@@ -504,7 +504,7 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   SmallVector<TypeVariableType *, 4> typeVars;
   llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
   fixed->getTypeVariables(typeVars);
-  Node &node = (*this)[typeVar];
+  auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
     if (knownTypeVars.insert(otherTypeVar)) {
       (*this)[otherTypeVar].removeFixedBinding(typeVar);
@@ -528,7 +528,7 @@ void ConstraintGraph::gatherConstraints(
 
 /// Depth-first search for connected components
 static void connectedComponentsDFS(ConstraintGraph &cg,
-                                   ConstraintGraph::Node &node,
+                                   ConstraintGraphNode &node,
                                    unsigned component,
                                    SmallVectorImpl<unsigned> &components) {
   // Local function that recurses on the given set of type variables.
@@ -644,7 +644,7 @@ unsigned ConstraintGraph::computeConnectedComponents(
 
 #pragma mark Debugging output
 
-void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
+void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
   out.indent(indent);
   TypeVar->print(out);
   out << ":\n";
@@ -708,7 +708,7 @@ void ConstraintGraph::Node::print(llvm::raw_ostream &out, unsigned indent) {
   }
 }
 
-void ConstraintGraph::Node::dump() {
+void ConstraintGraphNode::dump() {
   print(llvm::dbgs(), 0);
 }
 
@@ -762,7 +762,7 @@ void ConstraintGraph::dumpConnectedComponents() {
 /// provide extra, contextual information about the failure.
 static void _require(bool condition, const Twine &complaint,
                      ConstraintGraph &cg,
-                     ConstraintGraph::Node *node,
+                     ConstraintGraphNode *node,
                      const std::function<void()> &extraContext = nullptr) {
   if (condition)
     return;
@@ -794,7 +794,7 @@ static void printValue(llvm::raw_ostream &os, unsigned value) {
   os << value;
 }
 
-void ConstraintGraph::Node::verify(ConstraintGraph &cg) {
+void ConstraintGraphNode::verify(ConstraintGraph &cg) {
 #define require(condition, complaint) _require(condition, complaint, cg, this)
 #define requireWithContext(condition, complaint, context) \
   _require(condition, complaint, cg, this, context)
@@ -835,7 +835,8 @@ void ConstraintGraph::Node::verify(ConstraintGraph &cg) {
   llvm::DenseMap<TypeVariableType *, unsigned> expectedAdjacencies;
   for (auto constraint : Constraints) {
     SmallVector<TypeVariableType *, 4> referencedTypeVars;
-    gatherReferencedTypeVars(cg.CS, constraint, referencedTypeVars);
+    gatherReferencedTypeVars(cg.getConstraintSystem(), constraint, 
+                             referencedTypeVars);
 
     for (auto adjTypeVar : referencedTypeVars) {
       if (adjTypeVar == TypeVar)
@@ -974,7 +975,7 @@ void ConstraintGraph::verify() {
                            llvm::dbgs() << "\n";
                          });
 
-      Node &node = *nodePos->second.NodePtr;
+      auto &node = *nodePos->second.NodePtr;
       auto constraintPos = node.ConstraintIndex.find(&constraint);
       requireWithContext(constraintPos != node.ConstraintIndex.end(),
                          "type variable doesn't know about constraint",
