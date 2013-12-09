@@ -782,7 +782,10 @@ public:
     GlobalVar,
 
     /// RootSelf designates "self" in a struct, enum, or root class.
-    RootSelf
+    RootSelf,
+
+    /// DerivedSelf designates "self" in a derived (non-root) class.
+    DerivedSelf
   };
 private:
   Kind ThisKind;

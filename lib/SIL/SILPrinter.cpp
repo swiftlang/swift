@@ -633,6 +633,7 @@ public:
     switch (MU->getKind()) {
     case MarkUninitializedInst::GlobalVar: OS << "[globalvar] "; break;
     case MarkUninitializedInst::RootSelf:  OS << "[rootself] "; break;
+    case MarkUninitializedInst::DerivedSelf:  OS << "[derivedself] "; break;
     }
     
     OS << getIDAndType(MU->getOperand());
