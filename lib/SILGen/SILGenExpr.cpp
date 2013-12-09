@@ -258,7 +258,6 @@ namespace {
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
-    RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
 
@@ -2889,12 +2888,6 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     auto result = SGF.manageBufferForExprResult(resultAddr, lowering, C);
     return (result ? RValue(SGF, E, result) : RValue());
   }
-}
-
-RValue RValueEmitter::visitZeroValueExpr(ZeroValueExpr *E, SGFContext C) {
-  SILValue zero = SGF.B.createBuiltinZero(E,
-                                    SGF.getLoweredLoadableType(E->getType()));
-  return RValue(SGF, E, ManagedValue(zero, ManagedValue::Unmanaged));
 }
 
 RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {

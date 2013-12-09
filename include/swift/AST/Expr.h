@@ -2707,23 +2707,6 @@ public:
     return E->getKind() == ExprKind::Assign;
   }
 };
-  
-/// \brief An expression that produces a zero value for types that
-/// default-initialize to zero, including builtin types and classes.
-///
-/// This expression is synthesizes by type checking and cannot be written
-/// directly by the user.
-class ZeroValueExpr : public Expr {
-public:
-  explicit ZeroValueExpr(Type Ty)
-    : Expr(ExprKind::ZeroValue, /*Implicit=*/true, Ty) { }
-
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ZeroValue;
-  }
-};
 
 /// \brief An expression that describes the use of a default value, which may
 /// come from the default argument of a function type or member initializer.

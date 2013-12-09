@@ -133,7 +133,6 @@ ABSTRACT_EXPR(ExplicitCast, Expr)
   EXPR_RANGE(ExplicitCast, ConditionalCheckedCast, Coerce)
 EXPR(If, Expr)
 EXPR(Assign, Expr)
-EXPR(ZeroValue, Expr)
 EXPR(DefaultValue, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
 

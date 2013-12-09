@@ -1304,10 +1304,6 @@ public:
     OS << ")";
   }
 
-  void visitZeroValueExpr(ZeroValueExpr *E) {
-    printCommon(E, "zero_value_expr") << ')';
-  }
-
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName);
     if (E->isSuper())

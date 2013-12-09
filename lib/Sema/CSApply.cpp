@@ -1666,11 +1666,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitZeroValueExpr(ZeroValueExpr *expr) {
-      // Do nothing with zero-value initialization expressions.
-      return simplifyExprType(expr);
-    }
-
     Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

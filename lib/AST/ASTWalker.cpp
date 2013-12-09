@@ -115,7 +115,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
-  Expr *visitZeroValueExpr(ZeroValueExpr *E) { return E; }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     for (auto &Segment : E->getSegments()) {

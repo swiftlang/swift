@@ -848,10 +848,6 @@ namespace {
       return expr->getType();
     }
 
-    Type visitZeroValueExpr(ZeroValueExpr *expr) {
-      return expr->getType();
-    }
-
     Type visitDefaultValueExpr(DefaultValueExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
       return expr->getType();
