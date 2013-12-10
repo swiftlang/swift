@@ -14,3 +14,6 @@ SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LIBRARYNAME := swiftFrontend
+
+include $(SWIFT_LEVEL)/Makefile
+
