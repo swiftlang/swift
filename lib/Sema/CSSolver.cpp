@@ -522,8 +522,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
-  oldGeneratedConstraints = cs.solverState->generatedConstraints;
-  cs.solverState->generatedConstraints = &generatedConstraints;
+  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
   ++cs.solverState->NumStatesExplored;
@@ -556,15 +555,16 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                 firstRetired);
 
   // Remove any constraints that were generated here.
-  for (auto constraint : generatedConstraints) {
-    cs.InactiveConstraints.erase(ConstraintList::iterator(constraint));
+  auto &generatedConstraints = cs.solverState->generatedConstraints;
+  auto genStart = generatedConstraints.begin() + numGeneratedConstraints,
+       genEnd = generatedConstraints.end();
+  for (auto genI = genStart; genI != genEnd; ++genI) {
+    cs.InactiveConstraints.erase(ConstraintList::iterator(*genI));
   }
+  generatedConstraints.erase(genStart, genEnd);
 
   // Remove any constraint restrictions.
   truncate(cs.solverState->constraintRestrictions, numConstraintRestrictions);
-
-  // Reset the prior generated-constraints pointer.
-  cs.solverState->generatedConstraints = oldGeneratedConstraints;
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1262,7 +1262,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // Record this as a generated constraint.
-    solverState->generatedConstraints->insert(constraint);
+    solverState->generatedConstraints.push_back(constraint);
 
     if (!solve(solutions, allowFreeTypeVariables)) {
       anySolved = true;

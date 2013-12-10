@@ -1033,7 +1033,7 @@ private:
     ConstraintList retiredConstraints;
 
     /// The current set of generated constraints.
-    llvm::SmallPtrSet<Constraint *, 4> *generatedConstraints = nullptr;
+    SmallVector<Constraint *, 4> generatedConstraints;
 
     /// \brief The set of constraint restrictions used to reach this state.
     ///
@@ -1090,11 +1090,8 @@ public:
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
 
-    /// The set of constraints generated within this scope.
-    llvm::SmallPtrSet<Constraint *, 4> generatedConstraints;
-
-    /// The outer generatedConstraints setting.
-    llvm::SmallPtrSet<Constraint *, 4> *oldGeneratedConstraints;
+    /// The length of generatedConstraints.
+    unsigned numGeneratedConstraints;
 
     /// \brief The last retired constraint in the list.
     ConstraintList::iterator firstRetired;

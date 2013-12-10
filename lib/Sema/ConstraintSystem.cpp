@@ -312,8 +312,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting && solverState->generatedConstraints) {
-        solverState->generatedConstraints->insert(constraint);
+      if (!simplifyExisting) {
+        solverState->generatedConstraints.push_back(constraint);
       }
     }
 
@@ -325,8 +325,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // Record solved constraint.
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting && solverState->generatedConstraints)
-        solverState->generatedConstraints->insert(constraint);
+      if (!simplifyExisting)
+        solverState->generatedConstraints.push_back(constraint);
     }
 
     // Remove the constraint from the constraint graph.
@@ -345,8 +345,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     if (!simplifyExisting)
       CG.addConstraint(constraint);
 
-    if (!simplifyExisting && solverState && solverState->generatedConstraints) {
-      solverState->generatedConstraints->insert(constraint);
+    if (!simplifyExisting && solverState) {
+      solverState->generatedConstraints.push_back(constraint);
     }
 
     return false;
