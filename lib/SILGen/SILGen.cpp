@@ -497,7 +497,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   
   auto *f = new (M) SILFunction(M, SILLinkage::Internal, funcName,
                                 initSILType, binding, IsNotTransparent);
-  // TODO: Debug scope? Decl context?
+  f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding->getInit())));
+  f->setLocation(binding);
   
   SILGenFunction(*this, *f)
     .emitLazyGlobalInitializer(binding);
