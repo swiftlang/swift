@@ -66,10 +66,13 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
-                                       bool updateScore) {
+                                       bool updateState) {
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
-  if (updateScore && !type->is<TypeVariableType>()) {
+  if (!updateState)
+    return;
+
+  if (!type->is<TypeVariableType>()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;
@@ -116,7 +119,8 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
   // Add any constraints that aren't already active to the worklist.
   for (auto constraint : constraints) {
     if (!constraint->isActive()) {
-      Worklist.push_back(constraint);
+      ActiveConstraints.splice(ActiveConstraints.end(),
+                               InactiveConstraints, constraint);
       constraint->setActive(true);
     }
   }
@@ -334,7 +338,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
     if (!isExternallySolved) {
-      Constraints.push_back(constraint);        
+      InactiveConstraints.push_back(constraint);        
     }
 
     // Add this constraint to the constraint graph.

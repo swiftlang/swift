@@ -272,7 +272,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // First, collect all of the constraints that relate directly to a
   // type variable.
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
-  for (auto &constraint : Constraints) {
+  for (auto &constraint : InactiveConstraints) {
     Type first;
     if (constraint.getKind() != ConstraintKind::Conjunction &&
         constraint.getKind() != ConstraintKind::Disjunction)
@@ -405,14 +405,11 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 }
 
 bool ConstraintSystem::simplify() {
-  // The set of constraints that we retired.
-  llvm::SetVector<Constraint *> retiredConstraints;
-
   // While we have a constraint in the worklist, process it.
-  while (!Worklist.empty()) {
+  while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
-    auto constraint = Worklist.front();
-    Worklist.pop_front();
+    auto *constraint = &ActiveConstraints.front();
+    ActiveConstraints.pop_front();
     assert(constraint->isActive() && "Worklist constraint is not active?");
 
     // Simplify this constraint.
@@ -421,13 +418,18 @@ bool ConstraintSystem::simplify() {
       if (!failedConstraint) {
         failedConstraint = constraint;
       }
+
+      if (solverState)
+        solverState->retiredConstraints.push_front(constraint);
+
       break;
 
     case SolutionKind::Solved:
       ++solverState->NumSimplifiedConstraints;
 
       // This constraint has already been solved; retire it.
-      retiredConstraints.insert(constraint);
+      if (solverState)
+        solverState->retiredConstraints.push_front(constraint);
 
       // Remove the constraint from the constraint graph.
       CG.removeConstraint(constraint);
@@ -435,6 +437,8 @@ bool ConstraintSystem::simplify() {
 
     case SolutionKind::Unsolved:
       ++solverState->NumUnsimplifiedConstraints;
+
+      InactiveConstraints.push_back(constraint);
       break;
     }
 
@@ -444,54 +448,16 @@ bool ConstraintSystem::simplify() {
 
     // Check whether a constraint failed. If so, we're done.
     if (failedConstraint) {
-      // Mark all of the remaining constraints in the worklist inactive.
-      while (!Worklist.empty()) {
-        auto constraint = Worklist.front();
-        Worklist.pop_front();
-        assert(constraint->isActive()&&"Worklist constraint is not active?");
-        constraint->setActive(false);
-      }
-
-      // Retire all of the constraints.
-      if (solverState)
-        solverState->retiredConstraints.splice(
-          solverState->retiredConstraints.begin(),
-          Constraints);
-      else
-        Constraints.clear();
-
-      // Clear out the worklist. There's nothing to do now.
       return true;
     }
 
     // If the current score is worse than the best score we've seen so far,
     // there's no point in continuing. So don't.
-    if (worseThanBestSolution())
+    if (worseThanBestSolution()) {
       return true;
+    }
   }
 
-  // Transfer any retired constraints to the retired list.
-  for (auto i = Constraints.begin(), end = Constraints.end();
-       i != end; /*increment in loop*/) {
-    // If it's not retired, do nothing.
-    if (retiredConstraints.count(&*i) == 0) {
-      ++i;
-      continue;
-    }
-
-    // If there is no list of retired constraints, just erase it.
-    // FIXME: This is weird.
-    if (!solverState) {
-      i = Constraints.erase(i);
-      continue;
-    }
-
-    // If we have a list of retired constraints, move it there.
-    auto victim = i++;
-    solverState->retiredConstraints.splice(solverState->retiredConstraints.begin(),
-                                           Constraints,
-                                           victim);
-  }
   return false;
 }
 
@@ -574,16 +540,25 @@ ConstraintSystem::SolverScope::~SolverScope() {
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
                                    numSavedBindings);
 
+  // Move any remaining active constraints into the inactive list.
+  while (!cs.ActiveConstraints.empty()) {
+    for (auto &constraint : cs.ActiveConstraints) {
+      constraint.setActive(false);
+    }
+    cs.InactiveConstraints.splice(cs.InactiveConstraints.end(),
+                                  cs.ActiveConstraints);
+  }
+
   // Add the retired constraints back into circulation.
-  cs.Constraints.splice(cs.Constraints.end(), 
-                        cs.solverState->retiredConstraints,
-                        cs.solverState->retiredConstraints.begin(),
-                        firstRetired);
+  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(), 
+                                cs.solverState->retiredConstraints,
+                                cs.solverState->retiredConstraints.begin(),
+                                firstRetired);
 
   // Remove any constraints that were generated here.
-  cs.Constraints.erase_if([&](Constraint &c) {
-                            return generatedConstraints.count(&c) > 0;
-                          });
+  for (auto constraint : generatedConstraints) {
+    cs.InactiveConstraints.erase(ConstraintList::iterator(constraint));
+  }
 
   // Remove any constraint restrictions.
   truncate(cs.solverState->constraintRestrictions, numConstraintRestrictions);
@@ -904,11 +879,14 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   }
 
   // If we already failed, or simplification fails, we're done.
-  if (failedConstraint || simplify())
+  if (failedConstraint || simplify()) {
     return true;
+  } else {
+    assert(ActiveConstraints.empty() && "Active constraints remain?");
+  }
 
   // If there are no constraints remaining, we're done. Save this solution.
-  if (Constraints.empty()) {
+  if (InactiveConstraints.empty()) {
     // If this solution is worse than the best solution we've seen so far,
     // skipt it.
     if (worseThanBestSolution())
@@ -974,18 +952,19 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Sort the constraints into buckets based on component number.
   std::unique_ptr<ConstraintList[]> constraintBuckets(
                                       new ConstraintList[numComponents]);
-  while (!Constraints.empty()) {
-    auto constraint = &Constraints.front();
-    Constraints.pop_front();
+  while (!InactiveConstraints.empty()) {
+    auto *constraint = &InactiveConstraints.front();
+    InactiveConstraints.pop_front();
     constraintBuckets[constraintComponent[constraint]].push_back(constraint);
   }
 
   // Function object that returns all constraints placed into buckets
   // back to the list of constraints.
   auto returnAllConstraints = [&] {
-    assert(Constraints.empty() && "Already have constraints?");
+    assert(InactiveConstraints.empty() && "Already have constraints?");
     for (unsigned component = 0; component != numComponents; ++component) {
-      Constraints.splice(Constraints.end(), constraintBuckets[component]);
+      InactiveConstraints.splice(InactiveConstraints.end(), 
+                                 constraintBuckets[component]);
     }
   };
 
@@ -994,11 +973,13 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     partialSolutions(new SmallVector<Solution, 4>[numComponents]);
   Optional<Score> PreviousBestScore = solverState->BestScore;
   for (unsigned component = 0; component != numComponents; ++component) {
-    assert(Constraints.empty() && "Some constraints were not transferred?");
+    assert(InactiveConstraints.empty() && 
+           "Some constraints were not transferred?");
     ++solverState->NumComponentsSplit;
 
     // Collect the constraints for this component.
-    Constraints.splice(Constraints.end(), constraintBuckets[component]);
+    InactiveConstraints.splice(InactiveConstraints.end(), 
+                               constraintBuckets[component]);
 
     // Collect the type variables that are not part of a different
     // component; this includes type variables that are part of the
@@ -1030,7 +1011,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     // Put the constraints back into their original bucket.
     auto &bucket = constraintBuckets[component];
-    bucket.splice(bucket.end(), Constraints);
+    bucket.splice(bucket.end(), InactiveConstraints);
     
     if (failed) {
       if (TC.getLangOpts().DebugConstraintSolver) {
@@ -1184,7 +1165,7 @@ bool ConstraintSystem::solveSimplified(
     if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
         hasFreeTypeVariables()) {
       bool anyNonConformanceConstraints = false;
-      for (auto &constraint : Constraints) {
+      for (auto &constraint : InactiveConstraints) {
         if (constraint.getKind() == ConstraintKind::ConformsTo ||
             constraint.getKind() == ConstraintKind::SelfObjectOfProtocol)
           continue;
@@ -1234,7 +1215,7 @@ bool ConstraintSystem::solveSimplified(
   }
 
   // Remove this disjunction constraint from the list.
-  auto afterDisjunction = Constraints.erase(disjunction);
+  auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
   // Try each of the constraints within the disjunction.
@@ -1267,13 +1248,15 @@ bool ConstraintSystem::solveSimplified(
     case SolutionKind::Error:
       if (!failedConstraint)
         failedConstraint = constraint;
+      solverState->retiredConstraints.push_back(constraint);
       break;
 
     case SolutionKind::Solved:
+      solverState->retiredConstraints.push_back(constraint);
       break;
 
     case SolutionKind::Unsolved:
-      Constraints.push_back(constraint);
+      InactiveConstraints.push_back(constraint);
       CG.addConstraint(constraint);
       break;
     }
@@ -1310,7 +1293,7 @@ bool ConstraintSystem::solveSimplified(
   }
 
   // Put the disjunction constraint back in its place.
-  Constraints.insert(afterDisjunction, disjunction);
+  InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
   return !anySolved;

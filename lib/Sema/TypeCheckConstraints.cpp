@@ -1573,8 +1573,15 @@ void ConstraintSystem::dump(raw_ostream &out) {
     out << "\n";
   }
 
-  out << "\nUnsolved Constraints:\n";
-  for (auto &constraint : Constraints) {
+  out << "\nActive Constraints:\n";
+  for (auto &constraint : InactiveConstraints) {
+    out.indent(2);
+    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    out << "\n";
+  }
+
+  out << "\nInactive Constraints:\n";
+  for (auto &constraint : InactiveConstraints) {
     out.indent(2);
     constraint.print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";

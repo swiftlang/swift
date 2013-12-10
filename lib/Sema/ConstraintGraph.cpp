@@ -871,10 +871,8 @@ void ConstraintGraph::verify() {
   }
 
   // Verify that all of the constraints in the constraint system
-  // are accounted for. This requires a better abstraction for tracking
-  // the set of constraints that are live.
+  // are accounted for.
   for (auto &constraint : CS.getConstraints()) {
-
     // Check whether the constraint graph knows about this constraint.
     auto referencedTypeVars = constraint.getTypeVariables();
     requireWithContext((knownConstraints.count(&constraint) ||

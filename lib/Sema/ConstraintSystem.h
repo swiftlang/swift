@@ -36,7 +36,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <deque> // FIXME: Eliminate reliance on deque
 #include <functional>
 
 namespace swift {
@@ -997,12 +996,15 @@ private:
   Score CurrentScore;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
-  ConstraintList Constraints;
 
-  /// The worklist of constraints that should be revisited due to a change.
-  /// FIXME: This is a crappy data structure. We want to bounce between
-  /// two ConstraintLists so there's no memory allocation needed.
-  std::deque<Constraint *> Worklist;
+
+  /// The worklist of "active" constraints that should be revisited
+  /// due to a change.
+  ConstraintList ActiveConstraints;
+
+  /// The list of "inactive" constraints that still need to be solved,
+  /// but will not be revisited until one of their inputs changes.
+  ConstraintList InactiveConstraints;
 
   /// The constraint graph.
   ConstraintGraph &CG;
@@ -1369,7 +1371,7 @@ public:
   }
 
   /// Retrieve the list of active constraints.
-  ConstraintList &getConstraints() { return Constraints; }
+  ConstraintList &getConstraints() { return InactiveConstraints; }
 
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
@@ -1408,10 +1410,14 @@ public:
   /// \brief Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
+  ///
   /// \param type The fixed type to which the type variable will be bound.
-  /// \param updateScore Whether to update the score based on this binding.
+  ///
+  /// \param updateState Whether to update the state based on this binding.
+  /// False when we're only assigning a type as part of reconstructing 
+  /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       bool updateScore = true);
+                       bool updateState = true);
 
 private:
   /// Introduce the constraints associated with the given type variable
