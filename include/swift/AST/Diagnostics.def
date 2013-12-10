@@ -1575,6 +1575,8 @@ ERROR(superinit_multiple_times,sil_analysis,none,
       "super.init called multiple times in initializer", ())
 ERROR(superinit_not_called_before_return,sil_analysis,none,
       "super.init isn't called before returning from initializer", ())
+ERROR(self_before_superinit,sil_analysis,none,
+      "'self' used before super.init call", ())
 ERROR(return_from_init_without_initing_self,sil_analysis,none,
       "return from enum initializer method without storing to 'self'", ())
 

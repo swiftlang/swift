@@ -807,7 +807,7 @@ void ElementUseCollector::collectClassSelfUses() {
     // We can safely handle anything else as an escape.  They should all happen
     // after super.init is invoked.  As such, all elements must be initialized
     // and super.init must be called.
-    Uses.push_back(DIMemoryUse(User, DIUseKind::Escape,
+    Uses.push_back(DIMemoryUse(User, DIUseKind::Load,
                                0, TheMemory.NumElements));
   }
 }
@@ -838,10 +838,10 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // Otherwise, the use is something complicated, it escapes.
 
     // upcast instructions are accesses into the base class.  These are
-    // effectively escapes for DI's purposes, but we classify them differently
+    // effectively loads for DI's purposes, but we classify them differently
     // since the diagnostics are pretty different.
     auto Kind =
-      isa<UpcastInst>(User) ? DIUseKind::Superclass : DIUseKind::Escape;
+      isa<UpcastInst>(User) ? DIUseKind::Superclass : DIUseKind::Load;
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }

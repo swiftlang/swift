@@ -359,7 +359,7 @@ namespace {
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
 
-    DIKind getLivenessAtUse(const DIMemoryUse &Use);
+    bool isInitializedAtUse(const DIMemoryUse &Use, bool *SuperInitDone = 0);
 
     void handleStoreUse(unsigned UseID);
     void handleSuperclassUse(const DIMemoryUse &InstInfo);
@@ -473,14 +473,11 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
            "No undef elements found?");
   }
 
-  // If this is the super.init marker not being initialized, then this isn't a
-  // real user variable, this is something requiring super.init to be called,
-  // and it isn't.  Emit a specific diagnostic.
-  if (TheMemory.isDerivedClassSelf() &&
-      FirstUndefElement == TheMemory.NumElements-1) {
-    diagnose(Module, Inst->getLoc(), diag::superinit_not_called_before_return);
-    return;
-  }
+  // Verify that it isn't the super.init marker that failed.  The client should
+  // handle this, not pass it down to diagnoseInitError.
+  assert((!TheMemory.isDerivedClassSelf() ||
+          FirstUndefElement != TheMemory.NumElements-1) &&
+         "super.init failure not handled in the right place");
 
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
@@ -545,18 +542,17 @@ void LifetimeChecker::doIt() {
       break;
 
     case DIUseKind::IndirectIn:
-    case DIUseKind::Load:
+    case DIUseKind::Load: {
+      bool IsSuperInitComplete;
       // If the value is not definitively initialized, emit an error.
-      // TODO: In the "No" case, we can emit a fixit adding a default
-      // initialization of the type.
-      // TODO: In the "partial" case, we can produce a more specific diagnostic
-      // indicating where the control flow merged.
-      if (getLivenessAtUse(Use) == DIKind::Yes)
+      if (isInitializedAtUse(Use, &IsSuperInitComplete))
         break;
-        
+
       // Otherwise, this is a use of an uninitialized value.  Emit a
       // diagnostic.
-        
+      // TODO: In the "No" case, we can emit a fixit adding a default
+      // initialization of the type.
+
       // If this is a load with a single user that is a return, then this is a
       // return in the enum init case, and we haven't stored to self.   Emit a
       // specific diagnostic.
@@ -568,26 +564,40 @@ void LifetimeChecker::doIt() {
                      diag::return_from_init_without_initing_self);
           break;
         }
-        
+
+      // If this is the super.init marker not being initialized, then the load
+      // requires super.init to be called, and it isn't.  Emit a specific
+      // diagnostic.
+      if (!IsSuperInitComplete) {
+        if (shouldEmitError(Inst)) {
+          if (isa<ReturnInst>(Inst))
+            diagnose(Module, Inst->getLoc(),
+                     diag::superinit_not_called_before_return);
+          else
+            diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+        }
+        return;
+      }
+
+      if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer) {
+        diagnoseInitError(Use, diag::ivar_not_initialized_at_init_return);
+        break;
+      }
       diagnoseInitError(Use, diag::variable_used_before_initialized);
       break;
-      
+    }
     case DIUseKind::InOutUse:
-      if (getLivenessAtUse(Use) != DIKind::Yes) {
-        // This is a use of an uninitialized value.  Emit a diagnostic.
+      if (!isInitializedAtUse(Use))
         diagnoseInitError(Use, diag::variable_inout_before_initialized);
-      }
       break;
-      
+
     case DIUseKind::Escape:
-      if (getLivenessAtUse(Use) != DIKind::Yes) {
+      if (!isInitializedAtUse(Use)) {
         Diag<StringRef> DiagMessage;
 
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
-        else if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer)
-          DiagMessage = diag::ivar_not_initialized_at_init_return;
         else
           DiagMessage = diag::variable_escape_before_initialized;
 
@@ -624,25 +634,40 @@ void LifetimeChecker::doIt() {
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
-  DIKind DI = getLivenessAtUse(InstInfo);
+
+  // Determine the liveness state of the element that we care about.
+  auto Liveness = getLivenessAtInst(InstInfo.Inst, InstInfo.FirstElement,
+                                    InstInfo.NumElements);
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
-  if (InstInfo.Kind == DIUseKind::PartialStore && DI != DIKind::Yes) {
+  if (InstInfo.Kind == DIUseKind::PartialStore &&
+      Liveness.get(InstInfo.FirstElement) != DIKind::Yes) {
+    assert(InstInfo.NumElements == 1 && "partial stores are intra-element");
     diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
     return;
   }
 
+  // Check to see if the store is either fully uninitialized or fully
+  // initialized.
+  bool isFullyInitialized = true;
+  bool isFullyUninitialized = true;
+  for (unsigned i = InstInfo.FirstElement, e = i+InstInfo.NumElements;
+       i != e;++i) {
+    auto DI = Liveness.get(i);
+    if (DI != DIKind::Yes)
+      isFullyInitialized = false;
+    if (DI != DIKind::No)
+      isFullyUninitialized = false;
+  }
+
   // If this is an initialization or a normal assignment, upgrade the store to
   // an initialization or assign in the uses list so that clients know about it.
-  switch (DI) {
-  case DIKind::No:
+  if (isFullyUninitialized) {
     InstInfo.Kind = DIUseKind::Initialization;
-    break;
-  case DIKind::Yes:
+  } else if (isFullyInitialized) {
     InstInfo.Kind = DIUseKind::Assign;
-    break;
-  case DIKind::Partial:
+  } else {
     // If it is initialized on some paths, but not others, then we have an
     // inconsistent initialization, which needs dynamic control logic in the
     // general case.
@@ -1404,34 +1429,32 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   return Result;
 }
 
-/// The specified instruction is a use of the element.  Determine whether all of
-/// the tuple elements touched by the instruction are definitely initialized at
-/// this point or not.  If the value is initialized on some paths, but not
-/// others, this returns a partial result.
-DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
-
+/// The specified instruction is a use of some number of elements.  Determine
+/// whether all of the elements touched by the instruction are definitely
+/// initialized at this point or not.
+bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
+                                         bool *SuperInitDone) {
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
-  
-  // Now that we know about each element, determine a yes/no/partial result
-  // based on the elements we care about.
-  bool LiveInAll = true, LiveInAny = false;
-  
-  for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
-       i != e; ++i) {
-    DIKind ElementKind = Liveness.get(i);
-    if (ElementKind != DIKind::No)
-      LiveInAny = true;
-    if (ElementKind != DIKind::Yes)
-      LiveInAll = false;
+
+  // If the client wants to know about super.init, check to see if we failed
+  // it or some other element.
+  if (SuperInitDone) {
+    *SuperInitDone = true;
+    if (Use.FirstElement+Use.NumElements == TheMemory.NumElements &&
+        TheMemory.isDerivedClassSelf() &&
+        Liveness.get(Liveness.size()-1) != DIKind::Yes)
+      *SuperInitDone = false;
   }
-  
-  if (LiveInAll)
-    return DIKind::Yes;
-  if (LiveInAny)
-    return DIKind::Partial;
-  return DIKind::No;
+
+  // Check all the results.
+  for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
+       i != e; ++i)
+    if (Liveness.get(i) != DIKind::Yes)
+      return false;
+
+  return true;
 }
 
 
