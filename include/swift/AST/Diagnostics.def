@@ -1569,8 +1569,7 @@ ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "instance variable '%0' not initialized at super.init call",
       (StringRef))
 ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
-      "instance variable '%0' not initialized at end of initializer",
-      (StringRef))
+      "instance variable '%0' not initialized", (StringRef))
 ERROR(superinit_multiple_times,sil_analysis,none,
       "super.init called multiple times in initializer", ())
 ERROR(superinit_not_called_before_return,sil_analysis,none,
