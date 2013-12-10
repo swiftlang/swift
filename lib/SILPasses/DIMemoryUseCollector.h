@@ -88,6 +88,14 @@ public:
     return NumElements - (unsigned)isDerivedClassSelf();
   }
 
+  bool isEnumSelf() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      if (MUI->getKind() == MarkUninitializedInst::RootSelf &&
+          isa<EnumDecl>(getType()->getAnyNominal()))
+        return true;
+    return false;
+  }
+  
   /// isDerivedClassSelf - Return true if this memory object is the 'self' of
   /// a derived class init method.
   bool isDerivedClassSelf() const {

@@ -1551,7 +1551,7 @@ ERROR(invalid_sil_builtin,sil_gen,none,
 
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,
-      "variable defined here", ())
+     "variable defined here", ())
 ERROR(variable_used_before_initialized,sil_analysis,none,
       "variable '%0' used before being initialized", (StringRef))
 ERROR(variable_inout_before_initialized,sil_analysis,none,
@@ -1563,8 +1563,7 @@ ERROR(base_object_use_before_initialized,sil_analysis,none,
       "use of base object '%0' before super.init call initializes it",
       (StringRef))
 ERROR(base_object_use_before_initialized_some_paths,sil_analysis,none,
-      "use of base object '%0' before super.init call to initializes it "
-      "on some paths",
+      "super.init not called on all paths leading to use of base object '%0'",
       (StringRef))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "instance variable '%0' not initialized at super.init call",
@@ -1576,7 +1575,8 @@ ERROR(superinit_multiple_times,sil_analysis,none,
       "super.init called multiple times in initializer", ())
 ERROR(superinit_not_called_before_return,sil_analysis,none,
       "super.init isn't called before returning from initializer", ())
-
+ERROR(return_from_init_without_initing_self,sil_analysis,none,
+      "return from enum initializer method without storing to 'self'", ())
 
 ERROR(global_variable_function_use_uninit,sil_analysis,none,
       "variable '%0' used by function definition before being initialized",

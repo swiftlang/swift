@@ -551,11 +551,25 @@ void LifetimeChecker::doIt() {
       // initialization of the type.
       // TODO: In the "partial" case, we can produce a more specific diagnostic
       // indicating where the control flow merged.
-      if (getLivenessAtUse(Use) != DIKind::Yes) {
-        // Otherwise, this is a use of an uninitialized value.  Emit a
-        // diagnostic.
-        diagnoseInitError(Use, diag::variable_used_before_initialized);
-      }
+      if (getLivenessAtUse(Use) == DIKind::Yes)
+        break;
+        
+      // Otherwise, this is a use of an uninitialized value.  Emit a
+      // diagnostic.
+        
+      // If this is a load with a single user that is a return, then this is a
+      // return in the enum init case, and we haven't stored to self.   Emit a
+      // specific diagnostic.
+      if (auto *LI = dyn_cast<LoadInst>(Inst))
+        if (TheMemory.isEnumSelf() && LI->hasOneUse() &&
+            isa<ReturnInst>((*LI->use_begin())->getUser())) {
+          if (shouldEmitError(Inst))
+            diagnose(Module, Inst->getLoc(),
+                     diag::return_from_init_without_initing_self);
+          break;
+        }
+        
+      diagnoseInitError(Use, diag::variable_used_before_initialized);
       break;
       
     case DIUseKind::InOutUse:
