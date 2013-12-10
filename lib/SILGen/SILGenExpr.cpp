@@ -2069,9 +2069,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Emit the constructor body.
   visit(ctor->getBody());
-  
+
+  // Prepare the end of initializer location.
+  SILLocation endOfInitLoc = RegularLocation(ctor);
+  endOfInitLoc.pointToEnd();
+
+
   // Return 'self' in the epilog.
-  if (!emitEpilogBB(ctor).first)
+  if (!emitEpilogBB(endOfInitLoc).first)
     return;
 
   // If 'self' is address-only, copy 'self' into the indirect return slot.
@@ -2082,25 +2087,25 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     assert(selfBox &&
            "address-only non-heap this should have been allocated in-place");
     // We have to do a non-take copy because someone else may be using the box.
-    B.createCopyAddr(ctor, selfLV, IndirectReturnAddress,
+    B.createCopyAddr(endOfInitLoc, selfLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
-    B.emitStrongRelease(ctor, selfBox);
-    B.createReturn(ctor, emitEmptyTuple(ctor));
+    B.emitStrongRelease(endOfInitLoc, selfBox);
+    B.createReturn(endOfInitLoc, emitEmptyTuple(ctor));
     return;
   }
 
   // Otherwise, load and return the final 'self' value.
-  SILValue selfValue = B.createLoad(ctor, selfLV);
+  SILValue selfValue = B.createLoad(endOfInitLoc, selfLV);
   SILValue selfBox = VarLocs[selfDecl].box;
   assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
-  selfValue = lowering.emitCopyValue(B, ctor, selfValue);
+  selfValue = lowering.emitCopyValue(B, endOfInitLoc, selfValue);
 
   // Release the box.
-  B.emitStrongRelease(ctor, selfBox);
+  B.emitStrongRelease(endOfInitLoc, selfBox);
 
-  B.createReturn(ctor, selfValue);
+  B.createReturn(endOfInitLoc, selfValue);
 }
 
 static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
@@ -2390,36 +2395,42 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
 
   if (NeedsBoxForSelf) {
-    B.createStore(ctor, selfArg, VarLocs[selfDecl].getAddress());
+    SILLocation prologueLoc = RegularLocation(ctor);
+    prologueLoc.markAsPrologue();
+    B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].getAddress());
   } else {
     VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
   }
 
+  // Prepare the end of initializer location.
+  SILLocation endOfInitLoc = RegularLocation(ctor);
+  endOfInitLoc.pointToEnd();
+
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), CleanupLocation(ctor));
+  prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
   
   // Emit the constructor body.
   visit(ctor->getBody());
   
   // Return 'self' in the epilog.
-  if (!emitEpilogBB(ctor).first)
+  if (!emitEpilogBB(endOfInitLoc).first)
     return;
 
   // If we're using a box for self, reload the value at the end of the init
   // method.
   if (NeedsBoxForSelf) {
-    selfArg = B.createLoad(ctor, VarLocs[selfDecl].getAddress());
+    selfArg = B.createLoad(endOfInitLoc, VarLocs[selfDecl].getAddress());
     SILValue selfBox = VarLocs[selfDecl].box;
     assert(selfBox);
 
     // We have to do a retain because someone else may be using the box.
-    selfArg = B.emitCopyValueOperation(ctor, selfArg);
-    B.emitStrongRelease(ctor, selfBox);
+    selfArg = B.emitCopyValueOperation(endOfInitLoc, selfArg);
+    B.emitStrongRelease(endOfInitLoc, selfBox);
   }
 
   // Return the final 'self'.
-  B.createReturn(ctor, selfArg);
+  B.createReturn(endOfInitLoc, selfArg);
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,
