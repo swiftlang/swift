@@ -562,7 +562,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int64):
   %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
   assign %1 to %13 : $*Int64
 
-  return %3 : $RootClassWithIVars  // expected-error {{instance variable '<unknown>.z.1' not initialized}}
+  return %3 : $RootClassWithIVars  // expected-error {{property '<unknown>.z.1' not initialized}}
 }
 
 // CHECK-LABEL: sil @rootclass_test3
@@ -575,7 +575,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int64):
   assign %1 to %11 : $*Int64
   strong_release %3 : $RootClassWithIVars            // id: %14
 
-  return %3 : $RootClassWithIVars    // expected-error {{instance variable '<unknown>.x' not initialized}}
+  return %3 : $RootClassWithIVars    // expected-error {{property '<unknown>.x' not initialized}}
 }
 
 class DerivedClassWithIVars : RootClassWithIVars {
@@ -624,7 +624,7 @@ bb0(%0 : $DerivedClassWithIVars):
 
   %11 = load %1#1 : $*DerivedClassWithIVars
   strong_retain %11 : $DerivedClassWithIVars
-  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{instance variable '<unknown>.a' not initialized at super.init call}}
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{property '<unknown>.a' not initialized at super.init call}}
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

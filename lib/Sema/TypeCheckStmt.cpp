@@ -713,20 +713,17 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
     // Create a tuple expression with the same structure as the
     // pattern.
-    if (Expr *dest = createPatternMemberRefExpr(*this,
-                                                ctor->getImplicitSelfDecl(),
-                                                patternBind->getPattern())) {
-      initializer = new (Context) DefaultValueExpr(initializer);
-      Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                              initializer,
-                                              /*Implicit=*/true);
-      typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
-      memberInitializers.push_back(assign);
-      continue;
-    }
-
-    diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
-    diagnose(patternBind->getLoc(), diag::decl_init_here);
+    Expr *dest = createPatternMemberRefExpr(*this,
+                                            ctor->getImplicitSelfDecl(),
+                                            patternBind->getPattern());
+    assert(dest);
+    initializer = new (Context) DefaultValueExpr(initializer);
+    Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
+                                            initializer,
+                                            /*Implicit=*/true);
+    typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
+    memberInitializers.push_back(assign);
+    continue;
   }
 
   // If this is the implicit default constructor for a class with a superclass,

@@ -147,9 +147,9 @@ enum DIUseKind {
   /// closure that captures it.
   Escape,
 
-  /// This instruction is the start of an access to the superclass when we are
-  /// analyzing 'self'.
-  Superclass
+  /// This instruction is a call to 'super.init' in a 'self' initializer of a
+  /// derived class.
+  SuperInit
 };
 
 /// This struct represents a single classified access to the memory object

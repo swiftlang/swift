@@ -867,7 +867,7 @@ void AllocOptimize::tryToRemoveDeadAllocation() {
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case DIUseKind::Superclass: assert(0 && "Can't happen on allocations");
+    case DIUseKind::SuperInit: assert(0 && "Can't happen on allocations");
     case DIUseKind::Assign:
     case DIUseKind::PartialStore:
     case DIUseKind::InitOrAssign:

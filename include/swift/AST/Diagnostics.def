@@ -1205,9 +1205,6 @@ ERROR(overload_base_decl,sema_tcd,none,
 
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
-ERROR(decl_no_default_init_ivar,sema_tcd,none,
-      "cannot default-initialize instance variable %0 of type %1", 
-      (Identifier, Type))
 ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
       "cannot use initial value when one of the variables is '_'", ())
 NOTE(decl_init_here,sema_tcd,none,
@@ -1559,17 +1556,15 @@ ERROR(variable_inout_before_initialized,sil_analysis,none,
 ERROR(variable_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",
       (StringRef))
-ERROR(base_object_use_before_initialized,sil_analysis,none,
-      "use of base object '%0' before super.init call initializes it",
-      (StringRef))
-ERROR(base_object_use_before_initialized_some_paths,sil_analysis,none,
-      "super.init not called on all paths leading to use of base object '%0'",
+ERROR(ivar_in_base_object_use_before_initialized,sil_analysis,none,
+      "use of property '%0' in base object before super.init"
+      " initializes it",
       (StringRef))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
-      "instance variable '%0' not initialized at super.init call",
+      "property '%0' not initialized at super.init call",
       (StringRef))
 ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
-      "instance variable '%0' not initialized", (StringRef))
+      "property '%0' not initialized", (StringRef))
 ERROR(superinit_multiple_times,sil_analysis,none,
       "super.init called multiple times in initializer", ())
 ERROR(superinit_not_called_before_return,sil_analysis,none,

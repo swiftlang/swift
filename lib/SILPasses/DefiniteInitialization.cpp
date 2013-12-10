@@ -362,7 +362,9 @@ namespace {
     bool isInitializedAtUse(const DIMemoryUse &Use, bool *SuperInitDone = 0);
 
     void handleStoreUse(unsigned UseID);
-    void handleSuperclassUse(const DIMemoryUse &InstInfo);
+    void handleLoadUseFailure(const DIMemoryUse &InstInfo,
+                              bool IsSuperInitComplete);
+    void handleSuperInitUse(const DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
@@ -545,47 +547,11 @@ void LifetimeChecker::doIt() {
     case DIUseKind::Load: {
       bool IsSuperInitComplete;
       // If the value is not definitively initialized, emit an error.
-      if (isInitializedAtUse(Use, &IsSuperInitComplete))
-        break;
-
-      // Otherwise, this is a use of an uninitialized value.  Emit a
-      // diagnostic.
-      // TODO: In the "No" case, we can emit a fixit adding a default
-      // initialization of the type.
-
-      // If this is a load with a single user that is a return, then this is a
-      // return in the enum init case, and we haven't stored to self.   Emit a
-      // specific diagnostic.
-      if (auto *LI = dyn_cast<LoadInst>(Inst))
-        if (TheMemory.isEnumSelf() && LI->hasOneUse() &&
-            isa<ReturnInst>((*LI->use_begin())->getUser())) {
-          if (shouldEmitError(Inst))
-            diagnose(Module, Inst->getLoc(),
-                     diag::return_from_init_without_initing_self);
-          break;
-        }
-
-      // If this is the super.init marker not being initialized, then the load
-      // requires super.init to be called, and it isn't.  Emit a specific
-      // diagnostic.
-      if (!IsSuperInitComplete) {
-        if (shouldEmitError(Inst)) {
-          if (isa<ReturnInst>(Inst))
-            diagnose(Module, Inst->getLoc(),
-                     diag::superinit_not_called_before_return);
-          else
-            diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
-        }
-        return;
-      }
-
-      if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer) {
-        diagnoseInitError(Use, diag::ivar_not_initialized_at_init_return);
-        break;
-      }
-      diagnoseInitError(Use, diag::variable_used_before_initialized);
+      if (!isInitializedAtUse(Use, &IsSuperInitComplete))
+        handleLoadUseFailure(Use, IsSuperInitComplete);
       break;
     }
+
     case DIUseKind::InOutUse:
       if (!isInitializedAtUse(Use))
         diagnoseInitError(Use, diag::variable_inout_before_initialized);
@@ -604,8 +570,8 @@ void LifetimeChecker::doIt() {
         diagnoseInitError(Use, DiagMessage);
       }
       break;
-    case DIUseKind::Superclass:
-      handleSuperclassUse(Use);
+    case DIUseKind::SuperInit:
+      handleSuperInitUse(Use);
       break;
     }
   }
@@ -691,90 +657,77 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   updateInstructionForInitState(InstInfo);
 }
 
-/// isSuperInitUse - Return true if this "upcast" is part of a call to
-/// super.init.
-static bool isSuperInitUse(UpcastInst *Inst) {
-  
-  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
-  // that came from a call to super.init.
-  for (auto UI : Inst->getUses()) {
-    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
-    if (!AI) continue;
+/// handleLoadUseFailure - Check and diagnose various failures when a load use
+/// is not fully initialized.
+///
+/// TODO: In the "No" case, we can emit a fixit adding a default
+/// initialization of the type.
+///
+void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
+                                           bool IsSuperInitComplete) {
+  SILInstruction *Inst = Use.Inst;
 
-    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
-    if (!LocExpr) {
-      // If we're reading a .sil file, treat a call to "superinit" as a
-      // super.init call as a hack to allow us to write testcases.
-      if (AI->getLoc().is<SILFileLocation>())
-        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-          if (FRI->getReferencedFunction()->getName() == "superinit")
-            return true;
-      continue;
+  // If this is a load with a single user that is a return, then this is a
+  // return in the enum init case, and we haven't stored to self.   Emit a
+  // specific diagnostic.
+  if (auto *LI = dyn_cast<LoadInst>(Inst))
+    if (TheMemory.isEnumSelf() && LI->hasOneUse() &&
+        isa<ReturnInst>((*LI->use_begin())->getUser())) {
+      if (shouldEmitError(Inst))
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_self);
+      return;
     }
 
-    // This is a super.init call if structured like this:
-    // (call_expr type='SomeClass'
-    //   (dot_syntax_call_expr type='() -> SomeClass' super
-    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
-    //     (load_expr implicit type='SomeClass'
-    //       (super_ref_expr type='@inout (implicit)SomeClass')))
-    //   (...some argument...)
-    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
-    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
-      continue;
+  // If this is the super.init marker not being initialized, then the load
+  // requires super.init to be called, and it isn't.  Emit a specific
+  // diagnostic.
+  if (!IsSuperInitComplete) {
+    if (!shouldEmitError(Inst)) return;
 
-    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
-    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
-      return true;
+    if (isa<ReturnInst>(Inst)) {
+      diagnose(Module, Inst->getLoc(),
+               diag::superinit_not_called_before_return);
+      return;
+    }
+
+    // Handle conversions of self to a base type.
+    if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
+      // If the upcast is used by a ref_element_addr, then it is an access to a
+      // base ivar.
+      if (UCI->hasOneUse())
+        if (auto *REI =
+              dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
+          diagnose(Module, Inst->getLoc(),
+                   diag::ivar_in_base_object_use_before_initialized,
+                   REI->getField()->getName().str());
+          return;
+        }
+    }
+
+    // Otherwise, this is a general use of self.
+    diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    return;
   }
 
-  return false;
+  // Check to see if we're returning self in a class initializer before all the
+  // ivars are set up.
+  if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer) {
+    diagnoseInitError(Use, diag::ivar_not_initialized_at_init_return);
+    return;
+  }
+
+  diagnoseInitError(Use, diag::variable_used_before_initialized);
 }
 
-/// handleSuperclassUse - When processing a 'self' argument on a class, this is
-/// called on any conversions to base classes.  These are effectively escape
-/// points, but we have additional semantics we want to apply and want to make
-/// the diagnostics a lot better.
-void LifetimeChecker::handleSuperclassUse(const DIMemoryUse &InstInfo) {
+/// handleSuperInitUse - When processing a 'self' argument on a class, this is
+/// a call to super.init.
+void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   UpcastInst *Inst = cast<UpcastInst>(InstInfo.Inst);
 
   // Determine the liveness states of the memory object, including the
   // super.init state.
   AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
-
-  // We have two different cases to handle here: a super.init call, and a normal
-  // conversion to the base class.
-  if (!isSuperInitUse(Inst)) {
-    // Normal conversion to the base class require that everything be
-    // initialized and that super.init already be called.
-    if (Liveness.isAllYes()) return;
-
-    Diag<StringRef> DiagMessage;
-
-    // If super.init hasn't been called, diagnose that specifically.
-    switch (Liveness.get(TheMemory.NumElements-1)) {
-    case DIKind::Yes:
-      // If super.init has already been called by this point, we would have
-      // diagnosed the uninitialized ivar at that point.
-      return;
-
-    case DIKind::No:
-      // If super.init hasn't been called by this point, emit an error requiring
-      // it.
-      DiagMessage = diag::base_object_use_before_initialized;
-      break;
-
-    case DIKind::Partial:
-      DiagMessage = diag::base_object_use_before_initialized_some_paths;
-      break;
-    }
-
-    if (shouldEmitError(Inst)) {
-      auto BaseType = Inst->getType().getSwiftRValueType().getString();
-      diagnose(Module, Inst->getLoc(), DiagMessage, BaseType);
-    }
-    return;
-  }
 
   // super.init() calls require that super.init has not already been called. If
   // it has, reject the program.

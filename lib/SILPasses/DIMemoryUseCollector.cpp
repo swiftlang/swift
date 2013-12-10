@@ -812,6 +812,46 @@ void ElementUseCollector::collectClassSelfUses() {
   }
 }
 
+/// isSuperInitUse - Return true if this "upcast" is part of a call to
+/// super.init.
+static bool isSuperInitUse(UpcastInst *Inst) {
+
+  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
+  // that came from a call to super.init.
+  for (auto UI : Inst->getUses()) {
+    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
+    if (!AI) continue;
+
+    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+    if (!LocExpr) {
+      // If we're reading a .sil file, treat a call to "superinit" as a
+      // super.init call as a hack to allow us to write testcases.
+      if (AI->getLoc().is<SILFileLocation>())
+        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+          if (FRI->getReferencedFunction()->getName() == "superinit")
+            return true;
+      continue;
+    }
+
+    // This is a super.init call if structured like this:
+    // (call_expr type='SomeClass'
+    //   (dot_syntax_call_expr type='() -> SomeClass' super
+    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
+    //     (load_expr implicit type='SomeClass'
+    //       (super_ref_expr type='@inout (implicit)SomeClass')))
+    //   (...some argument...)
+    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
+    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
+      continue;
+
+    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
+    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
+      return true;
+  }
+
+  return false;
+}
+
 
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -834,14 +874,13 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
       continue;
 
-
-    // Otherwise, the use is something complicated, it escapes.
-
-    // upcast instructions are accesses into the base class.  These are
-    // effectively loads for DI's purposes, but we classify them differently
-    // since the diagnostics are pretty different.
-    auto Kind =
-      isa<UpcastInst>(User) ? DIUseKind::Superclass : DIUseKind::Load;
+    // If this is an upcast instruction, it is a conversion of self to the base.
+    // This is either part of a super.init sequence, or a general superclass
+    // access.
+    DIUseKind Kind = DIUseKind::Load;
+    if (auto *UCI = dyn_cast<UpcastInst>(User))
+      if (isSuperInitUse(UCI))
+        Kind = DIUseKind::SuperInit;
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
