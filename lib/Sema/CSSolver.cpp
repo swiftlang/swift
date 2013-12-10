@@ -720,15 +720,20 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
     }
 
-    // If this is a conversion to a single-element, non-variadic labelled
-    // tuple, just grab the element type.
+    // Don't deduce autoclosure types or single-element, non-variadic tuples.
     if (arg.first->getKind() == ConstraintKind::Conversion ||
         arg.first->getKind() == ConstraintKind::Subtype ||
         arg.first->getKind() == ConstraintKind::TrivialSubtype) {
-      if (auto tupleTy = type->getAs<TupleType>())
+      if (auto funcTy = type->getAs<FunctionType>()) {
+        if (funcTy->isAutoClosure())
+          type = funcTy->getResult();
+      }
+
+      if (auto tupleTy = type->getAs<TupleType>()) {
         if (tupleTy->getNumElements() == 1 &&
             !tupleTy->getFields()[0].isVararg())
           type = tupleTy->getElementType(0);
+      }
     }
 
     if (exactTypes.insert(type->getCanonicalType()))
