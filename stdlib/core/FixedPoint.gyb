@@ -262,6 +262,12 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 @ end
 
+// bitwise operations
+@@transparent
+extension ${Self} : BitwiseOperations {
+  static func allZeros() -> ${Self} { return 0 }
+}
+
 // Compound assignments
 @ for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
 @@transparent @@assignment
