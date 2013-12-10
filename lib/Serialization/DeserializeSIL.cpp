@@ -83,66 +83,54 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   SILCursor.advance();
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
-  // Read SIL_FUNC_NAMES record and update FuncTable.
-  auto next = cursor.advance();
-  if (next.Kind == llvm::BitstreamEntry::EndBlock)
-    return;
-  SmallVector<uint64_t, 4> scratch;
-  StringRef blobData;
-  unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_FUNC_NAMES) &&
-         "Expect a SIL_FUNC_NAMES record.");
-  FuncTable = readFuncTable(scratch, blobData);
+  // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
+  // SIL_GLOBALVAR_NAMES. But each one can be omitted if no entries exist
+  // in the module file.
+  unsigned kind = 0;
+  while (kind != sil_index_block::SIL_GLOBALVAR_NAMES) {
+    auto next = cursor.advance();
+    if (next.Kind == llvm::BitstreamEntry::EndBlock)
+      return;
 
-  // Read SIL_FUNC_OFFSETS record and initialize Funcs.
-  next = cursor.advance();
-  scratch.clear();
-  kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_FUNC_OFFSETS) &&
-         "Expect a SIL_FUNC_OFFSETS record.");
-  Funcs.assign(scratch.begin(), scratch.end());
+    SmallVector<uint64_t, 4> scratch;
+    StringRef blobData;
+    unsigned prevKind = kind;
+    kind = cursor.readRecord(next.ID, scratch, &blobData);
+    assert((next.Kind == llvm::BitstreamEntry::Record &&
+            kind > prevKind &&
+            (kind == sil_index_block::SIL_FUNC_NAMES ||
+             kind == sil_index_block::SIL_VTABLE_NAMES ||
+             kind == sil_index_block::SIL_GLOBALVAR_NAMES)) &&
+         "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, or SIL_GLOBALVAR_NAMES.");
 
-  // Read SIL_VTABLE_NAMES record and update VTableList.
-  next = cursor.advance();
-  if (next.Kind == llvm::BitstreamEntry::EndBlock)
-    return;
-  scratch.clear();
-  kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_VTABLE_NAMES) &&
-         "Expect a SIL_VTABLE_NAMES record.");
-  VTableList = readFuncTable(scratch, blobData);
+    if (kind == sil_index_block::SIL_FUNC_NAMES)
+      FuncTable = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_VTABLE_NAMES)
+      VTableList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES)
+      GlobalVarList = readFuncTable(scratch, blobData);
 
-  // Read SIL_VTABLE_OFFSETS record and initialize VTables.
-  next = cursor.advance();
-  scratch.clear();
-  kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_VTABLE_OFFSETS) &&
-         "Expect a SIL_VTABLE_OFFSETS record.");
-  VTables.assign(scratch.begin(), scratch.end());
-
-  // Read SIL_GLOBALVAR_NAMES record and update GlobalVarList.
-  next = cursor.advance();
-  if (next.Kind == llvm::BitstreamEntry::EndBlock)
-    return;
-  scratch.clear();
-  kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_GLOBALVAR_NAMES) &&
-         "Expect a SIL_GLOBALVAR_NAMES record.");
-  GlobalVarList = readFuncTable(scratch, blobData);
-
-  // Read SIL_GLOBALVAR_OFFSETS record and initialize GlobalVars.
-  next = cursor.advance();
-  scratch.clear();
-  kind = cursor.readRecord(next.ID, scratch, &blobData);
-  assert((next.Kind == llvm::BitstreamEntry::Record &&
-          kind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
-         "Expect a SIL_GLOBALVAR_OFFSETS record.");
-  GlobalVars.assign(scratch.begin(), scratch.end());
+    // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
+    next = cursor.advance();
+    scratch.clear();
+    unsigned offKind = cursor.readRecord(next.ID, scratch, &blobData);
+    if (kind == sil_index_block::SIL_FUNC_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_FUNC_OFFSETS) &&
+             "Expect a SIL_FUNC_OFFSETS record.");
+      Funcs.assign(scratch.begin(), scratch.end());
+    } else if (kind == sil_index_block::SIL_VTABLE_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_VTABLE_OFFSETS) &&
+             "Expect a SIL_VTABLE_OFFSETS record.");
+      VTables.assign(scratch.begin(), scratch.end());
+    } else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
+             "Expect a SIL_GLOBALVAR_OFFSETS record.");
+      GlobalVars.assign(scratch.begin(), scratch.end());
+    }
+  }
 }
 
 std::unique_ptr<SILDeserializer::SerializedFuncTable>
