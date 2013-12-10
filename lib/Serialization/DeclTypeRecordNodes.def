@@ -1,0 +1,160 @@
+//===-- DeclTypeRecordNodes.def - Serialization Metaprogramming -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// \brief Defines macros used for metaprogramming with the serialized records
+/// in the "decls-and-types" block of serialized ASTs.
+///
+/// You should define one of the following sets of macros:
+/// - RECORD(Id)
+/// - RECORD(Id) and RECORD_VAL(Id)
+/// - Any of TYPE(Id), DECL(Id), PATTERN(Id)
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef RECORD
+#define RECORD(Id)
+#endif
+
+#ifdef RECORD_VAL
+#define DECLTYPERECORDNODES_HAS_RECORD_VAL 1
+#else
+#define DECLTYPERECORDNODES_HAS_RECORD_VAL 0
+#define RECORD_VAL(Id, Value) RECORD(Id)
+#endif
+
+#ifndef TYPE
+#define TYPE(Id) RECORD(Id##_TYPE)
+#endif
+
+#ifndef FIRST_TYPE
+# if DECLTYPERECORDNODES_HAS_RECORD_VAL
+#  define FIRST_TYPE(Id, Value) RECORD_VAL(Id##_TYPE, Value)
+# else
+#  define FIRST_TYPE(Id, Value) TYPE(Id)
+# endif
+#endif
+
+#ifndef DECL
+#define DECL(Id) RECORD(Id##_DECL)
+#endif
+
+#ifndef FIRST_DECL
+# if DECLTYPERECORDNODES_HAS_RECORD_VAL
+#  define FIRST_DECL(Id, Value) RECORD_VAL(Id##_DECL, Value)
+# else
+#  define FIRST_DECL(Id, Value) DECL(Id)
+# endif
+#endif
+
+#ifndef PATTERN
+#define PATTERN(Id) RECORD(Id##_PATTERN)
+#endif
+
+#ifndef FIRST_PATTERN
+# if DECLTYPERECORDNODES_HAS_RECORD_VAL
+#  define FIRST_PATTERN(Id, Value) RECORD_VAL(Id##_PATTERN, Value)
+# else
+#  define FIRST_PATTERN(Id, Value) PATTERN(Id)
+# endif
+#endif
+
+#ifndef TRAILING_INFO
+#define TRAILING_INFO(Id) RECORD(Id)
+#endif
+
+#ifndef OTHER
+#define OTHER(Id, Value) RECORD_VAL(Id, Value)
+#endif
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR in ModuleFormat.h. Names, however, may change.
+FIRST_TYPE(NAME_ALIAS, 1)
+TYPE(GENERIC_TYPE_PARAM)
+TYPE(ASSOCIATED_TYPE) // This is correct! ASSOCIATED_TYPE_TYPE
+TYPE(DEPENDENT_MEMBER)
+TYPE(NOMINAL)
+TYPE(PAREN)
+TYPE(TUPLE)
+TRAILING_INFO(TUPLE_TYPE_ELT)
+TYPE(FUNCTION)
+TYPE(METATYPE)
+TYPE(LVALUE)
+TYPE(ARCHETYPE)
+TRAILING_INFO(ARCHETYPE_NESTED_TYPE_NAMES)
+TRAILING_INFO(ARCHETYPE_NESTED_TYPES)
+TYPE(PROTOCOL_COMPOSITION)
+TYPE(SUBSTITUTED)
+TYPE(BOUND_GENERIC)
+TRAILING_INFO(BOUND_GENERIC_SUBSTITUTION)
+TYPE(POLYMORPHIC_FUNCTION)
+TYPE(GENERIC_FUNCTION)
+TYPE(ARRAY_SLICE)
+TYPE(ARRAY)
+TYPE(REFERENCE_STORAGE)
+TYPE(UNBOUND_GENERIC)
+TYPE(OPTIONAL)
+TYPE(SIL_FUNCTION)
+
+FIRST_DECL(TYPE_ALIAS, 100)
+DECL(GENERIC_TYPE_PARAM)
+DECL(ASSOCIATED_TYPE)
+DECL(STRUCT)
+DECL(CONSTRUCTOR)
+DECL(VAR)
+DECL(FUNC)
+DECL(PATTERN_BINDING)
+DECL(PROTOCOL)
+DECL(PREFIX_OPERATOR)
+DECL(POSTFIX_OPERATOR)
+DECL(INFIX_OPERATOR)
+DECL(CLASS)
+DECL(ENUM)
+DECL(ENUM_ELEMENT)
+DECL(SUBSCRIPT)
+DECL(EXTENSION)
+DECL(DESTRUCTOR)
+
+FIRST_PATTERN(PAREN, 200)
+PATTERN(TUPLE)
+TRAILING_INFO(TUPLE_PATTERN_ELT)
+PATTERN(NAMED)
+PATTERN(ANY)
+PATTERN(TYPED)
+PATTERN(ISA)
+PATTERN(NOMINAL_TYPE)
+TRAILING_INFO(NOMINAL_TYPE_PATTERN_ELT)
+PATTERN(VAR)
+
+OTHER(GENERIC_PARAM_LIST, 240)
+TRAILING_INFO(GENERIC_PARAM)
+TRAILING_INFO(GENERIC_REQUIREMENT)
+TRAILING_INFO(LAST_GENERIC_REQUIREMENT)
+
+OTHER(NO_CONFORMANCE, 250)
+OTHER(NORMAL_PROTOCOL_CONFORMANCE, 251)
+OTHER(SPECIALIZED_PROTOCOL_CONFORMANCE, 252)
+OTHER(INHERITED_PROTOCOL_CONFORMANCE, 253)
+OTHER(DECL_CONTEXT, 254)
+OTHER(XREF, 255)
+
+#undef RECORD
+#undef DECLTYPERECORDNODES_HAS_RECORD_VAL
+#undef RECORD_VAL
+#undef TYPE
+#undef FIRST_TYPE
+#undef DECL
+#undef FIRST_DECL
+#undef PATTERN
+#undef FIRST_PATTERN
+#undef TRAILING_INFO
+#undef OTHER

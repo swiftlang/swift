@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file Contains various constants and helper types to deal with serialized
+/// \file
+/// \brief Contains various constants and helper types to deal with serialized
 /// modules.
 ///
 //===----------------------------------------------------------------------===//
@@ -303,75 +304,9 @@ namespace decls_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
-    NAME_ALIAS_TYPE = 1,
-    GENERIC_TYPE_PARAM_TYPE,
-    ASSOCIATED_TYPE_TYPE,
-    DEPENDENT_MEMBER_TYPE,
-    NOMINAL_TYPE,
-    PAREN_TYPE,
-    TUPLE_TYPE,
-    TUPLE_TYPE_ELT,
-    FUNCTION_TYPE,
-    METATYPE_TYPE,
-    LVALUE_TYPE,
-    ARCHETYPE_TYPE,
-    ARCHETYPE_NESTED_TYPE_NAMES,
-    ARCHETYPE_NESTED_TYPES,
-    PROTOCOL_COMPOSITION_TYPE,
-    SUBSTITUTED_TYPE,
-    BOUND_GENERIC_TYPE,
-    BOUND_GENERIC_SUBSTITUTION,
-    POLYMORPHIC_FUNCTION_TYPE,
-    GENERIC_FUNCTION_TYPE,
-    ARRAY_SLICE_TYPE,
-    ARRAY_TYPE,
-    REFERENCE_STORAGE_TYPE,
-    UNBOUND_GENERIC_TYPE,
-    OPTIONAL_TYPE,
-    SIL_FUNCTION_TYPE,
-
-    TYPE_ALIAS_DECL = 100,
-    GENERIC_TYPE_PARAM_DECL,
-    ASSOCIATED_TYPE_DECL,
-    STRUCT_DECL,
-    CONSTRUCTOR_DECL,
-    VAR_DECL,
-    FUNC_DECL,
-    PATTERN_BINDING_DECL,
-    PROTOCOL_DECL,
-    PREFIX_OPERATOR_DECL,
-    POSTFIX_OPERATOR_DECL,
-    INFIX_OPERATOR_DECL,
-    CLASS_DECL,
-    ENUM_DECL,
-    ENUM_ELEMENT_DECL,
-    SUBSCRIPT_DECL,
-    EXTENSION_DECL,
-    DESTRUCTOR_DECL,
-    KNOWN_PROTOCOL,
-
-    PAREN_PATTERN = 200,
-    TUPLE_PATTERN,
-    TUPLE_PATTERN_ELT,
-    NAMED_PATTERN,
-    ANY_PATTERN,
-    TYPED_PATTERN,
-    ISA_PATTERN,
-    NOMINAL_TYPE_PATTERN,
-    NOMINAL_TYPE_PATTERN_ELT,
-    VAR_PATTERN,
-
-    GENERIC_PARAM_LIST = 240,
-    GENERIC_PARAM,
-    GENERIC_REQUIREMENT,
-    LAST_GENERIC_REQUIREMENT,
-
-    NO_CONFORMANCE = 250,
-    NORMAL_PROTOCOL_CONFORMANCE = 251,
-    SPECIALIZED_PROTOCOL_CONFORMANCE = 252,
-    INHERITED_PROTOCOL_CONFORMANCE = 253,
-    DECL_CONTEXT = 254,
-    XREF = 255
+#define RECORD(Id) Id,
+#define RECORD_VAL(Id, Value) Id = Value,
+#include "DeclTypeRecordNodes.def"
   };
 
   using NameAliasTypeLayout = BCRecordLayout<

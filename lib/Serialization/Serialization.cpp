@@ -230,124 +230,62 @@ void Serializer::writeBlockInfoBlock() {
 
   SmallVector<unsigned char, 64> nameBuffer;
 #define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
 
   BLOCK(CONTROL_BLOCK);
-  RECORD(control_block, METADATA);
+  BLOCK_RECORD(control_block, METADATA);
 
   BLOCK(INPUT_BLOCK);
-  RECORD(input_block, SOURCE_FILE);
-  RECORD(input_block, IMPORTED_MODULE);
-  RECORD(input_block, LINK_LIBRARY);
+  BLOCK_RECORD(input_block, SOURCE_FILE);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE);
+  BLOCK_RECORD(input_block, LINK_LIBRARY);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
-  RECORD(decls_block, NAME_ALIAS_TYPE);
-  RECORD(decls_block, GENERIC_TYPE_PARAM_TYPE);
-  RECORD(decls_block, ASSOCIATED_TYPE_TYPE);
-  RECORD(decls_block, DEPENDENT_MEMBER_TYPE);
-  RECORD(decls_block, NOMINAL_TYPE);
-  RECORD(decls_block, PAREN_TYPE);
-  RECORD(decls_block, TUPLE_TYPE);
-  RECORD(decls_block, TUPLE_TYPE_ELT);
-  RECORD(decls_block, FUNCTION_TYPE);
-  RECORD(decls_block, METATYPE_TYPE);
-  RECORD(decls_block, LVALUE_TYPE);
-  RECORD(decls_block, ARCHETYPE_TYPE);
-  RECORD(decls_block, ARCHETYPE_NESTED_TYPE_NAMES);
-  RECORD(decls_block, ARCHETYPE_NESTED_TYPES);
-  RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
-  RECORD(decls_block, SUBSTITUTED_TYPE);
-  RECORD(decls_block, BOUND_GENERIC_TYPE);
-  RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
-  RECORD(decls_block, POLYMORPHIC_FUNCTION_TYPE);
-  RECORD(decls_block, GENERIC_FUNCTION_TYPE);
-  RECORD(decls_block, ARRAY_SLICE_TYPE);
-  RECORD(decls_block, ARRAY_TYPE);
-  RECORD(decls_block, REFERENCE_STORAGE_TYPE);
-  RECORD(decls_block, UNBOUND_GENERIC_TYPE);
-  RECORD(decls_block, OPTIONAL_TYPE);
-  RECORD(decls_block, SIL_FUNCTION_TYPE);
-
-  RECORD(decls_block, TYPE_ALIAS_DECL);
-  RECORD(decls_block, GENERIC_TYPE_PARAM_DECL);
-  RECORD(decls_block, ASSOCIATED_TYPE_DECL);
-  RECORD(decls_block, STRUCT_DECL);
-  RECORD(decls_block, CONSTRUCTOR_DECL);
-  RECORD(decls_block, VAR_DECL);
-  RECORD(decls_block, FUNC_DECL);
-  RECORD(decls_block, PATTERN_BINDING_DECL);
-  RECORD(decls_block, PROTOCOL_DECL);
-  RECORD(decls_block, PREFIX_OPERATOR_DECL);
-  RECORD(decls_block, POSTFIX_OPERATOR_DECL);
-  RECORD(decls_block, INFIX_OPERATOR_DECL);
-  RECORD(decls_block, CLASS_DECL);
-  RECORD(decls_block, ENUM_DECL);
-  RECORD(decls_block, ENUM_ELEMENT_DECL);
-  RECORD(decls_block, SUBSCRIPT_DECL);
-  RECORD(decls_block, EXTENSION_DECL);
-  RECORD(decls_block, DESTRUCTOR_DECL);
-
-  RECORD(decls_block, PAREN_PATTERN);
-  RECORD(decls_block, TUPLE_PATTERN);
-  RECORD(decls_block, TUPLE_PATTERN_ELT);
-  RECORD(decls_block, NAMED_PATTERN);
-  RECORD(decls_block, ANY_PATTERN);
-  RECORD(decls_block, TYPED_PATTERN);
-
-  RECORD(decls_block, GENERIC_PARAM_LIST);
-  RECORD(decls_block, GENERIC_PARAM);
-  RECORD(decls_block, GENERIC_REQUIREMENT);
-  RECORD(decls_block, LAST_GENERIC_REQUIREMENT);
-
-  RECORD(decls_block, NO_CONFORMANCE);
-  RECORD(decls_block, NORMAL_PROTOCOL_CONFORMANCE);
-  RECORD(decls_block, SPECIALIZED_PROTOCOL_CONFORMANCE);
-  RECORD(decls_block, INHERITED_PROTOCOL_CONFORMANCE);
-  RECORD(decls_block, DECL_CONTEXT);
-  RECORD(decls_block, XREF);
+#define RECORD(X) BLOCK_RECORD(decls_block, X);
+#include "DeclTypeRecordNodes.def"
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
-  RECORD(identifier_block, IDENTIFIER_DATA);
+  BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
 
   BLOCK(INDEX_BLOCK);
-  RECORD(index_block, TYPE_OFFSETS);
-  RECORD(index_block, DECL_OFFSETS);
-  RECORD(index_block, IDENTIFIER_OFFSETS);
-  RECORD(index_block, TOP_LEVEL_DECLS);
-  RECORD(index_block, OPERATORS);
-  RECORD(index_block, EXTENSIONS);
-  RECORD(index_block, CLASS_MEMBERS);
+  BLOCK_RECORD(index_block, TYPE_OFFSETS);
+  BLOCK_RECORD(index_block, DECL_OFFSETS);
+  BLOCK_RECORD(index_block, IDENTIFIER_OFFSETS);
+  BLOCK_RECORD(index_block, TOP_LEVEL_DECLS);
+  BLOCK_RECORD(index_block, OPERATORS);
+  BLOCK_RECORD(index_block, EXTENSIONS);
+  BLOCK_RECORD(index_block, CLASS_MEMBERS);
 
   BLOCK(SIL_BLOCK);
-  RECORD(sil_block, SIL_FUNCTION);
-  RECORD(sil_block, SIL_BASIC_BLOCK);
-  RECORD(sil_block, SIL_ONE_VALUE_ONE_OPERAND);
-  RECORD(sil_block, SIL_ONE_TYPE);
-  RECORD(sil_block, SIL_ONE_OPERAND);
-  RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND);
-  RECORD(sil_block, SIL_ONE_TYPE_VALUES);
-  RECORD(sil_block, SIL_TWO_OPERANDS);
-  RECORD(sil_block, SIL_INST_APPLY);
-  RECORD(sil_block, SIL_INST_NO_OPERAND);
-  RECORD(sil_block, SIL_VTABLE);
-  RECORD(sil_block, SIL_VTABLE_ENTRY);
-  RECORD(sil_block, SIL_GLOBALVAR);
+  BLOCK_RECORD(sil_block, SIL_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_BASIC_BLOCK);
+  BLOCK_RECORD(sil_block, SIL_ONE_VALUE_ONE_OPERAND);
+  BLOCK_RECORD(sil_block, SIL_ONE_TYPE);
+  BLOCK_RECORD(sil_block, SIL_ONE_OPERAND);
+  BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND);
+  BLOCK_RECORD(sil_block, SIL_ONE_TYPE_VALUES);
+  BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS);
+  BLOCK_RECORD(sil_block, SIL_INST_APPLY);
+  BLOCK_RECORD(sil_block, SIL_INST_NO_OPERAND);
+  BLOCK_RECORD(sil_block, SIL_VTABLE);
+  BLOCK_RECORD(sil_block, SIL_VTABLE_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
 
   BLOCK(SIL_INDEX_BLOCK);
-  RECORD(sil_index_block, SIL_FUNC_NAMES);
-  RECORD(sil_index_block, SIL_FUNC_OFFSETS);
-  RECORD(sil_index_block, SIL_VTABLE_NAMES);
-  RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
-  RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
-  RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_FUNC_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_VTABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
-#define PROTOCOL(Id) RECORD(index_block, Id);
+#define PROTOCOL(Id) BLOCK_RECORD(index_block, Id);
 #include "swift/AST/KnownProtocols.def"
-  RECORD(index_block, FORCE_DESERIALIZATION);
+  BLOCK_RECORD(index_block, FORCE_DESERIALIZATION);
 
 #undef BLOCK
-#undef RECORD
+#undef BLOCK_RECORD
 }
 
 void Serializer::writeHeader() {

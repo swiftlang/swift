@@ -23,6 +23,7 @@
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -71,6 +72,19 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
   return result;
 }
+
+namespace {
+  class PrettyModuleFileDeserialization : public llvm::PrettyStackTraceEntry {
+    const ModuleFile &File;
+  public:
+    explicit PrettyModuleFileDeserialization(const ModuleFile &file)
+        : File(file) {}
+
+    virtual void print(raw_ostream &os) const override {
+      os << "While reading from " << File.getModuleFilename() << "\n";
+    }
+  };
+} // end anonymous namespace
 
 /// Used to deserialize entries in the on-disk decl hash table.
 class ModuleFile::DeclTableInfo {
@@ -274,6 +288,8 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
     InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
                 reinterpret_cast<const uint8_t *>(InputFile->getBufferEnd())),
     Status(ModuleStatus::Valid) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   llvm::BitstreamCursor cursor{InputReader};
 
   for (unsigned char byte : SIGNATURE) {
@@ -452,6 +468,8 @@ static NominalTypeDecl *getAnyNominal(Decl *D) {
 }
 
 bool ModuleFile::associateWithFileContext(FileUnit *file) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   assert(Status == ModuleStatus::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
@@ -503,6 +521,8 @@ ModuleFile::~ModuleFile() = default;
 
 void ModuleFile::lookupValue(Identifier name,
                              SmallVectorImpl<ValueDecl*> &results) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   if (!TopLevelDecls)
     return;
 
@@ -521,6 +541,8 @@ void ModuleFile::lookupValue(Identifier name,
 }
 
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   if (!OperatorDecls)
     return nullptr;
 
@@ -541,6 +563,8 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
     bool includePrivate) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   for (auto &dep : Dependencies) {
     if (!includePrivate && !dep.IsExported)
       continue;
@@ -552,6 +576,7 @@ void ModuleFile::getImportedModules(
 void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
+  PrettyModuleFileDeserialization stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!TopLevelDecls)
@@ -576,6 +601,7 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
 }
 
 void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
+  PrettyModuleFileDeserialization stackEntry(*this);
   if (!ExtensionDecls)
     return;
 
@@ -590,6 +616,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
 }
 
 void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
   auto index = static_cast<unsigned>(kind);
   for (DeclID DID : KnownProtocolAdopters[index]) {
     Decl *D = getDecl(DID);
@@ -602,6 +630,7 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
 void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
                                    Identifier name,
                                    SmallVectorImpl<ValueDecl*> &results) {
+  PrettyModuleFileDeserialization stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!ClassMembersByName)
@@ -632,6 +661,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
 
 void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer) {
+  PrettyModuleFileDeserialization stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!ClassMembersByName)
@@ -668,6 +698,7 @@ ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
 }
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
+  PrettyModuleFileDeserialization stackEntry(*this);
   if (OperatorDecls) {
     for (auto entry : make_range(OperatorDecls->data_begin(),
                                  OperatorDecls->data_end())) {
@@ -697,5 +728,6 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   if (ShadowedModule)
     ShadowedModule->getDisplayDecls(results);
 
+  PrettyModuleFileDeserialization stackEntry(*this);
   getTopLevelDecls(results);
 }

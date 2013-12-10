@@ -180,6 +180,8 @@ private:
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
     assert(issue != ModuleStatus::Valid);
+    assert((!FileContext || issue != ModuleStatus::Malformed) &&
+           "error deserializing an individual record");
     Status = issue;
   }
 

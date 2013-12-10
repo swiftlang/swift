@@ -13,12 +13,85 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::serialization;
 
 using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
+
+
+namespace {
+  class PrettyDeclDeserialization : public llvm::PrettyStackTraceEntry {
+    const ModuleFile::Serialized<Decl*> &DeclOrOffset;
+    DeclID ID;
+    decls_block::RecordKind Kind;
+  public:
+    PrettyDeclDeserialization(const ModuleFile::Serialized<Decl*> &declOrOffset,
+                              DeclID DID, decls_block::RecordKind kind)
+      : DeclOrOffset(declOrOffset), ID(DID), Kind(kind) {
+    }
+
+    static const char *getRecordKindString(decls_block::RecordKind Kind) {
+      switch (Kind) {
+#define RECORD(Id) case decls_block::Id: return #Id;
+#include "DeclTypeRecordNodes.def"
+      }
+    }
+
+    virtual void print(raw_ostream &os) const override {
+      if (!DeclOrOffset.isComplete()) {
+        os << "While deserializing decl #" << ID << " ("
+           << getRecordKindString(Kind) << ")\n";
+        return;
+      }
+
+      os << "While deserializing ";
+      if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
+        os << "'" << VD->getName() << "' ("
+           << Decl::getKindName(VD->getKind()) << "Decl) \n";
+      } else {
+        os << Decl::getKindName(DeclOrOffset.get()->getKind())
+           << "Decl #" << ID << "\n";
+      }
+    }
+  };
+
+  class PrettyXRefDeserialization : public llvm::PrettyStackTraceEntry {
+    ModuleFile &File;
+    XRefKind Kind;
+    Module &ContainingModule;
+    ArrayRef<uint64_t> RawPath;
+
+  public:
+    PrettyXRefDeserialization(ModuleFile &file, XRefKind kind, Module &M,
+                              ArrayRef<uint64_t> rawPath)
+      : File(file), Kind(kind), ContainingModule(M), RawPath(rawPath) {}
+
+    virtual void print(raw_ostream &os) const override {
+      auto NamePath = RawPath;
+
+      os << "Cross-reference to ";
+      switch (Kind) {
+      case XRefKind::SwiftValue:
+      case XRefKind::SwiftOperator:
+        break;
+      case XRefKind::SwiftGenericParameter:
+        os << "generic param " << RawPath.back() << " of ";
+        NamePath = RawPath.slice(0, RawPath.size()-1);
+        break;
+      }
+
+      os << "'";
+      interleave(NamePath,
+                 [&](IdentifierID IID) { os << File.getIdentifier(IID); },
+                 [&]() { os << "."; });
+      os << "' in " << ContainingModule.Name << "\n";
+    }
+  };
+} // end anonymous namespace
 
 
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
@@ -782,6 +855,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+
+  PrettyDeclDeserialization stackTraceEntry(
+     declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
@@ -1625,6 +1701,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     Module *M = getModule(rawAccessPath.front());
     assert(M && "missing dependency");
     rawAccessPath = rawAccessPath.slice(1);
+
+    PrettyXRefDeserialization moreStackInfo(*this, static_cast<XRefKind>(kind),
+                                            *M, rawAccessPath);
 
     switch (kind) {
     case XRefKind::SwiftValue:
