@@ -352,6 +352,7 @@ public:
   static SILLocation getImplicitReturnLoc(SILLocation L) {
     assert(L.isASTNode<Expr>() ||
            L.isASTNode<ValueDecl>() ||
+           L.isASTNode<PatternBindingDecl>() ||
            (L.isNull() && L.isInTopLevel()));
     L.setKind(ImplicitReturnKind);
     return L;
