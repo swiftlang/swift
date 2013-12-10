@@ -77,6 +77,12 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
+  if (protocol && !protocol->hasType()) {
+    validateDecl(protocol);
+    if (protocol->isInvalid())
+      return nullptr;
+  }
+
   return protocol;
 }
 
