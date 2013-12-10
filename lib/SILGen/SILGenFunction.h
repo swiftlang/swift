@@ -473,8 +473,8 @@ public:
   ///          of the return instrcution if the epilog block is supposed to host
   ///          the ReturnLocation (This happens in case the predecessor block is
   ///          merged with the epilog block.)
-  std::pair<Optional<SILValue>,
-            Optional<SILLocation>> emitEpilogBB(SILLocation TopLevelLoc);
+  std::pair<Optional<SILValue>, SILLocation>
+    emitEpilogBB(SILLocation TopLevelLoc);
   
   /// \brief Emits a standard epilog which runs top-level cleanups then returns
   /// the function return value, if any.

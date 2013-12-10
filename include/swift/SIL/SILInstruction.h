@@ -104,7 +104,7 @@ public:
 
   SILLocation getLoc() const { return Loc; }
   SILDebugScope *getDebugScope() const { return DebugScope; }
-  void setDebugScope(SILDebugScope *DS)  { DebugScope = DS; }
+  SILInstruction *setDebugScope(SILDebugScope *DS)  { DebugScope = DS; return this; }
 
   /// removeFromParent - This method unlinks 'self' from the containing basic
   /// block, but does not delete it.

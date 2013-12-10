@@ -1525,9 +1525,9 @@ SourceRange ConstructorDecl::getSourceRange() const {
     const DeclContext *DC = getDeclContext();
     switch (DC->getContextKind()) {
     case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(DC)->getLoc();
+      return cast<ExtensionDecl>(DC)->getSourceRange();
     case DeclContextKind::NominalTypeDecl:
-      return cast<NominalTypeDecl>(DC)->getLoc();
+      return cast<NominalTypeDecl>(DC)->getSourceRange();
     default:
       if (isInvalid())
         return getConstructorLoc();

@@ -131,14 +131,6 @@ protected:
     return cast<T>(Node.get<typename base_type<T>::type*>());
   }
 
-  /// \brief Check if the corresponding source code location definitely points
-  ///  to the start of the AST node.
-  bool alwaysPointsToStart() const { return KindData & (1 << PointsToStartBit);}
-
-  /// \brief Check if the corresponding source code location definitely points
-  ///  to the end of the AST node.
-  bool alwaysPointsToEnd() const { return KindData & (1 << PointsToEndBit); }
-
   // SILLocation constructors.
   SILLocation(LocationKind K) : KindData(K) {}
   SILLocation(Stmt *S, LocationKind K) : ASTNode(S), KindData(K) {}
@@ -207,6 +199,14 @@ public:
   bool isInPrologue() const { return KindData & (1 << IsInPrologue); }
 
   bool hasASTLocation() const { return !ASTNode.isNull(); }
+
+  /// \brief Check if the corresponding source code location definitely points
+  ///  to the start of the AST node.
+  bool alwaysPointsToStart() const { return KindData & (1 << PointsToStartBit);}
+
+  /// \brief Check if the corresponding source code location definitely points
+  ///  to the end of the AST node.
+  bool alwaysPointsToEnd() const { return KindData & (1 << PointsToEndBit); }
 
   LocationKind getKind() const { return (LocationKind)(KindData & BaseMask); }
 
@@ -340,10 +340,10 @@ class ImplicitReturnLocation : public SILLocation {
 public:
 
   ImplicitReturnLocation(AbstractClosureExpr *E)
-    : SILLocation(E, ImplicitReturnKind) { pointToEnd(); }
+    : SILLocation(E, ImplicitReturnKind) { }
 
   ImplicitReturnLocation(AbstractFunctionDecl *AFD)
-    : SILLocation(AFD, ImplicitReturnKind) { pointToEnd(); }
+    : SILLocation(AFD, ImplicitReturnKind) { }
 
   /// \brief Construct from a RegularLocation; preserve all special bits.
   ///
@@ -351,10 +351,9 @@ public:
   /// (specifically, in case of auto-generated bodies).
   static SILLocation getImplicitReturnLoc(SILLocation L) {
     assert(L.isASTNode<Expr>() ||
-           L.isASTNode<AbstractFunctionDecl>() ||
+           L.isASTNode<ValueDecl>() ||
            (L.isNull() && L.isInTopLevel()));
     L.setKind(ImplicitReturnKind);
-    L.pointToEnd();
     return L;
   }
 
@@ -446,7 +445,7 @@ private:
 /// \brief Used on the instruction performing auto-generated cleanup such as
 /// deallocs, destructor calls.
 ///
-/// The cleanups are performed after completing the evaluztion of the AST Node
+/// The cleanups are performed after completing the evaluation of the AST Node
 /// wrapped inside the SILLocation. This location wraps the statement
 /// representing the enclosing scope, for example, FuncDecl, ParenExpr. The
 /// scope's end location points to the SourceLoc that shows when the operation

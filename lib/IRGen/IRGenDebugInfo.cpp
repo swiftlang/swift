@@ -189,6 +189,7 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
     return {};
 
   SILLocation Loc = OptLoc.getValue();
+  bool UseEnd = Loc.alwaysPointsToEnd();
 
   if (Loc.isNull()) return {};
   if (Expr *E = Loc.getAsASTNode<Expr>()) {
@@ -198,29 +199,29 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
     // on how we decide to resolve rdar://problem/14627460, we may
     // want to use the regular getLoc instead and rather use the
     // column info.
-    auto ELoc = getLoc(SM, E);
+    auto ELoc = getLoc(SM, E, UseEnd);
     if (isa<AutoClosureExpr>(E))
       return {{}, ELoc};
     return {ELoc, ELoc};
   }
   if (Pattern* P = Loc.getAsASTNode<Pattern>()) {
-    auto PLoc = getLoc(SM, P);
+    auto PLoc = getLoc(SM, P, UseEnd);
     return {PLoc, PLoc};
   }
   if (Stmt* S = Loc.getAsASTNode<Stmt>()) {
-    auto SLoc = getLoc(SM, S);
+    auto SLoc = getLoc(SM, S, UseEnd);
     return {SLoc, SLoc};
   }
 
   if (Decl* D = Loc.getAsASTNode<Decl>()) {
-    auto DLoc = getLoc(SM, D);
+    auto DLoc = getLoc(SM, D, UseEnd);
     auto LinetableLoc = DLoc;
     if (Loc.isInPrologue())
       LinetableLoc = {};
 
-    // FIXME: It may or may not be better to fix this in SILLocation.
-    // If this is an implicit return, we want the end of the
-    // AbstractFunctionDecl's body.
+    // For return and cleanup code SILLocation points to the start,
+    // because this is where we want diagnostics to appear. For the
+    // line table, we want them to point to the end of the Decl.
     else if (Loc.getKind() == SILLocation::ImplicitReturnKind ||
              Loc.getKind() == SILLocation::CleanupKind)
       LinetableLoc = getLoc(SM, D, true);
