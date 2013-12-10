@@ -40,7 +40,7 @@
 		    "dealloc_stack" "dealloc_box" "dealloc_ref")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
-   `(,(regexp-opt '("load" "store" "assign" "initialize_var" "copy_addr"
+   `(,(regexp-opt '("load" "store" "assign" "copy_addr"
 		    "destroy_addr" "index_addr" "index_raw_pointer" "to"
                     "copy_value" "mark_uninitialized" "mark_function_escape")
 		  'words) . font-lock-keyword-face)

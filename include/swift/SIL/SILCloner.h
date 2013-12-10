@@ -360,15 +360,6 @@ SILCloner<ImplClass>::visitStoreWeakInst(StoreWeakInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitInitializeVarInst(InitializeVarInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createInitializeVar(getOpLocation(Inst->getLoc()),
-                                getOpValue(Inst->getOperand()),
-                                Inst->canDefaultConstruct()));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
   doPostProcess(Inst,
     Builder.createCopyAddr(getOpLocation(Inst->getLoc()),

@@ -560,7 +560,6 @@ public:
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
 
-  void visitInitializeVarInst(InitializeVarInst *i);
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
@@ -2755,18 +2754,6 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   emitArchetypeMethodValue(*this, baseTy, member, conformance, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
-}
-
-void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
-  SILType ty = i->getOperand().getType();
-  const TypeInfo &ti = getTypeInfo(ty);
-  Address dest = getLoweredAddress(i->getOperand());
-  Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
-                                             IGM.Int8PtrTy),
-                       Builder.getInt8(0),
-                       ti.getSize(*this),
-                       dest.getAlignment().getValue(),
-                       /*isVolatile=*/ false);
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {

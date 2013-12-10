@@ -536,7 +536,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialInst:
   case ValueKind::DestroyAddrInst:
-  case ValueKind::InitializeVarInst:
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
@@ -552,8 +551,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned Attr = 0;
     if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
       Attr = LWI->isTake();
-    else if (auto *IVI = dyn_cast<InitializeVarInst>(&SI))
-      Attr = IVI->canDefaultConstruct();
     else if (auto *MUI = dyn_cast<MarkUninitializedInst>(&SI))
       Attr = (unsigned)MUI->getKind();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];

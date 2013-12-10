@@ -298,12 +298,6 @@ public:
     return insert(new (F.getModule()) StoreWeakInst(loc, value, dest, isInit));
   }
 
-  InitializeVarInst *createInitializeVar(SILLocation Loc, SILValue DestAddr,
-                                         bool canDefaultConstruct) {
-    return insert(new (F.getModule())
-                    InitializeVarInst(Loc, DestAddr, canDefaultConstruct));
-  }
-
   CopyAddrInst *createCopyAddr(SILLocation loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {

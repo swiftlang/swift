@@ -124,7 +124,6 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     if (isa<StrongRetainInst>(User) ||
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
-        isa<InitializeVarInst>(User) ||
         isa<ProtocolMethodInst>(User) ||
         (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
         (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {

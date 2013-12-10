@@ -271,7 +271,6 @@ struct Val {
 //sil @_TV4todo3ValCfMS0_FT_S0_ : $@thin (Val.metatype) -> Val {
 //bb0(%0 : $Val.metatype):
   //%1 = alloc_stack $Val
-  //%2 = initialize_var [no_default_construct] %1#1 : $*Val
   //%3 = load %1#1 : $*Val
   //%4 = return %3 : $Val
 //}
@@ -296,8 +295,6 @@ sil @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph {
 bb0(%0 : $Aleph.metatype):
   %1 = tuple ()
   %2 = alloc_box $Aleph       // CHECK: alloc_box
-  // CHECK: initialize_var [no_default_construct]
-  %3 = initialize_var [no_default_construct] %2#1 : $*Aleph
   // CHECK: struct_element_addr {{.*}} : $*Aleph, #a
   %5 = struct_element_addr %2#1 : $*Aleph, #a
   %6 = load %5 : $*Ref

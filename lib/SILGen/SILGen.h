@@ -66,6 +66,7 @@ public:
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
+  Optional<SILDeclRef> StringDefaultInitFn;
   
 public:
   SILGenModule(SILModule &M, Module *SM);
@@ -229,6 +230,7 @@ public:
   SILDeclRef getNSStringToStringFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
+  SILDeclRef getStringDefaultInitFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

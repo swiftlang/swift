@@ -467,8 +467,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
       .visit(D->getPattern());
   
   // If an initial value expression was specified by the decl, emit it into
-  // the initialization. Otherwise, emit 'initialize_var' placeholder
-  // instructions.
+  // the initialization. Otherwise, leave it uninitialized for DI to resolve.
   if (D->getInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(D->getInit()));
     emitExprInto(D->getInit(), initialization.get());

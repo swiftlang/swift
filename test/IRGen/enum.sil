@@ -1,5 +1,7 @@
 // RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -enable-dynamic-value-type-layout | FileCheck %s
 
+sil_stage canonical
+
 import Builtin
 
 // -- Singleton enum. The representation is just the singleton payload.
@@ -2028,11 +2030,11 @@ sil @top_level_code : $() -> () {
 entry:
   // Force the global variables to materialize.
   %x = global_addr #x : $*AllConcreteTestEnums
-  initialize_var %x : $*AllConcreteTestEnums
+  %y = load %x : $*AllConcreteTestEnums
   %a = global_addr #a : $*DynamicSingleton<()>
-  initialize_var %a : $*DynamicSingleton<()>
+  %q = load %a : $*DynamicSingleton<()>
   %b = global_addr #b : $*DynamicSingleton<NoPayloads>
-  initialize_var %b : $*DynamicSingleton<NoPayloads>
+  %r = load %b : $*DynamicSingleton<NoPayloads>
   %z = tuple ()
   return %z : $()
 }

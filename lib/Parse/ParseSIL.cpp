@@ -892,7 +892,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
     .Case("init_existential", ValueKind::InitExistentialInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
-    .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
@@ -1868,14 +1867,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     ResultVal = B.createUpcastExistential(InstLoc, Val, DestVal,
                                           IsTake_t(IsTake));
-    break;
-  }
-  case ValueKind::InitializeVarInst: {
-    bool NoDefault = false;
-    if (parseSILOptional(NoDefault, *this, "no_default_construct") ||
-        parseTypedValueRef(Val))
-      return true;
-    ResultVal = B.createInitializeVar(InstLoc, Val, !NoDefault);
     break;
   }
   case ValueKind::StructInst: {

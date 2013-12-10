@@ -537,7 +537,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     return false;
   }
   // These instructions are ok but count as mutations.
-  if (isa<InitializeVarInst>(U) || isa<DeallocBoxInst>(U)) {
+  if (isa<DeallocBoxInst>(U)) {
     Mutations.push_back(cast<SILInstruction>(U));
     return true;
   }

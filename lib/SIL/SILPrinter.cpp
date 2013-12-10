@@ -667,12 +667,6 @@ public:
       OS << "[initialization] ";
     OS << getIDAndType(CI->getDest());
   }
-  void visitInitializeVarInst(InitializeVarInst *ZI) {
-    OS << "initialize_var ";
-    if (!ZI->canDefaultConstruct())
-      OS << "[no_default_construct] ";
-    OS << getIDAndType(ZI->getOperand());
-  }
   
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
                                     StringRef name) {

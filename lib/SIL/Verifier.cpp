@@ -464,11 +464,6 @@ public:
             "Source value should be an object value");
   }
 
-  void checkInitializeVarInst(InitializeVarInst *ZI) {
-    require(ZI->getOperand().getType().isAddress(),
-            "Dest address should be lvalue");
-  }
-  
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");

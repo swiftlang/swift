@@ -177,6 +177,34 @@ SILDeclRef SILGenModule::getNSStringToStringFn() {
                        Types.getEmptyTupleType());
 }
 
+SILDeclRef SILGenModule::getStringDefaultInitFn() {
+  return StringDefaultInitFn.cache([&] {
+    auto &C = getASTContext();
+    auto stringDecl = Types.getStringType()->getNominalOrBoundGenericNominal();
+    auto constructors = stringDecl->lookupDirect(C.getIdentifier("init"));
+    ConstructorDecl *defaultCtor = nullptr;
+    for (auto decl : constructors) {
+      auto ctor = dyn_cast<ConstructorDecl>(decl);
+      if (!ctor) continue;
+      auto argTy = ctor->getType()->castTo<AnyFunctionType>()
+        ->getResult()->castTo<AnyFunctionType>()->getInput();
+      if (!argTy->isEqual(C.TheEmptyTupleType))
+        continue;
+      
+      defaultCtor = ctor;
+      break;
+    }
+    
+    if (!defaultCtor) {
+      diagnose(SourceLoc(), diag::bridging_function_missing,
+               "swift", "String.init()");
+      exit(1);
+    }
+    
+    return SILDeclRef(defaultCtor, SILDeclRef::Kind::Allocator);
+  });
+}
+
 SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
                        "Foundation", "convertStringToNSString",

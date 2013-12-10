@@ -884,23 +884,6 @@ public:
   }
 };
 
-/// InitializeVarInst - Represents a default initialization of a variable.
-class InitializeVarInst
-  : public UnaryInstructionBase<ValueKind::InitializeVarInst,
-                                SILInstruction,
-                                /*HAS_RESULT*/ false>
-{
-  bool CanDefaultConstruct;
-  
-public:
-  InitializeVarInst(SILLocation Loc, SILValue Dest, bool CanDefaultConstruct)
-    : UnaryInstructionBase(Loc, Dest),
-      CanDefaultConstruct(CanDefaultConstruct) {}
-  
-  /// True if this InitializeVar can be lowered to a default constructor call.
-  bool canDefaultConstruct() const { return CanDefaultConstruct; }
-};
-
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
 ///   %1 = load %src

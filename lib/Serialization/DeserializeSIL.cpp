@@ -837,15 +837,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         IsTake_t(isTake));
     break;
   }
-  case ValueKind::InitializeVarInst: {
-    auto Ty = MF->getType(TyID);
-    bool canDefault = (Attr > 0);
-    ResultVal = Builder.createInitializeVar(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-        canDefault);
-    break;
-  }
   case ValueKind::MarkUninitializedInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Kind = (MarkUninitializedInst::Kind)Attr;

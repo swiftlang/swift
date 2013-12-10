@@ -594,15 +594,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
     
-    // Initializations are definitions.  This is currently used in constructors
-    // and should go away someday.
-    if (isa<InitializeVarInst>(User)) {
-      auto Kind = InStructSubElement ?
-        DIUseKind::PartialStore : DIUseKind::Initialization;
-      addElementUses(BaseEltNo, PointeeType, User, Kind);
-      continue;
-    }
-
     // The apply instruction does not capture the pointer when it is passed
     // through [inout] arguments or for indirect returns.  InOut arguments are
     // treated as uses and may-store's, but an indirect return is treated as a

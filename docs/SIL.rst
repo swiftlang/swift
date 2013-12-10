@@ -810,11 +810,6 @@ constructors, all instance variables of a struct, enum, or class type must
 be initialized before the object is used and before the constructor is returned
 from.
 
-Memory locations that require definitive initialization are currently modeled
-using the `initialize_var`_ instruction. See the discussion below for more
-details. ``initialize_var`` instructions that cannot be eliminated are dataflow
-errors.
-
 Unreachable Control Flow
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1310,9 +1305,6 @@ value must be retained explicitly if necessary. It is undefined behavior to
 load from uninitialized memory or to load from an address that points to
 deallocated storage.
 
-TODO: Should loading from uninitialized memory instead have the dataflow
-analysis semantics of initialize_var?
-
 store
 `````
 ::
@@ -1395,44 +1387,6 @@ which are not represented as box allocations.
 
 It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
 appropriate by the definitive initialization pass.
-
-initialize_var
-``````````````
-::
-
-  sil-instruction ::= 'initialize_var' sil-operand
-
-  initialize_var %0 : $*T
-  // %0 must be an address $*T
-
-TODO: Dataflow analysis not implemented yet. initialize_var currently is passed
-through to IRGen and lowers to zero initialization.
-
-TODO: Do we actually need an instruction to model this? Should alloc
-instructions just implicitly require definitive initialization?
-
-A pseudo-instruction that notionally "stores" the "must be initialized" value
-to the address ``%0``. In dataflow analysis, this value has the following
-semantics:
-
-- It can be loaded but not stored. If it is of an address-only type,
-  ``copy_addr`` cannot use its address as a source. ``destroy_addr``
-  may take its address as an operand; it is a no-op.
-- A "must be initialized" value cannot be used as the argument of an ``apply``
-  or ``partial_apply`` instruction, and cannot be used as part of a ``struct``
-  or ``tuple`` construction.
-- Retaining and releasing the value, or any part of the value, is a no-op.
-- Extracting or projecting any component of the value, as by
-  ``struct_extract``, ``tuple_extract``, ``project_existential``, etc.,
-  produces another "must be initialized" value (or the address of such a value).
-- The address containing the value can be overwritten as the destination of a 
-  ``store`` or ``copy_addr``. A ``copy_addr`` assignment can be promoted to a
-  ``copy_addr`` ``[initialization]``.
-
-The goal of these semantics is model definitive assignment, that is, the
-requirement that local variables and instance variable fields be initialized
-before use. Dataflow analysis verifies these semantics then eliminates the
-instruction.
 
 copy_addr
 `````````

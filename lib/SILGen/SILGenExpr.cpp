@@ -2907,7 +2907,18 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   // Allocate and initialize a temporary to receive the result String.
   SILValue strTemp = gen.emitTemporaryAllocation(loc,
                              gen.getLoweredType(gen.SGM.Types.getStringType()));
-  gen.B.createInitializeVar(loc, strTemp, true);
+  // struct String { init() }
+  SILValue strInitFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringDefaultInitFn());
+  SILValue strMetaty
+    = gen.B.createMetatype(loc, gen.getLoweredLoadableType(
+                   MetaTypeType::get(gen.SGM.Types.getStringType(),
+                                     gen.getASTContext())->getCanonicalType()));
+  SILValue strInit = gen.B.createApply(loc, strInitFn,
+                      strInitFn.getType(),
+                      gen.getLoweredLoadableType(gen.SGM.Types.getStringType()),
+                      {}, strMetaty);
+  gen.B.createStore(loc, strInit, strTemp);
   
   SILValue args[2] = {nsstr.forward(gen), strTemp};
   gen.B.createApply(loc, nsstringToStringFn,

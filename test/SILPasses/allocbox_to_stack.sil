@@ -23,7 +23,6 @@ bb0(%0 : $Int64):
 sil @init_var : $() -> Int64 {
 bb0:
   %1 = alloc_box $Int64
-  %2 = initialize_var %1#1 : $*Int64
   %3 = load %1#1 : $*Int64
   %4 = strong_release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $Int64
