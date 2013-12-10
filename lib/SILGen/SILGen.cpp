@@ -623,7 +623,8 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   // Emit initializers for variables in top-level code.
-  emitGlobalInitialization(pd);
+  if (pd->hasInit())
+    emitGlobalInitialization(pd);
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {

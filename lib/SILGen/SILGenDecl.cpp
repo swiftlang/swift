@@ -1065,7 +1065,7 @@ public:
   
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    if (pd->isStatic()) {
+    if (pd->isStatic() && pd->hasInit()) {
       SGM.emitGlobalInitialization(pd);
     }
   }
