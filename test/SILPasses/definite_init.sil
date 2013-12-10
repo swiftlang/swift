@@ -624,7 +624,7 @@ bb0(%0 : $DerivedClassWithIVars):
 
   %11 = load %1#1 : $*DerivedClassWithIVars
   strong_retain %11 : $DerivedClassWithIVars
-  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{use of base object 'RootClassWithIVars' before super.init call initializes it}}
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{instance variable '<unknown>.a' not initialized at super.init call}}
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

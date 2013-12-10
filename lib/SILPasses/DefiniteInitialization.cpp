@@ -324,10 +324,7 @@ namespace {
     /// TheMemory - This holds information about the memory object being
     /// analyzed.
     DIMemoryObjectInfo TheMemory;
-    
-    /// The number of elements in this memory object.
-    unsigned NumElements;
-    
+
     SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     std::vector<std::pair<unsigned, AvailabilitySet>> ConditionalDestroys;
@@ -356,7 +353,7 @@ namespace {
 
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
-                                 LiveOutBlockState(NumElements)}).first->second;
+                     LiveOutBlockState(TheMemory.NumElements)}).first->second;
     }
     
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
@@ -365,7 +362,7 @@ namespace {
     DIKind getLivenessAtUse(const DIMemoryUse &Use);
 
     void handleStoreUse(unsigned UseID);
-    void handleSuperclassUse(unsigned UseID);
+    void handleSuperclassUse(const DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
@@ -390,8 +387,6 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  SmallVectorImpl<SILInstruction*> &Releases)
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
-
-  NumElements = TheMemory.getElementCount();
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -476,6 +471,15 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
     ++FirstUndefElement;
     assert(FirstUndefElement != Use.FirstElement+Use.NumElements &&
            "No undef elements found?");
+  }
+
+  // If this is the super.init marker not being initialized, then this isn't a
+  // real user variable, this is something requiring super.init to be called,
+  // and it isn't.  Emit a specific diagnostic.
+  if (TheMemory.isDerivedClassSelf() &&
+      FirstUndefElement == TheMemory.NumElements-1) {
+    diagnose(Module, Inst->getLoc(), diag::superinit_not_called_before_return);
+    return;
   }
 
   // TODO: Given that we know the range of elements being accessed, we don't
@@ -577,7 +581,7 @@ void LifetimeChecker::doIt() {
       }
       break;
     case DIUseKind::Superclass:
-      handleSuperclassUse(i);
+      handleSuperclassUse(Use);
       break;
     }
   }
@@ -648,31 +652,113 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   updateInstructionForInitState(InstInfo);
 }
 
+/// isSuperInitUse - Return true if this "upcast" is part of a call to
+/// super.init.
+static bool isSuperInitUse(UpcastInst *Inst) {
+  
+  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
+  // that came from a call to super.init.
+  for (auto UI : Inst->getUses()) {
+    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
+    if (!AI) continue;
+
+    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+    if (!LocExpr) {
+      // If we're reading a .sil file, treat a call to "superinit" as a
+      // super.init call as a hack to allow us to write testcases.
+      if (AI->getLoc().is<SILFileLocation>())
+        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+          if (FRI->getReferencedFunction()->getName() == "superinit")
+            return true;
+      continue;
+    }
+
+    // This is a super.init call if structured like this:
+    // (call_expr type='SomeClass'
+    //   (dot_syntax_call_expr type='() -> SomeClass' super
+    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
+    //     (load_expr implicit type='SomeClass'
+    //       (super_ref_expr type='@inout (implicit)SomeClass')))
+    //   (...some argument...)
+    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
+    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
+      continue;
+
+    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
+    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
+      return true;
+  }
+
+  return false;
+}
 
 /// handleSuperclassUse - When processing a 'self' argument on a class, this is
 /// called on any conversions to base classes.  These are effectively escape
 /// points, but we have additional semantics we want to apply and want to make
 /// the diagnostics a lot better.
-void LifetimeChecker::handleSuperclassUse(unsigned UseID) {
-  DIMemoryUse &InstInfo = Uses[UseID];
-  if (getLivenessAtUse(InstInfo) == DIKind::Yes) return;
+void LifetimeChecker::handleSuperclassUse(const DIMemoryUse &InstInfo) {
+  UpcastInst *Inst = cast<UpcastInst>(InstInfo.Inst);
 
-  auto *Inst = InstInfo.Inst;
+  // Determine the liveness states of the memory object, including the
+  // super.init state.
+  AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
 
-  if (InstInfo.isSuperInitUse())
-    return diagnoseInitError(InstInfo, diag::ivar_not_initialized_at_superinit);
+  // We have two different cases to handle here: a super.init call, and a normal
+  // conversion to the base class.
+  if (!isSuperInitUse(Inst)) {
+    // Normal conversion to the base class require that everything be
+    // initialized and that super.init already be called.
+    if (Liveness.isAllYes()) return;
 
-  // If we've already emitted an error at this instruction, don't emit more.
-  if (shouldEmitError(Inst)) {
-    auto BaseType = Inst->getType(0).getSwiftRValueType().getString();
-    diagnose(Module, Inst->getLoc(),
-             diag::base_object_use_before_initialized, BaseType);
+    Diag<StringRef> DiagMessage;
+
+    // If super.init hasn't been called, diagnose that specifically.
+    switch (Liveness.get(TheMemory.NumElements-1)) {
+    case DIKind::Yes:
+      // If super.init has already been called by this point, we would have
+      // diagnosed the uninitialized ivar at that point.
+      return;
+
+    case DIKind::No:
+      // If super.init hasn't been called by this point, emit an error requiring
+      // it.
+      DiagMessage = diag::base_object_use_before_initialized;
+      break;
+
+    case DIKind::Partial:
+      DiagMessage = diag::base_object_use_before_initialized_some_paths;
+      break;
+    }
+
+    if (shouldEmitError(Inst)) {
+      auto BaseType = Inst->getType().getSwiftRValueType().getString();
+      diagnose(Module, Inst->getLoc(), DiagMessage, BaseType);
+    }
+    return;
   }
 
+  // super.init() calls require that super.init has not already been called. If
+  // it has, reject the program.
+  switch (Liveness.get(TheMemory.NumElements-1)) {
+  case DIKind::No:  // This is good! Keep going.
+    break;
+  case DIKind::Yes:
+  case DIKind::Partial:
+    // This is bad, only one super.init call is allowed.
+    if (shouldEmitError(Inst))
+      diagnose(Module, Inst->getLoc(), diag::superinit_multiple_times);
+    return;
+  }
 
-  // superinit_multiple_times
-  // superinit_not_called_before_return
+  // super.init also requires that all ivars are initialized before the
+  // superclass initializer runs.
+  for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
+    if (Liveness.get(i) != DIKind::Yes)
+      return diagnoseInitError(InstInfo,
+                               diag::ivar_not_initialized_at_superinit);
+  }
 
+  // Otherwise everything is good!
 }
 
 
@@ -756,7 +842,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
-  AvailabilitySet Availability = getLivenessAtInst(Release, 0, NumElements);
+  AvailabilitySet Availability =
+    getLivenessAtInst(Release, 0, TheMemory.NumElements);
   if (Availability.isAllYes()) return;
   
   // If it is all no, then we can just remove it.
@@ -846,12 +933,14 @@ static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
 SILValue LifetimeChecker::handleConditionalInitAssign() {
   SILLocation Loc = TheMemory.getLoc();
   Loc.markAutoGenerated();
-  
+
+  unsigned NumMemoryElements = TheMemory.getNumMemoryElements();
+
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
   SILBuilder B(TheMemory.getFunctionEntryPoint());
   SILType IVType =
-    SILType::getBuiltinIntegerType(NumElements, Module.getASTContext());
+    SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
   auto Alloc = B.createAllocStack(Loc, IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
@@ -897,7 +986,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       
       // Get the integer constant.
       B.setInsertionPoint(Use.Inst);
-      APInt Bitmask = Use.getElementBitmask(NumElements);
+      APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
       SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
 
       // If the mask is all ones, do a simple store, otherwise do a
@@ -942,7 +1031,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
          Elt != e; ++Elt) {
       B.setInsertionPoint(Use.Inst);
       SILValue CondVal = Bitmask;
-      if (NumElements != 1) {
+      if (NumMemoryElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
           if (!ShiftRightFn)
@@ -988,7 +1077,9 @@ void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilder B(TheMemory.MemoryInst);
   SILValue ShiftRightFn, TruncateFn;
-  
+
+  unsigned NumMemoryElements = TheMemory.getNumMemoryElements();
+
   // After handling any conditional initializations, check to see if we have any
   // cases where the value is only partially initialized by the time its
   // lifetime ends.  In this case, we have to make sure not to destroy an
@@ -1015,7 +1106,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // to handle, whereas the partial case requires dynamic codegen based on the
     // liveness bitmask.
     SILValue LoadedMask;
-    for (unsigned Elt = 0, e = NumElements; Elt != e; ++Elt) {
+    for (unsigned Elt = 0; Elt != NumMemoryElements; ++Elt) {
       switch (Availability.get(Elt)) {
       case DIKind::No:
         // If an element is known to be uninitialized, then we know we can
@@ -1049,7 +1140,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // If this memory object has multiple tuple elements, we need to make sure
       // to test the right one.
-      if (NumElements != 1) {
+      if (NumMemoryElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
           if (!ShiftRightFn) {
@@ -1157,7 +1248,7 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
     return BBState.getAvailabilitySet();
   case LiveOutBlockState::IsComputingLiveOut:
     // Speculate that it will be live out in cyclic cases.
-    return AvailabilitySet(NumElements);
+    return AvailabilitySet(TheMemory.NumElements);
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1167,14 +1258,14 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   // is required to handle cycles properly.
   BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
 
-  auto Result = AvailabilitySet(NumElements);
+  auto Result = AvailabilitySet(TheMemory.NumElements);
   getPredsLiveOutN(BB, Result);
 
   // Anything that our initial pass knew as a definition is still a definition
   // live out of this block.  Something known to be not-defined in a predecessor
   // does not drop it to "partial".
   auto &LocalAV = BBState.getAvailabilitySet();
-  for (unsigned i = 0, e = NumElements; i != e; ++i) {
+  for (unsigned i = 0, e = TheMemory.NumElements; i != e; ++i) {
     auto EV = LocalAV.getConditional(i);
     if (EV.hasValue() && EV.getValue() == DIKind::Yes)
       Result.set(i, DIKind::Yes);
@@ -1207,7 +1298,7 @@ getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
 /// computed correctly.
 AvailabilitySet LifetimeChecker::
 getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
-  AvailabilitySet Result(NumElements);
+  AvailabilitySet Result(TheMemory.NumElements);
 
   // Empty tuple queries return a completely "unknown" vector, since they don't
   // care about any of the elements.
@@ -1218,7 +1309,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   
   // The vastly most common case is memory allocations that are not tuples,
   // so special case this with a more efficient algorithm.
-  if (NumElements == 1) {
+  if (TheMemory.NumElements == 1) {
     
     // If there is a store in the current block, scan the block to see if the
     // store is before or after the load.  If it is before, it produces the value
@@ -1250,7 +1341,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 
   // Check locally to see if any elements are satified within the block, and
   // keep track of which ones are still needed in the NeededElements set.
-  llvm::SmallBitVector NeededElements(NumElements);
+  llvm::SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the
@@ -1304,6 +1395,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 /// this point or not.  If the value is initialized on some paths, but not
 /// others, this returns a partial result.
 DIKind LifetimeChecker::getLivenessAtUse(const DIMemoryUse &Use) {
+
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);

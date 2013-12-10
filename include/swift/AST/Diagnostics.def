@@ -1562,6 +1562,10 @@ ERROR(variable_escape_before_initialized,sil_analysis,none,
 ERROR(base_object_use_before_initialized,sil_analysis,none,
       "use of base object '%0' before super.init call initializes it",
       (StringRef))
+ERROR(base_object_use_before_initialized_some_paths,sil_analysis,none,
+      "use of base object '%0' before super.init call to initializes it "
+      "on some paths",
+      (StringRef))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "instance variable '%0' not initialized at super.init call",
       (StringRef))

@@ -22,32 +22,6 @@ using namespace swift;
 //                  DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
-  MemoryInst = MI;
-  IsSelfOfInitializer = false;
-
-  // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
-    MemorySILType = ABI->getElementType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
-    MemorySILType = ASI->getElementType();
-  else {
-    auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
-    MemorySILType = MUI->getType().getObjectType();
-
-    // If this is a 'self' decl in an init method for a non-enum value, then we
-    // want to process the stored members of the struct/class elementwise.
-    if (MUI->getKind() != MarkUninitializedInst::GlobalVar) {
-      if (!isa<EnumDecl>(getType()->getAnyNominal()))
-        IsSelfOfInitializer = true;
-    }
-  }
-}
-
-SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
-  return getFunction().begin()->begin();
-}
-
 static unsigned getElementCountRec(CanType T, bool IsSelfOfInitializer) {
   // If this is a tuple, it is always recursively flattened.
   if (CanTupleType TT = dyn_cast<TupleType>(T)) {
@@ -74,12 +48,38 @@ static unsigned getElementCountRec(CanType T, bool IsSelfOfInitializer) {
   return 1;
 }
 
-/// getElementCount - Return the number of elements in the flattened type.
-/// For tuples, this is the (recursive) count of the fields it contains,
-/// otherwise this is 1.  For "self" in initializers, this is the number of
-/// stored members in the type (but not in superclasses).
-unsigned DIMemoryObjectInfo::getElementCount() const {
-  return ::getElementCountRec(getType(), IsSelfOfInitializer);
+
+DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
+  MemoryInst = MI;
+  IsSelfOfInitializer = false;
+
+  // Compute the type of the memory object.
+  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
+    MemorySILType = ABI->getElementType();
+  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
+    MemorySILType = ASI->getElementType();
+  else {
+    auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+    MemorySILType = MUI->getType().getObjectType();
+
+    // If this is a 'self' decl in an init method for a non-enum value, then we
+    // want to process the stored members of the struct/class elementwise.
+    if (MUI->getKind() != MarkUninitializedInst::GlobalVar) {
+      if (!isa<EnumDecl>(getType()->getAnyNominal()))
+        IsSelfOfInitializer = true;
+    }
+  }
+
+  NumElements = getElementCountRec(getType(), IsSelfOfInitializer);
+
+  // If this is a derived class init method, track an extra element to determine
+  // whether super.init has been called at each program point.
+  if (isDerivedClassSelf())
+    ++NumElements;
+}
+
+SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
+  return getFunction().begin()->begin();
 }
 
 /// Given a symbolic element number, return the type of the element.
@@ -258,43 +258,6 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   return true;
 }
 
-/// isSuperInitUse - Return true if this is a "Superclass" use which is part
-/// of a call to super.init.
-bool DIMemoryUse::isSuperInitUse() const {
-  if (Kind != Superclass) return false;
-
-  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
-  // that came from a call to super.init.
-  for (auto UI : Inst->getUses()) {
-    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
-    if (!AI) continue;
-
-    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
-    if (!LocExpr) continue;
-
-    // This is a super.init call if structured like this:
-    // (call_expr type='SomeClass'
-    //   (dot_syntax_call_expr type='() -> SomeClass' super
-    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
-    //     (load_expr implicit type='SomeClass'
-    //       (super_ref_expr type='@inout (implicit)SomeClass')))
-    //   (tuple_expr type='()'))
-    if (!isa<TupleExpr>(LocExpr->getArg()))
-      continue;
-    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
-    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
-      continue;
-
-    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
-    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
-      return true;
-  }
-
-  return false;
-}
-
-
-
 
 //===----------------------------------------------------------------------===//
 //                          Scalarization Logic
@@ -351,6 +314,7 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
 namespace {
   class ElementUseCollector {
+    const DIMemoryObjectInfo &TheMemory;
     SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
     
@@ -371,28 +335,29 @@ namespace {
     /// of this.
     bool InEnumSubElement = false;
   public:
-    ElementUseCollector(SmallVectorImpl<DIMemoryUse> &Uses,
+    ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
+                        SmallVectorImpl<DIMemoryUse> &Uses,
                         SmallVectorImpl<SILInstruction*> &Releases,
                         bool isDefiniteInitFinished)
-      : Uses(Uses), Releases(Releases),
+      : TheMemory(TheMemory), Uses(Uses), Releases(Releases),
         isDefiniteInitFinished(isDefiniteInitFinished) {
     }
 
     /// This is the main entry point for the use walker.  It collects uses from
     /// the address and the refcount result of the allocation.
-    void collectFrom(const DIMemoryObjectInfo &MemInfo) {
-      IsSelfOfInitializer = MemInfo.IsSelfOfInitializer;
+    void collectFrom() {
+      IsSelfOfInitializer = TheMemory.IsSelfOfInitializer;
 
       // If this is a class pointer, we need to look through ref_element_addrs.
       if (IsSelfOfInitializer &&
-          MemInfo.getType()->getClassOrBoundGenericClass() != nullptr)
-        collectClassSelfUses(MemInfo);
+          TheMemory.getType()->getClassOrBoundGenericClass() != nullptr)
+        collectClassSelfUses();
       else
-        collectUses(MemInfo.getAddress(), 0);
+        collectUses(TheMemory.getAddress(), 0);
 
-      if (!isa<MarkUninitializedInst>(MemInfo.MemoryInst)) {
+      if (!isa<MarkUninitializedInst>(TheMemory.MemoryInst)) {
         // Collect information about the retain count result as well.
-        for (auto UI : SILValue(MemInfo.MemoryInst, 0).getUses()) {
+        for (auto UI : SILValue(TheMemory.MemoryInst, 0).getUses()) {
           auto *User = UI->getUser();
 
           // If this is a release or dealloc_stack, then remember it as such.
@@ -406,7 +371,7 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
-    void collectClassSelfUses(const DIMemoryObjectInfo &MemInfo);
+    void collectClassSelfUses();
     void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                               llvm::SmallDenseMap<VarDecl*, unsigned> &EN);
 
@@ -428,7 +393,7 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
-  if (!InStructSubElement && !InEnumSubElement)
+  if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
     NumElements = getElementCountRec(UseTy.getSwiftRValueType(),
                                      IsSelfOfInitializer);
   
@@ -778,17 +743,16 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
 /// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class
 /// constructor.  The memory object has class type.
-void ElementUseCollector::
-collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
+void ElementUseCollector::collectClassSelfUses() {
   assert(IsSelfOfInitializer &&
-         MemInfo.getType()->getClassOrBoundGenericClass() != nullptr);
+         TheMemory.getType()->getClassOrBoundGenericClass() != nullptr);
 
   // For efficiency of lookup below, compute a mapping of the local ivars in the
   // class to their element number.
   llvm::SmallDenseMap<VarDecl*, unsigned> EltNumbering;
 
   {
-    auto *NTD = cast<NominalTypeDecl>(MemInfo.getType()->getAnyNominal());
+    auto *NTD = cast<NominalTypeDecl>(TheMemory.getType()->getAnyNominal());
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
@@ -799,18 +763,19 @@ collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MUI = cast<MarkUninitializedInst>(MemInfo.MemoryInst);
+  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
   if (MUI->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(MemInfo.getAddress(), MemInfo.MemorySILType,
+    collectClassSelfUses(TheMemory.getAddress(), TheMemory.MemorySILType,
                          EltNumbering);
     return;
   }
 
-  // Otherwise, things are more complicated.  Because super.init is allows to
-  // change self, SILGen is producing a box for 'self'.  This means that we need
-  // to see through this box to find the uses of 'self'.  We handle this by
-  // pattern matching: we allow only a single use of MUI, which must be a store
-  // to an alloc_box/alloc_stack.
+  // Otherwise, we have a 'self' init in a derived class, and things are more
+  // complicated.  Because super.init is allows to change self, SILGen is
+  // producing a box for 'self'.  This means that we need to see through this
+  // box to find the uses of 'self'.  We handle this by pattern matching: we
+  // allow only a single use of MUI, which must be a store to an
+  // alloc_box/alloc_stack.
   assert(MUI->hasOneUse());
   auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
   SILValue SelfBox = TheStore->getOperand(1);
@@ -832,13 +797,18 @@ collectClassSelfUses(const DIMemoryObjectInfo &MemInfo) {
 
     // Loads of the box produce self, so collect uses from them.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
-      collectClassSelfUses(LI, MemInfo.MemorySILType, EltNumbering);
+      collectClassSelfUses(LI, TheMemory.MemorySILType, EltNumbering);
       continue;
     }
 
+    // destroyaddr on the box is load+release, which is ignored.
+    if (isa<DestroyAddrInst>(User)) continue;
+
     // We can safely handle anything else as an escape.  They should all happen
-    // after super.init is invoked.
-    addElementUses(0, MemInfo.MemorySILType, User, DIUseKind::Escape);
+    // after super.init is invoked.  As such, all elements must be initialized
+    // and super.init must be called.
+    Uses.push_back(DIMemoryUse(User, DIUseKind::Escape,
+                               0, TheMemory.NumElements));
   }
 }
 
@@ -865,16 +835,15 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
       continue;
 
 
+    // Otherwise, the use is something complicated, it escapes.
+
     // upcast instructions are accesses into the base class.  These are
     // effectively escapes for DI's purposes, but we classify them differently
     // since the diagnostics are pretty different.
-    if (isa<UpcastInst>(User)) {
-      addElementUses(0, MemorySILType, User, DIUseKind::Superclass);
-      continue;
-    }
+    auto Kind =
+      isa<UpcastInst>(User) ? DIUseKind::Superclass : DIUseKind::Escape;
 
-    // Otherwise, the use is something complicated, it escapes.
-    addElementUses(0, MemorySILType, User, DIUseKind::Escape);
+    Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
 }
 
@@ -887,5 +856,5 @@ void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                                      SmallVectorImpl<DIMemoryUse> &Uses,
                                      SmallVectorImpl<SILInstruction*> &Releases,
                                      bool isDIFinished) {
-  ElementUseCollector(Uses, Releases, isDIFinished).collectFrom(MemoryInfo);
+  ElementUseCollector(MemoryInfo, Uses, Releases, isDIFinished).collectFrom();
 }
