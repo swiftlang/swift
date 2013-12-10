@@ -405,132 +405,93 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 }
 
 bool ConstraintSystem::simplify() {
-  // If there is a constraint graph, use the worklist implementation.
-  if (CG) {
-    // The set of constraints that we retired.
-    llvm::SetVector<Constraint *> retiredConstraints;
+  // The set of constraints that we retired.
+  llvm::SetVector<Constraint *> retiredConstraints;
 
-    // While we have a constraint in the worklist, process it.
-    while (!Worklist.empty()) {
-      // Grab the next constraint from the worklist.
-      auto constraint = Worklist.front();
-      Worklist.pop_front();
-      assert(constraint->isActive() && "Worklist constraint is not active?");
+  // While we have a constraint in the worklist, process it.
+  while (!Worklist.empty()) {
+    // Grab the next constraint from the worklist.
+    auto constraint = Worklist.front();
+    Worklist.pop_front();
+    assert(constraint->isActive() && "Worklist constraint is not active?");
 
-      // Simplify this constraint.
-      switch (simplifyConstraint(*constraint)) {
-      case SolutionKind::Error:
-        if (!failedConstraint) {
-          failedConstraint = constraint;
-        }
-        break;
-
-      case SolutionKind::Solved:
-        ++solverState->NumSimplifiedConstraints;
-
-        // This constraint has already been solved; retire it.
-        retiredConstraints.insert(constraint);
-
-        // Remove the constraint from the constraint graph.
-        CG->removeConstraint(constraint);
-        break;
-
-      case SolutionKind::Unsolved:
-        ++solverState->NumUnsimplifiedConstraints;
-        break;
+    // Simplify this constraint.
+    switch (simplifyConstraint(*constraint)) {
+    case SolutionKind::Error:
+      if (!failedConstraint) {
+        failedConstraint = constraint;
       }
+      break;
 
-      // This constraint is not active. We delay this operation until
-      // after simplification to avoid re-insertion.
-      constraint->setActive(false);
+    case SolutionKind::Solved:
+      ++solverState->NumSimplifiedConstraints;
 
-      // Check whether a constraint failed. If so, we're done.
-      if (failedConstraint) {
-        // Mark all of the remaining constraints in the worklist inactive.
-        while (!Worklist.empty()) {
-          auto constraint = Worklist.front();
-          Worklist.pop_front();
-          assert(constraint->isActive()&&"Worklist constraint is not active?");
-          constraint->setActive(false);
-        }
+      // This constraint has already been solved; retire it.
+      retiredConstraints.insert(constraint);
 
-        // Retire all of the constraints.
-        if (solverState)
-          solverState->retiredConstraints.splice(
-            solverState->retiredConstraints.begin(),
-            Constraints);
-        else
-          Constraints.clear();
+      // Remove the constraint from the constraint graph.
+      CG.removeConstraint(constraint);
+      break;
 
-        // Clear out the worklist. There's nothing to do now.
-        return true;
-      }
-
-      // If the current score is worse than the best score we've seen so far,
-      // there's no point in continuing. So don't.
-      if (worseThanBestSolution())
-        return true;
+    case SolutionKind::Unsolved:
+      ++solverState->NumUnsimplifiedConstraints;
+      break;
     }
 
-    // Transfer any retired constraints to the retired list.
-    for (auto i = Constraints.begin(), end = Constraints.end();
-         i != end; /*increment in loop*/) {
-      // If it's not retired, do nothing.
-      if (retiredConstraints.count(&*i) == 0) {
-        ++i;
-        continue;
+    // This constraint is not active. We delay this operation until
+    // after simplification to avoid re-insertion.
+    constraint->setActive(false);
+
+    // Check whether a constraint failed. If so, we're done.
+    if (failedConstraint) {
+      // Mark all of the remaining constraints in the worklist inactive.
+      while (!Worklist.empty()) {
+        auto constraint = Worklist.front();
+        Worklist.pop_front();
+        assert(constraint->isActive()&&"Worklist constraint is not active?");
+        constraint->setActive(false);
       }
 
-      // If there is no list of retired constraints, just erase it.
-      // FIXME: This is weird.
-      if (!solverState) {
-        i = Constraints.erase(i);
-        continue;
-      }
+      // Retire all of the constraints.
+      if (solverState)
+        solverState->retiredConstraints.splice(
+          solverState->retiredConstraints.begin(),
+          Constraints);
+      else
+        Constraints.clear();
 
-      // If we have a list of retired constraints, move it there.
-      auto victim = i++;
-      solverState->retiredConstraints.splice(solverState->retiredConstraints.begin(),
-                                             Constraints,
-                                             victim);
+      // Clear out the worklist. There's nothing to do now.
+      return true;
     }
-    return false;
+
+    // If the current score is worse than the best score we've seen so far,
+    // there's no point in continuing. So don't.
+    if (worseThanBestSolution())
+      return true;
   }
 
-
-  bool solvedAny;
-  do {
-    // Loop through all of the thus-far-unsolved constraints, attempting to
-    // simplify each one.
-    ConstraintList existingConstraints;
-    existingConstraints.splice(existingConstraints.end(), Constraints);
-    solvedAny = false;
-    while (!existingConstraints.empty()) {
-      // Pull the next constraint off the beginning of the list.
-      auto constraint = &existingConstraints.front();
-      existingConstraints.pop_front();
-
-      if (addConstraint(constraint, false, true)) {
-        solvedAny = true;
-        ++solverState->NumSimplifiedConstraints;
-      } else if (!failedConstraint) {
-        ++solverState->NumUnsimplifiedConstraints;
-      }
-
-      if (failedConstraint) {
-        if (solverState) {
-          solverState->retiredConstraints.splice(
-            solverState->retiredConstraints.begin(),
-            existingConstraints);
-        }
-        return true;
-      }
+  // Transfer any retired constraints to the retired list.
+  for (auto i = Constraints.begin(), end = Constraints.end();
+       i != end; /*increment in loop*/) {
+    // If it's not retired, do nothing.
+    if (retiredConstraints.count(&*i) == 0) {
+      ++i;
+      continue;
     }
 
-    ++solverState->NumSimplifyIterations;
-  } while (solvedAny);
+    // If there is no list of retired constraints, just erase it.
+    // FIXME: This is weird.
+    if (!solverState) {
+      i = Constraints.erase(i);
+      continue;
+    }
 
-  // We've simplified all of the constraints we can.
+    // If we have a list of retired constraints, move it there.
+    auto victim = i++;
+    solverState->retiredConstraints.splice(solverState->retiredConstraints.begin(),
+                                           Constraints,
+                                           victim);
+  }
   return false;
 }
 
@@ -586,7 +547,7 @@ ConstraintSystem::SolverState::~SolverState() {
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
-  : cs(cs)
+  : cs(cs), CGScope(cs.CG)
 {
   ++cs.solverState->depth;
 
@@ -600,9 +561,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   PreviousScore = cs.CurrentScore;
 
   ++cs.solverState->NumStatesExplored;
-
-  if (cs.CG)
-    CGScope.emplace(*cs.CG);
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
@@ -973,20 +931,13 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return false;
   }
 
-  // If there's no global constraint graph, just simplify all of the
-  // constraints.
-  Optional<ConstraintGraph> localCG;
-  if (!CG) {
-    return solveSimplified(solutions, allowFreeTypeVariables);
-  }
-
   // Compute the connected components of the constraint graph.
   // FIXME: We're seeding typeVars with TypeVariables so that the
   // connected-components algorithm only considers those type variables within
   // our component. There are clearly better ways to do this.
   SmallVector<TypeVariableType *, 16> typeVars(TypeVariables);
   SmallVector<unsigned, 16> components;
-  unsigned numComponents = CG->computeConnectedComponents(typeVars, components);
+  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
 
   // If we don't have more than one component, just solve the whole
   // system.
@@ -998,13 +949,13 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     auto &log = getASTContext().TypeCheckerDebug->getStream();
 
     // Verify that the constraint graph is valid.
-    CG->verify();
+    CG.verify();
 
     log << "---Constraint graph---\n";
-    CG->print(log);
+    CG.print(log);
 
     log << "---Connected components---\n";
-    CG->printConnectedComponents(log);
+    CG.printConnectedComponents(log);
   }
 
   // Construct a mapping from type variables and constraints to their
@@ -1016,7 +967,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     typeVarComponent[typeVars[i]] = components[i];
 
     // Record the component of each of the constraints.
-    for (auto constraint : (*CG)[typeVars[i]].getConstraints())
+    for (auto constraint : CG[typeVars[i]].getConstraints())
       constraintComponent[constraint] = components[i];
   }
 
@@ -1284,8 +1235,7 @@ bool ConstraintSystem::solveSimplified(
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = Constraints.erase(disjunction);
-  if (CG)
-    CG->removeConstraint(disjunction);
+  CG.removeConstraint(disjunction);
 
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
@@ -1324,8 +1274,7 @@ bool ConstraintSystem::solveSimplified(
 
     case SolutionKind::Unsolved:
       Constraints.push_back(constraint);
-      if (CG)
-        CG->addConstraint(constraint);
+      CG.addConstraint(constraint);
       break;
     }
 
@@ -1362,8 +1311,7 @@ bool ConstraintSystem::solveSimplified(
 
   // Put the disjunction constraint back in its place.
   Constraints.insert(afterDisjunction, disjunction);
-  if (CG)
-    CG->addConstraint(disjunction);
+  CG.addConstraint(disjunction);
 
   return !anySolved;
 }

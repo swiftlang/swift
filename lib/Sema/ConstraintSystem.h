@@ -1004,8 +1004,8 @@ private:
   /// two ConstraintLists so there's no memory allocation needed.
   std::deque<Constraint *> Worklist;
 
-  /// The constraint graph, if there is one.
-  ConstraintGraph *CG = nullptr;
+  /// The constraint graph.
+  ConstraintGraph &CG;
 
   /// \brief Describes the current solver state.
   struct SolverState {
@@ -1104,10 +1104,7 @@ public:
     Score PreviousScore;
 
     /// Constraint graph scope associated with this solver scope.
-    ///
-    /// FIXME: This is optional so we can easily enabled/disable the
-    /// constraint graph globally.
-    Optional<ConstraintGraphScope> CGScope;
+    ConstraintGraphScope CGScope;
 
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;

@@ -23,15 +23,14 @@ using namespace swift;
 using namespace constraints;
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
-  : TC(tc), DC(dc), Arena(tc.Context, Allocator) {
+  : TC(tc), DC(dc), Arena(tc.Context, Allocator),
+    CG(*new ConstraintGraph(*this))
+{
   assert(DC && "context required");
-
-  // Create the constraint graph.
-  CG = new ConstraintGraph(*this);
 }
 
 ConstraintSystem::~ConstraintSystem() {
-  delete CG;
+  delete &CG;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -49,8 +48,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.push_back(typeVar);
   
   // Notify the constraint graph.
-  if (CG)
-    (void)(*CG)[typeVar];
+  (void)CG[typeVar];
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
@@ -63,10 +61,8 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
 
   // Merge nodes in the constraint graph.
-  if (CG) {
-    CG->mergeNodes(typeVar1, typeVar2);
-    addTypeVariableConstraintsToWorkList(typeVar1);
-  }
+  CG.mergeNodes(typeVar1, typeVar2);
+  addTypeVariableConstraintsToWorkList(typeVar1);
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
@@ -77,30 +73,22 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;
-    if (CG) {
-      // If we have the constraint graph, we can check all type variables in
-      // the equivalence class. This is the More Correct path.
-      // FIXME: Eliminate the less-correct path.
-      auto typeVarRep = getRepresentative(typeVar);
-      for (auto tv : (*CG)[typeVarRep].getEquivalenceClass()) {
-        auto locator = tv->getImpl().getLocator();
-        if (!locator || !locator->getPath().empty())
-          continue;
+    // If we have the constraint graph, we can check all type variables in
+    // the equivalence class. This is the More Correct path.
+    // FIXME: Eliminate the less-correct path.
+    auto typeVarRep = getRepresentative(typeVar);
+    for (auto tv : CG[typeVarRep].getEquivalenceClass()) {
+      auto locator = tv->getImpl().getLocator();
+      if (!locator || !locator->getPath().empty())
+        continue;
 
-        auto anchor = locator->getAnchor();
-        if (!anchor)
-          continue;
+      auto anchor = locator->getAnchor();
+      if (!anchor)
+        continue;
 
-        literalProtocol = TC.getLiteralProtocol(anchor);
-        if (literalProtocol)
-          break;
-      }
-    } else {
-      // FIXME: This is the less-correct path.
-      auto locator = typeVar->getImpl().getLocator();
-      if (locator && locator->getPath().empty() && locator->getAnchor()) {
-        literalProtocol = TC.getLiteralProtocol(locator->getAnchor());
-      }
+      literalProtocol = TC.getLiteralProtocol(anchor);
+      if (literalProtocol)
+        break;
     }
 
     // If the protocol has a default type, check it.
@@ -115,19 +103,15 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   }
 
   // Notify the constraint graph.
-  if (CG) {
-    CG->bindTypeVariable(typeVar, type);
-    addTypeVariableConstraintsToWorkList(typeVar);
-  }
+  CG.bindTypeVariable(typeVar, type);
+  addTypeVariableConstraintsToWorkList(typeVar);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
-  assert(CG && "No constraint graph available");
-
   // Gather the constraints affected by a change to this type variable.
   SmallVector<Constraint *, 8> constraints;
-  CG->gatherConstraints(typeVar, constraints);
+  CG.gatherConstraints(typeVar, constraints);
 
   // Add any constraints that aren't already active to the worklist.
   for (auto constraint : constraints) {
@@ -342,8 +326,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     }
 
     // Remove the constraint from the constraint graph.
-    if (simplifyExisting && CG)
-      CG->removeConstraint(constraint);
+    if (simplifyExisting)
+      CG.removeConstraint(constraint);
     
     return true;
 
@@ -354,8 +338,8 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     }
 
     // Add this constraint to the constraint graph.
-    if (!simplifyExisting && CG)
-      CG->addConstraint(constraint);
+    if (!simplifyExisting)
+      CG.addConstraint(constraint);
 
     if (!simplifyExisting && solverState && solverState->generatedConstraints) {
       solverState->generatedConstraints->insert(constraint);
