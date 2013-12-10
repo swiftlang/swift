@@ -414,7 +414,7 @@ public:
   }
   
   EnumDataAddrInst *createEnumDataAddr(SILLocation Loc, SILValue Operand,
-                                       EnumElementDecl *Element, SILType Ty){
+                                       EnumElementDecl *Element, SILType Ty) {
     return insert(
               new (F.getModule()) EnumDataAddrInst(Loc, Operand, Element, Ty));
   }
