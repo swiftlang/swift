@@ -17,7 +17,7 @@ TOOLNAME = lldb-moduleimport-test
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader mcjit option
-USEDLIBS = swiftFrontend.a swiftParse.a \
+USEDLIBS = swiftDriver.a swiftFrontend.a swiftParse.a \
 	swiftClangImporter.a swiftASTSectionImporter.a \
 	swiftSIL.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a
 
