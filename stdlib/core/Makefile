@@ -54,7 +54,7 @@ endif
 # Done with SWIFT_SOURCES
 #
 
-SOURCES := swift.swift
+SOURCES := swift.o
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 

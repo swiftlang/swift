@@ -17,7 +17,7 @@ LIBRARYNAME := swiftUIKit
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := UIKit.swift
-SOURCES := UIKit.swift
+SOURCES := UIKit.o
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 

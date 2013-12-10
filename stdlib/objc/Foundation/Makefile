@@ -16,8 +16,8 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swiftFoundation
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := Foundation.swift
-SOURCES := Foundation.swift BridgeNSString.mm Misc.mm
+SWIFT_SOURCES := Foundation.swift NSStringAPI.swift
+SOURCES := Foundation.o BridgeNSString.mm Misc.mm
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
@@ -38,7 +38,7 @@ PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 $(SWIFT_HEADER_DIR)/Foundation.swiftmodule: $(ObjDir)/Foundation.o $(SWIFT_HEADER_DIR)
 $(ObjDir)/Foundation.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -module-name=Foundation -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(PATH_TO_SWIFT_SOURCES) -c -o $@
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(PATH_TO_SWIFT_SOURCES)
 	@mv $(ObjDir)/Foundation.swiftmodule $(SWIFT_HEADER_DIR)
 
 all-local:: $(SWIFT_HEADER_DIR)/Foundation.swiftmodule

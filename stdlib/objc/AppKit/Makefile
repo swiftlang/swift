@@ -17,7 +17,7 @@ LIBRARYNAME := swiftAppKit
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := AppKit.swift
-SOURCES := AppKit.swift
+SOURCES := AppKit.o
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 

@@ -23,7 +23,7 @@ SHARED_LIBRARY := 1
 # sed is used here to strip comments.
 SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/POSIX/POSIXLibSources.txt" )
 
-SOURCES := POSIX.swift
+SOURCES := POSIX.o
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
