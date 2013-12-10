@@ -676,6 +676,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(g->getLoweredType().getAddressType() ==
            getSILType(Ty, (SILValueCategory)TyCategory) &&
            "Type of a global variable does not match SILGlobalAddr.");
+    (void)Ty;
 
     ResultVal = Builder.createSILGlobalAddr(Loc, g);
     break;
