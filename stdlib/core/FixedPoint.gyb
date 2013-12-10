@@ -125,8 +125,8 @@ else:
     # accumulate the low word; requires only a mask
     hashValue += ' ^ Int(self & %s)' % maskBits(intBits)
 }@
-      return ${hashValue}
-    }
+    return ${hashValue}
+  }
 }
 
 @@transparent
