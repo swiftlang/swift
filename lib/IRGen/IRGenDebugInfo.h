@@ -65,7 +65,6 @@ typedef struct {
 
 enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
-enum IntrinsicKind  : bool { Declare = false, Value = true };
 
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
@@ -171,8 +170,7 @@ public:
                                unsigned Tag,
                                unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
-                               ArtificialKind = RealValue,
-                               IntrinsicKind = Declare);
+                               ArtificialKind = RealValue);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
@@ -190,8 +188,7 @@ public:
                                   StringRef Name,
                                   unsigned ArgNo,
                                   IndirectionKind = DirectValue,
-                                  ArtificialKind = RealValue,
-                                  IntrinsicKind = Declare);
+                                  ArtificialKind = RealValue);
 
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,

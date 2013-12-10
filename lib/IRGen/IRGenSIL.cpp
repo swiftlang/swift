@@ -1018,7 +1018,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
       auto Vals = getLoweredExplosion(Arg).claimAll();
       if (Vals.size() == 1)
         IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI, Name, N,
-                                                  DirectValue, RealValue, Value);
+                                                  DirectValue, RealValue);
     }
   }
 }

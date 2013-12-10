@@ -664,16 +664,14 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   StringRef Name,
                                                   SILInstruction *I,
                                                   IndirectionKind Indirection) {
-  auto IntrinsicKind = Declare;
   // There are variables without storage, such as "struct { func foo() {} }".
   if (isa<llvm::UndefValue>(Storage)) {
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     Storage = llvm::ConstantInt::get(Int64Ty, 0);
-    IntrinsicKind = Value;
   }
   emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, 0, Indirection,
-                          RealValue, IntrinsicKind);
+                          llvm::dwarf::DW_TAG_auto_variable,
+                          0, Indirection, RealValue);
 }
 
 
@@ -689,8 +687,7 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                           // swift.type is a already pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
-                          DirectValue, ArtificialValue,
-                          isa<llvm::AllocaInst>(Metadata) ? Declare : Value);
+                          DirectValue, ArtificialValue);
 }
 
 
@@ -700,17 +697,16 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 StringRef Name,
                                                 unsigned ArgNo,
                                                 IndirectionKind Indirection,
-                                                ArtificialKind IsArtificial,
-                                                IntrinsicKind Intrinsic) {
+                                                ArtificialKind IsArtificial) {
   assert(ArgNo > 0);
   if (Name == IGM.Context.SelfIdentifier.str())
     emitVariableDeclaration(Builder, Storage, Ty, Name,
                             llvm::dwarf::DW_TAG_arg_variable, ArgNo,
-                            DirectValue, ArtificialValue, Intrinsic);
+                            DirectValue, ArtificialValue);
   else
     emitVariableDeclaration(Builder, Storage, Ty, Name,
                             llvm::dwarf::DW_TAG_arg_variable, ArgNo,
-                            Indirection, IsArtificial, Intrinsic);
+                            Indirection, IsArtificial);
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -741,8 +737,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned Tag,
                                              unsigned ArgNo,
                                              IndirectionKind Indirection,
-                                             ArtificialKind Artificial,
-                                             IntrinsicKind DbgValue) {
+                                             ArtificialKind Artificial) {
   llvm::DIDescriptor Scope = getOrCreateScope(Ty.getDebugScope());
   Location Loc = getLoc(SM, Ty.getDecl());
 
@@ -788,10 +783,10 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
   // Insert a debug intrinsic into the current block.
-  auto Call = DbgValue
-    ? DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor,
-                                       Builder.GetInsertBlock())
-    : DBuilder.insertDeclare(Storage, Descriptor, Builder.GetInsertBlock());
+  auto BB = Builder.GetInsertBlock();
+  auto Call = isa<llvm::AllocaInst>(Storage)
+    ? DBuilder.insertDeclare(Storage, Descriptor, BB)
+    : DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor, BB);
   Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope));
 }
 
