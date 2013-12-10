@@ -55,7 +55,7 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   // Invoke ourselves in -frontend mode.
   Arguments.push_back("-frontend");
 
-  Arguments.push_back("-triple");
+  Arguments.push_back("-target");
   std::string TripleStr = getToolChain().getTripleString();
   Arguments.push_back(Args.MakeArgString(TripleStr));
   
