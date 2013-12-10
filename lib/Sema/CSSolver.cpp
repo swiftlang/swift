@@ -720,6 +720,17 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
     }
 
+    // If this is a conversion to a single-element, non-variadic labelled
+    // tuple, just grab the element type.
+    if (arg.first->getKind() == ConstraintKind::Conversion ||
+        arg.first->getKind() == ConstraintKind::Subtype ||
+        arg.first->getKind() == ConstraintKind::TrivialSubtype) {
+      if (auto tupleTy = type->getAs<TupleType>())
+        if (tupleTy->getNumElements() == 1 &&
+            !tupleTy->getFields()[0].isVararg())
+          type = tupleTy->getElementType(0);
+    }
+
     if (exactTypes.insert(type->getCanonicalType()))
       result.Bindings.push_back({type, false});
   }
