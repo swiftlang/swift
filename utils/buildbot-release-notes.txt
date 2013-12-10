@@ -31,11 +31,12 @@
 * The "Char" type has been renamed "UnicodeScalar".  The preferred
   unit of string fragments for users is called "Character".
 
-* Instance variables of classes, structs and enums now follow the same
+* Initialization semantics for classes, structs and enums init methods are now
+  properly diagnosed by the compiler.  Instance variables now follow the same
   initialization rules as local variables: they must be defined before use.  The
   initialization model requires that all local ivars (ivars defined with storage
   on the current class) must be initialized before super.init is called (or, in
-  a root class, before any method is called on self).
+  a root class, before any method is called on self, or before the final return).
 
   For example, this will yield an error:
   
@@ -50,6 +51,11 @@
   A simple fix for this is to change the ivar to be defined as "var x = Int()",
   or to explicitly assign to it before calling super.init().
 
+* Relatedly, the compiler now diagnoses incorrect calls to super.init().  It
+  validates that any path through an initializer calls super.init() exactly once,
+  that all ivars are defined before the call to super.init, and that any uses 
+  which require the entire object to be initialized come after the super.init 
+  call.
 
 2013-12-04
 ----------
