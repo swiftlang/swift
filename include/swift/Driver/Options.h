@@ -28,6 +28,8 @@ namespace options {
   /// llvm::opt::DriverFlag.
   enum SwiftFlags {
     DriverOption = (1 << 4),
+    FrontendOption = (1 << 5),
+    NoDriverOption = (1 << 6),
   };
 
   enum ID {

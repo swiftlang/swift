@@ -120,9 +120,13 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
 }
 
 InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
+  unsigned IncludedFlagsBitmask = 0;
+  unsigned ExcludedFlagsBitmask = options::NoDriverOption;
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList *ArgList = getOpts().ParseArgs(Args.begin(), Args.end(),
-                                              MissingArgIndex, MissingArgCount);
+                                              MissingArgIndex, MissingArgCount,
+                                              IncludedFlagsBitmask,
+                                              ExcludedFlagsBitmask);
 
   // Check for missing argument error.
   if (MissingArgCount) {
@@ -528,7 +532,7 @@ void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
 
 void Driver::printHelp(bool ShowHidden) const {
   unsigned IncludedFlagsBitmask = 0;
-  unsigned ExcludedFlagsBitmask = 0;
+  unsigned ExcludedFlagsBitmask = options::NoDriverOption;
 
   if (!ShowHidden)
     ExcludedFlagsBitmask |= HelpHidden;

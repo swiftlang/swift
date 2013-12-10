@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift::driver;
 using namespace swift::driver::tools;
@@ -49,13 +50,10 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
                                          StringRef LinkingOutput) const {
   ArgStringList Arguments;
 
-  StringRef ExecRef = getToolChain().getDriver().getSwiftProgramPath();
+  const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
   
   // Invoke ourselves in -frontend mode.
-  // TODO: remove once the frontend is integrated, and pass -frontend instead
-  ExecRef = ExecRef.drop_back(7);
-
-  const char *Exec = Args.MakeArgString(ExecRef);
+  Arguments.push_back("-frontend");
 
   Arguments.push_back("-triple");
   std::string TripleStr = getToolChain().getTripleString();
@@ -90,7 +88,15 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
     
     Arguments.push_back(IA->getInputArg().getValue());
   }
-  
+
+  if (Args.hasArg(options::OPT_module_name)) {
+    Args.AddLastArg(Arguments, options::OPT_module_name);
+  } else if (const Arg *A = Args.getLastArgNoClaim(options::OPT_o)) {
+      Arguments.push_back("-module-name");
+      StringRef InferredModuleName = llvm::sys::path::stem(A->getValue());
+      Arguments.push_back(Args.MakeArgString(InferredModuleName));
+  }
+
   Args.AddLastArg(Arguments, options::OPT_g);
   
   // Set the SDK for the frontend.

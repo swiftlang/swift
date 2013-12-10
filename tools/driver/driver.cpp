@@ -40,6 +40,9 @@ std::string getExecutablePath(const char *FirstArg) {
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
 
+extern int frontend_main(ArrayRef<const char *> Args,
+                         const char *Argv0, void *MainAddr);
+
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -56,8 +59,13 @@ int main(int argc_, const char **argv_) {
     llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
     return 1;
   }
-
-  // TODO: handle integrated tools, such as the frontend.
+  
+  // Handle -frontend integrated tools.
+  if (argv.size() > 1 && StringRef(argv[1]) == "-frontend") {
+    return frontend_main(llvm::makeArrayRef(argv.data()+2,
+                                            argv.data()+argv.size()),
+                         argv[0], (void *)(intptr_t)getExecutablePath);
+  }
 
   std::string Path = getExecutablePath(argv[0]);
 

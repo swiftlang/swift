@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "swift/Driver/Options.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -32,54 +33,22 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeIncludePath(LibPath.str());
 }
 
-namespace {
-
-// Create enum with OPT_xxx values for each option in FrontendOptions.td.
-enum Opt {
-  OPT_INVALID = 0,
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, \
-               HELP, META) \
-          OPT_##ID,
-#include "FrontendOptions.inc"
-  LastOption
-#undef OPTION
-};
-
-// Create prefix string literals used in FrontendOptions.td.
-#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
-#include "FrontendOptions.inc"
-#undef PREFIX
-
-// Create table mapping all options defined in FrontendOptions.td.
-static const llvm::opt::OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, \
-               HELPTEXT, METAVAR)   \
-  { PREFIX, NAME, HELPTEXT, METAVAR, OPT_##ID, llvm::opt::Option::KIND##Class, \
-    PARAM, FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS },
-#include "FrontendOptions.inc"
-#undef OPTION
-};
-
-// Create OptTable class for parsing actual command line arguments
-class FrontendOptTable : public llvm::opt::OptTable {
-public:
-  FrontendOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
-};
-
-} // namespace anonymous
-
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
+  using namespace driver;
+  using namespace driver::options;
+
   if (Args.empty())
     return false;
 
   // Parse command line options using FrontendOptions.td
   std::unique_ptr<llvm::opt::InputArgList> ParsedArgs;
-  FrontendOptTable Table;
+  std::unique_ptr<llvm::opt::OptTable> Table = createDriverOptTable();
   unsigned MissingIndex;
   unsigned MissingCount;
   ParsedArgs.reset(
-      Table.ParseArgs(Args.begin(), Args.end(), MissingIndex, MissingCount));
+      Table->ParseArgs(Args.begin(), Args.end(), MissingIndex, MissingCount,
+                       driver::options::FrontendOption));
   if (MissingCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                    ParsedArgs->getArgString(MissingIndex), MissingCount);
@@ -88,15 +57,15 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
-    case OPT_triple:
+    case OPT_target:
       setTargetTriple(InputArg->getValue());
       break;
 
-    case OPT_import_search_path:
+    case OPT_I:
       ImportSearchPaths.push_back(InputArg->getValue());
       break;
 
-    case OPT_framework_search_path:
+    case OPT_F:
       FrameworkSearchPaths.push_back(InputArg->getValue());
       break;
 
@@ -120,7 +89,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       setParseStdlib();
       break;
 
-    case OPT_Xclang:
+    case OPT_Xcc:
       ExtraClangArgs.push_back(InputArg->getValue());
       break;
 
@@ -128,19 +97,23 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       LangOpts.DebugConstraintSolver = true;
       break;
 
-    case OPT_link_library:
+    case OPT_l:
       addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
       break;
 
-    case OPT_serialized_diagnostics_path:
+    case OPT_framework:
+      addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
+      break;
+
+    case OPT_serialize_diagnostics:
       setSerializedDiagnosticsPath(InputArg->getValue());
       break;
 
-    case OPT_module_source_list_path:
+    case OPT_module_source_list:
       setModuleSourceListPath(InputArg->getValue());
       break;
 
-    case OPT_output:
+    case OPT_o:
       setOutputFilename(InputArg->getValue());
       break;
 
