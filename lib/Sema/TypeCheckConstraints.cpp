@@ -1574,7 +1574,7 @@ void ConstraintSystem::dump(raw_ostream &out) {
   }
 
   out << "\nActive Constraints:\n";
-  for (auto &constraint : InactiveConstraints) {
+  for (auto &constraint : ActiveConstraints) {
     out.indent(2);
     constraint.print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";

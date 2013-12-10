@@ -533,33 +533,6 @@ private:
   }
 };
 
-/// \brief A representative type variable with the list of constraints
-/// that apply to it.
-struct TypeVariableConstraints {
-  TypeVariableConstraints(TypeVariableType *typeVar) : TypeVar(typeVar) {}
-
-  /// \brief Whether there are any non-concrete constraints placed on this
-  /// type variable that aren't represented by the stored constraints.
-  bool HasNonConcreteConstraints = false;
-
-  /// \brief Whether this type variable is either fully bound by either an
-  /// overload set or a member constraint.
-  bool FullyBound = false;
-
-  /// \brief The representative type variable.
-  TypeVariableType *TypeVar;
-
-  /// \brief The set of constraints "above" the type variable.
-  SmallVector<std::pair<Constraint *, Type>, 4> Above;
-
-  /// \brief The set of constraints "below" the type variable.
-  SmallVector<std::pair<Constraint *, Type>, 4> Below;
-
-  /// \brief The set of protocol conformance constraints directly applicable
-  /// to the type variable.
-  SmallVector<Constraint *, 4> ConformsToConstraints;
-};
-
 /// \brief The kind of type matching to perform in matchTypes().
 enum class TypeMatchKind : char {
   /// \brief Bind the types together directly.
@@ -1116,8 +1089,11 @@ public:
   ConstraintSystem(TypeChecker &tc, DeclContext *dc);
   ~ConstraintSystem();
 
-  /// \brief Retrieve the type checker associated with this constraint system.
+  /// Retrieve the type checker associated with this constraint system.
   TypeChecker &getTypeChecker() const { return TC; }
+
+  /// Retrieve the constraint graph associated with this constraint system.
+  ConstraintGraph &getConstraintGraph() const { return CG; }
 
   /// \brief Retrieve the AST context.
   ASTContext &getASTContext() const { return TC.Context; }
@@ -1756,20 +1732,6 @@ private:
 
   /// \brief Simplify the given constaint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
-
-public:
-  /// \brief Walks through the list of constraints, collecting the constraints
-  /// that directly apply to each representative type variable.
-  ///
-  /// \param typeVarConstraints will be populated with a list of
-  /// representative type variables and the constraints that apply directly
-  /// to them.
-  ///
-  /// \param disjunctions will be populated with the list of disjunction
-  /// constraints encountered.
-  void collectConstraintsForTypeVariables(
-         SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
-         SmallVectorImpl<Constraint *> &disjunctions);
 
 public:
   /// \brief Simplify the system of constraints, by breaking down complex

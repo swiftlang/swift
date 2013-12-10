@@ -1426,6 +1426,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       choices.push_back(OverloadChoice(baseTy, result.first,
                                        /*isSpecialized=*/false));
     }
+
+    if (choices.empty()) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+      return SolutionKind::Error;
+    }
+
     auto locator = getConstraintLocator(constraint.getLocator());
     addOverloadSet(memberTy, choices, locator);
     return SolutionKind::Solved;
