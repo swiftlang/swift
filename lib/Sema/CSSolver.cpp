@@ -179,7 +179,12 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
                       savedBindings.end());
 }
 
-SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
+/// \brief Enumerates all of the 'direct' supertypes of the given type.
+///
+/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
+/// such that there is no type U where T < U and U < S.
+static SmallVector<Type, 4> 
+enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   SmallVector<Type, 4> result;
 
   if (auto tupleTy = type->getAs<TupleType>()) {
@@ -213,7 +218,7 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
     // does not.
 
     // If there is a superclass, it is a direct supertype.
-    if (auto superclass = TC.getSuperClassOf(type))
+    if (auto superclass = tc.getSuperClassOf(type))
       result.push_back(superclass);
   }
 
@@ -804,8 +809,11 @@ static bool tryTypeVariableBindings(
     // FIXME: Only if we're allowed to!
     for (auto binding : bindings) {
       auto type = binding.BindingType;
+      if (binding.Kind != AllowedBindingKind::Supertypes)
+        continue;
 
-      for (auto supertype : cs.enumerateDirectSupertypes(type)) {
+      for (auto supertype : enumerateDirectSupertypes(cs.getTypeChecker(),
+                                                      type)) {
         // If we're not allowed to try this binding, skip it.
         auto simpleSuper = checkTypeOfBinding(cs, typeVar, supertype);
         if (!simpleSuper)

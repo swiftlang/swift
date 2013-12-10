@@ -1562,12 +1562,6 @@ public:
     Error
   };
 
-  /// \brief Enumerates all of the 'direct' supertypes of the given type.
-  ///
-  /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
-  /// such that there is no type U where T < U and U < S.
-  SmallVector<Type, 4> enumerateDirectSupertypes(Type type);
-
   /// \brief Compute the rvalue type of the given expression, which is the
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
