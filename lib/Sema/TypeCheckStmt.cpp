@@ -698,24 +698,6 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
   SmallVector<ASTNode, 4> memberInitializers;
 
-  // If this is the implicit default constructor for a class with a superclass,
-  // call the superclass initializer.
-  if (ctor->isImplicit() && isa<ClassDecl>(ctor->getDeclContext()) &&
-      cast<ClassDecl>(ctor->getDeclContext())->getSuperclass()) {
-    Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
-                                                SourceLoc(), /*Implicit=*/true);
-    Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                                           SourceLoc(),
-                                                           SourceLoc(),
-                                                           /*Implicit=*/true);
-    Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                         /*hasTrailingClosure=*/false,
-                                         /*Implicit=*/true);
-    result = new (Context) CallExpr(result, args, /*Implicit=*/true);
-    if (!typeCheckExpression(result, ctor, Type(), /*discardedExpr=*/true))
-      memberInitializers.push_back(result);
-  }
-
   // Default-initialize all of the members.
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
     ->getNominalOrBoundGenericNominal();
@@ -745,6 +727,24 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
     diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
     diagnose(patternBind->getLoc(), diag::decl_init_here);
+  }
+
+  // If this is the implicit default constructor for a class with a superclass,
+  // call the superclass initializer.
+  if (ctor->isImplicit() && isa<ClassDecl>(ctor->getDeclContext()) &&
+      cast<ClassDecl>(ctor->getDeclContext())->getSuperclass()) {
+    Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
+                                                SourceLoc(), /*Implicit=*/true);
+    Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
+                                                           SourceLoc(),
+                                                           SourceLoc(),
+                                                           /*Implicit=*/true);
+    Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
+                                         /*hasTrailingClosure=*/false,
+                                         /*Implicit=*/true);
+    result = new (Context) CallExpr(result, args, /*Implicit=*/true);
+    if (!typeCheckExpression(result, ctor, Type(), /*discardedExpr=*/true))
+      memberInitializers.push_back(result);
   }
 
   // If we added any default initializers, update the body.
