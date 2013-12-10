@@ -448,7 +448,7 @@ public:
   void emitProlog(AnyFunctionRef TheClosure, ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
-                  Type resultType);
+                  Type resultType, DeclContext *DeclCtx);
 
   /// \brief Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.

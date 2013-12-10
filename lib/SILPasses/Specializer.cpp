@@ -128,7 +128,8 @@ void TypeSubCloner::populateCloned() {
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
     SILValue MappedValue =
-        new (M) SILArgument(remapType((*I)->getType()), ClonedEntryBB);
+      new (M) SILArgument(remapType((*I)->getType()), ClonedEntryBB,
+                          (*I)->getDecl());
     ValueMap.insert(std::make_pair(*I, MappedValue));
     ++I;
   }

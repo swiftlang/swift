@@ -25,10 +25,10 @@ class SILArgument : public ValueBase {
   void operator delete(void *Ptr, size_t) = delete;
 
   SILBasicBlock *ParentBB;
-  ValueDecl *Decl;
+  const ValueDecl *Decl;
 public:
   explicit
-  SILArgument(SILType Ty, SILBasicBlock *ParentBB, ValueDecl *D = nullptr);
+  SILArgument(SILType Ty, SILBasicBlock *ParentBB, const ValueDecl *D = nullptr);
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }

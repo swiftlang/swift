@@ -269,7 +269,7 @@ public:
   
   RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M)
-      SILArgument(gen.getLoweredType(t), parent, loc.getAsASTNode<VarDecl>());
+      SILArgument(gen.getLoweredType(t), parent, loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = isa<LValueType>(t)
       ? ManagedValue(arg, ManagedValue::LValue)
       : gen.emitManagedRValueWithCleanup(arg);

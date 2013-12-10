@@ -340,14 +340,14 @@ ClosureCloner::populateCloned() {
       SILArgument *ReleaseArgument = *I++;
       SILValue MappedValue =
         new (M) SILArgument((*I)->getType().getObjectType(),
-                            ClonedEntryBB);
+                            ClonedEntryBB, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(ReleaseArgument, MappedValue));
       AddrArgumentMap.insert(std::make_pair(*I, MappedValue));
       ++ArgNo;
     } else {
       // Otherwise, create a new argument which copies the original argument
       SILValue MappedValue =
-        new (M) SILArgument((*I)->getType(), ClonedEntryBB);
+        new (M) SILArgument((*I)->getType(), ClonedEntryBB, (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

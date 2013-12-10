@@ -26,8 +26,20 @@ using namespace swift;
 // SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB, ValueDecl *D)
+SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB, const ValueDecl *D)
   : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
+  // Function arguments need to have a decl.
+  assert(
+    // Unless the function is transparent,
+    !ParentBB->getParent()->isTransparent() &&
+    // or an ObjC thunk,
+    ParentBB->getParent()->getAbstractCC() != AbstractCC::ObjCMethod &&
+    // or comes from a SIL file.
+    !ParentBB->getParent()->getLocation().is<SILFileLocation>() &&
+    // Is this the initial basic block in the function?
+    ParentBB->getParent()->size() == 1
+          ? D != nullptr
+          : true );
   ParentBB->addArgument(this);
 }
 

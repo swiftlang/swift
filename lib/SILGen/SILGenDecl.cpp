@@ -629,7 +629,14 @@ struct ArgumentInitVisitor :
     assert(I->kind == Initialization::Kind::Ignored &&
            "any pattern should match a black-hole Initialization");
     auto &lowering = gen.getTypeLowering(P->getType());
-    SILValue arg = makeArgument(P->getType(), f.begin(), P);
+
+    auto &AC = gen.getASTContext();
+    auto VD = new (AC) VarDecl(/*static*/ false, SourceLoc(),
+                               // FIXME: we should probably number them.
+                               AC.getIdentifier("_"), P->getType(),
+                               f.getDeclContext());
+
+    SILValue arg = makeArgument(P->getType(), f.begin(), VD);
     lowering.emitDestroyRValue(gen.B, P, arg);
     return arg;
   }
@@ -676,7 +683,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
-                                               gen.F.begin());
+                                               gen.F.begin(), capture);
     SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
     gen.VarLocs[capture] = SILGenFunction::VarLoc::getAddress(addr, box);
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
@@ -735,7 +742,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
                                 ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
-  emitProlog(paramPatterns, resultType);
+  emitProlog(paramPatterns, resultType, TheClosure.getAsDeclContext());
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
@@ -746,12 +753,16 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
 }
 
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
-                                Type resultType) {
+                                Type resultType, DeclContext *DeclCtx) {
   // If the return type is address-only, emit the indirect return argument.
   const TypeLowering &returnTI = getTypeLowering(resultType);
   if (returnTI.isReturnedIndirectly()) {
-    IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
-                                                    F.begin());
+    auto &AC = getASTContext();
+    auto VD = new (AC) VarDecl(/*static*/ false, SourceLoc(),
+                                 AC.getIdentifier("$return_value"), resultType,
+                                 DeclCtx);
+    IndirectReturnAddress = new (SGM.M)
+      SILArgument(returnTI.getLoweredType(), F.begin(), VD);
   }
   
   // Emit the argument variables in calling convention order.
