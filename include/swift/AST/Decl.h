@@ -725,6 +725,10 @@ public:
   void overrideRequirements(MutableArrayRef<RequirementRepr> NewRequirements) {
     Requirements = NewRequirements;
   }
+  
+  /// True if this parameter list includes the implicit <Self> parameter list
+  /// of a protocol.
+  bool hasSelfArchetype() const;
 
   /// \brief Retrieves the list containing all archetypes described by this
   /// generic parameter clause.
@@ -732,25 +736,34 @@ public:
   /// In this list of archetypes, the primary archetypes come first followed by
   /// any non-primary archetypes (i.e., those archetypes that encode associated
   /// types of another archetype).
+  ///
+  /// This does not include archetypes from the outer generic parameter list(s).
   ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
 
+  /// \brief Return the number of primary archetypes.
+  unsigned getNumPrimaryArchetypes() const {
+    if (hasSelfArchetype())
+      return size() - 1;
+    return size();
+  }
+  
   /// \brief Retrieves the list containing only the primary archetypes described
   /// by this generic parameter clause. This excludes archetypes for associated
   /// types of the primary archetypes.
   ArrayRef<ArchetypeType *> getPrimaryArchetypes() const {
-    return getAllArchetypes().slice(0, size());
+    return getAllArchetypes().slice(0, getNumPrimaryArchetypes());
   }
   
   /// \brief Retrieves the list containing only the associated archetypes.
   ArrayRef<ArchetypeType *> getAssociatedArchetypes() const {
-    return getAllArchetypes().slice(size());
+    return getAllArchetypes().slice(getNumPrimaryArchetypes());
   }
 
   /// \brief Sets all archetypes *without* copying the source array.
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
     AllArchetypes = AA;
   }
-
+  
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
   /// exists.
@@ -3172,6 +3185,12 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   }
 }
 
+inline bool GenericParamList::hasSelfArchetype() const {
+  if (size() >= 1)
+    return isa<ProtocolDecl>(begin()[0].getDecl()->getDeclContext());
+  return nullptr;
+}
+  
 } // end namespace swift
 
 #endif
