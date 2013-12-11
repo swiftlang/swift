@@ -291,10 +291,6 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      if (Name.str() == "SEL") {
-        Name.str();
-      }
-
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
         bool IsError;
