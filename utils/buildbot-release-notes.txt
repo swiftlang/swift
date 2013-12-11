@@ -1,6 +1,9 @@
 2013-12-11
 ----------
 
+* Objective-C 'id' is now imported as 'AnyObject' (formerly known as
+  'DynamicLookup'), Objective-C 'Class' is imported as 'AnyClass'.
+
 * The casting syntax "x as T" now permits both implicit conversions
   (in which case it produces a value of type T) and for
   runtime-checked casts (in which case it produces a value of type T?
