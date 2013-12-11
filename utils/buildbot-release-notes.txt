@@ -34,9 +34,9 @@
 * Initialization semantics for classes, structs and enums init methods are now
   properly diagnosed by the compiler.  Instance variables now follow the same
   initialization rules as local variables: they must be defined before use.  The
-  initialization model requires that all local ivars (ivars defined with storage
-  on the current class) must be initialized before super.init is called (or, in
-  a root class, before any method is called on self, or before the final return).
+  initialization model requires that all properties with storage in the current
+  class be initialized before super.init is called (or, in a root class, before 
+  any method is called on self, and before the final return).
 
   For example, this will yield an error:
   
@@ -44,11 +44,12 @@
       var x : Int
       
       init() {
-        super.init()  // error, 'self.x' not initialized yet
+        // error: property 'self.x' not initialized at super.init call
+        super.init()
       }
     }
   
-  A simple fix for this is to change the ivar to be defined as "var x = Int()",
+  A simple fix for this is to change the property definition to "var x = 0",
   or to explicitly assign to it before calling super.init().
 
 * Relatedly, the compiler now diagnoses incorrect calls to super.init().  It
