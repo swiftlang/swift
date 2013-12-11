@@ -523,7 +523,7 @@ void IRGenModule::emitGlobalTopLevel() {
     AccessPath.push_back({ Context.StdlibModuleName, swift::SourceLoc() });
 
     auto Imp = ImportDecl::create(Context,
-                                  Context.getOptionalDecl()->getDeclContext(),
+                                  SILMod->getSwiftModule(),
                                   SourceLoc(),
                                   ImportKind::Module, SourceLoc(),
                                   false, AccessPath);
