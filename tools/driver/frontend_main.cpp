@@ -47,7 +47,9 @@ int frontend_main(ArrayRef<const char *>Args,
                                                                     MainAddr));
 
   // Parse arguments.
-  Invocation.parseArgs(Args, Instance.getDiags());
+  if (Invocation.parseArgs(Args, Instance.getDiags())) {
+    return 1;
+  }
 
   if (Instance.setup(Invocation)) {
     return 1;
