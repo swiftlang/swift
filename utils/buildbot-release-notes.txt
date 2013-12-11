@@ -62,7 +62,7 @@
   call.
 
 * Type checker performance has improved considerably (but we still
-have much work to do here).
+  have much work to do here).
 
 2013-12-04
 ----------
