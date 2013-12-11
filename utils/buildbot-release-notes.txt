@@ -13,6 +13,24 @@
   dependency order, so global variable initializers that cross module
   boundaries don't have undefined behavior or fragile link order dependencies.
 
+* A "map" method with the semantics of Haskell's "fmap" was added to
+  Optional<T>.  Map applies a function f: T->U to any value stored in
+  an Optional<T>, and returns an Optional<U>.  So,
+
+    (swift) func nameOf(x: Int?) -> String? {
+              return x.map { "<" + String($0) + ">" }
+            }
+   (swift)            
+   (swift) var no = nameOf(.None) // Empty optional in...
+   // no : String? = <unprintable value>
+   (swift) no ? "yes" : "no"      // ...empty optional out
+   // r0 : String = "no"
+   (swift)
+   (swift) nameOf(.Some(42))      // Non-empty in 
+   // r1 : String? = <unprintable value>
+   (swift) nameOf(.Some(42))!     // Non-empty out
+   // r2 : String = "<42>"
+
 2013-12-11
 ----------
 
