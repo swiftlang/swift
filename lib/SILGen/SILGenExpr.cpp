@@ -374,6 +374,10 @@ static bool isGlobalLazilyInitialized(VarDecl *var) {
   assert(!var->isComputed() &&
          "not a stored global variable!");
 
+  // Imports from C are never lazily initialized.
+  if (var->hasClangNode())
+    return false;
+  
   return !isa<SourceFile>(var->getDeclContext())
     || cast<SourceFile>(var->getDeclContext())->Kind != SourceFileKind::Main;
 }
