@@ -123,7 +123,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       addInputFilename(InputArg->getValue());
       break;
 
-    default:
+    case OPT_UNKNOWN:
       HasUnknownArgument = true;
       Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                      InputArg->getAsString(*ParsedArgs));
