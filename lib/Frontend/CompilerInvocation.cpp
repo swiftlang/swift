@@ -20,6 +20,8 @@
 #include "llvm/Support/Path.h"
 
 using namespace swift;
+using namespace swift::driver;
+using namespace llvm::opt;
 
 swift::CompilerInvocation::CompilerInvocation() {
   TargetTriple = llvm::sys::getDefaultTargetTriple();
@@ -33,9 +35,32 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeIncludePath(LibPath.str());
 }
 
+static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
+                              DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_o)) {
+    Opts.OutputFilename = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_module_name)) {
+    Opts.ModuleName = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_serialize_diagnostics)) {
+    Opts.SerializedDiagnosticsPath = A->getValue();
+  }
+
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT),
+                                 Args.filtered_end())) {
+    Opts.InputFilenames.push_back(A->getValue());
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
-  using namespace driver;
   using namespace driver::options;
 
   if (Args.empty())
@@ -55,6 +80,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
   bool HasUnknownArgument = false;
 
   for (auto InputArg : *ParsedArgs) {
@@ -69,10 +98,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_F:
       FrameworkSearchPaths.push_back(InputArg->getValue());
-      break;
-
-    case OPT_module_name:
-      setModuleName(InputArg->getValue());
       break;
 
     case OPT_sdk:
@@ -107,20 +132,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
       break;
 
-    case OPT_serialize_diagnostics:
-      setSerializedDiagnosticsPath(InputArg->getValue());
-      break;
-
     case OPT_module_source_list:
       setModuleSourceListPath(InputArg->getValue());
-      break;
-
-    case OPT_o:
-      setOutputFilename(InputArg->getValue());
-      break;
-
-    case OPT_INPUT:
-      addInputFilename(InputArg->getValue());
       break;
 
     case OPT_UNKNOWN:

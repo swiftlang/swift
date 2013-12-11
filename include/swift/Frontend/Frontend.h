@@ -27,6 +27,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -50,23 +51,18 @@ class CompilerInvocation {
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
-  std::string SerializedDiagnosticsPath;
   std::string ModuleSourceListPath;
   std::vector<std::string> ExtraClangArgs;
 
   LangOptions LangOpts;
+  FrontendOptions FrontendOpts;
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
   bool Immediate = false;
   SourceFileKind InputKind = SourceFileKind::Main;
 
-  std::string ModuleName;
-
-  std::vector<std::string> InputFilenames;
   std::vector<llvm::MemoryBuffer *> InputBuffers;
-
-  std::string OutputFilename;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
@@ -152,10 +148,10 @@ public:
   }
 
   void setSerializedDiagnosticsPath(StringRef Path) {
-    SerializedDiagnosticsPath = Path;
+    FrontendOpts.SerializedDiagnosticsPath = Path;
   }
   StringRef getSerializedDiagnosticsPath() const {
-    return SerializedDiagnosticsPath;
+    return FrontendOpts.SerializedDiagnosticsPath;
   }
 
   void setModuleSourceListPath(StringRef Path) {
@@ -197,15 +193,15 @@ public:
   }
 
   void setModuleName(StringRef Name) {
-    ModuleName = Name.str();
+    FrontendOpts.ModuleName = Name.str();
   }
 
   StringRef getModuleName() const {
-    return ModuleName;
+    return FrontendOpts.ModuleName;
   }
 
   void addInputFilename(StringRef Filename) {
-    InputFilenames.push_back(Filename);
+    FrontendOpts.InputFilenames.push_back(Filename);
   }
 
   void addInputBuffer(llvm::MemoryBuffer *Buf) {
@@ -213,18 +209,20 @@ public:
   }
 
   void clearInputs() {
-    InputFilenames.clear();
+    FrontendOpts.InputFilenames.clear();
     InputBuffers.clear();
   }
 
-  ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
+  ArrayRef<std::string> getInputFilenames() const {
+    return FrontendOpts.InputFilenames;
+  }
   ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const { return InputBuffers; }
 
   void setOutputFilename(StringRef Filename) {
-    OutputFilename = Filename;
+    FrontendOpts.OutputFilename = Filename;
   }
   StringRef getOutputFilename() const {
-    return OutputFilename;
+    return FrontendOpts.OutputFilename;
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
