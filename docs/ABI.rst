@@ -654,7 +654,6 @@ Globals
   global ::= 'Mm' type                   // class metaclass
   global ::= 'Mn' nominal-type           // nominal type descriptor
   global ::= 'Mp' protocol               // protocol descriptor
-  global ::= 'nk_' entity                // protocol witness
   global ::= 'PA' .*                     // partial application forwarder
   global ::= 'PAo' .*                    // ObjC partial application forwarder
   global ::= 'w' value-witness-kind type // value witness
@@ -671,6 +670,9 @@ Globals
   global ::= 'Tb' type                   // swift-to-ObjC block converter
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
+  global ::= 'TW' protocol-conformance entity
+                                         // protocol witness thunk (new)
+  global ::= 'nk_' entity                // protocol witness thunk (old)
   entity ::= context 'D'                 // deallocating destructor
   entity ::= context 'd'                 // non-deallocating destructor
   entity ::= context 'C' type            // allocating constructor

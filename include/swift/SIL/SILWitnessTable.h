@@ -34,8 +34,8 @@ namespace swift {
   class SILModule;
   class NormalProtocolConformance;
   
-/// A mapping from each dynamically-dispatchable method of a class to the
-/// SILFunction that implements the method for that class.
+/// A mapping from each requirement of a protocol to the SIL-level entity
+/// satisfying the requirement for a concrete type.
 class SILWitnessTable : public llvm::ilist_node<SILWitnessTable>,
                         public SILAllocated<SILWitnessTable>
 {
@@ -59,8 +59,10 @@ public:
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
   struct AssociatedTypeProtocolWitness {
-    /// The associated type and protocol required.
-    std::pair<AssociatedTypeDecl*, ProtocolDecl*> Requirement;
+    /// The associated type required.
+    AssociatedTypeDecl *Requirement;
+    /// The protocol requirement on the type.
+    ProtocolDecl *Protocol;
     /// The ProtocolConformance satisfying the requirement.
     ProtocolConformance *Witness;
   };

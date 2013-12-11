@@ -1252,6 +1252,9 @@ private:
 };
 BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
+  static CanMetaTypeType get(CanType type, const ASTContext &C) {
+    return CanMetaTypeType(MetaTypeType::get(type, C));
+  }
 END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in

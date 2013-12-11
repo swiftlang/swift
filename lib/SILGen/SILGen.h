@@ -39,6 +39,21 @@ namespace Lowering {
   class RValueSource;
   class TemporaryInitialization;
 
+/// An enum to indicate whether a protocol method requirement is satisfied by
+/// a free function, as for an operator requirement.
+enum IsFreeFunctionWitness_t : bool {
+  IsNotFreeFunctionWitness = false,
+  IsFreeFunctionWitness = true,
+};
+  
+/// An enum to indicate whether a protocol method requirement is satisfied by a
+/// method with an abstraction difference in the @inout-ness of its self
+/// parameter.
+enum HasInOutSelfAbstractionDifference_t : bool {
+  DoesNotHaveInOutSelfAbstractionDifference = false,
+  HasInOutSelfAbstractionDifference = true,
+};
+  
 /// An ASTVisitor for generating SIL from top-level declarations in a module.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
@@ -184,6 +199,16 @@ public:
   /// Emit the ObjC-compatible getter and setter for a subscript
   /// declaration.
   void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
+  
+  /// Emit the witness table for a protocol conformance.
+  void emitProtocolConformance(ProtocolConformance *conformance);
+  
+  /// Emit a protocol witness entry point.
+  SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
+                                   SILDeclRef requirement,
+                                   SILDeclRef witness,
+                                   IsFreeFunctionWitness_t isFree,
+                                   ArrayRef<Substitution> witnessSubs);
 
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.

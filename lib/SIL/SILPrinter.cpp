@@ -1281,7 +1281,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     entry.first.print(OS);
     OS << ": " << entry.second->getName() << "\n";
   }
-  OS << "}\n";
+  OS << "}\n\n";
 }
 
 void SILVTable::dump() const {
@@ -1322,8 +1322,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
       auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
       OS << "associated_type_protocol ("
-         << assocProtoWitness.Requirement.first->getName() << ": "
-         << assocProtoWitness.Requirement.second->getName() << "): ";
+         << assocProtoWitness.Requirement->getName() << ": "
+         << assocProtoWitness.Protocol->getName() << "): ";
       assocProtoWitness.Witness->printName(OS);
       break;
     }
