@@ -858,7 +858,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
-  ParserResult<Pattern> Pattern = parsePattern();
+  ParserResult<Pattern> Pattern = parsePattern(true);
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
     Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
@@ -879,8 +879,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   if (Container.hasCodeCompletion())
     return makeParserCodeCompletionResult<Stmt>();
   if (Container.isNull())
-    Container =
-        makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+    Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
 
   if (auto *CE = dyn_cast<ClosureExpr>(Container.get())) {
     diagnose(CE->getStartLoc(), diag::expected_foreach_container);

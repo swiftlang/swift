@@ -24,10 +24,8 @@
 #include <utility>
 using namespace swift;
 
-namespace {
-  
 /// Find an unqualified enum element.
-EnumElementDecl *
+static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name) {
   UnqualifiedLookup lookup(name, DC, &TC, SourceLoc(), /*typeLookup*/false);
@@ -51,7 +49,7 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
 }
 
 /// Find an enum element in an enum type.
-EnumElementDecl *
+static EnumElementDecl *
 lookupEnumMemberElement(TypeChecker &TC, EnumDecl *oof, Type ty,
                         Identifier name) {
   // Look up the case inside the enum.
@@ -73,7 +71,8 @@ lookupEnumMemberElement(TypeChecker &TC, EnumDecl *oof, Type ty,
   
   return foundElement;
 }
-  
+
+namespace {
 // 'T(x...)' is treated as a NominalTypePattern if 'T' references a type
 // by name, or an EnumElementPattern if 'T' references an enum element.
 // Build up an IdentTypeRepr and see what it resolves to.
@@ -608,6 +607,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
   case PatternKind::Var: {
     auto VP = cast<VarPattern>(P);
     VP->setType(type);
+    
     Pattern *sub = VP->getSubPattern();
     if (coerceToType(sub, dc, type, allowOverride, false, resolver))
       return true;
@@ -646,6 +646,9 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     NP->getDecl()->overwriteType(type);
+
+    if (type->is<LValueType>())
+      NP->getDecl()->setLet(false);
 
     P->setType(type);
     return false;

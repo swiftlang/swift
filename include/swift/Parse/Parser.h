@@ -655,7 +655,7 @@ public:
                                          Pattern *&BodyPattern,
                                          bool &HasSelectorStyleSignature);
 
-  ParserResult<Pattern> parsePattern();
+  ParserResult<Pattern> parsePattern(bool isLet);
 
   /// \brief Determine whether this token can start a pattern.
   bool isStartOfPattern(Token tok);
@@ -675,12 +675,12 @@ public:
   ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool allowInitExpr);
-  ParserResult<Pattern> parsePatternTuple(bool AllowInitExpr);
-  ParserResult<Pattern> parsePatternAtom();
-  ParserResult<Pattern> parsePatternIdentifier();
+  parsePatternTupleElement(bool allowInitExpr, bool isLet);
+  ParserResult<Pattern> parsePatternTuple(bool AllowInitExpr, bool isLet);
+  ParserResult<Pattern> parsePatternAtom(bool isLet);
+  ParserResult<Pattern> parsePatternIdentifier(bool isLet);
   
-  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name);
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
   
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

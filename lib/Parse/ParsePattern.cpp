@@ -37,7 +37,8 @@ parseCurriedFunctionArguments(Parser &P,
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (P.Tok.is(tok::l_paren)) {
-    ParserResult<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false);
+    ParserResult<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false,
+                                                        /*IsLet*/false);
     if (pattern.isNull() || pattern.hasCodeCompletion())
       return pattern;
 
@@ -83,7 +84,7 @@ parseSelectorArgument(Parser &P,
                       SmallVectorImpl<TuplePatternElt> &bodyElts,
                       llvm::StringMap<VarDecl *> &selectorNames,
                       SourceLoc &rp) {
-  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier();
+  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(false);
   assert(ArgPatternRes.isNonNull() &&
          "selector argument did not start with an identifier!");
   Pattern *ArgPattern = ArgPatternRes.get();
@@ -115,7 +116,7 @@ parseSelectorArgument(Parser &P,
     return makeParserError();
   }
 
-  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom();
+  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom(false);
   if (BodyPatternRes.isNull()) {
     recoverFromBadSelectorArgument(P);
     return makeParserError();
@@ -272,7 +273,8 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                bool &HasSelectorStyleSignature) {
   // Parse the first function argument clause.
-  ParserResult<Pattern> FirstPattern = parsePatternTuple(/*AllowInitExpr=*/true);
+  ParserResult<Pattern> FirstPattern = parsePatternTuple(/*AllowInitExpr=*/true,
+                                                         /*IsLet*/ false);
   if (FirstPattern.isNull()) {
     // Recover by creating a '()' pattern.
     auto EmptyTuplePattern =
@@ -361,7 +363,8 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
-    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
+    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true,
+                                                     /*IsLet*/ false);
 
     // If we failed to parse the pattern, create an empty tuple to recover.
     if (Params.isNull()) {
@@ -430,9 +433,9 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
-ParserResult<Pattern> Parser::parsePattern() {
+ParserResult<Pattern> Parser::parsePattern(bool isLet) {
   // First, parse the pattern atom.
-  ParserResult<Pattern> Result = parsePatternAtom();
+  ParserResult<Pattern> Result = parsePatternAtom(isLet);
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
@@ -466,15 +469,15 @@ bool Parser::isStartOfBindingName(Token tok) {
   return tok.is(tok::kw__) || tok.is(tok::identifier);
 }
 
-Pattern *Parser::createBindingFromPattern(SourceLoc loc,
-                                          Identifier name) {
-  VarDecl *var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ false,
-                                       loc, name, Type(), CurDeclContext);
+Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
+                                          bool isLet) {
+  auto *var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
+                                    loc, name, Type(), CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
 /// Parse an identifier as a pattern.
-ParserResult<Pattern> Parser::parsePatternIdentifier() {
+ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
   SourceLoc loc = Tok.getLoc();
   if (consumeIf(tok::kw__)) {
     return makeParserResult(new (Context) AnyPattern(loc));
@@ -483,7 +486,7 @@ ParserResult<Pattern> Parser::parsePatternIdentifier() {
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {
     Identifier ident = Context.getIdentifier(text);
-    return makeParserResult(createBindingFromPattern(loc, ident));
+    return makeParserResult(createBindingFromPattern(loc, ident, isLet));
   }
 
   return nullptr;
@@ -495,14 +498,14 @@ ParserResult<Pattern> Parser::parsePatternIdentifier() {
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= '_'
 ///   pattern-atom ::= pattern-tuple
-ParserResult<Pattern> Parser::parsePatternAtom() {
+ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    return parsePatternTuple(/*AllowInitExpr*/false);
+    return parsePatternTuple(/*AllowInitExpr*/false, isLet);
 
   case tok::identifier:
   case tok::kw__:
-    return parsePatternIdentifier();
+    return parsePatternIdentifier(isLet);
 
   case tok::code_complete:
     // Just eat the token and return an error status, *not* the code completion
@@ -525,9 +528,9 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
 }
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
-Parser::parsePatternTupleElement(bool allowInitExpr) {
+Parser::parsePatternTupleElement(bool allowInitExpr, bool isLet) {
   // Parse the pattern.
-  ParserResult<Pattern> pattern = parsePattern();
+  ParserResult<Pattern> pattern = parsePattern(isLet);
   if (pattern.hasCodeCompletion())
     return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
 
@@ -564,7 +567,7 @@ Parser::parsePatternTupleElement(bool allowInitExpr) {
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 
-ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
+ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr, bool isLet){
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
 
@@ -578,7 +581,7 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement(AllowInitExpr);
+    std::tie(EltStatus, elt) = parsePatternTupleElement(AllowInitExpr, isLet);
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (!elt)

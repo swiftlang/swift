@@ -117,12 +117,14 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       // This is ill-formed, but the problem will be caught later by scope
       // resolution.
       auto pattern = createBindingFromPattern(declRef->getLoc(),
-                                              declRef->getDecl()->getName());
+                                              declRef->getDecl()->getName(),
+                                              false);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
     if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
       auto pattern = createBindingFromPattern(udre->getLoc(),
-                                              udre->getName());
+                                              udre->getName(),
+                                              false);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
   }
@@ -1138,7 +1140,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
     // Parse the pattern-tuple.
-    auto pattern = parsePatternTuple(/*AllowInitExpr=*/false);
+    auto pattern = parsePatternTuple(/*AllowInitExpr=*/false, /*IsLet*/ false);
     if (pattern.isNonNull())
       params = pattern.get();
     else

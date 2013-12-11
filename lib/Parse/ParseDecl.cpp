@@ -1404,7 +1404,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   unsigned FirstDecl = Decls.size();
   
   do {
-    ParserResult<Pattern> pattern = parsePattern();
+    ParserResult<Pattern> pattern = parsePattern(false);
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (pattern.isNull())
@@ -2324,7 +2324,8 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     return makeParserError();
   }
 
-  ParserResult<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
+  ParserResult<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false,
+                                                    /*IsLet*/ false);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   Indices.get()->walk(SetVarContext(CurDeclContext));
@@ -2534,7 +2535,8 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::l_paren)) {
     // Parse the parameter tuple.
     SourceLoc LParenLoc = Tok.getLoc();
-    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
+    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true,
+                                                     /*IsLet*/false);
     if (!Params.isParseError()) {
       // Check that the destructor has zero parameters.
       SourceRange ElementsRange;
