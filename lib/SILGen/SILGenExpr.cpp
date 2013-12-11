@@ -389,8 +389,7 @@ static bool isGlobalLazilyInitialized(VarDecl *var) {
 
 static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
                                           SILLocation loc, VarDecl *var) {
-  if (isGlobalLazilyInitialized(var)
-      && gen.getASTContext().LangOpts.EmitLazyGlobalInitializers) {
+  if (isGlobalLazilyInitialized(var)) {
     // Call the global accessor to get the variable's address.
     SILFunction *accessorFn = gen.SGM.getFunction(
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor));

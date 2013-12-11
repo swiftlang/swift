@@ -37,9 +37,6 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
     
-    /// \brief Enable codegen of lazy global initializers in SILGen.
-    bool EmitLazyGlobalInitializers = false;
-    
     /// \brief Enable generation of SIL protocol witness tables.
     bool EmitSILProtocolWitnessTables = false;
   };
