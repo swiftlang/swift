@@ -519,8 +519,9 @@ void IRGenModule::emitGlobalTopLevel() {
 
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
-    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
-    AccessPath.push_back({ Context.StdlibModuleName, swift::SourceLoc() });
+    std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+      { Context.StdlibModuleName, swift::SourceLoc() }
+    };
 
     auto Imp = ImportDecl::create(Context,
                                   SILMod->getSwiftModule(),
