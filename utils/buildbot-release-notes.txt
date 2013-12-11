@@ -10,9 +10,9 @@
   that will be .Some(casted x) on success and .None on failure). An
   example:
 
-    func f(s: String, o: NSString) {
-      var ns = s as NSString                  // has type 'NSString'
-      var maybeMutable = o as NSMutableString // has type NSMutableString?
+    func f(x: AnyObject, y: NSControl) {
+      var view = y as NSView                  // has type 'NSView'
+      var maybeView = x as NSView             // has type NSView?
     }
 
 * The precedence levels of binary operators has been redefined, with a much 
