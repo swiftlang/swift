@@ -55,6 +55,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  bool HasUnknownArgument = false;
+
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
     case OPT_target:
@@ -120,8 +122,14 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     case OPT_INPUT:
       addInputFilename(InputArg->getValue());
       break;
+
+    default:
+      HasUnknownArgument = true;
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     InputArg->getAsString(*ParsedArgs));
+      break;
     }
   }
 
-  return false;
+  return HasUnknownArgument;
 }

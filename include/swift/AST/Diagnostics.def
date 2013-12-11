@@ -1682,6 +1682,8 @@ ERROR(error_clang_importer_create_fail,frontend,none,
 ERROR(error_missing_arg_value,frontend,none,
   "missing argument value for '%0', expected %1 argument(s)",
   (StringRef, unsigned))
+ERROR(error_unknown_arg,frontend,none,
+  "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,frontend,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
 ERROR(error_immediate_mode_missing_stdlib,frontend,none,
