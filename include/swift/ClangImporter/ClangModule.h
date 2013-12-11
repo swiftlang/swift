@@ -64,6 +64,8 @@ public:
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
+
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
                      bool includePrivate) const override;

@@ -680,6 +680,40 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   owner.lookupVisibleDecls(FilterConsumer);
 }
 
+static void getImportDecls(ClangModuleUnit *ClangUnit,
+                           clang::Module *M,
+                           SmallVectorImpl<Decl *> &Results) {
+  SmallVector<clang::Module *, 1> Exported;
+  M->getExportedModules(Exported);
+
+  ASTContext &Ctx = ClangUnit->getASTContext();
+
+  for (auto *ImportedMod : M->Imports) {
+    // FIXME: submodule imports.
+    auto ModuleID = Ctx.getIdentifier(ImportedMod->getTopLevelModuleName());
+    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
+        AccessPath;
+    AccessPath.push_back({ ModuleID, SourceLoc() });
+
+    bool IsExported = false;
+    for (auto *ExportedMod : Exported) {
+      if (ImportedMod == ExportedMod) {
+        IsExported = true;
+        break;
+      }
+    }
+
+    Results.push_back(ImportDecl::create(
+        Ctx, ClangUnit, SourceLoc(), ImportKind::Module, SourceLoc(),
+        IsExported, AccessPath));
+  }
+}
+
+void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  getImportDecls(const_cast<ClangModuleUnit *>(this), clangModule, results);
+  getTopLevelDecls(results);
+}
+
 void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
                                   Identifier name, NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &results) const {
