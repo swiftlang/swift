@@ -654,6 +654,19 @@ public:
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
+  
+  /// True if this is a "script mode" source file that admits top-level code.
+  bool isScriptMode() const {
+    switch (Kind) {
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      return true;
+      
+    case SourceFileKind::Library:
+    case SourceFileKind::SIL:
+      return false;
+    }
+  }
 };
 
 

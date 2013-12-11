@@ -378,8 +378,13 @@ static bool isGlobalLazilyInitialized(VarDecl *var) {
   if (var->hasClangNode())
     return false;
   
-  return !isa<SourceFile>(var->getDeclContext())
-    || cast<SourceFile>(var->getDeclContext())->Kind != SourceFileKind::Main;
+  // Top-level global variables in the main source file and in the REPL are not
+  // lazily initialized.
+  auto sourceFileContext = dyn_cast<SourceFile>(var->getDeclContext());
+  if (!sourceFileContext)
+    return true;
+  
+  return !sourceFileContext->isScriptMode();
 }
 
 static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,

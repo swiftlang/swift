@@ -623,7 +623,18 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
-  // Emit initializers for variables in top-level code.
+  // If we're in a script mode context, emit the pattern binding as top-level
+  // code.
+  if (auto sf = dyn_cast<SourceFile>(pd->getDeclContext())) {
+    if (sf->isScriptMode()) {
+      assert(TopLevelSGF && "no top-level code for script mode?!");
+      if (TopLevelSGF->B.hasValidInsertionPoint())
+        TopLevelSGF->visit(pd);
+      return;
+    }
+  }
+  
+  // Otherwise, emit the initializer for library global variables.
   if (pd->hasInit())
     emitGlobalInitialization(pd);
 }
