@@ -165,6 +165,9 @@ private:
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
 
+  SmallVector<Decl *, 1> ImportDecls;
+  bool ComputedImportDecls = false;
+
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
   /// All adopters of compiler-known protocols in this module.
@@ -294,6 +297,8 @@ public:
   /// Unless \p includePrivate is true, only re-exported modules are included.
   void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,
                           bool includePrivate);
+
+  void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
   /// Reports all visible top-level members in this module.
   void lookupVisibleDecls(Module::AccessPathTy accessPath,

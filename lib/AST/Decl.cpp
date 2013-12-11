@@ -189,6 +189,68 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
   std::uninitialized_copy(Path.begin(), Path.end(), getPathBuffer());
 }
 
+ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
+  switch (VD->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+  case DeclKind::EnumCase:
+    llvm_unreachable("not a ValueDecl");
+
+  case DeclKind::AssociatedType:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::Subscript:
+  case DeclKind::EnumElement:
+    llvm_unreachable("not a top-level ValueDecl");
+
+  case DeclKind::Protocol:
+    return ImportKind::Protocol;
+
+  case DeclKind::Class:
+    return ImportKind::Class;
+  case DeclKind::Enum:
+    return ImportKind::Enum;
+  case DeclKind::Struct:
+    return ImportKind::Struct;
+
+  case DeclKind::TypeAlias: {
+    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
+    return getBestImportKind(underlyingTy->getAnyNominal());
+  }
+
+  case DeclKind::Func:
+    return ImportKind::Func;
+
+  case DeclKind::Var:
+    return ImportKind::Var;
+  }
+}
+
+Optional<ImportKind>
+ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
+  assert(!Decls.empty());
+  ImportKind FirstKind = ImportDecl::getBestImportKind(Decls.front());
+
+  // Only functions can be overloaded.
+  if (Decls.size() == 1)
+    return FirstKind;
+  if (FirstKind != ImportKind::Func)
+    return Nothing;
+
+  for (auto NextDecl : Decls.slice(1)) {
+    if (ImportDecl::getBestImportKind(NextDecl) != FirstKind)
+      return Nothing;
+  }
+
+  return FirstKind;
+}
+
 /// Associates the decls that are conforming, to the protocol decls.
 static void associateConformingValueDecls(ProtocolConformance *Conformance,
                                           ASTContext &Ctx) {

@@ -573,6 +573,56 @@ void ModuleFile::getImportedModules(
   }
 }
 
+void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
+  if (!ComputedImportDecls) {
+    ASTContext &Ctx = getContext();
+    for (auto &Dep : Dependencies) {
+      StringRef ModulePath, ScopePath;
+      llvm::tie(ModulePath, ScopePath) = Dep.RawAccessPath.split('\0');
+
+      auto ModuleID = Ctx.getIdentifier(ModulePath);
+      assert(!ModuleID.empty() &&
+             "invalid module name (submodules not yet supported)");
+
+      if (ModuleID == Ctx.StdlibModuleName)
+        continue;
+
+      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
+          AccessPath;
+      AccessPath.push_back({ ModuleID, SourceLoc() });
+
+      auto Kind = ImportKind::Module;
+      if (!ScopePath.empty()) {
+        auto ScopeID = Ctx.getIdentifier(ScopePath);
+        assert(!ScopeID.empty() &&
+               "invalid decl name (non-top-level decls not supported)");
+        AccessPath.push_back({ ScopeID, SourceLoc() });
+
+        Module *M = Ctx.getModule(AccessPath);
+        if (!M) {
+          // The dependency module could not be loaded.  Just make a guess
+          // about the import kind, we can not do better.
+          Kind = ImportKind::Func;
+        } else {
+          SmallVector<ValueDecl *, 8> Decls;
+          M->lookupQualified(ModuleType::get(M), ScopeID,
+                             NL_QualifiedDefault, nullptr, Decls);
+          Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
+          assert(FoundKind.hasValue() &&
+                 "deserialized imports should not be ambigous");
+          Kind = *FoundKind;
+        }
+      }
+
+      ImportDecls.push_back(ImportDecl::create(
+          Ctx, FileContext, SourceLoc(), Kind, SourceLoc(), Dep.IsExported,
+          AccessPath));
+    }
+    ComputedImportDecls = true;
+  }
+  Results.append(ImportDecls.begin(), ImportDecls.end());
+}
+
 void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
@@ -729,5 +779,6 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
     ShadowedModule->getDisplayDecls(results);
 
   PrettyModuleFileDeserialization stackEntry(*this);
+  getImportDecls(results);
   getTopLevelDecls(results);
 }

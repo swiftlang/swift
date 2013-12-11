@@ -843,6 +843,18 @@ public:
                             SourceLoc KindLoc, bool Exported,
                             ArrayRef<AccessPathElement> Path);
 
+  /// Returns the import kind that is most appropriate for \p VD.
+  ///
+  /// Note that this will never return \c Type; an imported typealias will use
+  /// the more specific kind from its underlying type.
+  static ImportKind getBestImportKind(const ValueDecl *VD);
+
+  /// Returns the most appropriate import kind for the given list of decls.
+  ///
+  /// If the list is non-homogenous, or if there is more than one decl that cannot
+  /// be overloaded, returns Nothing.
+  static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
+
   ArrayRef<AccessPathElement> getFullAccessPath() const {
     return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
   }

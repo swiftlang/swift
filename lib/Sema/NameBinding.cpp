@@ -84,75 +84,6 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   return Context.getModule(modulePath);
 }
 
-/// Gets the import kind that is most appropriate for \p VD.
-///
-/// Note that this will never return \c Type; an imported typealias will use
-/// the more specific kind from its underlying type.
-static ImportKind getBestImportKind(const ValueDecl *VD) {
-  switch (VD->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::EnumCase:
-    llvm_unreachable("not a ValueDecl");
-
-  case DeclKind::AssociatedType:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::Subscript:
-  case DeclKind::EnumElement:
-    llvm_unreachable("not a top-level ValueDecl");
-
-  case DeclKind::Protocol:
-    return ImportKind::Protocol;
-
-  case DeclKind::Class:
-    return ImportKind::Class;
-  case DeclKind::Enum:
-    return ImportKind::Enum;
-  case DeclKind::Struct:
-    return ImportKind::Struct;
-
-  case DeclKind::TypeAlias: {
-    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
-    return getBestImportKind(underlyingTy->getAnyNominal());
-  }
-
-  case DeclKind::Func:
-    return ImportKind::Func;
-
-  case DeclKind::Var:
-    return ImportKind::Var;
-  }
-}
-
-/// Returns the most appropriate import kind for the given list of decls.
-///
-/// If the list is non-homogenous, or if there is more than one decl that cannot
-/// be overloaded, returns Nothing.
-Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> decls) {
-  assert(!decls.empty());
-  ImportKind firstKind = getBestImportKind(decls.front());
-
-  // Only functions can be overloaded.
-  if (decls.size() == 1)
-    return firstKind;
-  if (firstKind != ImportKind::Func)
-    return Nothing;
-
-  for (auto next : decls.slice(1)) {
-    if (getBestImportKind(next) != firstKind)
-      return Nothing;
-  }
-
-  return firstKind;
-}
-
 /// Returns true if a decl with the given \p actual kind can legally be
 /// imported via the given \p expected kind.
 static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
@@ -230,7 +161,7 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
       return result;
     }
 
-    Optional<ImportKind> actualKind = findBestImportKind(decls);
+    Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
     if (!actualKind.hasValue()) {
       // FIXME: print entire module name?
       diagnose(ID, diag::ambiguous_decl_in_module,
