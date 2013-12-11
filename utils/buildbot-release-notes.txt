@@ -1,3 +1,12 @@
+2013-12-18
+----------
+
+* Global variables and static properties are now lazily initialized on first
+  use. Where you would use dispatch_once to lazily initialize a singleton
+  object in Objective-C, you can simply declare a global variable with an
+  initializer in Swift. Like dispatch_once, this lazy initialization is thread
+  safe.
+
 2013-12-11
 ----------
 
