@@ -49,7 +49,9 @@ enum class ImplicitConstructorKind {
 /// Character, string, float, and integer literals are all keyed by value.
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
-  enum class Kind : uint8_t { String, UnicodeScalar, Float, Int, Tombstone, Empty } kind;
+  enum class Kind : uint8_t {
+    String, UnicodeScalar, Float, Int, Tombstone, Empty
+  } kind;
   
   // FIXME: doesn't accommodate >64-bit or signed raw integer or float values.
   union {
@@ -436,9 +438,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
-static ArrayRef<ProtocolDecl *> getInheritedForCycleCheck(TypeChecker &tc,
-                                                          ProtocolDecl *proto,
-                                                          ProtocolDecl **scratch) {
+static ArrayRef<ProtocolDecl *>
+getInheritedForCycleCheck(TypeChecker &tc,
+                          ProtocolDecl *proto,
+                          ProtocolDecl **scratch) {
   return tc.getDirectConformsTo(proto);
 }
 
@@ -1361,7 +1364,8 @@ public:
             lastExplicitValueElt = elt;
           }
           prevValue = elt->getRawValueExpr();
-          assert(prevValue && "continued without setting raw value of enum case");
+          assert(prevValue &&
+                 "continued without setting raw value of enum case");
           
           // Check that the raw value is unique.
           RawValueKey key(elt->getRawValueExpr());
@@ -1560,7 +1564,8 @@ public:
     }
     auto bodyResultType = funcTy;
 
-    // FIXME: it would be nice to have comments explaining what this is all about.
+    // FIXME: it would be nice to have comments explaining what this is all
+    // about.
     GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getArgParamPatterns();

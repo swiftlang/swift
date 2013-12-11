@@ -110,8 +110,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
   // The input is a tuple type:
   TupleTypeElt argTypes[3] = {
     // The first element is Builtin.RawPointer.
-    // FIXME: this should probably be either UnsafePointer<T> or the
-    // first two arguments should be combined into a inout(heap).
+    // FIXME: this should probably be UnsafePointer<T>.
     Context.TheRawPointerType,
 
     // The second element is the owner pointer, Builtin.ObjectPointer.
