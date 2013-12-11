@@ -31,6 +31,10 @@
 
 using namespace swift;
 
+#ifndef SWIFT_MODULES_SDK
+#define SWIFT_MODULES_SDK ""
+#endif
+
 int frontend_main(ArrayRef<const char *>Args,
                   const char *Argv0, void *MainAddr) {
   llvm::InitializeAllTargets();
@@ -49,6 +53,11 @@ int frontend_main(ArrayRef<const char *>Args,
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
+  }
+
+  // TODO: remove once we properly handle no -sdk argument
+  if (Invocation.getSDKPath() == "") {
+    Invocation.setSDKPath(SWIFT_MODULES_SDK);
   }
 
   if (Instance.setup(Invocation)) {
