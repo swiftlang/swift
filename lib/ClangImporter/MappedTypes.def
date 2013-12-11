@@ -15,7 +15,7 @@
 //
 // MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,
 //          SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES,
-//          CAN_BE_MISSING)
+//          CAN_BE_MISSING, CREATE_TYPEALIAS)
 //  - C_TYPE_NAME is the name of the C type.
 //  - C_TYPE_KIND is the expected kind of the C type (see MappedCTypeKind
 //    enum).
@@ -27,13 +27,16 @@
 //    is applicable (see MappedLanguages enum).
 //  - CAN_BE_MISSING is true if it is OK for swift type to be missing in the
 //    stdlib.
+//  - CREATE_TYPEALIAS specifies if we should create a typealias in the
+//    imported Clang module.
 //
 //===----------------------------------------------------------------------===//
 
 #define MAP_STDLIB_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,  \
                         SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING) \
     MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,             \
-             "swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING)
+             "swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING,   \
+             true)
 
 // MacTypes.h defines typedefs UIntXX, SIntXX, FloatXX.
 MAP_STDLIB_TYPE("UInt8",  UnsignedInt, 8,  "UInt8",  All, false)
@@ -62,8 +65,10 @@ MAP_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false)
 MAP_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false)
 
 // Objective-C types.
-MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", ObjC1, false)
-MAP_TYPE("SEL",  ObjCSel,  0, "ObjectiveC", "ObjCSel",  ObjC1, false)
+MAP_TYPE("BOOL",  ObjCBool,  8, "ObjectiveC", "ObjCBool",  ObjC1, false, false)
+MAP_TYPE("SEL",   ObjCSel,   0, "ObjectiveC", "ObjCSel",   ObjC1, false, false)
+MAP_TYPE("id",    ObjCId,    0, "swift",      "AnyObject", ObjC1, false, false)
+MAP_TYPE("Class", ObjCClass, 0, "swift",      "AnyClass",  ObjC1, false, false)
 MAP_STDLIB_TYPE("NSUInteger", UnsignedInt, 64, "Int", ObjC1, false)
 MAP_STDLIB_TYPE("NSInteger",  SignedInt,   64, "Int", ObjC1, false)
 

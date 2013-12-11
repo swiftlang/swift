@@ -97,7 +97,9 @@ enum class MappedCTypeKind {
   FloatIEEEdouble,
   FloatX87DoubleExtended,
   ObjCBool,
-  ObjCSel
+  ObjCSel,
+  ObjCId,
+  ObjCClass,
 };
 
 /// \brief Bitmask constants for language dialects where a certain C to Swift

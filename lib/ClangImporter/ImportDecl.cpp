@@ -63,7 +63,7 @@ static std::pair<Type, StringRef>
 getSwiftStdlibType(const clang::TypedefNameDecl *D,
                    Identifier Name,
                    ClangImporter::Implementation &Impl,
-                   bool *IsError) {
+                   bool *IsError, bool *ShouldCreateTypealias) {
   *IsError = false;
 
   MappedCTypeKind CTypeKind;
@@ -77,7 +77,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   do {
 #define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
                  SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
-                 CAN_BE_MISSING)                                \
+                 CAN_BE_MISSING, CREATE_TYPEALIAS)              \
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
@@ -91,6 +91,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
       Languages = MappedLanguages::LANGUAGES;                      \
       CanBeMissing = CAN_BE_MISSING;                               \
+      *ShouldCreateTypealias = CREATE_TYPEALIAS;                   \
       break;                                                       \
     }
 #include "MappedTypes.def"
@@ -170,6 +171,16 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
                                   clang::BuiltinType::ObjCSel))
         return std::make_pair(Type(), "");
     }
+    break;
+
+  case MappedCTypeKind::ObjCId:
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCIdType()))
+      return std::make_pair(Type(), "");
+    break;
+
+  case MappedCTypeKind::ObjCClass:
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCClassType()))
+      return std::make_pair(Type(), "");
     break;
   }
 
@@ -280,16 +291,17 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      auto DC = Impl.importDeclContextOf(Decl);
-      if (!DC)
-        return nullptr;
+      if (Name.str() == "SEL") {
+        Name.str();
+      }
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
         bool IsError;
         StringRef StdlibTypeName;
+        bool ShouldCreateTypealias;
         std::tie(SwiftType, StdlibTypeName) =
-            getSwiftStdlibType(Decl, Name, Impl, &IsError);
+            getSwiftStdlibType(Decl, Name, Impl, &IsError, &ShouldCreateTypealias);
 
         if (IsError)
           return nullptr;
@@ -298,14 +310,23 @@ namespace {
           // Note that this typedef-name is special.
           Impl.SpecialTypedefNames.insert(Decl);
 
-          if (Name.str() == StdlibTypeName) {
+          if (!ShouldCreateTypealias || Name.str() == StdlibTypeName) {
             // Don't create an extra typealias in the imported module because
             // doing so will cause ambiguity between the name in the imported
             // module and the same name in the 'swift' module.
-            return SwiftType->castTo<StructType>()->getDecl();
+            if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
+              return NAT->getDecl();
+
+            auto *NTD = SwiftType->getAnyNominal();
+            assert(NTD);
+            return NTD;
           }
         }
       }
+
+      auto DC = Impl.importDeclContextOf(Decl);
+      if (!DC)
+        return nullptr;
 
       if (!SwiftType)
         SwiftType = Impl.importType(Decl->getUnderlyingType(),
@@ -2592,7 +2613,8 @@ Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
   if (!result->getDeclContext()->isModuleScopeContext() ||
-      result->getModuleContext() != getSwiftModule()) {
+      (result->getModuleContext() != getSwiftModule() &&
+       result->getModuleContext() != getNamedModule("ObjectiveC"))) {
     assert(!result->getClangDecl() ||
            result->getClangDecl()->getCanonicalDecl() == canon);
     result->setClangNode(decl);
@@ -2626,10 +2648,10 @@ importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
 
 DeclContext *ClangImporter::Implementation::importDeclContextImpl(
     const clang::DeclContext *dc) {
-  // FIXME: Should map to the module we want to import into (?).
-  if (dc->isTranslationUnit())
-    return firstClangModule;
-  
+  // Every declaration should come from a module, so we should not see the
+  // TranslationUnit DeclContext here.
+  assert(!dc->isTranslationUnit());
+
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl)
     return nullptr;
@@ -2652,9 +2674,12 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(const clang::Decl *D) {
   const clang::DeclContext *DC = D->getDeclContext();
-  if (DC->isTranslationUnit())
+  if (DC->isTranslationUnit()) {
     if (auto *M = getClangModuleForDecl(D))
       return M;
+    else
+      return nullptr;
+  }
 
   return importDeclContextImpl(DC);
 }
