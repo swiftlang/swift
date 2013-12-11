@@ -117,6 +117,12 @@ def module_source_list : Separate<["-"], "module-source-list">,
 def module_source_list_EQ : Joined<["-"], "module-source-list=">,
   Flags<[FrontendOption]>, Alias<module_source_list>;
 
+def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
+  HelpText<"Name of the module to build">;
+
+def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
+  Alias<module_name>;
+
 // Linker inputs
 
 def l : JoinedOrSeparate<["-"], "l">, Flags<[FrontendOption]>,

@@ -20,10 +20,4 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
   Flags<[HelpHidden]>,
   HelpText<"Debug the constraint-based type checker">;
 
-def module_name : Separate<["-"], "module-name">,
-  HelpText<"Name of the module to build">;
-
-def module_name_EQ : Joined<["-"], "module-name=">,
-  Alias<module_name>;
-
 } // end let Flags = [FrontendOption, NoDriverOption]
