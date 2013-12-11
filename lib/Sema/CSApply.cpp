@@ -2568,6 +2568,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Tuple-to-scalar conversion.
+  // FIXME: Will go away when tuple labels go away.
+  if (auto fromTuple = fromType->getAs<TupleType>()) {
+    if (fromTuple->getNumElements() == 1 &&
+        !fromTuple->getFields()[0].isVararg() &&
+        !toType->is<TupleType>()) {
+      expr = new (cs.getASTContext()) TupleElementExpr(
+                                        expr,
+                                        expr->getLoc(),
+                                        0,
+                                        expr->getLoc(),
+                                        fromTuple->getElementType(0));
+      expr->setImplicit(true);
+    }
+  }
+
   // Coercions from an lvalue: requalify and load. We perform these coercions
   // first because they are often the first step in a multi-step coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
