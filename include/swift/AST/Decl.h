@@ -3200,7 +3200,7 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
 inline bool GenericParamList::hasSelfArchetype() const {
   if (size() >= 1)
     return isa<ProtocolDecl>(begin()[0].getDecl()->getDeclContext());
-  return nullptr;
+  return false;
 }
   
 } // end namespace swift
