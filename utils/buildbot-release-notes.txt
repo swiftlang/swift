@@ -7,6 +7,12 @@
   initializer in Swift. Like dispatch_once, this lazy initialization is thread
   safe.
 
+  Unlike C++ global variable constructors, Swift global variables and
+  static properties now never emit static constructors (and thereby don't
+  raise B&I flags). Also unlike C++, lazy initialization naturally follows 
+  dependency order, so global variable initializers that cross module
+  boundaries don't have undefined behavior or fragile link order dependencies.
+
 2013-12-11
 ----------
 
