@@ -1427,7 +1427,7 @@ public:
       return;
     if (protocol->isObjC())
       for (auto &mapping : conformance->getWitnesses()) {
-        if (mapping.second)
+        if (mapping.first->isObjC() && mapping.second)
           mapping.second.getDecl()->setIsObjC(true);
       }
     for (auto &inherited : conformance->getInheritedConformances())
