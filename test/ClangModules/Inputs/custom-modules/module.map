@@ -10,3 +10,12 @@ module LinkMusket {
 module script {
   header "script.h"
 }
+
+module ClangModuleUser {
+  header "ClangModuleUser.h"
+  export *
+}
+
+module ClangModuleWithAdapter {
+  link "UnderlyingClangLibrary"
+}

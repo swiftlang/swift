@@ -894,6 +894,15 @@ void ClangModuleUnit::collectLinkLibraries(
     
     callback(LinkLibrary(clangLinkLib.Library, kind));
   }
+
+  // Recurse to find possible adapter modules, but only for public re-exports.
+  // This is consistent with Clang 3.4.
+  getParentModule()->forAllVisibleModules(Nothing,
+                                          [&](Module::ImportedModule import) {
+    for (auto file : import.second->getFiles())
+      if (!isa<ClangModuleUnit>(file))
+        file->collectLinkLibraries(callback);
+  });
 }
 
 StringRef ClangModuleUnit::getFilename() const {
