@@ -189,6 +189,20 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      // The unresolved member itself is the function.
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        if (unresolvedMember->getArgument()) {
+          // No additional target locator information.
+          targetAnchor = nullptr;
+          targetPath.clear();
+
+          anchor = unresolvedMember;
+          path = path.slice(1);
+        }
+        continue;
+      }
+
       break;
 
     case ConstraintLocator::Load:
@@ -331,11 +345,21 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     decl = mre->getMember().getDecl();
   } else if (isa<OverloadedDeclRefExpr>(anchor) ||
              isa<OverloadedMemberRefExpr>(anchor) ||
-             isa<UnresolvedDeclRefExpr>(anchor) ||
-             isa<UnresolvedMemberExpr>(anchor)) {
+             isa<UnresolvedDeclRefExpr>(anchor)) {
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor, { });
     if (auto choice = findOvlChoice(anchorLocator)) {
+      // FIXME: DeclViaDynamic
+      if (choice->getKind() == OverloadChoiceKind::Decl)
+        decl = choice->getDecl();
+    }
+  } else if (isa<UnresolvedMemberExpr>(anchor)) {
+    // Unresolved member: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(
+                           anchor,
+                           ConstraintLocator::UnresolvedMember);
+    if (auto choice = findOvlChoice(anchorLocator)) {
+      // FIXME: DeclViaDynamic
       if (choice->getKind() == OverloadChoiceKind::Decl)
         decl = choice->getDecl();
     }
