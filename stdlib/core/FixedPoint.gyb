@@ -276,12 +276,3 @@ func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
 }
 @ end
 @ end  # for bits in allInts
-
-// FIXME: rdar://14897572
-// hack to make non-x86 architectures build at a reasonable speed
-struct Hack14897572 { }
-extension UInt32 {
-  init(_: Hack14897572) {
-    value = UInt32(0).value
-  }
-}
