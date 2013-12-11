@@ -206,7 +206,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // first walk through the loop and initialize it to "true".
   VarDecl *firstVar = nullptr;
   if (boolTy && trueDecl && falseDecl) {
-    firstVar = new (context) VarDecl(/*static*/ false,
+    firstVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
                                      Loc,
                                      context.getIdentifier("first"),
                                      boolTy, DC);
@@ -226,7 +226,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
   // Create the "value" variable and its pattern.
   auto valueId = context.getIdentifier("value");
-  VarDecl *valueVar = new (context) VarDecl(/*static*/ false,
+  VarDecl *valueVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
                                             Loc, valueId, ValueTy, DC);
   Pattern *valuePattern = new (context) NamedPattern(valueVar);
   valuePattern->setType(ValueTy);
@@ -242,7 +242,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     // Form the key variable and its pattern.
     auto keyId = context.getIdentifier("key");
-    keyVar = new (context) VarDecl(/*static*/ false,
+    keyVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
                                    Loc, keyId, KeyTy, DC);
     Pattern *keyPattern = new (context) NamedPattern(keyVar);
     keyPattern->setType(KeyTy);
@@ -523,7 +523,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
     PrintDecls.push_back(Result.getValueDecl());
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (C) VarDecl(/*static*/ false,
+  VarDecl *Arg = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
                                  Loc,
                                  TC->Context.getIdentifier("arg"),
                                  E->getType(), nullptr);
@@ -610,7 +610,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
+  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                           E->getStartLoc(), name,
                                           E->getType(), &SF);
   SF.Decls.push_back(vd);
@@ -671,7 +671,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false,
+  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                           PBD->getStartLoc(), name,
                                           PBD->getPattern()->getType(), &SF);
   SF.Decls.push_back(vd);

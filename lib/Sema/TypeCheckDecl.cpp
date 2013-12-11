@@ -2333,10 +2333,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       auto varType = tc.getTypeOfRValue(var);
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(/*static*/ false,
-                                        Loc,
-                                        var->getName(),
-                                        varType, decl);
+      auto *arg = new (context) VarDecl(/*static*/false, /*IsLet*/true,
+                                        Loc, var->getName(), varType, decl);
       allArgs.push_back(arg);
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
@@ -2348,7 +2346,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   auto constructorID = context.getIdentifier("init");
   VarDecl *selfDecl
-    = new (context) VarDecl(/*static*/ false,
+    = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
                             Loc, context.SelfIdentifier, Type(), decl);
   selfDecl->setImplicit();
   ConstructorDecl *ctor
@@ -2447,8 +2445,9 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (FoundDestructor)
     return;
 
-  VarDecl *SelfDecl = new (Context)
-    VarDecl(/*static*/ false, SourceLoc(), Context.SelfIdentifier, Type(), CD);
+  VarDecl *SelfDecl =
+    new (Context) VarDecl(/*static*/ false, /*IsLet*/true, SourceLoc(),
+                          Context.SelfIdentifier, Type(), CD);
   SelfDecl->setImplicit();
 
   DestructorDecl *DD =

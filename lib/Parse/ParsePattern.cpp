@@ -468,7 +468,7 @@ bool Parser::isStartOfBindingName(Token tok) {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc,
                                           Identifier name) {
-  VarDecl *var = new (Context) VarDecl(/*static*/ false,
+  VarDecl *var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                        loc, name, Type(), CurDeclContext);
   return new (Context) NamedPattern(var);
 }

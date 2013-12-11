@@ -1256,6 +1256,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     {
       VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
+                                             /*IsLet*/false,
                                              SetNameLoc, SetName,
                                              Type(), CurDeclContext);
       if (IsNameImplicit)
@@ -1540,6 +1541,7 @@ static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
 Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
   VarDecl *D
     = new (Context) VarDecl(/*static*/ false,
+                            /*IsLet*/ false,
                             Loc, Context.SelfIdentifier,
                             Type(), CurDeclContext);
   D->setImplicit();
@@ -2458,7 +2460,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
   }
 
   VarDecl *SelfDecl
-    = new (Context) VarDecl(/*static*/ false,
+    = new (Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                             SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
   SelfDecl->setImplicit();
@@ -2576,7 +2578,7 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   }
 
   VarDecl *SelfDecl
-    = new (Context) VarDecl(/*static*/ false,
+    = new (Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                             SourceLoc(), Context.SelfIdentifier,
                             Type(), CurDeclContext);
   SelfDecl->setImplicit();

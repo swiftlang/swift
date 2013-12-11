@@ -425,7 +425,7 @@ createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
                     DeclContext* DeclCtx) {
   // FIXME: these uses of getSwiftType() are extremely suspect.
   if (DeclCtx) {
-    VarDecl VD(/*static*/ false,
+    VarDecl VD(/*static*/ false, /*IsLet*/ false,
                SourceLoc(), Identifier::getEmptyKey(),
                type.getSwiftType(), DeclCtx);
     DebugTypeInfo DTy(&VD, IGM.getTypeInfo(type));
@@ -857,7 +857,7 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   for (auto ElemTy : TupleTy->getElementTypes()) {
     // Wrap the type in a fake VarDecl so we cann pass the DeclContext
     // to the Mangler.
-    VarDecl VD(/*static*/ false, SourceLoc(),
+    VarDecl VD(/*static*/ false, /*IsLet*/ false, SourceLoc(),
                Identifier::getEmptyKey(), ElemTy, DeclContext);
     DebugTypeInfo DTI(&VD, IGM.getTypeInfoForUnlowered(ElemTy));
     Elements.push_back(createMemberType(DTI, StringRef(), OffsetInBits,
@@ -967,7 +967,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                       llvm::DIDescriptor Scope)
 {
   if (auto Decl = DbgTy.getDecl()) {
-    VarDecl VD(/*static*/ false, SourceLoc(),
+    VarDecl VD(/*static*/ false, /*IsLet*/ false, SourceLoc(),
                Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
     return getOrCreateType(DebugTypeInfo(&VD, DbgTy.size, DbgTy.align), Scope);
   }
@@ -1362,7 +1362,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto File = getOrCreateFile(L.Filename);
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
-      VarDecl VD(/*static*/ false,
+      VarDecl VD(/*static*/ false, /*IsLet*/ false,
                  SourceLoc(), Identifier::getEmptyKey(), AliasedTy,
                  Decl->getDeclContext());
       DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);

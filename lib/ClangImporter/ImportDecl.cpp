@@ -360,7 +360,7 @@ namespace {
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetaType = MetaTypeType::get(selfType, context);
       auto selfName = context.SelfIdentifier;
-      auto selfDecl = new (context) VarDecl(/*static*/ false,
+      auto selfDecl = new (context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                             SourceLoc(), selfName, selfType,
                                             structDecl);
 
@@ -374,7 +374,7 @@ namespace {
           if (var->isComputed())
             continue;
           
-          auto param = new (context) VarDecl(/*static*/ false,
+          auto param = new (context) VarDecl(/*static*/ false, /*IsLet*/ true,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
           params.push_back(param);
@@ -589,6 +589,7 @@ namespace {
         // Create a variable to store the underlying value.
         auto varName = Impl.SwiftContext.getIdentifier("value");
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                   /*IsLet*/ false,
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
@@ -666,6 +667,7 @@ namespace {
         // Create a field to store the underlying value.
         auto varName = Impl.SwiftContext.getIdentifier("value");
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                   /*IsLet*/ false,
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
@@ -977,7 +979,7 @@ namespace {
 
       // Map this indirect field to a Swift variable.
       return new (Impl.SwiftContext)
-               VarDecl(/*static*/ false,
+               VarDecl(/*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
     }
@@ -1048,8 +1050,8 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto result = new (Impl.SwiftContext)
-                      VarDecl(/*static*/ false,
+      auto result =
+        new (Impl.SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
@@ -1090,8 +1092,10 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // FIXME: Should 'const' vardecl's be imported as 'let' decls?
       return new (Impl.SwiftContext)
                VarDecl(/*static*/ false,
+                       /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
     }
@@ -1162,6 +1166,7 @@ namespace {
         selfTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                     /*IsLet*/ true,
                                                      SourceLoc(), selfName,
                                                      selfTy,
                                                      Impl.firstClangModule);
@@ -1438,6 +1443,7 @@ namespace {
       auto selfMetaTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                         /*IsLet*/ true,
                                                          SourceLoc(), selfName,
                                                          selfMetaTy,
                                                          Impl.firstClangModule);
@@ -1476,6 +1482,7 @@ namespace {
       Type initType = FunctionType::get(selfTy, type, Impl.SwiftContext);
 
       VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                         /*IsLet*/ true,
                                                          SourceLoc(),
                                                          selfName, selfTy, dc);
       selfVar->isImplicit();
@@ -1528,6 +1535,7 @@ namespace {
                                       SmallVectorImpl<Pattern *> &args) {
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                     /*IsLet*/ true,
                                                      SourceLoc(), selfName,
                                                      selfTy,
                                                      Impl.firstClangModule);
@@ -2449,7 +2457,7 @@ namespace {
         return nullptr;
       
       auto result = new (Impl.SwiftContext)
-      VarDecl(/*static*/ false,
+      VarDecl(/*static*/ false, /*IsLet*/ false,
               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
@@ -2688,7 +2696,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               bool isStatic) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(isStatic,
+  auto var = new (context) VarDecl(isStatic, /*IsLet*/ false,
                                    SourceLoc(), name, type, dc);
 
   // Form the argument patterns.

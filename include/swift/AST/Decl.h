@@ -152,8 +152,12 @@ class alignas(8) Decl {
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     unsigned Static : 1;
+    
+    /// \brief Whether this is a 'let' property, which can only be initialized
+    /// in its declaration, and never assigned to, making it immutable.
+    unsigned IsLet : 1;
   };
-  enum { NumVarDeclBits = NumValueDeclBits + 1 };
+  enum { NumVarDeclBits = NumValueDeclBits + 2 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class AbstractFunctionDeclBitfields {
@@ -2057,7 +2061,7 @@ public:
   }
 };
 
-/// VarDecl - 'var' declaration.
+/// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public ValueDecl {
 private:
   struct GetSetRecord {
@@ -2073,11 +2077,11 @@ private:
   VarDecl *OverriddenDecl = nullptr;
 
 public:
-  VarDecl(bool IsStatic,
-          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, NameLoc)
-  {
+  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
+          Type Ty, DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, NameLoc) {
     VarDeclBits.Static = IsStatic;
+    VarDeclBits.IsLet = IsLet;
     setType(Ty);
   }
 
@@ -2116,7 +2120,12 @@ public:
 
   /// \brief Returns whether the var is settable, either because it is a
   /// stored var or because it has a custom setter.
-  bool isSettable() const { return !GetSet || GetSet->Set; }
+  bool isSettable() const {
+    // 'let' properties are always immutable.
+    if (isLet()) return false;
+    
+    return !GetSet || GetSet->Set;
+  }
   
   VarDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -2146,6 +2155,10 @@ public:
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.Static; }
   void setStatic(bool IsStatic) { VarDeclBits.Static = IsStatic; }
+
+  /// Is this an immutable 'let' property?
+  bool isLet() const { return VarDeclBits.IsLet; }
+  void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }

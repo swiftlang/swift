@@ -1149,6 +1149,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     do {
       if (Tok.is(tok::identifier)) {
         auto var = new (Context) VarDecl(/*static*/ false,
+                                         /*IsLet*/ true,
                                          Tok.getLoc(),
                                          Context.getIdentifier(Tok.getText()),
                                          Type(), nullptr);
@@ -1359,6 +1360,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = Loc;
     VarDecl *var = new (Context) VarDecl(/*static*/ false,
+                                         /*IsLet*/ true,
                                          varLoc, ident, Type(), closure);
     decls.push_back(var);
   }

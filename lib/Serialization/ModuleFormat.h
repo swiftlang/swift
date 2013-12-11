@@ -586,6 +586,7 @@ namespace decls_block {
     BCFixed<1>,   // IBOutlet?
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
+    BCFixed<1>,   // isLet?
     TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter

@@ -616,7 +616,7 @@ Type ClangImporter::Implementation::importFunctionType(
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
       auto bodyVar
-        = new (SwiftContext) VarDecl(/*static*/ false,
+        = new (SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
                                      importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, firstClangModule);
       bodyVar->setClangNode(param);
@@ -638,6 +638,7 @@ Type ClangImporter::Implementation::importFunctionType(
                                                    /*Implicit=*/true);
       } else {
         auto argVar = new (SwiftContext) VarDecl(/*static*/ false,
+                                                 /*IsLet*/ false,
                                                  SourceLoc(), name,
                                                  swiftParamTy,
                                                  firstClangModule);
@@ -677,6 +678,7 @@ Type ClangImporter::Implementation::importFunctionType(
       auto name = SwiftContext.getIdentifier(paramName);
       auto type = TupleType::getEmpty(SwiftContext);
       auto var = new (SwiftContext) VarDecl(/*static*/ false,
+                                            /*IsLet*/ true,
                                             SourceLoc(), name, type,
                                             firstClangModule);
       Pattern *pattern = new (SwiftContext) NamedPattern(var);

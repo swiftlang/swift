@@ -388,6 +388,8 @@ namespace {
       printCommon(VD, "var_decl");
       if (VD->isStatic())
         OS << " static";
+      if (VD->isLet())
+        OS << " let";
       
       if (VD->isComputed()) {
         if (FuncDecl *Get = VD->getGetter()) {

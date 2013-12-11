@@ -104,7 +104,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   Type rawType = enumDecl->getRawType();
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
@@ -179,7 +179,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   Type rawType = enumDecl->getRawType();
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
@@ -190,7 +190,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
   selfParam->setImplicit();
   
-  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false,
+  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                      SourceLoc(),
                                      C.getIdentifier("raw"),
                                      Type(),
