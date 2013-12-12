@@ -52,7 +52,6 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::at_sign:
   case tok::kw_static:
   case tok::kw_extension:
-  case tok::kw_let:
   case tok::kw_var:
   case tok::kw_typealias:
   case tok::kw_enum:
@@ -660,8 +659,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     LPLoc = consumeToken();
     LPLocConsumed = true;
   }
-  // Parse the first part, either a var, let, expr, or stmt-assign.
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
+  // Parse the first part, either a var, expr, or stmt-assign.
+  if (Tok.is(tok::kw_var) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls,

@@ -29,6 +29,7 @@ using namespace swift;
 ///     '(' selector-element ')' (identifier '(' selector-element ')')+
 ///   selector-element:
 ///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
+
 static ParserStatus
 parseCurriedFunctionArguments(Parser &P,
                               SmallVectorImpl<Pattern *> &argPat,
@@ -37,7 +38,7 @@ parseCurriedFunctionArguments(Parser &P,
   // Parse additional curried argument clauses as long as we can.
   while (P.Tok.is(tok::l_paren)) {
     ParserResult<Pattern> pattern = P.parsePatternTuple(/*DefArgs=*/nullptr,
-                                                        /*IsLet*/true);
+                                                        /*IsLet*/false);
     if (pattern.isNull() || pattern.hasCodeCompletion())
       return pattern;
 
@@ -136,7 +137,7 @@ parseSelectorArgument(Parser &P,
                       llvm::StringMap<VarDecl *> &selectorNames,
                       Parser::DefaultArgumentInfo &defaultArgs,
                       SourceLoc &rp) {
-  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(true);
+  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(false);
   assert(ArgPatternRes.isNonNull() &&
          "selector argument did not start with an identifier!");
   Pattern *ArgPattern = ArgPatternRes.get();
@@ -170,7 +171,7 @@ parseSelectorArgument(Parser &P,
     return makeParserError();
   }
 
-  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom(true);
+  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom(false);
   if (BodyPatternRes.isNull()) {
     recoverFromBadSelectorArgument(P);
     return makeParserError();
@@ -322,7 +323,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                bool &HasSelectorStyleSignature) {
   // Parse the first function argument clause.
   ParserResult<Pattern> FirstPattern = parsePatternTuple(&DefaultArgs,
-                                                         /*IsLet*/true);
+                                                         /*IsLet*/ false);
   if (FirstPattern.isNull()) {
     // Recover by creating a '()' pattern.
     auto EmptyTuplePattern =
@@ -414,7 +415,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
     ParserResult<Pattern> Params = parsePatternTuple(&DefaultArgs,
-                                                     /*IsLet*/ true);
+                                                     /*IsLet*/ false);
 
     // If we failed to parse the pattern, create an empty tuple to recover.
     if (Params.isNull()) {
@@ -681,13 +682,14 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
-  if (Tok.is(tok::kw_var))
+  if (Tok.is(tok::kw_var)) {
     return parseMatchingPatternVar();
-
+  }
   // matching-pattern ::= 'is' type
-  if (Tok.is(tok::kw_is))
+  if (Tok.is(tok::kw_is)) {
     return parseMatchingPatternIsa();
-
+  }
+  
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.

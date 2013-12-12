@@ -154,8 +154,6 @@ ERROR(expected_identifier_after_case_comma,decl_parsing,none,
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
-ERROR(let_requires_initializer,decl_parsing,none,
-      "'let' declarations require an initializer expression", ())
 ERROR(disallowed_stored_var_decl,decl_parsing,none,
       "'var' declarations without getter/setter not allowed here", ())
 ERROR(disallowed_computed_var_decl,decl_parsing,none,

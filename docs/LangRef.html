@@ -611,7 +611,6 @@
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
-    decl ::= <a href="#decl-let">decl-let</a>
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-subscript">decl-subscript</a>
  </pre>
@@ -742,33 +741,7 @@
 
   <p>FIXME: Write this section.</p>
   
-  <!-- ===================================================================== -->
-  <h3 id="decl-let">let Declarations</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    decl-let    ::= <a href="#attribute-list">attribute-list</a> 'let' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
-    initializer ::= '=' <a href="#expr">expr</a>
-  </pre>
-
-
-  <p>'let' declarations define an immutable binding between an initializer value
-  and a name.</p>
-
-<p>Here are some examples of 'let' declarations:</p>
-
-<pre class="example">
-  <i>// Simple examples.</i>
-  let a = 4
-  let c : Int = 42
-
-  <i>// This decodes the tuple return value into independently named parts</i>
-  <i>// and both 'val' and 'err' are in scope after this line.</i>
-  let (val, err) = foo()
-
-  let b : Int        <i>// error: let requires an initializer</i>
-</pre>
-
+  
   <!-- ===================================================================== -->
   <h3 id="decl-var">var Declarations</h3>
   <!-- ===================================================================== -->
@@ -779,6 +752,8 @@
     decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
 
     decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
+  
+   initializer     ::= '=' <a href="#expr">expr</a>
 
     <a name="get-set"></a>get-set         ::= get set?
     get-set         ::= set get
