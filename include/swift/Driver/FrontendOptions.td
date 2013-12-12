@@ -25,6 +25,10 @@ def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
 def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
   Flags<[HelpHidden]>, Alias<debug_constraints_attempt>;
 
+def emit_sil_protocol_witness_tables :
+  Flag<["-"], "emit-sil-protocol-witness-tables">, Flags<[HelpHidden]>,
+  HelpText<"Emit experimental SIL protocol witness tables">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   Flags<[HelpHidden]>, HelpText<"Emit locations during SIL emission">;
 
