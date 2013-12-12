@@ -766,7 +766,16 @@
   <i>// and both 'val' and 'err' are in scope after this line.</i>
   let (val, err) = foo()
 
+  // let declarations require an initializer (though the type is optional).
   let b : Int        <i>// error: let requires an initializer</i>
+
+  // Let bindings of classes make the binding immutable, not the object.
+  class Rocket {
+    func blastOff() { ... }
+  }
+  let rocket = Rocket()
+  rocket.blastOff()      // okay
+  rocket = Rocket()   <i>// error, cannot change a let binding</i>
 </pre>
 
   <!-- ===================================================================== -->
