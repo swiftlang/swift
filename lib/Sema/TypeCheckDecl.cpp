@@ -1696,7 +1696,10 @@ public:
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type selfType = FD->computeSelfType(&outerGenericParams)) {
-      FD->getImplicitSelfDecl()->setType(selfType);
+      auto SelfDecl = FD->getImplicitSelfDecl();
+      SelfDecl->setType(selfType);
+      if (!selfType->hasReferenceSemantics())
+        SelfDecl->setLet(false);
 
       TypedPattern *selfPattern =
           cast<TypedPattern>(FD->getArgParamPatterns()[0]);
@@ -1943,7 +1946,10 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
-    CD->getImplicitSelfDecl()->setType(SelfTy);
+    auto SelfDecl = CD->getImplicitSelfDecl();
+    SelfDecl->setType(SelfTy);
+    if (!SelfTy->hasReferenceSemantics())
+      SelfDecl->setLet(false);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2077,7 +2083,10 @@ public:
                                TC.Context);
 
     DD->setType(FnTy);
-    DD->getImplicitSelfDecl()->setType(SelfTy);
+    auto SelfDecl = DD->getImplicitSelfDecl();
+    SelfDecl->setType(SelfTy);
+    if (SelfTy->is<LValueType>())
+      SelfDecl->setLet(false);
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.

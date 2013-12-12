@@ -1293,7 +1293,7 @@ namespace {
     
     // A map used to track partial applications of value type methods to
     // require that they be fully applied. Partial applications of value types
-    // would capture 'self' as an [inout] and hide any mutation of 'self',
+    // would capture 'self' as an @inout and hide any mutation of 'self',
     // which is surprising.
     llvm::DenseMap<Expr*, ValueTypeMemberApplication>
       ValueTypeMemberApplications;
