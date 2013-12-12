@@ -696,6 +696,14 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
     }
 
+    // Make sure we aren't trying to equate type variables with different
+    // lvalue-binding rules.
+    if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
+      if (typeVar->getImpl().canBindToLValue() !=
+            otherTypeVar->getImpl().canBindToLValue())
+        continue;
+    }
+
     if (exactTypes.insert(type->getCanonicalType()))
       result.Bindings.push_back({type, kind, Nothing});
   }
