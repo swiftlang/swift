@@ -102,6 +102,7 @@ namespace {
     void printAttributes(const DeclAttributes &attrs);
     void printTypedPattern(const TypedPattern *TP,
                            bool StripOuterSliceType = false);
+
 public:
     void printPattern(const Pattern *pattern);
 
@@ -588,7 +589,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   OS << decl->getName().str();
   if (decl->hasType()) {
     OS << ": ";
-    decl->getType().print(OS);   
+    decl->getType().print(OS, Options);
   }
 
   if (decl->isComputed() && Options.FunctionDefinitions) {
@@ -716,7 +717,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     Type ResultTy = decl->getResultType();
     if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
       OS << " -> ";
-      ResultTy->print(OS);
+      ResultTy->print(OS, Options);
     }
     
     if (!Options.FunctionDefinitions || !decl->getBody()) {
@@ -1117,6 +1118,39 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     PrintAST(OS, Options, nullptr).printGenericParams(Params);
   }
 
+  bool shouldPrintFullyQualified(TypeBase *T) {
+    if (Options.FullyQualifiedTypes)
+      return true;
+
+    if (!Options.FullyQualifiedTypesIfAmbiguous)
+      return false;
+
+    Decl *D = nullptr;
+    if (auto *NAT = dyn_cast<NameAliasType>(T))
+      D = NAT->getDecl();
+    else
+      D = T->getAnyNominal();
+
+    // If we can not find the declaration, be extra careful and print
+    // the type qualified.
+    if (!D)
+      return true;
+
+    Module *M = D->getDeclContext()->getParentModule();
+
+    // Don't print qualifiers for types from the standard library.
+    if (M == T->getASTContext().getStdlibModule())
+      return false;
+
+    // Don't print qualifiers for imported types.
+    for (auto File : M->getFiles()) {
+      if (File->getKind() == FileUnitKind::ClangModule)
+        return false;
+    }
+
+    return true;
+  }
+
 public:
   TypePrinter(raw_ostream &OS, const PrintOptions &PO)
       : OS(OS), Options(PO) {}
@@ -1176,7 +1210,7 @@ public:
   }
 
   void visitNameAliasType(NameAliasType *T) {
-    if (Options.FullyQualifiedTypes) {
+    if (shouldPrintFullyQualified(T)) {
       if (auto ParentDC = T->getDecl()->getDeclContext()) {
         printDeclContext(ParentDC);
         OS << '.';
@@ -1216,7 +1250,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.FullyQualifiedTypes) {
+    } else if (shouldPrintFullyQualified(T)) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
     OS << T->getDecl()->getName().get();
@@ -1240,7 +1274,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.FullyQualifiedTypes) {
+    } else if (shouldPrintFullyQualified(T)) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1252,7 +1286,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.FullyQualifiedTypes) {
+    } else if (shouldPrintFullyQualified(T)) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1263,7 +1297,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.FullyQualifiedTypes) {
+    } else if (shouldPrintFullyQualified(T)) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1274,7 +1308,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.FullyQualifiedTypes) {
+    } else if (shouldPrintFullyQualified(T)) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 

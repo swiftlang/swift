@@ -688,7 +688,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit,
         AccessPath;
     auto *TmpMod = ImportedMod;
     while (TmpMod) {
-      AccessPath.push_back({Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
+      AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
       TmpMod = TmpMod->Parent;
     }
     std::reverse(AccessPath.begin(), AccessPath.end());

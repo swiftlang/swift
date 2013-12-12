@@ -41,6 +41,10 @@ namespace swift {
     /// \brief Whether to print fully qualified Types.
     bool FullyQualifiedTypes = false;
 
+    /// \brief Print fully qualified types if our heuristics say that a certain
+    /// type might be ambiguous.
+    bool FullyQualifiedTypesIfAmbiguous = false;
+
     /// \brief Print swift.Slice and swift.Optional with sugared syntax
     /// ([] and ?), even if there are no sugar type nodes.
     bool SynthesizeSugarOnTypes = false;
