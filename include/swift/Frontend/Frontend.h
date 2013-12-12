@@ -27,6 +27,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
@@ -45,17 +46,16 @@ class SerializedModuleLoader;
 
 class CompilerInvocation {
   std::string TargetTriple;
-  std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
   std::string ModuleSourceListPath;
-  std::vector<std::string> ExtraClangArgs;
 
   LangOptions LangOpts;
   FrontendOptions FrontendOpts;
+  ClangImporterOptions ClangImporterOpts;
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
@@ -90,11 +90,11 @@ public:
   }
 
   void setClangModuleCachePath(StringRef Path) {
-    ClangModuleCachePath = Path.str();
+    ClangImporterOpts.ModuleCachePath = Path.str();
   }
 
   StringRef getClangModuleCachePath() const {
-    return ClangModuleCachePath;
+    return ClangImporterOpts.ModuleCachePath;
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
@@ -114,11 +114,11 @@ public:
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
-    ExtraClangArgs = Args;
+    ClangImporterOpts.ExtraArgs = Args;
   }
 
   ArrayRef<std::string> getExtraClangArgs() const {
-    return ExtraClangArgs;
+    return ClangImporterOpts.ExtraArgs;
   }
 
   void addLinkLibrary(StringRef name, LibraryKind kind) {

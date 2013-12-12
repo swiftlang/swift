@@ -90,6 +90,22 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
+                                   DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
+    Opts.ModuleCachePath = A->getValue();
+  }
+
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
+                                 Args.filtered_end())) {
+    Opts.ExtraArgs.push_back(A->getValue());
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -128,6 +144,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  if (ParseClangImporterArgs(ClangImporterOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
     case OPT_target:
@@ -146,20 +166,12 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       setSDKPath(InputArg->getValue());
       break;
 
-    case OPT_module_cache_path:
-      setClangModuleCachePath(InputArg->getValue());
-      break;
-
     case OPT_parse_as_library:
       setInputKind(SourceFileKind::Library);
       break;
 
     case OPT_parse_stdlib:
       setParseStdlib();
-      break;
-
-    case OPT_Xcc:
-      ExtraClangArgs.push_back(InputArg->getValue());
       break;
 
     case OPT_l:
