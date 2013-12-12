@@ -34,6 +34,7 @@
 #include "clang/Basic/Version.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
+#include <algorithm>
 #include <memory>
 
 using namespace swift;
@@ -689,11 +690,14 @@ static void getImportDecls(ClangModuleUnit *ClangUnit,
   ASTContext &Ctx = ClangUnit->getASTContext();
 
   for (auto *ImportedMod : M->Imports) {
-    // FIXME: submodule imports.
-    auto ModuleID = Ctx.getIdentifier(ImportedMod->getTopLevelModuleName());
-    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
+    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4>
         AccessPath;
-    AccessPath.push_back({ ModuleID, SourceLoc() });
+    auto *TmpMod = ImportedMod;
+    while (TmpMod) {
+      AccessPath.push_back({Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
+      TmpMod = TmpMod->Parent;
+    }
+    std::reverse(AccessPath.begin(), AccessPath.end());
 
     bool IsExported = false;
     for (auto *ExportedMod : Exported) {
