@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+namespace swift {
+
 /// Options for controlling the behavior of the Clang importer.
 class ClangImporterOptions {
 public:
@@ -25,5 +27,7 @@ public:
   /// Extra arguments which should be passed to the Clang importer.
   std::vector<std::string> ExtraArgs;
 };
+
+} // end namespace swift
 
 #endif
