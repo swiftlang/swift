@@ -75,6 +75,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugConstraintSolver = true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
+    unsigned attempt;
+    if (StringRef(A->getValue()).getAsInteger(0, attempt)) {
+      Opts.DebugConstraintSolverAttempt = attempt;
+    }
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getValue(), A->getAsString(Args));
+      return true;
+    }
+  }
+
   return false;
 }
 
