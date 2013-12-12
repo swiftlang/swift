@@ -32,16 +32,17 @@ class TypeSubCloner : public SILCloner<TypeSubCloner> {
 public:
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
-  static SILFunction *cloneFunction(SILFunction *F, TypeSubstitutionMap &Subs) {
+  static SILFunction *cloneFunction(SILFunction *F, TypeSubstitutionMap &Subs,
+                                    unsigned &Counter) {
     // Clone and specialize the function.
-    TypeSubCloner TSC(F, Subs);
+    TypeSubCloner TSC(F, Subs, Counter);
     TSC.populateCloned();
     return TSC.getCloned();
   }
 
 private:
-  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst)
-      : SILCloner(*initCloned(F, Subst)),
+  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, unsigned &Counter)
+      : SILCloner(*initCloned(F, Subst, Counter)),
         SwiftMod(F->getModule().getSwiftModule()), SubsMap(Subst), OrigFunc(F) {
   }
 
@@ -75,13 +76,12 @@ private:
 
   /// Create a new empty function with the correct arguments and a unique name.
   static SILFunction *initCloned(SILFunction *Orig,
-                                 TypeSubstitutionMap &Subst) {
+                                 TypeSubstitutionMap &Subst,
+                                 unsigned &Counter) {
     SILModule &M = Orig->getModule();
     Module *SM = M.getSwiftModule();
 
-    // Suffix the function name with "_specX", where X is the first integer
-    // that does not result in a conflict.
-    unsigned Counter = 0;
+    // Suffix the function name with "_specX", where X is a running counter.
     std::string ClonedName;
     do {
       ClonedName.clear();
@@ -322,6 +322,9 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
   SmallVector<AIList, 4> Buckets;
 
+  /// A running counter that we use to name functions.
+  unsigned Counter = 0;
+
   // Sort the incoming ApplyInst instructions into multiple buckets of AI with
   // exactly the same substitution lists.
   for (auto &AI : List) {
@@ -361,7 +364,7 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       continue;
 
     // Create a new function.
-    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs);
+    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, Counter);
 
     // Replace all of the AI functions with the new function.
     for (auto &AI : Bucket)
