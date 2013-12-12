@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/Stmt.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
@@ -94,6 +95,22 @@ Expr *Expr::getValueProvidingExpr() {
   // TODO:
   //   - tuple literal projection, which may become interestingly idiomatic
   return getSemanticsProvidingExpr();
+}
+
+Initializer *Expr::findExistingInitializerContext() {
+  struct FindExistingInitializer : ASTWalker {
+    Initializer *TheInitializer = nullptr;
+    std::pair<bool,Expr*> walkToExprPre(Expr *E) override {
+      assert(!TheInitializer && "continuing to walk after finding context?");
+      if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
+        TheInitializer = cast<Initializer>(closure->getParent());
+        return { false, nullptr };
+      }
+      return { true, E };
+    }
+  } finder;
+  walk(finder);
+  return finder.TheInitializer;
 }
 
 //===----------------------------------------------------------------------===//

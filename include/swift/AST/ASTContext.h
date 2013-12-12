@@ -51,9 +51,13 @@ namespace swift {
   class BoundGenericType;
   class ClangNode;
   class Decl;
+  class DeclContext;
+  class DefaultArgumentInitializer;
   class ExtensionDecl;
   class FuncDecl;
   class LazyResolver;
+  class PatternBindingDecl;
+  class PatternBindingInitializer;
   class SourceLoc;
   class Type;
   class TupleType;
@@ -362,6 +366,21 @@ public:
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
+
+  /// Create a context for the initializer of a non-local variable,
+  /// like a global or a field.  To reduce memory usage, if the
+  /// context goes unused, it should be returned to the ASTContext
+  /// with destroyPatternBindingContext.
+  PatternBindingInitializer *createPatternBindingContext(PatternBindingDecl *D);
+  void destroyPatternBindingContext(PatternBindingInitializer *DC);
+
+  /// Create a context for the initializer of the nth default argument
+  /// of the given function.  To reduce memory usage, if the context
+  /// goes unused, it should be returned to the ASTContext with
+  /// destroyDefaultArgumentContext.
+  DefaultArgumentInitializer *createDefaultArgumentContext(DeclContext *fn,
+                                                           unsigned index);
+  void destroyDefaultArgumentContext(DefaultArgumentInitializer *DC);
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions

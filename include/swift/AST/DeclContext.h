@@ -36,6 +36,7 @@ namespace swift {
   class Type;
   class Module;
   class ValueDecl;
+  class Initializer;
 }
 
 namespace llvm {
@@ -93,6 +94,12 @@ class alignas(8) DeclContext {
                 "Not enough KindBits for DeclContextKind");
   
   llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
+
+  /// Change the parent of this context.  This should only be used
+  /// very carefully.
+  void setParent(DeclContext *parent) { ParentAndKind.setPointer(parent); }
+  friend class Initializer; // uses setParent
+  friend class AutoClosureExpr; // uses setParent
   
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)

@@ -36,24 +36,45 @@
 using namespace swift;
 
 namespace {
-  class SetDiscriminators : public ASTWalker {
+  class ContextualizeClosures : public ASTWalker {
     unsigned NextDiscriminator = 0;
+    DeclContext *ParentDC;
   public:
+    ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
+
+    bool hasAutoClosures() const {
+      return NextDiscriminator != 0;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Number all the autoclosures.
+      // Autoclosures need to be numbered and potentially reparented.
+      // Reparenting is required with:
+      //   - nested autoclosures, because the inner autoclosure will be
+      //     parented to the outer context, not the outer autoclosure
+      //   - non-local initializers
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
         assert(CE->getDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
         CE->setDiscriminator(NextDiscriminator++);
+        CE->setParent(ParentDC);
 
-        // Any sub-closures of the autoclosure follow the same sequence.
+        // Recurse into the autoclosure body using the same sequence,
+        // but parenting to the autoclosure instead of the outer closure.
+        auto oldParentDC = ParentDC;
+        ParentDC = CE;
+        CE->getBody()->walk(*this);
+        ParentDC = oldParentDC;
+        return { false, E };
+      } 
 
       // Explicit closures start their own sequence.
-      } else if (auto CE = dyn_cast<ClosureExpr>(E)) {
+      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        assert(CE->getParent() == ParentDC);
+
         // If the closure has a single expression body, we need to
         // walk into it with a new sequence.  Otherwise, it'll have
         // been separately type-checked.
         if (CE->hasSingleExpressionBody())
-          CE->getBody()->walk(SetDiscriminators());
+          CE->getBody()->walk(ContextualizeClosures(CE));
 
         // In neither case do we need to continue the *current* walk.
         return { false, E };
@@ -71,8 +92,8 @@ namespace {
   };
 }
 
-static void setAutoClosureDiscriminators(Stmt *S) {
-  S->walk(SetDiscriminators());
+static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
+  S->walk(ContextualizeClosures(DC));
 }
 
 namespace {
@@ -163,7 +184,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     if (typeCheckStmt(S)) return true;
-    setAutoClosureDiscriminators(S);
+    setAutoClosureDiscriminators(DC, S);
     return false;
   }
   
@@ -549,25 +570,57 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
 
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
+                                  unsigned &nextArgIndex,
                                   DeclContext *dc) {
+  assert(dc->isLocalContext());
+
   switch (pattern->getKind()) {
   case PatternKind::Tuple:
     for (auto &field : cast<TuplePattern>(pattern)->getFields()) {
+      unsigned curArgIndex = nextArgIndex++;
       if (field.getInit()) {
         assert(!field.getInit()->alreadyChecked() &&
                "Expression already checked");
         Expr *e = field.getInit()->getExpr();
-        if (tc.typeCheckExpression(e, dc, field.getPattern()->getType(),
+
+        // Re-use an existing initializer context if possible.
+        auto existingContext = e->findExistingInitializerContext();
+        DefaultArgumentInitializer *initContext;
+        if (existingContext) {
+          initContext = cast<DefaultArgumentInitializer>(existingContext);
+          assert(initContext->getIndex() == curArgIndex);
+          assert(initContext->getParent() == dc);
+
+        // Otherwise, allocate one temporarily.
+        } else {
+          initContext =
+            tc.Context.createDefaultArgumentContext(dc, curArgIndex);
+        }
+
+        // Type-check the initializer, then flag that we did so.
+        if (tc.typeCheckExpression(e, initContext,
+                                   field.getPattern()->getType(),
                                    /*discardedExpr=*/false))
           field.getInit()->setExpr(field.getInit()->getExpr(), true);
         else
           field.getInit()->setExpr(e, true);
+
+        // Walk the checked initializer and contextualize any closures
+        // we saw there.
+        ContextualizeClosures contextualizer(initContext);
+        e->walk(contextualizer);
+
+        // If we created a new context and didn't run into any autoclosures
+        // during the walk, give the context back to the ASTContext.
+        if (!existingContext && !contextualizer.hasAutoClosures())
+          tc.Context.destroyDefaultArgumentContext(initContext);
       }
     }
     return;
   case PatternKind::Paren:
     return checkDefaultArguments(tc,
                                  cast<ParenPattern>(pattern)->getSubPattern(),
+                                 nextArgIndex,
                                  dc);
   case PatternKind::Typed:
   case PatternKind::Named:
@@ -606,8 +659,9 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     return true;
 
   // Check the default argument definitions.
+  unsigned nextArgIndex = 0;
   for (auto pattern : FD->getBodyParamPatterns()) {
-    checkDefaultArguments(*this, pattern, FD->getParent());
+    checkDefaultArguments(*this, pattern, nextArgIndex, FD);
   }
 
   BraceStmt *BS = FD->getBody();
@@ -685,7 +739,8 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
-  checkDefaultArguments(*this, ctor->getArgParams(), ctor->getDeclContext());
+  unsigned nextArgIndex = 0;
+  checkDefaultArguments(*this, ctor->getArgParams(), nextArgIndex, ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

@@ -1140,7 +1140,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
     // Parse the pattern-tuple.
-    auto pattern = parsePatternTuple(/*AllowInitExpr=*/false, /*IsLet*/ true);
+    auto pattern = parsePatternTuple(/*DefaultArgs=*/nullptr, /*IsLet*/ true);
     if (pattern.isNonNull())
       params = pattern.get();
     else

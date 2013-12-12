@@ -151,10 +151,14 @@ public:
     typedef llvm::DenseMap<Identifier, unsigned> LocalDiscriminatorMap;
     LocalDiscriminatorMap LocalDiscriminators;
     unsigned CurClosureDiscriminator = 0;
+    bool HasClosures = false;
   private:
     ContextChange CC;
   public:
     ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {}
+
+    void setHasClosures() { HasClosures = true; }
+    bool hasClosures() const { return HasClosures; }
 
     void pop() {
       CC.pop();
@@ -644,15 +648,33 @@ public:
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
+  /// A structure for collecting information about the default
+  /// arguments of a context.
+  struct DefaultArgumentInfo {
+    llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
+    unsigned NextIndex = 0;
+
+    /// Claim the next argument index.  It's important to do this for
+    /// all the arguments, not just those that have default arguments.
+    unsigned claimNextIndex() { return NextIndex++; }
+
+    /// Set the parsed context for all the initializers to the given
+    /// function.
+    void setFunctionContext(DeclContext *DC);
+  };
+
   ParserStatus parseFunctionArguments(SmallVectorImpl<Pattern*> &ArgPatterns,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,
+                                      DefaultArgumentInfo &defaultArgs,
                                       bool &HasSelectorStyleSignature);
   ParserStatus parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
+                                      DefaultArgumentInfo &defaultArgs,
                                       TypeRepr *&retType,
                                       bool &HasSelectorStyleSignature);
   ParserStatus parseConstructorArguments(Pattern *&ArgPattern,
                                          Pattern *&BodyPattern,
+                                         DefaultArgumentInfo &defaultArgs,
                                          bool &HasSelectorStyleSignature);
 
   ParserResult<Pattern> parsePattern(bool isLet);
@@ -671,12 +693,13 @@ public:
   ///     pattern ('=' expr)?
   /// \endcode
   ///
-  /// \param allowInitExpr Whether to allow initializers.
+  /// \param args If non-null, collect default arguments here.
   ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool allowInitExpr, bool isLet);
-  ParserResult<Pattern> parsePatternTuple(bool AllowInitExpr, bool isLet);
+  parsePatternTupleElement(DefaultArgumentInfo *args, bool isLet);
+  ParserResult<Pattern> parsePatternTuple(DefaultArgumentInfo *args,
+                                          bool isLet);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
   ParserResult<Pattern> parsePatternIdentifier(bool isLet);
   

@@ -162,6 +162,11 @@ public:
     IsCodeCompletion = true;
   }
 
+  /// True if we should stop parsing for any reason.
+  bool shouldStopParsing() const {
+    return IsError || IsCodeCompletion;
+  }
+
   ParserStatus &operator|=(ParserStatus RHS) {
     IsError |= RHS.IsError;
     IsCodeCompletion |= RHS.IsCodeCompletion;

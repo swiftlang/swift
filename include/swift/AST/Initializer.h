@@ -49,6 +49,9 @@ protected:
       Kind(unsigned(kind)) {
   }
 
+  // Expose this to subclasses.
+  using DeclContext::setParent;
+
 public:
   /// Returns the kind of initializer this is.
   InitializerKind getInitializerKind() const {
@@ -65,6 +68,12 @@ public:
 /// declaration, such as a field or global variable.
 class PatternBindingInitializer : public Initializer {
   PatternBindingDecl *Binding;
+
+  friend class ASTContext; // calls reset on unused contexts
+  void reset(PatternBindingDecl *binding) {
+    setParent(binding->getDeclContext());
+    Binding = binding;
+  }
 public:
   explicit PatternBindingInitializer(PatternBindingDecl *binding)
     : Initializer(InitializerKind::PatternBinding,
@@ -86,6 +95,12 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
+  friend class ASTContext; // calls reset on unused contexts
+  void reset(DeclContext *parent, unsigned index) {
+    setParent(parent);
+    SpareBits = index;
+  }
+
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
@@ -93,6 +108,14 @@ public:
   }
 
   unsigned getIndex() const { return SpareBits; }
+
+  /// Change the parent of this context.  This is necessary because
+  /// the function signature is parsed before the function
+  /// declaration/expression itself is built.
+  void changeFunction(DeclContext *parent) {
+    assert(parent->isLocalContext());
+    setParent(parent);
+  }
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

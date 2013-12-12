@@ -67,27 +67,33 @@ struct ASTNodeBase {};
     const bool HadError;
     SmallVector<bool, 8> InImplicitBraceStmt;
 
-    using FunctionLike = llvm::PointerUnion4<
-        ConstructorDecl *, DestructorDecl *, FuncDecl *, ClosureExpr *>;
-
     /// \brief The stack of functions we're visiting.
-    SmallVector<FunctionLike, 4> Functions;
+    SmallVector<DeclContext *, 4> Functions;
+
+    /// \brief The stack of scopes we're visiting.
+    using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
+    SmallVector<ScopeLike, 4> Scopes;
 
     /// \brief The set of opaque value expressions active at this point.
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
   public:
-    Verifier(Module *M)
-      : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {}
-    Verifier(SourceFile &SF)
+    Verifier(Module *M, DeclContext *DC)
+      : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {
+      Scopes.push_back(DC);
+    }
+    Verifier(SourceFile &SF, DeclContext *DC)
       : M(&SF), Ctx(SF.getASTContext()), Out(llvm::errs()),
-        HadError(SF.getASTContext().hadError()) {}
+        HadError(SF.getASTContext().hadError()) {
+      Scopes.push_back(DC);
+    }
 
     static Verifier forDecl(const Decl *D) {
-      DeclContext *topDC = D->getDeclContext()->getModuleScopeContext();
+      DeclContext *DC = D->getDeclContext();
+      DeclContext *topDC = DC->getModuleScopeContext();
       if (auto SF = dyn_cast<SourceFile>(topDC))
-        return Verifier(*SF);
-      return Verifier(topDC->getParentModule());
+        return Verifier(*SF, DC);
+      return Verifier(topDC->getParentModule(), DC);
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -329,53 +335,64 @@ struct ASTNodeBase {};
 
     // Specialized verifiers.
 
-    bool shouldVerify(ClosureExpr *closure) {
-      Functions.push_back(closure);
-      return shouldVerify(cast<Expr>(closure));
+    template <class T> void pushScope(T *scope) {
+      Scopes.push_back(scope);
+    }
+    void popScope(DeclContext *scope) {
+      assert(Scopes.back().get<DeclContext*>() == scope);
+      Scopes.pop_back();
+    }
+    void popScope(BraceStmt *scope) {
+      assert(Scopes.back().get<BraceStmt*>() == scope);
+      Scopes.pop_back();
     }
 
-    bool shouldVerify(ConstructorDecl *CD) {
-      Functions.push_back(CD);
-      return shouldVerify(cast<Decl>(CD));
+    void pushFunction(DeclContext *functionScope) {
+      pushScope(functionScope);
+      Functions.push_back(functionScope);
     }
-
-    bool shouldVerify(DestructorDecl *DD) {
-      Functions.push_back(DD);
-      return shouldVerify(cast<Decl>(DD));
-    }
-
-    bool shouldVerify(FuncDecl *FD) {
-      Functions.push_back(FD);
-      return shouldVerify(cast<Decl>(FD));
-    }
-
-    void cleanup(ClosureExpr *closure) {
-      assert(Functions.back().get<ClosureExpr*>() == closure);
+    void popFunction(DeclContext *functionScope) {
+      assert(Functions.back() == functionScope);
       Functions.pop_back();
+      popScope(functionScope);
     }
 
-    void cleanup(ConstructorDecl *CD) {
-      assert(Functions.back().get<ConstructorDecl *>() == CD);
-      Functions.pop_back();
+#define FUNCTION_LIKE(NODE)                                     \
+    bool shouldVerify(NODE *fn) {                               \
+      pushFunction(fn);                                         \
+      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
+    }                                                           \
+    void cleanup(NODE *fn) {                                    \
+      popFunction(fn);                                          \
+    }
+#define SCOPE_LIKE(NODE)                                        \
+    bool shouldVerify(NODE *fn) {                               \
+      pushScope(fn);                                            \
+      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
+    }                                                           \
+    void cleanup(NODE *fn) {                                    \
+      popScope(fn);                                             \
     }
 
-    void cleanup(DestructorDecl *DD) {
-      assert(Functions.back().get<DestructorDecl *>() == DD);
-      Functions.pop_back();
-    }
+    FUNCTION_LIKE(AbstractClosureExpr)
+    FUNCTION_LIKE(ConstructorDecl)
+    FUNCTION_LIKE(DestructorDecl)
+    FUNCTION_LIKE(FuncDecl)
+    SCOPE_LIKE(NominalTypeDecl)
+    SCOPE_LIKE(ExtensionDecl)
 
-    void cleanup(FuncDecl *FD) {
-      assert(Functions.back().get<FuncDecl *>() == FD);
-      Functions.pop_back();
-    }
+#undef SCOPE_LIKE
+#undef FUNCTION_LIKE
 
     bool shouldVerify(BraceStmt *BS) {
+      pushScope(BS);
       InImplicitBraceStmt.push_back(BS->isImplicit());
       return shouldVerify(cast<Stmt>(BS));
     }
 
     void cleanup(BraceStmt *BS) {
       InImplicitBraceStmt.pop_back();
+      popScope(BS);
     }
 
     void verifyCheckedAlways(ValueDecl *D) {
@@ -405,9 +422,9 @@ struct ASTNodeBase {};
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
-      if (FuncDecl *FD = func.dyn_cast<FuncDecl *>()) {
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultType();
-      } else if (auto closure = func.dyn_cast<ClosureExpr *>()) {
+      } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
         resultType = TupleType::getEmpty(Ctx);
@@ -503,10 +520,42 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(AbstractClosureExpr *E) {
+      assert(Scopes.back().get<DeclContext*>() == E);
+
       // This only applies in local contexts because we don't know how
       // to contextualize closures in other contexts.
-      if (E->getDiscriminator() == AbstractClosureExpr::InvalidDiscriminator &&
-          E->getParent()->isLocalContext()) {
+      if (!E->getParent()->isLocalContext()) return;
+
+      // If the enclosing scope is a DC directly, rather than a local scope,
+      // then the closure should be parented by an Initializer.  Otherwise,
+      // it should be parented by the innermost function.
+      auto enclosingScope = Scopes[Scopes.size() - 2];
+      auto enclosingDC = enclosingScope.dyn_cast<DeclContext*>();
+      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)) {
+        auto parentDC = E->getParent();
+        if (!isa<Initializer>(parentDC)) {
+          Out << "a closure in non-local context should be parented "
+                 "by an initializer";
+          E->print(Out);
+          Out << "\n";
+          abort();
+        } else if (parentDC->getParent() != enclosingDC) {
+          Out << "closure in non-local context not grandparented by its "
+                 "enclosing function";
+          E->print(Out);
+          Out << "\n";
+          abort();
+        }
+      } else if (Functions.size() >= 2 &&
+                 Functions[Functions.size() - 2] != E->getParent()) {
+        Out << "closure in local context not parented by its "
+               "enclosing function";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      if (E->getDiscriminator() == AbstractClosureExpr::InvalidDiscriminator) {
         Out << "a closure expression should have a valid discriminator\n";
         E->print(Out);
         Out << "\n";
@@ -1750,7 +1799,7 @@ struct ASTNodeBase {};
 }
 
 void swift::verify(SourceFile &SF) {
-  Verifier verifier(SF);
+  Verifier verifier(SF, &SF);
   SF.walk(verifier);
 }
 

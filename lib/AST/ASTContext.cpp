@@ -100,6 +100,12 @@ struct ASTContext::Implementation {
   /// Missing entries implicitly have value 0.
   llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
 
+  /// \brief A cached unused pattern-binding initializer context.
+  PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
+  
+  /// \brief A cached unused default-argument initializer context.
+  DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -727,6 +733,38 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
     return;
   }
   getASTContext().Impl.LocalDiscriminators.insert({this, index});
+}
+
+PatternBindingInitializer *
+ASTContext::createPatternBindingContext(PatternBindingDecl *binding) {
+  // Check for an existing context we can re-use.
+  if (auto existing = Impl.UnusedPatternBindingContext) {
+    Impl.UnusedPatternBindingContext = nullptr;
+    existing->reset(binding);
+    return existing;
+  }
+
+  return new (*this) PatternBindingInitializer(binding);
+}
+void ASTContext::destroyPatternBindingContext(PatternBindingInitializer *DC) {
+  // There isn't much value in caching more than one of these.
+  Impl.UnusedPatternBindingContext = DC;
+}
+
+DefaultArgumentInitializer *
+ASTContext::createDefaultArgumentContext(DeclContext *fn, unsigned index) {
+  // Check for an existing context we can re-use.
+  if (auto existing = Impl.UnusedDefaultArgumentContext) {
+    Impl.UnusedDefaultArgumentContext = nullptr;
+    existing->reset(fn, index);
+    return existing;
+  }
+
+  return new (*this) DefaultArgumentInitializer(fn, index);
+}
+void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
+  // There isn't much value in caching more than one of these.
+  Impl.UnusedDefaultArgumentContext = DC;
 }
 
 void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {

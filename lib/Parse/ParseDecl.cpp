@@ -1397,12 +1397,30 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                                   SourceLoc StaticLoc) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
 
-  SmallVector<PatternBindingDecl*, 4> PBDs;
+  struct AllBindings {
+    Parser &P;
+
+    struct BindingInfo {
+      PatternBindingDecl *Binding;
+      TopLevelCodeDecl *TopLevelCode;
+    };
+    SmallVector<BindingInfo, 4> All;
+
+    AllBindings(Parser &P) : P(P) {}
+    ~AllBindings() {
+      for (auto &info : All) {
+        if (!info.TopLevelCode) continue;
+        auto binding = info.Binding;
+        auto range = binding->getSourceRange();
+        info.TopLevelCode->setBody(BraceStmt::create(P.Context, range.Start,
+                                               ASTNode(binding), range.End));
+      }
+    }
+  } Bindings(*this);
+
   bool HasGetSet = false;
   ParserStatus Status;
 
-  unsigned FirstDecl = Decls.size();
-  
   do {
     ParserResult<Pattern> pattern = parsePattern(false);
     if (pattern.hasCodeCompletion())
@@ -1418,6 +1436,21 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       HasGetSet = true;
     }
 
+    // If this is a var in the top-level of script/repl source file,
+    // wrap everything in a TopLevelCodeDecl, since it represents
+    // executable code.
+    //
+    // Note that, once we've built the TopLevelCodeDecl, we have to be
+    // really cautious not to escape this scope in a way that doesn't
+    // add it as a binding.
+    TopLevelCodeDecl *topLevelDecl = nullptr;
+    Optional<ParseFunctionBody> topLevelParser;
+    if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
+      // The body of topLevelDecl will get set later.
+      topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
+      topLevelParser.emplace(*this, topLevelDecl);
+    }
+
     ParserResult<Expr> Init;
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
@@ -1429,11 +1462,10 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
 
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_init_value);
-      if (Init.hasCodeCompletion())
+      if (Init.hasCodeCompletion()) {
         return makeParserCodeCompletionStatus();
-      if (Init.isNull()) {
-        Status.setIsParseError();
-        break;
+      } if (Init.isNull()) {
+        return makeParserError();
       }
     
       if (HasGetSet) {
@@ -1452,15 +1484,26 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                                                 pattern.get(),
                                                 Init.getPtrOrNull(),
                                                 CurDeclContext);
-    Decls.push_back(PBD);
+
+    Bindings.All.push_back({PBD, topLevelDecl});
+
+    if (topLevelDecl) {
+      Decls.push_back(topLevelDecl);
+    } else {
+      Decls.push_back(PBD);
+    }
+
+    // We need to revert CurDeclContext before calling addVarsToScope.
+    if (topLevelDecl)
+      topLevelParser.getValue().pop();
 
     addVarsToScope(pattern.get(), Decls, StaticLoc.isValid(), Attributes, PBD);
 
     // Propagate back types for simple patterns, like "var A, B : T".
     if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
       if (isa<NamedPattern>(TP->getSubPattern()) && !PBD->hasInit()) {
-        for (unsigned i = PBDs.size(); i != 0; --i) {
-          PatternBindingDecl *PrevPBD = PBDs[i-1];
+        for (unsigned i = Bindings.All.size() - 1; i != 0; --i) {
+          PatternBindingDecl *PrevPBD = Bindings.All[i-1].Binding;
           Pattern *PrevPat = PrevPBD->getPattern();
           if (!isa<NamedPattern>(PrevPat) || PrevPBD->hasInit())
             break;
@@ -1476,11 +1519,10 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
         }
       }
     }
-    PBDs.push_back(PBD);
   } while (consumeIf(tok::comma));
 
   if (HasGetSet) {
-    if (PBDs.size() > 1) {
+    if (Bindings.All.size() > 1) {
       diagnose(VarLoc, diag::disallowed_var_multiple_getset);
       Status.setIsParseError();
     }
@@ -1492,22 +1534,6 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     diagnose(VarLoc, diag::disallowed_stored_var_decl);
     Status.setIsParseError();
     return Status;
-  }
-
-  // If this is a var in the top-level of script/repl source file, then
-  // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represent
-  // executable code.
-  if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
-    for (unsigned i = FirstDecl; i != Decls.size(); ++i) {
-      auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
-      if (PBD == 0) continue;
-      auto *Brace = BraceStmt::create(Context, PBD->getStartLoc(),
-                                      ASTNode(PBD), PreviousLoc);
-
-      auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext, Brace);
-      PBD->setDeclContext(TLCD);
-      Decls[i] = TLCD;
-    }
   }
 
   return Status;
@@ -1668,10 +1694,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     BodyParams.push_back(SelfPattern);
   }
 
+  DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   bool HasSelectorStyleSignature;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(ArgParams, BodyParams, FuncRetTy,
+      parseFunctionSignature(ArgParams, BodyParams, DefaultArgs, FuncRetTy,
                              HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -1698,6 +1725,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     if (SignatureStatus.hasCodeCompletion())
       CodeCompletion->setDelayedParsedDecl(FD);
 
+    DefaultArgs.setFunctionContext(FD);
     addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
     setVarContext(FD->getArgParamPatterns(), FD);
     setLocalDiscriminator(FD);
@@ -2324,7 +2352,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     return makeParserError();
   }
 
-  ParserResult<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false,
+  ParserResult<Pattern> Indices = parsePatternTuple(/*DefaultArgs=*/nullptr,
                                                     /*IsLet*/ true);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
@@ -2448,11 +2476,12 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
+  DefaultArgumentInfo DefaultArgs;
   Pattern *ArgPattern;
   Pattern *BodyPattern;
   bool HasSelectorStyleSignature;
   ParserStatus SignatureStatus =
-      parseConstructorArguments(ArgPattern, BodyPattern,
+      parseConstructorArguments(ArgPattern, BodyPattern, DefaultArgs,
                                 HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -2477,6 +2506,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
     CD->setHasSelectorStyleSignature();
 
   SelfDecl->setDeclContext(CD);
+  DefaultArgs.setFunctionContext(CD);
 
   // Pass the function signature to code completion.
   if (SignatureStatus.hasCodeCompletion())
@@ -2535,7 +2565,8 @@ parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::l_paren)) {
     // Parse the parameter tuple.
     SourceLoc LParenLoc = Tok.getLoc();
-    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true,
+    DefaultArgumentInfo DefaultArgs; // ignored in valid code
+    ParserResult<Pattern> Params = parsePatternTuple(&DefaultArgs,
                                                      /*IsLet*/true);
     if (!Params.isParseError()) {
       // Check that the destructor has zero parameters.

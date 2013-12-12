@@ -43,6 +43,7 @@ namespace swift {
   class Stmt;
   class BraceStmt;
   class ASTWalker;
+  class Initializer;
   class VarDecl;
   class OpaqueValueExpr;
   class ProtocolConformance;
@@ -180,6 +181,11 @@ public:
   /// walk - This recursively walks the AST rooted at this expression.
   Expr *walk(ASTWalker &walker);
   Expr *walk(ASTWalker &&walker) { return walk(walker); }
+
+  /// findExistingInitializerContext - Given that this expression is
+  /// an initializer that belongs in some sort of Initializer
+  /// context, look through it for any existing context object.
+  Initializer *findExistingInitializerContext();
   
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -2048,6 +2054,9 @@ public:
 
   BraceStmt *getBody() const { return Body; }
   void setBody(Expr *E);
+
+  // Expose this to users.
+  using DeclContext::setParent;
 
   /// Returns the body of the auto_closure as an \c Expr.
   ///

@@ -377,6 +377,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
       MetaBaseDecl = BaseDecl;
+    } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
+      // In a default argument, skip immediately out of both the
+      // initializer and the function.
+      DC = I->getParent()->getParent();
+      continue;
     }
 
     // Check the generic parameters for something with the given name.
