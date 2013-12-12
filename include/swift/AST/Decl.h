@@ -46,6 +46,7 @@ namespace swift {
   class ASTWalker;
   class Type;
   class Expr;
+  class LazyMemberLoader;
   class LiteralExpr;
   class FuncDecl;
   class BraceStmt;
@@ -918,6 +919,9 @@ class ExtensionDecl : public Decl, public DeclContext {
   llvm::PointerIntPair<ExtensionDecl *, 1, bool> NextExtension
     = {nullptr, false};
 
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
+
   friend class ExtensionIterator;
   friend class NominalTypeDecl;
   friend class MemberLookupTable;
@@ -977,8 +981,9 @@ public:
   }
   void setConformances(ArrayRef<ProtocolConformance *> c);
 
-  ArrayRef<Decl*> getMembers() const { return Members; }
+  ArrayRef<Decl*> getMembers() const;
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
+  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1683,6 +1688,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// called.
   MemberLookupTable *LookupTable = nullptr;
 
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
+
   friend class MemberLookupTable;
   friend class ExtensionDecl;
 
@@ -1708,9 +1716,10 @@ protected:
 public:
   using TypeDecl::getASTContext;
 
-  ArrayRef<Decl*> getMembers() const { return Members; }
+  ArrayRef<Decl*> getMembers() const;
   SourceRange getBraces() const { return Braces; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
+  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   GenericParamList *getGenericParams() const { return GenericParams; }
 

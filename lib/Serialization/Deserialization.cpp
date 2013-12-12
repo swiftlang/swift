@@ -1026,9 +1026,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       conformances.push_back(*conformance);
     processConformances(ctx, theStruct, conformances);
 
-    auto members = readMembers();
-    assert(members.hasValue() && "could not read struct members");
-    theStruct->setMembers(members.getValue(), SourceRange());
+    theStruct->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theStruct->setCheckedInheritanceClause();
     break;
   }
@@ -1355,9 +1353,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     }
     proto->setProtocols(ctx.AllocateCopy(protocols));
 
-    auto members = readMembers();
-    assert(members.hasValue() && "could not read struct members");
-    proto->setMembers(members.getValue(), SourceRange());
+    proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCheckedInheritanceClause();
     proto->setCircularityCheck(CircularityCheck::Checked);
     break;
@@ -1476,9 +1472,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       conformances.push_back(*conformance);
     processConformances(ctx, theClass, conformances);
 
-    auto members = readMembers();
-    assert(members.hasValue() && "could not read class members");
-    theClass->setMembers(members.getValue(), SourceRange());
+    theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theClass->setCheckedInheritanceClause();
     theClass->setCircularityCheck(CircularityCheck::Checked);
     break;
@@ -1534,9 +1528,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       conformances.push_back(*conformance);
     processConformances(ctx, theEnum, conformances);
 
-    auto members = readMembers();
-    assert(members.hasValue() && "could not read enum members");
-    theEnum->setMembers(members.getValue(), SourceRange());
+    theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theEnum->setCheckedInheritanceClause();
     break;
   }
@@ -1650,9 +1642,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       conformances.push_back(*conformance);
     processConformances(ctx, extension, conformances);
 
-    auto members = readMembers();
-    assert(members.hasValue() && "could not read extension members");
-    extension->setMembers(members.getValue(), SourceRange());
+    extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     baseTy.getType()->getAnyNominal()->addExtension(extension);
     extension->setCheckedInheritanceClause();
@@ -2490,4 +2480,13 @@ Type ModuleFile::getType(TypeID TID) {
   }
   
   return typeOrOffset;
+}
+
+ArrayRef<Decl *> ModuleFile::loadAllMembers(uint64_t contextData) {
+  // FIXME: Add PrettyStackTrace.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+  auto result = readMembers();
+  assert(result && "unable to read members");
+  return result.getValue();
 }

@@ -73,6 +73,17 @@ public:
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 };
 
+
+/// A class that can lazily load members from a serialized format.
+class alignas(void*) LazyMemberLoader {
+  virtual void anchor();
+public:
+  virtual ~LazyMemberLoader() = default;
+
+  /// Returns an ASTContext-allocated array containing all member decls.
+  virtual ArrayRef<Decl *> loadAllMembers(uint64_t contextData) = 0;
+};
+
 }
 
 #endif // LLVM_SWIFT_AST_LAZYRESOLVER_H

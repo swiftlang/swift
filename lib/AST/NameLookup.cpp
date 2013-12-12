@@ -24,7 +24,15 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
+
+#define DEBUG_TYPE "Name lookup"
+
+STATISTIC(NumLazyMembers,
+          "# of serialized member contexts");
+STATISTIC(NumUnloadedLazyMembers,
+          "# of serialized member contexts never loaded");
 
 using namespace swift;
 
@@ -554,6 +562,8 @@ TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
 
 #pragma mark Member lookup table
 
+void LazyMemberLoader::anchor() {}
+
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable {
@@ -655,6 +665,28 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
   }
 }
 
+template <typename T>
+static void loadAllMembers(const T *container,
+                           LazyMemberLoader * const &resolver,
+                           uint64_t contextData) {
+  if (!resolver)
+    return;
+  const_cast<T *>(container)->setMembers(resolver->loadAllMembers(contextData),
+                                         {});
+  const_cast<LazyMemberLoader *&>(resolver) = nullptr;
+  --NumUnloadedLazyMembers;
+}
+
+ArrayRef<Decl*> NominalTypeDecl::getMembers() const {
+  loadAllMembers(this, Resolver, ResolverContextData);
+  return Members;
+}
+
+ArrayRef<Decl*> ExtensionDecl::getMembers() const {
+  loadAllMembers(this, Resolver, ResolverContextData);
+  return Members;
+}
+
 void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
   // If we have already constructed a lookup table and we are adding members,
   // add them to the lookup table.
@@ -669,9 +701,32 @@ void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
   Braces = B;
 }
 
+void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
+                                      uint64_t contextData) {
+  assert(!Resolver && "already have a resolver");
+  assert(Members.empty() && "already have members");
+  Resolver = resolver;
+  ResolverContextData = contextData;
+  ++NumLazyMembers;
+  ++NumUnloadedLazyMembers;
+}
+
+void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
+                                    uint64_t contextData) {
+  assert(!Resolver && "already have a resolver");
+  assert(Members.empty() && "already have members");
+  Resolver = resolver;
+  ResolverContextData = contextData;
+  ++NumLazyMembers;
+  ++NumUnloadedLazyMembers;
+}
+
 ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
-  // Make sure we have the complete list of extensions.
-  (void)getExtensions();
+  // Make sure we have the complete list of members (in this nominal and in all
+  // extensions).
+  for (auto E : getExtensions())
+    (void)E->getMembers();
+  (void)getMembers();
 
   if (!LookupTable) {
     // Create the lookup table.

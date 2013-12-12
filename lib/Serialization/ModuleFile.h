@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
@@ -46,7 +47,7 @@ class Pattern;
 class ProtocolConformance;
 
 /// A serialized module, along with the tools to access it.
-class ModuleFile {
+class ModuleFile : public LazyMemberLoader {
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
@@ -395,6 +396,8 @@ public:
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
+
+  virtual ArrayRef<Decl *> loadAllMembers(uint64_t contextData) override;
 };
 
 } // end namespace swift
