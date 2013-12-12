@@ -22,10 +22,6 @@
 #define TYPE_ATTR(X)
 #endif
 
-#ifndef BOTH_ATTR
-#define BOTH_ATTR(X) ATTR(X) TYPE_ATTR(X)
-#endif
-
 #ifndef IB_ATTR
 #define IB_ATTR(X) ATTR(X)
 #endif
@@ -57,6 +53,7 @@ ATTR(class_protocol)
 ATTR(conversion)
 ATTR(exported)
 ATTR(infix)
+ATTR(inout)
 ATTR(resilient)
 ATTR(fragile)
 ATTR(born_fragile)
@@ -75,6 +72,5 @@ IB_ATTR(IBAction)
 IB_ATTR(IBLiveView)
 
 #undef IB_ATTR
-#undef BOTH_ATTR
 #undef TYPE_ATTR
 #undef ATTR

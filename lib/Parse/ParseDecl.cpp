@@ -118,6 +118,7 @@ bool Parser::skipExtraTopLevelRBraces() {
 ///     'unary'
 ///     'stdlib'
 ///     'weak'
+///     'inout'
 ///     'unowned'
 ///     'noreturn'
 ///     'optional'
@@ -140,12 +141,13 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   
   if (attr == AK_Count) {
     StringRef Text = Tok.getText();
-    bool isTypeAttribute = false
-#define TYPE_ATTR(X) || Text == #X
+    bool isTypeOnlyAttribute = true
+#define ATTR(X) && Text != #X
+#define TYPE_ATTR(X)
 #include "swift/AST/Attr.def"
     ;
     
-    if (isTypeAttribute)
+    if (isTypeOnlyAttribute)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
     else
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
@@ -1657,6 +1659,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   }
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
+
+  if (StaticLoc.isValid() && Attributes.isInOut()) {
+    diagnose(Tok, diag::static_functions_not_inout);
+    Attributes.clearAttribute(AK_inout);
+  }
+
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
