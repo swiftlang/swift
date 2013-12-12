@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ExprHandle.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -682,7 +683,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
-  if (Tok.is(tok::kw_var))
+  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let))
     return parseMatchingPatternVar();
 
   // matching-pattern ::= 'is' type
@@ -702,13 +703,18 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternVar() {
-  // 'var' patterns shouldn't nest.
-  if (VarPatternDepth >= 1)
-    diagnose(Tok, diag::var_pattern_in_var);
-  
-  VarPatternScope scope(*this);
-  
-  SourceLoc varLoc = consumeToken(tok::kw_var);
+  bool isLet = Tok.is(tok::kw_let);
+
+  // 'var' and 'let' patterns shouldn't nest.
+  if (InVarOrLetPattern)
+    diagnose(Tok, diag::var_pattern_in_var, unsigned(isLet));
+
+  // In our recursive parse, remember that we're in a var/let pattern.
+  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+  assert(Tok.is(tok::kw_let) || Tok.is(tok::kw_var));
+  SourceLoc varLoc = consumeToken();
   ParserResult<Pattern> subPattern = parseMatchingPattern();
   if (subPattern.isNull())
     return nullptr;
@@ -724,6 +730,5 @@ ParserResult<Pattern> Parser::parseMatchingPatternIsa() {
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  return Tok.is(tok::kw_var)
-    || Tok.is(tok::kw_is);
+  return Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::kw_is);
 }

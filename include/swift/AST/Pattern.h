@@ -619,7 +619,7 @@ public:
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
-  
+
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
     return {VarLoc, SubPattern->getSourceRange().End};

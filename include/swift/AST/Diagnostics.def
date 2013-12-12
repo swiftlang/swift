@@ -540,7 +540,8 @@ ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
 ERROR(var_pattern_in_var,pattern_parsing,none,
-      "'var' cannot appear nested inside another 'var' pattern", ())
+      "'%select{var|let}0' cannot appear nested inside another 'var' or "
+      "'let' pattern", (unsigned))
 ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
       "subpattern of a struct or class pattern must have a keyword name", ())
 

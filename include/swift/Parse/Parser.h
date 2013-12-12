@@ -79,7 +79,12 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
-  unsigned VarPatternDepth = 0;
+  enum {
+    IVOLP_NotInVarOrLet,
+    IVOLP_InVar,
+    IVOLP_InLet
+  } InVarOrLetPattern = IVOLP_NotInVarOrLet;
+
   bool GreaterThanIsOperator = true;
 
   class ParseFunctionBody;
@@ -252,16 +257,6 @@ public:
     ~BacktrackingScope() {
       P.backtrackToPosition(PP);
     }
-  };
-
-  /// RAII object for managing 'var' patterns. Inside a 'var' pattern, bare
-  /// identifiers are parsed as new VarDecls instead of references to existing
-  /// ones.
-  class VarPatternScope {
-    Parser &P;
-  public:
-    VarPatternScope(Parser &P) : P(P) { ++P.VarPatternDepth; }
-    ~VarPatternScope() { --P.VarPatternDepth; }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to

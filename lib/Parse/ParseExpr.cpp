@@ -112,19 +112,19 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   //
   // TODO: We could check for a bare identifier followed by a non-postfix
   // token first thing with a lookahead.
-  if (VarPatternDepth > 0) {
+  if (InVarOrLetPattern) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(expr.get())) {
       // This is ill-formed, but the problem will be caught later by scope
       // resolution.
       auto pattern = createBindingFromPattern(declRef->getLoc(),
                                               declRef->getDecl()->getName(),
-                                              false);
+                                              InVarOrLetPattern == IVOLP_InLet);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
     if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
       auto pattern = createBindingFromPattern(udre->getLoc(),
                                               udre->getName(),
-                                              false);
+                                              InVarOrLetPattern == IVOLP_InLet);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
   }

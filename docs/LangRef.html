@@ -2252,16 +2252,18 @@ ill-formed if the type does not conform to the protocol.</p>
   is irrefutable.</p>
 
   <!-- ********************************************************************* -->
-  <h3 id="pattern-var">'var' Patterns</h3>
+  <h3 id="pattern-var">'var' and 'let' Patterns</h3>
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
+    pattern-var ::= 'let' pattern
     pattern-var ::= 'var' pattern
   </pre>
 
-  <p>The keyword <tt>var</tt> within a pattern introduces variable bindings.
-    Any identifiers within the subpattern bind new named variables to their
-    matching values.<p>
+  <p>The <tt>var</tt> and <tt>let</tt> keywords within a pattern introduces 
+    variable bindings.  Any identifiers within the subpattern bind new named 
+    variables to their matching values.  'var' bindings are mutable within
+    the bound scope, and 'let' bindings are immutable.<p>
 
   <pre class="example">
     var point = (0, 0, 0)
