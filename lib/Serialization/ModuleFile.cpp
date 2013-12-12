@@ -620,7 +620,6 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
         auto ScopeID = Ctx.getIdentifier(ScopePath);
         assert(!ScopeID.empty() &&
                "invalid decl name (non-top-level decls not supported)");
-        AccessPath.push_back({ ScopeID, SourceLoc() });
 
         Module *M = Ctx.getModule(AccessPath);
         if (!M) {
@@ -636,6 +635,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                  "deserialized imports should not be ambigous");
           Kind = *FoundKind;
         }
+
+        AccessPath.push_back({ ScopeID, SourceLoc() });
       }
 
       ImportDecls.push_back(ImportDecl::create(
