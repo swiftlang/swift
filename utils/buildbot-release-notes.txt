@@ -13,6 +13,28 @@
   dependency order, so global variable initializers that cross module
   boundaries don't have undefined behavior or fragile link order dependencies.
 
+* Swift has the start of an immutability model for value types. As part of this,
+  you can now declare immutable value bindings with a new 'let' declaration,
+  which is semantically similar to defining a get-only property:
+
+    let x = foo()
+    print(x)       // ok
+    x = bar()      // error: cannot modify an immutable value
+    swap(&x, &y)   // error: cannot pass an immutable value as @inout parameter
+  
+  In the case of bindings of class type, the bound object itself is still
+  mutable, but you cannot change the binding.
+  
+    let r = Rocket()
+    r.blastOff()    // Ok, your rocket is mutable.
+    r = Rocket()    // error: cannot modify an immutable binding.
+
+  In addition to the 'let' declaration itself, the iteration variable in
+  for-each loops, 'self' on classes, and a few other minor things have switched
+  to immutable bindings.
+  
+  There is more to come here.
+
 * A "map" method with the semantics of Haskell's "fmap" was added to
   Optional<T>.  Map applies a function f: T->U to any value stored in
   an Optional<T>, and returns an Optional<U>.  So,
