@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "specialization"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -20,7 +19,6 @@
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/ImmutableSet.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -116,6 +114,23 @@ private:
 
 } // end anonymous namespace.
 
+/// Return the bottom up call-graph order for module M. Notice that we don't
+/// include functions that don't participate in any call (caller or callee).
+static void BottomUpCallGraphOrder(SILModule *M,
+                                   std::vector<SILFunction*> &order) {
+  CallGraphSorter<SILFunction*> sorter;
+  for (auto &Caller : *M) {
+    for (auto &BB : Caller)
+      for (auto &I : BB)
+        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
+          SILFunction *Callee = FRI->getReferencedFunction();
+          sorter.addEdge(&Caller, Callee);
+        }
+  }
+
+  sorter.sort(order);
+}
+
 void TypeSubCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
@@ -208,63 +223,61 @@ struct SILSpecializer {
 
   bool specializeApplyInstGroup(SILFunction *F, AIList &List);
 
-  /// Scan the module and collect all of the ApplyInst with generic
+  /// Scan the function and collect all of the ApplyInst with generic
   /// substitutions into buckets according to the called function.
-  void collectApplyInst(SILModule *M);
+  void collectApplyInst(SILFunction &F);
 
   /// The driver for the generic specialization pass.
-  ///
-  /// TODO: This function performs multiple rounds of specialization.
-  /// this is *not* the way to go. We need to start specializing from the
-  /// top of the call graph.
   void specialize(SILModule *M) {
-    bool Changed = true;
-    while (Changed) {
-      Changed = false;
-      collectApplyInst(M);
+    for (auto &F : *M)
+      collectApplyInst(F);
 
-      // Specialize all AI groups.
-      for (auto &E : ApplyInstMap)
-        Changed |= specializeApplyInstGroup(E.first, E.second);
+    // Collect a call-graph bottom-up list of functions. We specialize
+    // the functions in a top-down order, starting from the end of the list.
+    BottomUpCallGraphOrder(M, Worklist);
 
-      ApplyInstMap.clear();
+    while (Worklist.size()) {
+      SILFunction *F = Worklist.back();
+      Worklist.pop_back();
+      if (ApplyInstMap.count(F))
+        specializeApplyInstGroup(F, ApplyInstMap[F]);
     }
   }
 
   /// Maps a function to all of the ApplyInst that call it.
   llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
+  std::vector<SILFunction*> Worklist;
 };
 
 } // end anonymous namespace.
 
-void SILSpecializer::collectApplyInst(SILModule *M) {
-  // Scan all of the instructions in this module in search of ApplyInsts.
-  for (auto &F : *M)
-    for (auto &BB : F)
-      for (auto &I : BB) {
-        ApplyInst *AI = dyn_cast<ApplyInst>(&I);
+void SILSpecializer::collectApplyInst(SILFunction &F) {
+  // Scan all of the instructions in this function in search of ApplyInsts.
+  for (auto &BB : F)
+    for (auto &I : BB) {
+      ApplyInst *AI = dyn_cast<ApplyInst>(&I);
 
-        if (!AI || !AI->hasSubstitutions())
-          continue;
+      if (!AI || !AI->hasSubstitutions())
+        continue;
 
-        SILValue CalleeVal = AI->getCallee();
-        FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
+      SILValue CalleeVal = AI->getCallee();
+      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
 
-        if (!FRI)
-          continue;
+      if (!FRI)
+        continue;
 
-        SILFunction *Callee = FRI->getReferencedFunction();
-        if (Callee->isExternalDeclaration())
-          continue;
+      SILFunction *Callee = FRI->getReferencedFunction();
+      if (Callee->isExternalDeclaration())
+        continue;
 
-        // Check if we can specialize this AI. We perform this check last
-        // because it can be more expensive.
-        if (!canSpecializeApplyInst(AI))
-          continue;
+      // Check if we can specialize this AI. We perform this check last
+      // because it can be more expensive.
+      if (!canSpecializeApplyInst(AI))
+        continue;
 
-        // Save the ApplyInst into the function/bucket that it calls.
-        ApplyInstMap[Callee].push_back(AI);
-      }
+      // Save the ApplyInst into the function/bucket that it calls.
+      ApplyInstMap[Callee].push_back(AI);
+    }
 }
 
 static void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
@@ -354,6 +367,10 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     for (auto &AI : Bucket)
       replaceWithSpecializedFunction(AI, NewF);
     Changed = true;
+
+    // Analyze the ApplyInsts in the new function.
+    collectApplyInst(*NewF);
+    Worklist.push_back(NewF);
   }
 
   if (!F->getRefCount() && F->getLinkage() == SILLinkage::Internal) {
