@@ -42,6 +42,10 @@ public:
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
+
+  /// Indicates whether or not the frontend should print statistics upon
+  /// termination.
+  bool PrintStats = false;
 };
 
 }

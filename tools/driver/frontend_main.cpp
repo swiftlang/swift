@@ -24,6 +24,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -53,6 +54,10 @@ int frontend_main(ArrayRef<const char *>Args,
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
+  }
+
+  if (Invocation.getFrontendOptions().PrintStats) {
+    llvm::EnableStatistics();
   }
 
   // TODO: remove once we properly handle no -sdk argument

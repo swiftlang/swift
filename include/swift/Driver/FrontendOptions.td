@@ -36,6 +36,9 @@ def emit_sil_protocol_witness_tables :
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   Flags<[HelpHidden]>, HelpText<"Emit locations during SIL emission">;
 
+def print_stats : Flag<["-"], "print-stats">,
+  Flags<[HelpHidden]>, HelpText<"Print various statistics">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   Flags<[HelpHidden]>,
   HelpText<"Allocate internal data structures using malloc "
