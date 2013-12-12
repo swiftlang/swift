@@ -31,9 +31,16 @@ public:
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
+  /// Indicates that the frontend should emit "verbose" SIL
+  /// (if asked to emit SIL).
+  bool EmitVerboseSIL;
+
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
+
+  FrontendOptions() : InputFilenames(), OutputFilename(), ModuleName(),
+                      EmitVerboseSIL(false), SerializedDiagnosticsPath() {};
 };
 
 }

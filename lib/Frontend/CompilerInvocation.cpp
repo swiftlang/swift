@@ -51,6 +51,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.SerializedDiagnosticsPath = A->getValue();
   }
 
+  if (Args.hasArg(OPT_emit_verbose_sil)) {
+    Opts.EmitVerboseSIL = true;
+  }
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT),
                                  Args.filtered_end())) {
     Opts.InputFilenames.push_back(A->getValue());

@@ -20,4 +20,7 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
   Flags<[HelpHidden]>,
   HelpText<"Debug the constraint-based type checker">;
 
+def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
+  Flags<[HelpHidden]>, HelpText<"Emit locations during SIL emission">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
