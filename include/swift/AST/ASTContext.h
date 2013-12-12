@@ -20,6 +20,7 @@
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
@@ -151,12 +152,15 @@ public:
   
   friend class ConstraintCheckerArenaRAII;
 public:
-  ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
-             DiagnosticEngine &Diags);
+  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// \brief The language options used for translation.
   LangOptions &LangOpts;
+
+  /// \brief The search path options used by this AST context.
+  SearchPathOptions &SearchPathOpts;
 
   /// \brief The source manager object.
   SourceManager &SourceMgr;

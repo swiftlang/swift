@@ -219,10 +219,11 @@ static Module *createBuiltinModule(ASTContext &ctx) {
   return M;
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
-                       DiagnosticEngine &Diags)
+ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+                       SourceManager &SourceMgr, DiagnosticEngine &Diags)
   : Impl(*new Implementation()),
     LangOpts(langOpts),
+    SearchPathOpts(SearchPathOpts),
     SourceMgr(SourceMgr),
     Diags(Diags),
     TheBuiltinModule(createBuiltinModule(*this)),

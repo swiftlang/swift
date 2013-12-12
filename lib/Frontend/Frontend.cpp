@@ -38,7 +38,9 @@ void swift::CompilerInstance::createSILModule() {
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(), SourceMgr, Diagnostics));
+  Context.reset(new ASTContext(Invocation.getLangOptions(),
+                               Invocation.getSearchPathOptions(),
+                               SourceMgr, Diagnostics));
 
   // Give the context the list of search paths to use for modules.
   Context->ImportSearchPaths = Invocation.getImportSearchPaths();
@@ -71,9 +73,6 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
     Context->addModuleLoader(clangImporter, /*isClang*/true);
   }
-
-  // Add the runtime include path (which contains swift.swift)
-  Context->ImportSearchPaths.push_back(Invocation.getRuntimeIncludePath());
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 

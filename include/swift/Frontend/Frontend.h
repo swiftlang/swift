@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -49,13 +50,13 @@ class CompilerInvocation {
   std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
   SmallVector<LinkLibrary, 4> LinkLibraries;
-  std::string RuntimeIncludePath;
   std::string SDKPath;
   std::string ModuleSourceListPath;
 
   LangOptions LangOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
+  SearchPathOptions SearchPathOpts;
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
@@ -130,11 +131,11 @@ public:
   void setMainExecutablePath(StringRef Path);
 
   void setRuntimeIncludePath(StringRef Path) {
-    RuntimeIncludePath = Path;
+    SearchPathOpts.RuntimeIncludePath = Path;
   }
 
   StringRef getRuntimeIncludePath() const {
-    return RuntimeIncludePath;
+    return SearchPathOpts.RuntimeIncludePath;
   }
 
   void setSDKPath(const std::string &Path) {
@@ -172,6 +173,11 @@ public:
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
     return ClangImporterOpts;
+  }
+
+  SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
+  const SearchPathOptions &getSearchPathOptions() const {
+    return SearchPathOpts;
   }
 
   void setParseStdlib() {

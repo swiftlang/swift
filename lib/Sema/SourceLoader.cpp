@@ -73,6 +73,14 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
       return err;
   }
 
+  // Finally, check the runtime include path.
+  inputFilename = ctx.SearchPathOpts.RuntimeIncludePath;
+  llvm::sys::path::append(inputFilename, moduleFilename.str());
+  err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
+  if (!err)
+    return err;
+
+  // If we get here, we couldn't find the module, so return our most recent err.
   return err;
 }
 

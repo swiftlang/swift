@@ -118,6 +118,19 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
+                                DiagnosticEngine &Diags) {
+  using namespace options;
+
+  // TODO: begin parsing search path arguments.
+
+  // Opts.RuntimeIncludePath is set by calls to
+  // CompilerInvocation::setRuntimeIncludePath().
+  // TODO: improve the handling of RuntimeIncludePath.
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -157,6 +170,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseClangImporterArgs(ClangImporterOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags)) {
     return true;
   }
 
