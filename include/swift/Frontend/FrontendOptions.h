@@ -21,11 +21,18 @@ namespace swift {
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
 public:
+  /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
+
+  /// The name of the primary output file which should be created
+  /// by the frontend.
   std::string OutputFilename;
 
+  /// The name of the module which the frontend is building.
   std::string ModuleName;
 
+  /// Path to a file which should contain serialized diagnostics for this
+  /// frontend invocation.
   std::string SerializedDiagnosticsPath;
 };
 
