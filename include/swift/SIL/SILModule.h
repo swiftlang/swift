@@ -168,7 +168,9 @@ public:
   Module *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
   ASTContext &getASTContext() const { return TheSwiftModule->Ctx; }
-  
+
+  SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
+
   // FIXME: Remove these when SILGlobalVariable is ready to take over.
   
   using global_iterator = decltype(globals)::const_iterator;
