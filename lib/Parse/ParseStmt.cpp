@@ -265,7 +265,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-      ParseFunctionBody CC(*this, TLCD);
+      ContextChange CC(*this, TLCD, &TopLevelCodeContext);
       SourceLoc StartLoc = Tok.getLoc();
 
       ParserStatus Status = parseExprOrStmt(Result);
@@ -361,7 +361,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 
   // Re-enter the top-level decl context.
   auto *TLCD = cast<TopLevelCodeDecl>(DelayedState->ParentContext);
-  ParseFunctionBody CC(*this, TLCD); // restore discriminator context?
+  ContextChange CC(*this, TLCD, &TopLevelCodeContext); // FIXME: out-of-order?
 
   SourceLoc StartLoc = Tok.getLoc();
   ASTNode Result;

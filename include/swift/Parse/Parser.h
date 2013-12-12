@@ -118,6 +118,7 @@ public:
     bool hasClosures() const { return NextClosureDiscriminator != 0; }    
   };
 
+  LocalContext TopLevelCodeContext;
   LocalContext *CurLocalContext = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
@@ -189,7 +190,10 @@ public:
   private:
     ContextChange CC;
   public:
-    ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {}
+    ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {
+      assert(!isa<TopLevelCodeDecl>(DC) &&
+             "top-level code should be parsed using TopLevelCodeContext!");
+    }
 
     void pop() {
       CC.pop();

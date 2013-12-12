@@ -1456,11 +1456,11 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     // really cautious not to escape this scope in a way that doesn't
     // add it as a binding.
     TopLevelCodeDecl *topLevelDecl = nullptr;
-    Optional<ParseFunctionBody> topLevelParser;
+    Optional<ContextChange> topLevelParser;
     if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
       // The body of topLevelDecl will get set later.
       topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
-      topLevelParser.emplace(*this, topLevelDecl);
+      topLevelParser.emplace(*this, topLevelDecl, &TopLevelCodeContext);
     }
 
     // In the normal case, just add PatternBindingDecls to our DeclContext.
