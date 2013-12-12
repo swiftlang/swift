@@ -33,14 +33,11 @@ public:
 
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
-  bool EmitVerboseSIL;
+  bool EmitVerboseSIL = false;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
-
-  FrontendOptions() : InputFilenames(), OutputFilename(), ModuleName(),
-                      EmitVerboseSIL(false), SerializedDiagnosticsPath() {};
 };
 
 }
