@@ -1451,7 +1451,14 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       topLevelParser.emplace(*this, topLevelDecl);
     }
 
-    ParserResult<Expr> Init;
+    // In the normal case, just add PatternBindingDecls to our DeclContext.
+    auto PBD = new (Context) PatternBindingDecl(StaticLoc, VarLoc,
+                                                pattern.get(),
+                                                nullptr,
+                                                CurDeclContext);
+
+    Bindings.All.push_back({PBD, topLevelDecl});
+
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
       SmallVector<VarDecl *, 4> Vars;
@@ -1461,31 +1468,25 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
 
       SourceLoc EqualLoc = consumeToken(tok::equal);
-      Init = parseExpr(diag::expected_init_value);
-      if (Init.hasCodeCompletion()) {
+      ParserResult<Expr> init = parseExpr(diag::expected_init_value);
+      if (init.hasCodeCompletion()) {
         return makeParserCodeCompletionStatus();
-      } if (Init.isNull()) {
+      } if (init.isNull()) {
         return makeParserError();
       }
     
       if (HasGetSet) {
         diagnose(pattern.get()->getLoc(), diag::getset_init)
-          .highlight(Init.get()->getSourceRange());
-        Init = nullptr;
+          .highlight(init.get()->getSourceRange());
+        init = nullptr;
       }
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
         Status.setIsParseError();
       }
+
+      PBD->setInit(init.getPtrOrNull(), false);
     }
-
-    // In the normal case, just add PatternBindingDecls to our DeclContext.
-    auto PBD = new (Context) PatternBindingDecl(StaticLoc, VarLoc,
-                                                pattern.get(),
-                                                Init.getPtrOrNull(),
-                                                CurDeclContext);
-
-    Bindings.All.push_back({PBD, topLevelDecl});
 
     if (topLevelDecl) {
       Decls.push_back(topLevelDecl);

@@ -651,11 +651,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
     }
     if (DC->getContextKind() == DeclContextKind::TopLevelCodeDecl) {
-      // Code completion can see top-level code declarations that
-      // haven't been filled in properly.
-      auto code = cast<TopLevelCodeDecl>(DC);
-      if (!code->getBody()) return true;
-      return typeCheckTopLevelCodeDecl(code);
+      return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
     }
     return true;
   }
