@@ -330,7 +330,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     return { proto,
              ctx.getSpecializedConformance(conformingType,
                                            genericConformance,
-                                           substitutions,
+                                           ctx.AllocateCopy(substitutions),
                                            std::move(typeWitnesses)) };
   }
 
