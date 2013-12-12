@@ -63,6 +63,21 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
+                          DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (Args.hasArg(OPT_use_malloc)) {
+    Opts.UseMalloc = true;
+  }
+
+  if (Args.hasArg(OPT_debug_constraints)) {
+    Opts.DebugConstraintSolver = true;
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -94,6 +109,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseLangArgs(LangOpts, *ParsedArgs, Diags)) {
     return true;
   }
 
@@ -129,10 +148,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_Xcc:
       ExtraClangArgs.push_back(InputArg->getValue());
-      break;
-
-    case OPT_debug_constraints:
-      LangOpts.DebugConstraintSolver = true;
       break;
 
     case OPT_l:

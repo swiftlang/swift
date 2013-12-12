@@ -22,4 +22,9 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   Flags<[HelpHidden]>, HelpText<"Emit locations during SIL emission">;
 
+def use_malloc : Flag<["-"], "use-malloc">,
+  Flags<[HelpHidden]>,
+  HelpText<"Allocate internal data structures using malloc "
+           "(for memory debugging)">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
