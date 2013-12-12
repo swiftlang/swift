@@ -122,7 +122,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   using namespace options;
 
-  // TODO: begin parsing search path arguments.
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_I),
+                                 Args.filtered_end())) {
+    Opts.ImportSearchPaths.push_back(A->getValue());
+  }
 
   // Opts.RuntimeIncludePath is set by calls to
   // CompilerInvocation::setRuntimeIncludePath().
@@ -181,10 +184,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     switch (InputArg->getOption().getID()) {
     case OPT_target:
       setTargetTriple(InputArg->getValue());
-      break;
-
-    case OPT_I:
-      ImportSearchPaths.push_back(InputArg->getValue());
       break;
 
     case OPT_F:

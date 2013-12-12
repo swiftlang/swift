@@ -42,8 +42,6 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                                Invocation.getSearchPathOptions(),
                                SourceMgr, Diagnostics));
 
-  // Give the context the list of search paths to use for modules.
-  Context->ImportSearchPaths = Invocation.getImportSearchPaths();
   Context->addModuleLoader(SourceLoader::create(*Context,
                                                 !Invocation.isImmediate()));
   SML = SerializedModuleLoader::create(*Context);

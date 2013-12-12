@@ -183,9 +183,6 @@ public:
   /// The identifier "self".
   Identifier SelfIdentifier;
 
-  /// ImportSearchPaths - The paths to search for imports in.
-  std::vector<std::string> ImportSearchPaths;
-
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
   // and remove the explicit delete loop in the destructor.
   typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 

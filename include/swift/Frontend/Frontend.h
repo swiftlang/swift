@@ -47,7 +47,6 @@ class SerializedModuleLoader;
 
 class CompilerInvocation {
   std::string TargetTriple;
-  std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string SDKPath;
@@ -97,11 +96,11 @@ public:
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
-    ImportSearchPaths = Paths;
+    SearchPathOpts.ImportSearchPaths = Paths;
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
-    return ImportSearchPaths;
+    return SearchPathOpts.ImportSearchPaths;
   }
 
   void setFrameworkSearchPaths(const std::vector<std::string> &Paths) {

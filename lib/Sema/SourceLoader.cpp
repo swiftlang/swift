@@ -65,7 +65,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
     return err;
 
   // If we fail, search each import search path.
-  for (auto Path : ctx.ImportSearchPaths) {
+  for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
     err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
