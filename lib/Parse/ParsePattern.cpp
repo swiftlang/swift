@@ -682,14 +682,13 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
-  if (Tok.is(tok::kw_var)) {
+  if (Tok.is(tok::kw_var))
     return parseMatchingPatternVar();
-  }
+
   // matching-pattern ::= 'is' type
-  if (Tok.is(tok::kw_is)) {
+  if (Tok.is(tok::kw_is))
     return parseMatchingPatternIsa();
-  }
-  
+
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
