@@ -485,6 +485,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
 ///   decl:
 ///     decl-typealias
 ///     decl-extension
+///     decl-let
 ///     decl-var
 ///     decl-func
 ///     decl-enum
@@ -519,6 +520,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   case tok::kw_extension:
     DeclResult = parseDeclExtension(Flags, Attributes);
     Status = DeclResult;
+    break;
+  case tok::kw_let:
+    Status = parseDeclVar(Flags, Attributes, Entries, SourceLoc());
     break;
   case tok::kw_var:
     // TODO: Static properties are only implemented for non-generic value types.
@@ -724,6 +728,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
       Kind = ImportKind::Protocol;
       break;
     case tok::kw_var:
+    case tok::kw_let:
       Kind = ImportKind::Var;
       break;
     case tok::kw_func:
@@ -1321,7 +1326,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
                                 SourceLoc StaticLoc) {
   bool Invalid = false;
-    
+  
   // The grammar syntactically requires a simple identifier for the variable
   // name. Complain if that isn't what we got.
   VarDecl *PrimaryVar = nullptr;
@@ -1385,17 +1390,20 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
     PrimaryVar->setComputedAccessors(Context, LBLoc, Get, Set, RBLoc);
 }
 
-/// \brief Parse a 'var' declaration, doing no token skipping on error.
+/// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-var:
+///      'let' attribute-list pattern initializer (',' pattern initializer )*
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
                                   SourceLoc StaticLoc) {
-  SourceLoc VarLoc = consumeToken(tok::kw_var);
+  bool isLet = Tok.is(tok::kw_let);
+  assert(Tok.getKind() == tok::kw_let || Tok.getKind() == tok::kw_var);
+  SourceLoc VarLoc = consumeToken();
 
   struct AllBindings {
     Parser &P;
@@ -1422,11 +1430,18 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   ParserStatus Status;
 
   do {
-    ParserResult<Pattern> pattern = parsePattern(false);
+    ParserResult<Pattern> pattern = parsePattern(isLet);
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (pattern.isNull())
       return makeParserError();
+
+    // 'let' declarations require initializers - get/set specifiers are not
+    // allowed.
+    if (isLet && Tok.isNot(tok::equal)) {
+      diagnose(Tok, diag::let_requires_initializer);
+      return makeParserError();
+    }
 
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
@@ -1459,6 +1474,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
 
     Bindings.All.push_back({PBD, topLevelDecl});
 
+    // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
       SmallVector<VarDecl *, 4> Vars;
@@ -1603,7 +1619,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
     // that point.
     backtrackToPosition(BeginParserPosition);
     consumeToken(tok::l_brace);
-    while (Tok.is(tok::kw_var) ||
+    while (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) ||
            (Tok.isNot(tok::eof) && !isStartOfDecl(Tok, peekToken()))) {
       consumeToken();
     }
