@@ -168,6 +168,9 @@ public:
     return LangOpts;
   }
 
+  FrontendOptions &getFrontendOptions() { return FrontendOpts; }
+  const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
+
   void setParseStdlib() {
     ParseStdlib = true;
   }
