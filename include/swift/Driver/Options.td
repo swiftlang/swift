@@ -177,6 +177,9 @@ def repl : Flag<["-"], "repl">, HelpText<"REPL mode">, Flags<[FrontendOption]>,
 def i : Flag<["-"], "i">, HelpText<"Immediate mode">, Flags<[FrontendOption]>,
   ModeOpt;
 
+def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[DriverOption]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
+
 def Xcc : Separate<["-"], "Xcc">, Flags<[DriverOption, FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;

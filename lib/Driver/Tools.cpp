@@ -101,7 +101,11 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   
   // Set the SDK for the frontend.
   Args.AddLastArg(Arguments, options::OPT_sdk);
-  
+
+  // Pass through the values passed to -Xfrontend.
+  Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
+
+
   // Add the output file argument.
   Arguments.push_back("-o");
   Arguments.push_back(Output->getFilename().data());
