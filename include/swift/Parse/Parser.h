@@ -87,8 +87,38 @@ public:
 
   bool GreaterThanIsOperator = true;
 
-  class ParseFunctionBody;
-  ParseFunctionBody *CurFunction = nullptr;
+  /// Information associated with parsing a local context.
+  class LocalContext {
+    /// A map holding the next discriminator for declarations with
+    /// various identifiers.
+    llvm::DenseMap<Identifier, unsigned> LocalDiscriminators;
+
+    /// The next discriminator for an explicit closure expression.
+    unsigned NextClosureDiscriminator = 0;
+
+  public:
+    /// Return a number that'll be unique in this context across all
+    /// declarations with the given name.
+    unsigned claimNextNamedDiscriminator(Identifier name) {
+      assert(!name.empty() &&
+             "setting a local discriminator on an anonymous decl; "
+             "maybe the name hasn't been set yet?");
+      return LocalDiscriminators[name]++;
+    }
+
+    /// Return a number that'll be unique in this context across all
+    /// explicit anonymous closure expressions.
+    unsigned claimNextClosureDiscriminator() {
+      return NextClosureDiscriminator++;
+    }
+
+    /// True if we saw any anonymous closures.  This is useful when
+    /// parsing an initializer context, because such contexts only
+    /// need to exist if the initializer contains closures.
+    bool hasClosures() const { return NextClosureDiscriminator != 0; }    
+  };
+
+  LocalContext *CurLocalContext = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
@@ -120,15 +150,19 @@ public:
   class ContextChange {
   protected:
     Parser &P;
-    DeclContext *OldContext;
-    ParseFunctionBody *OldFunction;
+    DeclContext *OldContext; // null signals that this has been popped
+    LocalContext *OldLocal;
+
+    ContextChange(const ContextChange &) = delete;
+    ContextChange &operator=(const ContextChange &) = delete;
+
   public:
     ContextChange(Parser &P, DeclContext *DC,
-                  ParseFunctionBody *newFunction = nullptr)
-      : P(P), OldContext(P.CurDeclContext), OldFunction(P.CurFunction) {
+                  LocalContext *newLocal = nullptr)
+      : P(P), OldContext(P.CurDeclContext), OldLocal(P.CurLocalContext) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
-      P.CurFunction = newFunction;
+      P.CurLocalContext = newLocal;
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
@@ -146,24 +180,16 @@ public:
   private:
     void popImpl() {
       P.CurDeclContext = OldContext;
-      P.CurFunction = OldFunction;
+      P.CurLocalContext = OldLocal;
     }
   };
 
-  /// A RAII object for parsing a new function/closure body.
-  class ParseFunctionBody {
-  public:
-    typedef llvm::DenseMap<Identifier, unsigned> LocalDiscriminatorMap;
-    LocalDiscriminatorMap LocalDiscriminators;
-    unsigned CurClosureDiscriminator = 0;
-    bool HasClosures = false;
+  /// A RAII object for parsing a new local context.
+  class ParseFunctionBody : public LocalContext {
   private:
     ContextChange CC;
   public:
     ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {}
-
-    void setHasClosures() { HasClosures = true; }
-    bool hasClosures() const { return HasClosures; }
 
     void pop() {
       CC.pop();

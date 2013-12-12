@@ -467,13 +467,10 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
 
 void Parser::setLocalDiscriminator(ValueDecl *D) {
   // If we're not in a local context, this is unnecessary.
-  if (!CurFunction) return;
+  if (!CurLocalContext) return;
 
   Identifier name = D->getName();
-  assert(!name.empty() &&
-         "setting a local discriminator on an anonymous decl; "
-         "maybe the name hasn't been set yet?");
-  unsigned discriminator = CurFunction->LocalDiscriminators[name]++;
+  unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
 }
 
