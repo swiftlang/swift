@@ -57,6 +57,7 @@ namespace {
 #define CAT2_(A,B) A ## B
 #define CAT2(A,B) CAT2_(A,B)
 #define CAT3(A,B,C) CAT2(CAT2(A,B), C)
+#define CAT4(A,B,C,D) CAT2(CAT2(CAT2(A,B), C), D)
 
 #define FUNC(ARGS, RESULTS) CAT3(CAT3(_TTbXFoCb_, ARGS, _), RESULTS, _)
 
@@ -261,6 +262,15 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo13NSURLResponse),
                           OWNED(CSo7NSError)),
                      VOID),
                 void(id, id, id));
+
+/// enumerateLinguisticTagsInRange callback
+/// (NSString, NSRange, NSRange, UnsafePointer<BOOL>) -> Void
+MAKE_BLOCK_SHIM(FUNC(CAT4(OWNED(SS),
+                          DIRECT(VSC8_NSRange),
+                          DIRECT(S_),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     VOID),
+                void(NSString*, NSRange, NSRange, BOOL*));
 
 /// NSURLSession
 /// FIXME lots
