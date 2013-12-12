@@ -111,6 +111,15 @@ bool Parser::skipExtraTopLevelRBraces() {
   return true;
 }
 
+/// getTypeAttrFromString - If the specified string is a valid type attribute,
+/// return the kind.  Otherwise, return TAK_Count as a sentinel.
+static TypeAttrKind getTypeAttrFromString(StringRef Str) {
+  return llvm::StringSwitch<TypeAttrKind>(Str)
+#define TYPE_ATTR(X) .Case(#X, TAK_##X)
+#include "swift/AST/Attr.def"
+  .Default(TAK_Count);
+}
+
 /// \verbatim
 ///   attribute:
 ///     'asmname' '=' identifier
@@ -140,14 +149,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
                .Default(AK_Count);
   
   if (attr == AK_Count) {
-    StringRef Text = Tok.getText();
-    bool isTypeOnlyAttribute = true
-#define ATTR(X) && Text != #X
-#define TYPE_ATTR(X)
-#include "swift/AST/Attr.def"
-    ;
-    
-    if (isTypeOnlyAttribute)
+    if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
     else
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
@@ -249,7 +251,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   return false;
 }
 
-
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -262,11 +263,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   }
   
   // Determine which attribute it is, and diagnose it if unknown.
-  TypeAttrKind attr = llvm::StringSwitch<TypeAttrKind>(Tok.getText())
-#define TYPE_ATTR(X) .Case(#X, TAK_##X)
-#include "swift/AST/Attr.def"
-    .Default(TAK_Count);
-  
+  TypeAttrKind attr = getTypeAttrFromString(Tok.getText());
+
   if (attr == TAK_Count) {
     StringRef Text = Tok.getText();
     bool isDeclAttribute = false
