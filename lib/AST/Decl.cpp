@@ -935,7 +935,6 @@ Type VarDecl::getGetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
-                                                       /*isConstructor=*/false,
                                                        &outerParams);
 
   // Form the getter type.
@@ -960,8 +959,7 @@ Type VarDecl::getGetterInterfaceType() const {
     return getter->getInterfaceType();
 
   // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
-                                                       /*isConstructor=*/false);
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic());
 
   // Form the getter type.
   auto &ctx = getASTContext();
@@ -994,7 +992,6 @@ Type VarDecl::getSetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
-                                                       /*isConstructor=*/false,
                                                        &outerParams);
 
   // Form the element -> () function type.
@@ -1022,8 +1019,7 @@ Type VarDecl::getSetterInterfaceType() const {
     return setter->getInterfaceType();
   
   // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
-                                                       /*isConstructor=*/false);
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic());
   
   // Form the element -> () function type.
   auto &ctx = getASTContext();
@@ -1065,9 +1061,7 @@ bool VarDecl::isAnonClosureParam() const {
 Type AbstractFunctionDecl::computeSelfType(
                              GenericParamList **outerGenericParams) {
   bool isStatic = isa<FuncDecl>(this) && cast<FuncDecl>(this)->isStatic();
-  return getDeclContext()->getSelfTypeInContext(isStatic,
-                                                isa<ConstructorDecl>(this),
-                                                outerGenericParams);
+  return getDeclContext()->getSelfTypeInContext(isStatic, outerGenericParams);
 }
 
 VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
@@ -1388,7 +1382,6 @@ Type SubscriptDecl::getGetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*isConstructor=*/false,
                                                        &outerParams);
 
   // Form the () -> element function type.
@@ -1414,8 +1407,7 @@ Type SubscriptDecl::getGetterInterfaceType() const {
     return getter->getInterfaceType();
 
   // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*isConstructor=*/false);
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false);
 
   auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
   auto indicesTy = interfaceTy->getInput();
@@ -1453,7 +1445,6 @@ Type SubscriptDecl::getSetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*isConstructor=*/false,
                                                        &outerParams);
 
   // Form the element -> () function type.
@@ -1481,8 +1472,7 @@ Type SubscriptDecl::getSetterInterfaceType() const {
     return setter->getInterfaceType();
 
   // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*isConstructor=*/false);
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false);
 
   auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
   auto indicesTy = interfaceTy->getInput();

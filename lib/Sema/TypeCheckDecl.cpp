@@ -1946,6 +1946,7 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
+    Type ResultTy = SelfTy->getRValueType();
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
     if (!SelfTy->hasReferenceSemantics())
@@ -2005,12 +2006,12 @@ public:
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
         FnTy = PolymorphicFunctionType::get(CD->getArgParams()->getType(),
-                                            SelfTy, innerGenericParams,
+                                            ResultTy, innerGenericParams,
                                             TC.Context);
       } else
         FnTy = FunctionType::get(CD->getArgParams()->getType(),
-                                 SelfTy, TC.Context);
-      Type SelfMetaTy = MetaTypeType::get(SelfTy, TC.Context);
+                                 ResultTy, TC.Context);
+      Type SelfMetaTy = MetaTypeType::get(ResultTy, TC.Context);
       if (outerGenericParams) {
         AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
                                                 outerGenericParams, TC.Context);

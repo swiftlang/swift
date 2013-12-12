@@ -91,7 +91,6 @@ Type DeclContext::getDeclaredInterfaceType() {
 static Type getSelfTypeForContainer(DeclContext *dc,
                                     Type containerTy,
                                     bool isStatic,
-                                    bool isConstructor,
                                     GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
@@ -113,9 +112,7 @@ static Type getSelfTypeForContainer(DeclContext *dc,
     return MetaTypeType::get(containerTy, dc->getASTContext());
 
   // Reference types have 'self' of type T.
-  //
-  // FIXME: Constructor 'self' values are never @inout, which is weird.
-  if (containerTy->hasReferenceSemantics() || isConstructor)
+  if (containerTy->hasReferenceSemantics())
     return containerTy;
 
   // All other types have 'self' of @inout T.
@@ -125,26 +122,23 @@ static Type getSelfTypeForContainer(DeclContext *dc,
 }
 
 Type DeclContext::getSelfTypeInContext(bool isStatic,
-                                       bool isConstructor,
                                        GenericParamList **outerGenericParams) {
   // Determine the type of the container.
   Type containerTy = getDeclaredTypeInContext();
   if (!containerTy)
     return nullptr;
 
-  return getSelfTypeForContainer(this, containerTy, isStatic, isConstructor,
+  return getSelfTypeForContainer(this, containerTy, isStatic,
                                  outerGenericParams);
 }
 
-Type DeclContext::getInterfaceSelfType(bool isStatic,
-                                       bool isConstructor) {
+Type DeclContext::getInterfaceSelfType(bool isStatic) {
   // Determine the type of the container.
   Type containerTy = getDeclaredInterfaceType();
   if (!containerTy)
     return nullptr;
   
-  return getSelfTypeForContainer(this, containerTy, isStatic, isConstructor,
-                                 nullptr);
+  return getSelfTypeForContainer(this, containerTy, isStatic, nullptr);
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {

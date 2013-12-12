@@ -163,14 +163,11 @@ public:
   /// \param isStatic Whether we're referring to a static method or some other
   /// static entity, for which the 'self' type will be a metatype.
   ///
-  /// \param isConstructor Whether we're producing the 'self' type for a
-  /// constructor.
-  ///
   /// \param outerGenericParams If non-null, receives the generic parameters
   /// corresponding to this declaration (if any).
   ///
   /// \returns the type of the 'self' parameter.
-  Type getSelfTypeInContext(bool isStatic, bool isConstructor,
+  Type getSelfTypeInContext(bool isStatic,
                             GenericParamList **outerGenericParams);
 
   /// Determine the interface type of 'self' as seen outside of the given
@@ -179,11 +176,8 @@ public:
   /// \param isStatic Whether we're referring to a static method or some other
   /// static entity, for which the 'self' type will be a metatype.
   ///
-  /// \param isConstructor Whether we're producing the 'self' type for a
-  /// constructor.
-  ///
   /// \returns the type of the 'self' parameter.
-  Type getInterfaceSelfType(bool isStatic, bool isConstructor);
+  Type getInterfaceSelfType(bool isStatic);
   
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not
