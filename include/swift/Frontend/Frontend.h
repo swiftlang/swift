@@ -47,7 +47,6 @@ class SerializedModuleLoader;
 
 class CompilerInvocation {
   std::string TargetTriple;
-  std::vector<std::string> FrameworkSearchPaths;
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string SDKPath;
   std::string ModuleSourceListPath;
@@ -104,11 +103,11 @@ public:
   }
 
   void setFrameworkSearchPaths(const std::vector<std::string> &Paths) {
-    FrameworkSearchPaths = Paths;
+    SearchPathOpts.FrameworkSearchPaths = Paths;
   }
 
   ArrayRef<std::string> getFrameworkSearchPaths() const {
-    return FrameworkSearchPaths;
+    return SearchPathOpts.FrameworkSearchPaths;
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {

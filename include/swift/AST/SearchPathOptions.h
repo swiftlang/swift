@@ -24,6 +24,9 @@ public:
   /// Path(s) which should be searched for modules.
   std::vector<std::string> ImportSearchPaths;
 
+  /// Path(s) which should be searched for frameworks.
+  std::vector<std::string> FrameworkSearchPaths;
+
   /// Path which includes the swift runtime.
   std::string RuntimeIncludePath;
 };
