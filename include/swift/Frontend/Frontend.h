@@ -72,8 +72,6 @@ class CompilerInvocation {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
-  bool DelayedFunctionBodyParsing = false;
-
 public:
   CompilerInvocation();
 
@@ -257,11 +255,11 @@ public:
   }
 
   void setDelayedFunctionBodyParsing(bool Val) {
-    DelayedFunctionBodyParsing = Val;
+    FrontendOpts.DelayedFunctionBodyParsing = Val;
   }
 
   bool isDelayedFunctionBodyParsing() const {
-    return DelayedFunctionBodyParsing;
+    return FrontendOpts.DelayedFunctionBodyParsing;
   }
 
   void setImmediate(bool Val) {

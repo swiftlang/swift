@@ -25,6 +25,10 @@ def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
 def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
   Flags<[HelpHidden]>, Alias<debug_constraints_attempt>;
 
+def delayed_function_body_parsing :
+  Flag<["-"], "delayed-function-body-parsing">,
+  HelpText<"Delay function body parsing until the end of all files">;
+
 def emit_sil_protocol_witness_tables :
   Flag<["-"], "emit-sil-protocol-witness-tables">, Flags<[HelpHidden]>,
   HelpText<"Emit experimental SIL protocol witness tables">;

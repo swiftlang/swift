@@ -55,6 +55,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.EmitVerboseSIL = true;
   }
 
+  if (Args.hasArg(OPT_delayed_function_body_parsing)) {
+    Opts.DelayedFunctionBodyParsing = true;
+  }
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT),
                                  Args.filtered_end())) {
     Opts.InputFilenames.push_back(A->getValue());

@@ -31,6 +31,10 @@ public:
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
+  /// Indicates whether function body parsing should be delayed
+  /// until the end of all files.
+  bool DelayedFunctionBodyParsing = false;
+
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
