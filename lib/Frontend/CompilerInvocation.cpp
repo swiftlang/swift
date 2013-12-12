@@ -80,11 +80,18 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+  if (ParsedArgs->hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : make_range(ParsedArgs->filtered_begin(OPT_UNKNOWN),
+                                   ParsedArgs->filtered_end())) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(*ParsedArgs));
+    }
     return true;
   }
 
-  bool HasUnknownArgument = false;
+  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
 
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
@@ -135,14 +142,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     case OPT_module_source_list:
       setModuleSourceListPath(InputArg->getValue());
       break;
-
-    case OPT_UNKNOWN:
-      HasUnknownArgument = true;
-      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                     InputArg->getAsString(*ParsedArgs));
-      break;
     }
   }
 
-  return HasUnknownArgument;
+  return false;
 }
