@@ -1,0 +1,147 @@
+// RUN: %sil-opt %s -mem2reg -verify | FileCheck %s
+
+import Builtin
+import swift
+
+// CHECK-LABEL: sil @store_only_allocas
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo0 (c : swift.Int64) -> ()
+sil @store_only_allocas : $@thin (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64  // var c               // users: %5, %2
+  store %0 to %1#1 : $*Int64                      // id: %2
+  // function_ref swift.print (val : swift.Int64) -> ()
+  %3 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int64) -> () // user: %4
+  %4 = apply %3(%0) : $@thin (Int64) -> ()
+  dealloc_stack %1#0 : $*@local_storage Int64     // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// swift.print (val : swift.Int64) -> ()
+sil @_TSs5printFT3valSi_T_ : $@thin (Int64) -> ()
+
+// CHECK-LABEL: sil @multiple_store_vals
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo1 (c : swift.Int64) -> swift.Int64
+sil @multiple_store_vals : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64  // var c               // users: %14, %2
+  store %0 to %1#1 : $*Int64                      // id: %2
+  %3 = alloc_stack $Int64  // var x               // users: %12, %11, %13, %6
+  %4 = integer_literal $Builtin.Int64, 2          // user: %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
+  store %5 to %3#1 : $*Int64                      // id: %6
+  %7 = integer_literal $Builtin.Int64, 5          // user: %9
+  %8 = integer_literal $Builtin.Int1, 0           // user: %10
+  %9 = struct $Int64 (%7 : $Builtin.Int64)        // users: %12, %15, %11
+  cond_fail %8 : $Builtin.Int1                    // id: %10
+  store %9 to %3#1 : $*Int64                      // id: %11
+  store %9 to %3#1 : $*Int64                      // id: %12
+  dealloc_stack %3#0 : $*@local_storage Int64     // id: %13
+  dealloc_stack %1#0 : $*@local_storage Int64     // id: %14
+  return %9 : $Int64                              // id: %15
+}
+
+// CHECK-LABEL: sil @multiple_store_vals2
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo2 (c : swift.Int64) -> swift.Int64
+sil @multiple_store_vals2 : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64  // var c               // users: %19, %2
+  store %0 to %1#1 : $*Int64                      // id: %2
+  %3 = alloc_box $Int64  // var x                 // users: %16, %11, %6
+  %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
+  store %5 to %3#1 : $*Int64                      // id: %6
+  %7 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %9
+  %8 = struct_extract %0 : $Int64, #value         // user: %9
+  %9 = apply %7(%8, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // users: %15, %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  strong_release %3#0 : $Builtin.ObjectPointer    // id: %11
+  br bb3(%5 : $Int64)                             // id: %12
+
+bb2:                                              // Preds: bb0
+  %13 = integer_literal $Builtin.Int64, 5         // user: %14
+  %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
+  cond_fail %9 : $Builtin.Int1                    // id: %15
+  strong_release %3#0 : $Builtin.ObjectPointer    // id: %16
+  br bb3(%14 : $Int64)                            // id: %17
+
+bb3(%18 : $Int64):                                // Preds: bb2 bb1
+  dealloc_stack %1#0 : $*@local_storage Int64     // id: %19
+  return %18 : $Int64                             // id: %20
+}
+
+// CHECK-LABEL: sil @with_loads
+// CHECK: alloc_stack
+// CHECK: return
+// simple.foo2 (c : swift.Int64) -> swift.Int64
+sil @with_loads : $@thin (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64  // var c               // users: %19, %2
+  store %0 to %1#1 : $*Int64                      // id: %2
+  %3 = alloc_box $Int64  // var x                 // users: %16, %11, %6
+  %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
+  store %5 to %3#1 : $*Int64                      // id: %6
+  %7 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %9
+  %8 = struct_extract %0 : $Int64, #value         // user: %9
+  %9 = apply %7(%8, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // users: %15, %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  strong_release %3#0 : $Builtin.ObjectPointer    // id: %11
+  br bb3(%5 : $Int64)                             // id: %12
+
+bb2:                                              // Preds: bb0
+  %13 = integer_literal $Builtin.Int64, 5         // user: %14
+  %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
+  cond_fail %9 : $Builtin.Int1                    // id: %15
+  strong_release %3#0 : $Builtin.ObjectPointer    // id: %16
+  br bb3(%14 : $Int64)                            // id: %17
+
+bb3(%18 : $Int64):                                // Preds: bb2 bb1
+  dealloc_stack %1#0 : $*@local_storage Int64     // id: %19
+  %20 = load %1#1 : $*Int64
+  return %18 : $Int64                             // id: %20
+}
+
+// CHECK-LABEL: sil @basic_block_with_loads_and_stores
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// test.foo3 (c : swift.Int64) -> ()
+sil @basic_block_with_loads_and_stores : $@thin (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64  // var c               // users: %20, %2
+  store %0 to %1#1 : $*Int64                      // id: %2
+  %3 = alloc_stack $Int64  // var x               // users: %14, %19, %6, %17
+  %4 = integer_literal $Builtin.Int64, 3          // user: %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
+  store %5 to %3#1 : $*Int64                      // id: %6
+  %7 = integer_literal $Builtin.Int64, 3          // user: %10
+  %8 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %10
+  %9 = struct_extract %0 : $Int64, #value         // user: %10
+  %10 = apply %8(%9, %7) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %11
+  %11 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %10
+
+  %12 = integer_literal $Builtin.Int64, 2         // user: %13
+  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
+  store %13 to %3#1 : $*Int64                     // id: %14
+  %15 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %10
+
+  // function_ref swift.print (val : swift.Int64) -> ()
+  %16 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int64) -> () // user: %18
+  %17 = load %3#1 : $*Int64                       // user: %18
+  %18 = apply %16(%17) : $@thin (Int64) -> ()
+  dealloc_stack %3#0 : $*@local_storage Int64     // id: %19
+  dealloc_stack %1#0 : $*@local_storage Int64     // id: %20
+  %21 = tuple ()                                  // user: %22
+  return %21 : $()                                // id: %22
+}
+

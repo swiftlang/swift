@@ -49,6 +49,11 @@ namespace swift {
   ///
   SILValue simplifyInstruction(SILInstruction *I);
 
+  /// \brief Recursively erase all of the uses of the instruction (but not the
+  /// instruction itself) and delete instructions that will become trivially
+  /// dead when this instruction is removed.
+  void eraseUsesOfInstruction(SILInstruction *Inst);
+
 } // end namespace swift
 
 #endif

@@ -121,3 +121,28 @@ swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
   return recursivelyDeleteTriviallyDeadInstructions(
            ArrayRef<SILInstruction*>(I), Force);
 }
+
+void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
+  for (auto UI : Inst->getUses()) {
+    auto *User = UI->getUser();
+
+    // If the instruction itself has any uses, recursively zap them so that
+    // nothing uses this instruction.
+    eraseUsesOfInstruction(User);
+
+    // Walk through the operand list and delete any random instructions that
+    // will become trivially dead when this instruction is removed.
+
+    for (auto &Op : User->getAllOperands()) {
+      if (auto *OpI = dyn_cast<SILInstruction>(Op.get().getDef())) {
+        // Don't recursively delete the pointer we're getting in.
+        if (OpI != Inst) {
+          Op.drop();
+          recursivelyDeleteTriviallyDeadInstructions(OpI);
+        }
+      }
+    }
+
+    User->eraseFromParent();
+  }
+}

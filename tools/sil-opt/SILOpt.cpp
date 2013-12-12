@@ -38,6 +38,7 @@ enum class PassKind {
   MandatoryInlining,
   PredictableMemoryOpt,
   SILCleanup,
+  SILMem2Reg,
   SILCombine,
   SILSpecialization,
   SimplifyCFG,
@@ -60,6 +61,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::CapturePromotion,
                                    "capture-promotion",
                                    "Promote closure capture variables"),
+                        clEnumValN(PassKind::SILMem2Reg,
+                                   "mem2reg",
+                                   "Promote stack allocations to registers"),
                         clEnumValN(PassKind::SILCleanup,
                                    "cleanup",
                                    "Cleanup SIL in preparation for IRGen"),
@@ -195,6 +199,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::SILCleanup:
       performSILCleanup(CI.getSILModule());
+      break;
+    case PassKind::SILMem2Reg:
+      performSILMem2Reg(CI.getSILModule());
       break;
     case PassKind::SILCombine:
       performSILCombine(CI.getSILModule());

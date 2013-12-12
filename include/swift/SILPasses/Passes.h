@@ -70,6 +70,9 @@ namespace swift {
   /// circularly inline
   void performSILMandatoryInlining(SILModule *M);
 
+  /// \brief Perform Mem2Reg.
+  void performSILMem2Reg(SILModule *M);
+
   /// \brief Promote closure captures from [inout] to by-value.
   void performSILCapturePromotion(SILModule *M);
 
