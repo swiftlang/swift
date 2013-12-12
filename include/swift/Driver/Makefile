@@ -17,6 +17,6 @@ TABLEGEN_INC_FILES_COMMON = 1
 
 include $(SWIFT_LEVEL)/Makefile
 
-$(ObjDir)/Options.inc.tmp : Options.td $(LLVM_TBLGEN) $(ObjDir)/.dir
+$(ObjDir)/Options.inc.tmp : Options.td FrontendOptions.td $(LLVM_TBLGEN) $(ObjDir)/.dir
 	$(Echo) "Building Swift Driver Option table with tblgen"
 	$(Verb) $(LLVMTableGen) -gen-opt-parser-defs -o $(call SYSPATH, $@) $<
