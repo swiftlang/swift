@@ -2616,6 +2616,14 @@ public:
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
+  static bool classof(const AbstractFunctionDecl *D) {
+    return classof(static_cast<const Decl*>(D));
+  }
+  static bool classof(const DeclContext *DC) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
+      return classof(fn);
+    return false;
+  }
 };
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
@@ -2925,6 +2933,14 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
+  static bool classof(const AbstractFunctionDecl *D) {
+    return classof(static_cast<const Decl*>(D));
+  }
+  static bool classof(const DeclContext *DC) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
+      return classof(fn);
+    return false;
+  }
 };
 
 /// DestructorDecl - Declares a destructor for a type.  For example:
@@ -2953,6 +2969,14 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;
+  }
+  static bool classof(const AbstractFunctionDecl *D) {
+    return classof(static_cast<const Decl*>(D));
+  }
+  static bool classof(const DeclContext *DC) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
+      return classof(fn);
+    return false;
   }
 };
 
