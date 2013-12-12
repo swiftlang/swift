@@ -33,9 +33,6 @@ namespace {
 
 /// Promote memory to registers
 class MemoryToRegisters {
-  /// Holds all of the AllocStacks in the program.
-  SmallVector<AllocStackInst*, 32> Allocations;
-
   /// The function that we are optimizing.
   SILFunction &F;
 
@@ -45,13 +42,6 @@ public:
 
   /// Promote memory to registers.
   void run();
-
-private:
-  /// Collect all of the AllocStacks in the program.
-  void collectAllocStackInstructions();
-
-  /// Promote a single AllocStack instruction.
-  void promoteAllocation(AllocStackInst *ASI);
 };
 
 } // end anonymous namespace.
@@ -87,7 +77,6 @@ static bool isCaptured(AllocStackInst *ASI) {
 
 /// Returns true if the AllocStack is only stored into.
 static bool isWriteOnlyAllocation(AllocStackInst *ASI) {
-
   // For all users of the AllocStack:
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
@@ -122,15 +111,10 @@ static bool isSingleBlockUsage(AllocStackInst *ASI) {
   return true;
 }
 
-void MemoryToRegisters::collectAllocStackInstructions() {
-  for (auto &BB : F)
-    for (auto &II : BB)
-      if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(&II))
-        Allocations.push_back(ASI);
-  DEBUG(llvm::errs() << "*** Found " << Allocations.size() << " AllocStacks\n");
-}
-
 /// Promote all of the AllocStacks in a single basic block in one linear scan.
+/// Note: This function deletes all of the users of the AllocStackInst,
+/// including the DeallocStackInst. However, it does not remove the
+// AllocStackInst itself!
 static void promoteAllocationInBlock(AllocStackInst *ASI) {
   DEBUG(llvm::errs() << "*** Promoting in-block: " << *ASI << "\n");
 
@@ -171,51 +155,61 @@ static void promoteAllocationInBlock(AllocStackInst *ASI) {
         Inst->eraseFromParent();
     }
   }
-
-  DEBUG(llvm::errs() << "*** Deleting " << *ASI << "\n");
-  ASI->eraseFromParent();
-  NumAllocStackRemoved++;
-}
-
-/// Delete the AllocStack and all of its users. This is used by write-only
-/// AllocStacks.
-static void deleteAllocation(AllocStackInst *ASI) {
-  DEBUG(llvm::errs() << "*** Deleting " << *ASI << "\n");
-
-  eraseUsesOfInstruction(ASI);
-  ASI->eraseFromParent();
-
-  NumAllocStackRemoved++;
-}
-
-void MemoryToRegisters::promoteAllocation(AllocStackInst *ASI) {
-  DEBUG(llvm::errs() << "*** Memory to register looking at: " << *ASI << "\n");
-  NumAllocStackFound++;
-
-  // Don't handle captured AllocStacks.
-  if (isCaptured(ASI)) {
-    NumAllocStackCaptured++;
-    return;
-  }
-
-  // For AllocStacks that are only used within a single basic blocks, use the
-  // linear sweep to remove the AllocStack.
-  if (isSingleBlockUsage(ASI))
-    return promoteAllocationInBlock(ASI);
-
-  // Remove write-only AllocStacks.
-  if (isWriteOnlyAllocation(ASI))
-   return deleteAllocation(ASI);
-
-  DEBUG(llvm::errs() << "*** Need to insert PHIs for " << *ASI << "\n");
-  // TODO: Replace AllocStacks with PHI-nodes ...
 }
 
 void MemoryToRegisters::run() {
-  collectAllocStackInstructions();
+  for (auto &BB : F) {
+    auto I = BB.begin(), E = BB.end();
+    while (I != E) {
+      SILInstruction *Inst = I;
+      AllocStackInst *ASI = dyn_cast<AllocStackInst>(Inst);
+      if (!ASI) {
+        ++I;
+        continue;
+      }
 
-  for (auto A : Allocations)
-    promoteAllocation(A);
+      DEBUG(llvm::errs()<< "*** Memory to register looking at: " << *I << "\n");
+      NumAllocStackFound++;
+
+      // Don't handle captured AllocStacks.
+      if (isCaptured(ASI)) {
+        NumAllocStackCaptured++;
+        ++I;
+        continue;
+      }
+
+      // For AllocStacks that are only used within a single basic blocks, use
+      // the linear sweep to remove the AllocStack.
+      if (isSingleBlockUsage(ASI)) {
+        promoteAllocationInBlock(ASI);
+
+        DEBUG(llvm::errs() << "*** Deleting single block AllocStackInst: " <<
+              *ASI << "\n");
+        I++;
+        ASI->eraseFromParent();
+        NumAllocStackRemoved++;
+        continue;
+      }
+
+      // Remove write-only AllocStacks.
+      if (isWriteOnlyAllocation(ASI)) {
+        eraseUsesOfInstruction(ASI);
+
+        DEBUG(llvm::errs() << "*** Deleting store-only AllocStackInst: " <<
+              *ASI << "\n");
+        I++;
+        ASI->eraseFromParent();
+        NumAllocStackRemoved++;
+        continue;
+      }
+
+      DEBUG(llvm::errs() << "*** Need to insert PHIs for " << *ASI << "\n");
+      // TODO: Replace AllocStacks with PHI-nodes ...
+
+      // Move iterator to avoid invalidation.
+      ++I;
+    }
+  }
 }
 
 void promoteAllocasInFunction(SILFunction &F) {
