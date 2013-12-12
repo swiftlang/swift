@@ -581,16 +581,11 @@ namespace {
 class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
   ClangImporter::Implementation &Impl;
   swift::VisibleDeclConsumer &NextConsumer;
-  const ClangModuleUnit *ModuleFilter = nullptr;
 
 public:
   ImportingVisibleDeclConsumer(ClangImporter::Implementation &Impl,
                                swift::VisibleDeclConsumer &NextConsumer)
       : Impl(Impl), NextConsumer(NextConsumer) {}
-
-  void filterByModule(const ClangModuleUnit *CMU) {
-    ModuleFilter = CMU;
-  }
 
   void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
                  clang::DeclContext *Ctx,
@@ -602,8 +597,7 @@ public:
       return;
 
     if (auto Imported = cast_or_null<ValueDecl>(Impl.importDecl(ND)))
-      if (isVisibleFromModule(ModuleFilter, Imported))
-        NextConsumer.foundDecl(Imported, DeclVisibilityKind::VisibleAtTopLevel);
+      NextConsumer.foundDecl(Imported, DeclVisibilityKind::VisibleAtTopLevel);
   }
 };
 
