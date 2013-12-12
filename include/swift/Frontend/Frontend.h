@@ -171,6 +171,11 @@ public:
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
 
+  ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
+  const ClangImporterOptions &getClangImporterOptions() const {
+    return ClangImporterOpts;
+  }
+
   void setParseStdlib() {
     ParseStdlib = true;
   }
