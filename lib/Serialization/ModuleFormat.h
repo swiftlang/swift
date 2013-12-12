@@ -926,9 +926,6 @@ namespace index_block {
   /// The names should be kept in sync, but the values must \em not be
   /// renumbered or reordered without incrementing VERSION_MAJOR.
   enum KnownProtocolKind : uint8_t {
-    /// Not a known protocol, but force deserialization anyway.
-    FORCE_DESERIALIZATION,
-
     ArrayBound = 1,
     Sequence,
     // killed

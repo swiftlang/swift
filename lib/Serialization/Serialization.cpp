@@ -283,7 +283,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) BLOCK_RECORD(index_block, Id);
 #include "swift/AST/KnownProtocols.def"
-  BLOCK_RECORD(index_block, FORCE_DESERIALIZATION);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -1250,9 +1249,6 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto pattern : fn->getBodyParamPatterns())
       writePattern(pattern);
 
-    if (fn->getAttrs().isConversion())
-      EagerDeserializationDecls.push_back(addDeclRef(DC));
-
     break;
   }
 
@@ -2008,8 +2004,6 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
         writeKnownProtocolList(AdopterList, static_cast<KnownProtocolKind>(i),
                                KnownProtocolAdopters[i]);
       }
-      AdopterList.emit(ScratchRecord, index_block::FORCE_DESERIALIZATION,
-                       EagerDeserializationDecls);
     }
   }
 

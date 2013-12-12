@@ -127,8 +127,8 @@ private:
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
 
+  /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
-  SmallVector<DeclID, 2> EagerDeserializationDecls;
 
   /// The last assigned DeclID for decls from this module.
   DeclID LastDeclID = 0;

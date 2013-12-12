@@ -151,8 +151,6 @@ static Optional<KnownProtocolKind> getActualKnownProtocol(unsigned rawKind) {
 #define PROTOCOL(Id) \
   case index_block::Id: return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
-  case index_block::FORCE_DESERIALIZATION:
-    llvm_unreachable("must handle FORCE_DESERIALIZATION explicitly");
   }
 
   // If there's a new case value in the module file, ignore it.
@@ -181,9 +179,7 @@ bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
       unsigned rawKind = cursor.readRecord(next.ID, scratch);
 
       DeclIDVector *list;
-      if (rawKind == index_block::FORCE_DESERIALIZATION) {
-        list = &EagerDeserializationDecls;
-      } else if (auto actualKind = getActualKnownProtocol(rawKind)) {
+      if (auto actualKind = getActualKnownProtocol(rawKind)) {
         auto index = static_cast<unsigned>(actualKind.getValue());
         list = &KnownProtocolAdopters[index];
       } else {
@@ -529,13 +525,6 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
   if (missingDependency) {
     error(ModuleStatus::MissingDependency);
     return false;
-  }
-
-  // Process decls we know we want to eagerly deserialize.
-  for (DeclID DID : EagerDeserializationDecls) {
-    Decl *decl = getDecl(DID);
-    if (auto nominal = getAnyNominal(decl))
-      loadExtensions(nominal);
   }
 
   return Status == ModuleStatus::Valid;
