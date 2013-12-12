@@ -44,6 +44,12 @@ namespace llvm {
   class Type;
   class AttributeSet;
 }
+namespace clang {
+  namespace CodeGen {
+    class CodeGenABITypes;
+  }
+}
+using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
   class ASTContext;
@@ -107,6 +113,9 @@ public:
   SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
+  /// A Clang-to-IR-type converter for types appearing in function
+  /// signatures of Objective-C methods and C functions.
+  CodeGenABITypes *ABITypes;
 
   /// Does the current target require Objective-C interoperation?
   static const bool ObjCInterop = true;

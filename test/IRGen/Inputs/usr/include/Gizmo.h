@@ -22,6 +22,12 @@ struct NSRect {
   } size;
 };
 
+struct Trio {
+  double i;
+  double j;
+  double k;
+};
+
 typedef long NSInteger;
 
 @interface Gizmo : NSObject
@@ -61,6 +67,11 @@ NSString *NSStringFromRect(struct NSRect r);
 - (void)runce;
 - (void)funge;
 - (void)foo;
+@end
+
+@interface NSStructReturns
+- (struct Rect)newRect;
+- (struct Trio)newTrio;
 @end
 
 typedef NS_ENUM(unsigned short, NSRuncingOptions) {
