@@ -293,8 +293,10 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
   llvm::BitstreamCursor cursor{InputReader};
 
   for (unsigned char byte : SIGNATURE) {
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
-      return error();
+    if (cursor.AtEndOfStream() || cursor.Read(8) != byte) {
+      error();
+      return;
+    }
   }
 
   // Future-proofing: make sure we validate the control block before we try to
@@ -306,24 +308,30 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     switch (topLevelEntry.ID) {
     case llvm::bitc::BLOCKINFO_BLOCK_ID:
-      if (cursor.ReadBlockInfoBlock())
-        return error();
+      if (cursor.ReadBlockInfoBlock()) {
+        error();
+        return;
+      }
       break;
 
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
       ModuleStatus err = validateControlBlock(cursor, scratch);
-      if (err != ModuleStatus::Valid)
-        return error(err);
+      if (err != ModuleStatus::Valid) {
+        error(err);
+        return;
+      }
 
       hasValidControlBlock = true;
       break;
     }
 
     case INPUT_BLOCK_ID: {
-      if (!hasValidControlBlock)
-        return error();
+      if (!hasValidControlBlock) {
+        error();
+        return;
+      }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
 
@@ -362,31 +370,37 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        return error();
+        error();
 
       break;
     }
 
     case DECLS_AND_TYPES_BLOCK_ID: {
-      if (!hasValidControlBlock)
-        return error();
+      if (!hasValidControlBlock) {
+        error();
+        return;
+      }
 
       // The decls-and-types block is lazily loaded. Save the cursor and load
       // any abbrev records at the start of the block.
       DeclTypeCursor = cursor;
       DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID);
       if (DeclTypeCursor.advance().Kind == llvm::BitstreamEntry::Error)
-        return error();
+        error();
 
       // With the main cursor, skip over the block and continue.
-      if (cursor.SkipBlock())
-        return error();
+      if (cursor.SkipBlock()) {
+        error();
+        return;
+      }
       break;
     }
 
     case IDENTIFIER_DATA_BLOCK_ID: {
-      if (!hasValidControlBlock)
-        return error();
+      if (!hasValidControlBlock) {
+        error();
+        return;
+      }
 
       cursor.EnterSubBlock(IDENTIFIER_DATA_BLOCK_ID);
 
@@ -410,17 +424,19 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
         next = cursor.advanceSkippingSubblocks();
       }
 
-      if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        return error();
+      if (next.Kind != llvm::BitstreamEntry::EndBlock) {
+        error();
+        return;
+      }
 
       break;
     }
 
     case INDEX_BLOCK_ID: {
-      if (!hasValidControlBlock)
-        return error();
-      if (!readIndexBlock(cursor))
-        return error();
+      if (!hasValidControlBlock || !readIndexBlock(cursor)) {
+        error();
+        return;
+      }
       break;
     }
 
@@ -430,8 +446,10 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
       SILIndexCursor.EnterSubBlock(SIL_INDEX_BLOCK_ID);
 
       // With the main cursor, skip over the block and continue.
-      if (cursor.SkipBlock())
-        return error();
+      if (cursor.SkipBlock()) {
+        error();
+        return;
+      }
       break;
     }
 
@@ -441,24 +459,30 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
       SILCursor.EnterSubBlock(SIL_BLOCK_ID);
 
       // With the main cursor, skip over the block and continue.
-      if (cursor.SkipBlock())
-        return error();
+      if (cursor.SkipBlock()) {
+        error();
+        return;
+      }
       break;
     }
 
     default:
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
-      if (cursor.SkipBlock())
-        return error();
+      if (cursor.SkipBlock()) {
+        error();
+        return;
+      }
       break;
     }
     
     topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
   }
   
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
-    return error();
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+    error();
+    return;
+  }
 }
 
 static NominalTypeDecl *getAnyNominal(Decl *D) {
