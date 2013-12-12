@@ -35,6 +35,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::Initializer:
     return Type();
 
   case DeclContextKind::ExtensionDecl: {
@@ -56,6 +57,7 @@ Type DeclContext::getDeclaredTypeInContext() {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::Initializer:
     return Type();
 
   case DeclContextKind::ExtensionDecl:
@@ -73,6 +75,7 @@ Type DeclContext::getDeclaredInterfaceType() {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::Initializer:
     return Type();
 
   case DeclContextKind::ExtensionDecl:
@@ -151,6 +154,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   case DeclContextKind::TopLevelCodeDecl:
     return nullptr;
 
+  case DeclContextKind::Initializer:
   case DeclContextKind::AbstractClosureExpr:
     return nullptr;
 
@@ -192,6 +196,7 @@ DeclContext::getGenericSignatureOfContext()const {
   case DeclContextKind::FileUnit:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
     return {{}, {}};
 
   case DeclContextKind::AbstractFunctionDecl: {
@@ -262,6 +267,7 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::FileUnit:
       return false;
 
+    case DeclContextKind::Initializer:
     case DeclContextKind::AbstractClosureExpr:
       // Check parent context.
       break;
@@ -320,6 +326,9 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<TopLevelCodeDecl>(this)->walk(Walker);
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
+  case DeclContextKind::Initializer:
+    // Is there any point in trying to walk the expression?
+    return false;
   }
 }
 
@@ -349,6 +358,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
+  case DeclContextKind::Initializer:      Kind = "Initializer"; break;
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
     break;
@@ -390,6 +400,19 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     OS << " name=" << cast<AbstractFunctionDecl>(this)->getName();
     OS << " : " << cast<AbstractClosureExpr>(this)->getType();
     break;
+  case DeclContextKind::Initializer:
+    switch (cast<Initializer>(this)->getInitializerKind()) {
+    case InitializerKind::PatternBinding: {
+      auto init = cast<PatternBindingInitializer>(this);
+      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      break;
+    }
+    case InitializerKind::DefaultArgument: {
+      auto init = cast<DefaultArgumentInitializer>(this);
+      OS << " DefaultArgument index=" << init->getIndex();
+      break;
+    }
+    }
   }
 
   OS << "\n";

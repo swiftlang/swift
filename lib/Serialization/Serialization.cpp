@@ -108,6 +108,7 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     return nullptr;
   case DeclContextKind::FileUnit:
     return getDeclForContext(DC->getParent());
+  case DeclContextKind::Initializer:
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
     llvm_unreachable("shouldn't serialize decls from anonymous closures");

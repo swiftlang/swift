@@ -2130,6 +2130,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::Initializer:
       llvm_unreachable("cannot have type params");
 
     case DeclContextKind::NominalTypeDecl:

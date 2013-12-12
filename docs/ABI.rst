@@ -687,8 +687,9 @@ Globals
   local-marker ::= 'L'
 
 Entity manglings all start with a nominal-type-kind (``[COPV]``), an
-identifier (``[0-9oX]``), or a substitution (``[S]``).  Global manglings start
-with any of those or ``[MTWw]``.
+identifier (``[0-9oX]``), a local context introducer (``[FI]``), or a
+substitution (``[S]``).  Global manglings start with any of those or
+``[MTWw]``.
 
 If a partial application forwarder is for a static symbol, its name will
 start with the sequence ``_TPA_`` followed by the mangled symbol name of the
@@ -727,6 +728,8 @@ Declaration Contexts
 
   context ::= module
   context ::= 'F' function
+  context ::= 'ID' index context             // default argument
+  context ::= 'IV' entity                    // variable initializer
   context ::= nominal-type
   context ::= protocol-context
   module ::= substitution                    // other substitution

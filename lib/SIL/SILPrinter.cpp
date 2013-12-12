@@ -157,6 +157,11 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     printFullContext(Context->getParent(), Buffer);
     return;
 
+  case DeclContextKind::Initializer:
+    // FIXME
+    Buffer << "<initializer>";
+    return;
+
   case DeclContextKind::AbstractClosureExpr:
     // FIXME
     Buffer << "<anonymous function>";

@@ -72,6 +72,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         case DeclContextKind::Module:
         case DeclContextKind::FileUnit:
         case DeclContextKind::TopLevelCodeDecl:
+        case DeclContextKind::Initializer:
           break;
 
         case DeclContextKind::NominalTypeDecl:

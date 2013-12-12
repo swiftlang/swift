@@ -661,6 +661,17 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     os << "extension";
     break;
 
+  case DeclContextKind::Initializer:
+    switch (cast<Initializer>(dc)->getInitializerKind()) {
+    case InitializerKind::PatternBinding:
+      os << "pattern binding initializer";
+      break;
+    case InitializerKind::DefaultArgument:
+      os << "default argument initializer";
+      break;
+    }
+    break;
+
   case DeclContextKind::TopLevelCodeDecl:
     os << "top-level code";
     break;

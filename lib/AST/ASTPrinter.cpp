@@ -1061,6 +1061,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       visit(cast<ExtensionDecl>(DC)->getExtendedType());
       return;
 
+    case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
       llvm_unreachable("bad decl context");
 

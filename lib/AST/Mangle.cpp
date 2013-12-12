@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Punycode.h"
@@ -184,6 +185,52 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
   mangleDeclContext(decl->getDeclContext());
 }
 
+namespace {
+  class FindFirstVariableName :
+    public PatternVisitor<FindFirstVariableName, Identifier> {
+  public:
+    Identifier visitNamedPattern(NamedPattern *P) {
+      return P->getDecl()->getName();
+    }
+
+    Identifier visitTuplePattern(TuplePattern *P) {
+      for (auto &elt : P->getFields()) {
+        Identifier id = visit(elt.getPattern());
+        if (!id.empty()) return id;
+      }
+      return Identifier();
+    }
+
+    Identifier visitParenPattern(ParenPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    Identifier visitTypedPattern(TypedPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    Identifier visitAnyPattern(AnyPattern *P) {
+      return Identifier();
+    }
+
+    // Refutable patterns shouldn't ever come up.
+#define REFUTABLE_PATTERN(ID, BASE)                                        \
+    Identifier visit##ID##Pattern(ID##Pattern *P) {                        \
+      llvm_unreachable("shouldn't be visiting a refutable pattern here!"); \
+    }
+#define PATTERN(ID, BASE)
+#include "swift/AST/PatternNodes.def"
+  };
+}
+
+/// Find the first identifier bound by the given binding.  This
+/// assumes that field and global-variable bindings always bind at
+/// least one name, which is probably a reasonable assumption but may
+/// not be adequately enforced.
+static Identifier findFirstVariableName(PatternBindingDecl *binding) {
+  auto ident = FindFirstVariableName().visit(binding->getPattern());
+  assert(!ident.empty() && "pattern-binding bound no names?");
+  return ident;
+}
+
 void Mangler::mangleDeclContext(DeclContext *ctx) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module: {
@@ -258,6 +305,25 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     mangleDeclName(cast<DestructorDecl>(AFD), IncludeType::No);
     return;
   }
+
+  case DeclContextKind::Initializer:
+    switch (cast<Initializer>(ctx)->getInitializerKind()) {
+    case InitializerKind::DefaultArgument: {
+      auto argInit = cast<DefaultArgumentInitializer>(ctx);
+      Buffer << "ID" << Index(argInit->getIndex());
+      mangleDeclContext(ctx->getParent());
+      return;
+    }
+
+    case InitializerKind::PatternBinding: {
+      auto patternInit = cast<PatternBindingInitializer>(ctx);
+      Buffer << "IV";
+      mangleDeclContext(patternInit->getBinding()->getDeclContext());
+      mangleIdentifier(findFirstVariableName(patternInit->getBinding()));
+      return;
+    }
+    }
+    llvm_unreachable("bad initializer kind");
 
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.

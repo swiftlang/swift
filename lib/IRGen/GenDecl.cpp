@@ -1282,6 +1282,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::Initializer:
     return AbstractCC::Freestanding;
 
   case DeclContextKind::ExtensionDecl:

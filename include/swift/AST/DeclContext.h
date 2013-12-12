@@ -59,15 +59,17 @@ namespace swift {
 // hierarchy.  Commented out members are abstract classes.  This formation
 // allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
-  Module,
-  FileUnit,
   AbstractClosureExpr,
-  NominalTypeDecl,
-  ExtensionDecl,
+  Initializer,
   TopLevelCodeDecl,
   AbstractFunctionDecl,
+  Last_LocalDeclContextKind = AbstractFunctionDecl,
 
-  Last_DeclContextKind = AbstractFunctionDecl
+  Module,
+  FileUnit,
+  NominalTypeDecl,
+  ExtensionDecl,
+  Last_DeclContextKind = ExtensionDecl
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -108,9 +110,7 @@ public:
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
-    return getContextKind() == DeclContextKind::AbstractClosureExpr ||
-           getContextKind() == DeclContextKind::TopLevelCodeDecl ||
-           getContextKind() == DeclContextKind::AbstractFunctionDecl;
+    return getContextKind() <= DeclContextKind::Last_LocalDeclContextKind;
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.
