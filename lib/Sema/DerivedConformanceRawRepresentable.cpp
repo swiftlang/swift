@@ -152,9 +152,8 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   toRawDecl->setBody(body);
   
   tc.typeCheckDecl(toRawDecl, /*FirstPass*/ true);
-  bool error = tc.typeCheckFunctionBodyUntil(toRawDecl, SourceLoc());
-  assert(!error); (void)error;
-  
+  tc.implicitlyDefinedFunctions.push_back(toRawDecl);
+
   return insertDecl(enumDecl, toRawDecl);
 }
 
@@ -273,8 +272,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   fromRawDecl->setBody(body);
   
   tc.typeCheckDecl(fromRawDecl, /*FirstPass*/ true);
-  bool error = tc.typeCheckFunctionBodyUntil(fromRawDecl, SourceLoc());
-  assert(!error); (void)error;
+  tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
 
   return insertDecl(enumDecl, fromRawDecl);
 }
