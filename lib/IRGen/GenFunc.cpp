@@ -59,10 +59,6 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILModule.h"
-#include "clang/AST/CanonicalType.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/Type.h"
-#include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Intrinsics.h"
@@ -562,19 +558,7 @@ llvm::Type *SignatureExpansion::expandResult() {
       return IGM.VoidTy;
 
   ExplosionSchema schema = IGM.getSchema(resultType, ExplosionLevel);
-  switch (FnType->getAbstractCC()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    HasIndirectResult =
-      requiresExternalIndirectResult(IGM, FnType, ExplosionLevel);
-    break;
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-    HasIndirectResult = schema.requiresIndirectResult(IGM);
-    break;
-  }
-
+  HasIndirectResult = schema.requiresIndirectResult(IGM);
   if (HasIndirectResult) {
     const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
     addPointerParameter(resultTI.getStorageType());
@@ -1544,21 +1528,6 @@ void CallEmission::setFromCallee() {
   }
 }
 
-/// Given a Swift type, attempt to return an appropriate Clang
-/// CanQualType for the purpose of generating correct code for the
-/// ABI.
-static clang::CanQualType getClangABIType(CanType swiftTy) {
-  // FIXME: ProtocolType generates a struct and might need special
-  //        handling here for some platforms.
-  if (auto structTy = swiftTy->getAs<StructType>())
-    if (auto *clangDecl = structTy->getDecl()->getClangDecl()) {
-      auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-      return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
-    }
-
-  return clang::CanQualType();
-}
-
 /// Does an ObjC method or C function returning the given type require an
 /// sret indirect result?
 llvm::PointerType *
@@ -1569,27 +1538,8 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
     return IGM.getStoragePointerType(fnType->getIndirectResult().getSILType());
   }
 
-  auto resultTy = fnType->getResult().getSILType();
-  auto clangTy = getClangABIType(resultTy.getSwiftRValueType());
-
-  // We are unable to produce an appropriate Clang type in some cases,
-  // so fall back on the test used for native Swift types.
-  if (!clangTy)
-    return IGM.requiresIndirectResult(fnType->getResult().getSILType(), level);
-
-  auto &ABITypes = *IGM.ABITypes;
-  SmallVector<clang::CanQualType,1> args;
-
-  auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-
-  auto &returnInfo = FI.getReturnInfo();
-  if (!returnInfo.isIndirect())
-    return nullptr;
-
-  auto &ti = IGM.getTypeInfo(resultTy);
-  return ti.getStorageType()->getPointerTo();
+  // FIXME: we need to consider the target's C calling convention.
+  return IGM.requiresIndirectResult(fnType->getResult().getSILType(), level);
 }
 
 /// Does an argument of this type need to be passed by value on the stack to

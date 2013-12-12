@@ -19,7 +19,6 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Options.h"
-#include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -38,7 +37,6 @@
 
 using namespace swift;
 using namespace irgen;
-using clang::CodeGen::CodeGenABITypes;
 using llvm::Attribute;
 
 const unsigned DefaultAS = 0;
@@ -201,13 +199,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-
-  auto &clangASTContext = CI->getClangASTContext();
-  ABITypes = new CodeGenABITypes(clangASTContext, Module, DataLayout);
-
   if (Opts.DebugInfo) {
+    auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+    assert(CI && "no clang module loader");
     DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module);
   }
 }
@@ -216,7 +210,6 @@ IRGenModule::~IRGenModule() {
   delete &Types;
   if (DebugInfo)
     delete DebugInfo;
-  delete ABITypes;
 }
 
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
