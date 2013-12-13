@@ -602,7 +602,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       UnhandledStatic = false;
     }
     Status = parseDeclSubscript(Flags & PD_HasContainerType,
-                                !(Flags & PD_DisallowFuncDef),
+                                !(Flags & PD_InProtocol),
                                 Attributes, Entries);
     break;
   
@@ -1663,10 +1663,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     Attributes.clearAttribute(AK_inout);
   }
 
-
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
-  if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
+  if (!(Flags & PD_AllowTopLevel) && 
+      !(Flags & PD_InProtocol) &&
       Tok.isAnyOperator()) {
     // FIXME: Recovery here is awful.
     diagnose(Tok, diag::func_decl_nonglobal_operator);
@@ -1763,13 +1763,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
-      if (Flags & PD_DisallowFuncDef) {
-        diagnose(Tok, diag::disallowed_func_def);
-        consumeToken();
-        skipUntil(tok::r_brace);
-        consumeToken();
-        // FIXME: don't just drop the body.
-      } else if (!isDelayedParsingEnabled()) {
+      if (!isDelayedParsingEnabled()) {
         ParserResult<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
@@ -1783,9 +1777,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
       } else {
         consumeAbstractFunctionBody(FD, Attributes);
       }
-    } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
-               !SignatureStatus.isError() && !isInSILMode()) {
-      diagnose(Tok.getLoc(), diag::func_decl_without_brace);
     }
   }
 
@@ -2330,7 +2321,7 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
       if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
                                   diag::expected_rbrace_protocol,
                                   PD_HasContainerType | PD_DisallowComputedVar |
-                                  PD_DisallowFuncDef | PD_DisallowNominalTypes |
+                                  PD_DisallowNominalTypes |
                                   PD_DisallowInit | PD_DisallowTypeAliasDef |
                                   PD_InProtocol))
         Status.setIsParseError();

@@ -1682,9 +1682,42 @@ public:
     FD->setOperatorDecl(op);
   }
 
+  /// Determine whether the given declaration requires a definition.
+  ///
+  /// Only valid for declarations that can have definitions, i.e.,
+  /// functions, initializers, etc.
+  static bool requiresDefinition(Decl *decl) {
+    // Invalid, implicit, and Clang-imported declarations never
+    // require a definition.
+    if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+      return false;
+
+    // Functions can have an asmname attribute.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (!func->getAttrs().AsmName.empty())
+        return false;
+    }
+
+    // Declarations in SIL don't require definitions.
+    if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
+      if (sourceFile->Kind == SourceFileKind::SIL)
+        return false;
+    }
+
+    // Everything else requires a definition.
+    return true;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
-    if (!IsFirstPass && FD->getBody())
-      TC.definedFunctions.push_back(FD);
+    if (!IsFirstPass) {
+      if (FD->getBody()) {
+        // Record the body.
+        TC.definedFunctions.push_back(FD);
+      } else if (requiresDefinition(FD)) {
+        // Complain if we should have a body.
+        TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+      }
+    }
 
     if (IsSecondPass || FD->hasType())
       return;
