@@ -1329,7 +1329,10 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "associated_type_protocol ("
          << assocProtoWitness.Requirement->getName() << ": "
          << assocProtoWitness.Protocol->getName() << "): ";
-      assocProtoWitness.Witness->printName(OS);
+      if (assocProtoWitness.Witness)
+        assocProtoWitness.Witness->printName(OS);
+      else
+        OS << "dependent";
       break;
     }
     case BaseProtocol: {

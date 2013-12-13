@@ -1205,7 +1205,7 @@ public:
       emitObjCConformanceThunks(inherited.first, inherited.second);
   }
   
-  /// Emit SIL functions for all the members of the type.
+  /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
     for (Decl *member : e->getMembers())
       visit(member);
@@ -1836,10 +1836,18 @@ public:
                                       witness.Replacement->getCanonicalType()});
     
     // Emit records for the protocol requirements on the type.
-    for (auto conformance : witness.Conformance) {
+    assert(td->getProtocols().size() == witness.Conformance.size()
+           && "number of conformances in assoc type substitution do not match "
+              "number of requirements on assoc type");
+    for (unsigned i = 0, e = td->getProtocols().size(); i < e; ++i) {
+      auto protocol = td->getProtocols()[i];
+      auto conformance = witness.Conformance[i];
+      assert((!conformance || conformance->getProtocol() == protocol)
+             && "conformance order does not match protocol order");
       Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-                          td, conformance->getProtocol(),
-                          conformance});
+        td, protocol,
+        conformance
+      });
     }
   }
 
@@ -1869,46 +1877,36 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILDeclRef witness,
                                   IsFreeFunctionWitness_t isFree,
                                   ArrayRef<Substitution> witnessSubs) {
-  ASTContext &C = M.getASTContext();
-  
-  // Get the type of the witness with its witnessing substitutions applied.
+  // Get the type of the protocol requirement and the original type of the
+  // witness.
   // FIXME: Rework for interface types.
-  auto witnessTy = Types.getConstantFormalType(witness);
-  auto requirementTy = Types.getConstantFormalType(requirement);
+  auto requirementTy
+    = cast<PolymorphicFunctionType>(Types.getConstantFormalType(requirement));
+  auto witnessOrigTy = Types.getConstantFormalType(witness);
   unsigned witnessUncurryLevel = witness.uncurryLevel;
 
-  // If the witness is a free function, add the artificial self metatype
-  // argument and uncurry level to its signature.
-  if (isFree) {
-    auto metaty = CanMetaTypeType::get(
-                                conformance->getType()->getCanonicalType(), C);
-    witnessTy = CanFunctionType::get(metaty, witnessTy, C);
-    ++witnessUncurryLevel;
+  // Substitute the 'self' type into the requirement to get the concrete
+  // witness type.
+  auto witnessSubstTy = cast<AnyFunctionType>(
+    requirementTy
+      ->substGenericArgs(conformance->getContainingModule(),
+                         conformance->getType())
+      ->getCanonicalType());
+  // If the conformance is generic, its generic parameters apply to
+  // the witness.
+  GenericParamList *conformanceParams = conformance->getGenericParams();
+  if (conformanceParams) {
+    witnessSubstTy = CanPolymorphicFunctionType::get(witnessSubstTy.getInput(),
+                                                   witnessSubstTy.getResult(),
+                                                   conformanceParams,
+                                                   witnessSubstTy->getExtInfo(),
+                                                   getASTContext());
   }
   
-  // Substitute generic arguments from the conformance.
-  if (auto pft = dyn_cast<PolymorphicFunctionType>(witnessTy.getResult())) {
-    CanAnyFunctionType witnessMethodTy = cast<FunctionType>(
-      pft->substGenericArgs(M.getSwiftModule(), witnessSubs)
-        ->getCanonicalType());
-    
-    // If the requirement is generic, apply its generic parameters to the
-    // witness type.
-    if (auto reqtPFT
-               = dyn_cast<PolymorphicFunctionType>(requirementTy.getResult())) {
-      witnessMethodTy = CanPolymorphicFunctionType::get(witnessMethodTy.getInput(),
-                                                witnessMethodTy.getResult(),
-                                                &reqtPFT->getGenericParams(),
-                                                witnessMethodTy->getExtInfo(),
-                                                C);
-    }
-    
-    witnessTy = CanFunctionType::get(witnessTy.getInput(), witnessMethodTy,
-                                     witnessTy->getExtInfo(), C);
-  } else {
-    assert(witnessSubs.empty() &&
-           "substitutions for nongeneric witness?!");
-  }
+  // If the witness is a free function, consider the self argument
+  // uncurry level.
+  if (isFree)
+    ++witnessUncurryLevel;
   
   // The witness SIL function has the type of the AST-level witness, at the
   // abstraction level of the original protocol requirement.
@@ -1922,19 +1920,15 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // not. Handle this special case in the witness type before applying the
   // abstraction change.
   auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;
-  if (!isa<LValueType>(witnessTy.getInput())
+  if (!isa<LValueType>(witnessOrigTy.getInput())
       && isa<LValueType>(requirementTy.getInput())) {
     inOutSelf = HasInOutSelfAbstractionDifference;
-    witnessTy = CanFunctionType::get(
-                   CanLValueType::get(witnessTy.getInput(),
-                                      LValueType::Qual::DefaultForInOutSelf, C),
-                   witnessTy.getResult(), witnessTy->getExtInfo(), C);
   }
       
   // Lower the witness type with the requirement's abstraction level.
   SILType witnessSILType = Types.getLoweredType(
                                               AbstractionPattern(requirementTy),
-                                              witnessTy,
+                                              witnessSubstTy,
                                               requirement.uncurryLevel);
   
   auto *f = new (M) SILFunction(M, SILLinkage::Internal, "",

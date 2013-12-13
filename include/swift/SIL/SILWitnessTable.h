@@ -63,7 +63,8 @@ public:
     AssociatedTypeDecl *Requirement;
     /// The protocol requirement on the type.
     ProtocolDecl *Protocol;
-    /// The ProtocolConformance satisfying the requirement.
+    /// The ProtocolConformance satisfying the requirement. Null if the
+    /// conformance is dependent.
     ProtocolConformance *Witness;
   };
   
