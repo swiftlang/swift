@@ -211,7 +211,6 @@ namespace {
 class CSE {
 public:
   SILModule &Module;
-  DominanceInfo *DT;
 
   typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase*> SimpleValueHTType;
   typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator,
