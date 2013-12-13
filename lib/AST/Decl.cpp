@@ -257,10 +257,11 @@ static void associateConformingValueDecls(ProtocolConformance *Conformance,
   if (!Conformance)
     return;
 
-  for (auto Witness : Conformance->getWitnesses()) {
-    if (Witness.second)
-      Ctx.recordConformingDecl(Witness.second.getDecl(), Witness.first);
-  }
+  Conformance->forEachValueWitness([&](ValueDecl *req,
+                                       ConcreteDeclRef witness) {
+    if (witness)
+      Ctx.recordConformingDecl(witness.getDecl(), req);
+  });
   
   for (auto InheritedConf: Conformance->getInheritedConformances())
     associateConformingValueDecls(InheritedConf.second, Ctx);

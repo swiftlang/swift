@@ -598,42 +598,6 @@ Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
   return append;
 }
 
-namespace {
-  /// Apply the given function object to each value witness within the
-  /// given protocol conformance.
-  ///
-  /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c ConcreteDeclRef for the witness.
-  template<typename F>
-  void forEachValueWitness(const ProtocolConformance *conformance, F f) {
-    const ProtocolDecl *protocol = conformance->getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto valueReq = dyn_cast<ValueDecl>(req);
-      if (!valueReq || isa<AssociatedTypeDecl>(valueReq))
-        continue;
-
-      f(valueReq, conformance->getWitness(valueReq));
-    }
-  }
-
-  /// Apply the given function object to each type witness within the given
-  /// protocol conformance.
-  ///
-  /// The function object should accept an \c AssociatedTypeDecl* for the
-  /// requirement followed by the \c Substitution for the witness.
-  template<typename F>
-  void forEachTypeWitness(const ProtocolConformance *conformance, F f) {
-    const ProtocolDecl *protocol = conformance->getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req);
-      if (!assocTypeReq)
-        continue;
-
-      f(assocTypeReq, conformance->getTypeWitness(assocTypeReq));
-    }
-  }
-}
-
 void
 Serializer::writeConformance(const ProtocolDecl *protocol,
                              const ProtocolConformance *conformance,
@@ -663,8 +627,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numValueWitnesses = 0;
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
-    forEachValueWitness(conformance,
-                        [&](ValueDecl *req, ConcreteDeclRef witness) {
+    conformance->forEachValueWitness([&](ValueDecl *req,
+                                         ConcreteDeclRef witness) {
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       // The substitution records are serialized later.
@@ -672,9 +636,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       ++numValueWitnesses;
     });
 
-    forEachTypeWitness(conformance,
-                       [&](AssociatedTypeDecl *assocType,
-                           const Substitution &witness) {
+    conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+                                        const Substitution &witness) {
        data.push_back(addDeclRef(assocType));
        // The substitution record is serialized later.
        ++numTypeWitnesses;
@@ -705,13 +668,12 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     }
     writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
                       abbrCodes);
-    forEachValueWitness(conformance,
-                        [&](ValueDecl *req, ConcreteDeclRef witness) {
+    conformance->forEachValueWitness([&](ValueDecl *req,
+                                         ConcreteDeclRef witness) {
       writeSubstitutions(witness.getSubstitutions(), abbrCodes);
     });
-    forEachTypeWitness(conformance,
-                       [&](AssociatedTypeDecl *assocType,
-                           const Substitution &witness) {
+    conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+                                        const Substitution &witness) {
       writeSubstitutions(witness, abbrCodes);
     });
 
@@ -722,9 +684,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     auto conf = cast<SpecializedProtocolConformance>(conformance);
     SmallVector<DeclID, 16> data;
     unsigned numTypeWitnesses = 0;
-    forEachTypeWitness(conf,
-                       [&](AssociatedTypeDecl *assocType,
-                           const Substitution &witness) {
+    conf->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+                                 const Substitution &witness) {
        data.push_back(addDeclRef(assocType));
        // The substitution record is serialized later.
        ++numTypeWitnesses;
@@ -749,9 +710,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                      data);
     writeSubstitutions(substitutions, abbrCodes);
 
-    forEachTypeWitness(conformance,
-                       [&](AssociatedTypeDecl *assocType,
-                           const Substitution &witness) {
+    conf->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+                                 const Substitution &witness) {
       writeSubstitutions(witness, abbrCodes);
     });
 

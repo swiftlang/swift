@@ -1188,19 +1188,22 @@ public:
   void emitObjCConformanceThunks(ProtocolDecl *protocol,
                                  ProtocolConformance *conformance) {
     assert(conformance);
-    if (protocol->isObjC())
-      for (auto &mapping : conformance->getWitnesses()) {
-        if (!mapping.second)
-          continue;
+    if (protocol->isObjC()) {
+      conformance->forEachValueWitness([&](ValueDecl *req,
+                                           ConcreteDeclRef witness) {
+        if (!witness)
+          return;
         
-        ValueDecl *vd = mapping.second.getDecl();
+        ValueDecl *vd = witness.getDecl();
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);
         else if (auto *prop = cast<VarDecl>(vd))
           SGM.emitObjCPropertyMethodThunks(prop);
         else
           llvm_unreachable("unexpected conformance mapping");
-      }
+      });
+    }
+
     for (auto &inherited : conformance->getInheritedConformances())
       emitObjCConformanceThunks(inherited.first, inherited.second);
   }
@@ -1807,13 +1810,10 @@ public:
   
   void visitFuncDecl(FuncDecl *fd) {
     // Find the witness in the conformance.
-    auto foundWitness = Conformance->getWitnesses().find(fd);
-    assert(foundWitness != Conformance->getWitnesses().end()
-           && "no witness for protocol requirement");
-    
+    ConcreteDeclRef witness = Conformance->getWitness(fd);
+
     // Emit the witness thunk and add it to the table.
     SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
-    ConcreteDeclRef witness = foundWitness->second;
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
     auto isFree = isFreeFunctionWitness(fd, witness.getDecl());

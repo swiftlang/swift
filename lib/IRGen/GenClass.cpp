@@ -799,16 +799,18 @@ namespace {
                               ProtocolConformance *conformance) {
       assert(TheExtension &&
              "should only consider objc conformances for extensions");
-      if (protocol->isObjC())
-        for (auto &mapping : conformance->getWitnesses()) {
+      if (protocol->isObjC()) {
+        conformance->forEachValueWitness([&](ValueDecl *req,
+                                             ConcreteDeclRef witness) {
           // Missing optional requirement.
-          if (!mapping.second)
-            continue;
+          if (!witness)
+            return;
 
-          ValueDecl *vd = mapping.second.getDecl();
+          ValueDecl *vd = witness.getDecl();
           if (vd->getDeclContext() != TheExtension)
             visit(vd);
-        }
+        });
+      }
       
       for (auto &inherited : conformance->getInheritedConformances())
         visitObjCConformance(inherited.first, inherited.second);

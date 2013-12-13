@@ -17,6 +17,7 @@
 #define SWIFT_AST_PROTOCOLCONFORMANCE_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -27,13 +28,10 @@
 
 namespace swift {
 
-class AssociatedTypeDecl;
 class ASTContext;
 class GenericParamList;
 class ProtocolConformance;
-class ProtocolDecl;
 class SubstitutableType;
-class ValueDecl;
 class Module;
   
 /// \brief Type substitution mapping from substitutable types to their
@@ -107,12 +105,47 @@ public:
   /// Retrieve the complete set of type witnesses.
   const TypeWitnessMap &getTypeWitnesses() const;
 
+  /// Apply the given function object to each type witness within this
+  /// protocol conformance.
+  ///
+  /// The function object should accept an \c AssociatedTypeDecl* for the
+  /// requirement followed by the \c Substitution for the witness.
+  template<typename F>
+  void forEachTypeWitness(F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req);
+      if (!assocTypeReq || req->isInvalid())
+        continue;
+
+      f(assocTypeReq, getTypeWitness(assocTypeReq));
+    }
+  }
+
   /// Retrieve the non-type witness for the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement) const {
     const auto &witnesses = getWitnesses();
     auto known = witnesses.find(requirement);
     assert(known != witnesses.end());
     return known->second;
+  }
+
+  /// Apply the given function object to each value witness within this
+  /// protocol conformance.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement
+  /// followed by the \c ConcreteDeclRef for the witness.
+  template<typename F>
+  void forEachValueWitness(F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
+          valueReq->isInvalid())
+        continue;
+
+      f(valueReq, getWitness(valueReq));
+    }
   }
 
   /// Retrieve the complete set of non-type witnesses.

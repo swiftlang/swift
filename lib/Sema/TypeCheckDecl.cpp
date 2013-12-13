@@ -1429,11 +1429,14 @@ public:
                             ProtocolConformance *conformance) {
     if (!conformance)
       return;
-    if (protocol->isObjC())
-      for (auto &mapping : conformance->getWitnesses()) {
-        if (mapping.first->isObjC() && mapping.second)
-          mapping.second.getDecl()->setIsObjC(true);
-      }
+    if (protocol->isObjC()) {
+      conformance->forEachValueWitness([&](ValueDecl *req,
+                                           ConcreteDeclRef witness) {
+        if (req->isObjC() && witness)
+          witness.getDecl()->setIsObjC(true);
+      });
+    }
+
     for (auto &inherited : conformance->getInheritedConformances())
       checkObjCConformance(inherited.first, inherited.second);
   }

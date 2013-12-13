@@ -2124,6 +2124,17 @@ namespace {
           }
         }
 
+        // Introduce empty mappings for any requirements not handled by the
+        // above.
+        for (auto req : proto->getMembers()) {
+          auto valueReq = dyn_cast<ValueDecl>(req);
+          if (!valueReq)
+            continue;
+
+          if (Mapping.count(valueReq) == 0)
+            Mapping[valueReq] = valueReq;
+        }
+
         Conformances.push_back(Ctx.getConformance(dc->getDeclaredTypeOfContext(),
                                                   proto, dc->getParentModule(),
                                                   std::move(Mapping),
