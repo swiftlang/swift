@@ -986,6 +986,21 @@ namespace {
     }
     
     Type visitIsaExpr(IsaExpr *expr) {
+      // Validate the type.
+      auto &tc = CS.getTypeChecker();
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
+                          /*allowUnboundGenerics=*/true))
+        return nullptr;
+
+      // Open up the type we're checking.
+      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      // Add a checked cast constraint.
+      auto fromType = expr->getSubExpr()->getType();
+      CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
+                       CS.getConstraintLocator(expr, { }));
+
       // The result is Bool.
       return CS.getTypeChecker().lookupBoolType(CS.DC);
     }
@@ -1128,12 +1143,10 @@ namespace {
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Don't recur into array-new, default-value expressions, or "is"
-      // expressions.
+      // Don't recur into array-new or default-value expressions.
       return {
         !isa<NewArrayExpr>(expr)
-          && !isa<DefaultValueExpr>(expr)
-          && !isa<IsaExpr>(expr),
+          && !isa<DefaultValueExpr>(expr),
         expr
       };
     }
@@ -1204,13 +1217,6 @@ namespace {
       // visit that first.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         auto type = CG.visitNewArrayExpr(newArray);
-        expr->setType(type);
-        return { false, expr };
-      }
-
-      // For isa expressions, we've already visited the subexpression.
-      if (auto cast = dyn_cast<IsaExpr>(expr)) {
-        auto type = CG.visit(cast);
         expr->setType(type);
         return { false, expr };
       }

@@ -497,120 +497,12 @@ namespace {
         return expr;
       }
 
-      // For a dynamic type check "x is T", check it first.
-      if (auto isa = dyn_cast<IsaExpr>(expr)) {
-        // If there is no subexpression, the sequence hasn't been folded yet.
-        // We'll require another pass.
-        if (!isa->getSubExpr()) {
-          RequiresAnotherPass = true;
-          return isa;
-        }
-
-        // Validate the type.
-        if (TC.validateType(isa->getCastTypeLoc(), DC,
-                            /*allowUnboundGenerics=*/true))
-          return nullptr;
-
-        CheckedCastKind castKind = checkCheckedCastExpr(isa);
-        switch (castKind) {
-          // Invalid type check.
-        case CheckedCastKind::Unresolved:
-          return nullptr;
-          // Check is trivially true.
-        case CheckedCastKind::Coercion:
-          TC.diagnose(isa->getLoc(), diag::isa_is_always_true,
-                      isa->getSubExpr()->getType(),
-                      isa->getCastTypeLoc().getType());
-          break;
-
-          // Valid checks.
-        case CheckedCastKind::Downcast:
-        case CheckedCastKind::SuperToArchetype:
-        case CheckedCastKind::ArchetypeToArchetype:
-        case CheckedCastKind::ArchetypeToConcrete:
-        case CheckedCastKind::ExistentialToArchetype:
-        case CheckedCastKind::ExistentialToConcrete:
-        case CheckedCastKind::ConcreteToArchetype:
-        case CheckedCastKind::ConcreteToUnrelatedExistential:
-          isa->setCastKind(castKind);
-          break;
-        }
-        return isa;
-      }
-
       return expr;
     }
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Never walk into statements.
       return { false, stmt };
-    }
-
-  private:
-    /// Expression type-checking listener for checking a cast.
-    class CastCheckListener : public ExprTypeCheckListener {
-      Type &ToType;
-
-    public:
-      explicit CastCheckListener(Type &toType) : ToType(toType) { }
-
-      virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
-        // Open up the type we're casting to.
-        ToType = cs.openType(ToType);
-
-        // Either convert the expression to the given type or perform a
-        // checked cast to the given type.
-        auto fromType = expr->getType();
-        auto locator = cs.getConstraintLocator(expr, { });
-        Constraint *constraints[2] = {
-          Constraint::create(cs, ConstraintKind::Conversion, fromType, ToType,
-                             Identifier(), locator),
-          Constraint::create(cs, ConstraintKind::CheckedCast, fromType, ToType,
-                             Identifier(), locator),
-        };
-        cs.addConstraint(Constraint::createDisjunction(cs, constraints,
-                                                       locator));
-
-        return false;
-      }
-
-      void solvedConstraints(Solution &solution) {
-        // Simplify the type we're converting to.
-        ConstraintSystem &cs = solution.getConstraintSystem();
-        ToType = solution.simplifyType(cs.getTypeChecker(), ToType);
-      }
-    };
-
-    /// Type-check a checked cast expression.
-    CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
-      // Simplify the type we're converting to.
-      Type toType = expr->getCastTypeLoc().getType();
-
-      // Type-check the subexpression.
-      CastCheckListener listener(toType);
-      Expr *sub = expr->getSubExpr();
-      if (TC.typeCheckExpression(sub, DC, Type(), /*discardedExpr=*/false,
-                                 FreeTypeVariableBinding::Disallow,
-                                 &listener)) {
-        return CheckedCastKind::Unresolved;
-      }
-
-      sub = TC.coerceToRValue(sub);
-      if (!sub) {
-        return CheckedCastKind::Unresolved;
-      }
-      expr->setSubExpr(sub);
-
-      Type fromType = sub->getType();
-      expr->getCastTypeLoc().setType(toType);
-      return TC.typeCheckCheckedCast(fromType, toType, DC,
-                                     expr->getLoc(),
-                                     sub->getSourceRange(),
-                                     expr->getCastTypeLoc().getSourceRange(),
-                                     [&](Type commonTy) -> bool {
-                                       return TC.convertToType(sub, commonTy,
-                                                               DC);
-                                     });
     }
   };
 }

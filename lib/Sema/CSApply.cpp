@@ -1731,12 +1731,57 @@ namespace {
     }
 
     Expr *visitIsaExpr(IsaExpr *expr) {
+      // Turn the subexpression into an rvalue.
+      auto &tc = cs.getTypeChecker();
+      auto sub = tc.coerceToRValue(expr->getSubExpr());
+      if (!sub)
+        return nullptr;
+      expr->setSubExpr(sub);
+
+      // Set the type we checked against.
+      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      auto fromType = sub->getType();
+      auto castKind = tc.typeCheckCheckedCast(
+                        fromType, toType, cs.DC,
+                        expr->getLoc(),
+                        sub->getSourceRange(),
+                        expr->getCastTypeLoc().getSourceRange(),
+                        [&](Type commonTy) -> bool {
+                          return tc.convertToType(sub, commonTy, cs.DC);
+                        });
+      
+      switch (castKind) {
+      case CheckedCastKind::Unresolved:
+        // Invalid type check.
+        return nullptr;
+      case CheckedCastKind::Coercion:
+        // Check is trivially true.
+        tc.diagnose(expr->getLoc(), diag::isa_is_always_true,
+                    expr->getSubExpr()->getType(),
+                    expr->getCastTypeLoc().getType());
+        expr->setCastKind(castKind);
+        break;
+      
+      case CheckedCastKind::Downcast:
+      case CheckedCastKind::SuperToArchetype:
+      case CheckedCastKind::ArchetypeToArchetype:
+      case CheckedCastKind::ArchetypeToConcrete:
+      case CheckedCastKind::ExistentialToArchetype:
+      case CheckedCastKind::ExistentialToConcrete:
+      case CheckedCastKind::ConcreteToArchetype:
+      case CheckedCastKind::ConcreteToUnrelatedExistential:
+        // Valid checks.
+        expr->setCastKind(castKind);
+        break;
+      }
+
       // SIL-generation magically turns this into a Bool; make sure it can.
       if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
-        cs.getTypeChecker().diagnose(expr->getLoc(),
-                                     diag::bool_intrinsics_not_found);
+        tc.diagnose(expr->getLoc(), diag::bool_intrinsics_not_found);
         // Continue anyway.
       }
+
       return expr;
     }
 
@@ -3071,11 +3116,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         Rewriter.visitNewArrayExpr(newArray);
         return { false, expr };
-      }
-
-      // For isa checks, the subexpression has already been checked.
-      if (auto isa = dyn_cast<IsaExpr>(expr)) {
-        return { false, Rewriter.visit(isa) };
       }
 
       // For a default-value expression, do nothing.
