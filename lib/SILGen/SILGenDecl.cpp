@@ -1760,8 +1760,8 @@ public:
     // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C))
   {
-    // ObjC protocols do not use witness tables.
-    if (Conformance->getProtocol()->isObjC())
+    // Not all protocols use witness tables.
+    if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))
       Conformance = nullptr;
   }
   
@@ -1784,6 +1784,10 @@ public:
   }
   
   void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {
+    // Only include the witness if the base protocol requires it.
+    if (!SGM.Types.protocolRequiresWitnessTable(baseProtocol))
+      return;
+    
     auto foundBaseConformance
       = Conformance->getInheritedConformances().find(baseProtocol);
     assert(foundBaseConformance != Conformance->getInheritedConformances().end()
@@ -1841,6 +1845,11 @@ public:
               "number of requirements on assoc type");
     for (unsigned i = 0, e = td->getProtocols().size(); i < e; ++i) {
       auto protocol = td->getProtocols()[i];
+      
+      // Only reference the witness if the protocol requires it.
+      if (!SGM.Types.protocolRequiresWitnessTable(protocol))
+        continue;
+      
       auto conformance = witness.Conformance[i];
       assert((!conformance || conformance->getProtocol() == protocol)
              && "conformance order does not match protocol order");

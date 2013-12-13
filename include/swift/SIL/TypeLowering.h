@@ -400,17 +400,18 @@ public:
 
   /// Get the calling convention used by witnesses of a protocol.
   static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
-    // Class protocols can use the regular class method CC...
-    if (P->requiresClass()) {
-      // ...except for ObjC protocols, which use the objc method
-      // convention.
-      if (P->isObjC())
-        return AbstractCC::ObjCMethod;
-      return AbstractCC::Method;
-    }
+    // ObjC protocols use the objc method
+    // convention.
+    if (P->isObjC())
+      return AbstractCC::ObjCMethod;
     
-    // Opaque protocols use the witness calling convention.
+    // Native protocols use the witness calling convention.
     return AbstractCC::WitnessMethod;
+  }
+  
+  /// True if a protocol uses witness tables for dynamic dispatch.
+  static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
+    return !P->isObjC();
   }
   
   /// Is the given declaration resilient from the current context?
