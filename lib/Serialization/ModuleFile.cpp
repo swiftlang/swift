@@ -545,10 +545,6 @@ void ModuleFile::lookupValue(Identifier name,
 
   for (auto item : *iter) {
     auto VD = cast<ValueDecl>(getDecl(item.second));
-    // Force load our own extensions, which may contain conformances.
-    if (auto TD = dyn_cast<TypeDecl>(VD))
-      if (auto nominal = TD->getDeclaredType()->getAnyNominal())
-        loadExtensions(nominal);
     results.push_back(VD);
   }
 }
@@ -686,8 +682,6 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
   for (DeclID DID : KnownProtocolAdopters[index]) {
     Decl *D = getDecl(DID);
     getContext().recordConformance(kind, D);
-    if (auto nominal = getAnyNominal(D))
-      loadExtensions(nominal);
   }
 }
 
