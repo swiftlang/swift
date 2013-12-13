@@ -219,6 +219,37 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
+/// Find a (possibly-inherited) conformance for a particular protocol.
+// FIXME: Checking the module is not very resilient. What if the conformance is
+// moved into a re-exported module instead?
+static ProtocolConformance *findConformance(ProtocolDecl *proto,
+                                            const Module *module,
+                                            ProtocolConformance *conformance) {
+  if (!conformance)
+    return nullptr;
+
+  if (conformance->getProtocol() == proto) {
+    if (conformance->getContainingModule() == module)
+      return conformance;
+    return nullptr;
+  }
+
+  auto &inheritedMap = conformance->getInheritedConformances();
+  auto directIter = inheritedMap.find(proto);
+  if (directIter != inheritedMap.end()) {
+    if (directIter->second->getContainingModule() == module)
+      return directIter->second;
+    return nullptr;
+  }
+
+  for (auto inheritedEntry : inheritedMap)
+    if (auto result = findConformance(proto, module, inheritedEntry.second))
+      return result;
+
+  return nullptr;
+}
+
+
 ProtocolConformance *
 ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
                                       DeclID typeID,
@@ -232,27 +263,17 @@ ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
   // Dig out the protocol conformance within the nominal declaration.
   auto nominal = cast<NominalTypeDecl>(getDecl(typeID));
   Module *owningModule = getModule(moduleID);
-  (void)owningModule; // FIXME: Currently only used for checking.
 
   // Search protocols
-  for (unsigned i = 0, n = nominal->getProtocols().size(); i != n; ++i) {
-    if (nominal->getProtocols()[i] == proto) {
-      // FIXME: Eventually, filter by owning module.
-      assert(nominal->getModuleContext() == owningModule);
-      return nominal->getConformances()[i];
-    }
-  }
+  for (auto conformance : nominal->getConformances())
+    if (auto result = findConformance(proto, owningModule, conformance))
+      return result;
 
   // Search extensions.
-  for (auto ext : nominal->getExtensions()) {
-    for (unsigned i = 0, n = ext->getProtocols().size(); i != n; ++i) {
-      if (ext->getProtocols()[i] == proto) {
-        // FIXME: Eventually, filter by owning module.
-        assert(ext->getModuleContext() == owningModule);
-        return ext->getConformances()[i];
-      }
-    }
-  }
+  for (auto ext : nominal->getExtensions())
+    for (auto conformance : ext->getConformances())
+      if (auto result = findConformance(proto, owningModule, conformance))
+        return result;
 
   llvm_unreachable("Unable to find underlying conformance");
 }
