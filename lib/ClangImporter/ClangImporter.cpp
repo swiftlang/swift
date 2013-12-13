@@ -79,15 +79,15 @@ ClangImporter::~ClangImporter() {
 
 #pragma mark Module loading
 
-ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
+ClangImporter *ClangImporter::create(ASTContext &ctx,
                                      StringRef targetTriple,
-                                     StringRef swiftRuntimeIncludePath,
                                      StringRef moduleCachePath,
-                                     ArrayRef<std::string> importSearchPaths,
-                                     ArrayRef<std::string> frameworkSearchPaths,
                                      StringRef overrideResourceDir,
                                      ArrayRef<std::string> extraArgs) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
+
+  // Get the SearchPathOptions to use when creating the Clang importer.
+  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
   // Create a Clang diagnostics engine.
   // FIXME: Route these diagnostics back to Swift's diagnostics engine,
@@ -108,16 +108,16 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w",
-    "-isysroot", sdkroot.str(), "-triple", targetTriple.str(),
+    "-isysroot", searchPathOpts.SDKPath, "-triple", targetTriple.str(),
     "swift.m"
   };
 
-  for (auto path : importSearchPaths) {
+  for (auto path : searchPathOpts.ImportSearchPaths) {
     invocationArgStrs.push_back("-I");
     invocationArgStrs.push_back(path);
   }
 
-  for (auto path : frameworkSearchPaths) {
+  for (auto path : searchPathOpts.FrameworkSearchPaths) {
     invocationArgStrs.push_back("-F");
     invocationArgStrs.push_back(path);
   }
@@ -137,7 +137,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   }
 
   if (overrideResourceDir.empty()) {
-    llvm::SmallString<128> resourceDir(swiftRuntimeIncludePath);
+    llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeIncludePath);
   
     // Adjust the path torefer to our copy of the Clang headers under
     // lib/swift/clang.

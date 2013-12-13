@@ -50,21 +50,11 @@ public:
   /// module into the given ASTContext.
   ///
   /// \param ctx The ASTContext into which the module will be imported.
-  ///
-  /// \param sdkroot The path to the SDK from which modules will be imported.
-  /// The SDK must support building modules with Clang.
+  /// The ASTContext's SearchPathOptions will be used for the Clang importer.
   ///
   /// \param targetTriple The target triple to use for the import.
   ///
   /// \param moduleCachePath The module cache path.
-  ///
-  /// \param swiftRuntimeIncludePath The /path/to/lib/swift. Can be empty if
-  /// \c overrideResourceDir is set instead.
-  ///
-  /// \param importSearchPaths Additional paths to search for user modules.
-  ///
-  /// \param frameworkSearchPaths Additional paths to search for user
-  /// frameworks.
   ///
   /// \param overrideResourceDir If nonempty, the path to use to locate the
   /// resources for Clang.  This should at least have an include/ subdirectory
@@ -74,12 +64,8 @@ public:
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
-  static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
-                               StringRef targetTriple,
-                               StringRef swiftRuntimeIncludePath,
+  static ClangImporter *create(ASTContext &ctx, StringRef targetTriple,
                                StringRef moduleCachePath,
-                               ArrayRef<std::string> importSearchPaths = {},
-                               ArrayRef<std::string> frameworkSearchPaths = {},
                                StringRef overrideResourceDir = StringRef(),
                                ArrayRef<std::string> extraArgs = {});
 
