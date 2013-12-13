@@ -81,7 +81,7 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(Si),
 /// (id, id, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                           OWNED(PS__),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, id, BOOL *));
 
