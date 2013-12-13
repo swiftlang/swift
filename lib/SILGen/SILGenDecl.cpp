@@ -1910,9 +1910,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               witnessTy,
                                               requirement.uncurryLevel);
   
-  // TODO: Should have internal linkage when we actually implement thunk
-  // generation. The verifier rejects undefined internal symbols.
-  auto *f = new (M) SILFunction(M, SILLinkage::External, "",
+  auto *f = new (M) SILFunction(M, SILLinkage::Internal, "",
                                 witnessSILType.castTo<SILFunctionType>(),
                                 SILLocation(witness.getDecl()),
                                 IsNotBare,
@@ -1930,12 +1928,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                        requirement.uncurryLevel);
   buffer.flush();
   
-  /*TODO
   // Create the witness.
   SILGenFunction(*this, *f)
     .emitProtocolWitness(conformance, requirement, witness, witnessSubs,
                          isFree, inOutSelf);
-   */
   
   return f;
 }

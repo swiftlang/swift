@@ -151,7 +151,7 @@ enum {
 class SILValue {
   llvm::PointerIntPair<ValueBase*, ValueResultNumberBits> ValueAndResultNumber;
   
-  SILValue(void *p) {
+  explicit SILValue(void *p) {
     ValueAndResultNumber =
       decltype(ValueAndResultNumber)::getFromOpaqueValue(p);
   }

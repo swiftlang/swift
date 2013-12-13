@@ -412,6 +412,15 @@ public:
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
   
+  /// Generate a protocol witness entry point, invoking 'witness' at the
+  /// abstraction level of 'requirement'.
+  void emitProtocolWitness(ProtocolConformance *conformance,
+                           SILDeclRef requirement,
+                           SILDeclRef witness,
+                           ArrayRef<Substitution> witnessSubs,
+                           IsFreeFunctionWitness_t isFree,
+                           HasInOutSelfAbstractionDifference_t inOutSelf);
+  
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//

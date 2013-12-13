@@ -647,6 +647,107 @@ namespace {
   };
 }
 
+/// Forward arguments according to a function type's ownership conventions.
+void forwardFunctionArguments(SILGenFunction &gen,
+                              SILLocation loc,
+                              CanSILFunctionType fTy,
+                              ArrayRef<ManagedValue> managedArgs,
+                              SmallVectorImpl<SILValue> &forwardedArgs) {
+  auto argTypes = fTy->getParametersWithoutIndirectResult();
+  for (auto index : indices(managedArgs)) {
+    auto &arg = managedArgs[index];
+    auto argTy = argTypes[index];
+    forwardedArgs.push_back(argTy.isConsumed() ? arg.forward(gen)
+                                               : arg.getValue());
+  }
+}
+
+/// Create a temporary result buffer, reuse an existing result address, or
+/// return null, based on the calling convention of a function type.
+SILValue getThunkInnerResultAddr(SILGenFunction &gen,
+                                 SILLocation loc,
+                                 CanSILFunctionType fTy,
+                                 SILValue outerResultAddr) {
+  if (fTy->hasIndirectResult()) {
+    auto resultType = fTy->getIndirectResult().getSILType();
+    
+    // Re-use the original result if possible.
+    if (outerResultAddr && outerResultAddr.getType() == resultType)
+      return outerResultAddr;
+    else
+      return gen.emitTemporaryAllocation(loc, resultType);
+  }
+  return {};
+}
+
+/// Return the result of a function application as the result from a thunk.
+SILValue getThunkResult(SILGenFunction &gen,
+                        SILLocation loc,
+                        TranslationKind kind,
+                        CanSILFunctionType fTy,
+                        AbstractionPattern origResultType,
+                        CanType substResultType,
+                        SILValue innerResultValue,
+                        SILValue innerResultAddr,
+                        SILValue outerResultAddr) {
+  // Convert the direct result to +1 if necessary.
+  auto &innerResultTL = gen.getTypeLowering(fTy->getSemanticResultSILType());
+  if (!fTy->hasIndirectResult()) {
+    switch (fTy->getResult().getConvention()) {
+    case ResultConvention::Owned:
+      break;
+    case ResultConvention::Autoreleased:
+      innerResultValue =
+        gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
+      break;
+    case ResultConvention::Unowned:
+      innerResultValue =
+        innerResultTL.emitCopyValue(gen.B, loc, innerResultValue);
+      break;
+    }
+  }
+  
+  // Control the result value.  The real result value is in the
+  // indirect output if it exists.
+  ManagedValue innerResult;
+  if (innerResultAddr) {
+    innerResult = gen.emitManagedBufferWithCleanup(innerResultAddr,
+                                                   innerResultTL);
+  } else {
+    innerResult = gen.emitManagedRValueWithCleanup(innerResultValue,
+                                                   innerResultTL);
+  }
+
+  if (outerResultAddr) {
+    // If we emitted directly, there's nothing more to do.
+    // Let the caller claim the result.
+    if (innerResultAddr == outerResultAddr) {
+      innerResult.forwardCleanup(gen);
+      innerResult = {};
+    // Otherwise we'll have to copy over.
+    } else {
+      TemporaryInitialization init(outerResultAddr, CleanupHandle::invalid());
+      auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
+                                               substResultType, innerResult,
+                                               /*emitInto*/ SGFContext(&init));
+      emitForceInto(gen, loc, translated, init);
+    }
+    
+    // Use the () from the call as the result of the outer function if
+    // it's available.
+    if (innerResultAddr) {
+      return innerResultValue;
+    } else {
+      auto voidTy = gen.SGM.Types.getEmptyTupleType();
+      return gen.B.createTuple(loc, voidTy, {});
+    }
+  } else {
+    auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
+                                             substResultType, innerResult);
+    return translated.forward(gen);
+  }
+}
+
 /// Build the body of a transformation thunk.
 static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
                            TranslationKind kind,
@@ -690,26 +791,13 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   SmallVector<SILValue, 8> argValues;
 
   // Create an indirect result buffer if required.
-  SILValue innerResultAddr;
-  if (fnType->hasIndirectResult()) {
-    auto resultType = fnType->getIndirectResult().getSILType();
-
-    // Re-use the original result if possible.
-    if (outerResultAddr && outerResultAddr.getType() == resultType) {
-      innerResultAddr = outerResultAddr;
-    } else {
-      innerResultAddr = gen.emitTemporaryAllocation(loc, resultType);
-    }
+  SILValue innerResultAddr = getThunkInnerResultAddr(gen, loc,
+                                                     fnType, outerResultAddr);
+  if (innerResultAddr)
     argValues.push_back(innerResultAddr);
-  }
 
   // Add the rest of the arguments.
-  for (auto index : indices(args)) {
-    auto &arg = args[index];
-    auto argType = argTypes[index];
-    argValues.push_back(argType.isConsumed() ? arg.forward(gen)
-                                             : arg.getValue());
-  }
+  forwardFunctionArguments(gen, loc, fnType, args, argValues);
 
   SILValue innerResultValue =
     gen.B.createApply(loc, fnValue.forward(gen),
@@ -718,67 +806,15 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
                       /*substitutions*/ {},
                       argValues);
 
-  // Convert the direct result to +1 if necessary.
-  auto &innerResultTL = gen.getTypeLowering(fnType->getSemanticResultSILType());
-  if (!fnType->hasIndirectResult()) {
-    switch (fnType->getResult().getConvention()) {
-    case ResultConvention::Owned:
-      break;
-    case ResultConvention::Autoreleased:
-      innerResultValue =
-        gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
-      break;
-    case ResultConvention::Unowned:
-      innerResultValue =
-        innerResultTL.emitCopyValue(gen.B, loc, innerResultValue);
-      break;
-    }
-  }
-
-  // Control the result value.  The real result value is in the
-  // indirect output if it exists.
-  ManagedValue innerResult;
-  if (innerResultAddr) {
-    innerResult = gen.emitManagedBufferWithCleanup(innerResultAddr,
-                                                   innerResultTL);
-  } else {
-    innerResult = gen.emitManagedRValueWithCleanup(innerResultValue,
-                                                   innerResultTL);
-  }
-
-  // Translate the result value.  Results are covariant: they use the
-  // same translation rules as the function.
+  // Translate the result value.
   auto origResultType = origFormalType.getFunctionResultType();
   auto substResultType = substFormalType.getResult();
-
-  SILValue outerResultValue;
-  if (outerResultAddr) {
-    // If we emitted directly, there's nothing more to do.
-    // Otherwise we'll have to copy over.
-    if (innerResultAddr != outerResultAddr) {
-      TemporaryInitialization init(outerResultAddr, CleanupHandle::invalid());
-      auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
-                                               substResultType, innerResult,
-                                               /*emitInto*/ SGFContext(&init));
-      emitForceInto(gen, loc, translated, init);
-    }
-
-    // Use the () from the call as the result of the outer function if
-    // it's available.
-    if (innerResultAddr) {
-      outerResultValue = innerResultValue;
-    } else {
-      auto voidTy = gen.SGM.Types.getEmptyTupleType();
-      outerResultValue = gen.B.createTuple(loc, voidTy, {});
-    }
-  } else {
-    auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
-                                             substResultType, innerResult);
-    outerResultValue = translated.forward(gen);
-  }
-
+  SILValue outerResultValue = getThunkResult(gen, loc, kind, fnType,
+                                             origResultType, substResultType,
+                                             innerResultValue,
+                                             innerResultAddr,
+                                             outerResultAddr);
   scope.pop();
-
   gen.B.createReturn(loc, outerResultValue);
 }
 
@@ -1110,4 +1146,160 @@ void RValueSource::forwardInto(SILGenFunction &SGF,
   // This potentially causes some pretty silly splitting and
   // re-combining.
   RValue(SGF, loc, substFormalType, outputValue).forwardInto(SGF, dest, loc);
+}
+
+//===----------------------------------------------------------------------===//
+// Protocol witnesses
+//===----------------------------------------------------------------------===//
+
+void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
+                               SILDeclRef requirement,
+                               SILDeclRef witness,
+                               ArrayRef<Substitution> witnessSubs,
+                               IsFreeFunctionWitness_t isFree,
+                               HasInOutSelfAbstractionDifference_t inOutSelf) {
+  F.setBare(IsBare);
+  
+  assert((!isFree || !inOutSelf)
+         && "free functions cannot have an inout self abstraction difference");
+  
+  SILLocation loc(witness.getDecl());
+  FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));
+  
+  auto thunkTy = F.getLoweredFunctionType();
+  
+  // Emit the indirect return and arguments.
+  SILValue reqtResultAddr;
+  if (thunkTy->hasIndirectResult()) {
+    auto resultType = thunkTy->getIndirectResult().getSILType();
+    reqtResultAddr = new (SGM.M) SILArgument(resultType, F.begin());
+  }
+
+  SmallVector<ManagedValue, 8> origParams;
+  collectParams(*this, loc, origParams);
+  
+  // Handle special abstraction differences in "self".
+  // If the witness is a free function, drop it completely.
+  // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
+  if (isFree)
+    origParams.pop_back();
+  
+  // If there is an @inout difference in self, load the @inout self parameter.
+  if (inOutSelf) {
+    ManagedValue &selfParam = origParams.back();
+    SILValue selfAddr = selfParam.getUnmanagedValue();
+    selfParam = emitLoad(loc, selfAddr,
+                         getTypeLowering(conformance->getType()),
+                         SGFContext(),
+                         IsNotTake);
+  }
+  
+  // Get the type of the witness.
+  auto witnessInfo = getConstantInfo(witness);
+  CanAnyFunctionType witnessFormalTy = witnessInfo.LoweredType;
+  assert(witness.uncurryLevel == (isFree ? 0 : 1)
+         && "curried requirement?!");
+  CanAnyFunctionType witnessSubstTy = witnessFormalTy;
+  if (!witnessSubs.empty()) {
+    witnessSubstTy = cast<FunctionType>(
+      cast<PolymorphicFunctionType>(witnessSubstTy)
+        ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
+        ->getCanonicalType());
+  }
+  
+  // Get the type of the requirement, so we can use it as an
+  // abstraction pattern.
+  auto reqtInfo = getConstantInfo(requirement);
+  CanAnyFunctionType reqtFormalTy = reqtInfo.LoweredType;
+  AbstractionPattern reqtOrigTy(reqtFormalTy);
+  AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
+  // For a free function witness, discard the 'self' parameter of the
+  // requirement.
+  if (isFree) {
+    auto inputTy = cast<TupleType>(reqtOrigInputTy.getAsType());
+    auto trimmedInputTy = TupleType::get(
+                 inputTy->getFields().slice(0, inputTy->getFields().size() - 1),
+                 getASTContext())->getCanonicalType();
+    reqtOrigInputTy = AbstractionPattern(trimmedInputTy);
+  }
+
+  // Translate the argument values from the requirement abstraction level to
+  // the substituted signature of the witness.
+  SmallVector<ManagedValue, 8> witnessParams;
+  auto witnessSubstSILTy
+    = SGM.Types.getLoweredType(witnessSubstTy);
+  auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
+  TranslateArguments(*this, loc, TranslationKind::OrigToSubst,
+                     origParams, witnessParams,
+                     witnessSubstFTy->getParametersWithoutIndirectResult())
+    .translate(reqtOrigInputTy, witnessSubstTy.getInput());
+
+  // Create an indirect result buffer if needed.
+  SILValue witnessSubstResultAddr
+    = getThunkInnerResultAddr(*this, loc, witnessSubstFTy, reqtResultAddr);
+  
+  // If the witness is generic, re-abstract to its original signature.
+  // TODO: Implement some sort of "abstraction path" mechanism to efficiently
+  // compose these two abstraction changes.
+  auto witnessSILTy = witnessSubstSILTy;
+  auto witnessFTy = witnessSubstFTy;
+  auto witnessResultAddr = witnessSubstResultAddr;
+  AbstractionPattern witnessOrigTy(witnessFormalTy);
+  if (!witnessSubs.empty()) {
+    SmallVector<ManagedValue, 8> genParams;
+    witnessSILTy
+      = SGM.Types.getLoweredType(witnessOrigTy, witnessSubstTy);
+    witnessFTy
+      = witnessSILTy.castTo<SILFunctionType>();
+    
+    TranslateArguments(*this, loc, TranslationKind::SubstToOrig,
+                       witnessParams, genParams,
+                       witnessFTy->getParametersWithoutIndirectResult())
+      .translate(witnessOrigTy.getFunctionInputType(),
+                 witnessSubstTy.getInput());
+    witnessParams = std::move(genParams);
+    
+    witnessResultAddr
+      = getThunkInnerResultAddr(*this, loc, witnessFTy, witnessSubstResultAddr);
+  }
+  
+  // Collect the arguments.
+  SmallVector<SILValue, 8> args;
+  if (witnessResultAddr)
+    args.push_back(witnessResultAddr);
+  forwardFunctionArguments(*this, loc, witnessFTy, witnessParams, args);
+  
+  // Invoke the witness function.
+  // TODO: Collect forwarding substitutions from outer context of method.
+  SILFunction *witnessFn = SGM.getFunction(witness);
+  SILValue witnessFnRef = B.createFunctionRef(loc, witnessFn);
+  SILValue witnessResultValue
+    = B.createApply(loc, witnessFnRef, witnessSILTy,
+                    witnessFTy->getResult().getSILType(),
+                    witnessSubs, args);
+  
+  // Reabstract the result value:
+  // If the witness is generic, reabstract to the concrete witness signature.
+  if (!witnessSubs.empty()) {
+    witnessResultValue = getThunkResult(*this, loc,
+                                        TranslationKind::OrigToSubst,
+                                        witnessFTy,
+                                        witnessOrigTy.getFunctionResultType(),
+                                        witnessSubstTy.getResult(),
+                                        witnessResultValue,
+                                        witnessResultAddr,
+                                        witnessSubstResultAddr);
+  }
+  // Reabstract to the original requirement signature.
+  SILValue reqtResultValue = getThunkResult(*this, loc,
+                                            TranslationKind::SubstToOrig,
+                                            witnessSubstFTy,
+                                            reqtOrigTy.getFunctionResultType(),
+                                            witnessSubstTy.getResult(),
+                                            witnessResultValue,
+                                            witnessSubstResultAddr,
+                                            reqtResultAddr);
+
+  scope.pop();
+  B.createReturn(loc, reqtResultValue);
 }
