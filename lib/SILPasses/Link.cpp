@@ -94,6 +94,8 @@ void swift::performSILLinking(SILModule *M) {
           }
         }
 
+        CalleeFunction->setBare(IsBare);
+
         if (CalleeFunction->empty()) {
           // Try to find the definition in a serialized module when callee is
           // currently empty.

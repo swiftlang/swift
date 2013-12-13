@@ -2411,6 +2411,7 @@ bool Parser::parseDeclSIL() {
   
     FunctionState.F =
       FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
+    FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setLinkage(FnLinkage);
 

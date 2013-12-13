@@ -325,6 +325,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
   auto Fn = InFunc;
   // FIXME: what should we set the linkage to?
   Fn->setLinkage(SILLinkage::Deserialized);
+  Fn->setBare(IsBare);
   Fn->setTransparent(IsTransparent_t(Transparent == 1));
   // FIXME: use the correct SILLocation from module.
   SourceLoc Loc;

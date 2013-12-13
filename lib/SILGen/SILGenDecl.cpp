@@ -1919,6 +1919,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto *f = new (M) SILFunction(M, SILLinkage::External, "",
                                 witnessSILType.castTo<SILFunctionType>(),
                                 SILLocation(witness.getDecl()),
+                                IsNotBare,
                                 IsNotTransparent);
   
   // Mangle the name of the witness thunk.

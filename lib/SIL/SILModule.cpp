@@ -53,6 +53,7 @@ SILModule::~SILModule() {
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,
+                                                  IsBare_t isBareSILFunction,
                                                 IsTransparent_t isTransparent) {
   // TODO: use a 'shared' linkage.
   auto linkage = SILLinkage::Internal;
@@ -63,7 +64,7 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
   }
 
   return new (*this) SILFunction(*this, linkage, name, type,
-                                 loc, isTransparent);
+                                 loc, isBareSILFunction, isTransparent);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {

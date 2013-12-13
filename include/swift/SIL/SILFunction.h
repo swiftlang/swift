@@ -33,6 +33,7 @@ enum class SILLinkage : unsigned char {
   Deserialized // Deserialized from a module.
 };
   
+enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -72,6 +73,9 @@ private:
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
 
+  /// The function's bare attribute. Bare means that the function is SIL-only.
+  unsigned Bare : 1;
+
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
   
@@ -84,6 +88,7 @@ public:
   SILFunction(SILModule &Module, SILLinkage Linkage,
               StringRef MangledName, CanSILFunctionType LoweredType,
               Optional<SILLocation> Loc = Nothing,
+              IsBare_t isBareSILFunction = IsNotBare,
               IsTransparent_t isTrans = IsNotTransparent,
               SILFunction *InsertBefore = nullptr,
               SILDebugScope *DebugScope = nullptr,
@@ -150,6 +155,10 @@ public:
   /// Get the source location of the function.
   SILDebugScope *getDebugScope() const { return DebugScope; }
   
+  /// Get this function's bare attribute.
+  IsBare_t isBare() const { return IsBare_t(Bare); }
+  void setBare(IsBare_t isB) { Bare = isB; }
+
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }

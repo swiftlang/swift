@@ -260,6 +260,7 @@ public:
   SILFunction *getOrCreateSharedFunction(SILLocation loc,
                                          StringRef name,
                                          CanSILFunctionType type,
+                                         IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent);
   
   /// \brief Return the stage of processing this module is at.
