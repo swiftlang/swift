@@ -60,8 +60,8 @@ const TypeWitnessMap &ProtocolConformance::getTypeWitnesses() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnesses, ())
 }
 
-const WitnessMap &ProtocolConformance::getWitnesses() const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getWitnesses, ())
+ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement))
 }
 
 const InheritedConformanceMap &
@@ -94,3 +94,10 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
     return nullptr;
   }
 }
+
+ConcreteDeclRef
+SpecializedProtocolConformance::getWitness(ValueDecl *requirement) const {
+  // FIXME: Apply substitutions here!
+  return GenericConformance->getWitness(requirement);
+}
+

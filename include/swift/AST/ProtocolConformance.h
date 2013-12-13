@@ -123,12 +123,7 @@ public:
   }
 
   /// Retrieve the non-type witness for the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
-    const auto &witnesses = getWitnesses();
-    auto known = witnesses.find(requirement);
-    assert(known != witnesses.end());
-    return known->second;
-  }
+  ConcreteDeclRef getWitness(ValueDecl *requirement) const;
 
   /// Apply the given function object to each value witness within this
   /// protocol conformance.
@@ -147,9 +142,6 @@ public:
       f(valueReq, getWitness(valueReq));
     }
   }
-
-  /// Retrieve the complete set of non-type witnesses.
-  const WitnessMap &getWitnesses() const;
 
   /// Retrieve the protocol conformance for a directly-inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const {
@@ -265,8 +257,13 @@ public:
     ContainingModule = containing;
   }
 
-  /// Retrieve the complete set of non-type witnesses.
-  const WitnessMap &getWitnesses() const { return Mapping; }
+  /// Retrieve the value witness corresponding to the given requirement.
+  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
+    assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+    auto known = Mapping.find(requirement);
+    assert(known != Mapping.end());
+    return known->second;
+  }
 
   /// Retrieve the complete set of type witnesses.
   const TypeWitnessMap &getTypeWitnesses() const { return TypeWitnesses; }
@@ -358,10 +355,8 @@ public:
     return GenericConformance->getContainingModule();
   }
 
-  /// Retrieve the complete set of non-type witnesses.
-  const WitnessMap &getWitnesses() const {
-    return GenericConformance->getWitnesses();
-  }
+  /// Retrieve the value witness corresponding to the given requirement.
+  ConcreteDeclRef getWitness(ValueDecl *requirement) const;
 
   /// Retrieve the complete set of type witnesses.
   const TypeWitnessMap &getTypeWitnesses() const {
@@ -441,9 +436,9 @@ public:
     return InheritedConformance->getContainingModule();
   }
 
-  /// Retrieve the complete set of non-type witnesses.
-  const WitnessMap &getWitnesses() const {
-    return InheritedConformance->getWitnesses();
+  /// Retrieve the value witness corresponding to the given requirement.
+  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
+    return InheritedConformance->getWitness(requirement);
   }
 
   /// Retrieve the complete set of type witnesses.
