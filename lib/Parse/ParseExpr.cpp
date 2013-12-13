@@ -445,6 +445,15 @@ ParserResult<Expr> Parser::parseExprNew() {
 
     brackets.End = consumeToken(tok::r_square);
 
+    // We don't support fixed-length arrays yet, which means we can't have
+    //
+    if (!bounds.empty()) {
+      diagnose(boundValue.get()->getLoc(), diag::new_array_multidimensional)
+        .highlight(boundValue.get()->getSourceRange());
+      bounds.push_back(NewArrayExpr::Bound(nullptr, brackets));
+      continue;
+    }
+
     bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
   }
 
