@@ -392,7 +392,7 @@ public:
 
   /// \brief Determine whether this declaration should be printed when
   /// encountered in its declaration context's list of members.
-  bool shouldPrintInContext() const;
+  bool shouldPrintInContext(const PrintOptions &PO) const;
 
   bool walk(ASTWalker &walker);
 

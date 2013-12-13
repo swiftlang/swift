@@ -1120,17 +1120,13 @@ bool Module::walk(ASTWalker &Walker) {
 // SourceFile Implementation
 //===----------------------------------------------------------------------===//
 
-void SourceFile::print(raw_ostream &os) {
-  print(os, PrintOptions::printEverything());
-}
-
-void SourceFile::print(raw_ostream &os, const PrintOptions &options) {
+void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
   for (auto decl : Decls) {
-    if (!decl->shouldPrintInContext())
+    if (!decl->shouldPrintInContext(PO))
       continue;
 
-    decl->print(os, options);
-    os << "\n";
+    decl->print(OS, PO);
+    OS << "\n";
   }
 }
 

@@ -344,7 +344,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
   {
     IndentRAII indentMore(*this);
     for (auto member : members) {
-      if (!member->shouldPrintInContext())
+      if (!member->shouldPrintInContext(Options))
         continue;
 
       if (Options.SkipImplicit && member->isImplicit())
@@ -584,6 +584,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
+  if (decl->isStatic())
+    OS << "static ";
   OS << "var ";
   recordDeclLoc(decl);
   OS << decl->getName().str();
@@ -656,7 +658,7 @@ void PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
     OS << "\n";
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
-      if (decl->shouldPrintInContext())
+      if (decl->shouldPrintInContext(Options))
         visit(decl);
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
@@ -749,7 +751,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 }
 
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
-  if (!decl->shouldPrintInContext())
+  if (!decl->shouldPrintInContext(Options))
     return;
 
   // In cases where there is no parent EnumCaseDecl (such as imported or
@@ -987,24 +989,33 @@ void Decl::print(
   printer.visit(const_cast<Decl *>(this));
 }
 
-bool Decl::shouldPrintInContext() const {
+bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   // Skip getters/setters. They are part of the variable or subscript.
   if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isGetterOrSetter())
     return false;
 
-  // Skip stored variables, unless they came from a Clang module.
-  // Stored variables in Swift source will be picked up by the
-  // PatternBindingDecl.
-  if (isa<VarDecl>(this) && !this->hasClangNode() &&
-      !cast<VarDecl>(this)->isComputed())
-    return false;
+  if (PO.ExplodePatternBindingDecls) {
+    if (isa<VarDecl>(this))
+      return true;
+    if (isa<PatternBindingDecl>(this))
+      return false;
+  } else {
+    // Try to preserve the PatternBindingDecl structure.
 
-  // Skip pattern bindings that consist of just one computed variable.
-  if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
-    auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
-    if (auto named = dyn_cast<NamedPattern>(pattern)) {
-      if (named->getDecl()->isComputed()) {
-        return false;
+    // Skip stored variables, unless they came from a Clang module.
+    // Stored variables in Swift source will be picked up by the
+    // PatternBindingDecl.
+    if (isa<VarDecl>(this) && !this->hasClangNode() &&
+        !cast<VarDecl>(this)->isComputed())
+      return false;
+
+    // Skip pattern bindings that consist of just one computed variable.
+    if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
+      auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
+      if (auto named = dyn_cast<NamedPattern>(pattern)) {
+        if (named->getDecl()->isComputed()) {
+          return false;
+        }
       }
     }
   }

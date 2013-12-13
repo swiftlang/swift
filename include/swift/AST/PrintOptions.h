@@ -49,6 +49,16 @@ namespace swift {
     /// ([] and ?), even if there are no sugar type nodes.
     bool SynthesizeSugarOnTypes = false;
 
+    /// \brief If true, the printer will explode a pattern like this:
+    /// \code
+    ///   var (a, b) = f()
+    /// \endcode
+    /// into multiple variable declarations.
+    ///
+    /// For this option to work correctly, \c VarInitializers should be
+    /// \c false.
+    bool ExplodePatternBindingDecls = false;
+
     /// \brief Whether to print implicit parts of the AST.
     bool SkipImplicit = false;
 

@@ -637,16 +637,11 @@ public:
   void dump() const;
   void dump(raw_ostream &os) const;
 
-  /// \brief Pretty-print the entire contents of this source file.
-  ///
-  /// \param os The stream to which the contents will be printed.
-  void print(raw_ostream &os);
-
   /// \brief Pretty-print the contents of this source file.
   ///
-  /// \param os The stream to which the contents will be printed.
-  /// \param options Options controlling the printing process.
-  void print(raw_ostream &os, const PrintOptions &options);
+  /// \param OS The stream to which the contents will be printed.
+  /// \param PO Options controlling the printing process.
+  void print(raw_ostream &OS, const PrintOptions &PO);
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::Source;
