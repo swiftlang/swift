@@ -497,23 +497,6 @@ namespace {
         return expr;
       }
 
-      // For a coercion "x as T", check the cast first.
-      if (auto cast = dyn_cast<ConditionalCheckedCastExpr>(expr)) {
-        // If there is no subexpression, the sequence hasn't been folded yet.
-        // We'll require another pass.
-        if (!cast->getSubExpr()) {
-          RequiresAnotherPass = true;
-          return cast;
-        }
-
-        // Validate the type.
-        if (TC.validateType(cast->getCastTypeLoc(), DC,
-                            /*allowUnboundGenerics=*/true))
-          return nullptr;
-
-        return checkAsCastExpr(cast);
-      }
-
       // For a dynamic type check "x is T", check it first.
       if (auto isa = dyn_cast<IsaExpr>(expr)) {
         // If there is no subexpression, the sequence hasn't been folded yet.
@@ -628,45 +611,6 @@ namespace {
                                        return TC.convertToType(sub, commonTy,
                                                                DC);
                                      });
-    }
-
-    Expr *checkAsCastExpr(CheckedCastExpr *expr) {
-      CheckedCastKind castKind = checkCheckedCastExpr(expr);
-      Type toType = expr->getCastTypeLoc().getType();
-      switch (castKind) {
-        /// Invalid cast.
-      case CheckedCastKind::Unresolved:
-        return nullptr;
-        /// Cast trivially succeeds. Emit a fixit and reduce to a coercion.
-      case CheckedCastKind::Coercion: {
-        // This is a coercion. Convert the subexpression.
-        Expr *sub = expr->getSubExpr();
-        bool failed = TC.convertToType(sub, toType, DC);
-        (void)failed;
-        assert(!failed && "Not convertible?");
-
-        // Transmute the checked cast into a coercion expression.
-        Expr *result = new (TC.Context) CoerceExpr(sub, expr->getLoc(),
-                                                   expr->getCastTypeLoc());
-
-        // The result type is the type we're converting to.
-        result->setType(toType);
-        return result;
-      }
-
-      // Valid casts.
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
-        expr->setCastKind(castKind);
-        break;
-      }
-      return expr;
     }
   };
 }

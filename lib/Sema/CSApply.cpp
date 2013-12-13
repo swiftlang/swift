@@ -1741,7 +1741,60 @@ namespace {
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-      return expr;
+      // Simplify the type we're casting to.
+      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      // The subexpression is always an rvalue.
+      auto &tc = cs.getTypeChecker();
+      auto sub = tc.coerceToRValue(expr->getSubExpr());
+      if (!sub)
+        return nullptr;
+      expr->setSubExpr(sub);
+
+      auto fromType = sub->getType();
+      auto castKind = tc.typeCheckCheckedCast(
+                        fromType, toType, cs.DC,
+                        expr->getLoc(),
+                        sub->getSourceRange(),
+                        expr->getCastTypeLoc().getSourceRange(),
+                        [&](Type commonTy) -> bool {
+                          return tc.convertToType(sub, commonTy,
+                                                 cs.DC);
+                        });
+      switch (castKind) {
+        /// Invalid cast.
+      case CheckedCastKind::Unresolved:
+        return nullptr;
+      case CheckedCastKind::Coercion: {
+        // This is a coercion. Convert the subexpression.
+        bool failed = tc.convertToType(sub, toType, cs.DC);
+        (void)failed;
+        assert(!failed && "Not convertible?");
+
+        // Transmute the checked cast into a coercion expression.
+        Expr *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
+                                                   expr->getCastTypeLoc());
+
+        // The result type is the type we're converting to.
+        result->setType(toType);
+        return result;
+      }
+
+      // Valid casts.
+      case CheckedCastKind::Downcast:
+      case CheckedCastKind::SuperToArchetype:
+      case CheckedCastKind::ArchetypeToArchetype:
+      case CheckedCastKind::ArchetypeToConcrete:
+      case CheckedCastKind::ExistentialToArchetype:
+      case CheckedCastKind::ExistentialToConcrete:
+      case CheckedCastKind::ConcreteToArchetype:
+      case CheckedCastKind::ConcreteToUnrelatedExistential:
+        expr->setCastKind(castKind);
+        break;
+      }
+
+      return simplifyExprType(expr);
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
@@ -3020,9 +3073,9 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, expr };
       }
 
-      // For explicit casts, the subexpression has already been checked.
-      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
-        return { false, Rewriter.visit(cast) };
+      // For isa checks, the subexpression has already been checked.
+      if (auto isa = dyn_cast<IsaExpr>(expr)) {
+        return { false, Rewriter.visit(isa) };
       }
 
       // For a default-value expression, do nothing.

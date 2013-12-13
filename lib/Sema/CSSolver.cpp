@@ -1109,6 +1109,29 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   return !anySolutions;
 }
 
+/// Whether we should short-circuit a disjunction that already has a
+/// solution when we encounter the given constraint.
+static bool shortCircuitDisjunctionAt(Constraint *constraint) {
+  // Non-optional conversions are better than optional-to-optional
+  // conversions.
+  if (auto restriction = constraint->getRestriction()) {
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
+      return true;
+  }
+
+  // Implicit conversions are better than checked casts.
+  if (constraint->getKind() == ConstraintKind::CheckedCast)
+    return true;
+
+  // For a conjunction, check if any of the terms should be skipped.
+  if (constraint->getKind() == ConstraintKind::Conjunction)
+    for (auto nested : constraint->getNestedConstraints())
+      if (shortCircuitDisjunctionAt(nested))
+        return true;
+
+  return false;
+}
+
 bool ConstraintSystem::solveSimplified(
        SmallVectorImpl<Solution> &solutions,
        FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1217,15 +1240,10 @@ bool ConstraintSystem::solveSimplified(
   bool anySolved = false;
   ++solverState->NumDisjunctions;
   for (auto constraint : disjunction->getNestedConstraints()) {
-    // These kinds of conversions should be avoided if we've already found a
-    // solution.
-    // FIXME: Generalize this!
-    if (anySolved) {
-      if (auto restriction = constraint->getRestriction()) {
-        if (*restriction == ConversionRestrictionKind::OptionalToOptional)
-          break;
-      }
-    }
+    // We already have a solution; check whether we should
+    // short-circuit the disjunction.
+    if (anySolved && shortCircuitDisjunctionAt(constraint))
+      break;
 
     // Try to solve the system with this option in the disjunction.
     SolverScope scope(*this);

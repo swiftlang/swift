@@ -940,8 +940,49 @@ namespace {
     
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      return tc.getOptionalType(expr->getLoc(),
-                                expr->getCastTypeLoc().getType());
+      
+      // Validate the resulting type.
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
+                          /*allowUnboundGenerics=*/true))
+        return nullptr;
+
+      // Open the type we're casting to.
+      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      // Create a type variable to describe the result.
+      auto locator = CS.getConstraintLocator(expr, { });
+      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
+
+      // Form the constraints for the implicit conversion case.
+      auto fromType = expr->getSubExpr()->getType();
+      Constraint *convConstraints[2] = {
+        Constraint::create(CS, ConstraintKind::Conversion, fromType, toType,
+                           Identifier(), locator),
+        Constraint::create(CS, ConstraintKind::Equal, typeVar, toType,
+                           Identifier(), locator)
+      };
+      auto convConstraint = Constraint::createConjunction(CS, convConstraints,
+                                                          locator);
+
+      // Form the constraints for the checked cast case.
+      auto optToType = tc.getOptionalType(expr->getLoc(), toType);
+      Constraint *checkConstraints[2] = {
+        Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
+                           Identifier(), locator),
+        Constraint::create(CS, ConstraintKind::Equal, typeVar, optToType,
+                           Identifier(), locator)
+      };
+      auto checkConstraint = Constraint::createConjunction(CS,
+                                                           checkConstraints,
+                                                           locator);
+
+      // Form the disjunction of the two kinds of constraints.
+      Constraint *constraints[2] = { convConstraint, checkConstraint };
+      CS.addConstraint(Constraint::createDisjunction(CS, constraints,
+                                                     locator));
+
+      return typeVar;
     }
     
     Type visitIsaExpr(IsaExpr *expr) {
@@ -1087,12 +1128,12 @@ namespace {
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Don't recur into array-new, default-value expressions, or explicit
-      // cast expressions.
+      // Don't recur into array-new, default-value expressions, or "is"
+      // expressions.
       return {
         !isa<NewArrayExpr>(expr)
           && !isa<DefaultValueExpr>(expr)
-          && !isa<ExplicitCastExpr>(expr),
+          && !isa<IsaExpr>(expr),
         expr
       };
     }
@@ -1167,8 +1208,8 @@ namespace {
         return { false, expr };
       }
 
-      // For explicit casts, we've already visited the subexpression.
-      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+      // For isa expressions, we've already visited the subexpression.
+      if (auto cast = dyn_cast<IsaExpr>(expr)) {
         auto type = CG.visit(cast);
         expr->setType(type);
         return { false, expr };
