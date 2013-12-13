@@ -1649,6 +1649,10 @@ void swift::printModuleInterface(Module *M, raw_ostream &OS,
   // Don't print empty curly braces while printing the module interface.
   AdjustedOptions.FunctionDefinitions = false;
 
+  // Print var declarations separately, one variable per decl.
+  AdjustedOptions.ExplodePatternBindingDecls = true;
+  AdjustedOptions.VarInitializers = false;
+
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
