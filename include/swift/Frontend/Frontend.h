@@ -48,7 +48,6 @@ class SerializedModuleLoader;
 class CompilerInvocation {
   std::string TargetTriple;
   SmallVector<LinkLibrary, 4> LinkLibraries;
-  std::string SDKPath;
   std::string ModuleSourceListPath;
 
   LangOptions LangOpts;
@@ -137,11 +136,11 @@ public:
   }
 
   void setSDKPath(const std::string &Path) {
-    SDKPath = Path;
+    SearchPathOpts.SDKPath = Path;
   }
 
   StringRef getSDKPath() const {
-    return SDKPath;
+    return SearchPathOpts.SDKPath;
   }
 
   void setSerializedDiagnosticsPath(StringRef Path) {

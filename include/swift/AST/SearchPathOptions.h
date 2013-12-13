@@ -21,6 +21,9 @@ namespace swift {
 /// Options for controlling search path behavior.
 class SearchPathOptions {
 public:
+  /// Path to the SDK which is being built against.
+  std::string SDKPath;
+
   /// Path(s) which should be searched for modules.
   std::vector<std::string> ImportSearchPaths;
 

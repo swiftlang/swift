@@ -132,6 +132,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.FrameworkSearchPaths.push_back(A->getValue());
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_sdk)) {
+    Opts.SDKPath = A->getValue();
+  }
+
   // Opts.RuntimeIncludePath is set by calls to
   // CompilerInvocation::setRuntimeIncludePath().
   // TODO: improve the handling of RuntimeIncludePath.
@@ -189,10 +193,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     switch (InputArg->getOption().getID()) {
     case OPT_target:
       setTargetTriple(InputArg->getValue());
-      break;
-
-    case OPT_sdk:
-      setSDKPath(InputArg->getValue());
       break;
 
     case OPT_parse_as_library:
