@@ -36,6 +36,22 @@ class MemoryToRegisters {
   /// The function that we are optimizing.
   SILFunction &F;
 
+  /// \brief Check if the AllocStackInst \p ASI is captured by any of its users.
+  bool isCaptured(AllocStackInst *ASI);
+
+  /// \brief Check if the AllocStackInst \p ASI is only used within a single
+  /// basic block.
+  bool isSingleBlockUsage(AllocStackInst *ASI);
+
+  /// \brief Check if the AllocStackInst \p ASI is only written into.
+  bool isWriteOnlyAllocation(AllocStackInst *ASI);
+
+  /// \brief Promote all of the AllocStacks in a single basic block in one
+  /// linear scan. Note: This function deletes all of the users of the
+  /// AllocStackInst, including the DeallocStackInst but it does not remove the
+  /// AllocStackInst itself!
+  void promoteAllocationInBlock(AllocStackInst *ASI);
+
 public:
   /// C'tor
   MemoryToRegisters(SILFunction &Func) : F(Func) {}
@@ -47,7 +63,7 @@ public:
 } // end anonymous namespace.
 
 /// Returns true if this AllocStacks is captured.
-static bool isCaptured(AllocStackInst *ASI) {
+bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
   // For all users of the AllocStack instruction.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
@@ -76,7 +92,7 @@ static bool isCaptured(AllocStackInst *ASI) {
 }
 
 /// Returns true if the AllocStack is only stored into.
-static bool isWriteOnlyAllocation(AllocStackInst *ASI) {
+bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
   // For all users of the AllocStack:
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
@@ -99,7 +115,7 @@ static bool isWriteOnlyAllocation(AllocStackInst *ASI) {
 }
 
 /// Returns true if this AllocStack is only used within a single basic block.
-static bool isSingleBlockUsage(AllocStackInst *ASI) {
+bool MemoryToRegisters::isSingleBlockUsage(AllocStackInst *ASI) {
   assert(!isCaptured(ASI) && "This AllocStack must not be captured");
   SILBasicBlock *BB = ASI->getParent();
 
@@ -111,11 +127,7 @@ static bool isSingleBlockUsage(AllocStackInst *ASI) {
   return true;
 }
 
-/// Promote all of the AllocStacks in a single basic block in one linear scan.
-/// Note: This function deletes all of the users of the AllocStackInst,
-/// including the DeallocStackInst. However, it does not remove the
-// AllocStackInst itself!
-static void promoteAllocationInBlock(AllocStackInst *ASI) {
+void MemoryToRegisters::promoteAllocationInBlock(AllocStackInst *ASI) {
   DEBUG(llvm::errs() << "*** Promoting in-block: " << *ASI << "\n");
 
   SILBasicBlock *BB = ASI->getParent();
