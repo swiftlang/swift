@@ -1572,10 +1572,20 @@ namespace {
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
       auto &tc = cs.getTypeChecker();
 
+      // Convert the subexpression to an array bound.
+      auto outerBoundLocator
+        = cs.getConstraintLocator(expr->getBounds()[0].Value,{ });
+      auto outerBound = solution.convertToArrayBound(expr->getBounds()[0].Value,
+                                                     outerBoundLocator);
+      if (!outerBound)
+        return nullptr;
+      expr->getBounds()[0].Value = outerBound;
+
+
       // Dig out the element type of the new array expression.
       auto resultType = simplifyType(expr->getType());
       auto elementType = resultType->castTo<BoundGenericType>()
-        ->getGenericArgs()[0];
+                           ->getGenericArgs()[0];
       expr->setElementType(elementType);
 
       // Make sure that the result type is a slice type, even if
@@ -1589,8 +1599,6 @@ namespace {
         sliceType = cast<ArraySliceType>(resultType.getPointer());
       }
       expr->setType(resultType);
-      
-      
 
       // Find the appropriate injection function.
       Expr* injectionFn = tc.buildArrayInjectionFnRef(dc, sliceType,
@@ -1605,17 +1613,21 @@ namespace {
       if (expr->hasConstructionFunction()) {
         // FIXME: Assume the index type is DefaultIntegerLiteralType for now.
         auto intProto = tc.getProtocol(expr->getConstructionFunction()->getLoc(),
-                                 KnownProtocolKind::IntegerLiteralConvertible);
+                                       KnownProtocolKind::IntegerLiteralConvertible);
         Type intTy = tc.getDefaultType(intProto, dc);
-        
-        Expr *constructionFn = expr->getConstructionFunction();
         Type constructionTy = FunctionType::get(intTy,
                                                 elementType,
                                                 tc.Context);
-        if (tc.typeCheckExpression(constructionFn, dc,
-                                   constructionTy,
-                                   /*discarded*/false))
+
+        auto constructionFn = expr->getConstructionFunction();
+        auto locator = cs.getConstraintLocator(
+                         expr,
+                         ConstraintLocator::NewArrayConstructor);
+        constructionFn = solution.coerceToType(constructionFn, constructionTy,
+                                               locator);
+        if (!constructionFn)
           return nullptr;
+
         expr->setConstructionFunction(constructionFn);
       } else {
         // If the element type is default constructible, form a partial
@@ -3111,13 +3123,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For an array, just walk the expression itself; its children have
-      // already been type-checked.
-      if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
-        Rewriter.visitNewArrayExpr(newArray);
-        return { false, expr };
-      }
-
       // For a default-value expression, do nothing.
       if (isa<DefaultValueExpr>(expr)) {
         return { false, expr };

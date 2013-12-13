@@ -457,34 +457,6 @@ namespace {
         return TC.foldSequence(seqExpr, DC);
       }
 
-      // Type check the type in an array new expression.
-      if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
-        // FIXME: Check that the element type has a default constructor.
-        
-        if (TC.validateType(newArray->getElementTypeLoc(), DC,
-                            /*allowUnboundGenerics=*/true))
-          return nullptr;
-
-        // Check array bounds. They are subproblems that don't interact with
-        // the surrounding expression context.
-        for (unsigned i = newArray->getBounds().size(); i != 1; --i) {
-          auto &bound = newArray->getBounds()[i-1];
-          if (!bound.Value)
-            continue;
-
-          // All inner bounds must be constant.
-          if (TC.typeCheckArrayBound(bound.Value, /*requireConstant=*/true, DC))
-            return nullptr;
-        }
-
-        // The outermost bound does not need to be constant.
-        if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
-                                   /*requireConstant=*/false, DC))
-          return nullptr;
-
-        return expr;
-      }
-
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {

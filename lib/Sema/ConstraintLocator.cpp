@@ -179,6 +179,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
         
     case NewArrayElement:
       out << "new array element type";
+      break;
+
+    case NewArrayConstructor:
+      out << "new array constructor";
+      break;
     }
   }
 }

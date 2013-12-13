@@ -121,6 +121,8 @@ public:
     AssignDest,
     /// \brief The array element type of a 'new' expression.
     NewArrayElement,
+    /// \brief The constructor for an array 'new' expression.
+    NewArrayConstructor
   };
 
   /// \brief Determine whether the given path element kind has an associated
@@ -155,6 +157,7 @@ public:
     case AssignSource:
     case AssignDest:
     case NewArrayElement:
+    case NewArrayConstructor:
       return false;
 
     case GenericArgument:
@@ -314,6 +317,7 @@ public:
       case AssignSource:
       case AssignDest:
       case NewArrayElement:
+      case NewArrayConstructor:
         continue;
 
       case Archetype:
