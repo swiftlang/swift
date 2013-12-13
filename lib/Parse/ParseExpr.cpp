@@ -445,8 +445,8 @@ ParserResult<Expr> Parser::parseExprNew() {
 
     brackets.End = consumeToken(tok::r_square);
 
-    // We don't support fixed-length arrays yet, which means we can't have
-    //
+    // We don't support multi-dimensional arrays with specified inner bounds.
+    // Jagged arrays (e.g., new Int[n][][]) are permitted.
     if (!bounds.empty()) {
       diagnose(boundValue.get()->getLoc(), diag::new_array_multidimensional)
         .highlight(boundValue.get()->getSourceRange());
