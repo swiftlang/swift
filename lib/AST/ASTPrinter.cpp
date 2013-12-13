@@ -1015,8 +1015,6 @@ bool Decl::shouldPrintInContext() const {
     return !EED->getSourceRange().isValid();
   }
 
-  // FIXME: Skip implicitly-generated constructors.
-
   // Print everything else.
   return true;
 }
