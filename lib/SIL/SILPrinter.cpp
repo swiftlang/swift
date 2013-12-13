@@ -1332,6 +1332,13 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       assocProtoWitness.Witness->printName(OS);
       break;
     }
+    case BaseProtocol: {
+      // base_protocol Protocol: <conformance>
+      auto &baseProtoWitness = witness.getBaseProtocolWitness();
+      OS << "base_protocol "
+         << baseProtoWitness.Requirement->getName() << ": ";
+      baseProtoWitness.Witness->printName(OS);
+    }
     }
     OS << '\n';
   }

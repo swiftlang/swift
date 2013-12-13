@@ -72,6 +72,8 @@ public:
   
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
+  /// Mapping from ProtocolConformances to emitted SILWitnessTables.
+  llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
   
   SILFunction *emitTopLevelFunction(SILLocation Loc);
   
@@ -200,8 +202,10 @@ public:
   /// declaration.
   void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
   
-  /// Emit the witness table for a protocol conformance.
-  void emitProtocolConformance(ProtocolConformance *conformance);
+  /// Get or emit the witness table for a protocol conformance.
+  /// Return null if the conformance does not have a witness table directly
+  /// associated with itself.
+  SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
   
   /// Emit a protocol witness entry point.
   SILFunction *emitProtocolWitness(ProtocolConformance *conformance,

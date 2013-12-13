@@ -67,12 +67,22 @@ public:
     ProtocolConformance *Witness;
   };
   
+  /// A witness table entry referencing the protocol conformance for a refined
+  /// base protocol.
+  struct BaseProtocolWitness {
+    /// The base protocol.
+    ProtocolDecl *Requirement;
+    /// The ProtocolConformance for the base protocol.
+    ProtocolConformance *Witness;
+  };
+  
   /// A witness table entry kind.
   enum WitnessKind {
     Invalid,
     Method,
     AssociatedType,
     AssociatedTypeProtocol,
+    BaseProtocol,
   };
   
   /// A witness table entry.
@@ -82,6 +92,7 @@ public:
       MethodWitness Method;
       AssociatedTypeWitness AssociatedType;
       AssociatedTypeProtocolWitness AssociatedTypeProtocol;
+      BaseProtocolWitness BaseProtocol;
     };
     
   public:
@@ -100,6 +111,11 @@ public:
         AssociatedTypeProtocol(AssociatedTypeProtocol)
     {}
     
+    Entry(const BaseProtocolWitness &BaseProtocol)
+      : Kind(WitnessKind::BaseProtocol),
+        BaseProtocol(BaseProtocol)
+    {}
+    
     WitnessKind getKind() const { return Kind; }
     
     const MethodWitness &getMethodWitness() const {
@@ -114,6 +130,11 @@ public:
     getAssociatedTypeProtocolWitness() const {
       assert(Kind == WitnessKind::AssociatedTypeProtocol);
       return AssociatedTypeProtocol;
+    }
+    const BaseProtocolWitness &
+    getBaseProtocolWitness() const {
+      assert(Kind == WitnessKind::BaseProtocol);
+      return BaseProtocol;
     }
   };
   

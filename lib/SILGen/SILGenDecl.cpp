@@ -1043,9 +1043,16 @@ public:
       visit(member);
     }
     
-    // Emit witness tables for conformances.
+    // Emit witness tables for conformances of concrete types. Protocol types
+    // are existential and do not have witness tables.
+    if (!SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables)
+      return;
+
+    if (isa<ProtocolDecl>(theType))
+      return;
+    
     for (auto *conformance : theType->getConformances())
-      SGM.emitProtocolConformance(conformance);
+      SGM.getWitnessTable(conformance);
   }
   
   //===--------------------------------------------------------------------===//
@@ -1203,9 +1210,13 @@ public:
     for (Decl *member : e->getMembers())
       visit(member);
 
-    // Emit witness tables for protocol conformances.
-    for (auto *conformance : e->getConformances())
-      SGM.emitProtocolConformance(conformance);
+    if (SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables
+        && !e->getExtendedType()->isExistentialType()) {
+      // Emit witness tables for protocol conformances introduced by the
+      // extension.
+      for (auto *conformance : e->getConformances())
+        SGM.getWitnessTable(conformance);
+    }
     
     // ObjC protocol conformances may require ObjC thunks to be introduced for
     // definitions from other contexts.
@@ -1758,15 +1769,30 @@ public:
     // Nothing to do if this wasn't a normal conformance.
     if (!Conformance)
       return nullptr;
-    
-    // TODO: Reference conformances for inherited protocols.
+
+    // Reference conformances for refined protocols.
+    auto protocol = Conformance->getProtocol();
+    for (auto base : protocol->getProtocols())
+      emitBaseProtocolWitness(base);
     
     // Emit witnesses in protocol declaration order.
-    for (auto reqt : Conformance->getProtocol()->getMembers())
+    for (auto reqt : protocol->getMembers())
       visit(reqt);
     
     // Create the witness table.
     return SILWitnessTable::create(SGM.M, Conformance, Entries);
+  }
+  
+  void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {
+    auto foundBaseConformance
+      = Conformance->getInheritedConformances().find(baseProtocol);
+    assert(foundBaseConformance != Conformance->getInheritedConformances().end()
+           && "no inherited conformance for base protocol");
+    Entries.push_back(SILWitnessTable::BaseProtocolWitness{
+      baseProtocol,
+      foundBaseConformance->second
+    });
+    SGM.getWitnessTable(foundBaseConformance->second);
   }
   
   /// Fallback for unexpected protocol requirements.
@@ -1829,11 +1855,16 @@ public:
   
 } // end anonymous namespace
 
-void SILGenModule::emitProtocolConformance(ProtocolConformance *conformance) {
-  if (!getASTContext().LangOpts.EmitSILProtocolWitnessTables)
-    return;
+SILWitnessTable *
+SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
+  // If we've already emitted this witness table, return it.
+  auto found = emittedWitnessTables.find(conformance);
+  if (found != emittedWitnessTables.end())
+    return found->second;
   
-  SILGenConformance(*this, conformance).emit();
+  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  emittedWitnessTables.insert({conformance, table});
+  return table;
 }
 
 SILFunction *
