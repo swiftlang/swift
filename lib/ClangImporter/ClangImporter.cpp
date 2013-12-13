@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
+#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -79,11 +80,8 @@ ClangImporter::~ClangImporter() {
 
 #pragma mark Module loading
 
-ClangImporter *ClangImporter::create(ASTContext &ctx,
-                                     StringRef targetTriple,
-                                     StringRef moduleCachePath,
-                                     StringRef overrideResourceDir,
-                                     ArrayRef<std::string> extraArgs) {
+ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
+    const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -122,6 +120,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back(path);
   }
 
+  const std::string &moduleCachePath = clangImporterOpts.ModuleCachePath;
+
   // Set the module cache path.
   if (moduleCachePath.empty()) {
     llvm::SmallString<128> DefaultModuleCache;
@@ -133,8 +133,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.back().append(DefaultModuleCache.str());
   } else {
     invocationArgStrs.push_back("-fmodules-cache-path=");
-    invocationArgStrs.back().append(moduleCachePath.str());
+    invocationArgStrs.back().append(moduleCachePath);
   }
+
+  const std::string &overrideResourceDir = clangImporterOpts.OverrideResourceDir;
 
   if (overrideResourceDir.empty()) {
     llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeIncludePath);
@@ -152,7 +154,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back(overrideResourceDir);
   }
 
-  for (auto extraArg : extraArgs) {
+  for (auto extraArg : clangImporterOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
 

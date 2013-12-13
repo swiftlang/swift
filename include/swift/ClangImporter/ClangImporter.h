@@ -31,6 +31,7 @@ class ClangModuleUnit;
 class Module;
 class NominalTypeDecl;
 class VisibleDeclConsumer;
+class ClangImporterOptions;
 
 /// \brief Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
@@ -54,20 +55,12 @@ public:
   ///
   /// \param targetTriple The target triple to use for the import.
   ///
-  /// \param moduleCachePath The module cache path.
-  ///
-  /// \param overrideResourceDir If nonempty, the path to use to locate the
-  /// resources for Clang.  This should at least have an include/ subdirectory
-  /// containing Clang's built-in headers.  The default (empty) argument causes
-  /// this function to assume that the headers are inside the
-  /// \c swiftRuntimeIncludePath.
+  /// \param clangImporterOpts The options to use for the Clang importer.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static ClangImporter *create(ASTContext &ctx, StringRef targetTriple,
-                               StringRef moduleCachePath,
-                               StringRef overrideResourceDir = StringRef(),
-                               ArrayRef<std::string> extraArgs = {});
+                               const ClangImporterOptions &clangImporterOpts);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
