@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Initialization.h"
@@ -32,6 +33,8 @@
 
 using namespace swift;
 using namespace Lowering;
+
+void SILDebuggerClient::anchor() {}
 
 namespace {
   class CleanupRValue : public Cleanup {
@@ -434,6 +437,17 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    if (var->isDebuggerVar()) {
+      DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
+      assert (DebugClient && "Debugger variables with no debugger client");
+      SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
+      assert (SILDebugClient && "Debugger client doesn't support SIL");
+      return ManagedValue(SILDebugClient->emitReferenceToDecl(loc, declRef,
+                                                              ncRefType,
+                                                              uncurryLevel),
+                          ManagedValue::Unmanaged);
+    }
+
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized variable references");
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel

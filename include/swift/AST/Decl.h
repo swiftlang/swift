@@ -157,8 +157,12 @@ class alignas(8) Decl {
     /// \brief Whether this is a 'let' property, which can only be initialized
     /// in its declaration, and never assigned to, making it immutable.
     unsigned IsLet : 1;
+
+    /// \brief Whether this is a property used in expressions in the debugger.
+    /// It is up to the debugger to instruct SIL how to access this variable.
+    unsigned IsDebuggerVar : 1;
   };
-  enum { NumVarDeclBits = NumValueDeclBits + 2 };
+  enum { NumVarDeclBits = NumValueDeclBits + 3 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class AbstractFunctionDeclBitfields {
@@ -2116,6 +2120,7 @@ public:
     : ValueDecl(DeclKind::Var, DC, Name, NameLoc) {
     VarDeclBits.Static = IsStatic;
     VarDeclBits.IsLet = IsLet;
+    VarDeclBits.IsDebuggerVar = false;
     setType(Ty);
   }
 
@@ -2193,6 +2198,10 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
+
+  /// Is this a special debugger variable?
+  bool isDebuggerVar() const { return VarDeclBits.IsDebuggerVar; }
+  void setDebuggerVar(bool IsDebuggerVar) { VarDeclBits.IsDebuggerVar = IsDebuggerVar; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }

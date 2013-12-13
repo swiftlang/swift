@@ -41,7 +41,7 @@ namespace swift {
   class Decl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
-  class ExternalNameLookup;
+  class DebuggerClient;
   class FileUnit;
   class InfixOperatorDecl;
   class LinkLibrary;
@@ -156,7 +156,7 @@ private:
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
-  ExternalNameLookup *ExternalLookup = nullptr;
+  DebuggerClient *DebugClient = nullptr;
 
   // FIXME: This storage is never freed, because Modules are allocated on the
   // ASTContext.
@@ -185,10 +185,10 @@ public:
   /// dealing with.
   FileUnit &getMainFile(FileUnitKind expectedKind) const;
 
-  ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
-  void setExternalLookup(ExternalNameLookup *R) {
-    assert(!ExternalLookup && "Name resolver already set");
-    ExternalLookup = R;
+  DebuggerClient *getDebugClient() const { return DebugClient; }
+  void setDebugClient(DebuggerClient *R) {
+    assert(!DebugClient && "Debugger client already set");
+    DebugClient = R;
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope

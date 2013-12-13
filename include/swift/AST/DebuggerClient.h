@@ -1,4 +1,4 @@
-//===--- ExternalNameLookup.h - Pluggable name resolution -------*- C++ -*-===//
+//===--- DebuggerClient.h - Interfaces LLDB uses for parsing ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,27 +10,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the abstract ExternalNameLookup class.
+// This file defines the abstract DebuggerClient class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_EXTERNALNAMELOOKUP_H
-#define SWIFT_EXTERNALNAMELOOKUP_H
+#ifndef SWIFT_DEBUGGERCLIENT_H
+#define SWIFT_DEBUGGERCLIENT_H
 
 #include "swift/AST/NameLookup.h"
 
 namespace swift {
 
-class ExternalNameLookup {
+class SILDebuggerClient;
+
+class DebuggerClient {
 protected:
   ASTContext &Ctx;
 public:
   typedef SmallVectorImpl<UnqualifiedLookupResult> ResultVector;
 
-  ExternalNameLookup(ASTContext &C) : Ctx(C) { }
-  virtual ~ExternalNameLookup() = default;
+  DebuggerClient(ASTContext &C) : Ctx(C) { }
+  virtual ~DebuggerClient() = default;
 
-  /// ExternalNameLookup is consulted at two times during name
+  /// DebuggerClient is consulted at two times during name
   /// lookup.  This is the first time: after all names in a
   /// source file have been checked but before external
   /// Modules are checked.  The results in the ResultVector will
@@ -40,7 +42,7 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
-  /// This is the second time ExternalNameLookup is consulted:
+  /// This is the second time DebuggerClient is consulted:
   /// after all names in external Modules are checked, if nothing
   /// suitable was found.  The idea is that lookupFallbacks can
   /// perform more cost-intensive checks.  Return true if results
@@ -48,6 +50,8 @@ public:
   virtual bool lookupFallbacks(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
+
+  virtual SILDebuggerClient *getAsSILDebuggerClient() = 0;
 private:
   virtual void anchor();
 };

@@ -17,7 +17,7 @@
 #include "ModuleNameLookup.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/ExternalNameLookup.h"
+#include "swift/AST/DebuggerClient.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -36,7 +36,7 @@ STATISTIC(NumUnloadedLazyMembers,
 
 using namespace swift;
 
-void ExternalNameLookup::anchor() {}
+void DebuggerClient::anchor() {}
 
 template <typename Fn>
 static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
@@ -505,9 +505,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         extraImports.push_back(importPair.first);
   }
     
-  ExternalNameLookup *ExternalLookup = M.getExternalLookup();
-  if (ExternalLookup && ExternalLookup->lookupOverrides(Name, DC, Loc,
-                                                        IsTypeLookup, Results))
+  DebuggerClient *DebugClient = M.getDebugClient();
+  if (DebugClient && DebugClient->lookupOverrides(Name, DC, Loc,
+                                                  IsTypeLookup, Results))
     return;
 
   using namespace namelookup;
@@ -538,8 +538,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     return true;
   });
 
-  if (ExternalLookup && !Results.size())
-    ExternalLookup->lookupFallbacks(Name, DC, Loc, IsTypeLookup, Results);
+  if (DebugClient && !Results.size())
+    DebugClient->lookupFallbacks(Name, DC, Loc, IsTypeLookup, Results);
 }
 
 Optional<UnqualifiedLookup>
