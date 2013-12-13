@@ -1047,8 +1047,16 @@ void Mangler::mangleDirectness(bool isIndirect) {
 }
 
 void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
-  // protocol-conformance ::= type protocol module
+  // protocol-conformance ::= ('U' generic-parameter+ '_')?
+  //                          type protocol module
   // FIXME: explosion level?
+  
+  // If the conformance is generic, mangle its generic parameters.
+  if (auto gp = conformance->getGenericParams()) {
+    Buffer << 'U';
+    bindGenericParameters(gp, /*mangle*/ true);
+  }
+  
   mangleType(conformance->getType()->getCanonicalType(),
              ExplosionKind::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());

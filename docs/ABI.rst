@@ -842,7 +842,7 @@ so the structure is quite simple.
 
 ::
 
-  protocol-conformance ::= type protocol module
+  protocol-conformance ::= ('U' generics '_')? type protocol module
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
 module is the one containing the extension or type declaration that declared

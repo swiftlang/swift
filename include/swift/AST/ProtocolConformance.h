@@ -29,6 +29,7 @@ namespace swift {
 
 class AssociatedTypeDecl;
 class ASTContext;
+class GenericParamList;
 class ProtocolConformance;
 class ProtocolDecl;
 class SubstitutableType;
@@ -128,6 +129,10 @@ public:
   /// Retrieve the complete set of protocol conformances for directly inherited
   /// protocols.
   const InheritedConformanceMap &getInheritedConformances() const;
+  
+  /// Get the generic parameters open on the conforming type.
+  /// FIXME: Return a dependent generic signature instead.
+  GenericParamList *getGenericParams() const;
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.

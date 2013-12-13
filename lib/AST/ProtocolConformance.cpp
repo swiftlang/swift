@@ -15,6 +15,9 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
+
 using namespace swift;
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -70,4 +73,24 @@ ProtocolConformance::getInheritedConformances() const {
 /// is either the default definition or was otherwise deduced.
 bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
+}
+
+GenericParamList *ProtocolConformance::getGenericParams() const {
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    // FIXME: This should be an independent property of the conformance.
+    // Assuming a BoundGenericType conformance is always for the
+    // DeclaredTypeInContext is unsound if we ever add constrained extensions.
+    if (auto bgt = getType()->getAs<BoundGenericType>()) {
+      auto decl = bgt->getDecl();
+      assert(bgt->isEqual(decl->getDeclaredTypeInContext())
+             && "conformance for constrained generic type not implemented");
+      return decl->getGenericParams();
+    }
+    return nullptr;
+  case ProtocolConformanceKind::Specialized:
+  case ProtocolConformanceKind::Inherited:
+    // FIXME: These could reasonably have open type variables.
+    return nullptr;
+  }
 }

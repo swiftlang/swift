@@ -800,6 +800,9 @@ public:
       ++depth;
     return depth;
   }
+  
+  void print(raw_ostream &OS);
+  void dump();
 };
 
 /// Describes what kind of name is being imported.

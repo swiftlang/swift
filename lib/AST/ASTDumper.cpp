@@ -36,6 +36,39 @@ DEF_COLOR(TypeRepr, GREEN)
 #undef DEF_COLOR
 
 //===----------------------------------------------------------------------===//
+//  Generic param list printing.
+//===----------------------------------------------------------------------===//
+
+void GenericParamList::print(llvm::raw_ostream &OS) {
+  OS << '<';
+  bool First = true;
+  for (auto P : *this) {
+    if (First) {
+      First = false;
+    } else {
+      OS << ", ";
+    }
+    OS << P.getDecl()->getName();
+    if (!P.getAsTypeParam()->getInherited().empty()) {
+      OS << " : ";
+      P.getAsTypeParam()->getInherited()[0].getType().print(OS);
+    }
+  }
+  OS << '>';
+}
+
+void GenericParamList::dump() {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
+  if (!Params)
+    return;
+  Params->print(OS);
+}
+
+//===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
 
@@ -179,27 +212,6 @@ namespace {
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
-
-    void printGenericParameters(GenericParamList *Params) {
-      if (!Params)
-        return;
-
-      OS << '<';
-      bool First = true;
-      for (auto P : *Params) {
-        if (First) {
-          First = false;
-        } else {
-          OS << ", ";
-        }
-        OS << P.getDecl()->getName();
-        if (!P.getAsTypeParam()->getInherited().empty()) {
-          OS << " : ";
-          P.getAsTypeParam()->getInherited()[0].getType().print(OS);
-        }
-      }
-      OS << '>';
-    }
 
     void printCommon(Decl *D, const char *Name,
                      llvm::Optional<llvm::raw_ostream::Colors> Color =
@@ -345,11 +357,11 @@ namespace {
       OS << ' ';
       printDeclName(VD);
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-        printGenericParameters(FD->getGenericParams());
+        printGenericParameters(OS, FD->getGenericParams());
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(VD))
-        printGenericParameters(CD->getGenericParams());
+        printGenericParameters(OS, CD->getGenericParams());
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
-        printGenericParameters(NTD->getGenericParams());
+        printGenericParameters(OS, NTD->getGenericParams());
 
       OS << " type='";
       if (VD->hasType()) {
@@ -1596,6 +1608,11 @@ bool Substitution::operator!=(const Substitution &Other) const {
 }
 
 void ProtocolConformance::printName(llvm::raw_ostream &os) const {
+  if (auto gp = getGenericParams()) {
+    gp->print(os);
+    os << ' ';
+  }
+  
   getType()->print(os);
   os << ": ";
   
@@ -1608,19 +1625,21 @@ void ProtocolConformance::printName(llvm::raw_ostream &os) const {
   }
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
-    os << " specialize <";
+    os << "specialize <";
     interleave(spec->getGenericSubstitutions(),
                [&](const Substitution &s) { s.print(os); },
                [&] { os << ", "; });
     os << "> (";
     spec->getGenericConformance()->printName(os);
     os << ")";
+    break;
   }
   case ProtocolConformanceKind::Inherited: {
     auto inherited = cast<InheritedProtocolConformance>(this);
-    os << " inherit (";
+    os << "inherit (";
     inherited->getInheritedConformance()->printName(os);
     os << ")";
+    break;
   }
   }
 }
@@ -1631,3 +1650,4 @@ void ProtocolConformance::dump() const {
   printName(llvm::errs());
   llvm::errs() << '\n';
 }
+
