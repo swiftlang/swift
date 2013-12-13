@@ -139,7 +139,7 @@ Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
     return StdlibModule;
 
   if (!StdlibModule)
-    StdlibModule = Context.LoadedModules.lookup(Context.StdlibModuleName.str());
+    StdlibModule = Context.getStdlibModule();
   if (!StdlibModule)
     StdlibModule = dc->getParentModule();
 

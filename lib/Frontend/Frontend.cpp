@@ -243,6 +243,10 @@ void CompilerInstance::performParse() {
     for (auto File : InputSourceFiles)
       if (auto SF = dyn_cast<SourceFile>(File))
         performTypeChecking(*SF);
+
+    // If there were no source files, we should still record known protocols.
+    if (Context->getStdlibModule())
+      Context->recordKnownProtocols(Context->getStdlibModule());
   }
 
   if (DelayedCB) {
