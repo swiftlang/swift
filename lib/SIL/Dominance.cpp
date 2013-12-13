@@ -25,6 +25,8 @@ template class llvm::DomTreeNodeBase<SILBasicBlock>;
 /// Compute the immmediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
     : DominatorTreeBase(/*isPostDom*/ false) {
+      assert(!F->isExternalDeclaration() &&
+             "Make sure the function is a definicion and not a declaration.");
   recalculate(*F);
 }
 
