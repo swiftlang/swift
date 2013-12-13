@@ -1746,17 +1746,13 @@ public:
   std::vector<SILWitnessTable::Entry> Entries;
 
   SILGenConformance(SILGenModule &SGM, ProtocolConformance *C)
-    // A class declaration may have an Inherited protocol conformance in a case
-    // where a subclass explicitly declares conformance to a protocol for which
-    // it already inherits conformance, for example:
-    //
-    // class A : P {}
-    // class B : A, P {}
-    //
-    // In this case, we don't actually need to emit a new witness table. We'll
-    // inherit the superclass's.
+    // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C))
-  {}
+  {
+    // ObjC protocols do not use witness tables.
+    if (Conformance->getProtocol()->isObjC())
+      Conformance = nullptr;
+  }
   
   SILWitnessTable *emit() {
     // Nothing to do if this wasn't a normal conformance.
