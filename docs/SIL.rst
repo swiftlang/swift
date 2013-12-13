@@ -348,7 +348,7 @@ pointer into a data structure. Addresses of loadable types can be
 loaded and stored to access values of those types.
 
 Addresses of address-only types (see below) can only be used with
-nstructions that manipulate their operands indirectly by address, such
+instructions that manipulate their operands indirectly by address, such
 as ``copy_addr`` or ``destroy_addr``, or as arguments to functions.
 It is illegal to have a value of type ``$T`` if ``T`` is address-only.
   
