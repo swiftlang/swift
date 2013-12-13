@@ -967,6 +967,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         // viable.
         if (matchWitness(TC, Proto, DC, Requirement, T, derived,
                          TypeWitnesses).isViable()) {
+          Mapping[Requirement] = derived;
           numViable = 1;
           continue;
         }

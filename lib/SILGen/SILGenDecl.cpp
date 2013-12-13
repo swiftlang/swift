@@ -1829,12 +1829,8 @@ public:
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
-    auto foundWitness = Conformance->getTypeWitnesses().find(td);
-    assert(foundWitness != Conformance->getTypeWitnesses().end()
-           && "no witness for associated type requirement");
-    
-    Substitution witness = foundWitness->second;
-    
+    const auto &witness = Conformance->getTypeWitness(td);
+
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
                                       witness.Replacement->getCanonicalType()});
