@@ -28,3 +28,9 @@ add_swift_library(swiftIRGen
   SwiftTargetMachine.cpp
   StructLayout.cpp
   DEPENDS LLVMMC LLVMSupport LLVMCore swiftAST)
+
+# Clang dependencies.
+# FIXME: Clang should really export these in some reasonable manner.
+target_link_libraries(swiftIRGen
+  clangCodeGen)
+
