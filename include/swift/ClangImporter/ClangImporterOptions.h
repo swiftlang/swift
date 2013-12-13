@@ -26,6 +26,9 @@ public:
 
   /// Extra arguments which should be passed to the Clang importer.
   std::vector<std::string> ExtraArgs;
+
+  /// A directory for overriding Clang's resource directory.
+  std::string OverrideResourceDir;
 };
 
 } // end namespace swift
