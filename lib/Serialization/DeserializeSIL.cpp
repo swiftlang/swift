@@ -102,6 +102,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
              kind == sil_index_block::SIL_VTABLE_NAMES ||
              kind == sil_index_block::SIL_GLOBALVAR_NAMES)) &&
          "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, or SIL_GLOBALVAR_NAMES.");
+    (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
       FuncTable = readFuncTable(scratch, blobData);
@@ -114,6 +115,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
     next = cursor.advance();
     scratch.clear();
     unsigned offKind = cursor.readRecord(next.ID, scratch, &blobData);
+    (void)offKind;
     if (kind == sil_index_block::SIL_FUNC_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_FUNC_OFFSETS) &&
