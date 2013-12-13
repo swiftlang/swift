@@ -481,12 +481,6 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
   }
 }
 
-static NominalTypeDecl *getAnyNominal(Decl *D) {
-  if (auto extension = dyn_cast<ExtensionDecl>(D))
-    D = extension->getExtendedType()->getAnyNominal();
-  return dyn_cast_or_null<NominalTypeDecl>(D);
-}
-
 bool ModuleFile::associateWithFileContext(FileUnit *file) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
