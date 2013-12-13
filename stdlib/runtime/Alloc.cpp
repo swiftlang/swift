@@ -145,10 +145,6 @@ namespace {
   };
 }
 
-static inline size_t getBoxHeaderSize(size_t align) {
-  return llvm::RoundUpToAlignment(sizeof(HeapObject) + sizeof(Metadata*),align);
-}
-
 /// Heap object destructor for a generic box allocated with swift_allocBox.
 static void destroyGenericBox(HeapObject *o) {
   auto *box = static_cast<GenericBox*>(o);
