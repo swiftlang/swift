@@ -487,7 +487,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   if (sema.LookupName(lookupResult, /*Scope=*/0)) {
     // FIXME: Filter based on access path? C++ access control?
     for (auto decl : lookupResult) {
-      if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
+      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
           // If the importer gave us a declaration from the stdlib, make sure
           // it does not show up in the lookup results for the imported module.
@@ -510,7 +510,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
 
     // FIXME: Filter based on access path? C++ access control?
     for (auto decl : lookupResult) {
-      if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
+      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
           consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
     }
@@ -598,7 +598,7 @@ public:
     if (ND->isModulePrivate())
       return;
 
-    if (auto Imported = cast_or_null<ValueDecl>(Impl.importDecl(ND)))
+    if (auto Imported = cast_or_null<ValueDecl>(Impl.importDeclReal(ND)))
       NextConsumer.foundDecl(Imported, DeclVisibilityKind::VisibleAtTopLevel);
   }
 };
@@ -738,7 +738,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   for (auto I = objcClass->visible_categories_begin(),
             E = objcClass->visible_categories_end();
        I != E; ++I) {
-    Impl.importDecl(*I);
+    Impl.importDeclReal(*I);
   }
 }
 
@@ -869,7 +869,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
         }
       }
 
-      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(searchForDecl))) {
+      if (auto VD = cast_or_null<ValueDecl>(Impl.importDeclReal(searchForDecl))) {
         if (isSubscript || name.empty()) {
           // When searching for a subscript, we may have found a getter.  If so,
           // use the subscript instead.

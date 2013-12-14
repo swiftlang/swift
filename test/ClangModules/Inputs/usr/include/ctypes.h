@@ -46,6 +46,53 @@ typedef struct {
   } size;
 } CGRect;
 
+//===---
+// Tag decls and typedefs.
+//===---
+
+struct FooStruct1 {
+  int x;
+  double y;
+};
+
+typedef struct FooStruct2 {
+  int x;
+  double y;
+} FooStructTypedef1;
+
+typedef struct {
+  int x;
+  double y;
+} FooStructTypedef2;
+
+typedef struct FooStruct3 {
+  int x;
+  double y;
+} FooStruct3;
+
+struct FooStruct4 {
+  int x;
+  double y;
+};
+typedef struct FooStruct4 FooStruct4;
+
+struct FooStruct5;
+typedef struct FooStruct5 FooStruct5;
+struct FooStruct5 {
+  int x;
+  double y;
+};
+
+typedef struct FooStruct6 FooStruct6;
+struct FooStruct6 {
+  int x;
+  double y;
+};
+
+//===---
+// Typedefs.
+//===---
+
 typedef CGRect NSRect;
 
 typedef void MyVoid;

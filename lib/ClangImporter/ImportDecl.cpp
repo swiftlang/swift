@@ -297,7 +297,8 @@ namespace {
         StringRef StdlibTypeName;
         bool ShouldCreateTypealias;
         std::tie(SwiftType, StdlibTypeName) =
-            getSwiftStdlibType(Decl, Name, Impl, &IsError, &ShouldCreateTypealias);
+            getSwiftStdlibType(Decl, Name, Impl, &IsError,
+                               &ShouldCreateTypealias);
 
         if (IsError)
           return nullptr;
@@ -2616,31 +2617,138 @@ Decl *ClangImporter::Implementation::importDeclCached(
   return nullptr;
 }
 
-Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
-  if (!decl)
+/// Checks if we don't need to import the typedef itself.  If the typedef
+/// should be skipped, returns the underlying declaration that the typedef
+/// refers to -- this declaration should be imported instead.
+static const clang::TagDecl *
+canSkipOverTypedef(ClangImporter::Implementation &Impl,
+                   const clang::NamedDecl *D,
+                   bool &TypedefIsSuperfluous) {
+  // If we have a typedef that refers to a tag type of the same name,
+  // skip the typedef and import the tag type directly.
+
+  TypedefIsSuperfluous = false;
+
+  auto *ClangTypedef = dyn_cast<clang::TypedefNameDecl>(D);
+  if (!ClangTypedef)
     return nullptr;
 
-  if (auto Known = importDeclCached(decl))
-    return Known;
-
-  SwiftDeclConverter converter(*this);
-  auto result = converter.Visit(decl);
-  if (!result)
+  const clang::DeclContext *RedeclContext =
+      ClangTypedef->getDeclContext()->getRedeclContext();
+  if (!RedeclContext->isTranslationUnit())
     return nullptr;
 
-  auto canon = decl->getCanonicalDecl();
+  clang::QualType UnderlyingType = ClangTypedef->getUnderlyingType();
+  auto *TT = UnderlyingType->getAs<clang::TagType>();
+  if (!TT)
+    return nullptr;
+
+  clang::TagDecl *UnderlyingDecl = TT->getDecl();
+  if (UnderlyingDecl->getDeclContext()->getRedeclContext() != RedeclContext)
+    return nullptr;
+
+  if (UnderlyingDecl->getDeclName().isEmpty())
+    return UnderlyingDecl;
+
+  auto Name = Impl.importName(ClangTypedef->getDeclName());
+
+  auto TypedefName = ClangTypedef->getDeclName();
+  auto TagDeclName = UnderlyingDecl->getDeclName();
+  if (TypedefName != TagDeclName)
+    return nullptr;
+
+  TypedefIsSuperfluous = true;
+  return UnderlyingDecl;
+}
+
+Decl *
+ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
+                                              bool &TypedefIsSuperfluous,
+                                              bool &HadForwardDeclaration) {
+  assert(ClangDecl);
+
+  bool SkippedOverTypedef = false;
+  Decl *Result = nullptr;
+  if (auto *UnderlyingDecl = canSkipOverTypedef(*this, ClangDecl,
+                                                TypedefIsSuperfluous)) {
+    Result = importDecl(UnderlyingDecl);
+    SkippedOverTypedef = true;
+  }
+
+  if (!Result) {
+    SwiftDeclConverter converter(*this);
+    Result = converter.Visit(ClangDecl);
+    HadForwardDeclaration = converter.hadForwardDeclaration();
+  }
+  if (!Result)
+    return nullptr;
+
+  auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
-  if (!result->getDeclContext()->isModuleScopeContext() ||
-      (result->getModuleContext() != getSwiftModule() &&
-       result->getModuleContext() != getNamedModule("ObjectiveC"))) {
-    assert(!result->getClangDecl() ||
-           result->getClangDecl()->getCanonicalDecl() == canon);
-    result->setClangNode(decl);
+  if (!Result->getDeclContext()->isModuleScopeContext() ||
+      (Result->getModuleContext() != getSwiftModule() &&
+       Result->getModuleContext() != getNamedModule("ObjectiveC"))) {
+    assert(
+        // Either the Swift declaration was from stdlib,
+        !Result->getClangDecl() ||
+        // or we imported the underlying decl of the typedef,
+        SkippedOverTypedef ||
+        // or the other type is a typedef,
+        (isa<clang::TypedefNameDecl>(Result->getClangDecl()) &&
+         // both types are ValueDecls:
+         (isa<clang::ValueDecl>(Result->getClangDecl()) &&
+          getClangASTContext().hasSameType(
+              cast<clang::ValueDecl>(Result->getClangDecl())->getType(),
+              cast<clang::ValueDecl>(Canon)->getType())) ||
+         // both types are TypeDecls:
+         (isa<clang::TypeDecl>(Result->getClangDecl()) &&
+          getClangASTContext().hasSameUnqualifiedType(
+              getClangASTContext().getTypeDeclType(
+                  cast<clang::TypeDecl>(Result->getClangDecl())),
+              getClangASTContext().getTypeDeclType(
+                  cast<clang::TypeDecl>(Canon))))) ||
+        // or we imported the decl itself.
+        Result->getClangDecl()->getCanonicalDecl() == Canon);
+    (void) SkippedOverTypedef;
+    Result->setClangNode(ClangDecl);
   }
-  if (!converter.hadForwardDeclaration())
-    ImportedDecls[canon] = result;
-  return result;
+  return Result;
+}
+
+Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
+    const clang::NamedDecl *ClangDecl,
+    bool SuperfluousTypedefsAreTransparent) {
+  if (!ClangDecl)
+    return nullptr;
+
+  auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
+
+  if (auto Known = importDeclCached(Canon)) {
+    if (!SuperfluousTypedefsAreTransparent &&
+        SuperfluousTypedefs.count(Canon))
+      return nullptr;
+    return Known;
+  }
+
+  bool TypedefIsSuperfluous = false;
+  bool HadForwardDeclaration = false;
+
+  Decl *Result = importDeclImpl(ClangDecl, TypedefIsSuperfluous,
+                                HadForwardDeclaration);
+  if (!Result)
+    return nullptr;
+
+  if (TypedefIsSuperfluous)
+    SuperfluousTypedefs.insert(Canon);
+
+  if (!HadForwardDeclaration)
+    ImportedDecls[Canon] = Result;
+
+  if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
+    return nullptr;
+
+  return Result;
 }
 
 Decl *

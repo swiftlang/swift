@@ -181,6 +181,10 @@ public:
   /// ObjCBool.
   llvm::SmallPtrSet<const clang::TypedefNameDecl *, 8> SpecialTypedefNames;
 
+  /// \brief Typedefs that we should not be importing.  We should be importing
+  /// underlying decls instead.
+  llvm::DenseSet<const clang::Decl *> SuperfluousTypedefs;
+
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
   llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
@@ -342,11 +346,34 @@ public:
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
 
-  /// \brief Import the given Clang declaration into Swift.
+  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl,
+                       bool &TypedefIsSuperfluous,
+                       bool &HadForwardDeclaration);
+
+  Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
+                               bool SuperfluousTypedefsAreTransparent);
+
+  /// \brief Same as \c importDeclReal, but for use inside importer
+  /// implementation.
+  ///
+  /// Unlike \c importDeclReal, this function for convenience transparently
+  /// looks through superfluous typedefs and returns the imported underlying
+  /// decl in that case.
+  Decl *importDecl(const clang::NamedDecl *ClangDecl) {
+    return importDeclAndCacheImpl(ClangDecl,
+                                  /*SuperfluousTypedefsAreTransparent=*/true);
+  }
+
+  /// \brief Import the given Clang declaration into Swift.  Use this function
+  /// outside of the importer implementation, when importing a decl requested by
+  /// Swift code.
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDecl(const clang::NamedDecl *decl);
+  Decl *importDeclReal(const clang::NamedDecl *ClangDecl) {
+    return importDeclAndCacheImpl(ClangDecl,
+                                  /*SuperfluousTypedefsAreTransparent=*/false);
+  }
 
   /// \brief Import a cloned version of the given declaration, which is part of
   /// an Objective-C protocol and currently must be a method, into the given
