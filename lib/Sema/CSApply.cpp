@@ -2931,19 +2931,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 Expr *
 ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
                                          ConstraintLocatorBuilder locator) {
-  // Map down to the underlying object type. We'll build an lvalue
-  Type containerType = toType->getRValueType();
-
-  // If the container type has reference semantics or is a metatype,
-  // just perform the coercion to that type.
-  if (containerType->hasReferenceSemantics() ||
-      containerType->is<MetaTypeType>()) {
-    assert(!toType->is<LValueType>() && "Caller should not provide lvalue type");
-    return coerceToType(expr, containerType, locator);
+  // If we're coercing to an rvalue type, just do it.
+  if (!toType->is<LValueType>()) {
+    return coerceToType(expr, toType, locator);
   }
 
-  // Types with value semantics are passed by reference.
-  assert(toType->is<LValueType>() && "Value semantics without lvalue type");
+  // Map down to the underlying object type.
+  Type containerType = toType->getRValueType();
 
   // Form the lvalue type we will be producing.
   auto &tc = cs.getTypeChecker();
