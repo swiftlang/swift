@@ -71,47 +71,47 @@ int frontend_main(ArrayRef<const char *>Args,
 
   Instance.performParse();
 
-  std::unique_ptr<SILModule> SM = Instance.takeSILModule();
-  if (!SM) {
-    SM = performSILGeneration(Instance.getMainModule());
-    performSILLinking(SM.get());
-  }
+  ASTContext &Context = Instance.getASTContext();
 
-  if (SM->getStage() != SILStage::Canonical) {
-    auto &Ctx = SM->getASTContext();
+  if (!Context.hadError()) {
+    std::unique_ptr<SILModule> SM = Instance.takeSILModule();
+    if (!SM) {
+      SM = performSILGeneration(Instance.getMainModule());
+      performSILLinking(SM.get());
+    }
 
-    performSILMandatoryInlining(SM.get());
+    if (SM->getStage() != SILStage::Canonical) {
+      performSILMandatoryInlining(SM.get());
 
-    performSILCapturePromotion(SM.get());
-    performSILAllocBoxToStackPromotion(SM.get());
-    performInOutDeshadowing(SM.get());
-    performSILDefiniteInitialization(SM.get());
+      performSILCapturePromotion(SM.get());
+      performSILAllocBoxToStackPromotion(SM.get());
+      performInOutDeshadowing(SM.get());
+      performSILDefiniteInitialization(SM.get());
 
-    performSILConstantPropagation(SM.get());
-    performSILDeadCodeElimination(SM.get());
+      performSILConstantPropagation(SM.get());
+      performSILDeadCodeElimination(SM.get());
 
-    emitSILDataflowDiagnostics(SM.get());
+      emitSILDataflowDiagnostics(SM.get());
 
-    SM->setStage(SILStage::Canonical);
+      SM->setStage(SILStage::Canonical);
+    }
 
-    if (Ctx.hadError()) {
-      return 1;
+    if (!Context.hadError()) {
+      performSILCleanup(SM.get());
+
+      irgen::Options Options;
+      Options.MainInputFilename = Invocation.getInputFilenames()[0];
+      Options.Triple = Invocation.getTargetTriple();
+      Options.LinkLibraries.append(Invocation.getLinkLibraries().begin(),
+                                   Invocation.getLinkLibraries().end());
+      Options.OptLevel = 0;
+      Options.OutputFilename = Invocation.getOutputFilename();
+
+      Options.OutputKind = irgen::OutputKind::ObjectFile;
+
+      performIRGeneration(Options, nullptr, Instance.getMainModule(), SM.get());
     }
   }
-
-  performSILCleanup(SM.get());
-
-  irgen::Options Options;
-  Options.MainInputFilename = Invocation.getInputFilenames()[0];
-  Options.Triple = Invocation.getTargetTriple();
-  Options.LinkLibraries.append(Invocation.getLinkLibraries().begin(),
-                               Invocation.getLinkLibraries().end());
-  Options.OptLevel = 0;
-  Options.OutputFilename = Invocation.getOutputFilename();
-
-  Options.OutputKind = irgen::OutputKind::ObjectFile;
-
-  performIRGeneration(Options, nullptr, Instance.getMainModule(), SM.get());
   
-  return 0;
+  return Context.hadError();
 }
