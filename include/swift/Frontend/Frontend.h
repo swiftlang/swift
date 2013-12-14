@@ -21,6 +21,7 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/TargetOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -46,7 +47,6 @@ namespace swift {
 class SerializedModuleLoader;
 
 class CompilerInvocation {
-  std::string TargetTriple;
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string ModuleSourceListPath;
 
@@ -54,6 +54,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
+  TargetOptions TargetOpts;
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
@@ -78,11 +79,11 @@ public:
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
 
   void setTargetTriple(StringRef Triple) {
-    TargetTriple = Triple.str();
+    TargetOpts.Triple = Triple.str();
   }
 
   StringRef getTargetTriple() const {
-    return TargetTriple;
+    return TargetOpts.Triple;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -176,6 +177,9 @@ public:
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;
   }
+
+  TargetOptions &getTargetOptions() { return TargetOpts; }
+  const TargetOptions &getTargetOptions() const { return TargetOpts; }
 
   void setParseStdlib() {
     ParseStdlib = true;

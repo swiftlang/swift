@@ -14,6 +14,7 @@
 
 #include "swift/Driver/Options.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -24,7 +25,7 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 swift::CompilerInvocation::CompilerInvocation() {
-  TargetTriple = llvm::sys::getDefaultTargetTriple();
+  TargetOpts.Triple = llvm::sys::getDefaultTargetTriple();
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
@@ -142,6 +143,17 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
+                            DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_target)) {
+    Opts.Triple = llvm::Triple::normalize(A->getValue());
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -188,12 +200,12 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  if (ParseTargetArgs(TargetOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
-    case OPT_target:
-      setTargetTriple(InputArg->getValue());
-      break;
-
     case OPT_parse_as_library:
       setInputKind(SourceFileKind::Library);
       break;
