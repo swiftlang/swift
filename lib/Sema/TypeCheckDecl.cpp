@@ -1734,10 +1734,8 @@ public:
     if (Type selfType = FD->computeSelfType(&outerGenericParams)) {
       auto SelfDecl = FD->getImplicitSelfDecl();
       SelfDecl->setType(selfType);
-      // 'self' is let for reference types (i.e., classes) or when 'self' is
-      // lowered to the type itself.  It is mutable when lowered to an lvalue.
-      SelfDecl->setLet(selfType->hasReferenceSemantics() ||
-                       !selfType->is<LValueType>());
+      if (!selfType->hasReferenceSemantics())
+        SelfDecl->setLet(false);
 
       TypedPattern *selfPattern =
           cast<TypedPattern>(FD->getArgParamPatterns()[0]);
@@ -1987,8 +1985,8 @@ public:
     Type ResultTy = SelfTy->getRValueType();
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     !SelfTy->is<LValueType>());
+    if (!SelfTy->hasReferenceSemantics())
+      SelfDecl->setLet(false);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2124,8 +2122,8 @@ public:
     DD->setType(FnTy);
     auto SelfDecl = DD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     !SelfTy->is<LValueType>());
+    if (SelfTy->is<LValueType>())
+      SelfDecl->setLet(false);
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
