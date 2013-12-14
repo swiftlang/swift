@@ -1196,7 +1196,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool hasSelectorStyleSignature;
     bool isClassMethod;
     bool isAssignmentOrConversion;
-    bool isObjC, isIBAction, isTransparent, isOptional;
+    bool isObjC, isIBAction, isTransparent, isInOut, isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1207,7 +1207,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         hasSelectorStyleSignature,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
-                                        isOptional,
+                                        isInOut, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID);
@@ -1277,6 +1277,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
+    if (isInOut)
+      fn->getMutableAttrs().setAttr(AK_inout, SourceLoc());
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
