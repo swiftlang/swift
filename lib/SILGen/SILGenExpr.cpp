@@ -599,7 +599,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // If we can and must fold this, do so.
   if (VarDecl *VD = isLoadPropagatedValue(E->getSubExpr(), SGF)) {
-    auto &Entry = SGF.VarLocs[VD];
+    auto Entry = SGF.VarLocs[VD];
     assert(Entry.isConstant() && "Not a load propagated vardecl");
     SILValue V = Entry.getConstant();
 
@@ -1648,7 +1648,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       // LValues are captured as both the box owning the value and the
       // address of the value.
       assert(VarLocs.count(capture) && "no location for captured var!");
-      const VarLoc &vl = VarLocs[capture];
+      VarLoc vl = VarLocs[capture];
       assert(vl.box && "no box for captured var!");
       assert(vl.isAddress() && vl.getAddress() &&
              "no address for captured var!");
@@ -1659,7 +1659,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
     case CaptureKind::Constant: {
       // LValues captured by value.
-      auto &Entry = VarLocs[cast<VarDecl>(capture)];
+      auto Entry = VarLocs[cast<VarDecl>(capture)];
       ManagedValue v;
       if (Entry.isConstant()) {
         SILValue Val = B.createCopyValue(loc, Entry.getConstant());

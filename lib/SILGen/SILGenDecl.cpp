@@ -416,12 +416,14 @@ struct InitializationForPattern
     if (isa<LValueType>(varType))
       return InitializationPtr(new InOutInitialization(vd));
 
-    // If this is a 'self' argument for a class method (not struct method), emit
-    // it as a constant value.  Since it is a constant value, there is no memory
-    // location associated with it, and thus we don't need an initialization -
-    // the store will provide the value directly into the VarLocs map.
+    // If this is a 'self' argument for a class method (or non-inout struct
+    // method), emit it as a constant value.  Since it is a constant value,
+    // there is no memory location associated with it, and thus we don't need an
+    // initialization - the store will provide the value directly into the
+    // VarLocs map.
     if (vd->isImplicit() && vd->getName().str() == "self" &&
-        vd->getType()->hasReferenceSemantics())
+        (vd->getType()->hasReferenceSemantics() ||
+         !vd->getType()->is<LValueType>()))
       return InitializationPtr(new BlackHoleInitialization());
     
     // Otherwise, we have a normal local-variable initialization.
@@ -646,12 +648,14 @@ struct ArgumentInitVisitor :
   SILValue visitNamedPattern(NamedPattern *P, Initialization *I) {
     VarDecl *vd = P->getDecl();
     
-    // If this is a 'self' argument for a class method (not struct method), emit
-    // it as a constant value.  Since it is a constant value, there is no memory
-    // location associated with it, and thus we don't need an initialization -
-    // the store will provide the value directly into the VarLocs map.
+    // If this is a 'self' argument for a class method (or non-inout struct
+    // method), emit it as a constant value.  Since it is a constant value,
+    // there is no memory location associated with it, and thus we don't need an
+    // initialization - the store will provide the value directly into the
+    // VarLocs map.
     if (vd->isImplicit() && vd->getName().str() == "self" &&
-        vd->getType()->hasReferenceSemantics()) {
+        (vd->getType()->hasReferenceSemantics() ||
+         !vd->getType()->is<LValueType>())) {
       SILLocation loc = vd;
       loc.markAsPrologue();
       SILValue arg = makeArgument(P->getType(), f.begin(), loc);
@@ -1320,7 +1324,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
   
-  auto &loc = VarLocs[vd];
+  auto loc = VarLocs[vd];
   
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
@@ -1337,7 +1341,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
 
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
 
-  auto &loc = VarLocs[vd];
+  auto loc = VarLocs[vd];
   if (loc.isConstant()) return;
 
   assert(loc.box && "captured var should have been given a box");
