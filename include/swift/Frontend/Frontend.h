@@ -19,6 +19,7 @@
 #define SWIFT_FRONTEND_H
 
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/TargetOptions.h"
@@ -54,6 +55,7 @@ class CompilerInvocation {
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
   TargetOptions TargetOpts;
+  DiagnosticOptions DiagnosticOpts;
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
@@ -179,6 +181,11 @@ public:
 
   TargetOptions &getTargetOptions() { return TargetOpts; }
   const TargetOptions &getTargetOptions() const { return TargetOpts; }
+
+  DiagnosticOptions &getDiagnosticOptions() { return DiagnosticOpts; }
+  const DiagnosticOptions &getDiagnosticOptions() const {
+    return DiagnosticOpts;
+  }
 
   void setParseStdlib() {
     ParseStdlib = true;

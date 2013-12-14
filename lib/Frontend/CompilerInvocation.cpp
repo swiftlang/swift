@@ -158,6 +158,17 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
+                                DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (Args.hasArg(OPT_verify)) {
+    Opts.VerifyDiagnostics = true;
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -205,6 +216,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseTargetArgs(TargetOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseDiagnosticArgs(DiagnosticOpts, *ParsedArgs, Diags)) {
     return true;
   }
 

@@ -44,4 +44,8 @@ def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
 
+def verify : Flag<["-"], "verify">,
+  HelpText<"Verify diagnostics against expected-{error|warning|note} "
+           "annotations">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]

@@ -21,6 +21,7 @@
 #include "swift/IRGen/Options.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
@@ -58,6 +59,10 @@ int frontend_main(ArrayRef<const char *>Args,
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
+  }
+
+  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
+    enableDiagnosticVerifier(Instance.getSourceMgr());
   }
 
   // TODO: remove once we properly handle no -sdk argument
@@ -112,6 +117,13 @@ int frontend_main(ArrayRef<const char *>Args,
       performIRGeneration(Options, nullptr, Instance.getMainModule(), SM.get());
     }
   }
+
+  bool HadError = Context.hadError();
+
+  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
+    HadError = verifyDiagnostics(Instance.getSourceMgr(),
+                                 Instance.getInputBufferIDs());
+  }
   
-  return Context.hadError();
+  return HadError;
 }
