@@ -69,10 +69,12 @@ def driver_print_bindings : Flag<["-"], "driver-print-bindings">,
 def driver_print_jobs : Flag<["-"], "driver-print-jobs">, InternalDebugOpt,
   HelpText<"Dump list of jobs to execute">;
 
-def help : Flag<["-", "--"], "help">, HelpText<"Display available options">;
+def help : Flag<["-", "--"], "help">, Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Display available options">;
 def _help_hidden : Flag<["--"], "help-hidden">,
-  HelpText<"Display available options, including hidden options">,
-  Flags<[HelpHidden]>;
+  Flags<[HelpHidden, DriverOption, FrontendOption]>,
+  HelpText<"Display available options, including hidden options">;
+
 def v : Flag<["-"], "v">,
   HelpText<"Show commands to run and use verbose output">;
 def _version : Flag<["--"], "version">;

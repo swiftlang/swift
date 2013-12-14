@@ -50,6 +50,12 @@ public:
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
+
+  /// Indicates whether standard help should be shown.
+  bool PrintHelp = false;
+
+  /// Indicates whether full help (including "hidden" options) should be shown.
+  bool PrintHelpHidden = false;
 };
 
 }

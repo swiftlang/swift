@@ -21,11 +21,15 @@
 #include "swift/IRGen/Options.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Driver/Options.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Option/Option.h"
+#include "llvm/Option/OptTable.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -36,6 +40,12 @@ using namespace swift;
 #ifndef SWIFT_MODULES_SDK
 #define SWIFT_MODULES_SDK ""
 #endif
+
+static std::string displayName(StringRef MainExecutablePath) {
+  std::string Name = llvm::sys::path::stem(MainExecutablePath);
+  Name += " -frontend";
+  return Name;
+}
 
 int frontend_main(ArrayRef<const char *>Args,
                   const char *Argv0, void *MainAddr) {
@@ -49,12 +59,27 @@ int frontend_main(ArrayRef<const char *>Args,
   Instance.addDiagnosticConsumer(&PDC);
   
   CompilerInvocation Invocation;
-  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(Argv0,
-                                                                    MainAddr));
+  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
+                                                                    MainAddr);
+  Invocation.setMainExecutablePath(MainExecutablePath);
 
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
+  }
+
+  if (Invocation.getFrontendOptions().PrintHelp ||
+      Invocation.getFrontendOptions().PrintHelpHidden) {
+    unsigned IncludedFlagsBitmask = driver::options::FrontendOption;
+    unsigned ExcludedFlagsBitmask =
+      Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
+                                                        llvm::opt::HelpHidden;
+    std::unique_ptr<llvm::opt::OptTable> Options(
+      driver::createDriverOptTable());
+    Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
+                       "Swift frontend", IncludedFlagsBitmask,
+                       ExcludedFlagsBitmask);
+    return 0;
   }
 
   if (Invocation.getFrontendOptions().PrintStats) {
