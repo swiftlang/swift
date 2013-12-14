@@ -731,14 +731,6 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MemberRefExpr *E) {
-      if (!E->getBase()->getType()->is<LValueType>() &&
-          !E->getBase()->getType()->is<MetaTypeType>() &&
-          !E->getBase()->getType()->hasReferenceSemantics()) {
-        Out << "Member reference base type is not an lvalue, class, or metatype:\n";
-        E->dump(Out);
-        abort();
-      }
-      
       if (!E->getType()->is<LValueType>() && !E->getType()->is<MetaTypeType>()) {
         Out << "Member reference type is not an lvalue or metatype\n";
         E->dump(Out);
@@ -785,12 +777,6 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(SubscriptExpr *E) {
-      if (!E->getBase()->getType()->is<LValueType>() &&
-          !E->getBase()->getType()->hasReferenceSemantics()) {
-        Out << "Subscript base type is not an lvalue";
-        abort();
-      }
-
       if (!E->getType()->is<LValueType>()) {
         Out << "Subscript type is not an lvalue";
         abort();
