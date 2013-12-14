@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -56,8 +57,9 @@ Module *ProtocolConformance::getContainingModule() const {
 }
 
 const Substitution &
-ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitness, (assocType))
+ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
+                                    LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitness, (assocType, resolver))
 }
 
 ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement) const {
@@ -96,11 +98,48 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
 }
 
 const Substitution &SpecializedProtocolConformance::getTypeWitness(
-                      AssociatedTypeDecl *assocType) const {
-  /// FIXME: Create these lazily.
+                      AssociatedTypeDecl *assocType, 
+                      LazyResolver *resolver) const {
+  // If we've already created this type witness, return it.
   auto known = TypeWitnesses.find(assocType);
-  assert(known != TypeWitnesses.end());
-  return known->second;
+  if (known != TypeWitnesses.end()) {
+    return known->second;
+  }
+
+  // Otherwise, perform substitutions to create this witness now.
+  TypeSubstitutionMap substitutionMap;
+  for (const auto &substitution : GenericSubstitutions) {
+    substitutionMap[substitution.Archetype] = substitution.Replacement;
+  }
+
+  auto &genericWitness = GenericConformance->getTypeWitness(assocType, resolver);
+  auto module = getContainingModule();
+  auto specializedType
+    = genericWitness.Replacement.subst(module, substitutionMap,
+                                       /*ignoreMissing=*/false,
+                                       resolver);
+
+  // If the type witness was unchanged, just copy it directly.
+  if (specializedType.getPointer() == genericWitness.Replacement.getPointer()) {
+    TypeWitnesses[assocType] = genericWitness;
+    return TypeWitnesses[assocType];
+  }
+
+  // Gather the conformances for the type witness. These should never fail.
+  SmallVector<ProtocolConformance *, 4> conformances;
+  auto archetype = genericWitness.Archetype;
+  for (auto proto : archetype->getConformsTo()) {
+    auto conforms = module->lookupConformance(specializedType, proto, resolver);
+    assert(conforms.getInt() == ConformanceKind::Conforms &&
+           "Improperly checked substitution");
+    conformances.push_back(conforms.getPointer());
+  }
+
+  // Form the substitution.
+  auto &ctx = assocType->getASTContext();
+  TypeWitnesses[assocType] = Substitution{archetype, specializedType,
+                                          ctx.AllocateCopy(conformances)};
+  return TypeWitnesses[assocType];
 }
 
 ConcreteDeclRef

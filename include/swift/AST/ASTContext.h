@@ -494,14 +494,10 @@ public:
   ///
   /// \param substitutions The set of substitutions required to produce the
   /// specialized conformance from the generic conformance.
-  ///
-  /// \param typeWitnesses The set of type witnesses used by the specialized
-  /// conformance.
   SpecializedProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            ArrayRef<Substitution> substitutions,
-                            TypeWitnessMap &&typeWitnesses);
+                            ArrayRef<Substitution> substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.

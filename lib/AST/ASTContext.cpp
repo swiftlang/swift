@@ -812,8 +812,7 @@ ASTContext::getConformance(Type conformingType,
 SpecializedProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      ArrayRef<Substitution> substitutions,
-                                      TypeWitnessMap &&typeWitnesses) {
+                                      ArrayRef<Substitution> substitutions) {
   llvm::FoldingSetNodeID id;
   SpecializedProtocolConformance::Profile(id, type, generic);
 
@@ -825,8 +824,7 @@ ASTContext::getSpecializedConformance(Type type,
 
   // Build a new specialized conformance.
   auto result
-    = new (*this) SpecializedProtocolConformance(type, generic, substitutions,
-                                                 std::move(typeWitnesses));
+    = new (*this) SpecializedProtocolConformance(type, generic, substitutions);
   Impl.SpecializedConformances.InsertNode(result, insertPos);
   return result;
 }

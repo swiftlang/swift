@@ -835,7 +835,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance)) {
-        auto memberTy = conformance->getTypeWitness(assocType).Replacement;
+        auto memberTy = conformance->getTypeWitness(assocType, &TC).Replacement;
         if (!isTypeReference)
           memberTy = MetaTypeType::get(memberTy, TC.Context);
 
@@ -947,7 +947,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         !baseObjTy->hasTypeVariable()) {
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance)) {
-        type = conformance->getTypeWitness(assocType).Replacement;
+        type = conformance->getTypeWitness(assocType, &TC).Replacement;
       }
     }
   } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||

@@ -1833,7 +1833,7 @@ public:
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
-    const auto &witness = Conformance->getTypeWitness(td);
+    const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,

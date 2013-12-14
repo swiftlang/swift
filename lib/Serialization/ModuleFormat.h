@@ -813,11 +813,8 @@ namespace decls_block {
     ModuleIDField,       // the module in which the generic conformance occurs,
                          // or BUILTIN_MODULE_ID to indicate that the generic
                          // conformance is in the following record
-    BCVBR<5>,            // type mapping count
-    BCVBR<5>,            // # of substitutions for the conformance
-    BCArray<DeclIDField> // the type witnesses
-    // followed by substitution records for the conformance, then the
-    // substitution records for the type witnesses
+    BCVBR<5>             // # of substitutions for the conformance
+    // followed by substitution records for the conformance
   >;
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<

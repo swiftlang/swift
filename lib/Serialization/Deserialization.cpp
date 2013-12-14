@@ -306,15 +306,11 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     DeclID protoID;
     DeclID typeID;
     IdentifierID moduleID;
-    unsigned numTypeWitnesses;
     unsigned numSubstitutions;
-    ArrayRef<uint64_t> rawIDs;
     SpecializedProtocolConformanceLayout::readRecord(scratch, protoID,
                                                      typeID,
                                                      moduleID,
-                                                     numTypeWitnesses,
-                                                     numSubstitutions,
-                                                     rawIDs);
+                                                     numSubstitutions);
 
     ASTContext &ctx = getContext();
 
@@ -328,19 +324,6 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
       substitutions.push_back(*sub);
     }
 
-    // Read the type witnesses.
-    ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
-    TypeWitnessMap typeWitnesses;
-    while (numTypeWitnesses--) {
-      // FIXME: We don't actually want to allocate an archetype here; we just
-      // want to get an access path within the protocol.
-      auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-      auto second = maybeReadSubstitution(Cursor);
-      assert(second.hasValue());
-      typeWitnesses[first] = *second;
-    }
-    assert(rawIDIter <= rawIDs.end() && "read too much");
-
     ProtocolConformance *genericConformance
       = readUnderlyingConformance(proto, typeID, moduleID, Cursor);
 
@@ -351,8 +334,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     return { proto,
              ctx.getSpecializedConformance(conformingType,
                                            genericConformance,
-                                           ctx.AllocateCopy(substitutions),
-                                           std::move(typeWitnesses)) };
+                                           ctx.AllocateCopy(substitutions)) };
   }
 
   case INHERITED_PROTOCOL_CONFORMANCE: {

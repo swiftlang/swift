@@ -1472,7 +1472,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
           return ignoreMissing? type : Type();
 
         case ConformanceKind::Conforms:
-          return conformance.getPointer()->getTypeWitness(assocType).Replacement;
+          return conformance.getPointer()->getTypeWitness(assocType,
+                                                          resolver).Replacement;
         }
       }
     }

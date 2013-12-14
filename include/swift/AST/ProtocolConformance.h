@@ -95,7 +95,8 @@ public:
   Module *getContainingModule() const;
 
   /// Retrieve the type witness for the given associated type.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const;
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType,
+                                    LazyResolver *resolver) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -104,14 +105,14 @@ public:
   /// requirement followed by the \c Substitution for the witness. It should
   /// return true to indicate an early exit.
   template<typename F>
-  bool forEachTypeWitness(F f) const {
+  bool forEachTypeWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();
     for (auto req : protocol->getMembers()) {
       auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req);
       if (!assocTypeReq || req->isInvalid())
         continue;
 
-      if (f(assocTypeReq, getTypeWitness(assocTypeReq)))
+      if (f(assocTypeReq, getTypeWitness(assocTypeReq, resolver)))
         return true;
     }
 
@@ -255,7 +256,8 @@ public:
 
   /// Retrieve the type witness corresponding to the given associated type
   /// requirement.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
+                                     LazyResolver *resolver) const {
     auto known = TypeWitnesses.find(assocType);
     assert(known != TypeWitnesses.end());
     return known->second;
@@ -315,21 +317,19 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The mapping from associated type requirements to their substitutions.
   ///
-  /// This is essentially cloned and specialized from the underlying, generic
-  /// conformance.
-  TypeWitnessMap TypeWitnesses;
+  /// This mapping is lazily produced by specializing the underlying,
+  /// generic conformance.
+  mutable TypeWitnessMap TypeWitnesses;
 
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions,
-                                 TypeWitnessMap &&typeWitnesses)
+                                 ArrayRef<Substitution> substitutions)
     : ProtocolConformance(ProtocolConformanceKind::Specialized,
                           conformingType),
       GenericConformance(genericConformance),
-      GenericSubstitutions(substitutions),
-      TypeWitnesses(std::move(typeWitnesses))
+      GenericSubstitutions(substitutions)
   {
   }
 
@@ -357,7 +357,8 @@ public:
   }
 
   /// Retrieve the type witness for the given associated type.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const;
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
+                                     LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement) const;
@@ -437,8 +438,9 @@ public:
   }
 
   /// Retrieve the type witness for the given associated type.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
-    return InheritedConformance->getTypeWitness(assocType);
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
+                                     LazyResolver *resolver) const {
+    return InheritedConformance->getTypeWitness(assocType, resolver);
   }
 
   /// Retrieve the value witness corresponding to the given requirement.

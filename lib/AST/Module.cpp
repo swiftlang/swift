@@ -493,67 +493,6 @@ static ArrayRef<Substitution> gatherSubstitutions(Module *module, Type type,
   return ctx.AllocateCopy(flatSubstitutions);
 }
 
-/// Given a type witness map and a set of substitutions, produce the specialized
-/// type witness map by applying the substitutions to each type witness.
-static TypeWitnessMap
-specializeTypeWitnesses(ASTContext &ctx,
-                        Module *module,
-                        ProtocolConformance *conformance,
-                        ArrayRef<Substitution> substitutions,
-                        LazyResolver *resolver) {
-  // Compute the substitution map, which is needed for substType().
-  TypeSubstitutionMap substitutionMap;
-  for (const auto &substitution : substitutions) {
-    substitutionMap[substitution.Archetype] = substitution.Replacement;
-  }
-
-  // Substitute into each of the type witnesses.
-  TypeWitnessMap result;
-  bool failed
-    = conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness) {
-      // Substitute into the type witness to produce the type witness for
-      // the specialized type.
-      auto specializedType
-        = witness.Replacement.subst(module, substitutionMap,
-                                    /*ignoreMissing=*/false, resolver);
-
-      // If the type witness was unchanged, just copy it directly.
-      if (specializedType.getPointer() ==
-            witness.Replacement.getPointer()) {
-        result.insert({assocType, witness});
-        return false;
-      }
-
-      // Gather the conformances for the type witness. These should never fail.
-      SmallVector<ProtocolConformance *, 4> conformances;
-      auto archetype = witness.Archetype;
-      for (auto proto : archetype->getConformsTo()) {
-        auto conforms = module->lookupConformance(specializedType, proto,
-                                                  resolver);
-        switch (conforms.getInt()) {
-        case ConformanceKind::Conforms:
-          conformances.push_back(conforms.getPointer());
-          break;
-
-        case ConformanceKind::DoesNotConform:
-        case ConformanceKind::UncheckedConforms:
-          // FIXME: Signal errors in a more sane way.
-          return true;
-        }
-      }
-
-      result[assocType] = Substitution{archetype, specializedType,
-                                       ctx.AllocateCopy(conformances)};
-      return false;
-    });
-
-  if (failed)
-    return TypeWitnessMap();
-
-  return result;
-}
-
 /// Retrieve the explicit conformance of the given nominal type declaration
 /// to the given protocol.
 static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
@@ -593,7 +532,8 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
       return false;
     };
 
-  resolver->resolveDeclSignature(nominal);
+  if (!nominal->hasType())
+    resolver->resolveDeclSignature(nominal);
 
   // Walk the stack of types to find a conformance.
   stack.push_back(std::make_tuple(nominal, nominal, nominal));
@@ -788,16 +728,10 @@ LookupConformanceResult Module::lookupConformance(Type type,
       // the specialized conformance.
       auto substitutions = gatherSubstitutions(this, type, resolver);
 
-      // The type witnesses for the specialized conformance.
-      TypeWitnessMap typeWitnesses
-        = specializeTypeWitnesses(ctx, this, nominalConformance,
-                                  substitutions, resolver);
-
       // Create the specialized conformance entry.
       ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
       auto result = ctx.getSpecializedConformance(type, nominalConformance,
-                                                  substitutions,
-                                                  std::move(typeWitnesses));
+                                                  substitutions);
       ctx.ConformsTo[key] = ConformanceEntry(result, true);
       return { result, ConformanceKind::Conforms };
     }

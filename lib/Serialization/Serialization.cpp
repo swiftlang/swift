@@ -636,7 +636,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       ++numValueWitnesses;
     });
 
-    conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+    conformance->forEachTypeWitness(/*resolver=*/nullptr,
+                                    [&](AssociatedTypeDecl *assocType,
                                         const Substitution &witness) {
        data.push_back(addDeclRef(assocType));
        // The substitution record is serialized later.
@@ -673,7 +674,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                          ConcreteDeclRef witness) {
       writeSubstitutions(witness.getSubstitutions(), abbrCodes);
     });
-    conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+    conformance->forEachTypeWitness(/*resolver=*/nullptr,
+                                    [&](AssociatedTypeDecl *assocType,
                                         const Substitution &witness) {
       writeSubstitutions(witness, abbrCodes);
       return false;
@@ -684,15 +686,6 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
-    SmallVector<DeclID, 16> data;
-    unsigned numTypeWitnesses = 0;
-    conf->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
-                                 const Substitution &witness) {
-       data.push_back(addDeclRef(assocType));
-       // The substitution record is serialized later.
-       ++numTypeWitnesses;
-      return false;
-     });
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode
       = abbrCodes[SpecializedProtocolConformanceLayout::Code];
@@ -708,16 +701,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                      addDeclRef(protocol),
                                                      typeID,
                                                      moduleID,
-                                                     numTypeWitnesses,
-                                                     substitutions.size(),
-                                                     data);
+                                                     substitutions.size());
     writeSubstitutions(substitutions, abbrCodes);
-
-    conf->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
-                                 const Substitution &witness) {
-      writeSubstitutions(witness, abbrCodes);
-      return false;
-    });
 
     if (appendGenericConformance) {
       writeConformance(protocol, conf->getGenericConformance(), nullptr,

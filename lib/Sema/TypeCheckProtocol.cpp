@@ -1226,7 +1226,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
     // Look for the owner of this witness.
     Decl *witnessOwner = nullptr;
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      auto witnessTy = conformance->getTypeWitness(assocType).Replacement;
+      auto witnessTy = conformance->getTypeWitness(assocType, &tc).Replacement;
       if (auto nameAlias = dyn_cast<NameAliasType>(witnessTy.getPointer())) {
         witnessOwner = getNominalOrExtensionDecl(
                          nameAlias->getDecl()->getDeclContext());
