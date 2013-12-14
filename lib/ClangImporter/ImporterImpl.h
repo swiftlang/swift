@@ -338,6 +338,10 @@ public:
   /// should be imported 
   EnumKind classifyEnum(const clang::EnumDecl *decl);
 
+  /// If we already imported a given decl, return the corresponding Swift decl.
+  /// Otherwise, return nullptr.
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
+
   /// \brief Import the given Clang declaration into Swift.
   ///
   /// \returns The imported declaration, or null if this declaration could

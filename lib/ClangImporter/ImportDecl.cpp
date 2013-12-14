@@ -894,9 +894,8 @@ namespace {
         // FIXME: Importing the type will recursively revisit this same
         // EnumConstantDecl. Short-circuit out if we already emitted the import
         // for this decl.
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
+        if (auto Known = Impl.importDeclCached(decl))
+          return Known;
 
         // Create the global constant.
         auto result = Impl.createConstant(name, dc, type,
@@ -924,9 +923,8 @@ namespace {
         // FIXME: Importing the type will can recursively revisit this same
         // EnumConstantDecl. Short-circuit out if we already emitted the import
         // for this decl.
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
+        if (auto Known = Impl.importDeclCached(decl))
+          return Known;
 
         // Create the global constant.
         auto result = Impl.createConstant(name, dc, enumType,
@@ -1139,9 +1137,8 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-      if (known != Impl.ImportedDecls.end())
-        return known->second;
+      if (auto Known = Impl.importDeclCached(decl))
+        return Known;
 
       return VisitObjCMethodDecl(decl, dc);
     }
@@ -2427,9 +2424,8 @@ namespace {
         return nullptr;
 
       // We might have imported this decl while importing the DeclContext.
-      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-      if (known != Impl.ImportedDecls.end())
-        return known->second;
+      if (auto Known = Impl.importDeclCached(decl))
+        return Known;
 
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
@@ -2611,13 +2607,21 @@ classifyEnum(const clang::EnumDecl *decl) {
   return EnumKind::Unknown;
 }
 
+Decl *ClangImporter::Implementation::importDeclCached(
+    const clang::NamedDecl *ClangDecl) {
+  auto Known = ImportedDecls.find(ClangDecl->getCanonicalDecl());
+  if (Known != ImportedDecls.end())
+    return Known->second;
+
+  return nullptr;
+}
+
 Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
   if (!decl)
     return nullptr;
-  
-  auto known = ImportedDecls.find(decl->getCanonicalDecl());
-  if (known != ImportedDecls.end())
-    return known->second;
+
+  if (auto Known = importDeclCached(decl))
+    return Known;
 
   SwiftDeclConverter converter(*this);
   auto result = converter.Visit(decl);
