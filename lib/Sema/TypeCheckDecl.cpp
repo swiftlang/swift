@@ -1731,19 +1731,22 @@ public:
 
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
-    if (Type selfType = FD->computeSelfType(&outerGenericParams)) {
+    if (Type SelfTy = FD->computeSelfType(&outerGenericParams)) {
       auto SelfDecl = FD->getImplicitSelfDecl();
-      SelfDecl->setType(selfType);
-      if (!selfType->hasReferenceSemantics())
-        SelfDecl->setLet(false);
+      SelfDecl->setType(SelfTy);
+      // 'self' is let for reference types (i.e., classes) or when 'self' is
+      // lowered to the type itself.  It is mutable when lowered to an lvalue.
+      SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
+                       (!SelfTy->is<LValueType>() &&
+                        !SelfTy->is<MetaTypeType>()));
 
       TypedPattern *selfPattern =
           cast<TypedPattern>(FD->getArgParamPatterns()[0]);
       if (selfPattern->hasType()) {
-        assert(selfPattern->getType().getPointer() == selfType.getPointer());
+        assert(selfPattern->getType().getPointer() == SelfTy.getPointer());
       } else {
-        selfPattern->setType(selfType);
-        cast<NamedPattern>(selfPattern->getSubPattern())->setType(selfType);
+        selfPattern->setType(SelfTy);
+        cast<NamedPattern>(selfPattern->getSubPattern())->setType(SelfTy);
       }
     }
 
@@ -1985,8 +1988,9 @@ public:
     Type ResultTy = SelfTy->getRValueType();
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    if (!SelfTy->hasReferenceSemantics())
-      SelfDecl->setLet(false);
+    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
+                     (!SelfTy->is<LValueType>() &&
+                      !SelfTy->is<MetaTypeType>()));
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2122,8 +2126,9 @@ public:
     DD->setType(FnTy);
     auto SelfDecl = DD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    if (SelfTy->is<LValueType>())
-      SelfDecl->setLet(false);
+    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
+                     (!SelfTy->is<LValueType>() &&
+                      !SelfTy->is<MetaTypeType>()));
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
