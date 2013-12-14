@@ -2650,8 +2650,6 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
   if (UnderlyingDecl->getDeclName().isEmpty())
     return UnderlyingDecl;
 
-  auto Name = Impl.importName(ClangTypedef->getDeclName());
-
   auto TypedefName = ClangTypedef->getDeclName();
   auto TagDeclName = UnderlyingDecl->getDeclName();
   if (TypedefName != TagDeclName)
