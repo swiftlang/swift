@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class SILBuilder;
+
 class SILDebuggerClient : public DebuggerClient {
 public:
   typedef SmallVectorImpl<UnqualifiedLookupResult> ResultVector;
@@ -36,7 +38,8 @@ public:
   virtual SILValue emitReferenceToDecl(SILLocation loc,
                                        ConcreteDeclRef declRef,
                                        Type ncRefType,
-                                       unsigned uncurryLevel) = 0;
+                                       unsigned uncurryLevel,
+                                       SILBuilder &builder) = 0;
 
 
   inline SILDebuggerClient *getAsSILDebuggerClient() {

@@ -444,7 +444,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       assert (SILDebugClient && "Debugger client doesn't support SIL");
       return ManagedValue(SILDebugClient->emitReferenceToDecl(loc, declRef,
                                                               ncRefType,
-                                                              uncurryLevel),
+                                                              uncurryLevel,
+                                                              B),
                           ManagedValue::Unmanaged);
     }
 
