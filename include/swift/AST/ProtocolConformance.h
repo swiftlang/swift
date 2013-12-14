@@ -95,31 +95,27 @@ public:
   Module *getContainingModule() const;
 
   /// Retrieve the type witness for the given associated type.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
-    const auto &typeWitnesses = getTypeWitnesses();
-    auto known = typeWitnesses.find(assocType);
-    assert(known != typeWitnesses.end());
-    return known->second;
-  }
-
-  /// Retrieve the complete set of type witnesses.
-  const TypeWitnessMap &getTypeWitnesses() const;
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
   ///
   /// The function object should accept an \c AssociatedTypeDecl* for the
-  /// requirement followed by the \c Substitution for the witness.
+  /// requirement followed by the \c Substitution for the witness. It should
+  /// return true to indicate an early exit.
   template<typename F>
-  void forEachTypeWitness(F f) const {
+  bool forEachTypeWitness(F f) const {
     const ProtocolDecl *protocol = getProtocol();
     for (auto req : protocol->getMembers()) {
       auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req);
       if (!assocTypeReq || req->isInvalid())
         continue;
 
-      f(assocTypeReq, getTypeWitness(assocTypeReq));
+      if (f(assocTypeReq, getTypeWitness(assocTypeReq)))
+        return true;
     }
+
+    return false;
   }
 
   /// Retrieve the non-type witness for the given requirement.
@@ -257,6 +253,14 @@ public:
     ContainingModule = containing;
   }
 
+  /// Retrieve the type witness corresponding to the given associated type
+  /// requirement.
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
+    auto known = TypeWitnesses.find(assocType);
+    assert(known != TypeWitnesses.end());
+    return known->second;
+  }
+
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement) const {
     assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
@@ -264,9 +268,6 @@ public:
     assert(known != Mapping.end());
     return known->second;
   }
-
-  /// Retrieve the complete set of type witnesses.
-  const TypeWitnessMap &getTypeWitnesses() const { return TypeWitnesses; }
 
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {
@@ -355,13 +356,12 @@ public:
     return GenericConformance->getContainingModule();
   }
 
+  /// Retrieve the type witness for the given associated type.
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const;
+
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement) const;
 
-  /// Retrieve the complete set of type witnesses.
-  const TypeWitnessMap &getTypeWitnesses() const {
-    return TypeWitnesses;
-  }
 
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {
@@ -436,14 +436,14 @@ public:
     return InheritedConformance->getContainingModule();
   }
 
+  /// Retrieve the type witness for the given associated type.
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
+    return InheritedConformance->getTypeWitness(assocType);
+  }
+
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement) const {
     return InheritedConformance->getWitness(requirement);
-  }
-
-  /// Retrieve the complete set of type witnesses.
-  const TypeWitnessMap &getTypeWitnesses() const {
-    return InheritedConformance->getTypeWitnesses();
   }
 
   /// Retrieve the protocol conformances directly-inherited protocols.

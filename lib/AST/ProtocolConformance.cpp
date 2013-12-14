@@ -55,9 +55,9 @@ Module *ProtocolConformance::getContainingModule() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getContainingModule, ())
 }
 
-/// Retrieve the complete set of type witnesses.
-const TypeWitnessMap &ProtocolConformance::getTypeWitnesses() const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnesses, ())
+const Substitution &
+ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitness, (assocType))
 }
 
 ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement) const {
@@ -93,6 +93,14 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
     // FIXME: These could reasonably have open type variables.
     return nullptr;
   }
+}
+
+const Substitution &SpecializedProtocolConformance::getTypeWitness(
+                      AssociatedTypeDecl *assocType) const {
+  /// FIXME: Create these lazily.
+  auto known = TypeWitnesses.find(assocType);
+  assert(known != TypeWitnesses.end());
+  return known->second;
 }
 
 ConcreteDeclRef

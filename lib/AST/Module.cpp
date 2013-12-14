@@ -498,7 +498,7 @@ static ArrayRef<Substitution> gatherSubstitutions(Module *module, Type type,
 static TypeWitnessMap
 specializeTypeWitnesses(ASTContext &ctx,
                         Module *module,
-                        const TypeWitnessMap &witnesses,
+                        ProtocolConformance *conformance,
                         ArrayRef<Substitution> substitutions,
                         LazyResolver *resolver) {
   // Compute the substitution map, which is needed for substType().
@@ -509,43 +509,47 @@ specializeTypeWitnesses(ASTContext &ctx,
 
   // Substitute into each of the type witnesses.
   TypeWitnessMap result;
-  for (const auto &genericWitness : witnesses) {
-    // Substitute into the type witness to produce the type witness for
-    // the specialized type.
-    auto specializedType
-      = genericWitness.second.Replacement.subst(module, substitutionMap,
-                                                /*ignoreMissing=*/false,
-                                                resolver);
+  bool failed
+    = conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
+                                      const Substitution &witness) {
+      // Substitute into the type witness to produce the type witness for
+      // the specialized type.
+      auto specializedType
+        = witness.Replacement.subst(module, substitutionMap,
+                                    /*ignoreMissing=*/false, resolver);
 
-    // If the type witness was unchanged, just copy it directly.
-    if (specializedType.getPointer() ==
-          genericWitness.second.Replacement.getPointer()) {
-      result.insert(genericWitness);
-      continue;
-    }
-
-    // Gather the conformances for the type witness. These should never fail.
-    SmallVector<ProtocolConformance *, 4> conformances;
-    auto archetype = genericWitness.second.Archetype;
-    for (auto proto : archetype->getConformsTo()) {
-      auto conforms = module->lookupConformance(specializedType, proto,
-                                                resolver);
-      switch (conforms.getInt()) {
-      case ConformanceKind::Conforms:
-        conformances.push_back(conforms.getPointer());
-        break;
-
-      case ConformanceKind::DoesNotConform:
-      case ConformanceKind::UncheckedConforms:
-        // FIXME: Signal errors in a more sane way.
-        return TypeWitnessMap();
+      // If the type witness was unchanged, just copy it directly.
+      if (specializedType.getPointer() ==
+            witness.Replacement.getPointer()) {
+        result.insert({assocType, witness});
+        return false;
       }
-    }
 
-    result[genericWitness.first]
-      = Substitution{archetype, specializedType,
-                     ctx.AllocateCopy(conformances)};
-  }
+      // Gather the conformances for the type witness. These should never fail.
+      SmallVector<ProtocolConformance *, 4> conformances;
+      auto archetype = witness.Archetype;
+      for (auto proto : archetype->getConformsTo()) {
+        auto conforms = module->lookupConformance(specializedType, proto,
+                                                  resolver);
+        switch (conforms.getInt()) {
+        case ConformanceKind::Conforms:
+          conformances.push_back(conforms.getPointer());
+          break;
+
+        case ConformanceKind::DoesNotConform:
+        case ConformanceKind::UncheckedConforms:
+          // FIXME: Signal errors in a more sane way.
+          return true;
+        }
+      }
+
+      result[assocType] = Substitution{archetype, specializedType,
+                                       ctx.AllocateCopy(conformances)};
+      return false;
+    });
+
+  if (failed)
+    return TypeWitnessMap();
 
   return result;
 }
@@ -786,10 +790,8 @@ LookupConformanceResult Module::lookupConformance(Type type,
 
       // The type witnesses for the specialized conformance.
       TypeWitnessMap typeWitnesses
-        = specializeTypeWitnesses(ctx, this,
-                                  nominalConformance->getTypeWitnesses(),
-                                  substitutions,
-                                  resolver);
+        = specializeTypeWitnesses(ctx, this, nominalConformance,
+                                  substitutions, resolver);
 
       // Create the specialized conformance entry.
       ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);

@@ -641,6 +641,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
        data.push_back(addDeclRef(assocType));
        // The substitution record is serialized later.
        ++numTypeWitnesses;
+      return false;
     });
 
     for (auto defaulted : conf->getDefaultedDefinitions()) {
@@ -675,6 +676,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                         const Substitution &witness) {
       writeSubstitutions(witness, abbrCodes);
+      return false;
     });
 
     break;
@@ -689,6 +691,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
        data.push_back(addDeclRef(assocType));
        // The substitution record is serialized later.
        ++numTypeWitnesses;
+      return false;
      });
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode
@@ -713,6 +716,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     conf->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                  const Substitution &witness) {
       writeSubstitutions(witness, abbrCodes);
+      return false;
     });
 
     if (appendGenericConformance) {
