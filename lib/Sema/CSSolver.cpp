@@ -161,9 +161,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
   for (auto restriction : solution.constraintRestrictions) {
-    solverState->constraintRestrictions.push_back({restriction.first.first,
-                                                   restriction.first.second,
-                                                   restriction.second});
+    solverState->constraintRestrictions.push_back(
+        std::make_tuple(restriction.first.first, restriction.first.second,
+                        restriction.second));
   }
 }
 
