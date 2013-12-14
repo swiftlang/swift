@@ -5,46 +5,6 @@ enum FooEnum1 { FooEnum1X };
 enum FooEnum2 { FooEnum2X, FooEnum2Y };
 enum FooEnum3 { FooEnum3X = 10, FooEnum3Y = 20 };
 
-struct FooStruct1 {
-  int x;
-  double y;
-};
-
-typedef struct FooStruct2 {
-  int x;
-  double y;
-} FooStructTypedef1;
-
-typedef struct {
-  int x;
-  double y;
-} FooStructTypedef2;
-
-typedef struct FooStruct3 {
-  int x;
-  double y;
-} FooStruct3;
-
-struct FooStruct4 {
-  int x;
-  double y;
-};
-typedef struct FooStruct4 FooStruct4;
-
-struct FooStruct5;
-typedef struct FooStruct5 FooStruct5;
-struct FooStruct5 {
-  int x;
-  double y;
-};
-
-typedef struct FooStruct6 FooStruct6;
-struct FooStruct6 {
-  int x;
-  double y;
-};
-
-
 typedef int FooTypedef1;
 
 extern int fooIntVar;
