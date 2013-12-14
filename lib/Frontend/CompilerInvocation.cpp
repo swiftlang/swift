@@ -69,6 +69,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.InputFilenames.push_back(A->getValue());
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {
+    Opts.ModuleSourceListPath = A->getValue();
+  }
+
   return false;
 }
 
@@ -220,10 +224,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_framework:
       addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
-      break;
-
-    case OPT_module_source_list:
-      setModuleSourceListPath(InputArg->getValue());
       break;
     }
   }

@@ -39,6 +39,10 @@ public:
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
 
+  /// Path to a "module source list", which lists all files in the module.
+  /// Currently unused.
+  std::string ModuleSourceListPath;
+
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;

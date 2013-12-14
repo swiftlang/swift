@@ -48,7 +48,6 @@ class SerializedModuleLoader;
 
 class CompilerInvocation {
   SmallVector<LinkLibrary, 4> LinkLibraries;
-  std::string ModuleSourceListPath;
 
   LangOptions LangOpts;
   FrontendOptions FrontendOpts;
@@ -152,10 +151,10 @@ public:
   }
 
   void setModuleSourceListPath(StringRef Path) {
-    ModuleSourceListPath = Path;
+    FrontendOpts.ModuleSourceListPath = Path;
   }
   StringRef getModuleSourceListPath() const {
-    return ModuleSourceListPath;
+    return FrontendOpts.ModuleSourceListPath;
   }
 
   LangOptions &getLangOptions() {
