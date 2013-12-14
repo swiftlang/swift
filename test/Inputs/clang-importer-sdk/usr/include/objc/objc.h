@@ -1,3 +1,6 @@
+typedef unsigned long NSUInteger;
+typedef long NSInteger;
+
 @protocol NSObject
 - description;
 @end
@@ -71,8 +74,6 @@
 - method:(int)i onExtB:(double)d;
 + newWithA:(A*)a;
 @end
-
-typedef long NSInteger;
 
 @interface A(Subscripting)
 - objectAtIndexedSubscript:(NSInteger)idx;

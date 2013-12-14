@@ -2,8 +2,6 @@
 
 typedef struct objc_object { void *isa; } *id;
 
-typedef unsigned long NSUInteger;
-
 typedef signed char BOOL;
 
 @class NSString;
