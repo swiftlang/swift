@@ -738,12 +738,12 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
     || contextType->isClassExistentialType();
 }
 
-static AbstractCC getAbstractCC(SILDeclRef c) {
+AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   // Currying thunks always have freestanding CC.
   if (c.isCurried)
     return AbstractCC::Freestanding;
   
-  // If this is an ObjC thunk, it always has ObjC calling convention.
+  // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign)
     return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
       ? AbstractCC::ObjCMethod
@@ -756,6 +756,12 @@ static AbstractCC getAbstractCC(SILDeclRef c) {
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
+  // Protocol witnesses are called using the witness calling convention.
+  if (Context.LangOpts.EmitSILProtocolWitnessTables) {
+    if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
+      return getProtocolWitnessCC(proto);
+  }
+  
   if (c.getDecl()->isInstanceMember() ||
       c.kind == SILDeclRef::Kind::Initializer)
     return AbstractCC::Method;

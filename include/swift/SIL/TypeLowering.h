@@ -409,6 +409,9 @@ public:
     return AbstractCC::WitnessMethod;
   }
   
+  /// Get the calling convention used to call a declaration.
+  AbstractCC getAbstractCC(SILDeclRef c);
+  
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
     return !P->isObjC();
