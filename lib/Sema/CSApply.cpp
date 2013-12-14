@@ -189,6 +189,32 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
   return cast<FuncDecl>(conformance->getWitness(requirement).getDecl());
 }
 
+/// Adjust the given type to become the self type when referring to
+/// the given member.
+static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
+  baseTy = baseTy->getRValueType();
+  if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+    // If 'self' is an lvalue type, turn the base type into an lvalue
+    // type.
+    auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
+    if (selfTy->is<LValueType>())
+      return LValueType::get(baseTy,
+                             LValueType::Qual::DefaultForMemberAccess,
+                             member->getASTContext());
+
+    // Otherwise, return the rvalue type.
+    return baseTy;
+  }
+
+  // Non-function members are always access
+  if (baseTy->hasReferenceSemantics() || baseTy->is<MetaTypeType>())
+    return baseTy;
+      
+  return LValueType::get(baseTy,
+                         LValueType::Qual::DefaultForMemberAccess,
+                         member->getASTContext());  
+}
+
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -376,8 +402,10 @@ namespace {
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
+        auto selfTy = isArchetypeOrExistentialRef ? baseTy : containerTy;
         base = coerceObjectArgumentToType(
-                 base, isArchetypeOrExistentialRef ? baseTy : containerTy,
+                 base, 
+                 adjustSelfTypeForMember(selfTy, member),
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
@@ -649,7 +677,10 @@ namespace {
         }
 
         // Materialize if we need to.
-        base = coerceObjectArgumentToType(base, baseTy, locator);
+        base = coerceObjectArgumentToType(base, 
+                                          adjustSelfTypeForMember(baseTy, 
+                                                                  subscript), 
+                                          locator);
         if (!base)
           return nullptr;
 
@@ -663,7 +694,10 @@ namespace {
       // Handle subscripting of archetypes.
       if (baseTy->is<ArchetypeType>() && containerTy->is<ProtocolType>()) {
         // Coerce as an object argument.
-        base = coerceObjectArgumentToType(base, baseTy, locator);
+        base = coerceObjectArgumentToType(base, 
+                                          adjustSelfTypeForMember(baseTy, 
+                                                                  subscript),
+                                          locator);
         if (!base)
           return nullptr;
 
@@ -696,7 +730,10 @@ namespace {
         auto openedBaseType = openedFullFnType->getInput()
                                 ->getRValueInstanceType();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        base = coerceObjectArgumentToType(base, containerTy, locator);
+        base = coerceObjectArgumentToType(base, 
+                                          adjustSelfTypeForMember(containerTy, 
+                                                                  subscript),
+                                          locator);
                  locator.withPathElement(ConstraintLocator::MemberRefBase);
         if (!base)
           return nullptr;
@@ -714,7 +751,10 @@ namespace {
       // Handle subscripting of existential types.
       if (baseTy->isExistentialType()) {
         // Materialize if we need to.
-        base = coerceObjectArgumentToType(base, baseTy, locator);
+        base = coerceObjectArgumentToType(base, 
+                                          adjustSelfTypeForMember(baseTy,
+                                                                  subscript),
+                                          locator);
         if (!base)
           return nullptr;
 
@@ -725,7 +765,10 @@ namespace {
       }
 
       // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, containerTy, locator);
+      base = coerceObjectArgumentToType(base, 
+                                        adjustSelfTypeForMember(containerTy,
+                                                                subscript),
+                                        locator);
       if (!base)
         return nullptr;
 
@@ -2895,10 +2938,12 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   // just perform the coercion to that type.
   if (containerType->hasReferenceSemantics() ||
       containerType->is<MetaTypeType>()) {
+    assert(!toType->is<LValueType>() && "Caller should not provide lvalue type");
     return coerceToType(expr, containerType, locator);
   }
 
   // Types with value semantics are passed by reference.
+  assert(toType->is<LValueType>() && "Value semantics without lvalue type");
 
   // Form the lvalue type we will be producing.
   auto &tc = cs.getTypeChecker();
