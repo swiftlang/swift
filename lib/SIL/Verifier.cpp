@@ -293,8 +293,13 @@ public:
     }
     require(fnTy->getGenericParams(),
             "callee of apply with substitutions must be polymorphic");
-    require(fnTy->getGenericParams()->getAllArchetypes().size() == subs.size(),
-            "number of apply substitutions must match number of archetypes "
+    
+    auto numExpectedSubs = fnTy->getGenericParams()->getAllArchetypes().size();
+    if (fnTy->getGenericParams()->hasSelfArchetype())
+      ++numExpectedSubs;
+    
+    require(numExpectedSubs == subs.size(),
+            "number of apply substitutions must match number of generic params "
             "in the function type");
     
     // Apply the substitutions.
@@ -770,43 +775,53 @@ public:
       require(methodType->getAbstractCC()
                 == F.getModule().Types.getProtocolWitnessCC(protocol),
               "result of archetype_method must have correct @cc for protocol");
+
+      require(methodType->isPolymorphic(),
+              "result of archetype_method must be polymorphic");
+
+      require(methodType->getGenericParams()->hasSelfArchetype(),
+              "method should be polymorphic on Self archetype");
+      
+      SILType selfType = getMethodSelfType(methodType);
+      require(selfType.castTo<ArchetypeType>()->getSelfProtocol(),
+              "method should be a Self archetype method");
     } else {
       require(methodType->isThin()
                 == protocol->requiresClass(),
               "result method must be thin function type if class archetype, "
               "thick if not class");
-    }
     
-    CanType operandType = AMI->getLookupType().getSwiftRValueType();
-    DEBUG(llvm::dbgs() << "operand type ";
-          operandType.print(llvm::dbgs());
-          llvm::dbgs() << "\n");
-    
-    SILType selfType = getMethodSelfType(methodType);
-    if (auto selfMT = selfType.getAs<MetaTypeType>()) {
-      require(selfType.isObject(),
-              "archetype_method taking metatype must take it directly");
-      require(selfMT.getInstanceType() == operandType,
-              "archetype_method must apply to an archetype metatype");
-    } else {
-      require(selfType.getSwiftRValueType() == operandType,
-              "archetype_method must apply to an archetype or archetype metatype");
-      require(selfType.isObject() == protocol->requiresClass(),
-              "archetype_method should take class archetypes by value");
-    }
-    
-    bool isArchetype = AMI->getLookupType().is<ArchetypeType>();
-    if (isArchetype) {
-      require(AMI->getConformance() == nullptr,
-              "archetypes should not have conformance");
-    } else {
-      require(AMI->getConformance(),
-              "archetype_method for concrete type must have conformance");
-      require(AMI->getConformance()->getProtocol() == protocol,
-              "archetype_method conformance is not for method's protocol");
-      require(AMI->getConformance()->getType()
-                ->isEqual(AMI->getLookupType().getSwiftRValueType()),
-              "archetype_method conformance is not for type");
+      CanType operandType = AMI->getLookupType().getSwiftRValueType();
+      DEBUG(llvm::dbgs() << "operand type ";
+            operandType.print(llvm::dbgs());
+            llvm::dbgs() << "\n");
+      
+      SILType selfType = getMethodSelfType(methodType);
+      if (auto selfMT = selfType.getAs<MetaTypeType>()) {
+        require(selfType.isObject(),
+                "archetype_method taking metatype must take it directly");
+        require(selfMT.getInstanceType() == operandType,
+                "archetype_method must apply to an archetype metatype");
+      } else {
+        require(selfType.getSwiftRValueType() == operandType,
+                "archetype_method must apply to an archetype or archetype metatype");
+        require(selfType.isObject() == protocol->requiresClass(),
+                "archetype_method should take class archetypes by value");
+      }
+      
+      bool isArchetype = AMI->getLookupType().is<ArchetypeType>();
+      if (isArchetype) {
+        require(AMI->getConformance() == nullptr,
+                "archetypes should not have conformance");
+      } else {
+        require(AMI->getConformance(),
+                "archetype_method for concrete type must have conformance");
+        require(AMI->getConformance()->getProtocol() == protocol,
+                "archetype_method conformance is not for method's protocol");
+        require(AMI->getConformance()->getType()
+                  ->isEqual(AMI->getLookupType().getSwiftRValueType()),
+                "archetype_method conformance is not for type");
+      }
     }
   }
   

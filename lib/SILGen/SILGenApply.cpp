@@ -459,17 +459,30 @@ public:
       auto constant = method.methodName.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(constant);
 
-      CanArchetypeType archetype;
-      SILType closureType =
-        getProtocolClosureType(gen.SGM, constant, constantInfo, archetype);
-
-      SILValue fn = gen.B.createArchetypeMethod(Loc,
+      if (gen.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
+        // Look up the witness for the archetype.
+        auto selfType = getProtocolSelfType(gen.SGM);
+        auto archetype = getArchetypeForSelf(selfType);
+        SILValue fn = gen.B.createArchetypeMethod(Loc,
                                     SILType::getPrimitiveObjectType(archetype),
-                                            /*conformance*/ nullptr,
-                                            constant,
-                                            closureType,
-                                            /*volatile*/ constant.isForeign);
-      mv = ManagedValue(fn, ManagedValue::Unmanaged);
+                                    /*conformance*/ nullptr,
+                                    constant,
+                                    constantInfo.getSILType(),
+                                    constant.isForeign);
+        mv = ManagedValue(fn, ManagedValue::Unmanaged);
+      } else {
+        CanArchetypeType archetype;
+        SILType closureType =
+          getProtocolClosureType(gen.SGM, constant, constantInfo, archetype);
+
+        SILValue fn = gen.B.createArchetypeMethod(Loc,
+                                      SILType::getPrimitiveObjectType(archetype),
+                                              /*conformance*/ nullptr,
+                                              constant,
+                                              closureType,
+                                              /*volatile*/ constant.isForeign);
+        mv = ManagedValue(fn, ManagedValue::Unmanaged);
+      }
       break;
     }
     case Kind::ProtocolMethod: {
@@ -832,10 +845,14 @@ public:
     auto proto = cast<ProtocolDecl>(fd->getDeclContext());
     bool isObjC = proto->isObjC();
 
-    // The declaration is always specialized (due to Self); ignore the
-    // substitutions related to Self. Skip the substitutions involving Self.
-    ArrayRef<Substitution> subs = getNonSelfSubstitutions(
-                                    e->getDeclRef().getSubstitutions());
+    ArrayRef<Substitution> subs;
+    if (gen.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
+      subs = e->getDeclRef().getSubstitutions();
+    } else {
+      // The declaration is always specialized (due to Self); ignore the
+      // substitutions related to Self. Skip the substitutions involving Self.
+      subs = getNonSelfSubstitutions(e->getDeclRef().getSubstitutions());
+    }
 
     // Figure out the result type of this expression. If we had any
     // substitutions not related to 'Self', we'll need to produce a
@@ -1069,9 +1086,8 @@ static bool isNative(AbstractCC cc) {
     return false;
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
-    return true;
   case AbstractCC::WitnessMethod:
-    llvm_unreachable("@cc(witness_method) not implemented");
+    return true;
   }
   llvm_unreachable("bad CC");
 }

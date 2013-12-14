@@ -1165,6 +1165,14 @@ static void getReplacementTypes(GenericParamList &genericParams,
                                 SmallVectorImpl<Type> &replacements) {
   (void) genericParams;
 
+  // Add a substitution for Self if present.
+  if (genericParams.hasSelfArchetype()) {
+    assert(subs[0].Archetype->getSelfProtocol()
+           && "first substitution is not for Self");
+    replacements.push_back(subs[0].Replacement);
+    subs = subs.slice(1);
+  }
+  
 #ifndef NDEBUG
   // FIXME: The AST sets up substitutions for secondary archetypes that are
   // strictly unnecessary.
