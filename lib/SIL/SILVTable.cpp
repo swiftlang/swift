@@ -25,7 +25,10 @@ using namespace swift;
 
 SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
                              ArrayRef<Pair> Entries) {
-  void *buf = M.allocate(sizeof(SILVTable) + sizeof(Pair) * (Entries.size()-1),
+  // SILVTable contains one element declared in Entries.  We must allocate
+  // space for it, because its default ctor will write to it.
+  unsigned NumTailElements = std::max((unsigned)Entries.size(), 1U)-1;
+  void *buf = M.allocate(sizeof(SILVTable) + NumTailElements,
                          alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
   M.vtables.push_back(vt);
