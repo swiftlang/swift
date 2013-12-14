@@ -738,6 +738,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned ArgNo,
                                              IndirectionKind Indirection,
                                              ArtificialKind Artificial) {
+  // FIXME: enable this assertion.
+  //assert(Ty.getDebugScope());
   llvm::DIDescriptor Scope = getOrCreateScope(Ty.getDebugScope());
   Location Loc = getLoc(SM, Ty.getDecl());
 
