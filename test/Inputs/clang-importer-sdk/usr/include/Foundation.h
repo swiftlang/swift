@@ -55,6 +55,10 @@ void *allocate(NSZone *zone);
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
 @end
 
+//===---
+// Enums.
+//===---
+
 #define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 
