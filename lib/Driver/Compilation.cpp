@@ -21,9 +21,11 @@ using namespace llvm::opt;
 
 Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          std::unique_ptr<InputArgList> InputArgs,
-                         std::unique_ptr<DerivedArgList> TranslatedArgs)
+                         std::unique_ptr<DerivedArgList> TranslatedArgs,
+                         unsigned NumberOfParallelCommands)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Jobs(new JobList),
-    InputArgs(std::move(InputArgs)), TranslatedArgs(std::move(TranslatedArgs)) {
+    InputArgs(std::move(InputArgs)), TranslatedArgs(std::move(TranslatedArgs)),
+    NumberOfParallelCommands(NumberOfParallelCommands) {
 };
 
 Compilation::~Compilation() = default;

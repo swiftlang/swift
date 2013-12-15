@@ -86,6 +86,9 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 def o : JoinedOrSeparate<["-"], "o">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
+def j : JoinedOrSeparate<["-"], "j">, Flags<[DriverOption]>,
+  HelpText<"Number of commands to execute in parallel">;
+
 def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
 def sdk : Separate<["-"], "sdk">, Flags<[DriverOption, FrontendOption]>,

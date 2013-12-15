@@ -95,8 +95,19 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     return nullptr;
   }
 
+  unsigned NumberOfParallelCommands = 1;
+  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
+    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
+      // TODO: emit diagnostic.
+      llvm::errs() << "warning: invalid value: " << A->getAsString(*ArgList)
+                   << '\n';
+      NumberOfParallelCommands = 1;
+    }
+  }
+
   std::unique_ptr<Compilation> C(new Compilation(*this, TC, std::move(ArgList),
-                                                 std::move(TranslatedArgList)));
+                                                 std::move(TranslatedArgList),
+                                                 NumberOfParallelCommands));
 
   buildJobs(*C, Actions);
   if (DriverPrintBindings) {

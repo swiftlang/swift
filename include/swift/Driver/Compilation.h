@@ -49,10 +49,15 @@ class Compilation {
   // The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
 
+  /// The number of commands which this compilation should attempt to run in
+  /// parallel.
+  unsigned NumberOfParallelCommands;
+
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
-              std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs);
+              std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
+              unsigned NumberOfParallelCommands = 1);
   ~Compilation();
 
   const Driver &getDriver() const { return TheDriver; }
@@ -65,6 +70,10 @@ public:
   const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
+
+  unsigned getNumberOfParallelCommands() const {
+    return NumberOfParallelCommands;
+  }
 };
 
 } // end namespace driver
