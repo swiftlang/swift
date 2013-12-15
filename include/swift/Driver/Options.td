@@ -80,7 +80,8 @@ def v : Flag<["-"], "v">,
 def _version : Flag<["--"], "version">;
 
 // Standard Options
-def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>, Flags<[DriverOption]>;
+def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
+  Flags<[DriverOption, FrontendOption]>;
 
 def o : JoinedOrSeparate<["-"], "o">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;

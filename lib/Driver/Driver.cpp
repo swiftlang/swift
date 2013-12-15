@@ -148,9 +148,11 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
 DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
   DerivedArgList *DAL = new DerivedArgList(ArgList);
 
+  bool ImmediateMode = ArgList.hasArgNoClaim(options::OPT_i);
+
   for (Arg *A : ArgList) {
-    // Pick up inputs via the -- option.
-    if (A->getOption().matches(options::OPT__DASH_DASH)) {
+    // If we're not in immediate mode, pick up inputs via the -- option.
+    if (!ImmediateMode && A->getOption().matches(options::OPT__DASH_DASH)) {
       A->claim();
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         DAL->append(makeInputArg(*DAL, *Opts, A->getValue(i)));

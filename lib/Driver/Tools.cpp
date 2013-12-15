@@ -70,6 +70,11 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   case types::TY_SIL:
     OutputOption = "-emit-sil";
     break;
+  case types::TY_Nothing:
+    // We were told to output nothing, so get the last mode option and use that.
+    OutputOption =
+      Args.getLastArg(options::OPT_modes_Group)->getSpelling().data();
+    break;
   default:
     llvm_unreachable("Invalid output type");
   }
@@ -106,9 +111,14 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
 
 
-  // Add the output file argument.
-  Arguments.push_back("-o");
-  Arguments.push_back(Output->getFilename().data());
+  // Add the output file argument if necessary.
+  if (Output->getType() != types::TY_Nothing) {
+    Arguments.push_back("-o");
+    Arguments.push_back(Output->getFilename().data());
+  } else if (Args.getLastArg(options::OPT_modes_Group)->getOption().matches(
+               options::OPT_i)) {
+    Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
+  }
 
   std::unique_ptr<Job> Cmd(new Command(JA, *this, std::move(Inputs),
                                        std::move(Output),
