@@ -62,8 +62,9 @@ ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
   CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitness, (assocType, resolver))
 }
 
-ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement))
+ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement,
+                                               LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
 }
 
 const InheritedConformanceMap &
@@ -143,8 +144,9 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
 }
 
 ConcreteDeclRef
-SpecializedProtocolConformance::getWitness(ValueDecl *requirement) const {
+SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
+                                           LazyResolver *resolver) const {
   // FIXME: Apply substitutions here!
-  return GenericConformance->getWitness(requirement);
+  return GenericConformance->getWitness(requirement, resolver);
 }
 

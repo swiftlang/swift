@@ -120,7 +120,8 @@ public:
   }
 
   /// Retrieve the non-type witness for the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement) const;
+  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+                             LazyResolver *resolver) const;
 
   /// Apply the given function object to each value witness within this
   /// protocol conformance.
@@ -128,7 +129,7 @@ public:
   /// The function object should accept a \c ValueDecl* for the requirement
   /// followed by the \c ConcreteDeclRef for the witness.
   template<typename F>
-  void forEachValueWitness(F f) const {
+  void forEachValueWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();
     for (auto req : protocol->getMembers()) {
       auto valueReq = dyn_cast<ValueDecl>(req);
@@ -136,7 +137,7 @@ public:
           valueReq->isInvalid())
         continue;
 
-      f(valueReq, getWitness(valueReq));
+      f(valueReq, getWitness(valueReq, resolver));
     }
   }
 
@@ -264,7 +265,8 @@ public:
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
+  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+                             LazyResolver *resolver) const {
     assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
     auto known = Mapping.find(requirement);
     assert(known != Mapping.end());
@@ -361,7 +363,8 @@ public:
                                      LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement) const;
+  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+                             LazyResolver *resolver) const;
 
 
   /// Retrieve the protocol conformances directly-inherited protocols.
@@ -444,8 +447,9 @@ public:
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
-    return InheritedConformance->getWitness(requirement);
+  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+                             LazyResolver *resolver) const {
+    return InheritedConformance->getWitness(requirement, resolver);
   }
 
   /// Retrieve the protocol conformances directly-inherited protocols.

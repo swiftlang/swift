@@ -800,7 +800,8 @@ namespace {
       assert(TheExtension &&
              "should only consider objc conformances for extensions");
       if (protocol->isObjC()) {
-        conformance->forEachValueWitness([&](ValueDecl *req,
+        conformance->forEachValueWitness(nullptr,
+                                         [&](ValueDecl *req,
                                              ConcreteDeclRef witness) {
           // Missing optional requirement.
           if (!witness)

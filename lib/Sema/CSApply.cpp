@@ -186,7 +186,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 
   assert(conformance && "Missing conformance information");
   // FIXME: Dropping substitutions here.
-  return cast<FuncDecl>(conformance->getWitness(requirement).getDecl());
+  return cast<FuncDecl>(conformance->getWitness(requirement, &tc).getDecl());
 }
 
 /// Adjust the given type to become the self type when referring to

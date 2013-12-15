@@ -1233,7 +1233,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
       } else if (auto nominal = witnessTy->getAnyNominal()) {
         witnessOwner = getNominalOrExtensionDecl(nominal->getDeclContext());
       }
-    } else if (auto witness = conformance->getWitness(valueReq).getDecl()) {
+    } else if (auto witness = conformance->getWitness(valueReq, &tc).getDecl()) {
       witnessOwner = getNominalOrExtensionDecl(witness->getDeclContext());
     }
 

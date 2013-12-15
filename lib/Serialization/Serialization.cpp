@@ -627,7 +627,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numValueWitnesses = 0;
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
-    conformance->forEachValueWitness([&](ValueDecl *req,
+    conformance->forEachValueWitness(nullptr, 
+                                     [&](ValueDecl *req,
                                          ConcreteDeclRef witness) {
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
@@ -670,7 +671,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     }
     writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
                       abbrCodes);
-    conformance->forEachValueWitness([&](ValueDecl *req,
+    conformance->forEachValueWitness(nullptr,
+                                     [&](ValueDecl *req,
                                          ConcreteDeclRef witness) {
       writeSubstitutions(witness.getSubstitutions(), abbrCodes);
     });

@@ -257,7 +257,10 @@ static void associateConformingValueDecls(ProtocolConformance *Conformance,
   if (!Conformance)
     return;
 
-  Conformance->forEachValueWitness([&](ValueDecl *req,
+  // FIXME: Walking the full value witness table at this point is
+  // really, really unfortunate.
+  Conformance->forEachValueWitness(nullptr,
+                                   [&](ValueDecl *req,
                                        ConcreteDeclRef witness) {
     if (witness)
       Ctx.recordConformingDecl(witness.getDecl(), req);

@@ -1193,7 +1193,8 @@ public:
                                  ProtocolConformance *conformance) {
     assert(conformance);
     if (protocol->isObjC()) {
-      conformance->forEachValueWitness([&](ValueDecl *req,
+      conformance->forEachValueWitness(nullptr,
+                                       [&](ValueDecl *req,
                                            ConcreteDeclRef witness) {
         if (!witness)
           return;
@@ -1814,7 +1815,7 @@ public:
   
   void visitFuncDecl(FuncDecl *fd) {
     // Find the witness in the conformance.
-    ConcreteDeclRef witness = Conformance->getWitness(fd);
+    ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
 
     // Emit the witness thunk and add it to the table.
     SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);

@@ -1430,7 +1430,8 @@ public:
     if (!conformance)
       return;
     if (protocol->isObjC()) {
-      conformance->forEachValueWitness([&](ValueDecl *req,
+      conformance->forEachValueWitness(&TC,
+                                       [&](ValueDecl *req,
                                            ConcreteDeclRef witness) {
         if (req->isObjC() && witness)
           witness.getDecl()->setIsObjC(true);
