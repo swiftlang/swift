@@ -606,35 +606,35 @@ Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
   bool ShouldLink = false;
   types::ID CompileOutputType = types::TY_INVALID;
 
-  Arg *OutputModeArg;
-  if ((OutputModeArg = Args.getLastArg(options::OPT_c))) {
-    // The user has requested an object file.
-    CompileOutputType = types::TY_Object;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_S))) {
-    // The user has requested an assembly file.
-    CompileOutputType = types::TY_Assembly;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_sil))) {
-    // The user has requested a SIL file.
-    CompileOutputType = types::TY_SIL;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_silgen))) {
-    // The user has requested a raw SIL file.
-    CompileOutputType = types::TY_RawSIL;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_parse)) ||
-             (OutputModeArg = Args.getLastArg(options::OPT_dump_parse)) ||
-             (OutputModeArg = Args.getLastArg(options::OPT_dump_ast)) ||
-             (OutputModeArg = Args.getLastArg(options::OPT_print_ast))) {
-    // These modes don't have any output.
-    CompileOutputType = types::TY_Nothing;
-  } else if ((OutputModeArg = Args.getLastArg(options::OPT_emit_executable))) {
-    // The user asked for a linked executable. As a result, the compile action
-    // should produce an object file suitable for linking.
-    ShouldLink = true;
-    CompileOutputType = types::TY_Object;
-  } else {
+  const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
+  if (!OutputModeArg ||
+      OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
     // Default to producing a linked executable. As a result, the compile
     // action should produce an object file suitable for linking.
     ShouldLink = true;
     CompileOutputType = types::TY_Object;
+  } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
+    // The user has requested an object file.
+    CompileOutputType = types::TY_Object;
+  } else if (OutputModeArg->getOption().matches(options::OPT_S)) {
+    // The user has requested an assembly file.
+    CompileOutputType = types::TY_Assembly;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_sil)) {
+    // The user has requested a SIL file.
+    CompileOutputType = types::TY_SIL;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_silgen)) {
+    // The user has requested a raw SIL file.
+    CompileOutputType = types::TY_RawSIL;
+  } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
+             OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
+             OutputModeArg->getOption().matches(options::OPT_dump_ast) ||
+             OutputModeArg->getOption().matches(options::OPT_print_ast) ||
+             OutputModeArg->getOption().matches(options::OPT_i) ||
+             OutputModeArg->getOption().matches(options::OPT_repl)) {
+    // These modes don't have any output.
+    CompileOutputType = types::TY_Nothing;
+  } else {
+    llvm_unreachable("Unknown output mode option!");
   }
 
   return OutputMode(CompileOutputType, ShouldLink);
