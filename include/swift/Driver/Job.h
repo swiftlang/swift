@@ -99,7 +99,7 @@ class CommandOutput {
 
 public:
   CommandOutput(types::ID Type, StringRef BaseInput,
-                StringRef Filename = nullptr)
+                StringRef Filename = StringRef())
     : Type(Type), BaseInput(BaseInput), Filename(Filename) {}
 
   types::ID getType() const { return Type; }
