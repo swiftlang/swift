@@ -852,11 +852,11 @@ public:
     SILType operandType = EMI->getOperand().getType();
     
     if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      require(methodType->isThin(),
-              "result of protocol_method must be thin function");
       require(methodType->getAbstractCC()
                 == F.getModule().Types.getProtocolWitnessCC(proto),
               "result of protocol_method must have correct @cc for protocol");
+      require(!methodType->isThin(),
+              "result of protocol_method must be thick");
     } else {
       require(methodType->isThin()
                 == operandType.isClassExistentialType(),
@@ -866,7 +866,7 @@ public:
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
-              "instance protocol_method must apply to an existential address");
+              "instance protocol_method must apply to an existential");
       SILType selfType = getMethodSelfType(methodType);
       if (!operandType.isClassExistentialType()) {
         require(selfType.isAddress(),

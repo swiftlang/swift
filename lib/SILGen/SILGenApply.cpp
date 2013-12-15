@@ -228,9 +228,15 @@ private:
     auto substSelfType =
       buildSubstSelfType(polyFormalType.getInput(), selfType, ctx);
 
-    // This function is thin only if it's a class archetype, because
-    // otherwise it implicitly binds up the metatype value.
-    bool isThin = getArchetypeForSelf(selfType)->requiresClass();
+    bool isThin;
+    if (SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
+      // Existential witnesses are always "thick" with the polymorphic info
+      isThin = false;
+    } else {
+      // This function is thin only if it's a class archetype, because
+      // otherwise it implicitly binds up the metatype value.
+      isThin = getArchetypeForSelf(selfType)->requiresClass();
+    }
     auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, isThin,
                                          /*noreturn*/ false);
 
