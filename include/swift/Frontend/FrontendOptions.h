@@ -47,6 +47,9 @@ public:
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
 
+  /// Arguments which should be passed in immediate mode.
+  std::vector<std::string> ImmediateArgv;
+
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
