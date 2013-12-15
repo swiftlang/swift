@@ -22,6 +22,9 @@ public:
   /// checked against expectated diagnostics, indicated by markers in the
   /// input source file.
   bool VerifyDiagnostics;
+
+  /// Indicates whether diagnostic passes should be skipped.
+  bool SkipDiagnosticPasses;
 };
 
 }

@@ -111,19 +111,21 @@ int frontend_main(ArrayRef<const char *>Args,
     }
 
     if (SM->getStage() != SILStage::Canonical) {
-      performSILMandatoryInlining(SM.get());
+      if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
+        performSILMandatoryInlining(SM.get());
 
-      performSILCapturePromotion(SM.get());
-      performSILAllocBoxToStackPromotion(SM.get());
-      performInOutDeshadowing(SM.get());
-      performSILDefiniteInitialization(SM.get());
+        performSILCapturePromotion(SM.get());
+        performSILAllocBoxToStackPromotion(SM.get());
+        performInOutDeshadowing(SM.get());
+        performSILDefiniteInitialization(SM.get());
 
-      performSILConstantPropagation(SM.get());
-      performSILDeadCodeElimination(SM.get());
+        performSILConstantPropagation(SM.get());
+        performSILDeadCodeElimination(SM.get());
 
-      emitSILDataflowDiagnostics(SM.get());
+        emitSILDataflowDiagnostics(SM.get());
 
-      SM->setStage(SILStage::Canonical);
+        SM->setStage(SILStage::Canonical);
+      }
     }
 
     if (!Context.hadError()) {

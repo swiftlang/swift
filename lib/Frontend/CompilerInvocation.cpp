@@ -176,6 +176,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.VerifyDiagnostics = true;
   }
 
+  if (Args.hasArg(OPT_disable_diagnostic_passes)) {
+    Opts.SkipDiagnosticPasses = true;
+  }
+
   return false;
 }
 
