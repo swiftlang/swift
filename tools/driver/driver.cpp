@@ -85,8 +85,7 @@ int main(int argc_, const char **argv_) {
   // so we can start with a 0 result code.
   int ResultCode = 0;
   if (C) {
-    // TODO: actually perform the Compilation, via the Driver.
-    ResultCode = C->getJobs().run();
+    ResultCode = C->performJobs();
   }
 
   return ResultCode;

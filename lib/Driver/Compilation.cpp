@@ -33,3 +33,7 @@ Compilation::~Compilation() = default;
 void Compilation::addJob(Job *J) {
   Jobs->addJob(J);
 }
+
+int Compilation::performJobs() {
+  return Jobs->run();
+}

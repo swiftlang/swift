@@ -74,6 +74,10 @@ public:
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
   }
+
+  /// Asks the Compilation to perform the Jobs which it knows about.
+  /// \returns result code for the Compilation's Jobs; 0 indicates success
+  int performJobs();
 };
 
 } // end namespace driver
