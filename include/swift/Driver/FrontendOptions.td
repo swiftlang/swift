@@ -44,7 +44,7 @@ def emit_sil_protocol_witness_tables :
   HelpText<"Emit experimental SIL protocol witness tables">;
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
-  HelpText<"Emit locations djuring SIL emission">;
+  HelpText<"Emit locations during SIL emission">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
