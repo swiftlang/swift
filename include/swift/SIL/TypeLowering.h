@@ -228,12 +228,6 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  /// Emit a lowered 'copy_value' operation.
-  ///
-  /// This type must be loadable.
-  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
-                                        SILValue value, bool deep) const = 0;
-
   /// Emit a lowered 'destroy_value' operation.
   ///
   /// This type must be loadable.
@@ -274,15 +268,6 @@ public:
   /// not necessarily the right thing to do on a semantic load.
   virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
-
-  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
-                                     SILValue value, bool wasDeep) const {
-    if (wasDeep) {
-      return emitLoweredCopyValue(B, loc, value, true);
-    } else {
-      return emitCopyValue(B, loc, value);
-    }
-  }
 
   /// Given a primitively loaded value of this type (which must be
   /// loadable), -1 it.
