@@ -19,7 +19,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
-#include "llvm/ADT/Statistic.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -90,11 +90,30 @@ int main(int argc, char **argv) {
   assert(CI.hasSILModule() && "CI must have a sil module to extract from.\n");
 
   SILModule *M = CI.getSILModule();
-  SILModule::FunctionListType &Functions = M->getFunctionList();
-  for (auto FI = Functions.begin(), FE = Functions.end(); FI != FE;) {
-    SILModule::FunctionListType::iterator Iter = FI++;
-    if (FunctionName != Iter->getName().str())
-      Functions.remove(Iter);
+
+  std::vector<SILFunction *> DeadFunctions;
+  for (auto &F : M->getFunctionList()) {
+    if (FunctionName != F.getName().str()) {
+      if (F.size()) {
+        SILBasicBlock &BB = F.front();
+
+        SILLocation Loc = BB.getInstList().back().getLoc();
+        BB.splitBasicBlock(BB.begin());
+        // Make terminator unreachable.
+        BB.getInstList().push_front(new (*M) UnreachableInst(Loc));
+
+        DeadFunctions.push_back(&F);
+      }
+    }
+  }
+
+  // After running this pass all of the functions to remove should consist only
+  // of one BB with an unreachable.
+  performSILDeadCodeElimination(M);
+
+  // Now clear those functions.
+  for (auto &F : DeadFunctions) {
+    F->getBlocks().clear();
   }
 
   std::string ErrorInfo;
