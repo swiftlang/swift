@@ -879,10 +879,44 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   BindingListener listener(binding);
   Expr *init = binding->getInit();
   assert(init && "type-checking an uninitialized binding?");
-  return typeCheckExpression(init, binding->getDeclContext(), Type(),
-                             /*discardedExpr=*/false,
-                             FreeTypeVariableBinding::Disallow,
-                             &listener);
+
+  // Enter an initializer context if necessary.
+  DeclContext *DC = binding->getDeclContext();
+  PatternBindingInitializer *initContext = nullptr;
+  bool initContextIsNew = false;
+  if (!DC->isLocalContext()) {
+    // Check for an existing context created by the parser.
+    initContext = cast_or_null<PatternBindingInitializer>(
+                                       init->findExistingInitializerContext());
+
+    // If we didn't find one, create it.
+    if (!initContext) {
+      initContext = Context.createPatternBindingContext(binding);
+      initContextIsNew = true;
+    }
+    DC = initContext;
+  }
+
+  // Type-check the initializer.
+  bool hadError = typeCheckExpression(init, binding->getDeclContext(), Type(),
+                                      /*discardedExpr=*/false,
+                                      FreeTypeVariableBinding::Disallow,
+                                      &listener);
+
+  // If we entered an initializer context, contextualize any
+  // auto-closures we might have created.
+  if (initContext) {
+    bool hasClosures =
+      (!hadError && contextualizeInitializer(initContext, init));
+
+    // If we created a fresh context and didn't make any autoclosures,
+    // destroy the initializer context.
+    if (!hasClosures && initContextIsNew) {
+      Context.destroyPatternBindingContext(initContext);
+    }
+  }
+
+  return hadError;
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the

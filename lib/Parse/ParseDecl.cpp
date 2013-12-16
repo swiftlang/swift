@@ -1480,8 +1480,25 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       using RestoreVarsRAII = llvm::SaveAndRestore<decltype(CurVars)>;
       RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
 
+      // Enter an initializer context if we're not in a local context.
+      PatternBindingInitializer *initContext = nullptr;
+      Optional<ParseFunctionBody> initParser;
+      if (!CurDeclContext->isLocalContext()) {
+        initContext = Context.createPatternBindingContext(PBD);
+        initParser.emplace(*this, initContext);
+      }
+
       SourceLoc EqualLoc = consumeToken(tok::equal);
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
+
+      // Leave the initializer context.
+      if (initContext) {
+        if (!initParser->hasClosures())
+          Context.destroyPatternBindingContext(initContext);
+        initParser.reset();
+      }
+      assert(!initParser.hasValue());
+
       if (init.hasCodeCompletion()) {
         return makeParserCodeCompletionStatus();
       } if (init.isNull()) {

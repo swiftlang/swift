@@ -608,6 +608,12 @@ public:
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);
 
+  /// \brief Change the context of closures in the given initializer
+  /// expression to the given context.
+  ///
+  /// \returns true if any closures were found
+  static bool contextualizeInitializer(Initializer *DC, Expr *init);
+
   /// Return the type-of-reference of the given value.  This does not
   /// open values of polymorphic function type.
   ///

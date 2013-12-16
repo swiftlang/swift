@@ -96,6 +96,12 @@ static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
   S->walk(ContextualizeClosures(DC));
 }
 
+bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
+  ContextualizeClosures CC(DC);
+  E->walk(CC);
+  return CC.hasAutoClosures();
+}
+
 namespace {
 /// StmtChecker - This class implements 
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
@@ -607,12 +613,11 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 
         // Walk the checked initializer and contextualize any closures
         // we saw there.
-        ContextualizeClosures contextualizer(initContext);
-        e->walk(contextualizer);
+        bool hasClosures = tc.contextualizeInitializer(initContext, e);
 
         // If we created a new context and didn't run into any autoclosures
         // during the walk, give the context back to the ASTContext.
-        if (!existingContext && !contextualizer.hasAutoClosures())
+        if (!hasClosures && !existingContext)
           tc.Context.destroyDefaultArgumentContext(initContext);
       }
     }
