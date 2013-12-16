@@ -15,7 +15,8 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "destructor" "extension" "func"
                     "import" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where"  "sil_vtable")
+                    "typealias" "enum" "var" "where"  "sil_vtable"
+                    "sil_global")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
@@ -31,64 +32,73 @@
                   'words) . font-lock-keyword-face)
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
-		    "destroyer" "globalaccessor" "objc") 'words) .
+                    "destroyer" "globalaccessor" "objc") 'words) .
 		    font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_box" "alloc_array"
-		    "dealloc_stack" "dealloc_box" "dealloc_ref")
+                    "dealloc_stack" "dealloc_box" "dealloc_ref")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
-   `(,(regexp-opt '("load" "store" "assign" "copy_addr"
-		    "destroy_addr" "index_addr" "index_raw_pointer" "to"
-                    "copy_value" "mark_uninitialized" "mark_function_escape")
+   `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
+                    "mark_function_escape" "copy_addr" "destroy_addr"
+                    "index_addr" "index_raw_pointer" "to")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased" "strong_release"
-		    "strong_retain_unowned" "unowned_retain" "unowned_release"
-		    "load_weak" "store_weak")
+   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
+                    "strong_release" "strong_retain_unowned" "ref_to_unowned"
+                    "unowned_to_ref" "unowned_retain" "unowned_release"
+                    "load_weak" "store_weak")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref" "builtin_function_ref" "global_addr"
-		    "integer_literal" "float_literal" "string_literal"
-		    "builtin_zero" "module") 'words) . font-lock-keyword-face)
+                    "integer_literal" "float_literal" "string_literal"
+                    ) 'words) . font-lock-keyword-face)
    ;; Dynamic Dispatch
    `(,(regexp-opt '("class_method" "super_method" "archetype_method"
-		    "protocol_method") 'words) . font-lock-keyword-face)
+                    "protocol_method" "dynamic_method")
+                  'words) . font-lock-keyword-face)
    ;; Function Application
-   `(,(regexp-opt '("apply" "partial_apply" "specialize")
+   `(,(regexp-opt '("apply" "partial_apply")
 		  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "class_metatype" "archetype_metatype"
-		    "protocol_metatype") 'words) . font-lock-keyword-face)
+                    "protocol_metatype") 'words) . font-lock-keyword-face)
    ;; Aggregate Types
-   `(,(regexp-opt '("tuple" "tuple_extract" "tuple_element_addr" "struct"
-		    "struct_extract" "struct_element_addr" "ref_element_addr"
-                    "destroy_value" "copy_value")
-		  'words) . font-lock-keyword-face)
+   `(,(regexp-opt '("copy_value" "destroy_value" "tuple" "tuple_extract"
+                    "tuple_element_addr" "struct" "struct_extract"
+                    "struct_element_addr" "ref_element_addr")
+                  'words) . font-lock-keyword-face)
+   ;; Enums. *NOTE* We do not include enum itself here since enum is a
+   ;; swift declaration as well handled at the top.
+   `(,(regexp-opt '("enum_data_addr" "inject_enum_addr")
+                  'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "upcast_existential" "deinit_existential"
-		    "project_existential" "init_existential_ref"
-		    "upcast_existential_ref" "project_existential_ref")
+                    "project_existential" "init_existential_ref"
+                    "upcast_existential_ref" "project_existential_ref")
 		  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("coerce" "upcast" "archetype_ref_to_super"
-		    "address_to_pointer" "pointer_to_address"
-		    "ref_to_object_pointer" "object_pointer_to_ref"
-		    "ref_to_raw_pointer" "raw_pointer_to_ref"
-		    "convert_function" "convert_cc" "bridge_to_block"
-		    "thin_to_thick_function") 'words) . font-lock-keyword-face)
+                    "address_to_pointer" "pointer_to_address"
+                    "ref_to_object_pointer" "object_pointer_to_ref"
+                    "ref_to_raw_pointer" "raw_pointer_to_ref"
+                    "convert_function" "bridge_to_block"
+                    "thin_to_thick_function" "is_nonnull")
+                  'words) . font-lock-keyword-face)
    ;; Checked Conversions
-   `(,(regexp-opt '("is_nonnull" "downcast" "super_to_archetype_ref"
-		    "downcast_archetype_ref" "downcast_archetype_addr"
-		    "project_downcast_existential_addr"
-		    "downcast_existential_ref")
+   `(,(regexp-opt '("unconditional_checked_cast")
+		  'words) . font-lock-keyword-face)
+   ;; Runtime Failures
+   `(,(regexp-opt '("cond_fail")
 		  'words) . font-lock-keyword-face)
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
-		    "cond_br" "switch_int" "switch_enum")
-		  'words) . font-lock-keyword-face)
+                    "cond_br" "switch_int" "switch_enum"
+                    "destructive_switch_enum_addr" "dynamic_method_br"
+                    "checked_cast_br")
+                  'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)
    ;; Variables
