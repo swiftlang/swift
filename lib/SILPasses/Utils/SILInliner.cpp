@@ -140,32 +140,40 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 /// terminators (which are handled separately later).
 void SILInliner::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
-  // Iterate over and visit all instructions other than the terminator to clone.
+
+  // Clone all instructions in BB except for the terminator.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
     visit(I);
+
   // Iterate over successors to do the depth-first search.
   for (auto &Succ : BB->getSuccs()) {
     assert (Succ.getBB() != CalleeEntryBB &&
             "Entry block should not be a successor when inlining");
     SILBasicBlock *&MappedBB = BBMap[Succ];
-    // Only visit a successor that has not already been visisted.
-    if (!MappedBB) {
-      // Map the successor to a new BB.
-      MappedBB = new (F.getModule()) SILBasicBlock(&F);
-      // Create new arguments for each of the original block's arguments.
-      for (auto &Arg : Succ.getBB()->getBBArgs()) {
-        SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
-                                                             MappedBB);
-        ValueMap.insert(std::make_pair(Arg, MappedArg));
-      }
-      // Also, move the new mapped BB to the right position in the caller
-      if (InsertBeforeBB)
-        F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB),
-                             F.getBlocks(), SILFunction::iterator(MappedBB));
-      // Set the insertion point to the new mapped BB
-      getBuilder().setInsertionPoint(MappedBB);
-      // Recurse into the successor
-      visitSILBasicBlock(Succ.getBB());
+
+    // If we have already cloned the given successor, skip it.
+    if (MappedBB)
+      continue;
+
+    // Otherwise map the successor to a new BB.
+    MappedBB = new (F.getModule()) SILBasicBlock(&F);
+
+    // Create new arguments for each of the original block's arguments.
+    for (auto &Arg : Succ.getBB()->getBBArgs()) {
+      SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
+                                                           MappedBB);
+      ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
+
+    // Move the new mapped BB to the right position in the caller if requested.
+    if (InsertBeforeBB)
+      F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB),
+                           F.getBlocks(), SILFunction::iterator(MappedBB));
+
+    // Set the insertion point to the new mapped BB
+    getBuilder().setInsertionPoint(MappedBB);
+
+    // Recurse into the successor
+    visitSILBasicBlock(Succ.getBB());
   }
 }
