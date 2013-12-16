@@ -460,16 +460,6 @@ struct InitializationForPattern
     if (isa<LValueType>(varType))
       return InitializationPtr(new InOutInitialization(vd));
 
-    // If this is a 'self' argument for a class method (or non-inout struct
-    // method), emit it as a constant value.  Since it is a constant value,
-    // there is no memory location associated with it, and thus we don't need an
-    // initialization - the store will provide the value directly into the
-    // VarLocs map.
-    if (vd->isImplicit() && vd->getName().str() == "self" &&
-        (vd->getType()->hasReferenceSemantics() ||
-         !vd->getType()->is<LValueType>()))
-      return InitializationPtr(new BlackHoleInitialization());
-
     // If this is a 'let' initialization for a non-address-only type, set up a
     // let binding, which stores the initialization value into VarLocs directly.
     if (vd->isLet() && !Gen.getTypeLowering(vd->getType()).isAddressOnly())
@@ -681,15 +671,9 @@ struct ArgumentInitVisitor :
   SILValue visitNamedPattern(NamedPattern *P, Initialization *I) {
     VarDecl *vd = P->getDecl();
     
-    // If this is a 'self' argument for a class method (or non-inout struct
-    // method), emit it as a constant value.  Since it is a constant value,
-    // there is no memory location associated with it, and thus we don't need an
-    // initialization - the store will provide the value directly into the
-    // VarLocs map.
-    if ((vd->isImplicit() && vd->getName().str() == "self" &&
-         (vd->getType()->hasReferenceSemantics() ||
-          !vd->getType()->is<LValueType>())) ||
-        (vd->isLet() && !gen.getTypeLowering(vd->getType()).isAddressOnly())) {
+    // If this is a 'let' value being used as a constant, lower it as the
+    // value itself.
+    if (vd->isLet() && !gen.getTypeLowering(vd->getType()).isAddressOnly()) {
       SILLocation loc = vd;
       loc.markAsPrologue();
       SILValue arg = makeArgument(P->getType(), f.begin(), loc);
