@@ -521,10 +521,8 @@ struct ASTNodeBase {};
 
     void verifyChecked(AbstractClosureExpr *E) {
       assert(Scopes.back().get<DeclContext*>() == E);
-
-      // This only applies in local contexts because we don't know how
-      // to contextualize closures in other contexts.
-      if (!E->getParent()->isLocalContext()) return;
+      assert(E->getParent()->isLocalContext() &&
+             "closure expression was not in local context!");
 
       // If the enclosing scope is a DC directly, rather than a local scope,
       // then the closure should be parented by an Initializer.  Otherwise,
