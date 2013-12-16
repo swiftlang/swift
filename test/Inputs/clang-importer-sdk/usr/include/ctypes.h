@@ -46,6 +46,12 @@ typedef struct {
   } size;
 } CGRect;
 
+struct StructWithBitfields {
+  unsigned First;
+  unsigned Second : 17;
+  unsigned Third : 5;
+};
+
 //===---
 // Tag decls and typedefs.
 //===---
