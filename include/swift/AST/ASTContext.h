@@ -479,6 +479,7 @@ public:
   NormalProtocolConformance *
   getConformance(Type conformingType,
                  ProtocolDecl *protocol,
+                 SourceLoc loc,
                  Module *containingModule,
                  WitnessMap &&witnesses,
                  TypeWitnessMap &&typeWitnesses,

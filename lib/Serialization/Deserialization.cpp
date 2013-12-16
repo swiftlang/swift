@@ -436,7 +436,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   lastRecordOffset.reset();
 
   return { proto,
-           ctx.getConformance(conformingType, proto,
+           ctx.getConformance(conformingType, proto, SourceLoc(),
                               FileContext->getParentModule(),
                               std::move(witnesses),
                               std::move(typeWitnesses),

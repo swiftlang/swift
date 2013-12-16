@@ -203,6 +203,9 @@ class NormalProtocolConformance : public ProtocolConformance {
   /// \brief The protocol being conformed to.
   ProtocolDecl *Protocol;
 
+  /// The location of this protocol conformance in the source.
+  SourceLoc Loc;
+
   /// \brief The module containing the ExtensionDecl or NominalTypeDecl that
   /// declared the conformance.
   Module *ContainingModule;
@@ -227,6 +230,7 @@ class NormalProtocolConformance : public ProtocolConformance {
 
   NormalProtocolConformance(Type conformingType,
                             ProtocolDecl *protocol,
+                            SourceLoc loc,
                             Module *containingModule,
                             WitnessMap &&witnesses,
                             TypeWitnessMap &&typeWitnesses,
@@ -234,6 +238,7 @@ class NormalProtocolConformance : public ProtocolConformance {
                             ArrayRef<ValueDecl *> defaultedDefinitions)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       Protocol(protocol),
+      Loc(loc),
       ContainingModule(containingModule),
       Mapping(std::move(witnesses)),
       TypeWitnesses(std::move(typeWitnesses)),
@@ -246,6 +251,9 @@ class NormalProtocolConformance : public ProtocolConformance {
 public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return Protocol; }
+
+  /// Retrieve the location of this 
+  SourceLoc getLoc() const { return Loc; }
 
   /// Get the module that contains the conforming extension or type declaration.
   Module *getContainingModule() const { return ContainingModule; }

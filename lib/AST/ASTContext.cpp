@@ -793,13 +793,14 @@ ArrayRef<Decl *> ASTContext::getTypesThatConformTo(KnownProtocolKind kind) {
 NormalProtocolConformance *
 ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
+                           SourceLoc loc,
                            Module *containingModule,
                            WitnessMap &&witnesses,
                            TypeWitnessMap &&typeWitnesses,
                            InheritedConformanceMap &&inheritedConformances,
                            ArrayRef<ValueDecl *> defaultedDefinitions) {
   auto result
-    = new (*this) NormalProtocolConformance(conformingType, protocol,
+    = new (*this) NormalProtocolConformance(conformingType, protocol, loc,
                                             containingModule,
                                             std::move(witnesses),
                                             std::move(typeWitnesses),

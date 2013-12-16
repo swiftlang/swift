@@ -1072,7 +1072,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     ? ExplicitConformance->getModuleContext()
     : nullptr;
 
-  return TC.Context.getConformance(T, Proto, conformingModule,
+  return TC.Context.getConformance(T, Proto, ComplainLoc, conformingModule,
                                    std::move(Mapping),
                                    std::move(TypeWitnesses),
                                    std::move(InheritedMapping),

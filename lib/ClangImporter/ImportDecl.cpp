@@ -2134,7 +2134,8 @@ namespace {
         }
 
         Conformances.push_back(Ctx.getConformance(dc->getDeclaredTypeOfContext(),
-                                                  proto, dc->getParentModule(),
+                                                  proto, SourceLoc(),
+                                                  dc->getParentModule(),
                                                   std::move(Mapping),
                                                   std::move(TypeWitnesses),
                                                   std::move(InheritedMapping),
