@@ -12,6 +12,7 @@
 
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/STLExtras.h"
+
 using namespace swift;
 
 /// \brief Inlines the callee of a given ApplyInst (which must be the value of a
@@ -37,7 +38,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   // We can't handle specializations yet.
   if (!Subs.empty())
     return false;
-  
+
   CalleeEntryBB = CalleeFunction->begin();
 
   // Compute the SILLocation which should be used by all the inlined
