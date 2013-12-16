@@ -226,7 +226,7 @@ public:
       I->finishInitialization(gen);
       return;
         
-    case Initialization::Kind::SingleBuffer: {
+    case Initialization::Kind::SingleBuffer:
       // If we didn't evaluate into the initialization buffer, do so now.
       if (result.getValue() != I->getAddress()) {
         result.forwardInto(gen, loc, I->getAddress());
@@ -238,7 +238,11 @@ public:
       
       I->finishInitialization(gen);
       return;
-    }
+
+    case Initialization::Kind::LetValue:
+      I->bindValue(result.getValue(), gen);
+      I->finishInitialization(gen);
+      return;
     }
   }
   

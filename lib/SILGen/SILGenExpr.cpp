@@ -632,10 +632,8 @@ SILValue SILGenFunction::getBufferForExprResult(
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
       llvm_unreachable("can't emit into address binding");
-
+    case Initialization::Kind::LetValue:
     case Initialization::Kind::Translating:
-      break;
-
     case Initialization::Kind::Ignored:
       break;
       
@@ -667,6 +665,7 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
     case Initialization::Kind::Ignored:
     case Initialization::Kind::Translating:
     case Initialization::Kind::Tuple:
+    case Initialization::Kind::LetValue:
       break;
     case Initialization::Kind::SingleBuffer:
       I->finishInitialization(*this);
@@ -1644,6 +1643,26 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::None:
       break;
 
+    case CaptureKind::Constant:
+      if (!getTypeLowering(capture->getType()).isAddressOnly()) {
+        // LValues captured by value.
+        auto Entry = VarLocs[cast<VarDecl>(capture)];
+        ManagedValue v;
+        if (Entry.isConstant()) {
+          SILValue Val = B.createCopyValue(loc, Entry.getConstant());
+          v = ManagedValue(Val, ManagedValue::Unmanaged);
+        } else {
+          SILValue addr = Entry.getAddress();
+          B.createStrongRetain(loc, Entry.box);
+          auto &TL = getTypeLowering(capture->getType());
+          v = emitLoad(loc, addr, TL, SGFContext(), IsNotTake);
+        }
+
+        capturedArgs.push_back(v.forward(*this));
+        break;
+      }
+      SWIFT_FALLTHROUGH;
+
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
       // address of the value.
@@ -1655,23 +1674,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       B.createStrongRetain(loc, vl.box);
       capturedArgs.push_back(vl.box);
       capturedArgs.push_back(vl.getAddress());
-      break;
-    }
-    case CaptureKind::Constant: {
-      // LValues captured by value.
-      auto Entry = VarLocs[cast<VarDecl>(capture)];
-      ManagedValue v;
-      if (Entry.isConstant()) {
-        SILValue Val = B.createCopyValue(loc, Entry.getConstant());
-        v = ManagedValue(Val, ManagedValue::Unmanaged);
-      } else {
-        SILValue addr = Entry.getAddress();
-        B.createStrongRetain(loc, Entry.box);
-        auto &TL = getTypeLowering(capture->getType());
-        v = emitLoad(loc, addr, TL, SGFContext(), IsNotTake);
-      }
-
-      capturedArgs.push_back(v.forward(*this));
       break;
     }
     case CaptureKind::LocalFunction: {
@@ -2519,6 +2521,13 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   case CaptureKind::None:
     break;
 
+  case CaptureKind::Constant:
+    if (!gen.getTypeLowering(capture->getType()).isAddressOnly()) {
+      addSILArgument(gen.getLoweredType(capture->getType()));
+      break;
+    }
+    SWIFT_FALLTHROUGH;
+
   case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(capture->getType()->getRValueType())
       .getAddressType();
@@ -2528,9 +2537,6 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     addSILArgument(ty);
     break;
   }
-  case CaptureKind::Constant:
-    addSILArgument(gen.getLoweredType(capture->getType()));
-    break;
   case CaptureKind::LocalFunction:
     // Forward the captured value.
     addSILArgument(gen.getLoweredType(capture->getType()));

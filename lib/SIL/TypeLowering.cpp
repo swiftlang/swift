@@ -73,11 +73,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
     if (var->isComputed())
       return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
 
-    // self for classes is always capture by value, never by address.  Even in
-    // the case when self can be reassigned within a init by a super.init()
-    // call, it cannot be live in a closure.
-    if (var->isImplicit() && var->getName().str() == "self" &&
-        var->getType()->hasReferenceSemantics())
+    if (var->isLet())
       return CaptureKind::Constant;
 
     return CaptureKind::Box;

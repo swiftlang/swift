@@ -68,14 +68,13 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
   switch (kind) {
   case Kind::Tuple:
     return getSubInitializations();
-  case Kind::Ignored: {
+  case Kind::Ignored:
     // "Destructure" an ignored binding into multiple ignored bindings.
     for (auto fieldType : tupleTy->getElementTypes()) {
       (void) fieldType;
       buf.push_back(InitializationPtr(new BlackHoleInitialization()));
     }
     return buf;
-  }
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
     SILValue baseAddr = getAddress();
@@ -98,6 +97,8 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     llvm_unreachable("cannot destructure a translating initialization");
   case Kind::AddressBinding:
     llvm_unreachable("cannot destructure an address binding initialization");
+  case Kind::LetValue:
+    llvm_unreachable("cannot destructure a let-value initialization");
   }
   llvm_unreachable("bad initialization kind");
 }
@@ -176,12 +177,30 @@ public:
   }
 };
 
+class StrongReleaseCleanup : public Cleanup {
+  SILValue box;
+public:
+  StrongReleaseCleanup(SILValue box) : box(box) {}
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.emitStrongRelease(l, box);
+  }
+};
+
+class DestroyValueCleanup : public Cleanup {
+  SILValue v;
+public:
+  DestroyValueCleanup(SILValue v) : v(v) {}
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.emitDestroyValueOperation(l, v);
+  }
+};
+
 /// Cleanup to destroy an initialized variable.
-class DeallocStack : public Cleanup {
+class DeallocStackCleanup : public Cleanup {
   SILLocation Loc;
   SILValue Addr;
 public:
-  DeallocStack(SILLocation loc, SILValue addr) : Loc(loc), Addr(addr) {}
+  DeallocStackCleanup(SILLocation loc, SILValue addr) : Loc(loc), Addr(addr) {}
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createDeallocStack(l, Addr);
@@ -361,6 +380,31 @@ public:
     VarInit->finishInitialization(gen);
   }
 };
+
+/// Initialize a writeback buffer that receives the "in" value of a inout
+/// argument on function entry and writes the "out" value back to the inout
+/// address on function exit.
+class LetValueInitialization : public Initialization {
+  /// The VarDecl for the let decl.
+  VarDecl *vd;
+public:
+  LetValueInitialization(VarDecl *vd)
+  : Initialization(Initialization::Kind::LetValue), vd(vd) {}
+
+  SILValue getAddressOrNull() override {
+    llvm_unreachable("let arguments are not addressable");
+  }
+  ArrayRef<InitializationPtr> getSubInitializations() override {
+    return {};
+  }
+
+  void bindValue(SILValue value, SILGenFunction &gen) override{
+    assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
+    gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
+  }
+};
+
+
   
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -425,6 +469,11 @@ struct InitializationForPattern
         (vd->getType()->hasReferenceSemantics() ||
          !vd->getType()->is<LValueType>()))
       return InitializationPtr(new BlackHoleInitialization());
+
+    // If this is a 'let' initialization for a non-address-only type, set up a
+    // let binding, which stores the initialization value into VarLocs directly.
+    if (vd->isLet() && !Gen.getTypeLowering(vd->getType()).isAddressOnly())
+      return InitializationPtr(new LetValueInitialization(vd));
     
     // Otherwise, we have a normal local-variable initialization.
     auto varInit = Gen.emitLocalVariableWithCleanup(vd);
@@ -491,28 +540,9 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
                                                        SILValue temp) {
   assert(temp.getType().isLocalStorage() &&
          "must deallocate container operand, not address operand!");
-  Cleanups.pushCleanup<DeallocStack>(loc, temp);
+  Cleanups.pushCleanup<DeallocStackCleanup>(loc, temp);
   return Cleanups.getTopCleanup();
 }
-
-
-class CleanupCaptureBox : public Cleanup {
-  SILValue box;
-public:
-  CleanupCaptureBox(SILValue box) : box(box) {}
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitStrongRelease(l, box);
-  }
-};
-
-class CleanupCaptureValue : public Cleanup {
-  SILValue v;
-public:
-  CleanupCaptureValue(SILValue v) : v(v) {}
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitDestroyValueOperation(l, v);
-  }
-};
 
 
 namespace {
@@ -561,7 +591,8 @@ struct ArgumentInitVisitor :
 
     case Initialization::Kind::Ignored:
       break;
-
+    case Initialization::Kind::LetValue:
+      llvm_unreachable("let-value initializations don't come from arguments");
     case Initialization::Kind::Tuple:
       llvm_unreachable("tuple initializations should be destructured before "
                        "reaching here");
@@ -602,6 +633,8 @@ struct ArgumentInitVisitor :
         break;
       case Initialization::Kind::AddressBinding:
         llvm_unreachable("empty tuple pattern with inout initializer?!");
+      case Initialization::Kind::LetValue:
+        llvm_unreachable("empty tuple pattern with letvalue initializer?!");
       case Initialization::Kind::Translating:
         llvm_unreachable("empty tuple pattern with translating initializer?!");
         
@@ -653,15 +686,16 @@ struct ArgumentInitVisitor :
     // there is no memory location associated with it, and thus we don't need an
     // initialization - the store will provide the value directly into the
     // VarLocs map.
-    if (vd->isImplicit() && vd->getName().str() == "self" &&
-        (vd->getType()->hasReferenceSemantics() ||
-         !vd->getType()->is<LValueType>())) {
+    if ((vd->isImplicit() && vd->getName().str() == "self" &&
+         (vd->getType()->hasReferenceSemantics() ||
+          !vd->getType()->is<LValueType>())) ||
+        (vd->isLet() && !gen.getTypeLowering(vd->getType()).isAddressOnly())) {
       SILLocation loc = vd;
       loc.markAsPrologue();
       SILValue arg = makeArgument(P->getType(), f.begin(), loc);
       assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(arg);
-      gen.Cleanups.pushCleanup<CleanupCaptureValue>(arg);
+      gen.Cleanups.pushCleanup<DestroyValueCleanup>(arg);
       I->finishInitialization(gen);
       return arg;
     }
@@ -678,11 +712,22 @@ struct ArgumentInitVisitor :
 
 };
 
-static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
+static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::None:
     break;
+
+  case CaptureKind::Constant:
+    if (!gen.getTypeLowering(capture->getType()).isAddressOnly()) {
+      // Constant decls are captured by value.
+      SILType ty = gen.getLoweredType(capture->getType());
+      SILValue val = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
+      gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
+      gen.Cleanups.pushCleanup<DestroyValueCleanup>(val);
+      break;
+    }
+    SWIFT_FALLTHROUGH;
 
   case CaptureKind::Box: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
@@ -692,15 +737,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
                                                gen.F.begin(), capture);
     SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
     gen.VarLocs[capture] = SILGenFunction::VarLoc::getAddress(addr, box);
-    gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
-    break;
-  }
-  case CaptureKind::Constant: {
-    // Constant decls are captured by value.
-    SILType ty = gen.getLoweredType(capture->getType());
-    SILValue val = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
-    gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
-    gen.Cleanups.pushCleanup<CleanupCaptureValue>(val);
+    gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::LocalFunction: {
@@ -711,7 +748,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                                  gen.F.begin(), capture);
     gen.LocalFunctions[SILDeclRef(capture)] = value;
-    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
+    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
     break;
   }
   case CaptureKind::GetterSetter: {
@@ -724,7 +761,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
-    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
+    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
@@ -737,7 +774,7 @@ static void emitCaptureArguments(SILGenFunction & gen, ValueDecl *capture) {
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
-    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
+    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
     break;
   }
   }

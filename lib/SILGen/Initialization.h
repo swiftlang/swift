@@ -47,9 +47,12 @@ public:
     /// This Initialization is for a _ binding or other ignored value; the
     /// corresponding result can be discarded.
     Ignored,
-    /// This Initialization is for a [inout] or address-only argument binding,
+    /// This Initialization is for an @inout or address-only argument binding,
     /// which is initialized using bindAddress().
     AddressBinding,
+    /// This Initialization is to bind a 'let' declaration with non-address-only
+    /// type into varlocs directly.
+    LetValue,
     /// This Initialization is for a single buffer with a physical address,
     /// which can be accessed with getAddress() and stored to.
     SingleBuffer,
@@ -83,6 +86,10 @@ public:
   virtual void translateValue(SILGenFunction &gen, SILLocation loc,
                               ManagedValue value) {
     llvm_unreachable("unexpected translated value in initialization!");
+  }
+
+  virtual void bindValue(SILValue value, SILGenFunction &gen) {
+    llvm_unreachable("can only bind letvalue!");
   }
   
   /// Returns true if this initialization represents a single contiguous buffer.

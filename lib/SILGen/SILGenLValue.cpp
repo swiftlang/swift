@@ -1145,8 +1145,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // writeback chain.
 }
 
-void SILGenFunction::emitCopyLValueInto(SILLocation loc,
-                                        const LValue &src,
+void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
                                         Initialization *dest) {
   auto skipPeephole = [&]{
     if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
@@ -1158,7 +1157,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc,
   // If the source is a physical lvalue, the destination is a single address,
   // and there's no semantic conversion necessary, do a copy_addr from the
   // lvalue into the destination.
-  if (!src.isPhysical())
+  if (!src.isPhysical() || dest->kind == Initialization::Kind::LetValue)
     return skipPeephole();
   auto destAddr = dest->getAddressOrNull();
   if (!destAddr)
