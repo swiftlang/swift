@@ -922,6 +922,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         else
           Mapping[Requirement] = ConcreteDeclRef(TC.Context, best.Witness,
                                                  best.WitnessSubstitutions);
+        TC.Context.recordConformingDecl(best.Witness, Requirement);
 
         // If we deduced any associated types, record them now.
         if (!best.AssociatedTypeDeductions.empty()) {
@@ -968,7 +969,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         if (matchWitness(TC, Proto, DC, Requirement, T, derived,
                          TypeWitnesses).isViable()) {
           Mapping[Requirement] = derived;
-          numViable = 1;
+          TC.Context.recordConformingDecl(derived, Requirement);
           continue;
         }
         didDerive = true;

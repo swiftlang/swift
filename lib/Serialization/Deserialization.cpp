@@ -410,6 +410,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
       witness = ConcreteDeclRef(ctx, second, substitutions);
 
     witnesses.insert(std::make_pair(first, witness));
+    ctx.recordConformingDecl(second, first);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

@@ -251,35 +251,8 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-/// Associates the decls that are conforming, to the protocol decls.
-static void associateConformingValueDecls(ProtocolConformance *Conformance,
-                                          ASTContext &Ctx) {
-  if (!Conformance)
-    return;
-
-  // FIXME: Walking the full value witness table at this point is
-  // really, really unfortunate.
-  Conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req,
-                                       ConcreteDeclRef witness) {
-    if (witness)
-      Ctx.recordConformingDecl(witness.getDecl(), req);
-  });
-  
-  for (auto InheritedConf: Conformance->getInheritedConformances())
-    associateConformingValueDecls(InheritedConf.second, Ctx);
-}
-
-static void associateConformingValueDecls(
-    ArrayRef<ProtocolConformance *> Conformances, ASTContext &Ctx) {
-  for (auto Conf: Conformances) {
-    associateConformingValueDecls(Conf, Ctx);
-  }
-}
-
 void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
   Conformances = c;
-  associateConformingValueDecls(c, getASTContext());
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -539,10 +512,6 @@ bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
 
 void TypeDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
   Conformances = c;
-  // A typealias should not affect the conformance bit of members of the
-  // original; mark conformances only if this is a nominal type decl.
-  if (isa<NominalTypeDecl>(this))
-    associateConformingValueDecls(c, getASTContext());
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
