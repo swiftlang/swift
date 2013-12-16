@@ -24,39 +24,94 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-static void
-PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
-                   SmallVectorImpl<ValueDecl*> &PrintDecls,
-                   SmallVectorImpl<ASTNode> &BodyContent) {
-  ASTContext &Context = TC.Context;
-  Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
-  Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc, /*Implicit=*/true);
-  BodyContent.push_back(new (Context) CallExpr(PrintStrFn, PrintStr,
-                                               /*Implicit=*/true));
+namespace {
+  struct REPLContext {
+    TypeChecker &TC;
+    ASTContext &Context;
+    SourceFile &SF;
+    SmallVector<ValueDecl*, 4> PrintDecls;
+
+    REPLContext(TypeChecker &TC, SourceFile &SF)
+      : TC(TC), Context(TC.Context), SF(SF) {}
+
+    /// Look up the identifier "print".
+    bool requirePrintDecls() {
+      if (!PrintDecls.empty()) return false;
+
+      UnqualifiedLookup lookup(Context.getIdentifier("print"),
+                               TC.getStdlibModule(&SF), &TC);
+      if (!lookup.isSuccess())
+        return true;
+      for (auto result : lookup.Results)
+        PrintDecls.push_back(result.getValueDecl());
+      return false;
+    }
+  };
+
+  class StmtBuilder {
+    REPLContext &C;
+    TypeChecker &TC;
+    ASTContext &Context;
+    DeclContext *DC;
+    SmallVector<ASTNode, 8> Body;
+
+  public:
+    StmtBuilder(REPLContext &C, DeclContext *DC)
+      : C(C), TC(C.TC), Context(C.Context), DC(DC) { assert(DC); }
+    StmtBuilder(StmtBuilder &parent)
+      : C(parent.C), TC(C.TC), Context(C.Context), DC(parent.DC) {}
+
+    ~StmtBuilder() {
+      assert(Body.empty() && "statements remain in builder?");
+    }
+
+    BraceStmt *createBodyStmt(SourceLoc loc, SourceLoc endLoc) {
+      auto result = BraceStmt::create(Context, loc, Body, endLoc);
+      Body.clear();
+      return result;
+    }
+
+    void printLiteralString(StringRef str, SourceLoc loc);
+    void printReplExpr(VarDecl *arg, Type sugarType, CanType type,
+                       SourceLoc loc, SourceLoc endLoc,
+                       SmallVectorImpl<unsigned> &memberIndexes);
+    void printStruct(VarDecl *arg, Type sugarType, StructDecl *SD,
+                     SourceLoc loc, SourceLoc endLoc,
+                     SmallVectorImpl<unsigned> &memberIndexes);
+    void printClass(VarDecl *arg, Type sugarType, ClassDecl *CD,
+                    SourceLoc loc, SourceLoc endLoc,
+                    SmallVectorImpl<unsigned> &memberIndexes);
+    void printCollection(VarDecl *arg, Type keyType, Type valueType,
+                         SourceLoc loc, SourceLoc endLoc,
+                         SmallVectorImpl<unsigned> &memberIndexes);
+
+    Expr *getArgRefExpr(VarDecl *arg, ArrayRef<unsigned> memberIndexes,
+                        SourceLoc loc) const;
+
+    void addToBody(ASTNode node) {
+      Body.push_back(node);
+    }
+
+    Expr *buildPrintRefExpr(SourceLoc loc) {
+      assert(!C.PrintDecls.empty());
+      return TC.buildRefExpr(C.PrintDecls, loc, /*Implicit=*/true);
+    }
+  };
 }
 
-static void
-PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
-              Type SugarT, CanType T,
-              SourceLoc Loc, SourceLoc EndLoc,
-              SmallVectorImpl<unsigned> &MemberIndexes,
-              SmallVectorImpl<ASTNode> &BodyContent,
-              SmallVectorImpl<ValueDecl*> &PrintDecls,
-              DeclContext *DC);
+void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
+  Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
+  Expr *PrintStrFn = buildPrintRefExpr(Loc);
+  addToBody(new (Context) CallExpr(PrintStrFn, PrintStr, /*Implicit=*/true));
+}
 
-static void
-PrintStruct(TypeChecker &TC, VarDecl *Arg,
-            Type SugarT, StructDecl *SD,
-            SourceLoc Loc, SourceLoc EndLoc,
-            SmallVectorImpl<unsigned> &MemberIndexes,
-            SmallVectorImpl<ASTNode> &BodyContent,
-            SmallVectorImpl<ValueDecl*> &PrintDecls,
-            DeclContext *DC) {
+void StmtBuilder::printStruct(VarDecl *Arg, Type SugarT, StructDecl *SD,
+                              SourceLoc Loc, SourceLoc EndLoc,
+                              SmallVectorImpl<unsigned> &MemberIndexes) {
   auto TypeStr
-    = TC.Context.getIdentifier(SugarT->getString()).str();
-  PrintLiteralString(TypeStr, TC, Loc, PrintDecls, BodyContent);
-  
-  PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
+    = Context.getIdentifier(SugarT->getString()).str();
+  printLiteralString(TypeStr, Loc);
+  printLiteralString("(", Loc);
   
   unsigned idx = 0;
   bool isFirstMember = true;
@@ -66,7 +121,7 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
         if (isFirstMember)
           isFirstMember = false;
         else
-          PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
+          printLiteralString(", ", Loc);
         
         MemberIndexes.push_back(idx);
         
@@ -74,24 +129,19 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
         SubstType = TC.substMemberTypeWithBase(DC->getParentModule(),
                                                SubstType, VD, SugarT);
         
-        PrintReplExpr(TC, Arg, SubstType, SubstType->getCanonicalType(),
-                      Loc, EndLoc, MemberIndexes,
-                      BodyContent, PrintDecls, DC);
+        printReplExpr(Arg, SubstType, SubstType->getCanonicalType(),
+                      Loc, EndLoc, MemberIndexes);
+
         MemberIndexes.pop_back();
       }
     }
     ++idx;
   }
-  PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
+  printLiteralString(")", Loc);
 }
 
-static Expr *
-getArgRefExpr(TypeChecker &TC,
-              VarDecl *Arg,
-              ArrayRef<unsigned> MemberIndexes,
-              SourceLoc Loc) {
-  ASTContext &Context = TC.Context;
-
+Expr *StmtBuilder::getArgRefExpr(VarDecl *Arg, ArrayRef<unsigned> MemberIndexes,
+                                 SourceLoc Loc) const {
   Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc, /*Implicit=*/true);
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
@@ -125,17 +175,10 @@ getArgRefExpr(TypeChecker &TC,
   return ArgRef;
 }
 
-static void
-PrintClass(TypeChecker &TC, VarDecl *Arg,
-           Type SugarT, ClassDecl *CD,
-           SourceLoc Loc, SourceLoc EndLoc,
-           SmallVectorImpl<unsigned> &MemberIndexes,
-           SmallVectorImpl<ASTNode> &BodyContent,
-           SmallVectorImpl<ValueDecl*> &PrintDecls) {
-
-  ASTContext &Context = TC.Context;
-
-  PrintLiteralString("<", TC, Loc, PrintDecls, BodyContent);
+void StmtBuilder::printClass(VarDecl *Arg, Type SugarT, ClassDecl *CD,
+                             SourceLoc Loc, SourceLoc EndLoc,
+                             SmallVectorImpl<unsigned> &MemberIndexes) {
+  printLiteralString("<", Loc);
   
   // If the metatype has a className() property, use it to display the dynamic
   // type of the instance.
@@ -144,12 +187,12 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
   Type MetaT = MetaTypeType::get(SugarT, Context);
   if (TC.lookupMember(MetaT, MemberName, CD,
                       /*allowDynamicLookup=*/false)){
-    Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
+    Expr *ArgRef = getArgRefExpr(Arg, MemberIndexes, Loc);
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
                                                     MetaT);
-    Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc,
-                                                   /*Implicit=*/true);
+    Expr *Res = new (Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc,
+                                                /*Implicit=*/true);
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
@@ -158,14 +201,14 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
     Expr *CE = new (Context) CallExpr(Res, CallArgs, /*Implicit=*/true, Type());
     Res = CE;
 
-    Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc, /*Implicit=*/true);
+    Expr *PrintStrFn = buildPrintRefExpr(Loc);
     CE = new (Context) CallExpr(PrintStrFn, Res, /*Implicit=*/true);
     if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
                                /*discardedExpr=*/false))
       goto dynamicTypeFailed;
     Res = CE;
 
-    BodyContent.push_back(Res);
+    addToBody(Res);
     showedDynamicType = true;
   }
 
@@ -173,30 +216,24 @@ dynamicTypeFailed:
   if (!showedDynamicType) {
     auto TypeStr
       = TC.Context.getIdentifier(SugarT->getString()).str();
-    PrintLiteralString(TypeStr, TC, Loc, PrintDecls, BodyContent);
+    printLiteralString(TypeStr, Loc);
   }
   
-  PrintLiteralString(" instance>", TC, Loc, PrintDecls, BodyContent);
+  printLiteralString(" instance>", Loc);
 }
 
 /// \brief Print a collection.
-static void
-PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
-           SourceLoc Loc, SourceLoc EndLoc,
-           SmallVectorImpl<unsigned> &MemberIndexes,
-           SmallVectorImpl<ASTNode> &BodyContent,
-           SmallVectorImpl<ValueDecl*> &PrintDecls,
-           DeclContext *DC) {
-  ASTContext &context = TC.Context;
-
+void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
+                                  SourceLoc Loc, SourceLoc EndLoc,
+                                  SmallVectorImpl<unsigned> &MemberIndexes) {
   // Dig up Bool, true, and false. We'll need them.
   Type boolTy = TC.lookupBoolType(DC);
-  UnqualifiedLookup lookupTrue(context.getIdentifier("true"),
+  UnqualifiedLookup lookupTrue(Context.getIdentifier("true"),
                                TC.getStdlibModule(DC), nullptr);
   auto trueDecl = lookupTrue.isSuccess()
                     ? dyn_cast<VarDecl>(lookupTrue.Results[0].getValueDecl())
                     : nullptr;
-  UnqualifiedLookup lookupFalse(context.getIdentifier("false"),
+  UnqualifiedLookup lookupFalse(Context.getIdentifier("false"),
                                 TC.getStdlibModule(DC), nullptr);
   auto falseDecl = lookupFalse.isSuccess()
                      ? dyn_cast<VarDecl>(lookupFalse.Results[0].getValueDecl())
@@ -206,31 +243,31 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // first walk through the loop and initialize it to "true".
   VarDecl *firstVar = nullptr;
   if (boolTy && trueDecl && falseDecl) {
-    firstVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
+    firstVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
                                      Loc,
-                                     context.getIdentifier("first"),
+                                     Context.getIdentifier("first"),
                                      boolTy, DC);
-    Pattern *pattern = new (context) NamedPattern(firstVar);
+    Pattern *pattern = new (Context) NamedPattern(firstVar);
     pattern->setType(boolTy);
-    pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
+    pattern = new (Context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
     pattern->setType(boolTy);
 
     Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc, /*Implicit=*/true);
-    BodyContent.push_back(new (context) PatternBindingDecl(SourceLoc(),
-                                                           Loc, pattern, init,
-                                                           DC));
+    addToBody(new (Context) PatternBindingDecl(SourceLoc(),
+                                               Loc, pattern, init,
+                                               DC));
   }
 
   // Add opening bracket '['.
-  PrintLiteralString("[", TC, Loc, PrintDecls, BodyContent);
+  printLiteralString("[", Loc);
 
   // Create the "value" variable and its pattern.
-  auto valueId = context.getIdentifier("value");
-  VarDecl *valueVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
+  auto valueId = Context.getIdentifier("value");
+  VarDecl *valueVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
                                             Loc, valueId, ValueTy, DC);
-  Pattern *valuePattern = new (context) NamedPattern(valueVar);
+  Pattern *valuePattern = new (Context) NamedPattern(valueVar);
   valuePattern->setType(ValueTy);
-  valuePattern = new (context) TypedPattern(valuePattern,
+  valuePattern = new (Context) TypedPattern(valuePattern,
                                             TypeLoc::withoutLoc(ValueTy));
   valuePattern->setType(ValueTy);
 
@@ -241,26 +278,26 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     // We have a key type, so the pattern is '(key, value)'.
 
     // Form the key variable and its pattern.
-    auto keyId = context.getIdentifier("key");
-    keyVar = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
+    auto keyId = Context.getIdentifier("key");
+    keyVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
                                    Loc, keyId, KeyTy, DC);
-    Pattern *keyPattern = new (context) NamedPattern(keyVar);
+    Pattern *keyPattern = new (Context) NamedPattern(keyVar);
     keyPattern->setType(KeyTy);
-    keyPattern = new (context) TypedPattern(keyPattern,
+    keyPattern = new (Context) TypedPattern(keyPattern,
                                             TypeLoc::withoutLoc(KeyTy));
 
     // Form the tuple pattern.
     TuplePatternElt patternElts[2] = {
       TuplePatternElt(keyPattern), TuplePatternElt(valuePattern)
     };
-    pattern = TuplePattern::create(context,SourceLoc(),patternElts,SourceLoc());
+    pattern = TuplePattern::create(Context,SourceLoc(),patternElts,SourceLoc());
 
     // Provide a type for the pattern.
     TupleTypeElt elts[2] = {
       TupleTypeElt(KeyTy, keyId),
       TupleTypeElt(ValueTy, valueId)
     };
-    pattern->setType(TupleType::get(elts, context));
+    pattern->setType(TupleType::get(elts, Context));
 
   } else {
     // We don't have a key type, so the pattern is just 'value'.
@@ -269,7 +306,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
 
   // Construct the loop body.
-  SmallVector<ASTNode, 4> loopBodyContents;
+  StmtBuilder loopBuilder(*this);
 
   SmallVector<unsigned, 2> subMemberIndexes;
   
@@ -279,83 +316,75 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     Expr *firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
     Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, Loc, /*Implicit=*/true);
     Expr *setFirstToFalse
-      = new (context) AssignExpr(firstRef, Loc, falseRef, /*Implicit=*/true);
-    Stmt *thenStmt = BraceStmt::create(context, Loc,
+      = new (Context) AssignExpr(firstRef, Loc, falseRef, /*Implicit=*/true);
+    Stmt *thenStmt = BraceStmt::create(Context, Loc,
                                        ASTNode(setFirstToFalse), Loc);
 
     // else branch: print a comma.
-    SmallVector<ASTNode, 4> elseBodyContents;
-    PrintLiteralString(", ", TC, Loc, PrintDecls, elseBodyContents);
-    Stmt *elseStmt = BraceStmt::create(context, Loc, elseBodyContents, Loc);
+    StmtBuilder elseBuilder(*this);
+    elseBuilder.printLiteralString(", ", Loc);
+
+    Stmt *elseStmt = elseBuilder.createBodyStmt(Loc, Loc);
 
     // if-then-else statement.
     firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
-    loopBodyContents.push_back(new (context) IfStmt(Loc, firstRef,
-                                                    thenStmt,
-                                                    Loc, elseStmt));
+    loopBuilder.addToBody(new (Context) IfStmt(Loc, firstRef, thenStmt,
+                                               Loc, elseStmt));
   } else {
-    PrintLiteralString(", ", TC, Loc, PrintDecls, loopBodyContents);
+    loopBuilder.printLiteralString(", ", Loc);
   }
 
   // If there is a key, print it and the ':'.
   if (keyVar) {
-    PrintReplExpr(TC, keyVar, KeyTy, KeyTy->getCanonicalType(), Loc,
-                  EndLoc, subMemberIndexes, loopBodyContents, PrintDecls, DC);
+    loopBuilder.printReplExpr(keyVar, KeyTy, KeyTy->getCanonicalType(), Loc,
+                              EndLoc, subMemberIndexes);
 
-    PrintLiteralString(" : ", TC, Loc, PrintDecls, loopBodyContents);
+    loopBuilder.printLiteralString(" : ", Loc);
   }
 
   // Print the value
-  PrintReplExpr(TC, valueVar, ValueTy, ValueTy->getCanonicalType(), Loc,
-                EndLoc, subMemberIndexes, loopBodyContents, PrintDecls, DC);
+  loopBuilder.printReplExpr(valueVar, ValueTy, ValueTy->getCanonicalType(),
+                            Loc, EndLoc, subMemberIndexes);
 
-  auto loopBody = BraceStmt::create(context, Loc, loopBodyContents, EndLoc);
+  auto loopBody = loopBuilder.createBodyStmt(Loc, EndLoc);
 
   // Construct the loop.
-  Expr *argRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
+  Expr *argRef = getArgRefExpr(Arg, MemberIndexes, Loc);
   
-  BodyContent.push_back(new (context) ForEachStmt(Loc, pattern, Loc, argRef,
-                                                  loopBody));
+  addToBody(new (Context) ForEachStmt(Loc, pattern, Loc, argRef, loopBody));
 
   // Add closing bracket ']'.
-  PrintLiteralString("]", TC, EndLoc, PrintDecls, BodyContent);
+  printLiteralString("]", EndLoc);
 }
 
-static void
-PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
-              Type SugarT, CanType T,
-              SourceLoc Loc, SourceLoc EndLoc,
-              SmallVectorImpl<unsigned> &MemberIndexes,
-              SmallVectorImpl<ASTNode> &BodyContent,
-              SmallVectorImpl<ValueDecl*> &PrintDecls,
-              DeclContext *DC) {
-  ASTContext &Context = TC.Context;
-
+void StmtBuilder::printReplExpr(VarDecl *Arg, Type SugarT, CanType T,
+                                SourceLoc Loc, SourceLoc EndLoc,
+                                SmallVectorImpl<unsigned> &MemberIndexes) {
   if (TupleType *TT = dyn_cast<TupleType>(T)) {
     // We print a tuple by printing each element.
-    PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
+    printLiteralString("(", Loc);
 
     for (unsigned i = 0, e = TT->getFields().size(); i < e; ++i) {
       MemberIndexes.push_back(i);
       CanType SubType = TT->getElementType(i)->getCanonicalType();
-      PrintReplExpr(TC, Arg, TT->getElementType(i), SubType, Loc, EndLoc,
-                    MemberIndexes, BodyContent, PrintDecls, DC);
+      printReplExpr(Arg, TT->getElementType(i), SubType, Loc, EndLoc,
+                    MemberIndexes);
       MemberIndexes.pop_back();
 
       if (i + 1 != e)
-        PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
+        printLiteralString(", ", Loc);
     }
 
-    PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
+    printLiteralString(")", Loc);
     return;
   }
 
   Identifier MemberName = Context.getIdentifier("replPrint");
   if (TC.lookupMember(T, MemberName, DC,
                       /*allowDynamicLookup=*/false)) {
-    Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
-    Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
-                                                   EndLoc, /*Implicit=*/true);
+    Expr *ArgRef = getArgRefExpr(Arg, MemberIndexes, Loc);
+    Expr *Res = new (Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
+                                                EndLoc, /*Implicit=*/true);
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
@@ -366,14 +395,13 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                                /*discardedExpr=*/false))
       return;
     Res = CE;
-    BodyContent.push_back(Res);
+    addToBody(Res);
     return;
   }
 
   // We print a struct by printing each stored member variable.
   if (StructType *ST = dyn_cast<StructType>(T)) {
-    PrintStruct(TC, Arg, SugarT, ST->getDecl(), Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls, DC);
+    printStruct(Arg, SugarT, ST->getDecl(), Loc, EndLoc, MemberIndexes);
     return;
   }
   
@@ -383,19 +411,17 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     // constrained to being replPrintable.  We need replPrint to be more
     // dynamically reflective in its implementation.
     if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Array") {
-      PrintCollection(TC, Arg, Type(), BGST->getGenericArgs()[0], Loc, EndLoc,
-                      MemberIndexes, BodyContent, PrintDecls, DC);
+      printCollection(Arg, Type(), BGST->getGenericArgs()[0], Loc, EndLoc,
+                      MemberIndexes);
       return;
     }
 
-    PrintStruct(TC, Arg, SugarT, BGST->getDecl(), Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls, DC);
+    printStruct(Arg, SugarT, BGST->getDecl(), Loc, EndLoc, MemberIndexes);
     return;
   }
 
   if (ClassType *CT = dyn_cast<ClassType>(T)) {
-    PrintClass(TC, Arg, SugarT, CT->getDecl(), Loc, EndLoc,
-               MemberIndexes, BodyContent, PrintDecls);
+    printClass(Arg, SugarT, CT->getDecl(), Loc, EndLoc, MemberIndexes);
     return;
   }
 
@@ -405,21 +431,19 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     // to be constrained to being replPrintable.  We need replPrint to be more
     // dynamically reflective in its implementation.
     if (!BGCT->getParent() && BGCT->getDecl()->getName().str() == "Dictionary"){
-      PrintCollection(TC, Arg, BGCT->getGenericArgs()[0],
+      printCollection(Arg, BGCT->getGenericArgs()[0],
                       BGCT->getGenericArgs()[1], Loc, EndLoc,
-                      MemberIndexes, BodyContent, PrintDecls, DC);
+                      MemberIndexes);
       return;
     }
 
-    PrintClass(TC, Arg, SugarT, BGCT->getDecl(), Loc, EndLoc,
-               MemberIndexes, BodyContent, PrintDecls);
+    printClass(Arg, SugarT, BGCT->getDecl(), Loc, EndLoc, MemberIndexes);
     return;
   }
 
   // FIXME: We should handle EnumTypes at some point.
 
-  PrintLiteralString("<unprintable value>", TC, Loc, PrintDecls,
-                     BodyContent);
+  printLiteralString("<unprintable value>", Loc);
 }
 
 Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
@@ -501,46 +525,53 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 };
 } // end anonymous namespace.
 
+namespace {
+  class REPLChecker : public REPLContext {
+  public:
+    REPLChecker(TypeChecker &TC, SourceFile &SF) : REPLContext(TC, SF) {}
+
+    void processREPLTopLevelExpr(Expr *E);
+    void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
+  private:
+    void generatePrintOfExpression(StringRef name, Expr *E);
+  };
+}
+
 /// generatePrintOfExpression - Emit logic to print the specified expression
 /// value with the given description of the pattern involved.
-static void generatePrintOfExpression(StringRef NameStr, Expr *E,
-                                      TypeChecker *TC, SourceFile &SF) {
-  ASTContext &C = TC->Context;
-
+void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Always print rvalues, not lvalues.
-  E = TC->coerceToMaterializable(E);
+  E = TC.coerceToMaterializable(E);
 
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
-  
-  SmallVector<ValueDecl*, 4> PrintDecls;
-  UnqualifiedLookup PrintDeclLookup(C.getIdentifier("print"),
-                                    TC->getStdlibModule(&SF), TC);
-  if (!PrintDeclLookup.isSuccess())
+
+  // Require a non-trivial set of print functions.
+  if (requirePrintDecls())
     return;
-  for (auto Result : PrintDeclLookup.Results)
-    PrintDecls.push_back(Result.getValueDecl());
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
-                                 Loc,
-                                 TC->Context.getIdentifier("arg"),
-                                 E->getType(), nullptr);
-  Pattern *ParamPat = new (C) NamedPattern(Arg);
-  ParamPat = new (C) TypedPattern(ParamPat,TypeLoc::withoutLoc(Arg->getType()));
+  VarDecl *Arg = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+                                       Loc,
+                                       Context.getIdentifier("arg"),
+                                       E->getType(), /*DC*/ nullptr);
+  Pattern *ParamPat = new (Context) NamedPattern(Arg);
+  ParamPat = new (Context) TypedPattern(ParamPat,
+                                        TypeLoc::withoutLoc(Arg->getType()));
   if (!isa<TupleType>(T)) {
     TuplePatternElt elt{ParamPat};
-    ParamPat = TuplePattern::create(C, SourceLoc(), elt, SourceLoc());
+    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
-  TC->typeCheckPattern(ParamPat,
-                       Arg->getDeclContext(),
-                       /*allowUnknownTypes*/false);
+  TC.typeCheckPattern(ParamPat,
+                      Arg->getDeclContext(),
+                      /*allowUnknownTypes*/false);
   ClosureExpr *CE =
-      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
-                          /*discriminator*/ 0, &SF);
-  Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
-                                  C);
+      new (Context) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
+                                /*discriminator*/ 0, &SF);
+  Type FuncTy = FunctionType::get(ParamPat->getType(),
+                                  TupleType::getEmpty(Context),
+                                  Context);
   CE->setType(FuncTy);
   Arg->setDeclContext(CE);
   
@@ -555,37 +586,34 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   // Unique the type string into an identifier since PrintLiteralString is
   // building an AST around the string that must persist beyond the lifetime of
   // PrefixString.
-  auto TmpStr = C.getIdentifier(PrefixString).str();
+  auto TmpStr = Context.getIdentifier(PrefixString).str();
+
+  StmtBuilder builder(*this, CE);
   
-  // Fill in body of function.  Start with the string prefix to print.
-  SmallVector<ASTNode, 4> BodyContent;
-  PrintLiteralString(TmpStr, *TC, Loc, PrintDecls, BodyContent);
+  builder.printLiteralString(TmpStr, Loc);
   
   SmallVector<unsigned, 4> MemberIndexes;
-  PrintReplExpr(*TC, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
-                BodyContent, PrintDecls, CE);
-  PrintLiteralString("\n", *TC, Loc, PrintDecls, BodyContent);
-  
+  builder.printReplExpr(Arg, E->getType(), T, Loc, EndLoc, MemberIndexes);
+  builder.printLiteralString("\n", Loc);
+
   // Typecheck the function.
-  BraceStmt *Body = BraceStmt::create(C, Loc, BodyContent, EndLoc);
+  BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
-  TC->typeCheckClosureBody(CE);
-  
-  Expr *TheCall = new (C) CallExpr(CE, E, /*Implicit=*/true);
-  if (TC->typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
+  TC.typeCheckClosureBody(CE);
+
+  Expr *TheCall = new (Context) CallExpr(CE, E, /*Implicit=*/true);
+  if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
   
   // Inject the call into the top level stream by wrapping it with a TLCD.
-  auto *BS = BraceStmt::create(C, Loc, ASTNode(TheCall),
+  auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
                                EndLoc);
-  SF.Decls.push_back(new (C) TopLevelCodeDecl(&SF, BS));
+  SF.Decls.push_back(new (Context) TopLevelCodeDecl(&SF, BS));
 }
-
-
 
 /// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
 /// adding the proper decls back to the top level of the file.
-static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
+void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   CanType T = E->getType()->getCanonicalType();
   
   // Don't try to print invalid expressions, module exprs, or void expressions.
@@ -598,7 +626,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   // in the future.  However, if this is a direct reference to a decl (e.g. "x")
   // then don't create a repl metavariable.
   if (VarDecl *d = getObviousDECLFromExpr(E)) {
-    generatePrintOfExpression(d->getName().str(), E, TC, SF);
+    generatePrintOfExpression(d->getName().str(), E);
     return;
   }
   
@@ -606,40 +634,38 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   // going to reparent it.
   SF.Decls.pop_back();
 
-  E = TC->coerceToMaterializable(E);
+  E = TC.coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false, /*IsLet*/true,
-                                          E->getStartLoc(), name,
-                                          E->getType(), &SF);
+  Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+                                      E->getStartLoc(), name,
+                                      E->getType(), &SF);
   SF.Decls.push_back(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
-  Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
+  Pattern *metavarPat = new (Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(SourceLoc(),
-                                           E->getStartLoc(), metavarPat, E,
-                                           &SF);
+    = new (Context) PatternBindingDecl(SourceLoc(),
+                                       E->getStartLoc(), metavarPat, E,
+                                       &SF);
   SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
-  E = TC->buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(vd->getName().str(), E, TC, SF);
+  E = TC.buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
+  generatePrintOfExpression(vd->getName().str(), E);
 }
 
 /// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
 /// into the REPL, process it by generating code to print it out.
-static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
-                                              TypeChecker *TC,
-                                              SourceFile &SF) {
+void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   // If there is no initializer for the new variable, don't auto-print it.
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
   // (rdar://15157729) but until then, output a specialized error.
   if (!PBD->getInit()) {
-    TC->diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
+    TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
     return;
   }
   
@@ -650,9 +676,9 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Decl to print it.
   if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
                                            getSemanticsProvidingPattern())) {
-    Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
-                                      /*Implicit=*/true);
-    generatePrintOfExpression(PatternString, E, TC, SF);
+    Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
+                                     /*Implicit=*/true);
+    generatePrintOfExpression(PatternString, E);
     return;
   }
 
@@ -670,38 +696,38 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   SF.Decls.pop_back();
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC->getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (TC->Context) VarDecl(/*static*/ false, /*IsLet*/true,
-                                          PBD->getStartLoc(), name,
-                                          PBD->getPattern()->getType(), &SF);
+  Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+                                      PBD->getStartLoc(), name,
+                                      PBD->getPattern()->getType(), &SF);
   SF.Decls.push_back(vd);
 
   
   // Create a PatternBindingDecl to bind the expression into the decl.
-  Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
+  Pattern *metavarPat = new (Context) NamedPattern(vd);
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(SourceLoc(),
-                                           PBD->getStartLoc(), metavarPat,
-                                           PBD->getInit(), &SF);
+    = new (Context) PatternBindingDecl(SourceLoc(),
+                                       PBD->getStartLoc(), metavarPat,
+                                       PBD->getInit(), &SF);
 
-  auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
+  auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                    ASTNode(metavarBinding),
                                    metavarBinding->getEndLoc());
 
-  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&SF, MVBrace);
+  auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
   SF.Decls.push_back(MVTLCD);
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
-  Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
-  E = TC->coerceToMaterializable(E);
+  Expr *E = TC.buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
+  E = TC.coerceToMaterializable(E);
   PBD->setInit(E, /*checked=*/true);
   SF.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
-  E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(PatternString, E, TC, SF);
+  E = TC.buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
+  generatePrintOfExpression(PatternString, E);
 }
 
 
@@ -714,6 +740,8 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
   // adding them back (with modifications) one at a time.
   std::vector<Decl*> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
   SF.Decls.resize(FirstDecl);
+
+  REPLChecker RC(*this, SF);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.
@@ -728,10 +756,10 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (Expr *E = Entry.dyn_cast<Expr*>())
-      processREPLTopLevelExpr(E, this, SF);
+      RC.processREPLTopLevelExpr(E);
     else if (Decl *D = Entry.dyn_cast<Decl*>())
       if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-        processREPLTopLevelPatternBinding(PBD, this, SF);
+        RC.processREPLTopLevelPatternBinding(PBD);
   }
 }
 
