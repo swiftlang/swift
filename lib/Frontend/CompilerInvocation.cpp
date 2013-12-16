@@ -64,10 +64,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.PrintStats = true;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_help, OPT__help_hidden)) {
+  if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
       Opts.PrintHelp = true;
-    } else if (A->getOption().matches(OPT__help_hidden)) {
+    } else if (A->getOption().matches(OPT_help_hidden)) {
       Opts.PrintHelpHidden = true;
     } else {
       llvm_unreachable("Unknown help option parsed");

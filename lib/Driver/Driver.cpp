@@ -290,7 +290,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     return false;
   }
 
-  if (Args.hasArg(options::OPT__help_hidden)) {
+  if (Args.hasArg(options::OPT_help_hidden)) {
     printHelp(true);
     return false;
   }
