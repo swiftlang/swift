@@ -379,6 +379,7 @@ public:
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
@@ -1770,6 +1771,7 @@ public:
   void dump() const;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                                        SILParameterInfo type) {
     type.print(out);
@@ -1849,6 +1851,7 @@ public:
   void dump() const;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                                        SILResultInfo type) {
     type.print(out);

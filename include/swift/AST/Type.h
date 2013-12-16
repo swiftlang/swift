@@ -25,6 +25,7 @@
 
 namespace swift {
 
+class ASTPrinter;
 class ArchetypeType;
 class ASTContext;
 class LazyResolver;
@@ -106,6 +107,7 @@ public:
   void dump() const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExprHandle.h"
@@ -59,9 +60,14 @@ void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
-void TypeRepr::print(raw_ostream &OS) const {
+void TypeRepr::print(raw_ostream &OS, const PrintOptions &Opts) const {
+  StreamPrinter Printer(OS);
+  print(Printer, Opts);
+}
+
+void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   if (this == nullptr) {
-    OS << "<null>";
+    Printer << "<null>";
     return;
   }
 
@@ -69,36 +75,44 @@ void TypeRepr::print(raw_ostream &OS) const {
 #define TYPEREPR(CLASS, PARENT) \
   case TypeReprKind::CLASS: { \
     auto Ty = static_cast<const CLASS##TypeRepr*>(this); \
-    return Ty->printImpl(OS); \
+    return Ty->printImpl(Printer, Opts); \
   }
 #include "swift/AST/TypeReprNodes.def"
   }
   llvm_unreachable("unknown kind!");
 }
 
-void ErrorTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << "<<error type>>";
+void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  Printer << "<<error type>>";
 }
 
-void AttributedTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  printAttrs(OS);
-  OS << ' ' << Ty;
+void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
+                                   const PrintOptions &Opts) const {
+  printAttrs(Printer);
+  Printer << " ";
+  Ty->print(Printer, Opts);
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
+  StreamPrinter Printer(OS);
+  printAttrs(Printer);
+}
+
+void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
-  if (Attrs.has(TAK_inout))        OS << "@inout ";
-  if (Attrs.has(TAK_auto_closure)) OS << "@auto_closure ";
-  if (Attrs.has(TAK_thin))         OS << "@thin ";
-  if (Attrs.has(TAK_noreturn))     OS << "@noreturn ";
-  if (Attrs.has(TAK_objc_block))   OS << "@objc_block ";
+  if (Attrs.has(TAK_inout))        Printer << "@inout ";
+  if (Attrs.has(TAK_auto_closure)) Printer << "@auto_closure ";
+  if (Attrs.has(TAK_thin))         Printer << "@thin ";
+  if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";
+  if (Attrs.has(TAK_objc_block))   Printer << "@objc_block ";
   if (Attrs.cc.hasValue()) {
     switch (Attrs.cc.getValue()) {
-    case AbstractCC::C:             OS << "@cc(cdecl)"; break;
-    case AbstractCC::ObjCMethod:    OS << "@cc(objc_method)"; break;
-    case AbstractCC::Freestanding:  OS << "@cc(freestanding)"; break;
-    case AbstractCC::Method:        OS << "@cc(method)"; break;
-    case AbstractCC::WitnessMethod: OS << "@cc(witness_method)"; break;
+    case AbstractCC::C:             Printer << "@cc(cdecl)"; break;
+    case AbstractCC::ObjCMethod:    Printer << "@cc(objc_method)"; break;
+    case AbstractCC::Freestanding:  Printer << "@cc(freestanding)"; break;
+    case AbstractCC::Method:        Printer << "@cc(method)"; break;
+    case AbstractCC::WitnessMethod: Printer << "@cc(witness_method)"; break;
     }
   }
 }
@@ -114,45 +128,66 @@ IdentTypeRepr *IdentTypeRepr::createSimple(ASTContext &C, SourceLoc Loc,
   return create(C, llvm::makeArrayRef(IdTypeComponent));
 }
 
-static void printGenericArgs(raw_ostream &OS, ArrayRef<TypeRepr *> Args) {
+static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
+                             ArrayRef<TypeRepr *> Args) {
   if (Args.empty())
     return;
 
-  OS << '<';
+  Printer << "<";
   bool First = true;
   for (auto Arg : Args) {
     if (First)
       First = false;
     else
-      OS << ", ";
-    OS << Arg;
+      Printer << ", ";
+    Arg->print(Printer, Opts);
   }
-  OS << '>';
+  Printer << ">";
 }
 
-void IdentTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << Components[0].getIdentifier();
-  printGenericArgs(OS, Components[0].getGenericArgs());
+void IdentTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  bool isFirst = true;
+  for (const Component &C : Components) {
+    if (!isFirst)
+      Printer << ".";
+    else
+      isFirst = false;
 
-  for (const Component &C : Components.slice(1, Components.size()-1)) {
-    OS << '.' << C.getIdentifier().get();
-    printGenericArgs(OS, C.getGenericArgs());
+    if (Module *Mod = C.getBoundModule()) {
+      Printer.printModuleRef(Mod, C.getIdentifier().str());
+    } else if (Type Ty = C.getBoundType()) {
+      if (auto NTD = Ty->getAnyNominal())
+        Printer.printTypeRef(NTD, C.getIdentifier().str());
+      else
+        Printer << C.getIdentifier().str();
+    } else {
+      Printer << C.getIdentifier().str();
+    }
+    printGenericArgs(Printer, Opts, C.getGenericArgs());
   }
 }
 
-void FunctionTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << ArgsTy << " -> " << RetTy;
+void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
+                                 const PrintOptions &Opts) const {
+  ArgsTy->print(Printer, Opts);
+  Printer << " -> ";
+  RetTy->print(Printer, Opts);
 }
 
-void ArrayTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << Base << '[';
+void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  Base->print(Printer, Opts);
+  Printer << "[";
   if (Size)
-    Size->getExpr()->print(OS);
-  OS << ']';
+    Size->getExpr()->print(Printer, Opts);
+  Printer << "]";
 }
 
-void OptionalTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << Base << '?';
+void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
+                                 const PrintOptions &Opts) const {
+  Base->print(Printer, Opts);
+  Printer << "?";
 }
 
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
@@ -163,22 +198,24 @@ TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
                                Parens, Ellipsis);
 }
 
-void TupleTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << '(';
+void TupleTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  Printer << "(";
 
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (i) OS << ", ";
-    OS << Elements[i];
+    if (i) Printer << ", ";
+    Elements[i]->print(Printer, Opts);
   }
   if (hasEllipsis())
-    OS << "...";
-  OS << ')';
+    Printer << "...";
+  Printer << ")";
 }
 
-void NamedTypeRepr::printImpl(llvm::raw_ostream &OS) const {
+void NamedTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
   if (!Id.empty())
-    OS << Id << " : ";
-  OS << Ty;
+    Printer << Id.str() << " : ";
+  Ty->print(Printer, Opts);
 }
 
 ProtocolCompositionTypeRepr *
@@ -190,19 +227,22 @@ ProtocolCompositionTypeRepr::create(ASTContext &C,
                                              ProtocolLoc, AngleBrackets);
 }
 
-void ProtocolCompositionTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << "protocol<";
+void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
+                                            const PrintOptions &Opts) const {
+  Printer << "protocol<";
   bool First = true;
   for (auto Proto : Protocols) {
     if (First)
       First = false;
     else
-      OS << ", ";
-    OS << Proto;
+      Printer << ", ";
+    Proto->print(Printer, Opts);
   }
-  OS << '>';
+  Printer << ">";
 }
 
-void MetaTypeTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << Base << ".metatype";
+void MetaTypeTypeRepr::printImpl(ASTPrinter &Printer,
+                                 const PrintOptions &Opts) const {
+  Base->print(Printer, Opts);
+  Printer << ".metatype";
 }

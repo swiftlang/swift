@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
@@ -325,7 +326,20 @@ void DiagnosticEngine::flushActiveDiagnostic() {
       // so we can point to it.
       SourceLoc ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
       if (ppLoc.isInvalid()) {
-        SmallVector<std::pair<Decl *, uint64_t>, 8> entries;
+        class TrackingPrinter : public StreamPrinter {
+          SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries;
+
+        public:
+          TrackingPrinter(
+              SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries,
+              raw_ostream &OS) :
+            StreamPrinter(OS), Entries(Entries) {}
+
+          void printDeclLoc(const Decl *D) override {
+            Entries.push_back({ D, OS.tell() });
+          }
+        };
+        SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
         llvm::SmallString<128> buffer;
         llvm::SmallString<128> bufferName;
         {
@@ -397,7 +411,8 @@ void DiagnosticEngine::flushActiveDiagnostic() {
 
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
-          ppDecl->print(out, options, &entries);
+          TrackingPrinter printer(entries, out);
+          ppDecl->print(printer, options);
         }
 
         // Build a buffer with the pretty-printed declaration.

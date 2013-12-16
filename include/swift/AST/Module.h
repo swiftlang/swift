@@ -639,8 +639,9 @@ public:
 
   /// \brief Pretty-print the contents of this source file.
   ///
-  /// \param OS The stream to which the contents will be printed.
+  /// \param Printer The AST printer used for printing the contents.
   /// \param PO Options controlling the printing process.
+  void print(ASTPrinter &Printer, const PrintOptions &PO);
   void print(raw_ostream &OS, const PrintOptions &PO);
 
   static bool classof(const FileUnit *file) {

@@ -201,6 +201,7 @@ public:
       "only for use within the debugger");
   void dump(raw_ostream &OS) const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.

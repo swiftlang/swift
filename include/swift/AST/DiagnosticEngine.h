@@ -325,7 +325,7 @@ namespace swift {
 
     /// \brief The set of declarations for which we have pretty-printed
     /// results that we can point to on the command line.
-    llvm::DenseMap<Decl *, SourceLoc> PrettyPrintedDeclarations;
+    llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
 
     friend class InFlightDiagnostic;
     

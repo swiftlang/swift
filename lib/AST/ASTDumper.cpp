@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
@@ -1444,6 +1445,14 @@ void Expr::dump() const {
 
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
   PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
+}
+
+void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  // FIXME: Fully use the ASTPrinter.
+  llvm::SmallString<128> Str;
+  llvm::raw_svector_ostream OS(Str);
+  print(OS);
+  Printer << OS.str();
 }
 
 //===----------------------------------------------------------------------===//

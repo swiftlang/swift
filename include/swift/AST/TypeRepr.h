@@ -73,7 +73,8 @@ public:
   void operator delete(void *data) = delete;
   void *operator new(size_t bytes, void *data) = delete;
 
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
   void dump() const;
 };
 
@@ -100,7 +101,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Range.Start; }
   SourceLoc getEndLocImpl() const { return Range.End; }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -122,6 +123,7 @@ public:
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;
+  void printAttrs(ASTPrinter &Printer) const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Attributed;
@@ -131,7 +133,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Attrs.AtLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -214,7 +216,7 @@ private:
       return Components.back().getGenericArgs().back()->getEndLoc();
     return Components.back().getIdLoc();
   }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -246,7 +248,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -285,7 +287,7 @@ private:
       return Base->getEndLoc();
     return Brackets.End;
   }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -312,7 +314,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return QuestionLoc; }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -353,7 +355,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Parens.Start; }
   SourceLoc getEndLocImpl() const { return Parens.End; }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -383,7 +385,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return IdLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -421,7 +423,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return ProtocolLoc; }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -449,7 +451,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return MetaLoc; }
-  void printImpl(llvm::raw_ostream &OS) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 

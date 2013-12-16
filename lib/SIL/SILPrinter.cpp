@@ -1251,7 +1251,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&
           !D->isImplicit()) {
-        D->print(OS, Options, nullptr);
+        D->print(OS, Options);
         OS << "\n\n";
       }
     }

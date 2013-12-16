@@ -16,11 +16,12 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+class ASTPrinter;
 class Module;
 struct PrintOptions;
 
-void printModuleInterface(Module *M, raw_ostream &OS,
-                          const PrintOptions &Options);
+void printModuleInterface(Module *M, ASTPrinter &Printer,
+	                      const PrintOptions &Options);
 
 } // namespace swift
 

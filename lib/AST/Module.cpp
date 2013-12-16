@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/LazyResolver.h"
@@ -1057,12 +1058,17 @@ bool Module::walk(ASTWalker &Walker) {
 //===----------------------------------------------------------------------===//
 
 void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
+  StreamPrinter Printer(OS);
+  print(Printer, PO);
+}
+
+void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   for (auto decl : Decls) {
     if (!decl->shouldPrintInContext(PO))
       continue;
 
-    decl->print(OS, PO);
-    OS << "\n";
+    decl->print(Printer, PO);
+    Printer << "\n";
   }
 }
 
