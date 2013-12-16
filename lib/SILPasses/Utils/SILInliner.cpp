@@ -147,8 +147,8 @@ void SILInliner::visitSILBasicBlock(SILBasicBlock* BB) {
 
   // Iterate over successors to do the depth-first search.
   for (auto &Succ : BB->getSuccs()) {
-    assert (Succ.getBB() != CalleeEntryBB &&
-            "Entry block should not be a successor when inlining");
+    assert(Succ.getBB() != CalleeEntryBB &&
+           "Entry block should not be a successor when inlining");
     SILBasicBlock *&MappedBB = BBMap[Succ];
 
     // If we have already cloned the given successor, skip it.
