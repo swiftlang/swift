@@ -605,7 +605,7 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
     auto &TL = SGF.getTypeLowering(VD->getType());
     // The value must be copied for the duration of the expression.
-    V = TL.emitLoweredCopyValue(SGF.B, E, V, false);
+    V = TL.emitCopyValue(SGF.B, E, V);
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(V, TL));
   }
 

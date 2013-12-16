@@ -336,7 +336,7 @@ public:
       if (!GetGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
-      Generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/true,
+      Generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                            S->getInLoc(),
                                      TC.Context.getIdentifier("$generator"),
                                      GeneratorTy, DC);

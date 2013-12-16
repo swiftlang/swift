@@ -1371,7 +1371,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = Loc;
     VarDecl *var = new (Context) VarDecl(/*static*/ false,
-                                         /*IsLet*/ true,
+                                         /*IsLet*/ false,
                                          varLoc, ident, Type(), closure);
     decls.push_back(var);
   }
