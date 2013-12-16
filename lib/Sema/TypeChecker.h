@@ -613,6 +613,7 @@ public:
   ///
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
+  static void contextualizeTopLevelCode(ArrayRef<Decl*> topLevelDecls);
 
   /// Return the type-of-reference of the given value.  This does not
   /// open values of polymorphic function type.

@@ -42,6 +42,13 @@ namespace {
   public:
     ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
 
+    /// Change the context we're contextualizing to.  This is
+    /// basically only reasonable when processing all the different
+    /// top-level code declarations.
+    void setContext(TopLevelCodeDecl *parent) {
+      ParentDC = parent;
+    }
+
     bool hasAutoClosures() const {
       return NextDiscriminator != 0;
     }
@@ -100,6 +107,16 @@ bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
   ContextualizeClosures CC(DC);
   E->walk(CC);
   return CC.hasAutoClosures();
+}
+
+void TypeChecker::contextualizeTopLevelCode(ArrayRef<Decl*> topLevel) {
+  ContextualizeClosures CC(nullptr);
+  for (auto decl : topLevel) {
+    auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
+    if (!topLevelCode) continue;
+    CC.setContext(topLevelCode);
+    topLevelCode->getBody()->walk(CC);
+  }
 }
 
 namespace {
@@ -840,7 +857,10 @@ void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+  // We intentionally use typeCheckStmt instead of typeCheckBody here
+  // because we want to contextualize all the TopLevelCode
+  // declarations simultaneously.
   BraceStmt *Body = TLCD->getBody();
-  StmtChecker(*this, TLCD).typeCheckBody(Body);
+  StmtChecker(*this, TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
 }

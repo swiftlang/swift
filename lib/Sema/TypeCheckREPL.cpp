@@ -566,9 +566,11 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   TC.typeCheckPattern(ParamPat,
                       Arg->getDeclContext(),
                       /*allowUnknownTypes*/false);
+
+  TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
   ClosureExpr *CE =
       new (Context) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
-                                /*discriminator*/ 0, &SF);
+                                /*discriminator*/ 0, newTopLevel);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context),
                                   Context);
@@ -608,7 +610,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
                                EndLoc);
-  SF.Decls.push_back(new (Context) TopLevelCodeDecl(&SF, BS));
+  newTopLevel->setBody(BS);
+  SF.Decls.push_back(newTopLevel);
 }
 
 /// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
@@ -761,5 +764,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
       if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
         RC.processREPLTopLevelPatternBinding(PBD);
   }
+
+  contextualizeTopLevelCode(llvm::makeArrayRef(SF.Decls).slice(FirstDecl));
 }
 

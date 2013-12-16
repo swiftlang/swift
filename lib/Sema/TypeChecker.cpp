@@ -591,14 +591,19 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
 
+  bool hasTopLevelCode = false;
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      hasTopLevelCode = true;
       // Immediately perform global name-binding etc.
       TC.typeCheckTopLevelCodeDecl(TLCD);
     } else {
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
   }
+
+  if (hasTopLevelCode)
+    TC.contextualizeTopLevelCode(llvm::makeArrayRef(SF.Decls).slice(StartElem));
 
 #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE) \
   if (Module *module = SF.getASTContext().LoadedModules.lookup(#BRIDGED_MOD)) {\
