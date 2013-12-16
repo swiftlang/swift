@@ -239,6 +239,192 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
 }
 
 namespace {
+  enum class OptionSetFactoryMethod {
+    FromRaw,
+    FromMask,
+  };
+}
+
+/// Build the 'fromMask' or 'fromRaw' method for an option set.
+/// struct NSSomeOptionSet : RawOptionSet {
+///   var value : RawType
+///   static func fromMask(value: RawType) -> NSSomeOptionSet {
+///     return NSSomeOptionSet(value)
+///   }
+///   static func fromRaw(value: RawType) -> NSSomeOptionSet? {
+///     return NSSomeOptionSet(value)
+///   }
+/// }
+static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
+                                      VarDecl *valueDecl,
+                                      OptionSetFactoryMethod factoryMethod) {
+  auto &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+  auto rawType = valueDecl->getType();
+  
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
+                                      SourceLoc(),
+                                      C.SelfIdentifier,
+                                      Type(),
+                                      optionSetDecl);
+  selfDecl->setImplicit();
+  auto metaTy = MetaTypeType::get(optionSetType, C);
+  selfDecl->setType(metaTy);
+
+  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
+  selfParam->setType(metaTy);
+  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
+  selfParam->setImplicit();
+  selfParam->setType(metaTy);
+
+  VarDecl * rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
+                                      SourceLoc(),
+                                      C.getIdentifier("raw"),
+                                      Type(),
+                                      optionSetDecl);
+  rawDecl->setImplicit();
+  rawDecl->setType(rawType);
+  Pattern *rawParam = new (C) NamedPattern(rawDecl, /*implicit*/ true);
+  rawParam->setType(rawType);
+  rawParam = new (C) TypedPattern(rawParam, TypeLoc::withoutLoc(rawType));
+  rawParam->setImplicit();
+  rawParam->setType(rawType);
+  auto rawArgType = TupleType::get(TupleTypeElt(rawType,
+                                                C.getIdentifier("raw")), C);
+  rawParam = TuplePattern::create(C, SourceLoc(),
+                                  TuplePatternElt(rawParam), SourceLoc());
+  rawParam->setImplicit();
+  rawParam->setType(rawArgType);
+
+  Pattern *argParams[] = {selfParam->clone(C, /*Implicit=*/true),
+                          rawParam->clone(C, /*Implicit=*/true)};
+  Pattern *bodyParams[] = {selfParam, rawParam};
+  
+  Type retType;
+  switch (factoryMethod) {
+  case OptionSetFactoryMethod::FromMask:
+    retType = optionSetType;
+    break;
+  case OptionSetFactoryMethod::FromRaw:
+    retType = OptionalType::get(optionSetType, C);
+    break;
+  }
+  
+  Identifier name;
+  switch (factoryMethod) {
+  case OptionSetFactoryMethod::FromMask:
+    name = C.getIdentifier("fromMask");
+    break;
+  case OptionSetFactoryMethod::FromRaw:
+    name = C.getIdentifier("fromRaw");
+    break;
+  }
+  
+  auto factoryDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
+                                      name,
+                                      SourceLoc(), nullptr, Type(),
+                                      argParams,
+                                      bodyParams,
+                                      TypeLoc::withoutLoc(retType),
+                                      optionSetDecl);
+  
+  factoryDecl->setStatic();
+  factoryDecl->setImplicit();
+  selfDecl->setDeclContext(factoryDecl);
+  rawDecl->setDeclContext(factoryDecl);
+  
+  Type factoryType = FunctionType::get(rawArgType, retType, C);
+  factoryType = FunctionType::get(metaTy, factoryType, C);
+  factoryDecl->setType(factoryType);
+  factoryDecl->setBodyResultType(retType);
+
+  auto *ctorRef = new (C) DeclRefExpr(ConcreteDeclRef(optionSetDecl),
+                                      SourceLoc(), /*implicit*/ true);
+  auto *rawRef = new (C) DeclRefExpr(ConcreteDeclRef(rawDecl),
+                                     SourceLoc(), /*implicit*/ true);
+  auto *ctorCall = new (C) CallExpr(ctorRef, rawRef,
+                                    /*implicit*/ true);
+  auto *ctorRet = new (C) ReturnStmt(SourceLoc(), ctorCall,
+                                     /*implicit*/ true);
+  
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(ctorRet),
+                                SourceLoc(),
+                                /*implicit*/ true);
+  
+  factoryDecl->setBody(body);
+  
+  // Add as an external definition.
+  C.addedExternalDecl(factoryDecl);
+  
+  return factoryDecl;
+}
+
+// Build the 'toRaw' method for an option set.
+// struct NSSomeOptionSet : RawOptionSet {
+//   var value: RawType
+//   func toRaw() -> RawType {
+//     return self.value
+//   }
+// }
+static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
+                                          ValueDecl *valueDecl) {
+  ASTContext &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+  auto rawType = valueDecl->getType();
+
+  auto lvType = LValueType::get(optionSetType,
+                                LValueType::Qual::DefaultForInOutSelf, C);
+  
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
+                                      SourceLoc(),
+                                      C.SelfIdentifier,
+                                      Type(),
+                                      optionSetDecl);
+  selfDecl->setImplicit();
+  selfDecl->setType(lvType);
+  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
+  selfParam->setType(lvType);
+  selfParam = new (C) TypedPattern(selfParam,
+                                   TypeLoc::withoutLoc(optionSetType));
+  selfParam->setType(lvType);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+  
+  FuncDecl *toRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
+                               C.getIdentifier("toRaw"),
+                               SourceLoc(), nullptr, Type(),
+                               params, params,
+                               TypeLoc::withoutLoc(rawType), optionSetDecl);
+  toRawDecl->setImplicit();
+  
+  auto toRawArgType = TupleType::getEmpty(C);
+  Type toRawType = FunctionType::get(toRawArgType, rawType, C);
+  toRawType = FunctionType::get(lvType, toRawType, C);
+  toRawDecl->setType(toRawType);
+  toRawDecl->setBodyResultType(rawType);
+  
+  selfDecl->setDeclContext(toRawDecl);
+
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                        valueDecl, SourceLoc(),
+                                        /*implicit*/ true);
+  auto valueRet = new (C) ReturnStmt(SourceLoc(), valueRef);
+  
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(valueRet),
+                                SourceLoc(),
+                                /*implicit*/ true);
+  toRawDecl->setBody(body);
+  
+  // Add as an external definition.
+  C.addedExternalDecl(toRawDecl);
+
+  return toRawDecl;
+}
+
+namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
   /// \brief Convert Clang declarations into the corresponding Swift
@@ -693,10 +879,30 @@ namespace {
         Decl *varDecl = var;
         auto constructor = createValueConstructor(structDecl, {&varDecl, 1});
 
+        // Build a RawOptionSet conformance for the type.
+        ProtocolDecl *rawOptionSet = Impl.SwiftContext
+          .getProtocol(KnownProtocolKind::RawOptionSet);
+        auto protoList = Impl.SwiftContext.AllocateCopy(
+                                          llvm::makeArrayRef(rawOptionSet));
+        structDecl->setProtocols(protoList);
+
+        auto fromMask = makeOptionSetFactoryMethod(structDecl, var,
+                                             OptionSetFactoryMethod::FromMask);
+        auto fromRaw = makeOptionSetFactoryMethod(structDecl, var,
+                                            OptionSetFactoryMethod::FromRaw);
+        auto toRaw = makeOptionSetToRawMethod(structDecl, var);
+        
         // Set the members of the struct.
-        Decl *members[3] = { constructor, patternBinding, var };
+        Decl *members[] = {
+          constructor,
+          patternBinding,
+          var,
+          fromMask,
+          fromRaw,
+          toRaw,
+        };
         structDecl->setMembers(
-          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members, 3)),
+          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members)),
           SourceRange());
 
         result = structDecl;

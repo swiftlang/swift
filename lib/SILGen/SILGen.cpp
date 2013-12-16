@@ -266,7 +266,8 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
       isa<SubscriptDecl>(d) ||
       isa<EnumElementDecl>(d) ||
       (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed()) ||
-      (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext()))))
+      (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext())) ||
+      (isa<FuncDecl>(d) && isa<StructDecl>(d->getDeclContext()))))
     return SILLinkage::Thunk;
   
   // Otherwise, we have external linkage.

@@ -945,6 +945,7 @@ namespace index_block {
     DynamicLookup,
     RawRepresentable,
     Generator,
+    RawOptionSet,
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<

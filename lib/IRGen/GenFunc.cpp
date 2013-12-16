@@ -479,6 +479,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                              IGM.getPointerSize(),
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
+  
   // FIXME: thin
   return FuncTypeInfo::create(CanSILFunctionType(T), IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,

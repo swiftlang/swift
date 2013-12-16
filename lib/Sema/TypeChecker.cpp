@@ -671,7 +671,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();
-                  currentExternalDef != n;
+         currentExternalDef != n;
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
 
