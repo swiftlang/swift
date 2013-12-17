@@ -32,6 +32,7 @@ namespace swift {
 class ArchetypeBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
+class TopLevelContext;
 class TypeChecker;
 
 namespace constraints {
@@ -407,7 +408,8 @@ public:
 
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
+  void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
+                           unsigned StartElem);
   Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
@@ -613,7 +615,8 @@ public:
   ///
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
-  static void contextualizeTopLevelCode(ArrayRef<Decl*> topLevelDecls);
+  static void contextualizeTopLevelCode(TopLevelContext &TLC,
+                                        ArrayRef<Decl*> topLevelDecls);
 
   /// Return the type-of-reference of the given value.  This does not
   /// open values of polymorphic function type.

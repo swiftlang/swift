@@ -1250,12 +1250,8 @@ Expr *Parser::parseExprClosure() {
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
-  // TODO: what should we do for discriminators when we're in a
-  // non-local context, e.g. in a field initializer or default argument?
-  unsigned discriminator = ClosureExpr::InvalidDiscriminator;
-  if (CurLocalContext) {
-    discriminator = CurLocalContext->claimNextClosureDiscriminator();
-  }
+  assert(CurLocalContext && "parsing expression in non-local context?");
+  unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
   ClosureExpr *closure = new (Context) ClosureExpr(params, arrowLoc,

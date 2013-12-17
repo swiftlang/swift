@@ -932,12 +932,14 @@ private:
 
   REPLInput Input;
   REPLContext RC;
+  PersistentParserState PersistentState;
 
 private:
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
-    bool ShouldRun = swift::appendToREPLFile(REPLInputFile, RC, InputBuf);
+    bool ShouldRun = swift::appendToREPLFile(REPLInputFile, PersistentState,
+                                             RC, InputBuf);
     
     // SILGen the module and produce SIL diagnostics.
     std::unique_ptr<SILModule> sil;
@@ -1071,7 +1073,7 @@ public:
     static const char WarmUpStmt[] = "Void()\n";
 
     swift::appendToREPLFile(
-        REPLInputFile, RC,
+        REPLInputFile, PersistentState, RC,
         llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                              "<REPL Initialization>"));
     if (CI.getASTContext().hadError())

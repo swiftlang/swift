@@ -654,9 +654,10 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
   case DeclContextKind::AbstractClosureExpr: {
     auto *ACE = cast<AbstractClosureExpr>(dc);
     if (isa<ClosureExpr>(ACE))
-      os << "explicit closure";
+      os << "explicit closure discriminator=";
     if (isa<AutoClosureExpr>(ACE))
-      os << "auto_closure";
+      os << "auto_closure discriminator=";
+    os << ACE->getDiscriminator();
     break;
   }
 
@@ -1267,6 +1268,7 @@ public:
 
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
+    OS << " discriminator=" << E->getDiscriminator();
     if (!E->getCaptureInfo().empty()) {
       OS << " ";
       E->getCaptureInfo().print(OS);

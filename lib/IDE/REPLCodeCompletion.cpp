@@ -134,7 +134,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
                         DelayedCB.get());
-    performTypeChecking(SF, CurElem);
+    performTypeChecking(SF, PersistentState.getTopLevelContext(), CurElem);
     CurElem = SF.Decls.size();
   } while (!Done);
 

@@ -25,12 +25,13 @@ namespace llvm {
 }
 
 namespace swift {
+  class PersistentParserState;
   class REPLContext;
   class SILModule;
   class SourceFile;
 
-  bool appendToREPLFile(SourceFile &SF, REPLContext &RC,
-                        llvm::MemoryBuffer *Buffer);
+  bool appendToREPLFile(SourceFile &SF, PersistentParserState &State,
+                        REPLContext &RC, llvm::MemoryBuffer *Buffer);
 
   bool runSILDiagnosticPasses(SILModule &Module);
 

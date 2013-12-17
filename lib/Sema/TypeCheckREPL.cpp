@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Parse/LocalContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -527,8 +528,10 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 
 namespace {
   class REPLChecker : public REPLContext {
+    TopLevelContext &TLC;
   public:
-    REPLChecker(TypeChecker &TC, SourceFile &SF) : REPLContext(TC, SF) {}
+    REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
+      : REPLContext(TC, SF), TLC(TLC) {}
 
     void processREPLTopLevelExpr(Expr *E);
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
@@ -568,9 +571,11 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
                       /*allowUnknownTypes*/false);
 
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
+  unsigned discriminator = TLC.claimNextClosureDiscriminator();
+
   ClosureExpr *CE =
       new (Context) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
-                                /*discriminator*/ 0, newTopLevel);
+                                discriminator, newTopLevel);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context),
                                   Context);
@@ -738,13 +743,14 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
+                                      unsigned FirstDecl) {
   // Loop over all of the new decls, moving them out of the Decls list, then
   // adding them back (with modifications) one at a time.
   std::vector<Decl*> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
   SF.Decls.resize(FirstDecl);
 
-  REPLChecker RC(*this, SF);
+  REPLChecker RC(*this, SF, TLC);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.
@@ -765,6 +771,6 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
         RC.processREPLTopLevelPatternBinding(PBD);
   }
 
-  contextualizeTopLevelCode(llvm::makeArrayRef(SF.Decls).slice(FirstDecl));
+  contextualizeTopLevelCode(TLC, llvm::makeArrayRef(SF.Decls).slice(FirstDecl));
 }
 

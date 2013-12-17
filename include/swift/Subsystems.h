@@ -43,6 +43,7 @@ namespace swift {
   class SourceFile;
   class SourceManager;
   class Token;
+  class TopLevelContext;
   struct TypeLoc;
 
   namespace irgen {
@@ -121,7 +122,8 @@ namespace swift {
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
   ///                  source file.
-  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
+  void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
+                           unsigned StartElem = 0);
 
   /// \brief Recursively validate the specified type.
   ///

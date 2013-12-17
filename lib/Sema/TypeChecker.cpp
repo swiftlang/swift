@@ -462,7 +462,8 @@ static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
   return lhs->getAttrs().isPrefix() != rhs->getAttrs().isPrefix();
 }
 
-void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
+                                unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -602,8 +603,10 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
     }
   }
 
-  if (hasTopLevelCode)
-    TC.contextualizeTopLevelCode(llvm::makeArrayRef(SF.Decls).slice(StartElem));
+  if (hasTopLevelCode) {
+    TC.contextualizeTopLevelCode(TLC,
+                           llvm::makeArrayRef(SF.Decls).slice(StartElem));
+  }
 
 #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE) \
   if (Module *module = SF.getASTContext().LoadedModules.lookup(#BRIDGED_MOD)) {\
@@ -623,7 +626,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
   if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
-    TC.processREPLTopLevel(SF, StartElem);
+    TC.processREPLTopLevel(SF, TLC, StartElem);
 
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for source files with multiple chunks.

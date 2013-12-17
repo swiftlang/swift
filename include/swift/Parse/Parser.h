@@ -21,6 +21,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
@@ -87,38 +88,6 @@ public:
 
   bool GreaterThanIsOperator = true;
 
-  /// Information associated with parsing a local context.
-  class LocalContext {
-    /// A map holding the next discriminator for declarations with
-    /// various identifiers.
-    llvm::DenseMap<Identifier, unsigned> LocalDiscriminators;
-
-    /// The next discriminator for an explicit closure expression.
-    unsigned NextClosureDiscriminator = 0;
-
-  public:
-    /// Return a number that'll be unique in this context across all
-    /// declarations with the given name.
-    unsigned claimNextNamedDiscriminator(Identifier name) {
-      assert(!name.empty() &&
-             "setting a local discriminator on an anonymous decl; "
-             "maybe the name hasn't been set yet?");
-      return LocalDiscriminators[name]++;
-    }
-
-    /// Return a number that'll be unique in this context across all
-    /// explicit anonymous closure expressions.
-    unsigned claimNextClosureDiscriminator() {
-      return NextClosureDiscriminator++;
-    }
-
-    /// True if we saw any anonymous closures.  This is useful when
-    /// parsing an initializer context, because such contexts only
-    /// need to exist if the initializer contains closures.
-    bool hasClosures() const { return NextClosureDiscriminator != 0; }    
-  };
-
-  LocalContext TopLevelCodeContext;
   LocalContext *CurLocalContext = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;

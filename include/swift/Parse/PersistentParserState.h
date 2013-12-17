@@ -18,6 +18,7 @@
 #define SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/LocalContext.h"
 #include "swift/Parse/Scope.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -91,6 +92,9 @@ private:
 
   std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
 
+  /// The local context for all top-level code.
+  TopLevelContext TopLevelCode;
+
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
 
@@ -120,6 +124,10 @@ public:
   }
   std::unique_ptr<DelayedDeclState> takeDelayedDeclState() {
     return std::move(CodeCompletionDelayedDeclState);
+  }
+
+  TopLevelContext &getTopLevelContext() {
+    return TopLevelCode;
   }
 
   void markParserPosition(SourceLoc Loc, SourceLoc PrevLoc) {

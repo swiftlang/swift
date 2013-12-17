@@ -28,6 +28,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/LocalContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -37,10 +38,13 @@ using namespace swift;
 
 namespace {
   class ContextualizeClosures : public ASTWalker {
-    unsigned NextDiscriminator = 0;
     DeclContext *ParentDC;
   public:
-    ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
+    unsigned NextDiscriminator = 0;
+
+    ContextualizeClosures(DeclContext *parent,
+                          unsigned nextDiscriminator = 0)
+      : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
 
     /// Change the context we're contextualizing to.  This is
     /// basically only reasonable when processing all the different
@@ -109,14 +113,19 @@ bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
   return CC.hasAutoClosures();
 }
 
-void TypeChecker::contextualizeTopLevelCode(ArrayRef<Decl*> topLevel) {
-  ContextualizeClosures CC(nullptr);
+void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
+                                            ArrayRef<Decl*> topLevel) {
+  unsigned nextDiscriminator = TLC.NextAutoClosureDiscriminator;
+  ContextualizeClosures CC(nullptr, nextDiscriminator);
   for (auto decl : topLevel) {
     auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
     if (!topLevelCode) continue;
     CC.setContext(topLevelCode);
     topLevelCode->getBody()->walk(CC);
   }
+  assert(nextDiscriminator == TLC.NextAutoClosureDiscriminator &&
+         "reentrant/concurrent invocation of contextualizeTopLevelCode?");
+  TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
 }
 
 namespace {

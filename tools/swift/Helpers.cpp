@@ -21,8 +21,9 @@
 #include "swift/SILPasses/Passes.h"
 using namespace swift;
 
-bool swift::appendToREPLFile(SourceFile &SF, REPLContext &RC,
-                             llvm::MemoryBuffer *Buffer) {
+bool swift::appendToREPLFile(SourceFile &SF,
+                             PersistentParserState &PersistentState,
+                             REPLContext &RC, llvm::MemoryBuffer *Buffer) {
   assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   SourceManager &SrcMgr = SF.getParentModule()->Ctx.SourceMgr;
@@ -30,13 +31,12 @@ bool swift::appendToREPLFile(SourceFile &SF, REPLContext &RC,
   
   bool FoundAnySideEffects = false;
   unsigned CurElem = RC.CurElem;
-  PersistentParserState PersistentState;
   bool Done;
   do {
     FoundAnySideEffects |=
         parseIntoSourceFile(SF, RC.CurBufferID, &Done, nullptr,
                             &PersistentState);
-    performTypeChecking(SF, CurElem);
+    performTypeChecking(SF, PersistentState.getTopLevelContext(), CurElem);
     CurElem = SF.Decls.size();
   } while (!Done);
   return FoundAnySideEffects;
