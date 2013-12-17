@@ -1724,15 +1724,28 @@ void swift::printModuleInterface(Module *M, ASTPrinter &Printer,
             [](Decl *LHS, Decl *RHS) {
     auto *LHSValue = dyn_cast<ValueDecl>(LHS);
     auto *RHSValue = dyn_cast<ValueDecl>(RHS);
-    if (!LHSValue || !RHSValue) {
+    if (LHSValue && RHSValue) {
+      StringRef LHSName = LHSValue->getName().str();
+      StringRef RHSName = RHSValue->getName().str();
+      if (int Ret = LHSName.compare(RHSName))
+        return Ret < 0;
+      // FIXME: this is not sufficient to establish a total order for overloaded
+      // decls.
       return LHS->getKind() < RHS->getKind();
     }
-    StringRef LHSName = LHSValue->getName().str();
-    StringRef RHSName = RHSValue->getName().str();
-    if (int Ret = LHSName.compare(RHSName))
-      return Ret < 0;
-    // FIXME: this is not sufficient to establish a total order for overloaded
-    // decls.
+
+    auto *LHSImport = dyn_cast<ImportDecl>(LHS);
+    auto *RHSImport = dyn_cast<ImportDecl>(RHS);
+    if (LHSImport && RHSImport) {
+      auto LHSPath = LHSImport->getFullAccessPath();
+      auto RHSPath = RHSImport->getFullAccessPath();
+      for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size());
+           i != e; i++) {
+        if (int Ret = LHSPath[i].first.str().compare(RHSPath[i].first.str()))
+          return Ret < 0;
+      }
+      return LHSPath.size() < RHSPath.size();
+    }
     return LHS->getKind() < RHS->getKind();
   });
 
