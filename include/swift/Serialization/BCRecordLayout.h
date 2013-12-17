@@ -228,10 +228,19 @@ namespace impl {
 
     template <typename ElementTy, typename FirstData, typename... Data>
     static void read(ArrayRef<ElementTy> buffer,
-                     FirstData &data, Data &... rest) {
+                     FirstData &data, Data &&...rest) {
       assert(!buffer.empty() && "too few elements in buffer");
       data = First::convert(buffer.front());
-      BCRecordCoding<Fields...>::read(buffer.slice(1), rest...);
+      BCRecordCoding<Fields...>::read(buffer.slice(1),
+                                      std::forward<Data>(rest)...);
+    }
+
+    template <typename ElementTy, typename... Data>
+    static void read(ArrayRef<ElementTy> buffer,
+                     Nothing_t, Data &&...rest) {
+      assert(!buffer.empty() && "too few elements in buffer");
+      BCRecordCoding<Fields...>::read(buffer.slice(1),
+                                      std::forward<Data>(rest)...);
     }
   };
 
@@ -457,13 +466,14 @@ public:
   /// if you don't care about a particular parameter. Blob data is not included
   /// in the buffer and should be handled separately by the caller.
   template <typename ElementTy, typename... Data>
-  static void readRecord(ArrayRef<ElementTy> buffer, Data &... data) {
+  static void readRecord(ArrayRef<ElementTy> buffer, Data &&... data) {
     static_assert(sizeof...(data) <= sizeof...(Fields),
                   "Too many record elements");
     static_assert(sizeof...(Fields) <=
                   sizeof...(data) + impl::has_blob<Fields...>::value,
                   "Too few record elements");
-    return impl::BCRecordCoding<Fields...>::read(buffer, data...);
+    return impl::BCRecordCoding<Fields...>::read(buffer,
+                                                 std::forward<Data>(data)...);
   }
 
   /// Extract record data from \p buffer into the given data fields.
@@ -472,11 +482,12 @@ public:
   /// if you don't care about a particular parameter. Blob data is not included
   /// in the buffer and should be handled separately by the caller.
   template <typename BufferTy, typename... Data>
-  static void readRecord(BufferTy &buffer, Data &... data) {
-    return readRecord(llvm::makeArrayRef(buffer), data...);
+  static void readRecord(BufferTy &buffer, Data &&... data) {
+    return readRecord(llvm::makeArrayRef(buffer), std::forward<Data>(data)...);
   }
 };
 
+/// A record with a fixed record code.
 template<unsigned RecordCode, typename... Fields>
 class BCRecordLayout : public BCGenericRecordLayout<BCLiteral<RecordCode>,
                                                     Fields...> {
@@ -511,7 +522,7 @@ public:
   }
 };
 
-  /// RAII object to pair entering and exiting a sub-block.
+/// RAII object to pair entering and exiting a sub-block.
 class BCBlockRAII {
   llvm::BitstreamWriter &Writer;
 public:
