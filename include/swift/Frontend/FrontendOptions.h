@@ -85,6 +85,9 @@ public:
 
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
+
+  /// Indicates whether the RequestedAction has output.
+  bool actionHasOutput();
 };
 
 }
