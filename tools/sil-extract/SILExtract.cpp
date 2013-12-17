@@ -1,4 +1,4 @@
-//===-- SILOpt.cpp - SIL Optimization Driver ------------------------------===//
+//===-- SILExtract.cpp - SIL function extraction utility ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the entry point.
+// This utility is meant to help simplify the extraction of test cases from sil
+// files by removing (currently only) functions that do not match a
+// string. Eventually this should have additional capabilities like stripping
+// globals, vtables, etc.
 //
 //===----------------------------------------------------------------------===//
 
