@@ -2800,7 +2800,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // Only instance properties can be IBOutlets.
     // FIXME: This could do some type validation as well (all IBOutlets refer
     // to objects).
-    if (!(isa<VarDecl>(D) && isInClassContext(D))) {
+    auto *VD = dyn_cast<VarDecl>(D);
+    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
       TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
       D->getMutableAttrs().clearAttribute(AK_IBOutlet);
       return;
