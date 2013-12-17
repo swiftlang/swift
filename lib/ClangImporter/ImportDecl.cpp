@@ -1435,7 +1435,6 @@ namespace {
         result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
       // Mark this as an Objective-C method.
-      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->setIsObjC(true);
 
       // Mark class methods as static.
@@ -2496,7 +2495,6 @@ namespace {
       result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C and class protocol.
-      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
       result->setIsObjC(true);
 
@@ -2580,7 +2578,6 @@ namespace {
       result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C class.
-      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->setIsObjC(true);
       
       // Import each of the members.

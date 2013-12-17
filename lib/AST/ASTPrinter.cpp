@@ -104,6 +104,14 @@ namespace {
       if (!VD->isObjC())
         return;
 
+      // When printing imported declarations, print an explicit @objc attribute
+      // only on top-level decls and imply that we infer it for members.
+      if (VD->hasClangNode()) {
+        if (VD->getDeclContext()->isModuleScopeContext())
+          Printer << "@objc ";
+        return;
+      }
+
       Printer << "/* @objc(inferred) */ ";
     }
 
