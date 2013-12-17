@@ -376,6 +376,8 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       if (choice->getKind() == OverloadChoiceKind::Decl)
         decl = choice->getDecl();
     }
+  } else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor)) {
+    decl = ctorRef->getDecl();
   }
 
   // If we didn't find the declaration, we're out of luck.
