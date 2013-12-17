@@ -457,11 +457,10 @@ fi
 
 # Run the SourceKit tests.
 if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
-  export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
-  export SOURCEKITD_TEST="${SOURCEKIT_BUILD_DIR}/bin/sourcekitd-test"
   echo "--- Running SourceKit Tests ---"
-  (cd "${SOURCEKIT_BUILD_DIR}" &&
-    "${LLVM_BUILD_DIR}/bin/llvm-lit" -sv test) || exit 1
+
+  build_cmd=("$CMAKE" --build "${SOURCEKIT_BUILD_DIR}" -- ${BUILD_ARGS})
+  "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-sourcekit
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
