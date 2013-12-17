@@ -2809,7 +2809,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   if (Attrs.isIBAction()) {
     // Only instance methods returning () can be IBActions.
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!FD || !isa<ClassDecl>(D->getDeclContext()) || FD->isStatic() ||
+    if (!FD || !isInClassContext(D) || FD->isStatic() ||
         FD->isGetterOrSetter()) {
       TC.diagnose(Attrs.getLoc(AK_IBAction), diag::invalid_ibaction_decl);
       D->getMutableAttrs().clearAttribute(AK_IBAction);
