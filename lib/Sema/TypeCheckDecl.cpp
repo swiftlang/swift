@@ -1652,7 +1652,7 @@ public:
         // should be a prefix or a postfix operator.
 
         // Fix the AST and determine the insertion text.
-        SourceLoc insertionLoc = FD->getLoc();
+        SourceLoc insertionLoc = FD->getFuncLoc();
         const char *insertionText;
         if (postfixOp) {
           insertionText = "@postfix ";
@@ -1665,7 +1665,7 @@ public:
         }
 
         // Emit diagnostic with the Fix-It.
-        TC.diagnose(FD, diag::unary_op_missing_prepos_attribute,
+        TC.diagnose(insertionLoc, diag::unary_op_missing_prepos_attribute,
                     static_cast<bool>(postfixOp))
           .fixItInsert(insertionLoc, insertionText);
         TC.diagnose(op, diag::unary_operator_declaration_here,
