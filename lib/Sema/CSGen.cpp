@@ -410,13 +410,15 @@ namespace {
         CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
           memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-      } else {
-        // Otherwise, the member needs to have the same type as the base.
-        CS.addConstraint(ConstraintKind::Equal, baseTy, memberTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+        
+        return baseTy;
       }
 
-      return baseTy;
+      // Otherwise, the member needs to have the same type as the base.
+      CS.addConstraint(ConstraintKind::Equal, baseTy, memberTy,
+        CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+
+      return memberTy;
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {

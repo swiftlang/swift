@@ -814,9 +814,31 @@ static bool tryTypeVariableBindings(
     }
 
     // Enumerate the supertypes of each of the types we tried.
-    // FIXME: Only if we're allowed to!
     for (auto binding : bindings) {
       auto type = binding.BindingType;
+
+      // Handle simple subtype bindings.
+      if (binding.Kind == AllowedBindingKind::Subtypes &&
+          typeVar->getImpl().canBindToLValue() &&
+          !type->is<LValueType>()) {
+        // FIXME: It's horrible that we have to enumerate different
+        // bits on the lvalue type.
+        auto subtype = LValueType::get(type,
+                                       LValueType::Qual::DefaultForVar,
+                                       tc.Context);
+        if (exploredTypes.insert(subtype->getCanonicalType()))
+          newBindings.push_back({subtype, binding.Kind, Nothing});
+
+        subtype = LValueType::get(type,
+                                  (LValueType::Qual::DefaultForVar|
+                                   LValueType::Qual::NonSettable),
+                                  tc.Context);
+        if (exploredTypes.insert(subtype->getCanonicalType()))
+          newBindings.push_back({subtype, binding.Kind, Nothing});
+        
+      }
+
+
       if (binding.Kind != AllowedBindingKind::Supertypes)
         continue;
 

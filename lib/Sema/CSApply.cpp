@@ -1284,7 +1284,7 @@ namespace {
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       // Dig out the type of the base, which will be the result
       // type of this expression.
-      Type baseTy = simplifyType(expr->getType());
+      Type baseTy = simplifyType(expr->getType())->getRValueType();
       auto &tc = cs.getTypeChecker();
       auto baseMetaTy = MetaTypeType::get(baseTy, tc.Context);
 
