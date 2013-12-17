@@ -392,7 +392,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     break;
   case DeclContextKind::AbstractFunctionDecl:
     OS << " name=" << cast<AbstractFunctionDecl>(this)->getName();
-    OS << " : " << cast<AbstractClosureExpr>(this)->getType();
+    OS << " : " << cast<AbstractFunctionDecl>(this)->getType();
     break;
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(this)->getInitializerKind()) {
