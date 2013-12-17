@@ -36,8 +36,10 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeIncludePath(LibPath.str());
 }
 
+// TODO: remove InputKind param once we support storing it in FrontendOptions
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags) {
+                              DiagnosticEngine &Diags, SourceFileKind InputKind)
+{
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_o)) {
@@ -156,7 +158,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
 
     if (!Lexer::isIdentifier(ModuleName)) {
-      if (!Opts.actionHasOutput()) {
+      if (!Opts.actionHasOutput() ||
+          (InputKind == SourceFileKind::Main &&
+           Opts.InputFilenames.size() == 1)) {
         ModuleName = "main";
       } else {
         Diags.diagnose(SourceLoc(), diag::bad_module_name,
@@ -298,7 +302,27 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+  for (auto InputArg : *ParsedArgs) {
+    switch (InputArg->getOption().getID()) {
+      case OPT_parse_as_library:
+        setInputKind(SourceFileKind::Library);
+        break;
+
+      case OPT_parse_stdlib:
+        setParseStdlib();
+        break;
+
+      case OPT_l:
+        addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
+        break;
+
+      case OPT_framework:
+        addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
+        break;
+    }
+  }
+
+  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags, InputKind)) {
     return true;
   }
 
@@ -320,26 +344,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
   if (ParseDiagnosticArgs(DiagnosticOpts, *ParsedArgs, Diags)) {
     return true;
-  }
-
-  for (auto InputArg : *ParsedArgs) {
-    switch (InputArg->getOption().getID()) {
-    case OPT_parse_as_library:
-      setInputKind(SourceFileKind::Library);
-      break;
-
-    case OPT_parse_stdlib:
-      setParseStdlib();
-      break;
-
-    case OPT_l:
-      addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
-      break;
-
-    case OPT_framework:
-      addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
-      break;
-    }
   }
 
   return false;
