@@ -58,7 +58,6 @@ class CompilerInvocation {
   DiagnosticOptions DiagnosticOpts;
 
   bool ParseStdlib = false;
-  bool ParseOnly = false;
   bool Immediate = false;
   SourceFileKind InputKind = SourceFileKind::Main;
 
@@ -196,11 +195,11 @@ public:
   }
 
   void setParseOnly() {
-    ParseOnly = true;
+    FrontendOpts.ParseOnly = true;
   }
 
   bool getParseOnly() const {
-    return ParseOnly;
+    return FrontendOpts.ParseOnly;
   }
 
   void setInputKind(SourceFileKind K) {

@@ -54,6 +54,9 @@ public:
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = Parse;
 
+  /// Indicates that type-checking should be disabled.
+  bool ParseOnly = false;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
