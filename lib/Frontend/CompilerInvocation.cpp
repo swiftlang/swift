@@ -89,6 +89,47 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  // Determine what the user has asked the frontend to do.
+  FrontendOptions::ActionType Action;
+  if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
+    // TODO: add support for EmitIR, EmitBC
+    Option Opt = A->getOption();
+    if (Opt.matches(OPT_c)) {
+      Action = FrontendOptions::EmitObject;
+    } else if (Opt.matches(OPT_S)) {
+      Action = FrontendOptions::EmitAssembly;
+    } else if (Opt.matches(OPT_emit_sil)) {
+      Action = FrontendOptions::EmitSIL;
+    } else if (Opt.matches(OPT_emit_silgen)) {
+      Action = FrontendOptions::EmitSILGen;
+    } else if (Opt.matches(OPT_parse)) {
+      Action = FrontendOptions::Parse;
+    } else if (Opt.matches(OPT_dump_parse)) {
+      Action = FrontendOptions::DumpParse;
+    } else if (Opt.matches(OPT_dump_ast)) {
+      Action = FrontendOptions::DumpAST;
+    } else if (Opt.matches(OPT_print_ast)) {
+      Action = FrontendOptions::PrintAST;
+    } else if (Opt.matches(OPT_repl)) {
+      Action = FrontendOptions::REPL;
+    } else if (Opt.matches(OPT_i)) {
+      Action = FrontendOptions::Immediate;
+    } else {
+      llvm_unreachable("Unhandled mode option");
+    }
+  } else {
+    // We don't have a mode, so determine a default.
+    // TODO: add check for EmitModuleOnly, once we support -emit-module.
+    if (Opts.InputFilenames.empty()) {
+      // We don't have any input files, so default to the REPL.
+      Action = FrontendOptions::REPL;
+    } else {
+      // In the absence of any other mode indicators, parse the inputs.
+      Action = FrontendOptions::Parse;
+    }
+  }
+  Opts.RequestedAction = Action;
+
   return false;
 }
 

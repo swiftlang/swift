@@ -31,6 +31,29 @@ public:
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
+  enum ActionType {
+    Parse, ///< Parse only
+    DumpParse, ///< Parse and dump AST
+    DumpAST, ///< Parse, type-check, and dump AST
+    PrintAST, ///< Parse, type-check, and pretty-print AST
+
+    EmitSILGen, ///< Emit raw SIL
+    EmitSIL, ///< Emit canonical SIL
+
+    EmitModuleOnly, ///< Emit module only
+
+    Immediate, ///< Immediate mode
+    REPL, ///< REPL mode
+
+    EmitAssembly, ///< Emit assembly
+    EmitIR, ///< Emit LLVM IR
+    EmitBC, ///< Emit LLVM BC
+    EmitObject, ///< Emit object file
+  };
+
+  /// Indicates the action the user requested that the frontend perform.
+  ActionType RequestedAction = Parse;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
