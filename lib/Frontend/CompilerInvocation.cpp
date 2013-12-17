@@ -44,10 +44,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.OutputFilename = A->getValue();
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_module_name)) {
-    Opts.ModuleName = A->getValue();
-  }
-
   if (const Arg *A = Args.getLastArg(OPT_serialize_diagnostics)) {
     Opts.SerializedDiagnosticsPath = A->getValue();
   }
@@ -135,6 +131,42 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
   Opts.RequestedAction = Action;
+
+  {
+    const Arg *A = Args.getLastArg(OPT_module_name);
+    std::string ModuleName;
+    if (A) {
+      ModuleName = A->getValue();
+    } else {
+      // The user did not specify a module name, so determine a default fallback
+      // based on other options.
+      if (Opts.RequestedAction == FrontendOptions::REPL) {
+        // Default to a module named "REPL" if we're in REPL mode.
+        ModuleName = "REPL";
+      } else {
+        StringRef OutputFilename(Opts.OutputFilename);
+        if (OutputFilename.empty() || OutputFilename == "-") {
+          ModuleName = Opts.InputFilenames[0];
+        } else {
+          ModuleName = OutputFilename;
+        }
+
+        ModuleName = llvm::sys::path::stem(ModuleName);
+      }
+    }
+
+    if (!Lexer::isIdentifier(ModuleName)) {
+      if (!Opts.actionHasOutput()) {
+        ModuleName = "main";
+      } else {
+        Diags.diagnose(SourceLoc(), diag::bad_module_name,
+                       ModuleName, A == nullptr);
+        ModuleName = "__bad__";
+      }
+    }
+
+    Opts.ModuleName = ModuleName;
+  }
 
   return false;
 }
