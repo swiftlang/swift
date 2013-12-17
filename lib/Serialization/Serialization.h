@@ -212,6 +212,9 @@ private:
   void writeMembers(ArrayRef<Decl *> members, bool isClass);
 
   /// Writes a reference to a decl in another module.
+  void writeCrossReference(const DeclContext *DC, uint32_t pathLen = 1);
+
+  /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
   /// Writes the given decl.

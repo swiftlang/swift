@@ -77,22 +77,12 @@ using AbstractCCField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum XRefKind : uint8_t {
-  SwiftValue = 0,
-  SwiftOperator,
-  SwiftGenericParameter
-};
-using XRefKindField = BCFixed<2>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
 enum OperatorKind : uint8_t {
   Infix = 0,
   Prefix,
   Postfix
 };
-static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
-              "too many operator kinds");
+using OperatorKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -835,13 +825,35 @@ namespace decls_block {
 
   using XRefLayout = BCRecordLayout<
     XREF,
-    XRefKindField, // reference kind
-    TypeIDField,   // type if value, operator kind if operator,
-                   // index if generic parameter
-    BCFixed<1>,    // within extension?
-    BCArray<IdentifierIDField> // extension module ID (if extension value)
-                               // base module ID
-                               // access path
+    ModuleIDField,  // base module ID
+    BCVBR<4>        // xref path length (cannot be 0)
+  >;
+
+  using XRefTypePathPieceLayout = BCRecordLayout<
+    XREF_TYPE_PATH_PIECE,
+    IdentifierIDField // name
+  >;
+
+  using XRefValuePathPieceLayout = BCRecordLayout<
+    XREF_VALUE_PATH_PIECE,
+    TypeIDField,      // type
+    IdentifierIDField // name
+  >;
+
+  using XRefExtensionPathPieceLayout = BCRecordLayout<
+    XREF_EXTENSION_PATH_PIECE,
+    ModuleIDField     // module ID
+  >;
+
+  using XRefOperatorPathPieceLayout = BCRecordLayout<
+    XREF_OPERATOR_PATH_PIECE,
+    IdentifierIDField, // name
+    OperatorKindField
+  >;
+
+  using XRefGenericParamPathPieceLayout = BCRecordLayout<
+    XREF_GENERIC_PARAM_PATH_PIECE,
+    BCVBR<5> // index
   >;
 }
 

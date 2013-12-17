@@ -59,36 +59,113 @@ namespace {
     }
   };
 
-  class PrettyXRefDeserialization : public llvm::PrettyStackTraceEntry {
-    ModuleFile &File;
-    XRefKind Kind;
-    Module &ContainingModule;
-    ArrayRef<uint64_t> RawPath;
+  class PrettyXRefTrace : public llvm::PrettyStackTraceEntry {
+    class PathPiece {
+    public:
+      enum class Kind {
+        Value,
+        Operator,
+        OperatorFilter,
+        Extension,
+        GenericParam,
+        Unknown
+      };
 
-  public:
-    PrettyXRefDeserialization(ModuleFile &file, XRefKind kind, Module &M,
-                              ArrayRef<uint64_t> rawPath)
-      : File(file), Kind(kind), ContainingModule(M), RawPath(rawPath) {}
+    private:
+      Kind kind;
+      void *data;
 
-    virtual void print(raw_ostream &os) const override {
-      auto NamePath = RawPath;
-
-      os << "Cross-reference to ";
-      switch (Kind) {
-      case XRefKind::SwiftValue:
-      case XRefKind::SwiftOperator:
-        break;
-      case XRefKind::SwiftGenericParameter:
-        os << "generic param " << RawPath.back() << " of ";
-        NamePath = RawPath.slice(0, RawPath.size()-1);
-        break;
+      template <typename T>
+      T getDataAs() const {
+        return llvm::PointerLikeTypeTraits<T>::getFromVoidPointer(data);
       }
 
-      os << "'";
-      interleave(NamePath,
-                 [&](IdentifierID IID) { os << File.getIdentifier(IID); },
-                 [&]() { os << "."; });
-      os << "' in " << ContainingModule.Name << "\n";
+    public:
+      template <typename T>
+      PathPiece(Kind K, T value)
+        : kind(K),
+          data(llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value)) {}
+
+      void print(raw_ostream &os) const {
+        switch (kind) {
+        case Kind::Value:
+          os << getDataAs<Identifier>();
+          break;
+        case Kind::Extension:
+          if (getDataAs<Module *>())
+            os << "in an extension in module '" << getDataAs<Module *>()->Name
+               << "'";
+          else
+            os << "in an extension in any module";
+          break;
+        case Kind::Operator:
+          os << "operator " << getDataAs<Identifier>();
+          break;
+        case Kind::OperatorFilter:
+          switch (getDataAs<uintptr_t>()) {
+          case Infix:
+            os << "(infix)";
+            break;
+          case Prefix:
+            os << "(prefix)";
+            break;
+          case Postfix:
+            os << "(postfix)";
+            break;
+          default:
+            os << "(unknown operator filter)";
+            break;
+          }
+          break;
+        case Kind::GenericParam:
+          os << "generic param #" << getDataAs<uintptr_t>();
+          break;
+        case Kind::Unknown:
+          os << "unknown xref kind " << getDataAs<uintptr_t>();
+          break;
+        }
+      }
+    };
+
+  private:
+    Module &baseM;
+    SmallVector<PathPiece, 8> path;
+
+  public:
+    PrettyXRefTrace(Module &M) : baseM(M) {}
+
+    void addValue(Identifier name) {
+      path.push_back({ PathPiece::Kind::Value, name });
+    }
+
+    void addOperator(Identifier name) {
+      path.push_back({ PathPiece::Kind::Operator, name });
+    }
+
+    void addOperatorFilter(uint8_t fixity) {
+      path.push_back({ PathPiece::Kind::OperatorFilter,
+                       static_cast<uintptr_t>(fixity) });
+    }
+
+    void addExtension(Module *M) {
+      path.push_back({ PathPiece::Kind::Extension, M });
+    }
+
+    void addGenericParam(uintptr_t index) {
+      path.push_back({ PathPiece::Kind::GenericParam, index });
+    }
+
+    void addUnknown(uintptr_t kind) {
+      path.push_back({ PathPiece::Kind::Unknown, kind });
+    }
+
+    virtual void print(raw_ostream &os) const override {
+      os << "Cross-reference to module '" << baseM.Name << "'\n";
+      for (auto &piece : path) {
+        os << "\t... ";
+        piece.print(os);
+        os << "\n";
+      }
     }
   };
 } // end anonymous namespace
@@ -742,6 +819,253 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   }
 
   return members;
+}
+
+/// Remove values from \p values that don't match the expected type or module.
+///
+/// Both \p expectedTy and \p expectedModule can be omitted, in which case any
+/// type or module is accepted. Values imported from Clang can also appear in
+/// any module.
+static void filterValues(Type expectedTy, Module *expectedModule,
+                         SmallVectorImpl<ValueDecl *> &values) {
+  CanType canTy;
+  if (expectedTy)
+    canTy = expectedTy->getCanonicalType();
+
+  auto newEnd = std::remove_if(values.begin(), values.end(),
+                               [=](ValueDecl *value) {
+    if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
+      return true;
+    // FIXME: Should be able to move a value from an extension in a derived
+    // module to the original definition in a base module.
+    if (expectedModule && !value->hasClangNode() &&
+        value->getModuleContext() != expectedModule)
+      return true;
+    return false;
+  });
+  values.erase(newEnd, values.end());
+}
+
+Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
+  using namespace decls_block;
+  assert(M && "missing dependency");
+  PrettyXRefTrace pathTrace(*M);
+
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return nullptr;
+  }
+
+  SmallVector<ValueDecl *, 8> values;
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  // Read the first path piece. This one is special because lookup is performed
+  // against the base module, rather than against the previous link in the path.
+  // In particular, operator path pieces represent actual operators here, but
+  // filters on operator functions when they appear later on.
+  scratch.clear();
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                &blobData);
+  switch (recordID) {
+  case XREF_TYPE_PATH_PIECE:
+  case XREF_VALUE_PATH_PIECE: {
+    IdentifierID IID;
+    TypeID TID = 0;
+    if (recordID == XREF_TYPE_PATH_PIECE)
+      XRefTypePathPieceLayout::readRecord(scratch, IID);
+    else
+      XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+
+    Identifier name = getIdentifier(IID);
+    pathTrace.addValue(name);
+
+    M->lookupQualified(ModuleType::get(M), name, NL_QualifiedDefault,
+                       /*typeResolver=*/nullptr, values);
+    filterValues(getType(TID), nullptr, values);
+    break;
+  }
+
+  case XREF_EXTENSION_PATH_PIECE:
+    llvm_unreachable("can only extend a nominal");
+
+  case XREF_OPERATOR_PATH_PIECE: {
+    IdentifierID IID;
+    uint8_t rawOpKind;
+    XRefOperatorPathPieceLayout::readRecord(scratch, IID, rawOpKind);
+
+    Identifier opName = getIdentifier(IID);
+    pathTrace.addOperator(opName);
+
+    switch (rawOpKind) {
+    case OperatorKind::Infix:
+      return M->lookupInfixOperator(opName);
+    case OperatorKind::Prefix:
+      return M->lookupPrefixOperator(opName);
+    case OperatorKind::Postfix:
+      return M->lookupPostfixOperator(opName);
+    default:
+      // Unknown operator kind.
+      error();
+      return nullptr;
+    }
+  }
+
+  case XREF_GENERIC_PARAM_PATH_PIECE:
+    llvm_unreachable("only in a nominal or function");
+
+  default:
+    // Unknown xref kind.
+    pathTrace.addUnknown(recordID);
+    error();
+    return nullptr;
+  }
+
+  if (values.empty()) {
+    error();
+    return nullptr;
+  }
+
+  // Reset module filter.
+  M = nullptr;
+
+  // For remaining path pieces, filter or drill down into the results we have.
+  while (--pathLen) {
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      error();
+      return nullptr;
+    }
+
+    scratch.clear();
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                  &blobData);
+    switch (recordID) {
+    case XREF_TYPE_PATH_PIECE:
+    case XREF_VALUE_PATH_PIECE: {
+      if (values.size() != 1) {
+        error();
+        return nullptr;
+      }
+
+      auto nominal = dyn_cast<NominalTypeDecl>(values.front());
+      values.clear();
+
+      if (!nominal) {
+        error();
+        return nullptr;
+      }
+
+      IdentifierID IID;
+      TypeID TID = 0;
+      if (recordID == XREF_TYPE_PATH_PIECE)
+        XRefTypePathPieceLayout::readRecord(scratch, IID);
+      else
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+
+      Identifier memberName = getIdentifier(IID);
+      pathTrace.addValue(memberName);
+
+      auto members = nominal->lookupDirect(memberName);
+      values.append(members.begin(), members.end());
+      filterValues(getType(TID), M, values);
+      break;
+    }
+
+    case XREF_EXTENSION_PATH_PIECE: {
+      ModuleID ownerID;
+      XRefExtensionPathPieceLayout::readRecord(scratch, ownerID);
+      M = getModule(ownerID);
+      pathTrace.addExtension(M);
+      continue;
+    }
+
+    case XREF_OPERATOR_PATH_PIECE: {
+      uint8_t rawOpKind;
+      XRefOperatorPathPieceLayout::readRecord(scratch, Nothing, rawOpKind);
+
+      pathTrace.addOperatorFilter(rawOpKind);
+
+      auto newEnd = std::remove_if(values.begin(), values.end(),
+                                   [=](ValueDecl *value) {
+        auto fn = dyn_cast<FuncDecl>(value);
+        if (!fn)
+          return true;
+        if (!fn->getOperatorDecl())
+          return true;
+        if (getStableFixity(fn->getOperatorDecl()->getKind()) != rawOpKind)
+          return true;
+        return false;
+      });
+      values.erase(newEnd, values.end());
+      break;
+    }
+
+    case XREF_GENERIC_PARAM_PATH_PIECE: {
+      if (values.size() != 1) {
+        error();
+        return nullptr;
+      }
+
+      uint32_t paramIndex;
+      XRefGenericParamPathPieceLayout::readRecord(scratch, paramIndex);
+
+      pathTrace.addGenericParam(paramIndex);
+
+      ValueDecl *base = values.front();
+      GenericParamList *paramList = nullptr;
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(base))
+        paramList = nominal->getGenericParams();
+      else if (auto fn = dyn_cast<FuncDecl>(base))
+        paramList = fn->getGenericParams();
+      else if (auto ctor = dyn_cast<ConstructorDecl>(base))
+        paramList = ctor->getGenericParams();
+
+      if (!paramList || paramIndex >= paramList->size()) {
+        error();
+        return nullptr;
+      }
+
+      values.clear();
+      values.push_back(paramList->getParams()[paramIndex].getDecl());
+      assert(values.back());
+      break;
+    }
+
+    default:
+      // Unknown xref path piece.
+      pathTrace.addUnknown(recordID);
+      error();
+      return nullptr;
+    }
+
+    if (values.empty()) {
+      error();
+      return nullptr;
+    }
+
+    // Reset the module filter.
+    M = nullptr;
+  }
+
+  // Make sure we /used/ the last module filter we got.
+  // This catches the case where the last path piece we saw was an Extension
+  // path piece, which is not a valid way to end a path. (Cross-references to
+  // extensions are not allowed because they cannot be uniquely named.)
+  if (M) {
+    error();
+    return nullptr;
+  }
+
+  // When all is said and done, we should have a single value here to return.
+  if (values.size() != 1) {
+    error();
+    return nullptr;
+  }
+
+  return values.front();
 }
 
 Identifier ModuleFile::getIdentifier(IdentifierID IID) {
@@ -1685,156 +2009,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   }
 
   case decls_block::XREF: {
-    uint8_t kind;
-    TypeID expectedTypeID;
-    bool isWithinExtension;
-    ArrayRef<uint64_t> rawAccessPath;
-
-    decls_block::XRefLayout::readRecord(scratch, kind, expectedTypeID,
-                                        isWithinExtension, rawAccessPath);
-
-    // First, find the module this reference is referring to.
-    Module *M = getModule(rawAccessPath.front());
-    assert(M && "missing dependency");
-    rawAccessPath = rawAccessPath.slice(1);
-
-    PrettyXRefDeserialization moreStackInfo(*this, static_cast<XRefKind>(kind),
-                                            *M, rawAccessPath);
-
-    switch (kind) {
-    case XRefKind::SwiftValue:
-    case XRefKind::SwiftGenericParameter: {
-      // Start by looking up the top-level decl in the module.
-      Module *baseModule = M;
-      if (isWithinExtension) {
-        baseModule = getModule(rawAccessPath.front());
-        assert(baseModule && "missing dependency");
-        rawAccessPath = rawAccessPath.slice(1);
-      }
-
-      // We do a full qualified lookup from within the referenced module.
-      // This avoids inefficient access control restrictions from elsewhere in
-      // this module, but handles the case where a declaration is no longer
-      // *declared* in this module, merely re-exported. This also handles
-      // adapter modules for Clang frameworks.
-      SmallVector<ValueDecl *, 8> values;
-      baseModule->lookupQualified(ModuleType::get(baseModule),
-                                  getIdentifier(rawAccessPath.front()),
-                                  NL_QualifiedDefault,
-                                  /*typeResolver=*/nullptr,
-                                  values);
-      rawAccessPath = rawAccessPath.slice(1);
-
-      // Then, follow the chain of nested ValueDecls until we run out of
-      // identifiers in the access path.
-      SmallVector<ValueDecl *, 8> baseValues;
-      for (IdentifierID nextID : rawAccessPath) {
-        baseValues.swap(values);
-        values.clear();
-        for (auto base : baseValues) {
-          if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
-            Identifier memberName = getIdentifier(nextID);
-            auto members = nominal->lookupDirect(memberName);
-            values.append(members.begin(), members.end());
-          }
-        }
-      }
-
-      // If we have a type to validate against, filter out any ValueDecls that
-      // don't match that type.
-      CanType expectedTy;
-      if (kind == XRefKind::SwiftValue)
-        if (Type maybeExpectedTy = getType(expectedTypeID))
-          expectedTy = maybeExpectedTy->getCanonicalType();
-
-      ValueDecl *result = nullptr;
-      for (auto value : values) {
-        if (!value->hasClangNode() && value->getModuleContext() != M)
-          continue;
-        if (expectedTy &&
-            value->getInterfaceType()->getCanonicalType() != expectedTy)
-          continue;
-
-        if (!result || result == value) {
-          result = value;
-          continue;
-        }
-
-        // It's an error if more than one value has the same type.
-        // FIXME: Functions and constructors can overload based on parameter
-        // names.
-        error();
-        return nullptr;
-      }
-
-      // It's an error if lookup doesn't actually find anything -- that means
-      // the module's out of date.
-      if (!result) {
-        error();
-        return nullptr;
-      }
-
-      if (kind == XRefKind::SwiftGenericParameter) {
-        GenericParamList *paramList = nullptr;
-
-        if (auto nominal = dyn_cast<NominalTypeDecl>(result))
-          paramList = nominal->getGenericParams();
-        else if (auto fn = dyn_cast<FuncDecl>(result))
-          paramList = fn->getGenericParams();
-        else if (auto ctor = dyn_cast<ConstructorDecl>(result))
-          paramList = ctor->getGenericParams();
-
-        if (!paramList) {
-          error();
-          return nullptr;
-        }
-
-        if (expectedTypeID >= paramList->size()) {
-          error();
-          return nullptr;
-        }
-
-        result = paramList->getParams()[expectedTypeID].getDecl();
-        assert(result);
-      }
-
-      declOrOffset = result;
-      break;
-    }
-    case XRefKind::SwiftOperator: {
-      assert(rawAccessPath.size() == 1 &&
-             "can't import operators not at module scope");
-      Identifier opName = getIdentifier(rawAccessPath.back());
-
-      switch (expectedTypeID) {
-      case OperatorKind::Infix: {
-        declOrOffset = M->lookupInfixOperator(opName);
-        break;
-      }
-      case OperatorKind::Prefix: {
-        declOrOffset = M->lookupPrefixOperator(opName);
-        break;
-      }
-      case OperatorKind::Postfix: {
-        declOrOffset = M->lookupPostfixOperator(opName);
-        break;
-      }
-      default:
-        // Unknown operator kind.
-        error();
-        return nullptr;
-      }
-      break;
-    }
-    default:
-      // Unknown cross-reference kind.
-      error();
-      return nullptr;
-    }
-
+    ModuleID baseModuleID;
+    uint32_t pathLen;
+    decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
+    declOrOffset = resolveCrossReference(getModule(baseModuleID), pathLen);
     break;
   }
-      
+
   default:
     // We don't know how to deserialize this kind of decl.
     error();

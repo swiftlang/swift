@@ -18,6 +18,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
@@ -822,65 +823,115 @@ void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
+void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
+  using namespace decls_block;
+
+  unsigned abbrCode;
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::TopLevelCodeDecl:
+    llvm_unreachable("cannot cross-reference this context");
+
+  case DeclContextKind::FileUnit:
+    DC = cast<FileUnit>(DC)->getParentModule();
+    SWIFT_FALLTHROUGH;
+
+  case DeclContextKind::Module:
+    abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+    XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                           addModuleRef(cast<Module>(DC)), pathLen);
+    break;
+
+  case DeclContextKind::NominalTypeDecl: {
+    writeCrossReference(DC->getParent(), pathLen + 1);
+
+    auto nominal = cast<NominalTypeDecl>(DC);
+    abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+    XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addIdentifierRef(nominal->getName()));
+    break;
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    Type baseTy = cast<ExtensionDecl>(DC)->getExtendedType();
+    writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
+
+    abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
+    XRefExtensionPathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()));
+    break;
+  }
+
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto fn = cast<AbstractFunctionDecl>(DC);
+    writeCrossReference(DC->getParent(), pathLen + 1 + fn->isOperator());
+
+    Type ty = fn->getInterfaceType()->getCanonicalType();
+    abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+    XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addTypeRef(ty),
+                                         addIdentifierRef(fn->getName()));
+
+    if (fn->isOperator()) {
+      // Encode the fixity as a filter on the func decls, to distinguish prefix
+      // and postfix operators.
+      auto op = cast<FuncDecl>(fn)->getOperatorDecl();
+      assert(op);
+      abbrCode = DeclTypeAbbrCodes[XRefOperatorPathPieceLayout::Code];
+      XRefOperatorPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              addIdentifierRef(Identifier()),
+                                              getStableFixity(op->getKind()));
+    }
+    break;
+  }
+  }
+}
+
 void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
-  SmallVector<IdentifierID, 4> accessPath;
-  XRefKind kind;
-  TypeID typeID;
+  unsigned abbrCode;
 
-  if (auto value = dyn_cast<ValueDecl>(D)) {
-    kind = XRefKind::SwiftValue;
+  if (auto op = dyn_cast<OperatorDecl>(D)) {
+    writeCrossReference(op->getModuleContext());
 
-    if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
-      kind = XRefKind::SwiftGenericParameter;
-      typeID = genericParam->getIndex();
-    }
-
-    if (kind == XRefKind::SwiftValue) {
-      accessPath.push_back(addIdentifierRef(value->getName()));
-
-      // If the value is a type, it's uniquely identified by its name.
-      // Otherwise, use the value's type for disambiguation.
-      Type ty;
-      if (!isa<TypeDecl>(value)) {
-        // Use the canonicalized interface type for matching cross references.
-        ty = value->getInterfaceType()->getCanonicalType();
-      }
-      
-      typeID = addTypeRef(ty);
-    }
-
-  } else if (auto op = dyn_cast<OperatorDecl>(D)) {
-    kind = XRefKind::SwiftOperator;
-    accessPath.push_back(addIdentifierRef(op->getName()));
-    typeID = getStableFixity(op->getKind());
-  } else {
-    llvm_unreachable("cannot cross-reference this kind of decl");
+    abbrCode = DeclTypeAbbrCodes[XRefOperatorPathPieceLayout::Code];
+    XRefOperatorPathPieceLayout::emitRecord(Out, ScratchRecord,abbrCode,
+                                            addIdentifierRef(op->getName()),
+                                            getStableFixity(op->getKind()));
+    return;
   }
 
-  // Build up the access path by walking through parent DeclContexts.
-  const DeclContext *DC;
-  const ExtensionDecl *extension = nullptr;
-  for (DC = D->getDeclContext(); !DC->isModuleScopeContext();
-       DC = DC->getParent()) {
-    if ((extension = dyn_cast<ExtensionDecl>(DC)))
-      DC = extension->getExtendedType()->getNominalOrBoundGenericNominal();
-
-    auto value = cast<ValueDecl>(getDeclForContext(DC));
-    accessPath.push_back(addIdentifierRef(value->getName()));
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(D)) {
+    // Functions are special because they might be operators.
+    writeCrossReference(fn, 0);
+    return;
   }
 
-  accessPath.push_back(addModuleRef(DC->getParentModule()));
-  if (extension)
-    accessPath.push_back(addModuleRef(extension->getModuleContext()));
+  writeCrossReference(D->getDeclContext());
 
-  // Store the access path in forward order.
-  std::reverse(accessPath.begin(), accessPath.end());
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+    abbrCode = DeclTypeAbbrCodes[XRefGenericParamPathPieceLayout::Code];
+    XRefGenericParamPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                genericParam->getIndex());
+    return;
+  }
 
-  unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
-  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                         kind, typeID, !!extension, accessPath);
+  if (auto type = dyn_cast<TypeDecl>(D)) {
+    abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+    XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addIdentifierRef(type->getName()));
+    return;
+  }
+
+  auto val = cast<ValueDecl>(D);
+  auto ty = val->getInterfaceType()->getCanonicalType();
+  abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+  XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addTypeRef(ty),
+                                       addIdentifierRef(val->getName()));
 }
 
 /// Translate from the AST associativity enum to the Serialization enum
@@ -1847,6 +1898,12 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<GenericParamLayout>();
     registerDeclTypeAbbr<GenericRequirementLayout>();
     registerDeclTypeAbbr<LastGenericRequirementLayout>();
+
+    registerDeclTypeAbbr<XRefTypePathPieceLayout>();
+    registerDeclTypeAbbr<XRefValuePathPieceLayout>();
+    registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
+    registerDeclTypeAbbr<XRefOperatorPathPieceLayout>();
+    registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
 
     registerDeclTypeAbbr<NoConformanceLayout>();
     registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

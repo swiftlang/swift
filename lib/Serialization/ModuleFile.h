@@ -239,8 +239,16 @@ private:
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,
   /// because it reads from the cursor, it is not possible to reset the cursor
-  /// after reading. Nothing should ever follow a DECL_CONTEXT block.
+  /// after reading. Nothing should ever follow a DECL_CONTEXT record.
   Optional<MutableArrayRef<Decl *>> readMembers();
+
+  /// Resolves a cross-reference, starting from the given module.
+  ///
+  /// Note: this destroys the cursor's position in the stream. Furthermore,
+  /// because it reads from the cursor, it is not possible to reset the cursor
+  /// after reading. Nothing should ever follow an XREF record except
+  /// XREF_PATH_PIECE records.
+  Decl *resolveCrossReference(Module *M, uint32_t pathLen);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
