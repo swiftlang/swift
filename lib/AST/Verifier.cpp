@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 using namespace swift;
@@ -76,6 +77,15 @@ struct ASTNodeBase {};
 
     /// \brief The set of opaque value expressions active at this point.
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
+
+    /// A key into ClosureDiscriminators is a combination of a
+    /// ("canonicalized") local DeclContext* and a flag for whether to
+    /// use the explicit closure sequence (false) or the implicit
+    /// closure sequence (true).
+    typedef llvm::PointerIntPair<DeclContext*,1,bool> ClosureDiscriminatorKey;
+    llvm::DenseMap<ClosureDiscriminatorKey,
+                   llvm::SmallBitVector> ClosureDiscriminators;
+    DeclContext *CanonicalTopLevelContext = nullptr;
 
   public:
     Verifier(Module *M, DeclContext *DC)
@@ -395,6 +405,29 @@ struct ASTNodeBase {};
       popScope(BS);
     }
 
+    /// Canonicalize the given DeclContext pointer, in terms of
+    /// producing something that can be looked up in
+    /// ClosureDiscriminators.
+    DeclContext *getCanonicalDeclContext(DeclContext *DC) {
+      // All we really need to do is use a single TopLevelCodeDecl.
+      if (auto topLevel = dyn_cast<TopLevelCodeDecl>(DC)) {
+        if (!CanonicalTopLevelContext)
+          CanonicalTopLevelContext = topLevel;
+        return CanonicalTopLevelContext;
+      }
+
+      // TODO: check for uniqueness of initializer contexts?
+
+      return DC;
+    }
+
+    /// Return the appropriate discriminator set for a closure expression.
+    llvm::SmallBitVector &getClosureDiscriminators(AbstractClosureExpr *closure) {
+      auto dc = getCanonicalDeclContext(closure->getParent());
+      bool isAutoClosure = isa<AutoClosureExpr>(closure);
+      return ClosureDiscriminators[ClosureDiscriminatorKey(dc, isAutoClosure)];
+    }
+
     void verifyCheckedAlways(ValueDecl *D) {
       if (D->hasType() && D->getType()->hasTypeVariable()) {
         Out << "a type variable escaped the type checker";
@@ -523,6 +556,21 @@ struct ASTNodeBase {};
       assert(Scopes.back().get<DeclContext*>() == E);
       assert(E->getParent()->isLocalContext() &&
              "closure expression was not in local context!");
+
+      // Check that the discriminator is unique in its context.
+      auto &discriminatorSet = getClosureDiscriminators(E);
+      unsigned discriminator = E->getDiscriminator();
+      if (discriminator >= discriminatorSet.size()) {
+        discriminatorSet.resize(discriminator+1);
+        discriminatorSet.set(discriminator);
+      } else if (discriminatorSet.test(discriminator)) {
+        Out << "a closure must have a unique discriminator in its context\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      } else {
+        discriminatorSet.set(discriminator);
+      }
 
       // If the enclosing scope is a DC directly, rather than a local scope,
       // then the closure should be parented by an Initializer.  Otherwise,
