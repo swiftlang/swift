@@ -1020,7 +1020,7 @@ namespace {
       // Otherwise, we'll need to SIL-lower the substituted result
       // using the abstraction patterns of the original result.
       auto &substResultTL = TC.getTypeLowering(origResultType, substResultType);
-      auto loweredResultTy = substResultTL.getLoweredType().getSwiftRValueType();
+      auto loweredResultTy =substResultTL.getLoweredType().getSwiftRValueType();
 
       // If the original result was returned indirectly, we need to
       // preserve that.
