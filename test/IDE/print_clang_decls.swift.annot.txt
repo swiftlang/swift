@@ -1,0 +1,32 @@
+<decl>import FooClangDepModule</decl>
+<decl>@objc class FooClass {
+  <decl>var fooIntIvar: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var fooProperty: <ref:TypeAlias>CInt</ref></decl>
+  <decl>func fooInstanceFunc0()</decl>
+  <decl>func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>static func fooClassFunc0()</decl>
+}</decl>
+<decl>struct FooEnum1 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+}</decl>
+<decl>var FooEnum1X: <ref:Struct>FooEnum1</ref></decl>
+<decl>struct FooEnum2 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+}</decl>
+<decl>var FooEnum2X: <ref:Struct>FooEnum2</ref></decl>
+<decl>var FooEnum2Y: <ref:Struct>FooEnum2</ref></decl>
+<decl>struct FooEnum3 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+}</decl>
+<decl>var FooEnum3X: <ref:Struct>FooEnum3</ref></decl>
+<decl>var FooEnum3Y: <ref:Struct>FooEnum3</ref></decl>
+<decl>typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
+<decl>func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>func fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>UnsafePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
+<decl>func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>

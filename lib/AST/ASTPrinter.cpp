@@ -168,6 +168,14 @@ private:
   public:
     PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) { }
+
+    using ASTVisitor::visit;
+
+    void visit(Decl *D) {
+      Printer.printDeclPre(D);
+      ASTVisitor::visit(D);
+      Printer.printDeclPost(D);
+    }
   };
 } // unnamed namespace
 
@@ -389,7 +397,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
 }
 
 void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
-  Printer.printTypeRef(decl, decl->getName().str());
+  Printer << decl->getName().str();
   if (auto gp = decl->getGenericParams()) {
     if (!isa<ProtocolDecl>(decl))
       printGenericParams(gp);
