@@ -32,8 +32,8 @@ public:
   std::string ModuleName;
 
   enum ActionType {
-    Parse, ///< Parse only
-    DumpParse, ///< Parse and dump AST
+    Parse, ///< Parse and type-check only
+    DumpParse, ///< Parse only and dump AST
     DumpAST, ///< Parse, type-check, and dump AST
     PrintAST, ///< Parse, type-check, and pretty-print AST
 

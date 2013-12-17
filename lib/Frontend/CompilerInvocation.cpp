@@ -106,6 +106,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_dump_parse)) {
       Action = FrontendOptions::DumpParse;
+
+      // -dump-parse explicitly disables type-checking
+      Opts.ParseOnly = true;
     } else if (Opt.matches(OPT_dump_ast)) {
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_print_ast)) {
