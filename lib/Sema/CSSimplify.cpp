@@ -1505,6 +1505,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
+    // Verify that @inout methods on value types are only applied to settable
+    // values.
+    if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
+        isa<FuncDecl>(result) && result->getAttrs().isInOut() &&
+        result->isInstanceMember() &&
+        // Reject non-values and non-settable lvalues.
+        (!baseTy->is<LValueType>() ||
+         !baseTy->castTo<LValueType>()->isSettable()))
+      continue;
+
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (isDynamicLookup) {
