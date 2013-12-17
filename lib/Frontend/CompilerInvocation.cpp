@@ -92,12 +92,15 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   // Determine what the user has asked the frontend to do.
   FrontendOptions::ActionType Action;
   if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
-    // TODO: add support for EmitIR, EmitBC
     Option Opt = A->getOption();
     if (Opt.matches(OPT_c)) {
       Action = FrontendOptions::EmitObject;
     } else if (Opt.matches(OPT_S)) {
       Action = FrontendOptions::EmitAssembly;
+    } else if (Opt.matches(OPT_emit_ir)) {
+      Action = FrontendOptions::EmitIR;
+    } else if (Opt.matches(OPT_emit_bc)) {
+      Action = FrontendOptions::EmitBC;
     } else if (Opt.matches(OPT_emit_sil)) {
       Action = FrontendOptions::EmitSIL;
     } else if (Opt.matches(OPT_emit_silgen)) {

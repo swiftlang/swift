@@ -70,6 +70,12 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   case types::TY_SIL:
     OutputOption = "-emit-sil";
     break;
+  case types::TY_LLVM_IR:
+    OutputOption = "-emit-ir";
+    break;
+  case types::TY_LLVM_BC:
+    OutputOption = "-emit-bc";
+    break;
   case types::TY_Nothing:
     // We were told to output nothing, so get the last mode option and use that.
     OutputOption =

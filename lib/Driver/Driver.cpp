@@ -638,6 +638,12 @@ Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
   } else if (OutputModeArg->getOption().matches(options::OPT_emit_silgen)) {
     // The user has requested a raw SIL file.
     CompileOutputType = types::TY_RawSIL;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_ir)) {
+    // The user has requested LLVM IR.
+    CompileOutputType = types::TY_LLVM_IR;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_bc)) {
+    // The user has requested LLVM BC.
+    CompileOutputType = types::TY_LLVM_BC;
   } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
              OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
              OutputModeArg->getOption().matches(options::OPT_dump_ast) ||

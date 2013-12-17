@@ -166,8 +166,10 @@ def emit_sil : Flag<["-"], "emit-sil">, HelpText<"Emit canonical SIL file(s)">,
   Flags<[FrontendOption]>, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">, HelpText<"Emit raw SIL file(s)">,
   Flags<[FrontendOption]>, ModeOpt;
-// -emit-llvm/-emit-llvm-ir/-emit-ir
-// -emit-llvm-bc/-emit-bc
+def emit_ir : Flag<["-"], "emit-ir">,
+  HelpText<"Emit LLVM IR file(s)">, Flags<[FrontendOption]>, ModeOpt;
+def emit_bc : Flag<["-"], "emit-bc">,
+  HelpText<"Emit LLVM BC file(s)">, Flags<[FrontendOption]>, ModeOpt;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
