@@ -21,6 +21,14 @@ namespace swift {
 
   class SILModule;
 
+  /// \brief Run all the SIL diagnostic passes on \p M.
+  ///
+  /// \returns true if the diagnostic passes produced an error
+  bool runSILDiagnosticPasses(SILModule &M);
+
+  /// \brief Run all the SIL performance optimization passes on \p M.
+  void runSILOptimizationPasses(SILModule &M);
+
   /// performSILDefiniteInitialization - Perform definitive initialization
   /// analysis, applying flow sensitive analysis to the SILGen generated code
   /// to determine whether unadorned assignment operations are actually

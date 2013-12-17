@@ -32,12 +32,6 @@ namespace swift {
 
   bool appendToREPLFile(SourceFile &SF, PersistentParserState &State,
                         REPLContext &RC, llvm::MemoryBuffer *Buffer);
-
-  bool runSILDiagnosticPasses(SILModule &Module);
-
-  /// Run all the SIL performance optimization passes on Module.
-  void runSILOptimizationPasses(SILModule &Module);
-
 } // namespace swift
 
 #endif

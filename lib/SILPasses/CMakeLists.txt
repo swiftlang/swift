@@ -9,6 +9,7 @@ add_swift_library(swiftSILPasses
   InOutDeshadowing.cpp
   Link.cpp
   MandatoryInlining.cpp
+  Passes.cpp
   PredictableMemOpt.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
