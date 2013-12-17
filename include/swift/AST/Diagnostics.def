@@ -1178,9 +1178,9 @@ ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
       "[objc] protocol %0 cannot refine non-[objc] protocol %1", (Type, Type))
 
 ERROR(protocol_composition_dynamic_lookup,sema_tcd,none,
-      "'DynamicLookup' cannot be part of a protocol composition", ())
+      "'AnyObject' cannot be part of a protocol composition", ())
 ERROR(dynamic_lookup_conformance,sema_tcd,none,
-      "cannot declare explicit conformance to the 'DynamicLookup' protocol", ())
+      "cannot declare explicit conformance to the 'AnyObject' protocol", ())
 
 ERROR(requires_conformance_nonprotocol,sema_tcd,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
@@ -1492,7 +1492,7 @@ ERROR(objc_invalid_on_var,sema_objc,none,
       "property can not be marked @objc because its type can not be "
       "represented in Objective-C", ())
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
-     "'protocol<>' is not considered '@objc'; use 'DynamicLookup' instead", ())
+     "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,sema_objc,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_empty_tuple,sema_objc,none,
