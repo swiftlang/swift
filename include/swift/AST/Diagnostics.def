@@ -1489,8 +1489,8 @@ ERROR(objc_invalid_on_static_var,sema_tcd,none,
       "static properties can not be declared '@objc'", ())
 
 ERROR(objc_invalid_on_var,sema_objc,none,
-      "property can not be marked @objc because its type can not be "
-      "represented in Objective-C", ())
+      "property can not be marked %select{@objc|@IBOutlet}0 because its type "
+      "can not be represented in Objective-C", (unsigned))
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,sema_objc,none,
