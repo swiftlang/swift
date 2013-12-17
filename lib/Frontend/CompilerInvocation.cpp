@@ -38,8 +38,8 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
 
 // TODO: remove InputKind param once we support storing it in FrontendOptions
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags, SourceFileKind InputKind)
-{
+                              DiagnosticEngine &Diags,
+                              SourceFileKind InputKind) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_o)) {
