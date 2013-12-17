@@ -163,11 +163,15 @@ public:
   /// \param isStatic Whether we're referring to a static method or some other
   /// static entity, for which the 'self' type will be a metatype.
   ///
+  /// \param isInOutFunc True if this is an @inout method on a struct or enum
+  /// type.
+  ///
   /// \param outerGenericParams If non-null, receives the generic parameters
   /// corresponding to this declaration (if any).
   ///
   /// \returns the type of the 'self' parameter.
   Type getSelfTypeInContext(bool isStatic,
+                            bool isInOutFunc,
                             GenericParamList **outerGenericParams);
 
   /// Determine the interface type of 'self' as seen outside of the given
@@ -176,8 +180,11 @@ public:
   /// \param isStatic Whether we're referring to a static method or some other
   /// static entity, for which the 'self' type will be a metatype.
   ///
+  /// \param isInOutFunc True if this is an @inout method on a struct or enum
+  /// type.
+  ///
   /// \returns the type of the 'self' parameter.
-  Type getInterfaceSelfType(bool isStatic);
+  Type getInterfaceSelfType(bool isStatic, bool isInOutFunc);
   
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not

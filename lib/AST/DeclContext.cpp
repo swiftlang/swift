@@ -88,9 +88,8 @@ Type DeclContext::getDeclaredInterfaceType() {
   }
 }
 
-static Type getSelfTypeForContainer(DeclContext *dc,
-                                    Type containerTy,
-                                    bool isStatic,
+static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
+                                    bool isStatic, bool isInOutFunc,
                                     GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
@@ -115,30 +114,37 @@ static Type getSelfTypeForContainer(DeclContext *dc,
   if (containerTy->hasReferenceSemantics())
     return containerTy;
 
+  if (dc->getASTContext().LangOpts.InOutMethods) {
+    // Value type methods which are not marked @inout are of type T since they
+    // cannot mutate a receiver.
+    if (!isInOutFunc)
+      return containerTy;
+  }
+
   // All other types have 'self' of @inout T.
-  return LValueType::get(containerTy,
-                         LValueType::Qual::DefaultForInOutSelf,
+  return LValueType::get(containerTy, LValueType::Qual::DefaultForInOutSelf,
                          dc->getASTContext());
 }
 
-Type DeclContext::getSelfTypeInContext(bool isStatic,
+Type DeclContext::getSelfTypeInContext(bool isStatic, bool isInOutFunc,
                                        GenericParamList **outerGenericParams) {
   // Determine the type of the container.
   Type containerTy = getDeclaredTypeInContext();
   if (!containerTy)
     return nullptr;
 
-  return getSelfTypeForContainer(this, containerTy, isStatic,
+  return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
                                  outerGenericParams);
 }
 
-Type DeclContext::getInterfaceSelfType(bool isStatic) {
+Type DeclContext::getInterfaceSelfType(bool isStatic, bool isInOutFunc) {
   // Determine the type of the container.
   Type containerTy = getDeclaredInterfaceType();
   if (!containerTy)
     return nullptr;
   
-  return getSelfTypeForContainer(this, containerTy, isStatic, nullptr);
+  return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
+                                 nullptr);
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
