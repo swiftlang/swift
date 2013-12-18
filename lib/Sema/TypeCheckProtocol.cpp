@@ -627,6 +627,132 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   return result;
 }
 
+namespace {
+  /// The result of attempting to resolve a witness.
+  enum class ResolveWitnessResult {
+    /// The resolution succeeded.
+    Success,
+    /// There was an explicit witness available, but it failed some
+    /// criteria.
+    ExplicitFailed,
+    /// There was no witness available.
+    Missing
+  };
+
+}
+/// Attempt to resolve a type witness via member name lookup.
+static ResolveWitnessResult resolveTypeWitnessViaLookup(
+                              TypeChecker &tc,
+                              ProtocolDecl *proto,
+                              Type type,
+                              DeclContext *dc,
+                              SourceLoc loc,
+                              AssociatedTypeDecl *assocType,
+                              TypeWitnessMap &typeWitnesses,
+                              bool alreadyComplained) {
+  auto metaType = MetaTypeType::get(type, tc.Context);
+
+  // Look for a member type with the same name as the associated type.
+  auto candidates = tc.lookupMemberType(metaType, assocType->getName(), dc);
+  bool didDerive = false;
+
+  // If we didn't find any matches, try to derive the conformance.
+  // FIXME: Move this into a separate step.
+  if (!candidates) {
+    // See whether we can derive members of this conformance.
+    NominalTypeDecl *derivingTypeDecl = nullptr;
+    if (auto *nominal = type->getAnyNominal()) {
+      if (nominal->derivesProtocolConformance(proto))
+        derivingTypeDecl = nominal;
+    }
+
+    if (derivingTypeDecl) {
+      if (auto derived = tc.deriveProtocolRequirement(derivingTypeDecl,
+                                                      assocType)){
+        auto derivedType = cast<TypeDecl>(derived);
+        candidates.addResult({derivedType, derivedType->getDeclaredType()});
+        didDerive = true;
+      } else {
+        return ResolveWitnessResult::ExplicitFailed;
+      }
+    }
+  }
+
+  // If there aren't any candidates, we're done.
+  if (!candidates) {
+    return ResolveWitnessResult::Missing;
+  }
+
+  // Determine which of the candidates is viable.
+  SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
+  SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> nonViable;
+  for (auto candidate : candidates) {
+    // Check this type against the protocol requirements.
+    // FIXME: Check superclass requirement as well.
+    bool satisfiesRequirements = true;
+    for (auto reqProto : assocType->getProtocols()) {
+      if (!tc.conformsToProtocol(candidate.second, reqProto, dc)){
+        satisfiesRequirements = false;
+
+        nonViable.push_back({candidate.first, reqProto});
+        break;
+      }
+
+      if (!satisfiesRequirements)
+        break;
+    }
+
+    if (satisfiesRequirements)
+      viable.push_back(candidate);
+  }
+
+  // If there is a single viable candidate, form a substitution for it.
+  auto archetype = assocType->getArchetype();
+  if (viable.size() == 1) {
+    typeWitnesses[assocType] =
+      getArchetypeSubstitution(tc, dc, archetype, viable.front().second);
+    return ResolveWitnessResult::Success;
+  }
+
+  // We didn't find a suitable candidate.
+  auto didNotConform = didDerive ? diag::protocol_derivation_is_broken
+                                 : diag::type_does_not_conform;
+
+  // If we had multiple viable types, diagnose the ambiguity.
+  if (!viable.empty()) {
+    if (!alreadyComplained)
+      tc.diagnose(loc, didNotConform, type, proto->getDeclaredType());
+
+    tc.diagnose(assocType, diag::ambiguous_witnesses_type,
+                assocType->getName());
+
+    if (!didDerive) {
+      for (auto candidate : viable)
+        tc.diagnose(candidate.first, diag::protocol_witness_type);
+    }
+
+    return ResolveWitnessResult::ExplicitFailed;
+  }
+
+  // None of the candidates were viable.
+  if (!alreadyComplained)
+    tc.diagnose(loc, didNotConform, type, proto->getDeclaredType());
+
+  tc.diagnose(assocType, diag::no_witnesses_type,
+              assocType->getName());
+
+  if (!didDerive) {
+    for (auto candidate : nonViable) {
+      tc.diagnose(candidate.first,
+                  diag::protocol_witness_nonconform_type,
+                  candidate.first->getDeclaredType(),
+                  candidate.second->getDeclaredType());
+    }
+  }
+
+  return ResolveWitnessResult::ExplicitFailed;
+}
+
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 static ProtocolConformance *
@@ -684,130 +810,21 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     auto AssociatedType = dyn_cast<AssociatedTypeDecl>(Member);
     if (!AssociatedType)
       continue;
-    
-    TC.validateDecl(AssociatedType, true);
 
-    auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName(), DC);
-    bool didDerive = false;
+    // Try to resolve the type witness via name lookup.
+    switch (resolveTypeWitnessViaLookup(TC, Proto, T, DC, ComplainLoc,
+                                        AssociatedType, TypeWitnesses,
+                                        Complained)) {
+    case ResolveWitnessResult::Success:
+      break;
 
-    // If we didn't find any matches, try to derive the conformance.
-    if (!candidates && DerivingTypeDecl) {
-      if (auto derived = TC.deriveProtocolRequirement(DerivingTypeDecl,
-                                                      AssociatedType)) {
-        auto derivedType = cast<TypeDecl>(derived);
-        candidates.addResult({derivedType, derivedType->getDeclaredType()});
-        didDerive = true;
-      } else {
-        // Don't complain if derivation failed; derivation should have diagnosed
-        // the issue.
-        ComplainLoc = SourceLoc();
-      }
-    }
+    case ResolveWitnessResult::ExplicitFailed:
+      Complained = true;
+      break;
 
-    // If there are still no matches, consider this associated type to be
-    // unresolved.
-    if (!candidates) {
+    case ResolveWitnessResult::Missing:
       unresolvedAssocTypes.push_back(AssociatedType);
-      continue;
-    }
-
-    SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
-    SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
-
-    for (auto candidate : candidates) {
-      // Check this type against the protocol requirements.
-      // FIXME: Check superclass requirement as well.
-      bool SatisfiesRequirements = true;
-      for (auto ReqProto : AssociatedType->getProtocols()) {
-        if (!TC.conformsToProtocol(candidate.second, ReqProto, DC)){
-          SatisfiesRequirements = false;
-
-          NonViable.push_back({candidate.first, ReqProto});
-          break;
-        }
-
-        if (!SatisfiesRequirements)
-          break;
-      }
-
-      if (SatisfiesRequirements)
-        Viable.push_back(candidate);
-    }
-    
-    auto archetype = AssociatedType->getArchetype();
-    if (Viable.size() == 1) {
-      TypeWitnesses[AssociatedType]
-        = getArchetypeSubstitution(TC, DC, archetype, Viable.front().second);
-      continue;
-    }
-    
-    if (ComplainLoc.isInvalid())
-      return nullptr;
-    
-    // Don't blame the user if the compiler or stdlib is busted and derived
-    // conformance failed.
-    auto didNotConform = didDerive ? diag::protocol_derivation_is_broken
-                                   : diag::type_does_not_conform;
-    
-    
-    if (!Viable.empty()) {
-      if (!Complained) {
-        TC.diagnose(ComplainLoc, didNotConform,
-                    T, Proto->getDeclaredType());
-        Complained = true;
-      }
-      
-      TC.diagnose(AssociatedType,
-                  diag::ambiguous_witnesses_type,
-                  AssociatedType->getName());
-
-      if (didDerive)
-        continue;
-      
-      for (auto Candidate : Viable)
-        TC.diagnose(Candidate.first, diag::protocol_witness_type);
-      
-      continue;
-    }
-
-    if (!NonViable.empty()) {
-      if (!Complained) {
-        TC.diagnose(ComplainLoc, didNotConform,
-                    T, Proto->getDeclaredType());
-        Complained = true;
-      }
-      TC.diagnose(AssociatedType, diag::no_witnesses_type,
-                  AssociatedType->getName());
-      
-      if (didDerive)
-        continue;
-
-      for (auto Candidate : NonViable) {
-        TC.diagnose(Candidate.first,
-                    diag::protocol_witness_nonconform_type,
-                    Candidate.first->getDeclaredType(),
-                    Candidate.second->getDeclaredType());
-      }
-
-      continue;
-    }
-    
-    if (ComplainLoc.isValid()) {
-      if (!Complained) {
-        TC.diagnose(ComplainLoc, didNotConform,
-                    T, Proto->getDeclaredType());
-        Complained = true;
-      }
-      TC.diagnose(AssociatedType, diag::no_witnesses_type,
-                  AssociatedType->getName());
-      
-      if (didDerive)
-        continue;
-      
-      for (auto candidate : candidates)
-        TC.diagnose(candidate.first, diag::protocol_witness_type);
-    } else {
-      return nullptr;
+      break;
     }
   }
 
