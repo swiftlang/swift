@@ -23,7 +23,8 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
+bool SILInliner::inlineFunction(InlineKind IKind,
+                                SILBasicBlock::iterator &I,
                                 SILFunction *CalleeFunction,
                                 ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
@@ -43,7 +44,13 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
-  Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(I->getLoc());
+  if (IKind == InlineKind::PerformanceInline) {
+    Loc = InlinedLocation::getInlinedLocation(I->getLoc());
+  } else {
+    assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
+    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(I->getLoc());
+  }
+
   DebugScope = I->getDebugScope();
 
   // If the caller's BB is not the last BB in the calling function, then keep

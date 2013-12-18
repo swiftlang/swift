@@ -32,6 +32,11 @@ public:
     : SILCloner<SILInliner>(F), CalleeEntryBB(nullptr), DebugScope(nullptr) {
   }
 
+  enum class InlineKind {
+    MandatoryInline,
+    PerformanceInline
+  };
+
   /// inlineFunction - This method inlines a callee function, assuming that it
   /// is called with the given arguments, into the caller at a given instruction
   /// (as specified by a basic block iterator), assuming that the instruction
@@ -43,16 +48,16 @@ public:
   /// (for any reason). If successful, I now points to the first inlined
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
-  bool inlineFunction(SILBasicBlock::iterator &I, SILFunction *CalleeFunction,
-                      ArrayRef<Substitution> Subs,
+  bool inlineFunction(InlineKind IKind, SILBasicBlock::iterator &I,
+                      SILFunction *CalleeFunction, ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args);
 
-  bool inlineFunction(SILInstruction *AI, SILFunction *CalleeFunction,
-                      ArrayRef<Substitution> Subs,
+  bool inlineFunction(InlineKind IKind, SILInstruction *AI,
+                      SILFunction *CalleeFunction, ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args) {
     assert(AI->getParent() && "Inliner called on uninserted instruction");
     SILBasicBlock::iterator I(AI);
-    return inlineFunction(I, CalleeFunction, Subs, Args);
+    return inlineFunction(IKind, I, CalleeFunction, Subs, Args);
   }
 
 private:

@@ -372,7 +372,8 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         --I;
       else
         I = ApplyBlock->end();
-      if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
+      if (!Inliner.inlineFunction(SILInliner::InlineKind::MandatoryInline,
+                                  InnerAI, CalleeFunction,
                                   InnerAI->getSubstitutions(), FullArgs)) {
         I = InnerAI;
         ++I;
