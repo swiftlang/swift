@@ -41,5 +41,8 @@ if platform.system() != 'Linux':
   config.available_features.add('swift_repl')
 
 # Add each available target as a feature.
-for target in config.targets_to_build.split():
-  config.available_features.add(target)
+# FIXME: compile-only tests also require target's stdlib, 
+# which may be unavailable
+#for target in config.targets_to_build.split():
+#  config.available_features.add(target)
+config.available_features.add("X86")
