@@ -786,35 +786,16 @@ static ResolveWitnessResult resolveWitnessViaLookup(
     // We have an ambiguity; diagnose it below.
   }
 
-  // If there were no viable witnesses, try to derive one.
-  // FIXME: Move this to a separate step.
-  if (numViable == 0) {
-    NominalTypeDecl *derivingTypeDecl = nullptr;
-    if (auto *nominal = type->getAnyNominal()) {
-      if (nominal->derivesProtocolConformance(proto))
-        derivingTypeDecl = nominal;
-    }
-
-    if (derivingTypeDecl) {
-      if (auto derived = tc.deriveProtocolRequirement(derivingTypeDecl,
-                                                      requirement)) {
-        witnesses.push_back(derived);
-        // If the compiler or stdlib is broken, the derived witness may not be
-        // viable.
-        if (matchWitness(tc, proto, dc, requirement, type, derived,
-                         typeWitnesses).isViable()) {
-          witnessMap[requirement] = derived;
-          tc.Context.recordConformingDecl(derived, requirement);
-          return ResolveWitnessResult::Success;
-        }
-        didDerive = true;
-      } else {
-        return ResolveWitnessResult::ExplicitFailed;
-      }
-    }
-  }
-    
   // We have either no matches or an ambiguous match.
+
+  // If we can derive a definition for this requirement, just call it missing.
+  // FIXME: Hoist this computation out of here.
+
+  // Find the declaration that derives the protocol conformance.
+  if (auto *nominal = type->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(proto))
+      return ResolveWitnessResult::Missing;
+  }
 
   // If the requirement is optional, it's okay: just record that the
   // requirement was not satisfied.
@@ -864,6 +845,55 @@ static ResolveWitnessResult resolveWitnessViaLookup(
 
   // FIXME: Suggest a new declaration that does match?
 
+  return ResolveWitnessResult::ExplicitFailed;
+}
+
+/// Attempt to resolve a witness via derivation.
+static ResolveWitnessResult resolveWitnessViaDerivation(
+                              TypeChecker &tc,
+                              ProtocolDecl *proto,
+                              Type type,
+                              DeclContext *dc,
+                              SourceLoc loc,
+                              ValueDecl *requirement,
+                              TypeWitnessMap &typeWitnesses,
+                              WitnessMap &witnessMap,
+                              SmallVectorImpl<AssociatedTypeDecl *> &
+                                unresolvedAssocTypes,
+                              SmallVectorImpl<std::pair<AssociatedTypeDecl *,
+                                                        Type>> &
+                                deducedAssocTypes,
+                              bool alreadyComplained) {
+  // Find the declaration that derives the protocol conformance.
+  NominalTypeDecl *derivingTypeDecl = nullptr;
+  if (auto *nominal = type->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(proto))
+      derivingTypeDecl = nominal;
+  }
+
+  if (!derivingTypeDecl) {
+    return ResolveWitnessResult::Missing;
+  }
+
+  // Attempt to derive the witness.
+  auto derived = tc.deriveProtocolRequirement(derivingTypeDecl, requirement);
+  if (!derived)
+    return ResolveWitnessResult::ExplicitFailed;
+
+  // Try to match the derived requirement.
+  if (matchWitness(tc, proto, dc, requirement, type, derived,
+                   typeWitnesses).isViable()) {
+    // FIXME: Infer associated types from the match?
+    witnessMap[requirement] = derived;
+    tc.Context.recordConformingDecl(derived, requirement);
+    return ResolveWitnessResult::Success;
+  }
+
+  // Derivation failed.
+  if (!alreadyComplained) {
+    tc.diagnose(loc, diag::protocol_derivation_is_broken,
+                proto->getDeclaredType(), type);
+  }
   return ResolveWitnessResult::ExplicitFailed;
 }
 
@@ -1169,21 +1199,43 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     }
 
+    // Try to resolve the witness via explicit definitions.
     switch (resolveWitnessViaLookup(TC, Proto, T, DC, ComplainLoc,
                                     requirement, TypeWitnesses, Mapping,
                                     unresolvedAssocTypes, 
                                     deducedAssocTypes, Complained)) {
     case ResolveWitnessResult::Success:
-      break;
+      continue;
 
     case ResolveWitnessResult::ExplicitFailed:
       Complained = true;
       invalid = true;
-      break;
+      continue;
 
     case ResolveWitnessResult::Missing:
+      // Continue trying below.
       break;
     }
+
+    // Try to resolve the witness via derivation.
+    switch (resolveWitnessViaDerivation(TC, Proto, T, DC, ComplainLoc,
+                                        requirement, TypeWitnesses, Mapping,
+                                        unresolvedAssocTypes,
+                                        deducedAssocTypes, Complained)) {
+    case ResolveWitnessResult::Success:
+      continue;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      Complained = true;
+      invalid = true;
+      continue;
+
+    case ResolveWitnessResult::Missing:
+      // Continue trying below.
+      break;
+    }
+
+    // FIXME: Try to resolve the witness via defaults.
   }
   
   if (Complained || invalid)
