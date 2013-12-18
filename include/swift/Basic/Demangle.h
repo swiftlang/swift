@@ -34,12 +34,6 @@ typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
 
 class Node : public llvm::RefCountedBase<Node> {
 public:
-
-  typedef llvm::SmallVector<NodePointer,10> NodeVector;
-  
-  typedef NodeVector::iterator iterator;
-  typedef NodeVector::const_iterator const_iterator;
-  typedef NodeVector::size_type size_type;
   
   enum class Kind {
     Failure = 0,
@@ -114,61 +108,96 @@ public:
     Weak,
     WitnessTableOffset
   };
-  
-  size_type size ();
-  iterator begin ();
-  iterator end ();
-  const_iterator begin () const;
-  const_iterator end () const;
-  
-  NodePointer front ();
-  NodePointer back ();
-  
-  NodePointer child_at (size_type idx);
-  
-  Node (Kind k, std::string t);
-  
-  Node (const Node& other);
-  
-  Node* getParent ();
-  
-  NodePointer getNextNode ();
-  Node* getPreviousNode ();
-  
-  NodePointer push_back_child (NodePointer child);
-  
-  void setParent (Node *parent);
-  void setNextNode (NodePointer successor);
-  
-  Kind getKind();
-  void setKind (Kind k);
-  
-  std::string getText();
-  void setText (const std::string &t);
-  
-  static NodePointer makeNodePointer(Kind k, std::string t = "");
-  
+
 private:
-  struct FindPtr {
-    FindPtr(Node* v) : ptr_val(v) {}
-    bool operator () (NodePointer sp) {
-      return sp.getPtr() == ptr_val;
-    }
-  private:
-    Node* ptr_val;
-  };
-  
   Kind NodeKind;
   std::string NodeText;
-  NodePointer Successor;
+
+  typedef llvm::SmallVector<NodePointer, 10> NodeVector;
   NodeVector Children;
-  Node* Parent;
-  Node* Predecessor;
+  Node *Parent = nullptr;
+  Node *Predecessor = nullptr;
+  NodePointer Successor = nullptr;
+
+  Node(Kind k) : NodeKind(k) {}
+  Node(Kind k, StringRef t) : NodeKind(k), NodeText(t) {}
+  Node(Kind k, std::string &&t) : NodeKind(k), NodeText(std::move(t)) {}
+  Node(const Node &);
+  Node &operator=(const Node &) = delete;
+public:  
+  static NodePointer create(Kind k) {
+    return NodePointer(new Node(k));
+  }
+  static NodePointer create(Kind k, llvm::StringRef text) {
+    return NodePointer(new Node(k, text));
+  }
+  static NodePointer create(Kind k, std::string &&text) {
+    return NodePointer(new Node(k, std::move(text)));
+  }
+  template <size_t N>
+  static NodePointer create(Kind k, const char (&text)[N]) {
+    return NodePointer(new Node(k, llvm::StringRef(text)));
+  }
+
+  /// Perform a deep copy of this node, leaving it ultimately
+  /// unparented.
+  NodePointer clone() const { return NodePointer(new Node(*this)); }
   
-  void setParentImpl (Node *parent);
-  void setSuccessorImpl (NodePointer successor);
-  void push_back_childImpl (NodePointer child);
-  void insertSiblingImpl (NodePointer child);
+  Kind getKind() const { return NodeKind; }
+  void setKind(Kind kind) { NodeKind = kind; }
+
+  const std::string &getText() const { return NodeText; }
+  
+  typedef NodeVector::iterator iterator;
+  typedef NodeVector::const_iterator const_iterator;
+  typedef NodeVector::size_type size_type;
+
+  size_type size() const { return Children.size(); }
+  iterator begin() { return Children.begin(); }
+  iterator end() { return Children.end(); }
+  const_iterator begin() const { return Children.begin(); }
+  const_iterator end() const { return Children.end(); }
+  
+  NodePointer front() const { return Children.front(); }
+  NodePointer back() const { return Children.back(); }
+  
+  NodePointer child_at(size_type idx) const { return Children[idx]; }
+
+  Node *getParent() const { return Parent; }
+  
+  NodePointer getNextNode() const { return Successor; }
+  NodePointer getPreviousNode() const { return NodePointer(Predecessor); }
+  
+  NodePointer push_back_child(NodePointer child);
+  
+  void setParent(Node *parent) {
+    Node *ptr = this;
+    while (ptr) {
+      ptr->setParentImpl(parent);
+      ptr = ptr->getNextNode().getPtr();
+    }
+  }
+
+  void setNextNode(NodePointer successor) {
+    if (getParent())
+      insertSiblingImpl(successor);
+    else
+      setSuccessorImpl(successor);
+  }
+  
+private:
+  void setParentImpl(Node *parent) {
+    Parent = parent;    
+  }
+
+  void setSuccessorImpl(NodePointer successor) {
+    Successor = std::move(successor);
+    Successor->Predecessor = this;
+  }
+  void push_back_childImpl(NodePointer child) {
+    Children.push_back(std::move(child));
+  }
+  void insertSiblingImpl(NodePointer child);
 };
   
 /// \brief Demangle the given string as a Swift symbol.

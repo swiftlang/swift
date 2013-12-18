@@ -25,52 +25,12 @@
 using namespace swift;
 using namespace Demangle;
 
-Node::size_type Node::size () {
-  return Children.size();
-}
-Node::iterator Node::begin () {
-  return Children.begin();
-}
-Node::iterator Node::end () {
-  return Children.end();
-}
-Node::const_iterator Node::begin () const {
-  return Children.begin();
-}
-Node::const_iterator Node::end () const {
-  return Children.end();
-}
-
-NodePointer Node::front () {
-  return Children.front();
-}
-NodePointer Node::back () {
-  return Children.back();
-}
-
-NodePointer Node::child_at (Node::size_type idx) {
-  return Children[idx];
-}
-
-Node::Node (Node::Kind k, std::string t) : NodeKind(k), NodeText(t), Successor(nullptr), Children(), Parent(nullptr), Predecessor(nullptr) {}
-
-Node::Node (const Node& other) : NodeKind(other.NodeKind), NodeText(other.NodeText), Successor(), Children(), Parent(), Predecessor() {
+Node::Node(const Node& other) : NodeKind(other.NodeKind), NodeText(other.NodeText) {
   for (NodePointer child : other)
     push_back_child(NodePointer(new Node(*child)));
 }
 
-Node* Node::getParent () {
-  return Parent;
-}
-
-NodePointer Node::getNextNode () {
-  return Successor;
-}
-Node* Node::getPreviousNode () {
-  return Predecessor;
-}
-
-NodePointer Node::push_back_child (NodePointer child) {
+NodePointer Node::push_back_child(NodePointer child) {
   NodePointer ret(child);
   while (child) {
     if (size())
@@ -82,46 +42,18 @@ NodePointer Node::push_back_child (NodePointer child) {
   return ret;
 }
 
-void Node::setParent (Node *parent) {
-  Node* ptr = this;
-  while (ptr) {
-    ptr->setParentImpl(parent);
-    ptr = ptr->getNextNode().getPtr();
-  }
-}
-void Node::setNextNode (NodePointer successor) {
-  if (getParent())
-    insertSiblingImpl(successor);
-  else
-    setSuccessorImpl(successor);
+namespace {
+  struct FindPtr {
+    FindPtr(Node *v) : Target(v) {}
+    bool operator()(NodePointer sp) const {
+      return sp.getPtr() == Target;
+    }
+  private:
+    Node *Target;
+  };
 }
 
-Node::Kind Node::getKind() {
-  return NodeKind;
-}
-void Node::setKind (Node::Kind k) {
-  NodeKind = k;
-}
-
-std::string Node::getText() {
-  return NodeText;
-}
-void Node::setText (const std::string &t) {
-  NodeText.assign(t);
-}
-
-void Node::setParentImpl (Node *parent) {
-  Parent = parent;
-}
-void Node::setSuccessorImpl (NodePointer successor) {
-  Successor = successor;
-  successor->Predecessor = this;
-}
-void Node::push_back_childImpl (NodePointer child) {
-  Children.push_back(child);
-}
-
-void Node::insertSiblingImpl (NodePointer child) {
+void Node::insertSiblingImpl(NodePointer child) {
   iterator pBegin = getParent()->begin();
   iterator pEnd = getParent()->end();
   iterator prev_pos = std::find_if(pBegin,pEnd,FindPtr(this));
@@ -215,10 +147,6 @@ static std::string archetypeName(size_t i) {
   return name.str();
 }
 
-NodePointer Node::makeNodePointer(Kind k, std::string t) {
-  return NodePointer(new Node(k, t));
-}
-
 class Demangler {
 public:
   
@@ -238,20 +166,20 @@ public:
     return CurrentNode;
   }
 
-  NodePointer appendNode(Node::Kind k, std::string t = "") {
+  NodePointer appendNode(Node::Kind k, std::string &&t = "") {
     if (!RootNode) {
-      RootNode = NodePointer(new Node(k, t));
+      RootNode = Node::create(k, std::move(t));
       CurrentNode = RootNode;
     } else {
-      CurrentNode->setNextNode(NodePointer(new Node(k, t)));
+      CurrentNode->setNextNode(Node::create(k, std::move(t)));
       CurrentNode = CurrentNode->getNextNode();
     }
     return CurrentNode;
   }
 
-  void insertChildNode(Node::Kind k, std::string t = "") {
+  void insertChildNode(Node::Kind k, std::string &&t = "") {
     assert(CurrentNode.getPtr() && "Need a current node");
-    CurrentNode->push_back_child(NodePointer(new Node(k, t)));
+    CurrentNode->push_back_child(Node::create(k, std::move(t)));
   }
 
   bool demangle() {
@@ -304,7 +232,7 @@ private:
   }
 
   bool failure() {
-    RootNode = NodePointer(new Node(Node::Kind::Failure, ""));
+    RootNode = Node::create(Node::Kind::Failure);
     CurrentNode = RootNode;
     return false;
   }
@@ -541,35 +469,35 @@ private:
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::ProtocolWitnessTable))->push_back_child(conformance);
+        appendNode(Node::create(Node::Kind::ProtocolWitnessTable))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('Z')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::LazyProtocolWitnessTableAccessor))->push_back_child(conformance);
+        appendNode(Node::create(Node::Kind::LazyProtocolWitnessTableAccessor))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('z')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::LazyProtocolWitnessTableTemplate))->push_back_child(conformance);
+        appendNode(Node::create(Node::Kind::LazyProtocolWitnessTableTemplate))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('D')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::DependentProtocolWitnessTableGenerator))->push_back_child(conformance);
+        appendNode(Node::create(Node::Kind::DependentProtocolWitnessTableGenerator))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('d')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::DependentProtocolWitnessTableTemplate))->push_back_child(conformance);
+        appendNode(Node::create(Node::Kind::DependentProtocolWitnessTableTemplate))->push_back_child(conformance);
         return true;
       }
       return failure();
@@ -590,7 +518,7 @@ private:
         return failure();
       return true;
     }
-    NodePointer decl = Node::makeNodePointer(Node::Kind::Declaration);
+    NodePointer decl = Node::create(Node::Kind::Declaration);
     appendNode(decl);
     if (!demangleEntity(decl))
       return failure();
@@ -633,11 +561,11 @@ private:
       if (operatr.size()) {
         switch (op_mode) {
         case 'p':
-          return Node::makeNodePointer(Node::Kind::PrefixOperator, operatr);
+          return Node::create(Node::Kind::PrefixOperator, operatr);
         case 'P':
-          return Node::makeNodePointer(Node::Kind::PostfixOperator, operatr);
+          return Node::create(Node::Kind::PostfixOperator, operatr);
         case 'i':
-          return Node::makeNodePointer(Node::Kind::InfixOperator, operatr);
+          return Node::create(Node::Kind::InfixOperator, operatr);
         default:
           return nullptr;
         }
@@ -648,7 +576,7 @@ private:
       if (Mangled.hasAtLeast(length)) {
         auto identifier = Mangled.slice(length);
         Mangled.advanceOffset(length);
-        return Node::makeNodePointer(Node::Kind::Identifier, identifier);
+        return Node::create(Node::Kind::Identifier, identifier);
       }
     }
     return nullptr;
@@ -677,77 +605,77 @@ private:
       if (head)
         printer << separator;
     }
-    return Node::makeNodePointer(outputKind, printer.str());
+    return Node::create(outputKind, printer.str());
   }
 
   Substitution demangleSubstitutionIndexWithProtocol() {
     if (!Mangled)
-      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
+      return { Node::create(Node::Kind::Failure), IsProtocol::no };
     if (Mangled.nextIf('o'))
-      return { Node::makeNodePointer(Node::Kind::Module,"ObjectiveC"), IsProtocol::no };
+      return { Node::create(Node::Kind::Module,"ObjectiveC"), IsProtocol::no };
     if (Mangled.nextIf('C'))
-      return { Node::makeNodePointer(Node::Kind::Module,"C"), IsProtocol::no };
+      return { Node::create(Node::Kind::Module,"C"), IsProtocol::no };
     if (Mangled.nextIf('s'))
-      return { Node::makeNodePointer(Node::Kind::Module,"swift"), IsProtocol::no };
+      return { Node::create(Node::Kind::Module,"swift"), IsProtocol::no };
     if (Mangled.nextIf('a')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Array"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"Array"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('b')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Bool"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"Bool"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('c')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"UnicodeScalar"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"UnicodeScalar"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('d')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Float64"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"Float64"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('f')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Float32"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"Float32"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('i')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Int64"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"Int64"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('q')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Enum,"Optional"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Enum,"Optional"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('S')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"String"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"String"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('u')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
-      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"UInt64"));
+      NodePointer type = Node::create(Node::Kind::Path);
+      type->push_back_child(Node::create(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::create(Node::Kind::Structure,"UInt64"));
       return { type, IsProtocol::no };
     }
     size_t index_sub;
     if (!demangleIndex(index_sub))
-      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
+      return { Node::create(Node::Kind::Failure), IsProtocol::no };
     if (index_sub >= Substitutions.size())
-      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
+      return { Node::create(Node::Kind::Failure), IsProtocol::no };
     return Substitutions[index_sub];
   }
 
@@ -755,7 +683,7 @@ private:
     Substitution sub = demangleSubstitutionIndexWithProtocol();
     if (!sub.first)
       return nullptr;
-    return NodePointer(new Node(*sub.first.getPtr()));
+    return sub.first->clone();
   }
 
   NodePointer demangleSubstitution() {
@@ -772,7 +700,7 @@ private:
         return nullptr;
       if (identifier->getKind() == Node::Kind::Identifier)
         identifier->setKind(Node::Kind::Module);
-      NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
+      NodePointer copy_identifier = Node::create(identifier->getKind(),identifier->getText());
       Substitutions.push_back( { copy_identifier, IsProtocol::no });
       return identifier;
     }
@@ -810,17 +738,17 @@ private:
     }
     if (context->getKind() == Node::Kind::Path) {
       context->push_back_child(identifier);
-      NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+      NodePointer path = Node::create(Node::Kind::Path);
       straightenNestedDeclContext(context, path);
       context = path;
     }
     else {
       context->setNextNode(identifier);
-      NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+      NodePointer path = Node::create(Node::Kind::Path);
       path->push_back_child(context);
       context = path;
     }
-    NodePointer nominaltype = NodePointer(new Node(*context));
+    NodePointer nominaltype = context->clone();
     Substitutions.push_back({ nominaltype, is_proto });
     return context;
   }
@@ -829,7 +757,7 @@ private:
     NodePointer proto = demangleProtocolNameImpl();
     if (proto)
     {
-      NodePointer type = Node::makeNodePointer(Node::Kind::Type);
+      NodePointer type = Node::create(Node::Kind::Type);
       type->push_back_child(proto);
       return type;
     }
@@ -842,19 +770,19 @@ private:
       if (!sub.first)
         return nullptr;
       if (sub.second == IsProtocol::yes) {
-        NodePointer subProto = Node::makeNodePointer(sub.first->getKind(),sub.first->getText());
+        NodePointer subProto = Node::create(sub.first->getKind(),sub.first->getText());
         for (NodePointer child : *sub.first) {
-          subProto->push_back_child(Node::makeNodePointer(child->getKind(),child->getText()));
+          subProto->push_back_child(Node::create(child->getKind(),child->getText()));
         }
         return subProto;
       }
       NodePointer identifier = demangleIdentifier();
       if (!identifier)
         return nullptr;
-      NodePointer nominaltype = Node::makeNodePointer(Node::Kind::Path);
-      NodePointer copy_context = NodePointer(new Node(*sub.first.getPtr()));
+      NodePointer nominaltype = Node::create(Node::Kind::Path);
+      NodePointer copy_context = sub.first->clone();
       identifier->setKind(Node::Kind::Protocol);
-      NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
+      NodePointer copy_identifier = Node::create(identifier->getKind(),identifier->getText());
       nominaltype->push_back_child(copy_context)->setNextNode(copy_identifier);
       Substitutions.push_back({ nominaltype, IsProtocol::yes });
       return nominaltype;
@@ -881,8 +809,8 @@ private:
   }
   
   NodePointer demangleContextGreedy (NodePointer first) {
-    NodePointer decl_ctx = Node::makeNodePointer(Node::Kind::DeclContext);
-    NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+    NodePointer decl_ctx = Node::create(Node::Kind::DeclContext);
+    NodePointer path = Node::create(Node::Kind::Path);
     path->push_back_child(first);
     decl_ctx->push_back_child(path);
     while (Mangled.hasAtLeast(1) && isStartOfIdentifier(Mangled.peek())) {
@@ -905,9 +833,9 @@ private:
     char c = Mangled.peek();
     if (c == 'F') {
       Mangled.next();
-      demangled_ctx = Node::makeNodePointer(Node::Kind::Declaration);
+      demangled_ctx = Node::create(Node::Kind::Declaration);
       if (!demangleEntity(demangled_ctx))
-        return NodePointer(new Node(Node::Kind::Failure, ""));
+        return Node::create(Node::Kind::Failure);
       else return demangled_ctx;
    }
 
@@ -938,7 +866,7 @@ private:
       case swift::Demangle::Node::Kind::Module:
       case swift::Demangle::Node::Kind::Protocol:
       case swift::Demangle::Node::Kind::Identifier: // should only happen for greedy context demanglings
-        dest->push_back_child(Node::makeNodePointer(srcKind,src->getText()));
+        dest->push_back_child(Node::create(srcKind,src->getText()));
         break;
       case swift::Demangle::Node::Kind::Path:
         for (NodePointer child : *src) {
@@ -958,7 +886,7 @@ private:
     NodePointer demangled_ctx(demangleContextImpl(inferred_context_type,allow_greedy));
     if (!demangled_ctx)
       return nullptr;
-    NodePointer ret(Node::makeNodePointer(Node::Kind::Path));
+    NodePointer ret(Node::create(Node::Kind::Path));
     if (straightenNestedDeclContext(demangled_ctx, ret))
       return ret;
     else
@@ -979,8 +907,8 @@ private:
   }
 
   NodePointer demangleProtocolList() {
-    NodePointer proto_list = Node::makeNodePointer(Node::Kind::ProtocolList);
-    NodePointer type_list = Node::makeNodePointer(Node::Kind::TypeList);
+    NodePointer proto_list = Node::create(Node::Kind::ProtocolList);
+    NodePointer type_list = Node::create(Node::Kind::TypeList);
     proto_list->push_back_child(type_list);
     if (Mangled.nextIf('_')) {
       return proto_list;
@@ -1009,7 +937,7 @@ private:
     if (!context)
       return nullptr;
     NodePointer proto_conformance =
-        Node::makeNodePointer(Node::Kind::ProtocolConformance);
+        Node::create(Node::Kind::ProtocolConformance);
     proto_conformance->push_back_child(type);
     proto_conformance->push_back_child(protocol);
     proto_conformance->push_back_child(context);
@@ -1065,14 +993,14 @@ private:
     Node::Kind idKind = getDeclContextType(context);
     if (Mangled.nextIf('D')) {
       if (idKind == Node::Kind::Class)
-        context->push_back_child(Node::makeNodePointer(Node::Kind::Deallocator));
+        context->push_back_child(Node::create(Node::Kind::Deallocator));
       else
-        context->push_back_child(Node::makeNodePointer(Node::Kind::Destructor));
+        context->push_back_child(Node::create(Node::Kind::Destructor));
       decl->push_back_child(context);
       return true;
     }
     if (Mangled.nextIf('d')) {
-      context->push_back_child(Node::makeNodePointer(Node::Kind::Destructor));
+      context->push_back_child(Node::create(Node::Kind::Destructor));
       decl->push_back_child(context);
       return true;
     }
@@ -1081,9 +1009,9 @@ private:
       if (!type)
         return failure();
       if (idKind == Node::Kind::Class)
-        context->push_back_child(Node::makeNodePointer(Node::Kind::Allocator));
+        context->push_back_child(Node::create(Node::Kind::Allocator));
       else
-        context->push_back_child(Node::makeNodePointer(Node::Kind::Constructor));
+        context->push_back_child(Node::create(Node::Kind::Constructor));
       decl->push_back_child(context);
       decl->push_back_child(type);
       return true;
@@ -1092,7 +1020,7 @@ private:
       NodePointer type = demangleType();
       if (!type)
         return failure();
-      context->push_back_child(Node::makeNodePointer(Node::Kind::Constructor));
+      context->push_back_child(Node::create(Node::Kind::Constructor));
       decl->push_back_child(context);
       decl->push_back_child(type);
       return true;
@@ -1113,7 +1041,7 @@ private:
       return nullptr;
     if (accessorKind != Node::Kind::Failure) {
       context->push_back_child(demangledDecl.first);
-      context->push_back_child(Node::makeNodePointer(accessorKind));
+      context->push_back_child(Node::create(accessorKind));
       decl->push_back_child(context);
       decl->push_back_child(demangledDecl.second);
     } else {
@@ -1126,7 +1054,7 @@ private:
 
   NodePointer demangleArchetypes() {
     DemanglerPrinter result_printer;
-    NodePointer archetypes = Node::makeNodePointer(Node::Kind::ArchetypeList);
+    NodePointer archetypes = Node::create(Node::Kind::ArchetypeList);
     while (true) {
       if (Mangled.nextIf('_')) {
         if (!Mangled)
@@ -1134,15 +1062,15 @@ private:
         char c = Mangled.peek();
         if (c != '_' && c != 'S' && !isStartOfIdentifier(c))
           break;
-        archetypes->push_back_child(Node::makeNodePointer(
+        archetypes->push_back_child(Node::create(
             Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
       } else {
         NodePointer proto_list = demangleProtocolList();
         if (!proto_list)
           return nullptr;
         NodePointer arch_and_proto =
-            Node::makeNodePointer(Node::Kind::ArchetypeAndProtocol);
-        arch_and_proto->push_back_child(Node::makeNodePointer(
+            Node::create(Node::Kind::ArchetypeAndProtocol);
+        arch_and_proto->push_back_child(Node::create(
             Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
         arch_and_proto->push_back_child(proto_list);
         archetypes->push_back_child(arch_and_proto);
@@ -1154,7 +1082,7 @@ private:
 
   NodePointer demangleArchetypeRef(size_t depth, size_t i) {
     if (depth == 0 && ArchetypeCount == 0)
-      return Node::makeNodePointer(Node::Kind::ArchetypeRef, archetypeName(i));
+      return Node::create(Node::Kind::ArchetypeRef, archetypeName(i));
     size_t length = ArchetypeCounts.size();
     if (depth >= length)
       return nullptr;
@@ -1163,14 +1091,14 @@ private:
         (depth == 0) ? ArchetypeCount : ArchetypeCounts[length - depth];
     if (index >= max)
       return nullptr;
-    return Node::makeNodePointer(Node::Kind::ArchetypeRef,
+    return Node::create(Node::Kind::ArchetypeRef,
                                  archetypeName(index));
   }
   
   NodePointer demangleArchetypeType() {
     auto makeSelfType = [&](NodePointer proto) -> NodePointer {
       NodePointer selfType
-        = Node::makeNodePointer(Node::Kind::SelfTypeRef);
+        = Node::create(Node::Kind::SelfTypeRef);
       selfType->push_back_child(proto);
       Substitutions.push_back({ selfType, IsProtocol::no });
       return selfType;
@@ -1180,7 +1108,7 @@ private:
       NodePointer name = demangleIdentifier();
       if (!name) return nullptr;
       NodePointer assocType
-        = Node::makeNodePointer(Node::Kind::AssociatedTypeRef);
+        = Node::create(Node::Kind::AssociatedTypeRef);
       assocType->push_back_child(root);
       assocType->push_back_child(name);
       Substitutions.push_back({ assocType, IsProtocol::no });
@@ -1220,13 +1148,13 @@ private:
         return nullptr;
       DemanglerPrinter printer;
       printer << index;
-      NodePointer index_node = Node::makeNodePointer(Node::Kind::Number,printer.str());
-      NodePointer decl_ctx = Node::makeNodePointer(Node::Kind::DeclContext);
+      NodePointer index_node = Node::create(Node::Kind::Number,printer.str());
+      NodePointer decl_ctx = Node::create(Node::Kind::DeclContext);
       NodePointer ctx = demangleContext(nullptr,true);
       if (!ctx)
         return nullptr;
       decl_ctx->push_back_child(ctx);
-      NodePointer qual_atype = Node::makeNodePointer(Node::Kind::QualifiedArchetype);
+      NodePointer qual_atype = Node::create(Node::Kind::QualifiedArchetype);
       qual_atype->push_back_child(index_node);
       qual_atype->push_back_child(decl_ctx);
       return qual_atype;
@@ -1238,14 +1166,14 @@ private:
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
-    NodePointer tuple = Node::makeNodePointer(
+    NodePointer tuple = Node::create(
         isV == IsVariadic::yes ? Node::Kind::VariadicTuple
                                : Node::Kind::NonVariadicTuple);
     while (Mangled.nextIf('_') == false) {
       if (!Mangled)
         return nullptr;
       NodePointer tuple_element =
-          Node::makeNodePointer(Node::Kind::TupleElement);
+          Node::create(Node::Kind::TupleElement);
       NodePointer identifier;
       NodePointer type;
       if (isStartOfIdentifier(Mangled.peek())) {
@@ -1268,7 +1196,7 @@ private:
   }
   
   NodePointer postProcessReturnTypeNode (NodePointer out_args) {
-    NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
+    NodePointer out_node = Node::create(Node::Kind::ReturnType);
     out_node->push_back_child(out_args);
     return out_node;
   }
@@ -1277,7 +1205,7 @@ private:
     NodePointer type = demangleTypeImpl();
     if (!type)
       return nullptr;
-    NodePointer nodeType = Node::makeNodePointer(Node::Kind::Type);
+    NodePointer nodeType = Node::create(Node::Kind::Type);
     nodeType->push_back_child(type);
     return nodeType;
   }
@@ -1292,9 +1220,9 @@ private:
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
-        NodePointer array = Node::makeNodePointer(Node::Kind::ArrayType);
+        NodePointer array = Node::create(Node::Kind::ArrayType);
         array->push_back_child(type);
-        array->push_back_child(Node::makeNodePointer(
+        array->push_back_child(Node::create(
             Node::Kind::Number, (DemanglerPrinter() << size).str()));
         return array;
       }
@@ -1307,7 +1235,7 @@ private:
       if (c == 'f') {
         size_t size;
         if (demangleBuiltinSize(size)) {
-          return Node::makeNodePointer(
+          return Node::create(
               Node::Kind::BuiltinTypeName,
               (DemanglerPrinter() << "Builtin.Float" << size).str());
         }
@@ -1315,7 +1243,7 @@ private:
       if (c == 'i') {
         size_t size;
         if (demangleBuiltinSize(size)) {
-          return Node::makeNodePointer(
+          return Node::create(
               Node::Kind::BuiltinTypeName,
               (DemanglerPrinter() << "Builtin.Int" << size).str());
         }
@@ -1329,7 +1257,7 @@ private:
             size_t size;
             if (!demangleBuiltinSize(size))
               return nullptr;
-            return Node::makeNodePointer(
+            return Node::create(
                 Node::Kind::BuiltinTypeName,
                 (DemanglerPrinter() << "Builtin.Vec" << elts << "xInt" << size)
                     .str());
@@ -1338,29 +1266,29 @@ private:
             size_t size;
             if (!demangleBuiltinSize(size))
               return nullptr;
-            return Node::makeNodePointer(
+            return Node::create(
                 Node::Kind::BuiltinTypeName,
                 (DemanglerPrinter() << "Builtin.Vec" << elts << "xFloat"
                                     << size).str());
           }
           if (Mangled.nextIf('p'))
-            return Node::makeNodePointer(
+            return Node::create(
                 Node::Kind::BuiltinTypeName,
                 (DemanglerPrinter() << "Builtin.Vec" << elts << "xRawPointer")
                     .str());
         }
       }
       if (c == 'O')
-        return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
+        return Node::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.ObjCPointer");
       if (c == 'o')
-        return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
+        return Node::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.ObjectPointer");
       if (c == 'p')
-        return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
+        return Node::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");
       if (c == 'w')
-        return Node::makeNodePointer(Node::Kind::BuiltinTypeName,
+        return Node::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.Word");
       return nullptr;
     }
@@ -1374,8 +1302,8 @@ private:
       NodePointer out_args = demangleType();
       if (!out_args)
         return nullptr;
-      NodePointer block = Node::makeNodePointer(Node::Kind::ObjCBlock);
-      NodePointer in_node = Node::makeNodePointer(Node::Kind::ArgumentTuple);
+      NodePointer block = Node::create(Node::Kind::ObjCBlock);
+      NodePointer in_node = Node::create(Node::Kind::ArgumentTuple);
       block->push_back_child(in_node);
       in_node->push_back_child(in_args);
       block->push_back_child(postProcessReturnTypeNode(out_args));
@@ -1386,7 +1314,7 @@ private:
         return nullptr;
       if (!Mangled.nextIf('R'))
         return nullptr;
-      return Node::makeNodePointer(Node::Kind::ErrorType, std::string());
+      return Node::create(Node::Kind::ErrorType, std::string());
     }
     if (c == 'F') {
       NodePointer in_args = demangleType();
@@ -1395,8 +1323,8 @@ private:
       NodePointer out_args = demangleType();
       if (!out_args)
         return nullptr;
-      NodePointer block = Node::makeNodePointer(Node::Kind::FunctionType);
-      NodePointer in_node = Node::makeNodePointer(Node::Kind::ArgumentTuple);
+      NodePointer block = Node::create(Node::Kind::FunctionType);
+      NodePointer in_node = Node::create(Node::Kind::ArgumentTuple);
       block->push_back_child(in_node);
       in_node->push_back_child(in_args);
       block->push_back_child(postProcessReturnTypeNode(out_args));
@@ -1410,13 +1338,13 @@ private:
       if (!out_args)
         return nullptr;
       NodePointer block =
-          Node::makeNodePointer(Node::Kind::UncurriedFunctionType);
+          Node::create(Node::Kind::UncurriedFunctionType);
       block->push_back_child(in_args);
       block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
     if (c == 'G') {
-      NodePointer type_list = Node::makeNodePointer(Node::Kind::TypeList);
+      NodePointer type_list = Node::create(Node::Kind::TypeList);
       NodePointer unboundType = demangleType();
       if (!unboundType)
         return nullptr;
@@ -1446,7 +1374,7 @@ private:
           assert(false && "trying to make a generic type application for a non class|struct|enum");
       }
       NodePointer type_application =
-          Node::makeNodePointer(bound_type_kind);
+          Node::create(bound_type_kind);
       type_application->push_back_child(unboundType);
       type_application->push_back_child(type_list);
       return type_application;
@@ -1455,7 +1383,7 @@ private:
       NodePointer type = demangleType();
       if (!type)
         return nullptr;
-      NodePointer metatype = Node::makeNodePointer(Node::Kind::MetaType);
+      NodePointer metatype = Node::create(Node::Kind::MetaType);
       metatype->push_back_child(type);
       return metatype;
     }
@@ -1466,7 +1394,7 @@ private:
       return demangleArchetypeType();
     }
     if (c == 'R') {
-      NodePointer inout = Node::makeNodePointer(Node::Kind::InOut);
+      NodePointer inout = Node::create(Node::Kind::InOut);
       NodePointer type = demangleTypeImpl();
       if (!type)
         return nullptr;
@@ -1492,7 +1420,7 @@ private:
         return nullptr;
       ArchetypeCount = ArchetypeCounts.back();
       ArchetypeCounts.pop_back();
-      NodePointer generics = Node::makeNodePointer(Node::Kind::GenericType);
+      NodePointer generics = Node::create(Node::Kind::GenericType);
       generics->push_back_child(archetypes);
       generics->push_back_child(base);
       return generics;
@@ -1502,7 +1430,7 @@ private:
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
-        NodePointer unowned = Node::makeNodePointer(Node::Kind::Unowned);
+        NodePointer unowned = Node::create(Node::Kind::Unowned);
         unowned->push_back_child(type);
         return unowned;
       }
@@ -1510,7 +1438,7 @@ private:
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
-        NodePointer weak = Node::makeNodePointer(Node::Kind::Weak);
+        NodePointer weak = Node::create(Node::Kind::Weak);
         weak->push_back_child(type);
         return weak;
       }
