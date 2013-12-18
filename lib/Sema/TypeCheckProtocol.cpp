@@ -626,7 +626,6 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 }
 
 namespace {
-
   /// The result of attempting to resolve a witness.
   enum class ResolveWitnessResult {
     /// The resolution succeeded.
@@ -637,7 +636,237 @@ namespace {
     /// There was no witness available.
     Missing
   };
+}
 
+/// Attempt to resolve a witness via name lookup.
+static ResolveWitnessResult resolveWitnessViaLookup(
+                              TypeChecker &tc,
+                              ProtocolDecl *proto,
+                              Type type,
+                              DeclContext *dc,
+                              SourceLoc loc,
+                              ValueDecl *requirement,
+                              TypeWitnessMap &typeWitnesses,
+                              WitnessMap &witnessMap,
+                              SmallVectorImpl<AssociatedTypeDecl *> &
+                                unresolvedAssocTypes,
+                              SmallVectorImpl<std::pair<AssociatedTypeDecl *, 
+                                                        Type>> &
+                                deducedAssocTypes,
+                              bool alreadyComplained) {
+  auto metaType = MetaTypeType::get(type, tc.Context);
+
+  // Gather the witnesses.
+  SmallVector<ValueDecl *, 4> witnesses;
+  if (requirement->getName().isOperator()) {
+    // Operator lookup is always global.
+    UnqualifiedLookup lookup(requirement->getName(),
+                             dc->getModuleScopeContext(),
+                             &tc);
+
+    if (lookup.isSuccess()) {
+      for (auto candidate : lookup.Results) {
+        assert(candidate.hasValueDecl());
+        witnesses.push_back(candidate.getValueDecl());
+      }
+    }
+  } else {
+    // Variable/function/subscript requirements.
+    for (auto candidate : tc.lookupMember(metaType,requirement->getName(),dc)) {
+      witnesses.push_back(candidate);
+    }
+  }
+
+  // Match each of the witnesses to the requirement.
+  SmallVector<RequirementMatch, 4> matches;
+  unsigned numViable = 0;
+  unsigned bestIdx = 0;
+  bool invalidWitness = false;
+  bool didDerive = false;
+  for (auto witness : witnesses) {
+    // Don't match anything in a protocol.
+    // FIXME: When default implementations come along, we can try to match
+    // these when they're default implementations coming from another
+    // (unrelated) protocol.
+    if (isa<ProtocolDecl>(witness->getDeclContext())) {
+      continue;
+    }
+
+    if (!witness->hasType())
+      tc.validateDecl(witness, true);
+
+    auto match = matchWitness(tc, proto, dc, requirement, type, witness,
+                              typeWitnesses);
+    if (match.isViable()) {
+      ++numViable;
+      bestIdx = matches.size();
+    } else if (match.Kind == MatchKind::WitnessInvalid) {
+      invalidWitness = true;
+    }
+
+    matches.push_back(std::move(match));
+  }
+
+  // If there are any viable matches, try to find the best.
+  if (numViable >= 1) {
+    // If there numerous viable matches, throw out the non-viable matches
+    // and try to find a "best" match.
+    bool isReallyBest = true;
+    if (numViable > 1) {
+      matches.erase(std::remove_if(matches.begin(), matches.end(),
+                                   [](const RequirementMatch &match) {
+                                     return !match.isViable();
+                                   }),
+                    matches.end());
+
+      // Find the best match.
+      bestIdx = 0;
+      for (unsigned i = 1, n = matches.size(); i != n; ++i) {
+        if (isBetterMatch(tc, dc, matches[i], matches[bestIdx]))
+          bestIdx = i;
+      }
+
+      // Make sure it is, in fact, the best.
+      for (unsigned i = 0, n = matches.size(); i != n; ++i) {
+        if (i == bestIdx)
+          continue;
+
+        if (!isBetterMatch(tc, dc, matches[bestIdx], matches[i])) {
+          isReallyBest = false;
+          break;
+        }
+      }
+    }
+
+    // If we really do have a best match, record it.
+    if (isReallyBest) {
+      auto &best = matches[bestIdx];
+
+      // Record the match.
+      if (best.WitnessSubstitutions.empty())
+        witnessMap[requirement] = best.Witness;
+      else
+        witnessMap[requirement] = ConcreteDeclRef(tc.Context, best.Witness,
+                                                  best.WitnessSubstitutions);
+      tc.Context.recordConformingDecl(best.Witness, requirement);
+
+      // If we deduced any associated types, record them now.
+      if (!best.AssociatedTypeDeductions.empty()) {
+        // Record the deductions.
+        for (auto deduction : best.AssociatedTypeDeductions) {
+          auto assocType = deduction.first;
+          auto archetype = assocType->getArchetype();
+
+          // Compute the archetype substitution.
+          typeWitnesses[assocType]
+            = getArchetypeSubstitution(tc, dc, archetype, deduction.second);
+        }
+
+        // Remove the now-resolved associated types from the set of
+        // unresolved associated types.
+        unresolvedAssocTypes.erase(
+          std::remove_if(unresolvedAssocTypes.begin(),
+                         unresolvedAssocTypes.end(),
+                         [&](AssociatedTypeDecl *assocType) {
+                           auto known = typeWitnesses.find(assocType);
+                           if (known == typeWitnesses.end())
+                             return false;
+
+                           deducedAssocTypes.push_back(
+                             {assocType, known->second.Replacement});
+                           return true;
+                         }),
+            unresolvedAssocTypes.end());
+      }
+
+      return ResolveWitnessResult::Success;
+    }
+
+    // We have an ambiguity; diagnose it below.
+  }
+
+  // If there were no viable witnesses, try to derive one.
+  // FIXME: Move this to a separate step.
+  if (numViable == 0) {
+    NominalTypeDecl *derivingTypeDecl = nullptr;
+    if (auto *nominal = type->getAnyNominal()) {
+      if (nominal->derivesProtocolConformance(proto))
+        derivingTypeDecl = nominal;
+    }
+
+    if (derivingTypeDecl) {
+      if (auto derived = tc.deriveProtocolRequirement(derivingTypeDecl,
+                                                      requirement)) {
+        witnesses.push_back(derived);
+        // If the compiler or stdlib is broken, the derived witness may not be
+        // viable.
+        if (matchWitness(tc, proto, dc, requirement, type, derived,
+                         typeWitnesses).isViable()) {
+          witnessMap[requirement] = derived;
+          tc.Context.recordConformingDecl(derived, requirement);
+          return ResolveWitnessResult::Success;
+        }
+        didDerive = true;
+      } else {
+        return ResolveWitnessResult::ExplicitFailed;
+      }
+    }
+  }
+    
+  // We have either no matches or an ambiguous match.
+
+  // If the requirement is optional, it's okay: just record that the
+  // requirement was not satisfied.
+  if (requirement->getAttrs().isOptional()) {
+    witnessMap[requirement] = ConcreteDeclRef();
+    return ResolveWitnessResult::Success;
+  }
+
+  // Diagnose the error.
+    
+  // If the location is invalid, we can't complain. Just report the
+  // error to the caller.
+  if (loc.isInvalid())
+    return ResolveWitnessResult::ExplicitFailed;
+
+  // Complain that this type does not conform to this protocol.
+  if (!alreadyComplained) {
+    tc.diagnose(loc, diag::type_does_not_conform,
+                type, proto->getDeclaredType());
+  }
+
+  // If there was an invalid witness that might have worked, just
+  // suppress the diagnostic entirely. This stops the diagnostic cascade.
+  // FIXME: We could do something crazy, like try to fix up the witness.
+  if (invalidWitness) {
+    return ResolveWitnessResult::ExplicitFailed;
+  }
+
+  // Determine the type that the requirement is expected to have.
+  Type reqType = getRequirementTypeForDisplay(tc, dc->getParentModule(),
+                                              type, requirement, typeWitnesses);
+
+  // Point out the requirement that wasn't met.
+  tc.diagnose(requirement,
+              numViable > 0? diag::ambiguous_witnesses
+                           : diag::no_witnesses,
+              getRequirementKind(requirement),
+              requirement->getName(),
+              reqType);
+    
+  if (!didDerive) {
+    // Diagnose each of the matches.
+    for (const auto &match : matches)
+      diagnoseMatch(tc, dc->getParentModule(), type, requirement, match,
+                    deducedAssocTypes);
+  }
+
+  // FIXME: Suggest a new declaration that does match?
+
+  return ResolveWitnessResult::ExplicitFailed;
+}
+
+namespace {
   /// Describes the result of checking a type witness.
   ///
   /// This class evaluates true if an error occurred, and can be
@@ -885,7 +1114,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   bool Complained = false;
-  auto metaT = MetaTypeType::get(T, TC.Context);
 
   // First, resolve any associated type members that have bindings. We'll
   // attempt to deduce any associated types that don't have explicit
@@ -920,226 +1148,37 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // Check that T provides all of the required func/variable/subscript members.
   SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
   bool invalid = false;
-  for (auto Member : Proto->getMembers()) {
-    auto Requirement = dyn_cast<ValueDecl>(Member);
-    if (!Requirement || Requirement->isInvalid())
+  for (auto member : Proto->getMembers()) {
+    auto requirement = dyn_cast<ValueDecl>(member);
+    if (!requirement)
       continue;
 
     // Associated type requirements handled above.
-    if (isa<AssociatedTypeDecl>(Requirement))
+    if (isa<AssociatedTypeDecl>(requirement))
       continue;
-    
-    TC.validateDecl(Requirement, true);
 
-    // Gather the witnesses.
-    SmallVector<ValueDecl *, 4> witnesses;
-    if (Requirement->getName().isOperator()) {
-      // Operator lookup is always global.
-      UnqualifiedLookup Lookup(Requirement->getName(),
-                               DC->getModuleScopeContext(),
-                               &TC);
-
-      if (Lookup.isSuccess()) {
-        for (auto Candidate : Lookup.Results) {
-          assert(Candidate.hasValueDecl());
-          witnesses.push_back(Candidate.getValueDecl());
-        }
-      }
-    } else {
-      // Variable/function/subscript requirements.
-      for (auto candidate : TC.lookupMember(metaT, Requirement->getName(), DC)){
-        witnesses.push_back(candidate);
-      }
-    }
-
-    // Match each of the witnesses to the requirement, to see which ones
-    // succeed.
-    SmallVector<RequirementMatch, 4> matches;
-    unsigned numViable = 0;
-    unsigned bestIdx = 0;
-    bool invalidWitness = false;
-    bool didDerive = false;
-    for (auto witness : witnesses) {
-      // Don't match anything in a protocol.
-      // FIXME: When default implementations come along, we can try to match
-      // these when they're default implementations coming from another
-      // (unrelated) protocol.
-      if (isa<ProtocolDecl>(witness->getDeclContext())) {
-        continue;
-      }
-
-      if (!witness->hasType())
-        TC.validateDecl(witness, true);
-
-      auto match = matchWitness(TC, Proto, DC, Requirement, T, witness,
-                                TypeWitnesses);
-      if (match.isViable()) {
-        ++numViable;
-        bestIdx = matches.size();
-      } else if (match.Kind == MatchKind::WitnessInvalid) {
-        invalidWitness = true;
-      }
-
-      matches.push_back(std::move(match));
-    }
-
-    // If there are any viable matches, try to find the best.
-    if (numViable >= 1) {
-      // If there numerous viable matches, throw out the non-viable matches
-      // and try to find a "best" match.
-      bool isReallyBest = true;
-      if (numViable > 1) {
-        matches.erase(std::remove_if(matches.begin(), matches.end(),
-                                     [](const RequirementMatch &match) {
-                                       return !match.isViable();
-                                     }),
-                        matches.end());
-
-        // Find the best match.
-        bestIdx = 0;
-        for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-          if (isBetterMatch(TC, DC, matches[i], matches[bestIdx]))
-            bestIdx = i;
-        }
-
-        // Make sure it is, in fact, the best.
-        for (unsigned i = 0, n = matches.size(); i != n; ++i) {
-          if (i == bestIdx)
-            continue;
-
-          if (!isBetterMatch(TC, DC, matches[bestIdx], matches[i])) {
-            isReallyBest = false;
-            break;
-          }
-        }
-      }
-
-      // If we really do have a best match, record it.
-      if (isReallyBest) {
-        auto &best = matches[bestIdx];
-
-        // Record the match.
-        if (best.WitnessSubstitutions.empty())
-          Mapping[Requirement] = best.Witness;
-        else
-          Mapping[Requirement] = ConcreteDeclRef(TC.Context, best.Witness,
-                                                 best.WitnessSubstitutions);
-        TC.Context.recordConformingDecl(best.Witness, Requirement);
-
-        // If we deduced any associated types, record them now.
-        if (!best.AssociatedTypeDeductions.empty()) {
-          // Record the deductions.
-          for (auto deduction : best.AssociatedTypeDeductions) {
-            auto assocType = deduction.first;
-            auto archetype = assocType->getArchetype();
-
-            // Compute the archetype substitution.
-            TypeWitnesses[assocType]
-              = getArchetypeSubstitution(TC, DC, archetype, deduction.second);
-          }
-
-          // Remove the now-resolved associated types from the set of
-          // unresolved associated types.
-          unresolvedAssocTypes.erase(
-            std::remove_if(unresolvedAssocTypes.begin(),
-                           unresolvedAssocTypes.end(),
-                           [&](AssociatedTypeDecl *assocType) {
-                             auto known = TypeWitnesses.find(assocType);
-                             if (known == TypeWitnesses.end())
-                               return false;
-
-                             deducedAssocTypes.push_back(
-                               {assocType, known->second.Replacement});
-                             return true;
-                           }),
-            unresolvedAssocTypes.end());
-        }
-
-        continue;
-      }
-
-      // We have an ambiguity; diagnose it below.
-    }
-
-    // If there were no viable witnesses, try to derive one.
-    if (numViable == 0 && DerivingTypeDecl) {
-      if (auto derived = TC.deriveProtocolRequirement(DerivingTypeDecl,
-                                                      Requirement)) {
-        witnesses.push_back(derived);
-        // If the compiler or stdlib is broken, the derived witness may not be
-        // viable.
-        if (matchWitness(TC, Proto, DC, Requirement, T, derived,
-                         TypeWitnesses).isViable()) {
-          Mapping[Requirement] = derived;
-          TC.Context.recordConformingDecl(derived, Requirement);
-          continue;
-        }
-        didDerive = true;
-      } else {
-        // Don't complain if derivation failed; derivation should have diagnosed
-        // the issue.
-        ComplainLoc = SourceLoc();
-      }
-    }
-    
-    // We have either no matches or an ambiguous match.
-
-    // If the requirement is optional, it's okay: just record that the
-    // requirement was not satisfied.
-    if (Requirement->getAttrs().isOptional()) {
-      Mapping[Requirement] = ConcreteDeclRef();
-      continue;
-    }
-
-    // Diagnose the error.
-
-    // If we're not supposed to complain, don't; just return null to indicate
-    // failure.
-    if (ComplainLoc.isInvalid())
-      return nullptr;
-
-    // If there was an invalid witness that might have worked, just
-    // suppress the diagnostic entirely. This stops the diagnostic cascade.
-    // FIXME: We could do something crazy, like try to fix up the witness.
-    if (invalidWitness) {
+    // Make sure we've validated the requirement.
+    TC.validateDecl(requirement, true);
+    if (requirement->isInvalid()) {
       invalid = true;
       continue;
     }
-    
-    // Don't blame the user if the compiler or stdlib are broken and a
-    // derived conformance didn't work.
-    auto didNotConform = didDerive
-      ? diag::protocol_derivation_is_broken
-      : diag::type_does_not_conform;
-    
-    // Complain that this type does not conform to this protocol.
-    if (!Complained) {
-      TC.diagnose(ComplainLoc, didNotConform,
-                  T, Proto->getDeclaredType());
+
+    switch (resolveWitnessViaLookup(TC, Proto, T, DC, ComplainLoc,
+                                    requirement, TypeWitnesses, Mapping,
+                                    unresolvedAssocTypes, 
+                                    deducedAssocTypes, Complained)) {
+    case ResolveWitnessResult::Success:
+      break;
+
+    case ResolveWitnessResult::ExplicitFailed:
       Complained = true;
+      invalid = true;
+      break;
+
+    case ResolveWitnessResult::Missing:
+      break;
     }
-
-    // Determine the type that the requirement is expected to have.
-    Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
-                                                T, Requirement, TypeWitnesses);
-
-    // Point out the requirement that wasn't met.
-    TC.diagnose(Requirement,
-                numViable > 0? diag::ambiguous_witnesses
-                             : diag::no_witnesses,
-                getRequirementKind(Requirement),
-                Requirement->getName(),
-                reqType);
-    
-    if (didDerive)
-      continue;
-
-    // Diagnose each of the matches.
-    for (const auto &match : matches)
-      diagnoseMatch(TC, DC->getParentModule(), T, Requirement, match,
-                    deducedAssocTypes);
-
-    // FIXME: Suggest a new declaration that does match?
   }
   
   if (Complained || invalid)
