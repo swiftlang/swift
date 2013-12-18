@@ -28,7 +28,12 @@ bool SILInliner::inlineFunction(InlineKind IKind,
                                 SILFunction *CalleeFunction,
                                 ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
+  // Do not attempt to inline an apply into its parent function.
+  if (I->getParent()->getParent() == CalleeFunction)
+    return false;
+
   SILFunction &F = getBuilder().getFunction();
+
   assert(I->getParent()->getParent() && I->getParent()->getParent() == &F &&
          "Inliner called on apply instruction in wrong function?");
   assert(I != I->getParent()->end() && "Inliner called on a terminator?");
