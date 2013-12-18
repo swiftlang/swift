@@ -13,17 +13,12 @@ target_link_libraries(swift edit ${CORE_FOUNDATION})
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
-                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
+                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" 
+                   -DSWIFT_TOOLCHAIN_SUBDIR="${SWIFTLIB_SUBDIR}" )
 endif()
 
 if (SWIFT_SUBMIT_VERSION)
   add_definitions(-DSWIFT_VERSION_STRING="swift-${SWIFT_SUBMIT_VERSION}.${SWIFT_SUBMIT_SUBVERSION}")
-endif()
-
-# Add a run-path so that the interpreter can find the swift runtime libraries.
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_property(TARGET swift APPEND_STRING PROPERTY
-    LINK_FLAGS " -Wl,-rpath -Wl,@executable_path/../lib/swift")
 endif()
 
 install(TARGETS swift

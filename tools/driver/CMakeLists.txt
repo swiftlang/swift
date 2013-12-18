@@ -15,13 +15,6 @@ if (SWIFT_SUBMIT_VERSION)
   add_definitions(-DSWIFT_VERSION_STRING="swift-${SWIFT_SUBMIT_VERSION}.${SWIFT_SUBMIT_SUBVERSION}")
 endif()
 
-# Add a run-path so that the interpreter can find the swift runtime libraries.
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_target_properties(swift_driver
-    PROPERTIES
-    LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib/swift")
-endif()
-
 install(TARGETS swift_driver
   RUNTIME DESTINATION bin)
 

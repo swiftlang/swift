@@ -36,6 +36,32 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeIncludePath(LibPath.str());
 }
 
+void CompilerInvocation::setRuntimeIncludePath(StringRef Path) {
+  llvm::SmallString<128> LibPath(Path);
+  SearchPathOpts.RuntimeIncludePath = LibPath.str();
+  updateRuntimeImportPath();
+}
+
+void CompilerInvocation::updateRuntimeImportPath() {
+  llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeIncludePath);
+
+  llvm::Triple Triple(TargetOpts.Triple);
+  if (Triple.isiOS())
+    if (Triple.getArch() == llvm::Triple::ArchType::x86)
+      llvm::sys::path::append(LibPath, "iphonesimulator");
+    else 
+      llvm::sys::path::append(LibPath, "iphoneos");
+  else if (Triple.isMacOSX()) 
+    llvm::sys::path::append(LibPath, "macosx");  
+
+  SearchPathOpts.RuntimeImportPath = LibPath.str();
+}
+
+void CompilerInvocation::setTargetTriple(StringRef Triple) {
+  TargetOpts.Triple = Triple.str();
+  updateRuntimeImportPath();
+}
+
 // TODO: remove InputKind param once we support storing it in FrontendOptions
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags,
@@ -240,7 +266,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
 
   // Opts.RuntimeIncludePath is set by calls to
-  // CompilerInvocation::setRuntimeIncludePath().
+  // setRuntimeIncludePath() or setMainExecutablePath().
+  // Opts.RuntimeImportPath is set by calls to
+  // setRuntimeIncludePath() or setMainExecutablePath() and 
+  // updated by calls to setTargetTriple() or parseArgs().
+  // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
+  // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
 
   return false;
@@ -341,6 +372,9 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   if (ParseTargetArgs(TargetOpts, *ParsedArgs, Diags)) {
     return true;
   }
+
+  // Target options may have changed this path.
+  updateRuntimeImportPath();
 
   if (ParseDiagnosticArgs(DiagnosticOpts, *ParsedArgs, Diags)) {
     return true;
