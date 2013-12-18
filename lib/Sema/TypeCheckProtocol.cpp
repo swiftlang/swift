@@ -27,6 +27,20 @@
 
 using namespace swift;
 
+namespace {
+  /// The result of attempting to resolve a witness.
+  enum class ResolveWitnessResult {
+    /// The resolution succeeded.
+    Success,
+    /// There was an explicit witness available, but it failed some
+    /// criteria.
+    ExplicitFailed,
+    /// There was no witness available.
+    Missing
+  };
+}
+
+# pragma mark Witness resolution
 /// \brief Retrieve the kind of requirement described by the given declaration,
 /// for use in some diagnostics.
 /// FIXME: Enumify this.
@@ -625,19 +639,6 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   return result;
 }
 
-namespace {
-  /// The result of attempting to resolve a witness.
-  enum class ResolveWitnessResult {
-    /// The resolution succeeded.
-    Success,
-    /// There was an explicit witness available, but it failed some
-    /// criteria.
-    ExplicitFailed,
-    /// There was no witness available.
-    Missing
-  };
-}
-
 /// Attempt to resolve a witness via name lookup.
 static ResolveWitnessResult resolveWitnessViaLookup(
                               TypeChecker &tc,
@@ -866,6 +867,8 @@ static ResolveWitnessResult resolveWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+# pragma mark Type witness resolution
+
 namespace {
   /// Describes the result of checking a type witness.
   ///
@@ -1066,6 +1069,8 @@ static ResolveWitnessResult resolveTypeWitnessViaDerivation(
                                                       derivedType);
   return ResolveWitnessResult::Success;
 }
+
+# pragma mark Protocol conformance checking
 
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
