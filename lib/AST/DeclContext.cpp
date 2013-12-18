@@ -89,7 +89,7 @@ Type DeclContext::getDeclaredInterfaceType() {
 }
 
 static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
-                                    bool isStatic, bool isInOutFunc,
+                                    bool isStatic, bool isMutatingFunc,
                                     GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
@@ -117,7 +117,7 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
   if (dc->getASTContext().LangOpts.InOutMethods) {
     // Value type methods which are not marked @inout are of type T since they
     // cannot mutate a receiver.
-    if (!isInOutFunc)
+    if (!isMutatingFunc)
       return containerTy;
   }
 

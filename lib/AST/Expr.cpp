@@ -375,6 +375,25 @@ SourceRange UnresolvedPatternExpr::getSourceRange() const {
   return subPattern->getSourceRange();
 }
 
+RequalifyExpr::RequalifyExpr(Expr *subExpr, Type type, bool isForObject)
+  : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type),
+    IsForObject(isForObject) {
+
+  assert(subExpr->getType()->is<LValueType>() && type->is<LValueType>() &&
+         "RequalifyExpr can only convert from lvalue to lvalue");
+
+  // FIXME: We only get this check in the new mutability model, because the old
+  // model was stripping the settable bit.
+  if (type->getASTContext().LangOpts.InOutMethods) {
+    assert((subExpr->getType()->castTo<LValueType>()->getQualifiers() &
+            type->castTo<LValueType>()->getQualifiers()) ==
+           subExpr->getType()->castTo<LValueType>()->getQualifiers() &&
+           "RequalifyExpr is stripping lvalue qualifiers!");
+  }
+}
+
+
+
 unsigned ScalarToTupleExpr::getScalarField() const {
   unsigned result = std::find(Elements.begin(), Elements.end(), Element())
                       - Elements.begin();

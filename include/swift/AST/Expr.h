@@ -22,7 +22,6 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -1595,10 +1594,8 @@ public:
 class RequalifyExpr : public ImplicitConversionExpr {
   bool IsForObject;
 public:
-  RequalifyExpr(Expr *subExpr, Type type, bool isForObject = false)
-    : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type),
-      IsForObject(isForObject) {}
-
+  RequalifyExpr(Expr *subExpr, Type type, bool isForObject = false);
+  
   /// Is this requalification for the object operand?
   ///
   /// Qualification adjustments for the object operand are permitted
