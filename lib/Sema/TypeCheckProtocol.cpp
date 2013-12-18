@@ -38,6 +38,60 @@ namespace {
     /// There was no witness available.
     Missing
   };
+
+  /// The protocol conformance checker.
+  ///
+  /// This helper class handles most of the details of checking whether a
+  /// given type (\c Adoptee) conforms to a protocol (\c Proto).
+  class ConformanceChecker {
+    TypeChecker &TC;
+    ProtocolDecl *Proto;
+    Type Adoptee;
+    DeclContext *DC;
+    SourceLoc Loc;
+    TypeWitnessMap &TypeWitnesses;
+    WitnessMap &Witnesses;
+    SmallVectorImpl<AssociatedTypeDecl *> &UnresolvedAssocTypes;
+    SmallVectorImpl<std::pair<AssociatedTypeDecl *, Type>> &DeducedAssocTypes;
+    bool &AlreadyComplained;
+
+  public:
+    ConformanceChecker(TypeChecker &tc,
+                       ProtocolDecl *proto,
+                       Type adoptee,
+                       DeclContext *dc,
+                       SourceLoc loc,
+                       TypeWitnessMap &typeWitnesses,
+                       WitnessMap &witnesses,
+                       SmallVectorImpl<AssociatedTypeDecl *> &
+                         unresolvedAssocTypes,
+                       SmallVectorImpl<std::pair<AssociatedTypeDecl *,Type>> &
+                         deducedAssocTypes,
+                       bool &alreadyComplained)
+      : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc), Loc(loc),
+        TypeWitnesses(typeWitnesses), Witnesses(witnesses),
+        UnresolvedAssocTypes(unresolvedAssocTypes),
+        DeducedAssocTypes(deducedAssocTypes),
+        AlreadyComplained(alreadyComplained) { }
+
+    /// Resolve a (non-type) witness via name lookup.
+    ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
+
+    /// Resolve a (non-type) witness via derivation.
+    ResolveWitnessResult resolveWitnessViaDerivation(ValueDecl *requirement);
+
+    /// Attempt to resolve a type witness via member name lookup.
+    ResolveWitnessResult resolveTypeWitnessViaLookup(
+                           AssociatedTypeDecl *assocType);
+
+    /// Attempt to resolve a type witness via a default definition.
+    ResolveWitnessResult resolveTypeWitnessViaDefault(
+                           AssociatedTypeDecl *assocType);
+
+    /// Attempt to resolve a type witness via derivation.
+    ResolveWitnessResult resolveTypeWitnessViaDerivation(
+                           AssociatedTypeDecl *assocType);
+  };
 }
 
 # pragma mark Witness resolution
@@ -50,7 +104,7 @@ int getRequirementKind(ValueDecl *VD) {
 
   if (isa<VarDecl>(VD))
     return 1;
-  
+
   assert(isa<SubscriptDecl>(VD) && "Unhandled requirement kind");
   return 2;
 }
@@ -639,31 +693,17 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   return result;
 }
 
-/// Attempt to resolve a witness via name lookup.
-static ResolveWitnessResult resolveWitnessViaLookup(
-                              TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              Type type,
-                              DeclContext *dc,
-                              SourceLoc loc,
-                              ValueDecl *requirement,
-                              TypeWitnessMap &typeWitnesses,
-                              WitnessMap &witnessMap,
-                              SmallVectorImpl<AssociatedTypeDecl *> &
-                                unresolvedAssocTypes,
-                              SmallVectorImpl<std::pair<AssociatedTypeDecl *, 
-                                                        Type>> &
-                                deducedAssocTypes,
-                              bool alreadyComplained) {
-  auto metaType = MetaTypeType::get(type, tc.Context);
+ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
+                       ValueDecl *requirement) {
+  auto metaType = MetaTypeType::get(Adoptee, TC.Context);
 
   // Gather the witnesses.
   SmallVector<ValueDecl *, 4> witnesses;
   if (requirement->getName().isOperator()) {
     // Operator lookup is always global.
     UnqualifiedLookup lookup(requirement->getName(),
-                             dc->getModuleScopeContext(),
-                             &tc);
+                             DC->getModuleScopeContext(),
+                             &TC);
 
     if (lookup.isSuccess()) {
       for (auto candidate : lookup.Results) {
@@ -673,7 +713,7 @@ static ResolveWitnessResult resolveWitnessViaLookup(
     }
   } else {
     // Variable/function/subscript requirements.
-    for (auto candidate : tc.lookupMember(metaType,requirement->getName(),dc)) {
+    for (auto candidate : TC.lookupMember(metaType,requirement->getName(),DC)) {
       witnesses.push_back(candidate);
     }
   }
@@ -694,10 +734,10 @@ static ResolveWitnessResult resolveWitnessViaLookup(
     }
 
     if (!witness->hasType())
-      tc.validateDecl(witness, true);
+      TC.validateDecl(witness, true);
 
-    auto match = matchWitness(tc, proto, dc, requirement, type, witness,
-                              typeWitnesses);
+    auto match = matchWitness(TC, Proto, DC, requirement, Adoptee, witness,
+                              TypeWitnesses);
     if (match.isViable()) {
       ++numViable;
       bestIdx = matches.size();
@@ -723,7 +763,7 @@ static ResolveWitnessResult resolveWitnessViaLookup(
       // Find the best match.
       bestIdx = 0;
       for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-        if (isBetterMatch(tc, dc, matches[i], matches[bestIdx]))
+        if (isBetterMatch(TC, DC, matches[i], matches[bestIdx]))
           bestIdx = i;
       }
 
@@ -732,7 +772,7 @@ static ResolveWitnessResult resolveWitnessViaLookup(
         if (i == bestIdx)
           continue;
 
-        if (!isBetterMatch(tc, dc, matches[bestIdx], matches[i])) {
+        if (!isBetterMatch(TC, DC, matches[bestIdx], matches[i])) {
           isReallyBest = false;
           break;
         }
@@ -745,11 +785,11 @@ static ResolveWitnessResult resolveWitnessViaLookup(
 
       // Record the match.
       if (best.WitnessSubstitutions.empty())
-        witnessMap[requirement] = best.Witness;
+        Witnesses[requirement] = best.Witness;
       else
-        witnessMap[requirement] = ConcreteDeclRef(tc.Context, best.Witness,
+        Witnesses[requirement] = ConcreteDeclRef(TC.Context, best.Witness,
                                                   best.WitnessSubstitutions);
-      tc.Context.recordConformingDecl(best.Witness, requirement);
+      TC.Context.recordConformingDecl(best.Witness, requirement);
 
       // If we deduced any associated types, record them now.
       if (!best.AssociatedTypeDeductions.empty()) {
@@ -759,25 +799,25 @@ static ResolveWitnessResult resolveWitnessViaLookup(
           auto archetype = assocType->getArchetype();
 
           // Compute the archetype substitution.
-          typeWitnesses[assocType]
-            = getArchetypeSubstitution(tc, dc, archetype, deduction.second);
+          TypeWitnesses[assocType]
+            = getArchetypeSubstitution(TC, DC, archetype, deduction.second);
         }
 
         // Remove the now-resolved associated types from the set of
         // unresolved associated types.
-        unresolvedAssocTypes.erase(
-          std::remove_if(unresolvedAssocTypes.begin(),
-                         unresolvedAssocTypes.end(),
+        UnresolvedAssocTypes.erase(
+          std::remove_if(UnresolvedAssocTypes.begin(),
+                         UnresolvedAssocTypes.end(),
                          [&](AssociatedTypeDecl *assocType) {
-                           auto known = typeWitnesses.find(assocType);
-                           if (known == typeWitnesses.end())
+                           auto known = TypeWitnesses.find(assocType);
+                           if (known == TypeWitnesses.end())
                              return false;
 
-                           deducedAssocTypes.push_back(
+                           DeducedAssocTypes.push_back(
                              {assocType, known->second.Replacement});
                            return true;
                          }),
-            unresolvedAssocTypes.end());
+            UnresolvedAssocTypes.end());
       }
 
       return ResolveWitnessResult::Success;
@@ -792,15 +832,15 @@ static ResolveWitnessResult resolveWitnessViaLookup(
   // FIXME: Hoist this computation out of here.
 
   // Find the declaration that derives the protocol conformance.
-  if (auto *nominal = type->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(proto))
+  if (auto *nominal = Adoptee->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(Proto))
       return ResolveWitnessResult::Missing;
   }
 
   // If the requirement is optional, it's okay: just record that the
   // requirement was not satisfied.
   if (requirement->getAttrs().isOptional()) {
-    witnessMap[requirement] = ConcreteDeclRef();
+    Witnesses[requirement] = ConcreteDeclRef();
     return ResolveWitnessResult::Success;
   }
 
@@ -808,13 +848,13 @@ static ResolveWitnessResult resolveWitnessViaLookup(
     
   // If the location is invalid, we can't complain. Just report the
   // error to the caller.
-  if (loc.isInvalid())
+  if (Loc.isInvalid())
     return ResolveWitnessResult::ExplicitFailed;
 
   // Complain that this type does not conform to this protocol.
-  if (!alreadyComplained) {
-    tc.diagnose(loc, diag::type_does_not_conform,
-                type, proto->getDeclaredType());
+  if (!AlreadyComplained) {
+    TC.diagnose(Loc, diag::type_does_not_conform,
+                Adoptee, Proto->getDeclaredType());
   }
 
   // If there was an invalid witness that might have worked, just
@@ -825,11 +865,11 @@ static ResolveWitnessResult resolveWitnessViaLookup(
   }
 
   // Determine the type that the requirement is expected to have.
-  Type reqType = getRequirementTypeForDisplay(tc, dc->getParentModule(),
-                                              type, requirement, typeWitnesses);
+  Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
+                                              Adoptee, requirement, TypeWitnesses);
 
   // Point out the requirement that wasn't met.
-  tc.diagnose(requirement,
+  TC.diagnose(requirement,
               numViable > 0? diag::ambiguous_witnesses
                            : diag::no_witnesses,
               getRequirementKind(requirement),
@@ -839,8 +879,8 @@ static ResolveWitnessResult resolveWitnessViaLookup(
   if (!didDerive) {
     // Diagnose each of the matches.
     for (const auto &match : matches)
-      diagnoseMatch(tc, dc->getParentModule(), type, requirement, match,
-                    deducedAssocTypes);
+      diagnoseMatch(TC, DC->getParentModule(), Adoptee, requirement, match,
+                    DeducedAssocTypes);
   }
 
   // FIXME: Suggest a new declaration that does match?
@@ -849,25 +889,12 @@ static ResolveWitnessResult resolveWitnessViaLookup(
 }
 
 /// Attempt to resolve a witness via derivation.
-static ResolveWitnessResult resolveWitnessViaDerivation(
-                              TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              Type type,
-                              DeclContext *dc,
-                              SourceLoc loc,
-                              ValueDecl *requirement,
-                              TypeWitnessMap &typeWitnesses,
-                              WitnessMap &witnessMap,
-                              SmallVectorImpl<AssociatedTypeDecl *> &
-                                unresolvedAssocTypes,
-                              SmallVectorImpl<std::pair<AssociatedTypeDecl *,
-                                                        Type>> &
-                                deducedAssocTypes,
-                              bool alreadyComplained) {
+ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
+                       ValueDecl *requirement) {
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  if (auto *nominal = type->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(proto))
+  if (auto *nominal = Adoptee->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(Proto))
       derivingTypeDecl = nominal;
   }
 
@@ -876,23 +903,23 @@ static ResolveWitnessResult resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived = tc.deriveProtocolRequirement(derivingTypeDecl, requirement);
+  auto derived = TC.deriveProtocolRequirement(derivingTypeDecl, requirement);
   if (!derived)
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  if (matchWitness(tc, proto, dc, requirement, type, derived,
-                   typeWitnesses).isViable()) {
+  if (matchWitness(TC, Proto, DC, requirement, Adoptee, derived,
+                   TypeWitnesses).isViable()) {
     // FIXME: Infer associated types from the match?
-    witnessMap[requirement] = derived;
-    tc.Context.recordConformingDecl(derived, requirement);
+    Witnesses[requirement] = derived;
+    TC.Context.recordConformingDecl(derived, requirement);
     return ResolveWitnessResult::Success;
   }
 
   // Derivation failed.
-  if (!alreadyComplained) {
-    tc.diagnose(loc, diag::protocol_derivation_is_broken,
-                proto->getDeclaredType(), type);
+  if (!AlreadyComplained) {
+    TC.diagnose(Loc, diag::protocol_derivation_is_broken,
+                Proto->getDeclaredType(), Adoptee);
   }
   return ResolveWitnessResult::ExplicitFailed;
 }
@@ -937,19 +964,12 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 }
 
 /// Attempt to resolve a type witness via member name lookup.
-static ResolveWitnessResult resolveTypeWitnessViaLookup(
-                              TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              Type type,
-                              DeclContext *dc,
-                              SourceLoc loc,
-                              AssociatedTypeDecl *assocType,
-                              TypeWitnessMap &typeWitnesses,
-                              bool alreadyComplained) {
-  auto metaType = MetaTypeType::get(type, tc.Context);
+ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
+                       AssociatedTypeDecl *assocType) {
+  auto metaType = MetaTypeType::get(Adoptee, TC.Context);
 
   // Look for a member type with the same name as the associated type.
-  auto candidates = tc.lookupMemberType(metaType, assocType->getName(), dc);
+  auto candidates = TC.lookupMemberType(metaType, assocType->getName(), DC);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -961,7 +981,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> nonViable;
   for (auto candidate : candidates) {
     // Check this type against the protocol requirements.
-    if (auto checkResult = checkTypeWitness(tc, dc, assocType, 
+    if (auto checkResult = checkTypeWitness(TC, DC, assocType, 
                                             candidate.second)) {
       auto reqProto = checkResult.getProtocol();
       nonViable.push_back({candidate.first, reqProto});
@@ -973,36 +993,36 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   auto archetype = assocType->getArchetype();
   if (viable.size() == 1) {
-    typeWitnesses[assocType] =
-      getArchetypeSubstitution(tc, dc, archetype, viable.front().second);
+    TypeWitnesses[assocType] =
+      getArchetypeSubstitution(TC, DC, archetype, viable.front().second);
     return ResolveWitnessResult::Success;
   }
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
-    if (!alreadyComplained)
-      tc.diagnose(loc, diag::type_does_not_conform, type, 
-                  proto->getDeclaredType());
+    if (!AlreadyComplained)
+      TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                  Proto->getDeclaredType());
 
-    tc.diagnose(assocType, diag::ambiguous_witnesses_type,
+    TC.diagnose(assocType, diag::ambiguous_witnesses_type,
                 assocType->getName());
 
     for (auto candidate : viable)
-      tc.diagnose(candidate.first, diag::protocol_witness_type);
+      TC.diagnose(candidate.first, diag::protocol_witness_type);
 
     return ResolveWitnessResult::ExplicitFailed;
   }
 
   // None of the candidates were viable.
-  if (!alreadyComplained)
-    tc.diagnose(loc, diag::type_does_not_conform, type, 
-                proto->getDeclaredType());
+  if (!AlreadyComplained)
+    TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                Proto->getDeclaredType());
 
-  tc.diagnose(assocType, diag::no_witnesses_type,
+  TC.diagnose(assocType, diag::no_witnesses_type,
               assocType->getName());
 
   for (auto candidate : nonViable) {
-    tc.diagnose(candidate.first,
+    TC.diagnose(candidate.first,
                 diag::protocol_witness_nonconform_type,
                 candidate.first->getDeclaredType(),
                 candidate.second->getDeclaredType());
@@ -1012,15 +1032,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 }
 
 /// Attempt to resolve a type witness via a default definition.
-static ResolveWitnessResult resolveTypeWitnessViaDefault(
-                              TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              Type type,
-                              DeclContext *dc,
-                              SourceLoc loc,
-                              AssociatedTypeDecl *assocType,
-                              TypeWitnessMap &typeWitnesses,
-                              bool alreadyComplained) {
+ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
+                       AssociatedTypeDecl *assocType) {
   // If we don't have a default definition, we're done.
   if (assocType->getDefaultDefinitionLoc().isNull())
     return ResolveWitnessResult::Missing;
@@ -1028,23 +1041,23 @@ static ResolveWitnessResult resolveTypeWitnessViaDefault(
   // Create a set of type substitutions for all known associated type.
   // FIXME: Base this on dependent types rather than archetypes?
   TypeSubstitutionMap substitutions;
-  substitutions[proto->getSelf()->getArchetype()] = type;
-  for (const auto &witness: typeWitnesses) {
+  substitutions[Proto->getSelf()->getArchetype()] = Adoptee;
+  for (const auto &witness: TypeWitnesses) {
     substitutions[witness.second.Archetype] = witness.second.Replacement;
   }
-  auto defaultType = tc.substType(dc->getParentModule(),
+  auto defaultType = TC.substType(DC->getParentModule(),
                                   assocType->getDefaultDefinitionLoc().getType(),
                                   substitutions,
                                   /*IgnoreMissing=*/true);
   if (!defaultType)
     return ResolveWitnessResult::Missing;
 
-  if (auto checkResult = checkTypeWitness(tc, dc, assocType, defaultType)) {
-    if (!alreadyComplained)
-      tc.diagnose(loc, diag::type_does_not_conform, type, 
-                  proto->getDeclaredType());
+  if (auto checkResult = checkTypeWitness(TC, DC, assocType, defaultType)) {
+    if (!AlreadyComplained)
+      TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
+                  Proto->getDeclaredType());
     
-    tc.diagnose(assocType, diag::default_assocated_type_req_fail,
+    TC.diagnose(assocType, diag::default_assocated_type_req_fail,
                 defaultType, checkResult.getProtocol()->getDeclaredType());
 
     return ResolveWitnessResult::ExplicitFailed;
@@ -1052,25 +1065,18 @@ static ResolveWitnessResult resolveTypeWitnessViaDefault(
   
   // Fill in the type witness and declare success.
   auto archetype = assocType->getArchetype();
-  typeWitnesses[assocType] = getArchetypeSubstitution(tc, dc, archetype, 
+  TypeWitnesses[assocType] = getArchetypeSubstitution(TC, DC, archetype, 
                                                       defaultType);
   return ResolveWitnessResult::Success;
 }
 
 /// Attempt to resolve a type witness via derivation.
-static ResolveWitnessResult resolveTypeWitnessViaDerivation(
-                              TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              Type type,
-                              DeclContext *dc,
-                              SourceLoc loc,
-                              AssociatedTypeDecl *assocType,
-                              TypeWitnessMap &typeWitnesses,
-                              bool alreadyComplained) {
+ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
+                       AssociatedTypeDecl *assocType) {
   // See whether we can derive members of this conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  if (auto *nominal = type->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(proto))
+  if (auto *nominal = Adoptee->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(Proto))
       derivingTypeDecl = nominal;
   }
 
@@ -1078,24 +1084,24 @@ static ResolveWitnessResult resolveTypeWitnessViaDerivation(
   if (!derivingTypeDecl)
     return ResolveWitnessResult::Missing;
 
-  // PErform the derivation.
-  auto derived = tc.deriveProtocolRequirement(derivingTypeDecl, assocType);
+  // Perform the derivation.
+  auto derived = TC.deriveProtocolRequirement(derivingTypeDecl, assocType);
   if (!derived) {
     // The problem was already diagnosed.
     return ResolveWitnessResult::ExplicitFailed;
   }
 
   auto derivedType = cast<TypeDecl>(derived)->getDeclaredType();
-  if (checkTypeWitness(tc, dc, assocType, derivedType)) {
+  if (checkTypeWitness(TC, DC, assocType, derivedType)) {
     // FIXME: give more detail here?
-    tc.diagnose(loc, diag::protocol_derivation_is_broken,
-                proto->getDeclaredType(), derivedType);
+    TC.diagnose(Loc, diag::protocol_derivation_is_broken,
+                Proto->getDeclaredType(), derivedType);
     return ResolveWitnessResult::ExplicitFailed;
   } 
   
   // Fill in the type witness and declare success.
   auto archetype = assocType->getArchetype();
-  typeWitnesses[assocType] = getArchetypeSubstitution(tc, dc, archetype, 
+  TypeWitnesses[assocType] = getArchetypeSubstitution(TC, DC, archetype, 
                                                       derivedType);
   return ResolveWitnessResult::Success;
 }
@@ -1149,20 +1155,24 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   bool Complained = false;
+  SmallVector<AssociatedTypeDecl *, 4> unresolvedAssocTypes;
+  SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
+
+  // The conformance checker we're using.
+  ConformanceChecker checker(TC, Proto, T, DC, ComplainLoc, TypeWitnesses,
+                             Mapping, unresolvedAssocTypes, deducedAssocTypes,
+                             Complained);
 
   // First, resolve any associated type members that have bindings. We'll
   // attempt to deduce any associated types that don't have explicit
   // definitions.
-  SmallVector<AssociatedTypeDecl *, 4> unresolvedAssocTypes;
   for (auto Member : Proto->getMembers()) {
     auto AssociatedType = dyn_cast<AssociatedTypeDecl>(Member);
     if (!AssociatedType)
       continue;
 
     // Try to resolve the type witness via name lookup.
-    switch (resolveTypeWitnessViaLookup(TC, Proto, T, DC, ComplainLoc,
-                                        AssociatedType, TypeWitnesses,
-                                        Complained)) {
+    switch (checker.resolveTypeWitnessViaLookup(AssociatedType)) {
     case ResolveWitnessResult::Success:
       break;
 
@@ -1181,7 +1191,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return nullptr;
 
   // Check that T provides all of the required func/variable/subscript members.
-  SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
   bool invalid = false;
   for (auto member : Proto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
@@ -1200,10 +1209,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
 
     // Try to resolve the witness via explicit definitions.
-    switch (resolveWitnessViaLookup(TC, Proto, T, DC, ComplainLoc,
-                                    requirement, TypeWitnesses, Mapping,
-                                    unresolvedAssocTypes, 
-                                    deducedAssocTypes, Complained)) {
+    switch (checker.resolveWitnessViaLookup(requirement)) {
     case ResolveWitnessResult::Success:
       continue;
 
@@ -1218,10 +1224,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
 
     // Try to resolve the witness via derivation.
-    switch (resolveWitnessViaDerivation(TC, Proto, T, DC, ComplainLoc,
-                                        requirement, TypeWitnesses, Mapping,
-                                        unresolvedAssocTypes,
-                                        deducedAssocTypes, Complained)) {
+    switch (checker.resolveWitnessViaDerivation(requirement)) {
     case ResolveWitnessResult::Success:
       continue;
 
@@ -1245,9 +1248,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // or compiler-supported derivation.
   auto resolveAssocType = [&](AssociatedTypeDecl *assocType) -> bool {
     // Default implementations.
-    switch (resolveTypeWitnessViaDefault(TC, Proto, T, DC, ComplainLoc,
-                                         assocType, TypeWitnesses,
-                                         Complained)) {
+    switch (checker.resolveTypeWitnessViaDefault(assocType)) {
     case ResolveWitnessResult::Success:
       deducedAssocTypes.push_back(
         {assocType, TypeWitnesses[assocType].Replacement});
@@ -1261,9 +1262,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       break;
     }
 
-    switch (resolveTypeWitnessViaDerivation(TC, Proto, T, DC, ComplainLoc,
-                                            assocType, TypeWitnesses,
-                                            Complained)) {
+    switch (checker.resolveTypeWitnessViaDerivation(assocType)) {
     case ResolveWitnessResult::Success:
       deducedAssocTypes.push_back(
         {assocType, TypeWitnesses[assocType].Replacement});
