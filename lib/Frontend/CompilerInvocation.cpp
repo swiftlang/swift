@@ -272,6 +272,23 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
+                           DiagnosticEngine &Diags) {
+  using namespace options;
+
+  if (Args.hasArg(OPT_g)) {
+    Opts.DebugInfo = true;
+    llvm::raw_string_ostream Flags(Opts.DWARFDebugFlags);
+    interleave(Args,
+               [&](const Arg *Argument) {
+                 Flags << Argument->getAsString(Args);
+               },
+               [&] { Flags << " "; });
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
   using namespace driver::options;
@@ -339,6 +356,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseTargetArgs(TargetOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+  
+  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags)) {
     return true;
   }
 
