@@ -18,9 +18,9 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
 
-#include "swift/IRGen/Options.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"

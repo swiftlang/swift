@@ -27,9 +27,9 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
-#include "swift/IRGen/Options.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"

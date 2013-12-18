@@ -16,9 +16,9 @@
 
 #include "SwiftTargetMachine.h"
 #include "swift/Subsystems.h"
-#include "swift/IRGen/Options.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"

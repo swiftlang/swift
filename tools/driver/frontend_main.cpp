@@ -18,8 +18,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/IRGen/Options.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/Options.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
