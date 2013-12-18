@@ -149,13 +149,9 @@ static bool performCompile(CompilerInstance &Instance,
   // Cleanup instructions/builtin calls not suitable for IRGen.
   performSILCleanup(SM.get());
 
-  // TODO: remove these manual overrides as CompilerInvocation fills in more
-  // of IRGenOptions.
   IRGenOptions &Options = Invocation.getIRGenOptions();
-  Options.MainInputFilename = Invocation.getInputFilenames()[0];
-  Options.Triple = Invocation.getTargetTriple();
-  Options.OutputFilename = Invocation.getOutputFilename();
-
+  
+  // TODO: remove once the frontend understands what action it should perform  
   switch (Action) {
   case FrontendOptions::EmitIR:
     Options.OutputKind = IRGenOutputKind::LLVMAssembly;

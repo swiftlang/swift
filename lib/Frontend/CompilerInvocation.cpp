@@ -273,7 +273,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
-                           DiagnosticEngine &Diags) {
+                           DiagnosticEngine &Diags,
+                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   if (Args.hasArg(OPT_g)) {
@@ -324,6 +325,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_dynamic_value_type_layout)) {
     Opts.EnableDynamicValueTypeLayout = true;
+  }
+
+  // TODO: investigate whether these should be removed, in favor of definitions
+  // in other classes.
+  Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
+  Opts.OutputFilename = FrontendOpts.OutputFilename;
+
+  if (const Arg *A = Args.getLastArg(OPT_target)) {
+    Opts.Triple = A->getValue();
   }
 
   return false;
@@ -391,7 +401,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
   
-  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags)) {
+  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 
