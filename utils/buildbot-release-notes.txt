@@ -18,9 +18,11 @@
   which is semantically similar to defining a get-only property:
 
     let x = foo()
-    print(x)       // ok
-    x = bar()      // error: cannot modify an immutable value
-    swap(&x, &y)   // error: cannot pass an immutable value as @inout parameter
+    print(x)        // ok
+    x = bar()       // error: cannot modify an immutable value
+    swap(&x, &y)    // error: cannot pass an immutable value as @inout parameter
+    x.clear()       // error: cannot call mutating method on immutable value
+    getX().clear()  // error: cannot mutate a temporary
   
   In the case of bindings of class type, the bound object itself is still
   mutable, but you cannot change the binding.
@@ -29,11 +31,50 @@
     r.blastOff()    // Ok, your rocket is mutable.
     r = Rocket()    // error: cannot modify an immutable binding.
 
-  In addition to the 'let' declaration itself, the iteration variable in
-  for-each loops, 'self' on classes, and a few other minor things have switched
-  to immutable bindings.
+  In addition to the 'let' declaration itself, 'self' on classes, and a few
+  other minor things have switched to immutable bindings.
   
-  There is more to come here.
+  A pivotal part of this is that methods of value types (structs and enums) need
+  to indicate whether they can mutate self - mutating methods need to be
+  disallowed on let values (and get-only property results, temporaries, etc) but
+  non-mutating methods need to be allowed.  The default for a method is that it
+  does not mutate 'self', though you can opt into mutating behavior with a new
+  @mutating attribute:
+  
+    struct MyWeirdCounter {
+      var count : Int
+      
+      func empty() -> Bool { return count == 0 }
+      
+      @mutating
+      func reset() {
+        count = 0
+      }
+      ...
+    }
+
+    let x = MyWeirdCounter()
+    x.empty()   // ok
+    x.reset()   // error, cannot mutate immutable 'let' value
+
+   One missing piece is that the compiler does not yet reject mutations of self
+   in a method that isn't marked @mutating.  That will be coming soon.  Related
+   to methods are properties.  Getters and setters can be marked mutating as
+   well:
+
+   extension MyWeirdCounter {
+      var myproperty : Int {
+      get:
+        return 42
+
+      @mutating
+      set:
+        count = value*2
+      }
+    }
+
+  The intention is for setters to default to mutating, but this has not been 
+  implemented yet.  There is more to come here.
 
 * A "map" method with the semantics of Haskell's "fmap" was added to
   Optional<T>.  Map applies a function f: T->U to any value stored in
