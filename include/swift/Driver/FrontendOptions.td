@@ -49,6 +49,10 @@ def emit_sil_protocol_witness_tables :
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def enable_dynamic_value_type_layout :
+  Flag<["-"], "enable-dynamic-value-type-layout">,
+  HelpText<"Enable experimental dynamic generic struct/enum type layout">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 

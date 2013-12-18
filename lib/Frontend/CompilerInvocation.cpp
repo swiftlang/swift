@@ -322,6 +322,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLLVMOptzns = true;
   }
 
+  if (Args.hasArg(OPT_enable_dynamic_value_type_layout)) {
+    Opts.EnableDynamicValueTypeLayout = true;
+  }
+
   return false;
 }
 
