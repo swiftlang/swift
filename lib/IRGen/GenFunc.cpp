@@ -280,13 +280,51 @@ namespace {
     }
   };
 
+  /// Calculate the extra data kind for a function type.
+  static ExtraData getExtraDataKind(IRGenModule &IGM,
+                                    CanSILFunctionType formalType) {
+    // FIXME: We always lowered all function types as thick with retainable
+    // context in the old regime.
+    if (!IGM.Context.LangOpts.EmitSILProtocolWitnessTables)
+      return ExtraData::Retainable;
+    
+    // If the type is thin, there is no extra data.
+    if (formalType->isThin())
+      return ExtraData::None;
+    
+    // Otherwise, the extra data depends on the calling convention.
+    switch (formalType->getAbstractCC()) {
+    case AbstractCC::Freestanding:
+    case AbstractCC::Method:
+      // For non-witness methods, 'thick' always indicates a retainable context
+      // pointer.
+      return ExtraData::Retainable;
+
+    case AbstractCC::WitnessMethod:
+      // A 'thick' witness is partially applied to its Self archetype binding.
+      //
+      // TODO: This requires extra data only if the necessary metadata is not
+      // already available through a metatype or class 'self' parameter.
+      //
+      // TODO: For default implementations, the witness table needs to be
+      // supplied too.
+      return ExtraData::Metatype;
+    
+    case AbstractCC::C:
+    case AbstractCC::ObjCMethod:
+      llvm_unreachable("thick foreign functions should be lowered to a "
+                       "block type");
+    }
+  }
+  
   /// The type-info class.
   class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo> {
     /// Each possible currying of a function type has different function
     /// type variants along each of three orthogonal axes:
-    ///   - the calling convention
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
+    /// TODO: The ExtraData bit will be fully dependent on the formal type when
+    /// we enable SIL witness tables.
     struct Currying {
       Signature Signatures[unsigned(ExplosionKind::Last_ExplosionKind) + 1]
                           [unsigned(ExtraData::Last_ExtraData) + 1];
@@ -297,24 +335,30 @@ namespace {
     };
 
     /// The SIL function type being represented.
-    CanSILFunctionType const FormalType;
+    const CanSILFunctionType FormalType;
+    
+    /// The ExtraData kind associated with the function reference.
+    ExtraData ExtraDataKind;
 
     mutable Currying TheSignatures;
 
-    FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
-                 Size size, Alignment align)
+    FuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                 Size size, Alignment align, ExtraData ExtraDataKind)
       // FIXME: Spare bits.
       : ScalarTypeInfo(storageType, size, llvm::BitVector{}, align),
-        FormalType(formalType) {
+        FormalType(formalType), ExtraDataKind(ExtraDataKind)
+    {
     }
 
   public:
     static const FuncTypeInfo *create(CanSILFunctionType formalType,
-                                      llvm::StructType *storageType,
-                                      Size size, Alignment align) {
-      return new FuncTypeInfo(formalType, storageType, size, align);
+                                      llvm::Type *storageType,
+                                      Size size, Alignment align,
+                                      ExtraData extraDataKind) {
+      return new FuncTypeInfo(formalType, storageType, size, align,
+                              extraDataKind);
     }
-
+    
     // Function types do not satisfy allowsOwnership.
     const WeakTypeInfo *
     createWeakStorageType(TypeConverter &TC) const override {
@@ -325,36 +369,51 @@ namespace {
       llvm_unreachable("[unowned] function type");
     }
 
-    /// The storage type of a function is always just a pair of i8*s:
-    /// a function pointer and a retainable pointer.  We have to use
-    /// i8* instead of an appropriate function-pointer type because we
-    /// might be in the midst of recursively defining one of the types
-    /// used as a parameter.
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    ExtraData getExtraDataKind() const {
+      return ExtraDataKind;
     }
-
+    
     Signature getSignature(IRGenModule &IGM,
                            ExplosionKind explosionKind,
                            ExtraData extraData) const;
 
+    bool hasExtraData() const {
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        return false;
+      case ExtraData::Metatype:
+      case ExtraData::Retainable:
+        return true;
+      }
+    }
+    
     unsigned getExplosionSize(ExplosionKind kind) const {
-      return 2;
+      return hasExtraData() ? 2 : 1;
     }
 
     void getSchema(ExplosionSchema &schema) const {
-      llvm::StructType *Ty = getStorageType();
-      assert(Ty->getNumElements() == 2);
-      schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(0)));
-      schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(1)));
+      llvm::Type *storageTy = getStorageType();
+      llvm::StructType *structTy = dyn_cast<llvm::StructType>(storageTy);
+      
+      if (structTy) {
+        assert(structTy->getNumElements() == 2);
+        schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
+        schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
+      } else {
+        schema.add(ExplosionSchema::Element::forScalar(storageTy));
+      }
     }
 
-    static Address projectFunction(IRGenFunction &IGF, Address address) {
-      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
-                                         address->getName() + ".fn");
+    Address projectFunction(IRGenFunction &IGF, Address address) const {
+      if (hasExtraData()) {
+        return IGF.Builder.CreateStructGEP(address, 0, Size(0),
+                                           address->getName() + ".fn");
+      }
+      return address;
     }
 
-    static Address projectData(IRGenFunction &IGF, Address address) {
+    Address projectData(IRGenFunction &IGF, Address address) const {
+      assert(hasExtraData() && "no data");
       return IGF.Builder.CreateStructGEP(address, 1, IGF.IGM.getPointerSize(),
                                          address->getName() + ".data");
     }
@@ -364,9 +423,21 @@ namespace {
       Address fnAddr = projectFunction(IGF, address);
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
-      // Load the data.
-      Address dataAddr = projectData(IGF, address);
-      IGF.emitLoadAndRetain(dataAddr, e);
+      // Load the data, if any.
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable: {
+        Address dataAddr = projectData(IGF, address);
+        IGF.emitLoadAndRetain(dataAddr, e);
+        break;
+      }
+      case ExtraData::Metatype: {
+        Address dataAddr = projectData(IGF, address);
+        e.add(IGF.Builder.CreateLoad(dataAddr));
+        break;
+      }
+      }
     }
 
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -374,9 +445,11 @@ namespace {
       Address fnAddr = projectFunction(IGF, addr);
       e.add(IGF.Builder.CreateLoad(fnAddr));
 
-      // Load the data.
-      Address dataAddr = projectData(IGF, addr);
-      e.add(IGF.Builder.CreateLoad(dataAddr));
+      // Load the data, if any.
+      if (hasExtraData()) {
+        Address dataAddr = projectData(IGF, addr);
+        e.add(IGF.Builder.CreateLoad(dataAddr));
+      }
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
@@ -384,9 +457,21 @@ namespace {
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
-      // Store the data pointer.
-      Address dataAddr = projectData(IGF, address);
-      IGF.emitAssignRetained(e.claimNext(), dataAddr);
+      // Store the data pointer, if any.
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable: {
+        Address dataAddr = projectData(IGF, address);
+        IGF.emitAssignRetained(e.claimNext(), dataAddr);
+        break;
+      }
+      case ExtraData::Metatype: {
+        Address dataAddr = projectData(IGF, address);
+        IGF.Builder.CreateStore(e.claimNext(), dataAddr);
+        break;
+      }
+      }
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
@@ -394,49 +479,135 @@ namespace {
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
-      // Store the data pointer, transferring the +1.
-      Address dataAddr = projectData(IGF, address);
-      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
+      // Store the data pointer, if any, transferring the +1.
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable: {
+        Address dataAddr = projectData(IGF, address);
+        IGF.emitInitializeRetained(e.claimNext(), dataAddr);
+        break;
+      }
+      case ExtraData::Metatype: {
+        Address dataAddr = projectData(IGF, address);
+        IGF.Builder.CreateStore(e.claimNext(), dataAddr);
+        break;
+      }
+      }
     }
 
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest) const override {
       src.transferInto(dest, 1);
-      IGF.emitRetain(src.claimNext(), dest);
+      
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRetain(src.claimNext(), dest);
+        break;
+      case ExtraData::Metatype:
+        src.transferInto(dest, 1);
+        break;
+      }
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       src.claimNext();
-      IGF.emitRelease(src.claimNext());
+      
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRelease(src.claimNext());
+        break;
+      case ExtraData::Metatype:
+        src.claimNext();
+        break;
+      }
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitRetainCall(e.claimNext());
+      
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRetainCall(e.claimNext());
+        break;
+      case ExtraData::Metatype:
+        e.claimNext();
+        break;
+      }
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitRelease(e.claimNext());
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRelease(e.claimNext());
+        break;
+      case ExtraData::Metatype:
+        e.claimNext();
+        break;
+      }
     }
 
     void retainUnowned(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitRetainUnowned(e.claimNext());
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRetainUnowned(e.claimNext());
+        break;
+      case ExtraData::Metatype:
+        e.claimNext();
+        break;
+      }
     }
     
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitUnownedRetain(e.claimNext());
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitUnownedRetain(e.claimNext());
+        break;
+      case ExtraData::Metatype:
+        e.claimNext();
+        break;
+      }
     }
 
     void unownedRelease(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitUnownedRelease(e.claimNext());
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitUnownedRelease(e.claimNext());
+        break;
+      case ExtraData::Metatype:
+        e.claimNext();
+        break;
+      }
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const {
-      IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
+      switch (ExtraDataKind) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
+        break;
+      case ExtraData::Metatype:
+        break;
+      }
     }
     
     llvm::Value *packEnumPayload(IRGenFunction &IGF,
@@ -445,7 +616,8 @@ namespace {
                                   unsigned offset) const override {
       PackEnumPayload pack(IGF, bitWidth);
       pack.addAtOffset(src.claimNext(), offset);
-      pack.add(src.claimNext());
+      if (hasExtraData())
+        pack.add(src.claimNext());
       return pack.get();
     }
     
@@ -454,9 +626,15 @@ namespace {
                             Explosion &dest,
                             unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, payload);
-      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
-                                    offset));
-      dest.add(unpack.claim(getStorageType()->getElementType(1)));
+      auto storageTy = getStorageType();
+      if (hasExtraData()) {
+        auto structTy = cast<llvm::StructType>(storageTy);
+        dest.add(unpack.claimAtOffset(structTy->getElementType(0),
+                                      offset));
+        dest.add(unpack.claim(structTy->getElementType(1)));
+      } else {
+        dest.add(unpack.claimAtOffset(storageTy, offset));
+      }
     }
   };
 
@@ -480,10 +658,25 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
   
-  // FIXME: thin
-  return FuncTypeInfo::create(CanSILFunctionType(T), IGM.FunctionPairTy,
+  CanSILFunctionType ct(T);
+  auto extraDataKind = getExtraDataKind(IGM, ct);
+  llvm::Type *ty;
+  switch (extraDataKind) {
+  case ExtraData::None:
+    ty = IGM.FunctionPtrTy;
+    break;
+  case ExtraData::Retainable:
+    ty = IGM.FunctionPairTy;
+    break;
+  case ExtraData::Metatype:
+    ty = IGM.WitnessFunctionPairTy;
+    break;
+  }
+  
+  return FuncTypeInfo::create(ct, ty,
                               IGM.getPointerSize() * 2,
-                              IGM.getPointerAlignment());
+                              IGM.getPointerAlignment(),
+                              extraDataKind);
 }
 
 void irgen::addIndirectReturnAttributes(IRGenModule &IGM,

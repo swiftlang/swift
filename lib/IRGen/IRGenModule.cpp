@@ -166,9 +166,15 @@ IRGenModule::IRGenModule(ASTContext &Context,
   PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
 
   FunctionPairTy = createStructType(*this, "swift.function", {
-    Int8PtrTy,
-    RefCountedPtrTy
+    FunctionPtrTy,
+    RefCountedPtrTy,
   });
+  
+  WitnessFunctionPairTy = createStructType(*this, "swift.witness_function",  {
+    FunctionPtrTy,
+    TypeMetadataPtrTy,
+  });
+  
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 

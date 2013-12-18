@@ -389,6 +389,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
         .Case("method", AbstractCC::Method)
         .Case("cdecl", AbstractCC::C)
         .Case("objc_method", AbstractCC::ObjCMethod)
+        .Case("witness_method", AbstractCC::WitnessMethod)
         .Default(Nothing);
       if (!Attributes.cc) {
         diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);

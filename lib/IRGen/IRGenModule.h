@@ -136,6 +136,7 @@ public:
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *WitnessTableTy;
     llvm::PointerType *ObjCSELTy;
+    llvm::PointerType *FunctionPtrTy;
   };
   union {
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
@@ -146,6 +147,9 @@ public:
   llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
+  // TODO: For default implementations this needs to be a triple:
+  // { i8*, %swift.type*, %witness.table* }
+  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %swift.type* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
