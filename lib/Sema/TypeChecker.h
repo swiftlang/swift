@@ -163,6 +163,12 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
+
+  /// The callback is consulted before reporting the diagnostics in case
+  /// typechecking fails.
+  ///
+  /// \returns false if diagnostic reporting should be suppressed.
+  virtual bool suppressDiagnostics() const;
 };
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
@@ -201,6 +207,11 @@ private:
 
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
+
+  /// A helper to construct and typecheck call to super.init().
+  ///
+  /// \returns NULL if the constructed expression does not typecheck.
+  Expr* constructCallToSuperInit(ConstructorDecl *ctor,  ClassDecl *ClDecl);
 
 public:
   TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }

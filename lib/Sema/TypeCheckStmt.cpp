@@ -34,6 +34,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 namespace {
@@ -767,6 +769,52 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
   }
 }
 
+Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
+                                            ClassDecl *ClDecl) {
+  Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
+                                              SourceLoc(), /*Implicit=*/true);
+  Expr *r = new (Context) UnresolvedConstructorExpr(superRef,
+                                                         SourceLoc(),
+                                                         SourceLoc(),
+                                                         /*Implicit=*/true);
+  Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
+                                       /*hasTrailingClosure=*/false,
+                                       /*Implicit=*/true);
+  r = new (Context) CallExpr(r, args, /*Implicit=*/true);
+  r = new (Context) RebindSelfInConstructorExpr(r, ctor->getImplicitSelfDecl());
+
+  /// Expression type checking listener for the generated call to super ensures
+  /// that we suppress diagnostics.
+  class NoDiagnosticsListener : public ExprTypeCheckListener {
+  public:
+    virtual bool suppressDiagnostics() const { return true; }
+  } listener;
+
+  if (!typeCheckExpression(r, ctor, Type(), /*discardedExpr=*/true,
+                           FreeTypeVariableBinding::Disallow, &listener))
+    return r;
+
+  return 0;
+}
+
+/// Find out if the statement has references to initializers.
+static bool hasReferencesToInitializers(Stmt *S) {
+  struct FindReferenceToInitializer : ASTWalker {
+    bool FoundInitializerRef = false;
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+      assert(!FoundInitializerRef &&
+             "Continuing to walk after finding initializer.");
+      if (isa<OtherConstructorDeclRefExpr>(E)) {
+        FoundInitializerRef = true;
+        return { false, nullptr };
+      }
+      return { true, E };
+    }
+  } finder;
+  S->walk(finder);
+  return finder.FoundInitializerRef;
+}
+
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
@@ -812,25 +860,28 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     continue;
   }
 
-  // If this is the implicit default constructor for a class with a superclass,
-  // call the superclass initializer.
-  if (ctor->isImplicit() && isa<ClassDecl>(ctor->getDeclContext()) &&
-      cast<ClassDecl>(ctor->getDeclContext())->getSuperclass()) {
-    Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
-                                                SourceLoc(), /*Implicit=*/true);
-    Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                                           SourceLoc(),
-                                                           SourceLoc(),
-                                                           /*Implicit=*/true);
-    Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                         /*hasTrailingClosure=*/false,
-                                         /*Implicit=*/true);
-    result = new (Context) CallExpr(result, args, /*Implicit=*/true);
-    if (!typeCheckExpression(result, ctor, Type(), /*discardedExpr=*/true))
-      memberInitializers.push_back(result);
+  // Construct super.init call to be inserted at the end of the explicit
+  // initializer if none has been added by the user.
+  ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+  if (!ctor->isImplicit() && ClassD && ClassD->getSuperclass() &&
+      !hasReferencesToInitializers(body)) {
+    // Find a definite initializer in the superclass.
+    if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
+      // Store the super.init expression within the constructor declaration
+      // to be emitted during SILGen.
+      ctor->setSuperInitCall(SuperInitCall);
+    }
   }
 
-  // If we added any default initializers, update the body.
+  // If this is the implicit default initializer for a class with a superclass,
+  // call the superclass initializer.
+  if (ctor->isImplicit() && ClassD && ClassD->getSuperclass()) {
+    if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD))
+      memberInitializers.push_back(SuperInitCall);
+  }
+
+  // If we added any default initializers, append the rest of the body at
+  // the end.
   if (!memberInitializers.empty()) {
     memberInitializers.append(body->getElements().begin(),
                               body->getElements().end());

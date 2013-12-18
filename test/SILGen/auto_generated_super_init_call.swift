@@ -1,0 +1,147 @@
+// RUN: %swift -emit-silgen %s | FileCheck %s
+
+// Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
+
+class Parent { 
+  init() {}
+}
+
+class SomeDerivedClass : Parent {
+  var y: Int
+  func foo() {}
+
+  init() {
+    y = 42
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT_S0_ : $@cc(method) @thin (@owned SomeDerivedClass) -> @owned SomeDerivedClass
+// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: load
+// CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]]#1 : $*SomeDerivedClass
+// CHECK-NEXT: strong_retain [[SELFLOAD]] : $SomeDerivedClass
+// CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
+// CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
+// CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
+// CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
+// CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unconditional_checked_cast downcast [[RES1]] : $Parent to $SomeDerivedClass
+// CHECK-NEXT: assign [[DOWNCAST]] to [[SELF]]#1 : $*SomeDerivedClass 
+  }
+  
+  init(x: Int) {
+    y = x
+// CHECK-LABEL:sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1xSi_S0_ : $@cc(method) @thin (Int64, @owned SomeDerivedClass) -> @owned SomeDerivedClass
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+  }
+
+  init(b: Bool) {
+    if b {
+      y = 0
+      return
+    } else {
+      y = 10
+    }
+    return
+// Check that we are emittng the super.init expr into the epilog block.
+    
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@cc(method) @thin (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+// CHECK-NEXT: apply
+// CHECK-NEXT: unconditional_checked_cast downcast
+// CHECK-NEXT: assign
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: return
+  }
+
+  // One init has a call to super init. Make sure we don't instert more than one.
+  init(b: Bool, i: Int) {
+    if (b) {
+      y = i
+    } else {
+      y = 0
+    }
+      
+    super.init()
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb1iSi_S0_ : $@cc(method) @thin (Bool, Int64, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+// CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
+// CHECK: return
+  }
+}
+
+// Check that we do call super.init.
+class HasNoIVars : Parent {
+  init() {
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call10HasNoIVarscfMS0_FT_S0_ : $@cc(method) @thin (@owned HasNoIVars) -> @owned HasNoIVars
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
+  }
+}
+
+// Check that we don't call super.init.
+class ParentLess {
+  var y: Int
+  init() {
+    y = 0
+  }
+}
+
+class Grandparent {
+  init() {}
+}
+// This should have auto-generated default initializer.
+class ParentWithNoExplicitInit : Grandparent {
+}
+// Check that we add a call to super.init.
+class ChildOfParentWithNoExplicitInit : ParentWithNoExplicitInit {
+  var y: Int
+  init() {
+    y = 10
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call31ChildOfParentWithNoExplicitInitcfMS0_FT_S0_
+// CHECK: function_ref @_TFC30auto_generated_super_init_call24ParentWithNoExplicitInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
+  }
+}
+
+// This should have auto-generated default initializer.
+class ParentWithNoExplicitInit2 : Grandparent {
+  var i: Int = 0
+}
+// Check that we add a call to super.init.
+class ChildOfParentWithNoExplicitInit2 : ParentWithNoExplicitInit2 {
+  var y: Int
+  init() {
+    y = 10
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call32ChildOfParentWithNoExplicitInit2cfMS0_FT_S0_
+// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2cfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   
+  }
+}
+
+// Do not insert the call nor warn - the user should call init(5).
+class ParentWithNoDefaultInit {
+  var i: Int
+  init(x: Int) {
+    i = x
+  }
+}
+class ChildOfParentWithNoDefaultInit : ParentWithNoDefaultInit {
+  var y: Int
+  init() {
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call30ChildOfParentWithNoDefaultInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ChildOfParentWithNoDefaultInit) -> @owned ChildOfParentWithNoDefaultInit
+// CHECK: bb0
+// CHECK-NOT: apply
+// CHECK: return
+  }
+}
+
+// This is a non-constructable parent, so don't insert the call.
+// FIXME: We should warn about the non-constructable classes.
+class ParentWithNoDefaultInit2 {
+  var i: Int
+}
+class ChildOfParentWithNoDefaultInit2 : ParentWithNoDefaultInit2 {
+  var y: Int
+  init() {
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call31ChildOfParentWithNoDefaultInit2cfMS0_FT_S0_ : $@cc(method) @thin (@owned ChildOfParentWithNoDefaultInit2) -> @owned ChildOfParentWithNoDefaultInit2
+// CHECK: bb0
+// CHECK-NOT: apply
+// CHECK: return
+  }
+}

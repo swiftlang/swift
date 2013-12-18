@@ -600,11 +600,21 @@ bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-
 void ExprTypeCheckListener::solvedConstraints(Solution &solution) { }
 
 Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
+}
+
+bool ExprTypeCheckListener::suppressDiagnostics() const {
+  return false;
+}
+
+static void diagnoseExpr(TypeChecker &TC, const Expr *E,
+                         const ExprTypeCheckListener *listener) {
+  if (listener && listener->suppressDiagnostics())
+    return;
+  performExprDiagnostics(TC, E);
 }
 
 #pragma mark High-level entry points
@@ -653,9 +663,12 @@ bool TypeChecker::typeCheckExpression(
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (cs.solve(viable, allowFreeTypeVariables)) {
+    if (listener && listener->suppressDiagnostics())
+      return true;
+
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
-      performExprDiagnostics(*this, expr);
+      diagnoseExpr(*this, expr, listener);
       return true;
     }
 
@@ -663,7 +676,7 @@ bool TypeChecker::typeCheckExpression(
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
 
-    performExprDiagnostics(*this, expr);
+    diagnoseExpr(*this, expr, listener);
     return true;
   }
 
@@ -682,7 +695,7 @@ bool TypeChecker::typeCheckExpression(
   // Apply the solution to the expression.
   auto result = cs.applySolution(solution, expr);
   if (!result) {
-    performExprDiagnostics(*this, expr);
+    diagnoseExpr(*this, expr, listener);
     // Failure already diagnosed, above, as part of applying the solution.
    return true;
   }
@@ -693,7 +706,7 @@ bool TypeChecker::typeCheckExpression(
     result = solution.coerceToType(result, convertType,
                                    cs.getConstraintLocator(expr, { }));
     if (!result) {
-      performExprDiagnostics(*this, expr);
+      diagnoseExpr(*this, expr, listener);
       return true;
     }
   } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
@@ -729,12 +742,12 @@ bool TypeChecker::typeCheckExpression(
   if (listener) {
     result = listener->appliedSolution(solution, result);
     if (!result) {
-      performExprDiagnostics(*this, expr);
+      diagnoseExpr(*this, expr, listener);
       return true;
     }
   }
 
-  performExprDiagnostics(*this, result);
+  diagnoseExpr(*this, result, listener);
 
   expr = result;
   cleanup.disable();

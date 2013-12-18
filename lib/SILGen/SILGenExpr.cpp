@@ -2494,6 +2494,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // If we're using a box for self, reload the value at the end of the init
   // method.
   if (NeedsBoxForSelf) {
+    // Emit the call to super.init() right before exiting from the initializer.
+    if (Expr* SI = ctor->getSuperInitCall())
+      emitIgnoredRValue(SI);
+
     selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].getAddress());
     SILValue selfBox = VarLocs[selfDecl].box;
     assert(selfBox);

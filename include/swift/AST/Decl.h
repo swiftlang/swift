@@ -2920,6 +2920,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
 
+  /// The typechecked call to super.init expression, which needs to be
+  /// inserted at the end of the initializer by SILGen.
+  Expr *CallToSuperInit = 0;
+
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *ArgParams, Pattern *BodyParams,
@@ -2966,6 +2970,11 @@ public:
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
   void setInitializerInterfaceType(Type t);
+
+  /// Get the typechecked call to super.init expression, which needs to be
+  /// inserted at the end of the initializer by SILGen.
+  Expr *getSuperInitCall() { return CallToSuperInit; }
+  void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
