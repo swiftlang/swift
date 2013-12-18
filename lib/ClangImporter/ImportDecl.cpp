@@ -373,6 +373,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
 
+  // TODO: Shouldn't be an @inout method.
   auto lvType = LValueType::get(optionSetType,
                                 LValueType::Qual::DefaultForInOutSelf, C);
   
@@ -422,6 +423,119 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   C.addedExternalDecl(toRawDecl);
 
   return toRawDecl;
+}
+
+static Expr *
+getOperatorRef(ASTContext &C, Identifier name) {
+  // FIXME: This is hideous!
+  UnqualifiedLookup lookup(name, C.getStdlibModule(), nullptr);
+  if (!lookup.isSuccess())
+    return nullptr;
+  
+  SmallVector<ValueDecl *, 4> found;
+  for (auto &result : lookup.Results) {
+    if (!result.hasValueDecl())
+      continue;
+    
+    if (!isa<FuncDecl>(result.getValueDecl()))
+      continue;
+    
+    found.push_back(result.getValueDecl());
+  }
+  
+  if (found.empty())
+    return nullptr;
+  
+  if (found.size() == 1) {
+    return new (C) DeclRefExpr(found[0], SourceLoc(),
+                               /*Implicit=*/true);
+  } else {
+    auto foundCopy = C.AllocateCopy(found);
+    return new (C) OverloadedDeclRefExpr(
+                                     foundCopy, SourceLoc(), /*Implicit=*/true);
+  }
+}
+
+
+// Build the 'getLogicValue' method for an option set.
+// struct NSSomeOptionSet : RawOptionSet {
+//   var value: RawType
+//   func getLogicValue() -> Bool {
+//     return self.value != 0
+//   }
+// }
+static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
+                                                  ValueDecl *valueDecl) {
+  ASTContext &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+  auto boolType = C.getGetBoolDecl(nullptr)
+    ->getType()
+    ->castTo<AnyFunctionType>()
+    ->getResult();
+
+  // TODO: Shouldn't be an @inout method.
+  auto lvType = LValueType::get(optionSetType,
+                                LValueType::Qual::DefaultForInOutSelf, C);
+
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
+                                      SourceLoc(),
+                                      C.SelfIdentifier,
+                                      Type(),
+                                      optionSetDecl);
+  selfDecl->setImplicit();
+  selfDecl->setType(lvType);
+  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
+  selfParam->setType(lvType);
+  selfParam = new (C) TypedPattern(selfParam,
+                                   TypeLoc::withoutLoc(optionSetType));
+  selfParam->setType(lvType);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+  
+  FuncDecl *getLVDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
+                                         C.getIdentifier("getLogicValue"),
+                                         SourceLoc(), nullptr, Type(),
+                                         params, params,
+                                         TypeLoc::withoutLoc(boolType), optionSetDecl);
+  getLVDecl->setImplicit();
+  
+  auto toRawArgType = TupleType::getEmpty(C);
+  Type toRawType = FunctionType::get(toRawArgType, boolType, C);
+  toRawType = FunctionType::get(lvType, toRawType, C);
+  getLVDecl->setType(toRawType);
+  getLVDecl->setBodyResultType(boolType);
+  
+  selfDecl->setDeclContext(getLVDecl);
+  
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                        valueDecl, SourceLoc(),
+                                        /*implicit*/ true);
+
+  auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(), /*implicit*/ true);
+
+  auto neRef = getOperatorRef(C, C.getIdentifier("!="));
+  
+  Expr *args[] = {valueRef, zero};
+  auto argsTuple = new (C) TupleExpr(SourceLoc(),
+                                     C.AllocateCopy(args),
+                                     nullptr,
+                                     SourceLoc(),
+                                     /*trailingClosure*/ false,
+                                     /*implicit*/ true);
+  auto apply = new (C) BinaryExpr(neRef, argsTuple, /*implicit*/ true);
+  auto ret = new (C) ReturnStmt(SourceLoc(), apply);
+
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret),
+                                SourceLoc(),
+                                /*implicit*/ true);
+  getLVDecl->setBody(body);
+  
+  // Add as an external definition.
+  C.addedExternalDecl(getLVDecl);
+  
+  return getLVDecl;
 }
 
 namespace {
@@ -891,6 +1005,7 @@ namespace {
         auto fromRaw = makeOptionSetFactoryMethod(structDecl, var,
                                             OptionSetFactoryMethod::FromRaw);
         auto toRaw = makeOptionSetToRawMethod(structDecl, var);
+        auto getLV = makeOptionSetGetLogicValueMethod(structDecl, var);
         
         // Set the members of the struct.
         Decl *members[] = {
@@ -900,9 +1015,10 @@ namespace {
           fromMask,
           fromRaw,
           toRaw,
+          getLV,
         };
         structDecl->setMembers(
-          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members)),
+          Impl.SwiftContext.AllocateCopy(members),
           SourceRange());
 
         result = structDecl;
@@ -3109,35 +3225,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       break;
 
     // If it was a negative number, negate the integer literal.
-    auto minus = context.getIdentifier("-");
-    UnqualifiedLookup lookup(minus, getSwiftModule(), nullptr);
-    if (!lookup.isSuccess())
+    auto minusRef = getOperatorRef(context, context.getIdentifier("-"));
+    if (!minusRef)
       return nullptr;
-
-    Expr* minusRef;
-    SmallVector<ValueDecl *, 4> found;
-    for (auto &result : lookup.Results) {
-      if (!result.hasValueDecl())
-        continue;
-
-      if (!isa<FuncDecl>(result.getValueDecl()))
-        continue;
-
-      found.push_back(result.getValueDecl());
-    }
-
-    if (found.empty())
-      return nullptr;
-
-    if (found.size() == 1) {
-      minusRef = new (context) DeclRefExpr(found[0], SourceLoc(),
-                                           /*Implicit=*/true);
-    } else {
-      auto foundCopy = context.AllocateCopy(found);
-      minusRef = new (context) OverloadedDeclRefExpr(
-                                 foundCopy, SourceLoc(), /*Implicit=*/true);
-    }
-
     expr = new (context) PrefixUnaryExpr(minusRef, expr);
     break;
   }
