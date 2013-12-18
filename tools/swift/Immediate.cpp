@@ -226,7 +226,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::SmallPtrSet<swift::Module *, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
-                                 irgen::Options &Options,
+                                 IRGenOptions &Options,
                                  bool IsREPL = true) {
   swift::Module *M = CI.getMainModule();
   bool hadError = false;
@@ -288,7 +288,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 }
 
 void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                           irgen::Options &Options) {
+                           IRGenOptions &Options) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -928,7 +928,7 @@ private:
   llvm::SmallString<128> DumpSource;
 
   llvm::ExecutionEngine *EE;
-  irgen::Options Options;
+  IRGenOptions Options;
 
   REPLInput Input;
   REPLContext RC;
@@ -1063,7 +1063,7 @@ public:
     Options.OutputFilename = "";
     Options.Triple = llvm::sys::getDefaultTargetTriple();
     Options.OptLevel = 0;
-    Options.OutputKind = irgen::OutputKind::Module;
+    Options.OutputKind = IRGenOutputKind::Module;
     Options.UseJIT = true;
     Options.DebugInfo = false;
 

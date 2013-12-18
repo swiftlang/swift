@@ -24,16 +24,13 @@
 namespace swift {
   class CompilerInstance;
   class SILModule;
+  class IRGenOptions;
 
   // Using LLVM containers to store command-line arguments turns out
   // to be a lose, because LLVM's execution engine demands this vector
   // type.  We can flip the typedef if/when the LLVM interface
   // supports LLVM containers.
   using ProcessCmdLine = std::vector<std::string>;
-
-  namespace irgen {
-    class Options;
-  }
   
   /// Publicly available REPL state information.
   class REPLContext {
@@ -54,7 +51,7 @@ namespace swift {
   };
 
   void RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                      irgen::Options &Options);
+                      IRGenOptions &Options);
 
   void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
   void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);

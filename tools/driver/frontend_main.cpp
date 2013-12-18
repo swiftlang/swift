@@ -149,7 +149,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Cleanup instructions/builtin calls not suitable for IRGen.
   performSILCleanup(SM.get());
 
-  irgen::Options Options;
+  IRGenOptions Options;
   Options.MainInputFilename = Invocation.getInputFilenames()[0];
   Options.Triple = Invocation.getTargetTriple();
   Options.LinkLibraries.append(Invocation.getLinkLibraries().begin(),
@@ -159,16 +159,16 @@ static bool performCompile(CompilerInstance &Instance,
 
   switch (Action) {
   case FrontendOptions::EmitIR:
-    Options.OutputKind = irgen::OutputKind::LLVMAssembly;
+    Options.OutputKind = IRGenOutputKind::LLVMAssembly;
     break;
   case FrontendOptions::EmitBC:
-    Options.OutputKind = irgen::OutputKind::LLVMBitcode;
+    Options.OutputKind = IRGenOutputKind::LLVMBitcode;
     break;
   case FrontendOptions::EmitAssembly:
-    Options.OutputKind = irgen::OutputKind::NativeAssembly;
+    Options.OutputKind = IRGenOutputKind::NativeAssembly;
     break;
   case FrontendOptions::EmitObject:
-    Options.OutputKind = irgen::OutputKind::ObjectFile;
+    Options.OutputKind = IRGenOutputKind::ObjectFile;
     break;
   case FrontendOptions::Immediate:
     llvm_unreachable("Immediate mode is not yet implemented");

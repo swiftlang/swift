@@ -61,7 +61,7 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 };
 
 IRGenModule::IRGenModule(ASTContext &Context,
-                         Options &Opts, llvm::Module &Module,
+                         IRGenOptions &Opts, llvm::Module &Module,
                          const llvm::DataLayout &DataLayout,
                          SILModule *SILMod)
   : Context(Context), Opts(Opts), Module(Module),

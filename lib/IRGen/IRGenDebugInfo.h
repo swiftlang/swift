@@ -44,13 +44,13 @@ namespace swift {
 class ASTContext;
 class AllocStackInst;
 class ClangImporter;
+class IRGenOptions;
 class SILArgument;
 class SILDebugScope;
 class SILModule;
 
 namespace irgen {
 
-class Options;
 class IRGenFunction;
 
 typedef struct {
@@ -70,7 +70,7 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
 class IRGenDebugInfo {
-  const Options &Opts;
+  const IRGenOptions &Opts;
   ClangImporter &CI;
   SourceManager &SM;
   llvm::Module &M;
@@ -102,7 +102,7 @@ class IRGenDebugInfo {
   LocationStack; /// Used by pushLoc.
 
 public:
-  IRGenDebugInfo(const Options &Opts,
+  IRGenDebugInfo(const IRGenOptions &Opts,
                  ClangImporter &CI,
                  IRGenModule &IGM,
                  llvm::Module &M);

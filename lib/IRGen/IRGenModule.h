@@ -64,6 +64,7 @@ namespace swift {
   class SILFunction;
   class EnumElementDecl;
   class EnumDecl;
+  class IRGenOptions;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
@@ -93,7 +94,6 @@ namespace irgen {
   class FunctionRef;
   class IRGenDebugInfo;
   class LinkEntity;
-  class Options;
   class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;
@@ -104,7 +104,7 @@ namespace irgen {
 class IRGenModule {
 public:
   ASTContext &Context;
-  Options &Opts;
+  IRGenOptions &Opts;
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
@@ -309,7 +309,7 @@ private:                            \
   
 //--- Generic ---------------------------------------------------------------
 public:
-  IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
+  IRGenModule(ASTContext &Context, IRGenOptions &Opts, llvm::Module &Module,
               const llvm::DataLayout &DataLayout,
               SILModule *SILMod);
   ~IRGenModule();

@@ -1,4 +1,4 @@
-//===--- Options.h - Swift Language IR Generation Options -------*- C++ -*-===//
+//===--- IRGenOptions.h - Swift Language IR Generation Options --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,16 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_OPTIONS_H
-#define SWIFT_IRGEN_OPTIONS_H
+#ifndef SWIFT_AST_IRGENOPTIONS_H
+#define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
 #include <string>
 
 namespace swift {
-namespace irgen {
 
-enum class OutputKind : unsigned {
+enum class IRGenOutputKind : unsigned {
   /// Just generate an LLVM module and return it.
   Module,
 
@@ -41,8 +40,8 @@ enum class OutputKind : unsigned {
   ObjectFile
 };
 
-/// irgen::Options - The set of options support by IR generation.
-class Options {
+/// The set of options supported by IR generation.
+class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
@@ -55,7 +54,7 @@ public:
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
   /// The kind of compilation we should do.
-  OutputKind OutputKind : 3;
+  IRGenOutputKind OutputKind : 3;
 
   /// Should we spend time verifying that the IR we produce is
   /// well-formed?
@@ -76,12 +75,12 @@ public:
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
-  Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0),
-              DebugInfo(false), UseJIT(false),
-              EnableDynamicValueTypeLayout(false), DisableLLVMOptzns(false) {}
+  IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
+                   OptLevel(0), DebugInfo(false), UseJIT(false),
+                   EnableDynamicValueTypeLayout(false),
+                   DisableLLVMOptzns(false) {}
 };
 
-} // end namespace irgen
 } // end namespace swift
 
 #endif

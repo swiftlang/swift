@@ -35,6 +35,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DelayedParsingCallbacks;
+  class IRGenOptions;
   class Module;
   class Parser;
   class PersistentParserState;
@@ -45,10 +46,6 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-
-  namespace irgen {
-    class Options;
-  }
   
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
@@ -160,11 +157,11 @@ namespace swift {
                          StringRef moduleLinkName = {});
 
   /// Turn the given module into either LLVM IR or native code.
-  void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+  void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                            swift::Module *M, SILModule *SILMod);
 
   /// Turn the given source file into either LLVM IR or native code.
-  void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+  void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                            SourceFile &SF, SILModule *SILMod,
                            unsigned StartElem = 0);
 

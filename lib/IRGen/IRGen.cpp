@@ -42,14 +42,14 @@ using namespace swift;
 using namespace irgen;
 using namespace llvm;
 
-static bool isBinaryOutput(OutputKind kind) {
+static bool isBinaryOutput(IRGenOutputKind kind) {
   switch (kind) {
-  case OutputKind::Module:
-  case OutputKind::LLVMAssembly:
-  case OutputKind::NativeAssembly:
+  case IRGenOutputKind::Module:
+  case IRGenOutputKind::LLVMAssembly:
+  case IRGenOutputKind::NativeAssembly:
     return false;
-  case OutputKind::LLVMBitcode:
-  case OutputKind::ObjectFile:
+  case IRGenOutputKind::LLVMBitcode:
+  case IRGenOutputKind::ObjectFile:
     return true;
   }
   llvm_unreachable("bad output kind!");
@@ -105,7 +105,7 @@ static void emitModuleLinkOptions(llvm::Module &module, swift::Module *M,
 }
 
 
-static void performIRGeneration(Options &Opts, llvm::Module *Module,
+static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 swift::Module *M, SILModule *SILMod,
                                 SourceFile *SF = nullptr,
                                 unsigned StartElem = 0) {
@@ -229,7 +229,7 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
 
     // Most output kinds want a formatted output stream.  It's not clear
     // why writing an object file does.
-    if (Opts.OutputKind != OutputKind::LLVMBitcode)
+    if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
       FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
   }
 
@@ -279,18 +279,18 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
-  case OutputKind::Module:
+  case IRGenOutputKind::Module:
     break;
-  case OutputKind::LLVMAssembly:
+  case IRGenOutputKind::LLVMAssembly:
     EmitPasses.add(createPrintModulePass(&FormattedOS));
     break;
-  case OutputKind::LLVMBitcode:
+  case IRGenOutputKind::LLVMBitcode:
     EmitPasses.add(createBitcodeWriterPass(*RawOS));
     break;
-  case OutputKind::NativeAssembly:
-  case OutputKind::ObjectFile: {
+  case IRGenOutputKind::NativeAssembly:
+  case IRGenOutputKind::ObjectFile: {
     llvm::TargetMachine::CodeGenFileType FileType;
-    FileType = (Opts.OutputKind == OutputKind::NativeAssembly
+    FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
                   ? llvm::TargetMachine::CGFT_AssemblyFile
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
@@ -316,12 +316,12 @@ static void performIRGeneration(Options &Opts, llvm::Module *Module,
   EmitPasses.run(*Module);
 }
 
-void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+void swift::performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 swift::Module *M, SILModule *SILMod) {
   ::performIRGeneration(Opts, Module, M, SILMod);
 }
 
-void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+void swift::performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 SourceFile &SF, SILModule *SILMod,
                                 unsigned StartElem) {
   ::performIRGeneration(Opts, Module, SF.getParentModule(), SILMod, &SF,

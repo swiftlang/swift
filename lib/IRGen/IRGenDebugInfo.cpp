@@ -67,7 +67,7 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
   return BumpAllocatedString(S.data(), S.size());
 }
 
-IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
+IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
                                IRGenModule &IGM,
                                llvm::Module &M)
