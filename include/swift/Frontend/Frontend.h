@@ -71,8 +71,6 @@ class CompilerInvocation {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
-  void updateRuntimeImportPath();
-
 public:
   CompilerInvocation();
 
@@ -80,7 +78,9 @@ public:
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
 
-  void setTargetTriple(StringRef Triple);
+  void setTargetTriple(StringRef Triple) {
+    TargetOpts.Triple = Triple.str();
+  }
 
   StringRef getTargetTriple() const {
     return TargetOpts.Triple;
@@ -128,7 +128,13 @@ public:
 
   void setMainExecutablePath(StringRef Path);
 
-  void setRuntimeIncludePath(StringRef Path);
+  void setRuntimeIncludePath(StringRef Path) {
+    SearchPathOpts.RuntimeIncludePath = Path;
+  }
+
+  StringRef getRuntimeIncludePath() const {
+    return SearchPathOpts.RuntimeIncludePath;
+  }
 
   void setSDKPath(const std::string &Path) {
     SearchPathOpts.SDKPath = Path;

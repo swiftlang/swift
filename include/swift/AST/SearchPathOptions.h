@@ -30,11 +30,8 @@ public:
   /// Path(s) which should be searched for frameworks.
   std::vector<std::string> FrameworkSearchPaths;
 
-  /// Path to search for compiler-relative header files.
+  /// Path which includes the swift runtime.
   std::string RuntimeIncludePath;
-
-  /// Path to search for compiler-relative stdlib modules and dylibs.
-  std::string RuntimeImportPath;
 };
 
 }

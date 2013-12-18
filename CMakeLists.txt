@@ -215,7 +215,7 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
-function(compile_swift_files)
+function(compile_swift_files)	
   parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS" "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
   
@@ -245,7 +245,7 @@ function(compile_swift_files)
   endif()
 
   # Allow import of other Swift modules we just built.
-  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}")
+  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/swift")
 
   # Turn on debug symbols in debug builds.
   if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -289,7 +289,7 @@ function(compile_swift_files)
     set(postprocessing)
   else()
     get_filename_component(module_source_name ${objfile} NAME_WE)
-    set(module_source_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR})
+    set(module_source_dir ${SWIFTLIB_DIR}/swift)
 
     set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
     set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
@@ -297,7 +297,7 @@ function(compile_swift_files)
     set(postprocessing COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
 
     install(FILES ${module_source_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR})
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
   endif()
 
   set(stdlib_dep)
@@ -393,13 +393,6 @@ endfunction()
 # single-configuration builds.
 set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 
-# Set SWIFTLIB_SUBDIR to the subdirectory inside SWIFTLIB_DIR 
-# where Swift .swiftmodules and libraries should be placed.
-# This is changed later based on SWIFT_DEPLOYMENT_OS.
-# The OS is currently needed in lieu of proper SDK support.
-set(SWIFTLIB_SUBDIR "swift")
-
-
 # Add a new Swift library.
 #
 # Usage:
@@ -458,7 +451,7 @@ macro(add_swift_library name)
   set_source_files_properties(${SWIFTLIB_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTLIB_DEPENDS} )
+  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/swift" ${SWIFTLIB_DEPENDS} )
   llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
   link_system_libs( ${name} )
@@ -473,12 +466,15 @@ macro(add_swift_library name)
   endif(MSVC)
 
   if(SWIFTLIB_INSTALL)
+    set_target_properties(${name} PROPERTIES
+      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib/swift")
+
     # Install runtime libraries to lib/swift instead of lib. This works around
     # the fact that -isysroot prevents linking to libraries in the system
     # /usr/lib if Swift is installed in /usr.
     set_target_properties(${name} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR} )
+      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift)
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
@@ -491,13 +487,13 @@ macro(add_swift_library name)
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
       set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift)
     endforeach()
 
     install(TARGETS ${name}
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR})
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
@@ -512,8 +508,7 @@ macro(add_swift_library name)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${name}
       PROPERTIES
-      INSTALL_NAME_DIR "@rpath"
-      BUILD_WITH_INSTALL_RPATH YES)
+      INSTALL_NAME_DIR "@rpath")
   endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
@@ -556,7 +551,7 @@ macro(add_swift_executable name)
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTEXE_DEPENDS} )
+  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/swift" ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
   link_system_libs( ${name} )
@@ -565,7 +560,7 @@ macro(add_swift_executable name)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${name}
       PROPERTIES
-      LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main    -Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+      LINK_FLAGS "-Wl,-exported_symbol,_main")
   endif()
 endmacro(add_swift_executable)
 
@@ -676,10 +671,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
   endif()
-
-  # Add OS name to stdlib install directory
-  set(SWIFTLIB_SUBDIR "swift/${SWIFT_DEPLOYMENT_OS}")
-
 endif()
 
 # We'll need this once we have generated headers
@@ -693,11 +684,11 @@ if (SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
-  add_subdirectory(utils)
 endif (SWIFT_BUILD_TOOLS)
 if (SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 endif (SWIFT_BUILD_STDLIB)
+add_subdirectory(utils)
   add_subdirectory(examples)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." "${LLVM_INCLUDE_TESTS}")

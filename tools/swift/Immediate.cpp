@@ -68,10 +68,6 @@
 #include <histedit.h>
 #include <dlfcn.h>
 
-#ifndef SWIFT_TOOLCHAIN_SUBDIR
-#define SWIFT_TOOLCHAIN_SUBDIR "swift"
-#endif
-
 using namespace swift;
 
 namespace {
@@ -169,18 +165,17 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 static bool loadRuntimeLib(StringRef sharedLibName,
                            const ProcessCmdLine &CmdLine) {
   // FIXME: Need error-checking.
-  llvm::SmallString<128> Path(
+  llvm::SmallString<128> LibPath(
       llvm::sys::fs::getMainExecutable(CmdLine[0].data(),
                                        (void*)&swift::RunImmediately));
-  llvm::sys::path::remove_filename(Path); // Remove /executable
-  llvm::sys::path::remove_filename(Path); // Remove /bin
-  llvm::sys::path::append(Path, "lib", SWIFT_TOOLCHAIN_SUBDIR, sharedLibName);
-  return dlopen(Path.c_str(), 0);
+  llvm::sys::path::remove_filename(LibPath); // Remove /swift
+  llvm::sys::path::remove_filename(LibPath); // Remove /bin
+  llvm::sys::path::append(LibPath, "lib", "swift", sharedLibName);
+  return dlopen(LibPath.c_str(), 0);
 }
 
 static bool loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
-  // We rely on @rpath to find the core Swift stdlib.
-  return dlopen("libswift_stdlib_core.dylib", 0);
+  return loadRuntimeLib("libswift_stdlib_core.dylib", CmdLine);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
