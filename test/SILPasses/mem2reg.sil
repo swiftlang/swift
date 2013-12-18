@@ -79,12 +79,10 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 }
 
 // CHECK-LABEL: sil @with_loads
-// CHECK: alloc_stack
-// CHECK: return
 // simple.foo2 (c : swift.Int64) -> swift.Int64
 sil @with_loads : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %19, %2
+  %1 = alloc_stack $Int64  // var c               // users: %19, %2, (%20)
   store %0 to %1#1 : $*Int64                      // id: %2
   %3 = alloc_box $Int64  // var x                 // users: %16, %11, %6
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
@@ -106,9 +104,11 @@ bb2:                                              // Preds: bb0
   strong_release %3#0 : $Builtin.ObjectPointer    // id: %16
   br bb3(%14 : $Int64)                            // id: %17
 
+//CHECK: bb3([[RET:%[0-9]+]] : $Int64):
 bb3(%18 : $Int64):                                // Preds: bb2 bb1
   dealloc_stack %1#0 : $*@local_storage Int64     // id: %19
   %20 = load %1#1 : $*Int64
+//CHECK: return [[RET]]
   return %18 : $Int64                             // id: %20
 }
 
