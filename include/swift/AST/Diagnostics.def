@@ -808,6 +808,8 @@ ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
       "duplicate attribute", ())
+ERROR(invalid_attribute_inversion,attribute_parsing,none,
+      "attribute may not be inverted", ())
 ERROR(cannot_combine_attribute,attribute_parsing,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
@@ -1066,6 +1068,8 @@ ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial @inout argument", ())
 ERROR(static_functions_not_mutating,sema_tcd,none,
       "static functions may not be declared @mutating", ())
+ERROR(mutating_invalid,sema_tcd,none,
+      "@mutating is not valid on this declaration", ())
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,

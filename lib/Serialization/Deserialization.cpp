@@ -1589,8 +1589,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
-    if (isMutating)
-      fn->getMutableAttrs().setAttr(AK_mutating, SourceLoc());
+    fn->setMutating(isMutating);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 

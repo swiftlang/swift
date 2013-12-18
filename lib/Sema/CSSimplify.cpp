@@ -1508,7 +1508,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Verify that @mutating methods on value types are only applied to settable
     // values.
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
-        isa<FuncDecl>(result) && result->getAttrs().isMutating() &&
+        isa<FuncDecl>(result) && cast<FuncDecl>(result)->isMutating() &&
         result->isInstanceMember() &&
         // Reject non-values and non-settable lvalues.
         (!baseTy->is<LValueType>() ||

@@ -1287,7 +1287,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
                            fn->isTransparent(),
-                           fn->getAttrs().isMutating(),
+                           fn->isMutating(),
                            fn->getAttrs().isOptional(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),

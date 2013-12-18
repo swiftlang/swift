@@ -206,6 +206,11 @@ public:
   SourceLoc AtLoc;
   StringRef AsmName;
 
+  /// When the mutating attribute is present (i.e., we have a location for it),
+  /// this indicates whether it was inverted (@!mutating) or not (@mutating).
+  /// Clients should generally use the getMutating() accessor.
+  bool MutatingInverted = false;
+
   DeclAttributes() {}
 
   bool isValid() const { return AtLoc.isValid(); }
@@ -246,7 +251,6 @@ public:
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
-  bool isMutating() const { return has(AK_mutating); }
   bool isObjC() const { return has(AK_objc); }
   bool isIBOutlet() const { return has(AK_IBOutlet); }
   bool isIBAction() const { return has(AK_IBAction); }
@@ -256,6 +260,13 @@ public:
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
   bool isOptional() const { return has(AK_optional); }
+
+  bool hasMutating() const { return has(AK_mutating); }
+  Optional<bool> getMutating() const {
+    if (hasMutating())
+      return !MutatingInverted;
+    return Nothing;
+  }
 
   Resilience getResilienceKind() const {
     if (has(AK_resilient))

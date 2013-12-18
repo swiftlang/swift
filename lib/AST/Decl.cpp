@@ -909,7 +909,7 @@ Type VarDecl::getGetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
-                                                       /*@inout*/false,
+                                                       /*@mutating*/false,
                                                        &outerParams);
 
   // Form the getter type.
@@ -968,7 +968,7 @@ Type VarDecl::getSetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
-                                                       /*@inout*/!isStatic(),
+                                                       /*@mutating*/!isStatic(),
                                                        &outerParams);
 
   // Form the element -> () function type.
@@ -1039,19 +1039,19 @@ bool VarDecl::isAnonClosureParam() const {
 Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
   bool isStatic = false;
-  bool isInOut = false;
+  bool isMutating = false;
 
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
-    isInOut = FD->getAttrs().isMutating();
+    isMutating = FD->isMutating();
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
     // constructors and destructors of value types have an implicitly
     // @inout self.
-    isInOut = !getDeclContext()->getDeclaredTypeInContext()
+    isMutating = !getDeclContext()->getDeclaredTypeInContext()
         ->hasReferenceSemantics();
   }
 
-  return getDeclContext()->getSelfTypeInContext(isStatic, isInOut,
+  return getDeclContext()->getSelfTypeInContext(isStatic, isMutating,
                                                 outerGenericParams);
 }
 
@@ -1373,7 +1373,7 @@ Type SubscriptDecl::getGetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*@inout*/false,
+                                                       /*@mutating*/false,
                                                        &outerParams);
 
   // Form the () -> element function type.
@@ -1438,7 +1438,7 @@ Type SubscriptDecl::getSetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*@inout*/false,
+                                                       /*@mutating*/false,
                                                        &outerParams);
 
   // Form the element -> () function type.

@@ -131,8 +131,12 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 ///     'unowned'
 ///     'noreturn'
 ///     'optional'
+///     '!'? 'mutating'
 /// \endverbatim
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
+  SourceLoc InversionLoc = Tok.getLoc();
+  bool isInverted = consumeIf(tok::exclaim_postfix);
+
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
@@ -170,10 +174,23 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   SourceLoc Loc = consumeToken();
   
   // Diagnose duplicated attributes.
-  if (Attributes.has(attr))
+  if (Attributes.has(attr)) {
     diagnose(Loc, diag::duplicate_attribute);
-  else
-    Attributes.setAttr(attr, Loc);
+    return false;
+  }
+
+  Attributes.setAttr(attr, Loc);
+
+  // If this is an inverted attribute like "@!mutating", verify that inversion
+  // is ok.
+  if (isInverted) {
+    if (attr == AK_mutating) {
+      Attributes.MutatingInverted = true;
+    } else {
+      diagnose(InversionLoc, diag::invalid_attribute_inversion);
+      isInverted = false;
+    }
+  }
 
   // Handle any attribute-specific processing logic.
   switch (attr) {
@@ -1289,6 +1306,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                            CurDeclContext);
     if (StaticLoc.isValid())
       Set->setStatic(true);
+    else  // non-static setters default to @mutating.
+      Set->setMutating();
 
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
@@ -1673,7 +1692,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
-  if (StaticLoc.isValid() && Attributes.isMutating()) {
+  if (StaticLoc.isValid() && Attributes.hasMutating()) {
     diagnose(Tok, diag::static_functions_not_mutating);
     Attributes.clearAttribute(AK_mutating);
   }

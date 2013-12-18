@@ -186,9 +186,11 @@ class alignas(8) Decl {
 
     /// \brief Whether this function is a 'static' method.
     unsigned Static : 1;
+    /// \brief Whether this function is a 'mutating' method.
+    unsigned Mutating : 1;
 
     /// \brief Number of parameter patterns (tuples).
-    unsigned NumParamPatterns : 16;
+    unsigned NumParamPatterns : 15;
   };
   enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
@@ -2472,7 +2474,10 @@ class FuncDecl : public AbstractFunctionDecl {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
     assert(NumParamPatterns > 0);
     FuncDeclBits.NumParamPatterns = NumParamPatterns;
+    // Verify no bitfield truncation.
+    assert(FuncDeclBits.NumParamPatterns == NumParamPatterns);
     setType(Ty);
+    FuncDeclBits.Mutating = false;
   }
 
   VarDecl *getImplicitSelfDeclImpl() const;
@@ -2500,8 +2505,14 @@ public:
   bool isStatic() const {
     return FuncDeclBits.Static;
   }
+  bool isMutating() const {
+    return FuncDeclBits.Mutating;
+  }
   void setStatic(bool Static = true) {
     FuncDeclBits.Static = Static;
+  }
+  void setMutating(bool Mutating = true) {
+    FuncDeclBits.Mutating = Mutating;
   }
 
   void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,

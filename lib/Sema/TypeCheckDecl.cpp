@@ -1597,9 +1597,8 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getArgParamPatterns();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (hasSelf) {
+    if (hasSelf)
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
-    }
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
       Type argTy = patterns[e - i - 1]->getType();
@@ -1752,6 +1751,19 @@ public:
     // Bind operator functions to the corresponding operator declaration.
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
+
+
+    // Validate the @mutating attribute if present, and install it into the bit
+    // on funcdecl (instead of just being in DeclAttrs).
+    Optional<bool> MutatingAttr = FD->getAttrs().getMutating();
+    if (MutatingAttr) {
+      if (!FD->getDeclContext()->isTypeContext() ||
+          FD->getDeclContext()->getDeclaredTypeInContext()
+          ->hasReferenceSemantics())
+        TC.diagnose(FD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
+      else
+        FD->setMutating(MutatingAttr.getValue());
+    }
 
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
