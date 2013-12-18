@@ -21,24 +21,6 @@ using namespace swift;
 using namespace Lowering;
 using namespace Mangle;
 
-static char mangleConstructorKind(SILDeclRef::Kind kind) {
-  switch (kind) {
-  case SILDeclRef::Kind::Allocator:
-    return 'C';
-  case SILDeclRef::Kind::Initializer:
-    return 'c';
-      
-  case SILDeclRef::Kind::Func:
-  case SILDeclRef::Kind::Getter:
-  case SILDeclRef::Kind::Setter:
-  case SILDeclRef::Kind::EnumElement:
-  case SILDeclRef::Kind::Destroyer:
-  case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::DefaultArgGenerator:
-    llvm_unreachable("not a constructor kind");
-  }
-}
-
 SILFunction *
 SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
                                             CanSILFunctionType thunkType,
@@ -129,23 +111,27 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
   // FIXME: Only the destroying destructor is currently emitted in SIL.
   case SILDeclRef::Kind::Destroyer:
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    mangler.mangleDeclContext(cast<ClassDecl>(c.getDecl()));
-    buffer << 'd';
+    mangler.mangleDestructorEntity(cast<ClassDecl>(c.getDecl()),
+                                   /*isDeallocating*/ false);
     return;
 
   //   entity ::= context 'C' type                // allocating constructor
-  //   entity ::= context 'c' type                // initializing constructor
   case SILDeclRef::Kind::Allocator:
-  case SILDeclRef::Kind::Initializer: {
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    auto ctor = cast<ConstructorDecl>(c.getDecl());
-    mangler.mangleContextOf(ctor);
-    buffer << mangleConstructorKind(c.kind);
-    mangler.mangleDeclType(ctor, ExplosionKind::Minimal, c.uncurryLevel);
+    mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                    /*allocating*/ true,
+                                    ExplosionKind::Minimal,
+                                    c.uncurryLevel);
     return;
-  }
+
+  //   entity ::= context 'c' type                // initializing constructor
+  case SILDeclRef::Kind::Initializer:
+    buffer << introducer;
+    mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                    /*allocating*/ false,
+                                    ExplosionKind::Minimal,
+                                    c.uncurryLevel);
+    return;
 
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
@@ -155,10 +141,8 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
       return;
     }
 
-      buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
-    buffer << 'g';
+    buffer << introducer;
+    mangler.mangleGetterEntity(c.getDecl(), ExplosionKind::Minimal);
     return;
 
   //   entity ::= declaration 's'                 // setter
@@ -170,28 +154,20 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
     }
 
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
-    buffer << 's';
+    mangler.mangleSetterEntity(c.getDecl(), ExplosionKind::Minimal);
     return;
 
   //   entity ::= declaration 'a'                 // addressor
   case SILDeclRef::Kind::GlobalAccessor:
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
-    buffer << 'a';
+    mangler.mangleAddressorEntity(c.getDecl());
     return;
 
-  //   entity ::= declaration 'e' index           // default arg generator
+  //   entity ::= context 'e' index           // default arg generator
   case SILDeclRef::Kind::DefaultArgGenerator:
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
-    buffer << 'e';
-    if (c.defaultArgIndex > 0)
-      buffer << (c.defaultArgIndex - 1);
-    buffer << '_';
+    mangler.mangleDefaultArgumentEntity(cast<AbstractFunctionDecl>(c.getDecl()),
+                                        c.defaultArgIndex);
     return;
   }
 

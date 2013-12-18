@@ -306,9 +306,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     
     for (auto varNames : {
       // global accessor for swift.C_ARGC : CInt
-      std::make_pair("argc", "_TSs6C_ARGCVSs5Int32a"),
+      std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
       // global accessor for swift.C_ARGV : UnsafePointer<CString>
-      std::make_pair("argv", "_TSs6C_ARGVGVSs13UnsafePointerVSs7CString_a")
+      std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerVSs7CString_")
     }) {
       StringRef fnParameterName;
       StringRef accessorName;

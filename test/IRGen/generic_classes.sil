@@ -9,7 +9,7 @@ import gizmo
 // CHECK: [[NONGENERICINHERITSGENERIC:%C15generic_classes25NonGenericInheritsGeneric]] = type <{ %swift.refcounted, %VSs5UInt8, [7 x i8], <{ %Si, %VSs5UInt8 }>, %VSs5UInt8, [6 x i8], %Si }>
 
 // -- offset of RootGeneric<T>.x
-// CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
+// CHECK: @_TWvdvC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private unnamed_addr constant [32 x i8] c"C15generic_classes11RootGeneric\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private unnamed_addr constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = constant { {{.*}} i64 } {
@@ -34,18 +34,18 @@ import gizmo
 // --       nominal type descriptor
 // CHECK:   @_TMnC15generic_classes11RootGeneric,
 // --       vtable
-// CHECK:   @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-// CHECK:   @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-// CHECK:   @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       field offset placeholders
 // CHECK:   i64 16, i64 0, i64 0
 // CHECK: }
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
-// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1xVSs5UInt8 = global i64 16, align 8
-// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1yGSaQ__ = global i64 24, align 8
-// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1zVSs5UInt8 = global i64 48, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVSs5UInt8 = global i64 16, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSaQ__ = global i64 24, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVSs5UInt8 = global i64 48, align 8
 
 // -- fixed-layout nongeneric descriptor
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private unnamed_addr constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
@@ -67,7 +67,7 @@ import gizmo
 // CHECK: }
 
 // CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} i64 } {
-// CHECK:   void (%swift.refcounted*)* @_TC15generic_classes14RootNonGenericD,
+// CHECK:   void (%swift.refcounted*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
 // CHECK:   %swift.type* @"OBJC_CLASS_$_SwiftObject",
@@ -82,7 +82,7 @@ import gizmo
 // -- NonGenericInheritsGeneric instantiates its generic base class, giving
 //    fixed offsets for its own ivars
 // -- offset of NonGenericInheritsGeneric.w
-// CHECK: @_TWvdC15generic_classes25NonGenericInheritsGeneric1wSi = global i64 40, align 8
+// CHECK: @_TWvdvC15generic_classes25NonGenericInheritsGeneric1wSi = global i64 40, align 8
 // CHECK: [[NONGENERICINHERITSGENERIC_W_NAME:@.*]] = private unnamed_addr constant [2 x i8] c"w\00"
 // -- ivars for NonGenericInheritsGeneric
 // CHECK: @_IVARS_NonGenericInheritsGeneric = private constant { {{.*}} }] } {
@@ -93,7 +93,7 @@ import gizmo
 // CHECK:   [{
 // --       NonGenericInheritsGeneric.w
 // --         offset ptr
-// CHECK:     i64* @_TWvdC15generic_classes25NonGenericInheritsGeneric1wSi,
+// CHECK:     i64* @_TWvdvC15generic_classes25NonGenericInheritsGeneric1wSi,
 // --         name
 // CHECK:     i8* getelementptr inbounds ([2 x i8]* [[NONGENERICINHERITSGENERIC_W_NAME]], i64 0, i64 0),
 // --         type encoding (FIXME)
@@ -122,8 +122,8 @@ import gizmo
 // --       RootGeneric field offsets
 // CHECK:   i64 16, i64 24, i64 33,
 // --       NonGenericInheritsGeneric vtable
-// CHECK:   @_TC15generic_classes25NonGenericInheritsGeneric3zimfS0_FT_T_,
-// CHECK:   @_TC15generic_classes25NonGenericInheritsGeneric4zangfS0_FT_T_,
+// CHECK:   @_TFC15generic_classes25NonGenericInheritsGeneric3zimfS0_FT_T_,
+// CHECK:   @_TFC15generic_classes25NonGenericInheritsGeneric4zangfS0_FT_T_,
 // --       NonGenericInheritsGeneric field offsets
 //          FIXME: We shouldn't emit this
 // CHECK:   i64 40
@@ -133,15 +133,15 @@ import gizmo
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_GENERICINHERITSGENERIC:@fill_generic_metadata[0-9]*]],
 // --       RootGeneric vtable
-//          @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-//          @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-//          @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+//          @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+//          @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+//          @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       RootGeneric field offset placeholders
 // CHECK:   i64 16, i64 0, i64 0
 // --       GenericInheritsGeneric vtable
-// CHECK:   @_TC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
-// CHECK:   @_TC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
-// CHECK:   @_TC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
+// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
+// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
+// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
 // --       GenericInheritsGeneric field offset placeholder
 // CHECK:   i64 0
 // CHECK: }
@@ -309,8 +309,8 @@ entry:
 }
 
 // -- RootGeneric deallocating destructor
-// CHECK: define void @_TC15generic_classes11RootGenericD(%swift.refcounted*)
-// CHECK:   [[DESTROYED:%.*]] = call %swift.refcounted* @_TC15generic_classes11RootGenericd
+// CHECK: define void @_TFC15generic_classes11RootGenericD(%swift.refcounted*)
+// CHECK:   [[DESTROYED:%.*]] = call %swift.refcounted* @_TFC15generic_classes11RootGenericd
 // CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %swift.refcounted* [[DESTROYED]], i32 0, i32 0
 // CHECK:   [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]], align 8
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8***

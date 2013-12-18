@@ -73,12 +73,20 @@ public:
   Mangler(raw_ostream &buffer, bool DWARFMangling = false)
     : Buffer(buffer), DWARFMangling(DWARFMangling) {}
   void mangleContextOf(ValueDecl *decl);
-  void mangleDeclContext(DeclContext *ctx);
-  void mangleDeclName(ValueDecl *decl, IncludeType includeType);
+  void mangleContext(DeclContext *ctx);
+  void mangleDeclName(ValueDecl *decl);
   void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
                       unsigned uncurryingLevel);
   void mangleEntity(ValueDecl *decl, ExplosionKind kind,
                     unsigned uncurryingLevel);
+  void mangleConstructorEntity(ConstructorDecl *ctor, bool isAllocating,
+                               ExplosionKind kind, unsigned uncurryingLevel);
+  void mangleDestructorEntity(ClassDecl *type, bool isDeallocating);
+  void mangleGetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
+  void mangleSetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
+  void mangleAddressorEntity(ValueDecl *decl);
+  void mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index);
+  void mangleInitializerEntity(VarDecl *var);
   void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
   void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
@@ -95,7 +103,6 @@ private:
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
-  void mangleGetterOrSetterContext(FuncDecl *fn);
   void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
                              ExplosionKind explosion, unsigned uncurryLevel,
                              bool mangleAsFunction);

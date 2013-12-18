@@ -10,7 +10,7 @@ struct S : P {
   func foo()
 }
 
-// CHECK: [[S_P_WITNESS:@.*]] = internal constant [1 x i8*] [i8* bitcast (void (%V15witness_methods1S*)* @_TV15witness_methods1S3foofRS0_FT_T_ to i8*)]
+// CHECK: [[S_P_WITNESS:@.*]] = internal constant [1 x i8*] [i8* bitcast (void (%V15witness_methods1S*)* @_TFV15witness_methods1S3foofRS0_FT_T_ to i8*)]
 
 // CHECK: define void @concrete_type_witness(%V15witness_methods1S* noalias) {
 // CHECK: entry:

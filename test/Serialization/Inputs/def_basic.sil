@@ -11,8 +11,8 @@ sil_global internal @globalinit_token0 : $Builtin.Word
 var staticProp: Int64 = 0
 sil @globalinit_func0 : $@thin () -> ()
 
-// CHECK-LABEL: sil deserialized @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
-sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil deserialized @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+sil @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
   // CHECK: sil_global_addr @globalinit_token0 : $*Builtin.Word
@@ -108,8 +108,8 @@ bb0(%0 : $() -> Int64):
 
 sil @return_constant : $@thin () -> Int64 {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
-  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
+  // CHECK: function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
+  %1 = function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
 
   // CHECK: metatype $Int64.metatype
   %2 = metatype $Int64.metatype
@@ -123,12 +123,12 @@ bb0:                                         // CHECK: bb0:
   %5 = return %4 : $Int64
 }
 
-sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
+sil @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, Int64.metatype) -> Int64
+sil @_TFSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
+sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, Int64.metatype) -> Int64
 
 
 protocol P {
@@ -202,7 +202,7 @@ protocol Runcible {
   static func static_method()
 }
 
-//sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {
+//sil @_TF4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {
 //bb0(%0 : $*T):
   //%1 = archetype_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int64
   //%2 = apply %1(%0) : $@cc(method) ((), @inout T) -> Int64
@@ -222,7 +222,7 @@ protocol Runcible {
 protocol Bendable { }
 
 // CHECK-LABEL: $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
+sil @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -248,8 +248,8 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   func classBoundMethod()
 }
 
-// CHECK-LABEL: @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> ()
-sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> () {
+// CHECK-LABEL: @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> ()
+sil @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $ClassBound
   %2 = store %0 to %1#1 : $*ClassBound
@@ -268,7 +268,7 @@ bb0(%0 : $ClassBound):
 struct Val {
 }
 
-//sil @_TV4todo3ValCfMS0_FT_S0_ : $@thin (Val.metatype) -> Val {
+//sil @_TFV4todo3ValCfMS0_FT_S0_ : $@thin (Val.metatype) -> Val {
 //bb0(%0 : $Val.metatype):
   //%1 = alloc_stack $Val
   //%3 = load %1#1 : $*Val
@@ -282,16 +282,16 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK-LABEL: @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph
-sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph {
+// CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph
+sil @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
   %4 = return %3 : $Aleph  // CHECK: return
 }
 
-// CHECK-LABEL: @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph
-sil @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph {
+// CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph
+sil @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph {
 bb0(%0 : $Aleph.metatype):
   %1 = tuple ()
   %2 = alloc_box $Aleph       // CHECK: alloc_box
@@ -355,11 +355,11 @@ bb0(%0 : $*Gimel, %1 : $*Q):
   return %t : $()
 }
 
-sil @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
-sil @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
+sil @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
+sil @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
 
-// CHECK-LABEL: @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> ()
-sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> () {
+// CHECK-LABEL: @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> ()
+sil @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> () {
 bb0(%0 : $Int64, %1 : $Float32):
   %2 = alloc_box $(Int64, Float32)
   %3 = tuple (%0 : $Int64, %1 : $Float32)
@@ -371,11 +371,11 @@ bb0(%0 : $Int64, %1 : $Float32):
   %10 = tuple_element_addr %2#1 : $*(Int64, Float32), 1
   %11 = load %10 : $*Float32
   // CHECK: function_ref
-  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
+  %14 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
   // CHECK: apply
   %15 = apply %14() : $@thin () -> (Int64, Float32)
   // CHECK: function_ref
-  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
+  %19 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
   // CHECK: tuple_extract {{%.*}} : $(Int64, Float32), 1
   %17 = tuple_extract %15 : $(Int64, Float32), 1
   // CHECK: apply
@@ -389,8 +389,8 @@ class M {
   var member : Int
 }
 
-// CHECK-LABEL: @_TC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> ()
-sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> () {
+// CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> ()
+sil @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> () {
 bb0(%0 : $Int64, %1 : $M):
   %2 = alloc_box $Int64
   %3 = store %0 to %2#1 : $*Int64
@@ -412,8 +412,8 @@ bb0(%0 : $Int64, %1 : $M):
 class B { }
 class E : B { }
 
-// CHECK-LABEL: @_T4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
-sil @_T4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1 {
+// CHECK-LABEL: @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
+sil @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
@@ -432,22 +432,22 @@ isa(%6 : $Builtin.Int1):
   %9 = return %6 : $Builtin.Int1
 }
 
-sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
+sil @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
+sil @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
 
-// CHECK-LABEL: @_T7literal8literalsFT_T_ : $@thin () -> ()
-sil @_T7literal8literalsFT_T_ : $@thin () -> () {
+// CHECK-LABEL: @_TF7literal8literalsFT_T_ : $@thin () -> ()
+sil @_TF7literal8literalsFT_T_ : $@thin () -> () {
 bb0:
   %0 = tuple ()
   %1 = alloc_stack $Float64
-  %2 = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
+  %2 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
   %3 = metatype $Float64.metatype
   // CHECK: float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %4 = float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %5 = apply %2(%4, %3) : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
   %6 = store %5 to %1#1 : $*Float64
   %7 = alloc_stack $String
-  %8 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
   %9 = metatype $String.metatype
   // CHECK: string_literal "foo"
   %10 = string_literal "foo"
@@ -465,8 +465,8 @@ bb0:
   %24 = return %23 : $()
 }
 
-// CHECK-LABEL: @_T5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
-sil @_T5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
+// CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
+sil @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %2 = alloc_box $Builtin.RawPointer
   %3 = alloc_box $Builtin.Int64
@@ -642,7 +642,7 @@ bb0(%0 : $Bas):
   %1 = tuple ()
   %2 = alloc_box $Bas
   store %0 to %2#1 : $*Bas
-  %4 = function_ref @_TSSCfMSSFT_SS : $@thin (String.metatype) -> String
+  %4 = function_ref @_TFSSCfMSSFT_SS : $@thin (String.metatype) -> String
   %5 = metatype $String.metatype
   %6 = apply %4(%5) : $@thin (String.metatype) -> String
   %7 = load %2#1 : $*Bas
@@ -672,7 +672,7 @@ bb0(%0 : $Bas):
   strong_release %2#0 : $Builtin.ObjectPointer
   return %27 : $Bas
 }
-sil @_TSSCfMSSFT_SS : $@thin (String.metatype) -> String
+sil @_TFSSCfMSSFT_SS : $@thin (String.metatype) -> String
 
 // CHECK-LABEL: sil deserialized @test_builtin_func_ref
 sil @test_builtin_func_ref : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
@@ -736,9 +736,9 @@ enum MaybePair {
   case Left(Int)
 }
 
-sil @_T6switch1aFT_T_ : $@thin () -> ()
-sil @_T6switch1bFT_T_ : $@thin () -> ()
-sil @_T6switch1cFT_T_ : $@thin () -> ()
+sil @_TF6switch1aFT_T_ : $@thin () -> ()
+sil @_TF6switch1bFT_T_ : $@thin () -> ()
+sil @_TF6switch1cFT_T_ : $@thin () -> ()
 
 // CHECK-LABEL: sil deserialized @test_switch_union : $@thin (MaybePair) -> ()
 sil @test_switch_union : $@thin (MaybePair) -> () {
@@ -754,7 +754,7 @@ bb1:
   br bb2
 
 bb2:
-  %7 = function_ref @_T6switch1aFT_T_ : $@thin () -> ()
+  %7 = function_ref @_TF6switch1aFT_T_ : $@thin () -> ()
   %8 = apply %7() : $@thin () -> ()
   br bb5                                                 // CHECK: br
 
@@ -762,12 +762,12 @@ bb3(%10 : $Int64):
   br bb4
 
 bb4:
-  %12 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
+  %12 = function_ref @_TF6switch1bFT_T_ : $@thin () -> ()
   %13 = apply %12() : $@thin () -> ()
   br bb5                                                  // CHECK: br
 
 bb5:
-  %15 = function_ref @_T6switch1cFT_T_ : $@thin () -> ()
+  %15 = function_ref @_TF6switch1cFT_T_ : $@thin () -> ()
   %16 = apply %15() : $@thin () -> ()
   strong_release %1#0 : $Builtin.ObjectPointer
   %18 = tuple ()
@@ -803,12 +803,12 @@ bb0(%0 : $Builtin.Int64):
   switch_int %0 : $Builtin.Int64, case 1: bb1, case 2: bb2
 
 bb1:
-  %7 = function_ref @_T6switch1aFT_T_ : $@thin () -> () // CHECK: function_ref
+  %7 = function_ref @_TF6switch1aFT_T_ : $@thin () -> () // CHECK: function_ref
   %8 = apply %7() : $@thin () -> ()
   br bb3
 
 bb2:
-  %12 = function_ref @_T6switch1bFT_T_ : $@thin () -> () // CHECK: function_ref
+  %12 = function_ref @_TF6switch1bFT_T_ : $@thin () -> () // CHECK: function_ref
   %13 = apply %12() : $@thin () -> ()
   br bb3
 
@@ -955,9 +955,9 @@ class Foo {
   var y: Int
 }
 
-// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
-// CHECK_DECL-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin (Int64, Int64, Foo) -> Int64{{$}} 
-sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
+// CHECK-LABEL: sil deserialized @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
+// CHECK_DECL-LABEL: sil deserialized @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64{{$}} 
+sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int64  // var x               // users: %17, %6
@@ -976,9 +976,9 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   return %13 : $Int64
 }
 
-// CHECK-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
-// CHECK_DECL-LABEL: sil deserialized @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> (){{$}}
-sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sis : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
+// CHECK-LABEL: sil deserialized @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
+// CHECK_DECL-LABEL: sil deserialized @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> (){{$}}
+sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
   %4 = alloc_stack $Int64  // var value           // users: %16, %5
   store %0 to %4#1 : $*Int64
@@ -998,21 +998,21 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
-// CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+// CHECK: #Foo.subscript!getter.2: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
+// CHECK: #Foo.subscript!setter.2: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
 // CHECK: }
 // CHECK_DECL-LABEL: sil_vtable Foo {
-// CHECK_DECL: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
-// CHECK_DECL: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+// CHECK_DECL: #Foo.subscript!getter.2: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
+// CHECK_DECL: #Foo.subscript!setter.2: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
 // CHECK_DECL: }
 sil_vtable Foo {
-  #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
-  #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
+  #Foo.subscript!getter.2: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
+  #Foo.subscript!setter.2: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
 }
 
-sil @_T9def_basic13serialize_allFT_T_ : $@thin () -> () {
+sil @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
-  %1 = function_ref @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer
+  %1 = function_ref @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@thin () -> ()
   %4 = function_ref @test2 : $@thin (Int64) -> ()
   %6 = function_ref @named_tuple : $@thin () -> (Builtin.Int64, Builtin.Int64)
@@ -1021,23 +1021,23 @@ bb0:
   %13 = function_ref @return_constant : $@thin () -> Int64
   %23 = function_ref @existentials : $@thin (@in P) -> ()
   %25 = function_ref @classes : $@thin () -> ()
-  %27 = function_ref @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-  %29 = function_ref @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> ()
-  %31 = function_ref @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph
-  %33 = function_ref @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph
+  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
+  %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> ()
+  %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, Aleph.metatype) -> Aleph
+  %33 = function_ref @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (Aleph.metatype) -> Aleph
   %35 = function_ref @test_union_empty_case : $@thin () -> Beth
   %37 = function_ref @test_union_data_case : $@thin Int64 -> Beth
   %39 = function_ref @test_union_addr_empty_case : $@thin (@out Gimel) -> ()
   %41 = function_ref @test_union_addr_data_case : $@thin (@out Gimel, @in Q) -> ()
-  %43 = function_ref @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
-  %45 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
-  %47 = function_ref @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> ()
-  %49 = function_ref @_TC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> ()
-  %51 = function_ref @_T4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
-  %53 = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
-  %55 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
-  %57 = function_ref @_T7literal8literalsFT_T_ : $@thin () -> ()
-  %59 = function_ref @_T5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer
+  %43 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
+  %45 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int64, Float32)
+  %47 = function_ref @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int64, Float32) -> ()
+  %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int64, M) -> ()
+  %51 = function_ref @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
+  %53 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, Float64.metatype) -> Float64
+  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, String.metatype) -> String
+  %57 = function_ref @_TF7literal8literalsFT_T_ : $@thin () -> ()
+  %59 = function_ref @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@thin () -> ()
   %63 = function_ref @test_class_metatype : $@thin (SomeClass, SomeSubclass) -> (SomeClass.metatype, SomeClass.metatype)
   %67 = function_ref @test_protocol_metatype : $@thin (@in SomeProtocol) -> SomeProtocol.metatype

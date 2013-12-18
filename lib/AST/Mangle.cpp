@@ -182,38 +182,38 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
   }
 
   // Otherwise, just mangle the decl's DC.
-  mangleDeclContext(decl->getDeclContext());
+  mangleContext(decl->getDeclContext());
 }
 
 namespace {
-  class FindFirstVariableName :
-    public PatternVisitor<FindFirstVariableName, Identifier> {
+  class FindFirstVariable :
+    public PatternVisitor<FindFirstVariable, VarDecl *> {
   public:
-    Identifier visitNamedPattern(NamedPattern *P) {
-      return P->getDecl()->getName();
+    VarDecl *visitNamedPattern(NamedPattern *P) {
+      return P->getDecl();
     }
 
-    Identifier visitTuplePattern(TuplePattern *P) {
+    VarDecl *visitTuplePattern(TuplePattern *P) {
       for (auto &elt : P->getFields()) {
-        Identifier id = visit(elt.getPattern());
-        if (!id.empty()) return id;
+        VarDecl *var = visit(elt.getPattern());
+        if (var) return var;
       }
-      return Identifier();
+      return nullptr;
     }
 
-    Identifier visitParenPattern(ParenPattern *P) {
+    VarDecl *visitParenPattern(ParenPattern *P) {
       return visit(P->getSubPattern());
     }
-    Identifier visitTypedPattern(TypedPattern *P) {
+    VarDecl *visitTypedPattern(TypedPattern *P) {
       return visit(P->getSubPattern());
     }
-    Identifier visitAnyPattern(AnyPattern *P) {
-      return Identifier();
+    VarDecl *visitAnyPattern(AnyPattern *P) {
+      return nullptr;
     }
 
     // Refutable patterns shouldn't ever come up.
 #define REFUTABLE_PATTERN(ID, BASE)                                        \
-    Identifier visit##ID##Pattern(ID##Pattern *P) {                        \
+    VarDecl *visit##ID##Pattern(ID##Pattern *P) {                          \
       llvm_unreachable("shouldn't be visiting a refutable pattern here!"); \
     }
 #define PATTERN(ID, BASE)
@@ -225,42 +225,40 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static Identifier findFirstVariableName(PatternBindingDecl *binding) {
-  auto ident = FindFirstVariableName().visit(binding->getPattern());
-  assert(!ident.empty() && "pattern-binding bound no names?");
-  return ident;
+static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+  auto var = FindFirstVariable().visit(binding->getPattern());
+  assert(var && "pattern-binding bound no variables?");
+  return var;
 }
 
-void Mangler::mangleDeclContext(DeclContext *ctx) {
+void Mangler::mangleContext(DeclContext *ctx) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module: {
     Module *module = cast<Module>(ctx);
+    assert(!module->getParent() && "cannot mangle nested modules!");
 
     // Try the special 'swift' substitution.
-    // context ::= 'Ss'
+    // context ::= known-module
+
+    // known-module ::= 'Ss'
     if (module->isStdlibModule()) {
       Buffer << "Ss";
       return;
     }
 
-    // context ::= substitution identifier*
-    // context ::= identifier+
-
+    // context ::= substitution
     if (tryMangleSubstitution(module)) return;
 
-    if (DeclContext *parent = module->getParent())
-      mangleDeclContext(parent);
-
-    // This should work, because the language should be restricting
-    // the name of a module to be a valid language identifier.
+    // context ::= identifier
     mangleIdentifier(module->Name);
+
     addSubstitution(module);
     return;
   }
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
-    mangleDeclContext(ctx->getParent());
+    mangleContext(ctx->getParent());
     return;
 
   case DeclContextKind::NominalTypeDecl:
@@ -272,7 +270,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     auto ExtTy = ExtD->getExtendedType();
     // Recover from erroneous extension.
     if (ExtTy->is<ErrorType>())
-      return mangleDeclContext(ExtD->getDeclContext());
+      return mangleContext(ExtD->getDeclContext());
 
     auto decl = ExtTy->getAnyNominal();
     assert(decl && "extension of non-nominal type?");
@@ -284,42 +282,39 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     llvm_unreachable("unnamed closure mangling not yet implemented");
 
   case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(ctx);
-    Buffer << 'F';
+    auto fn = cast<AbstractFunctionDecl>(ctx);
 
-    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      // FIXME: We need a real solution here for local types.
-      if (FD->isGetterOrSetter()) {
-        mangleGetterOrSetterContext(FD);
-        return;
+    // Constructors and destructors as contexts are always mangled
+    // using the non-(de)allocating variants.
+    if (auto ctor = dyn_cast<ConstructorDecl>(fn)) {
+      return mangleConstructorEntity(ctor, /*allocating*/ false,
+                                     ExplosionKind::Minimal,
+                                     /*uncurry*/ 0);
+    } else if (auto dtor = dyn_cast<DestructorDecl>(fn)) {
+      return mangleDestructorEntity(cast<ClassDecl>(dtor->getParent()),
+                                    /*deallocating*/ false);
+    } else if (auto func = dyn_cast<FuncDecl>(fn)) {
+      if (auto value = func->getGetterDecl()) {
+        return mangleGetterEntity(value, ExplosionKind::Minimal);
+      } else if (auto value = func->getSetterDecl()) {
+        return mangleSetterEntity(value, ExplosionKind::Minimal);
       }
-      mangleDeclName(FD, IncludeType::Yes);
-      return;
     }
-
-    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
-      mangleDeclName(CD, IncludeType::Yes);
-      return;
-    }
-
-    mangleDeclName(cast<DestructorDecl>(AFD), IncludeType::No);
-    return;
+    return mangleEntity(fn, ExplosionKind::Minimal, /*uncurry*/ 0);
   }
 
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(ctx)->getInitializerKind()) {
     case InitializerKind::DefaultArgument: {
       auto argInit = cast<DefaultArgumentInitializer>(ctx);
-      Buffer << "ID" << Index(argInit->getIndex());
-      mangleDeclContext(ctx->getParent());
+      mangleDefaultArgumentEntity(ctx->getParent(), argInit->getIndex());
       return;
     }
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      Buffer << "IV";
-      mangleDeclContext(patternInit->getBinding()->getDeclContext());
-      mangleIdentifier(findFirstVariableName(patternInit->getBinding()));
+      auto var = findFirstVariable(patternInit->getBinding());
+      mangleInitializerEntity(var);
       return;
     }
     }
@@ -327,31 +322,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.
-    return mangleDeclContext(ctx->getParent());
+    return mangleContext(ctx->getParent());
   }
 
   llvm_unreachable("bad decl context");
-}
-
-void Mangler::mangleGetterOrSetterContext(FuncDecl *func) {
-  assert(func->isGetterOrSetter());
-  Decl *D = func->getGetterDecl();
-  if (!D) D = func->getSetterDecl();
-  assert(D && "no value type for getter/setter!");
-  assert(isa<VarDecl>(D) || isa<SubscriptDecl>(D));
-
-  mangleDeclName(cast<ValueDecl>(D), IncludeType::No);
-
-  // We mangle the type with a canonical set of parameters because
-  // objects nested within functions are shared across all expansions
-  // of the function.
-  mangleDeclType(cast<ValueDecl>(D), ExplosionKind::Minimal, /*uncurry*/ 0);
-
-  if (func->getGetterDecl()) {
-    Buffer << 'g';
-  } else {
-    Buffer << 's';
-  }
 }
 
 /// Bind the generic parameters from the given list and its parents.
@@ -412,17 +386,9 @@ static OperatorFixity getDeclFixity(ValueDecl *decl) {
   return OperatorFixity::Infix;
 }
 
-void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
-  // decl ::= context identifier
-  mangleContextOf(decl);
+void Mangler::mangleDeclName(ValueDecl *decl) {
+  // TODO: local discriminators
   mangleIdentifier(decl->getName(), getDeclFixity(decl));
-
-  if (includeType == IncludeType::No) return;
-
-  // We mangle the type with a canonical set of parameters because
-  // objects nested within functions are shared across all expansions
-  // of the function.
-  mangleDeclType(decl, ExplosionKind::Minimal, /*uncurry*/ 0);
 }
 
 void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
@@ -861,7 +827,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       SmallVector<void *, 4> SortedSubsts(Substitutions.size());
       for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
       for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-      ContextMangler.mangleDeclContext(DC);
+      ContextMangler.mangleContext(DC);
     } else {
       unsigned relativeDepth = ArchetypesDepth - info.Depth;
       if (relativeDepth != 0) {
@@ -935,7 +901,8 @@ void Mangler::mangleProtocolName(ProtocolDecl *protocol) {
   ProtocolType *type = cast<ProtocolType>(protocol->getDeclaredType());
   if (tryMangleSubstitution(type))
     return;
-  mangleDeclName(protocol, IncludeType::No);
+  mangleContextOf(protocol);
+  mangleDeclName(protocol);
   addSubstitution(type);
 }
 
@@ -970,7 +937,8 @@ void Mangler::mangleNominalType(NominalTypeDecl *decl,
     return;
 
   Buffer << getSpecifierForNominalType(decl);
-  mangleDeclName(decl, IncludeType::No);
+  mangleContextOf(decl);
+  mangleDeclName(decl);
 
   addSubstitution(key);
 }
@@ -1032,13 +1000,77 @@ void Mangler::mangleFunctionType(CanAnyFunctionType fn,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
+void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
+                                      bool isAllocating,
+                                      ExplosionKind explosion,
+                                      unsigned uncurryLevel) {
+  Buffer << 'F';
+  mangleContextOf(ctor);
+  Buffer << (isAllocating ? 'C' : 'c');
+  mangleDeclType(ctor, explosion, uncurryLevel);
+}
+
+void Mangler::mangleDestructorEntity(ClassDecl *theClass,
+                                     bool isDeallocating) {
+  Buffer << 'F';
+  mangleContext(theClass);
+  Buffer << (isDeallocating ? 'D' : 'd');
+}
+
+void Mangler::mangleGetterEntity(ValueDecl *decl, ExplosionKind explosion) {
+  Buffer << 'F';
+  mangleContextOf(decl);
+  Buffer << 'g';
+  mangleDeclName(decl);
+  mangleDeclType(decl, explosion, 0);
+}
+
+void Mangler::mangleSetterEntity(ValueDecl *decl, ExplosionKind explosion) {
+  Buffer << 'F';
+  mangleContextOf(decl);
+  Buffer << 's';
+  mangleDeclName(decl);
+  mangleDeclType(decl, explosion, 0);
+}
+
+void Mangler::mangleAddressorEntity(ValueDecl *decl) {
+  Buffer << 'F';
+  mangleContextOf(decl);
+  Buffer << 'a';
+  mangleDeclName(decl);
+  mangleDeclType(decl, ExplosionKind::Minimal, 0);
+}
+
+void Mangler::mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index) {
+  Buffer << 'I';
+  mangleContext(ctx);
+  Buffer << 'A' << Index(index);
+}
+
+void Mangler::mangleInitializerEntity(VarDecl *var) {
+  Buffer << 'I';
+  mangleContext(var->getDeclContext());
+  Buffer << 'i';
+  mangleDeclName(var);
+  mangleDeclType(var, ExplosionKind::Minimal, /*uncurry*/ 0);
+}
+
 void Mangler::mangleEntity(ValueDecl *decl, ExplosionKind explosion,
                            unsigned uncurryLevel) {
-  mangleDeclName(decl, IncludeType::No);
+  assert(!isa<ConstructorDecl>(decl));
+  assert(!isa<DestructorDecl>(decl));
+  assert(!isa<FuncDecl>(decl) || !cast<FuncDecl>(decl)->isGetterOrSetter());
 
-  // Mangle in a type as well.  Note that we have to mangle the type
-  // on all kinds of declarations, even variables, because at the
-  // moment they can *all* be overloaded.
+  // entity ::= entity-kind context entity-name
+  if (isa<VarDecl>(decl)) {
+    Buffer << 'v';
+  } else {
+    assert(isa<AbstractFunctionDecl>(decl) ||
+           isa<EnumElementDecl>(decl));
+    Buffer << 'F';
+  }
+  mangleContextOf(decl);
+  mangleDeclName(decl);
   mangleDeclType(decl, explosion, uncurryLevel);
 }
 
@@ -1060,5 +1092,5 @@ void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
   mangleType(conformance->getType()->getCanonicalType(),
              ExplosionKind::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
-  mangleDeclContext(conformance->getContainingModule());
+  mangleContext(conformance->getContainingModule());
 }

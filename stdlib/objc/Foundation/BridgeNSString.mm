@@ -28,12 +28,12 @@ struct SwiftString;
 // String.size()
 extern "C" int64_t
 String_size(SwiftString *swiftString) 
-  asm("__TSS4sizefRSSFT_Si");
+  asm("__TFSS4sizefRSSFT_Si");
 
 // String[] getter
 extern "C" uint32_t
 String_getSubscript(uint64_t idx, SwiftString *swiftString) 
-  asm("__TSS9subscriptFT3idxSi_Scg");
+  asm("__TFSSg9subscriptFT3idxSi_Sc");
 
 
 struct SwiftString {

@@ -665,7 +665,7 @@ Globals
   global ::= 'Wz' protocol-conformance   // lazy protocol witness table template
   global ::= 'WD' protocol-conformance   // dependent proto witness table generator
   global ::= 'Wd' protocol-conformance   // dependent proto witness table template
-  global ::= local-marker? entity        // some identifiable thing
+  global ::= entity                      // some identifiable thing
   global ::= 'To' global                 // swift-as-ObjC thunk
   global ::= 'Tb' type                   // swift-to-ObjC block converter
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
@@ -673,23 +673,33 @@ Globals
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk (new)
   global ::= 'nk_' entity                // protocol witness thunk (old)
-  entity ::= context 'D'                 // deallocating destructor
-  entity ::= context 'd'                 // non-deallocating destructor
-  entity ::= context 'C' type            // allocating constructor
-  entity ::= context 'c' type            // non-allocating constructor
-  entity ::= declaration 'g'             // getter
-  entity ::= declaration 's'             // setter
-  entity ::= declaration 'a'             // addressor
-  entity ::= declaration                 // other declaration
-  declaration ::= declaration-name type
-  declaration-name ::= context identifier
+  entity ::= nominal-type                // named type declaration
+  entity ::= entity-kind context entity-name
+  entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
+  entity-kind ::= 'v'                    // variable (let/var)
+  entity-kind ::= 'I'                    // initializer
+  entity-name ::= decl-name type         // named declaration
+  entity-name ::= 'D'                    // deallocating destructor; untyped
+  entity-name ::= 'd'                    // non-deallocating destructor; untyped
+  entity-name ::= 'C' type               // allocating constructor
+  entity-name ::= 'c' type               // non-allocating constructor
+  entity-name ::= 'g' decl-name type     // getter
+  entity-name ::= 's' decl-name type     // setter
+  entity-name ::= 'a' decl-name type     // addressor
+  entity-name ::= 'A' index              // default argument generator
+  entity-name ::= 'i'                    // non-local variable initializer
+  decl-name ::= identifier
   reabstract-signature ::= ('G' generics)? type type
-  local-marker ::= 'L'
 
-Entity manglings all start with a nominal-type-kind (``[COPV]``), an
-identifier (``[0-9oX]``), a local context introducer (``[FI]``), or a
-substitution (``[S]``).  Global manglings start with any of those or
-``[MTWw]``.
+An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
+substitution (``[S]``) of a nominal type, or an ``entity-kind``
+(``[FIv]``).
+
+A ``context`` starts with either an ``entity`` or a ``module``, which
+might be an ``identifier`` (``[0-9oX]``) or a substitution of a module
+(``[S]``).
+
+A global mangling starts with an ``entity`` or ``[MTWw]``.
 
 If a partial application forwarder is for a static symbol, its name will
 start with the sequence ``_TPA_`` followed by the mangled symbol name of the
@@ -727,18 +737,16 @@ Declaration Contexts
 ::
 
   context ::= module
-  context ::= 'F' function
-  context ::= 'ID' index context             // default argument
-  context ::= 'IV' entity                    // variable initializer
-  context ::= nominal-type
-  context ::= protocol-context
+  context ::= entity
   module ::= substitution                    // other substitution
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
-  function ::= entity
 
 These manglings identify the enclosing context in which an entity was declared,
 such as its enclosing module, function, or nominal type.
+
+When mangling the context of a local entity within a constructor or
+destructor, the non-allocating or non-deallocating variant is used.
 
 Types
 ~~~~~

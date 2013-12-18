@@ -29,7 +29,7 @@ class C {}
 // \ CHECK: }
 
 //   CHECK: @_TMdC5class1C = global { {{.*}} } {
-// \ CHECK:   void ([[REF]]*)* @_TC5class1CD,
+// \ CHECK:   void ([[REF]]*)* @_TFC5class1CD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
 // \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",

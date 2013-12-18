@@ -27,10 +27,18 @@ using namespace swift;
 using namespace irgen;
 using namespace Mangle;
 
-static char mangleConstructorKind(ConstructorKind kind) {
+static bool isDeallocating(DestructorKind kind) {
   switch (kind) {
-  case ConstructorKind::Allocating: return 'C';
-  case ConstructorKind::Initializing: return 'c';
+  case DestructorKind::Deallocating: return true;
+  case DestructorKind::Destroying: return false;
+  }
+  llvm_unreachable("bad destructor kind");
+}
+
+static bool isAllocating(ConstructorKind kind) {
+  switch (kind) {
+  case ConstructorKind::Allocating: return true;
+  case ConstructorKind::Initializing: return false;
   }
   llvm_unreachable("bad constructor kind");
 }
@@ -202,27 +210,17 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   entity ::= context 'd'                     // non-deallocating destructor
   case Kind::Destructor:
     buffer << "_T";
-    if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
-    switch (getDestructorKind()) {
-    case DestructorKind::Deallocating:
-      buffer << 'D';
-      return;
-    case DestructorKind::Destroying:
-      buffer << 'd';
-      return;
-    }
-    llvm_unreachable("bad destructor kind");
+    mangler.mangleDestructorEntity(cast<ClassDecl>(getDecl()),
+                                   isDeallocating(getDestructorKind()));
+    return;
 
   //   entity ::= context 'C' type                // allocating constructor
   //   entity ::= context 'c' type                // non-allocating constructor
   case Kind::Constructor: {
     buffer << "_T";
-    if (isLocalLinkage()) buffer << 'L';
-    auto ctor = cast<ConstructorDecl>(getDecl());
-    mangler.mangleContextOf(ctor);
-    buffer << mangleConstructorKind(getConstructorKind());
-    mangler.mangleDeclType(ctor, getExplosionKind(), getUncurryLevel());
+    mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
+                                    isAllocating(getConstructorKind()),
+                                    getExplosionKind(), getUncurryLevel());
     return;
   }
 
@@ -253,23 +251,23 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
+      mangler.mangleNominalType(type, getExplosionKind());
+    } else {
+      mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    }
     return;
 
   //   entity ::= declaration 'g'                 // getter
   case Kind::Getter:
     buffer << "_T";
-    if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleEntity(getDecl(), getExplosionKind(), 0);
-    buffer << 'g';
+    mangler.mangleGetterEntity(getDecl(), getExplosionKind());
     return;
 
   //   entity ::= declaration 's'                 // setter
   case Kind::Setter:
     buffer << "_T";
-    if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleEntity(getDecl(), getExplosionKind(), 0);
-    buffer << 's';
+    mangler.mangleSetterEntity(getDecl(), getExplosionKind());
     return;
 
   // An Objective-C class reference;  not a swift mangling.

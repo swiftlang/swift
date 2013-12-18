@@ -1044,11 +1044,24 @@ private:
       return getDeclContextType(child);
     return child->getKind();
   }
-  
+
+  // entity ::= entity-kind context entity-name  
+  // entity ::= nominal-type
   bool demangleEntity(NodePointer decl) {
+    if (!Mangled) return failure();
+
+    auto entityKind = Mangled.peek();
+    if (entityKind != 'F' && entityKind != 'v' && entityKind != 'I') {
+      auto type = demangleNominalType();
+      if (!type) return failure();
+      decl->push_back_child(type);
+      return true;
+    }
+
+    (void) Mangled.next();
     NodePointer context = demangleContext();
-    if (!context)
-      return failure();
+    if (!context) return failure();
+
     Node::Kind idKind = getDeclContextType(context);
     if (Mangled.nextIf('D')) {
       if (idKind == Node::Kind::Class)
@@ -1084,22 +1097,23 @@ private:
       decl->push_back_child(type);
       return true;
     }
+
+    auto accessorKind = Node::Kind::Failure;
+    if (Mangled) {
+      switch (Mangled.peek()) {
+      case 'a': accessorKind = Node::Kind::Addressor; break;
+      case 'g': accessorKind = Node::Kind::Getter; break;
+      case 's': accessorKind = Node::Kind::Setter; break;
+      }
+      if (accessorKind != Node::Kind::Failure) (void) Mangled.next();
+    }
+
     std::pair<NodePointer,NodePointer> demangledDecl = demangleDecl();
     if (demangledDecl.first.getPtr() == nullptr || demangledDecl.second.getPtr() == nullptr)
       return nullptr;
-    if (Mangled.nextIf('a')) {
+    if (accessorKind != Node::Kind::Failure) {
       context->push_back_child(demangledDecl.first);
-      context->push_back_child(Node::makeNodePointer(Node::Kind::Addressor));
-      decl->push_back_child(context);
-      decl->push_back_child(demangledDecl.second);
-    } else if (Mangled.nextIf('g')) {
-      context->push_back_child(demangledDecl.first);
-      context->push_back_child(Node::makeNodePointer(Node::Kind::Getter));
-      decl->push_back_child(context);
-      decl->push_back_child(demangledDecl.second);
-    } else if (Mangled.nextIf('s')) {
-      context->push_back_child(demangledDecl.first);
-      context->push_back_child(Node::makeNodePointer(Node::Kind::Setter));
+      context->push_back_child(Node::makeNodePointer(accessorKind));
       decl->push_back_child(context);
       decl->push_back_child(demangledDecl.second);
     } else {

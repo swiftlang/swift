@@ -18,26 +18,26 @@ entry:
   func initFamily() -> ObjCClass { return self }
 }
 
-sil @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
+sil @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
+sil @_TToFCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.metatype)() -> ObjectiveC.ObjCClass
-  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
+  %1 = function_ref @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
   %2 = apply %1(%0) : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %3
   return %2 : $ObjCClass
 }
 
-sil @_TToCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin (Int64, ObjCClass) -> () {
+sil @_TToFCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin (Int64, ObjCClass) -> () {
 bb0(%0 : $Int64, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
 }
 
-sil @_TToCSo9ObjCClass10initFamilyfS_FT_S_ : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass {
+sil @_TToFCSo9ObjCClass10initFamilyfS_FT_S_ : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }

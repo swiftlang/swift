@@ -17,34 +17,34 @@ class X {
 }
 
 // [objc] t.X.f (t.X)() -> ()
-sil @_TToC14dynamic_lookup1X1ffS0_FT_T_ : $@cc(objc_method) @thin (X) -> () {
+sil @_TToFC14dynamic_lookup1X1ffS0_FT_T_ : $@cc(objc_method) @thin (X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.metatype)() -> ()
-sil @_TToC14dynamic_lookup1X1gfMS0_FT_T_ : $@thin (X.metatype) -> () {
+sil @_TToFC14dynamic_lookup1X1gfMS0_FT_T_ : $@thin (X.metatype) -> () {
 bb0(%0 : $X.metatype):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
 }
 
-sil @_TToC14dynamic_lookup1X9subscriptFT1iSi_Sig : $@cc(objc_method) @thin (Int64, X) -> Int64 {
+sil @_TToFC14dynamic_lookup1Xg9subscriptFT1iSi_Si : $@cc(objc_method) @thin (Int64, X) -> Int64 {
 bb0(%0 : $Int64, %1 : $X):
-  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %7
+  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %7
   %5 = metatype $Int64.metatype                   // user: %7
   %6 = integer_literal $Builtin.Int64, 5          // user: %7
   %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %9
   return %7 : $Int64
 }
 
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
+sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64
 
 // [objc] dynamic_lookup.X.value.getter : swift.Int64
-sil @_TToC14dynamic_lookup1X5valueSig : $@cc(objc_method) @thin (X) -> Int64 {
+sil @_TToFC14dynamic_lookup1Xg5valueSi : $@cc(objc_method) @thin (X) -> Int64 {
 bb0(%0 : $X):
-  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %7
+  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %7
   %5 = metatype $Int64.metatype                   // user: %7
   %6 = integer_literal $Builtin.Int64, 5          // user: %7
   %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, Int64.metatype) -> Int64 // user: %9

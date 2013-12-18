@@ -35,9 +35,9 @@ static HeapObject *make_objc_object() {
 }
 
 // Make a Native Swift object by calling a constructor.
-extern "C" HeapObject *_TCSs6ObjectCfMS_FT_S_(void *unused);
+extern "C" HeapObject *_TFCSs6ObjectCfMS_FT_S_(void *unused);
 static HeapObject *make_swift_object() {
-  return _TCSs6ObjectCfMS_FT_S_(0);
+  return _TFCSs6ObjectCfMS_FT_S_(0);
 }
 
 static void unknown_release(void *value) {
