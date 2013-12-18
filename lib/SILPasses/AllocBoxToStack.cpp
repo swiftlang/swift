@@ -114,15 +114,13 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
 
 /// checkAllocBoxUses - Scan all of the uses (recursively) of the specified
 /// alloc_box, validating that they don't allow the ABI to escape.
-static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
-                              SmallVectorImpl<SILInstruction*> &Users,
-                              SmallVectorImpl<SILInstruction*> &Releases) {
-  for (auto UI : V->getUses()) {
+static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
+                              SmallVectorImpl<SILInstruction*> &Users) {
+  for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
     
     // These instructions do not cause the box's address to escape.
-    if (isa<StrongRetainInst>(User) ||
-        isa<CopyAddrInst>(User) ||
+    if (isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
         isa<ProtocolMethodInst>(User) ||
         (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
@@ -131,27 +129,19 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
       continue;
     }
     
-    // Release doesn't either, but we want to keep track of where this value
-    // gets released.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
-      Releases.push_back(User);
-      Users.push_back(User);
-      continue;
-    }
-
     // These instructions only cause the alloc_box to escape if they are used in
     // a way that escapes.  Recursively check that the uses of the instruction
     // don't escape and collect all of the uses of the value.
     if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
         isa<ProjectExistentialInst>(User) || isa<MarkUninitializedInst>(User)) {
       Users.push_back(User);
-      if (checkAllocBoxUses(ABI, User, Users, Releases))
+      if (checkAllocBoxUses(ABI, User, Users))
         return true;
       continue;
     }
     
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [inout] arguments or for indirect returns.
+    // it is passed through @inout arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getSubstCalleeType()
             ->getParameters()[UI->getOperandNumber()-1].isIndirect())
@@ -181,14 +171,39 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
 /// remove the alloc_box itself.
 static bool optimizeAllocBox(AllocBoxInst *ABI,
                              llvm::OwningPtr<PostDominanceInfo> &PDI) {
-  SmallVector<SILInstruction*, 32> Users;
-  SmallVector<SILInstruction*, 4> Releases;
-  
+
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
   // not, we can turn it into an alloc_stack.
-  if (checkAllocBoxUses(ABI, ABI, Users, Releases))
+  SmallVector<SILInstruction*, 32> Users;
+  if (checkAllocBoxUses(ABI, SILValue(ABI, 1), Users))
     return false;
+
+  // Scan all of the uses of the retain count value, collecting all the releases
+  // and validating that we don't have an unexpected user.
+  SmallVector<SILInstruction*, 4> Releases;
+  for (auto UI : SILValue(ABI, 0).getUses()) {
+    auto *User = UI->getUser();
+
+    if (isa<StrongRetainInst>(User))
+      continue;
+
+    // Release doesn't either, but we want to keep track of where this value
+    // gets released.
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
+      Releases.push_back(User);
+      Users.push_back(User);
+      continue;
+    }
+
+    // Otherwise, this looks like it escapes.
+    DEBUG(llvm::errs() << "*** Failed to promote alloc_box in @"
+          << ABI->getFunction()->getName() << ": " << *ABI
+          << "    Due to user: " << *User << "\n");
+
+    return false;
+  }
+
   
   // Okay, the value doesn't escape.  Determine where the last release is.  This
   // code only handles the case where there is a single "last release".  This
