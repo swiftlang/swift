@@ -1042,7 +1042,7 @@ computeSelfType(GenericParamList **outerGenericParams) {
 
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
-    isInOut = FD->getAttrs().isInOut();
+    isInOut = FD->getAttrs().isMutating();
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
     // constructors and destructors of value types have an implicitly
     // @inout self.

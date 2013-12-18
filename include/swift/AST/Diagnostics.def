@@ -1066,8 +1066,8 @@ ERROR(invalid_prefix_input,sema_tcd,none,
       "only unary operators can be declared 'prefix'", ())
 ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial @inout argument", ())
-ERROR(static_functions_not_inout,sema_tcd,none,
-      "static functions may not be declared @inout", ())
+ERROR(static_functions_not_mutating,sema_tcd,none,
+      "static functions may not be declared @mutating", ())
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,

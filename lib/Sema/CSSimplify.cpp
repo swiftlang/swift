@@ -1505,10 +1505,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
-    // Verify that @inout methods on value types are only applied to settable
+    // Verify that @mutating methods on value types are only applied to settable
     // values.
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
-        isa<FuncDecl>(result) && result->getAttrs().isInOut() &&
+        isa<FuncDecl>(result) && result->getAttrs().isMutating() &&
         result->isInstanceMember() &&
         // Reject non-values and non-settable lvalues.
         (!baseTy->is<LValueType>() ||

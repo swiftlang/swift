@@ -1676,9 +1676,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
-  if (StaticLoc.isValid() && Attributes.isInOut()) {
-    diagnose(Tok, diag::static_functions_not_inout);
-    Attributes.clearAttribute(AK_inout);
+  if (StaticLoc.isValid() && Attributes.isMutating()) {
+    diagnose(Tok, diag::static_functions_not_mutating);
+    Attributes.clearAttribute(AK_mutating);
   }
 
   Identifier Name;

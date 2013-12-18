@@ -1268,7 +1268,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_asmname, AK_assignment, AK_conversion, AK_IBAction, AK_infix,
       AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent,
-      AK_inout
+      AK_mutating
     >(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -1285,7 +1285,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
                            fn->isTransparent(),
-                           fn->getAttrs().isInOut(),
+                           fn->getAttrs().isMutating(),
                            fn->getAttrs().isOptional(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),

@@ -246,7 +246,7 @@ public:
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
-  bool isInOut() const { return has(AK_inout); }
+  bool isMutating() const { return has(AK_mutating); }
   bool isObjC() const { return has(AK_objc); }
   bool isIBOutlet() const { return has(AK_IBOutlet); }
   bool isIBAction() const { return has(AK_IBAction); }
