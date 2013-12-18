@@ -347,4 +347,6 @@ entry:
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
 // -- initialize our own dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* {{%.*}}, i64 1, %swift.type** {{%.*}}, i64* {{%.*}})
+// -- hack to initialize the ObjC class
+// CHECK:   call %objc_class* bitcast (void ()* @objc_msgSend
 // CHECK: }

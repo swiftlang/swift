@@ -1516,12 +1516,15 @@ namespace {
                                 const GenericParamList &classGenerics)
       : super(IGM, classGenerics, theClass, layout)
     {
+      // We need special initialization of metadata objects to trick the ObjC
+      // runtime into initializing them.
+      HasDependentMetadata = true;
+      
       // If the superclass is generic, we'll need to initialize the superclass
       // reference at runtime.
       if (theClass->hasSuperclass() &&
           theClass->getSuperclass()->is<BoundGenericClassType>()) {
         HasDependentSuperclass = true;
-        HasDependentMetadata = true;
       }
     }
                         
@@ -1596,12 +1599,6 @@ namespace {
       emitPolymorphicParametersForGenericValueWitness(IGF,
                                                       TargetClass,
                                                       metadata);
-
-      assert((HasDependentSuperclass
-              || HasDependentFieldOffsetVector
-              || !AncestorFieldOffsetVectors.empty()
-              || !AncestorFillOps.empty())
-             && "no dependent metadata parts?!");
       
       assert(!HasDependentVWT && "class should never have dependent VWT");
       
@@ -1702,6 +1699,22 @@ namespace {
                                 metadata, superMetadata, numFields,
                                 fields.getAddress(), fieldVector);
       }
+      
+      // FIXME: Crudely invoke an ObjC class method on the class to force the
+      // ObjC runtime to do minimal initialization of the class.
+      // We should really register the class pair with the runtime through the
+      // approved channels.
+      llvm::Value *msgSend = IGF.IGM.getObjCMsgSendFn();
+      llvm::Type *classFArgs[] = {
+        IGF.IGM.ObjCPtrTy,
+        IGF.IGM.ObjCSELTy,
+      };
+      auto classFTy = llvm::FunctionType::get(IGF.IGM.ObjCClassPtrTy,
+                                              classFArgs, /*isVarArg*/ false);
+      msgSend = IGF.Builder.CreateBitCast(msgSend, classFTy->getPointerTo());
+      auto classPtr = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCPtrTy);
+      llvm::Value *classSel = IGF.emitObjCSelectorRefLoad("class");
+      IGF.Builder.CreateCall2(msgSend, classPtr, classSel);
     }
     
   };
