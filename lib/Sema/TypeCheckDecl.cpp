@@ -1061,6 +1061,18 @@ public:
     gatherExplicitConformances(D, D, T);
   }
 
+  void checkExplicitConformance(TypeAliasDecl *D, Type T) {
+    SmallVector<ProtocolConformance *, 4> conformances;
+    for (auto proto : D->getProtocols()) {
+      ProtocolConformance *conformance = nullptr;
+      TC.conformsToProtocol(D->getUnderlyingType(), proto,
+                            D->getDeclContext(), &conformance,
+                            D->getLoc());
+      conformances.push_back(conformance);
+    }
+    D->setConformances(D->getASTContext().AllocateCopy(conformances));
+  }
+
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
