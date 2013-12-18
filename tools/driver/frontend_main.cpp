@@ -149,7 +149,9 @@ static bool performCompile(CompilerInstance &Instance,
   // Cleanup instructions/builtin calls not suitable for IRGen.
   performSILCleanup(SM.get());
 
-  IRGenOptions Options;
+  // TODO: remove these manual overrides as CompilerInvocation fills in more
+  // of IRGenOptions.
+  IRGenOptions &Options = Invocation.getIRGenOptions();
   Options.MainInputFilename = Invocation.getInputFilenames()[0];
   Options.Triple = Invocation.getTargetTriple();
   Options.LinkLibraries.append(Invocation.getLinkLibraries().begin(),
