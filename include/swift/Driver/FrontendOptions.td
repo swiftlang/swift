@@ -39,6 +39,9 @@ def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
 
+def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
+  HelpText<"Don't run LLVM optimization passes">;
+
 def emit_sil_protocol_witness_tables :
   Flag<["-"], "emit-sil-protocol-witness-tables">,
   HelpText<"Emit experimental SIL protocol witness tables">;

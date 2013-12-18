@@ -318,6 +318,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.OptLevel = 0;
   }
 
+  if (Args.hasArg(OPT_disable_llvm_optzns)) {
+    Opts.DisableLLVMOptzns = true;
+  }
+
   return false;
 }
 
