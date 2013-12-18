@@ -31,6 +31,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1323,9 +1324,11 @@ static bool performARCExpansion(Function &F) {
   }
 
   // Scan through all the returns to see if there are any that can be optimized.
-  for (ReturnInst *RI : Returns)
-    Changed |= optimizeReturn3(RI);
-  
+  // FIXME: swift_retainAndReturnThree runtime call 
+  // is currently implemented only on x86_64.
+  if (llvm::Triple(F.getParent()->getTargetTriple()).getArchName() == "x86_64")
+    for (ReturnInst *RI : Returns)
+      Changed |= optimizeReturn3(RI);
   
   return Changed;
 }
