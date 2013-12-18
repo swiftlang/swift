@@ -144,7 +144,7 @@ public:
   const Action &getSource() const { return Source; }
   const Tool &getCreator() const { return Creator; }
 
-  StringRef getExecutable() const { return Executable; }
+  const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
 
   const JobList &getInputs() const { return *Inputs; }
