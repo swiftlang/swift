@@ -1235,6 +1235,16 @@ public:
       checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
   
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    // Check the default definition, if there is one.
+    TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
+    if (!defaultDefinition.isNull() &&
+        TC.validateType(defaultDefinition, assocType->getDeclContext(),
+                        /*allowUnboundGenerics=*/false)) {
+      defaultDefinition.setInvalidType(TC.Context);
+    }
+  }
+
   // Given the raw value literal expression for an enum case, produces the
   // auto-incremented raw value for the subsequent case, or returns null if
   // the value is not auto-incrementable.
@@ -2186,8 +2196,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
-    if (!resolveTypeParams || typeParam->getArchetype())
+    if (!resolveTypeParams || typeParam->getArchetype()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
+        DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
+      }
+
       break;
+    }
     
     // FIXME: Avoid full check in these cases?
     DeclContext *DC = typeParam->getDeclContext();

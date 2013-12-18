@@ -225,8 +225,6 @@ ERROR(expected_equal_in_typealias,decl_parsing,PointsToFirstBadToken,
       "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,decl_parsing,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
-ERROR(associated_type_def,decl_parsing,none,
-      "typealias %0 in protocol cannot have a definition", (Identifier))
 
 // Func
 ERROR(func_decl_nonglobal_operator,decl_parsing,none,
@@ -1139,6 +1137,9 @@ NOTE(ambiguous_witnesses,sema_tcd,none,
      "with type %2", (int, Identifier, Type))
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
+NOTE(default_assocated_type_req_fail,sema_tcd,none,
+     "default associated type definition %0 does not conform to %1", 
+     (Type, Type))
 NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,sema_tcd,none,

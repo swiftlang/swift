@@ -124,8 +124,6 @@ namespace {
       }
     }
 
-    /// FIXME: Generic substitutions here.
-
     /// \brief Associated types determined by matching this requirement.
     SmallVector<std::pair<AssociatedTypeDecl *, Type>, 2>
       AssociatedTypeDeductions;
@@ -751,7 +749,53 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-/// Attempt to resolve a type witness via member name lookup.
+/// Attempt to resolve a type witness via a default definition.
+static ResolveWitnessResult resolveTypeWitnessViaDefault(
+                              TypeChecker &tc,
+                              ProtocolDecl *proto,
+                              Type type,
+                              DeclContext *dc,
+                              SourceLoc loc,
+                              AssociatedTypeDecl *assocType,
+                              TypeWitnessMap &typeWitnesses,
+                              bool alreadyComplained) {
+  // If we don't have a default definition, we're done.
+  if (assocType->getDefaultDefinitionLoc().isNull())
+    return ResolveWitnessResult::Missing;
+
+  // Create a set of type substitutions for all known associated type.
+  // FIXME: Base this on dependent types rather than archetypes?
+  TypeSubstitutionMap substitutions;
+  substitutions[proto->getSelf()->getArchetype()] = type;
+  for (const auto &witness: typeWitnesses) {
+    substitutions[witness.second.Archetype] = witness.second.Replacement;
+  }
+  auto defaultType = tc.substType(dc->getParentModule(),
+                                  assocType->getDefaultDefinitionLoc().getType(),
+                                  substitutions,
+                                  /*IgnoreMissing=*/true);
+  if (!defaultType)
+    return ResolveWitnessResult::Missing;
+
+  if (auto checkResult = checkTypeWitness(tc, dc, assocType, defaultType)) {
+    if (!alreadyComplained)
+      tc.diagnose(loc, diag::type_does_not_conform, type, 
+                  proto->getDeclaredType());
+    
+    tc.diagnose(assocType, diag::default_assocated_type_req_fail,
+                defaultType, checkResult.getProtocol()->getDeclaredType());
+
+    return ResolveWitnessResult::ExplicitFailed;
+  } 
+  
+  // Fill in the type witness and declare success.
+  auto archetype = assocType->getArchetype();
+  typeWitnesses[assocType] = getArchetypeSubstitution(tc, dc, archetype, 
+                                                      defaultType);
+  return ResolveWitnessResult::Success;
+}
+
+/// Attempt to resolve a type witness via derivation.
 static ResolveWitnessResult resolveTypeWitnessViaDerivation(
                               TypeChecker &tc,
                               ProtocolDecl *proto,
@@ -1101,12 +1145,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   if (Complained || invalid)
     return nullptr;
 
-  // If any associated types were left unresolved, try to derive them.
+  // If any associated types were left unresolved, try default types
+  // or compiler-supported derivation.
   auto resolveAssocType = [&](AssociatedTypeDecl *assocType) -> bool {
-    switch (resolveTypeWitnessViaDerivation(TC, Proto, T, DC, ComplainLoc,
-                                            assocType, TypeWitnesses,
-                                            Complained)) {
+    // Default implementations.
+    switch (resolveTypeWitnessViaDefault(TC, Proto, T, DC, ComplainLoc,
+                                         assocType, TypeWitnesses,
+                                         Complained)) {
     case ResolveWitnessResult::Success:
+      deducedAssocTypes.push_back(
+        {assocType, TypeWitnesses[assocType].Replacement});
       return true;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -1117,7 +1165,23 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       break;
     }
 
-    // FIXME: Default implementation
+    switch (resolveTypeWitnessViaDerivation(TC, Proto, T, DC, ComplainLoc,
+                                            assocType, TypeWitnesses,
+                                            Complained)) {
+    case ResolveWitnessResult::Success:
+      deducedAssocTypes.push_back(
+        {assocType, TypeWitnesses[assocType].Replacement});
+      return true;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      Complained = true;
+      return false;
+
+    case ResolveWitnessResult::Missing:
+      break;
+    }
+
+    // No other options.
     return false;
   };
   unresolvedAssocTypes.erase(std::remove_if(unresolvedAssocTypes.begin(),
@@ -1131,6 +1195,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     // Diagnose all missing associated types.
     for (auto assocType : unresolvedAssocTypes) {
+      // If we had a default that didn't work out, we already
+      // complained about it.
+      if (!assocType->getDefaultDefinitionLoc().isNull())
+        continue;
+
       if (!Complained) {
         TC.diagnose(ComplainLoc, diag::type_does_not_conform,
                     T, Proto->getDeclaredType());

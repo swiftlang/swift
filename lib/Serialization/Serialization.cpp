@@ -1130,12 +1130,14 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
-    AssociatedTypeDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addIdentifierRef(assocType->getName()),
-                                         addDeclRef(DC),
-                                         addTypeRef(assocType->getSuperclass()),
-                                         addTypeRef(assocType->getArchetype()),
-                                         assocType->isImplicit());
+    AssociatedTypeDeclLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      addIdentifierRef(assocType->getName()),
+      addDeclRef(DC),
+      addTypeRef(assocType->getSuperclass()),
+      addTypeRef(assocType->getArchetype()),
+      addTypeRef(assocType->getDefaultDefinitionType()),
+      assocType->isImplicit());
 
     writeConformances(assocType->getProtocols(),
                       assocType->getConformances(),

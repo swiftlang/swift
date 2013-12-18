@@ -722,9 +722,10 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
-                                       Identifier name, SourceLoc nameLoc)
+                                       Identifier name, SourceLoc nameLoc,
+                                       TypeLoc defaultDefinition)
   : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc)
+    KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);

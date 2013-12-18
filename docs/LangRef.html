@@ -1301,7 +1301,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <h4 id="protocol-member-typealias">'typealias' protocol elements (associated types)</h4>
   
   <pre class="grammar">
-    protocol-member ::= <a href="#typealias-head">typealias-head</a>
+    protocol-member ::= <a href="#typealias-head">typealias-head</a> ('=' <a href="#type">type</a>)?
   </pre>
 
   <p>'typealias' members of a protocol define associated types, which
@@ -1310,14 +1310,17 @@ an lvalue unless it has a <code>var-get</code> clause but not
   conforming type to another. When an associated type has an <a
   href="#inheritance">inheritance</a> clause, any type meant to
   satisfy the associated type requirement must conform to each of the
-  protocols specified within that inheritance clause.</p>
+  protocols specified within that inheritance clause. If a type is
+  provided after the '=', it is a default definition for the
+  associated type that will be used as the type witness if the type
+  witness cannot be determined in any other way.</p>
 
   <pre class="example">
     protocol Enumerable {
       typename EnumeratorType : Enumerator
       func getElements() -> EnumeratorType
     }
-</pre>
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="decl-subscript">subscript Declarations</h3>

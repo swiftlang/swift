@@ -568,6 +568,11 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   recordDeclLoc(decl);
   Printer << decl->getName().str();
   printInheritedWithSuperclass(decl);
+
+  if (!decl->getDefaultDefinitionLoc().isNull()) {
+    Printer << " = ";
+    decl->getDefaultDefinitionLoc().getType().print(Printer, Options);
+  }
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {

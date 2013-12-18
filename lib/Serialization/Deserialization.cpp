@@ -1274,12 +1274,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     TypeID superclassID;
     TypeID archetypeID;
+    TypeID defaultDefinitionID;
     bool isImplicit;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       superclassID,
                                                       archetypeID,
+                                                      defaultDefinitionID,
                                                       isImplicit);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
@@ -1287,9 +1289,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
+    TypeLoc defaultDefinitionType = 
+      TypeLoc::withoutLoc(getType(defaultDefinitionID));
     auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
                                                   getIdentifier(nameID),
-                                                  SourceLoc());
+                                                  SourceLoc(),
+                                                  defaultDefinitionType);
     declOrOffset = assocType;
 
     assocType->setSuperclass(getType(superclassID));

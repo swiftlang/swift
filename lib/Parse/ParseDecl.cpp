@@ -986,17 +986,14 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     Status |= UnderlyingTy;
     if (UnderlyingTy.isNull())
       return Status;
-    
-    if (!WantDefinition) {
-      diagnose(IdLoc, diag::associated_type_def, Id);
-      UnderlyingTy = nullptr;
-    }
   }
 
   // If this is an associated type, build the AST for it.
   if (isAssociatedType) {
-    auto assocType = new (Context) AssociatedTypeDecl(CurDeclContext,
-                                                      TypeAliasLoc, Id, IdLoc);
+    auto assocType = new (Context) AssociatedTypeDecl(
+                                     CurDeclContext,
+                                     TypeAliasLoc, Id, IdLoc,
+                                     UnderlyingTy.getPtrOrNull());
     if (!Inherited.empty())
       assocType->setInherited(Context.AllocateCopy(Inherited));
     addToScope(assocType);

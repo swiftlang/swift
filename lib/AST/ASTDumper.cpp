@@ -334,6 +334,10 @@ namespace {
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
       printCommon(decl, "associated_type_decl");
+      if (auto defaultDef = decl->getDefaultDefinitionType()) {
+        OS << " default=";
+        defaultDef.print(OS);
+      }
       OS << ")";
     }
 

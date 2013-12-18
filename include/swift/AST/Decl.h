@@ -1508,14 +1508,22 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
 
+  /// The default definition.
+  TypeLoc DefaultDefinition;
+
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc);
+                     SourceLoc nameLoc, TypeLoc defaultDefinition);
 
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
     return cast<ProtocolDecl>(getDeclContext());
   }
+
+  /// Retrieve the default definition type.
+  Type getDefaultDefinitionType() const { return DefaultDefinition.getType(); }
+
+  TypeLoc &getDefaultDefinitionLoc() { return DefaultDefinition; }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;

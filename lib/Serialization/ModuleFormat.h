@@ -503,6 +503,7 @@ namespace decls_block {
     DeclIDField,       // context decl
     TypeIDField,       // underlying type
     TypeIDField,       // archetype type
+    TypeIDField,       // default definition
     BCFixed<1>         // implicit flag
                        // Trailed by the conformance info (if any).
   >;
