@@ -286,6 +286,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                [&] { Flags << " "; });
   }
 
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
+                                 Args.filtered_end())) {
+    LibraryKind Kind;
+    if (A->getOption().matches(OPT_l)) {
+      Kind = LibraryKind::Library;
+    } else if (A->getOption().matches(OPT_framework)) {
+      Kind = LibraryKind::Framework;
+    } else {
+      llvm_unreachable("Unknown LinkLibrary option kind");
+    }
+
+    Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
+  }
+
   return false;
 }
 
@@ -327,14 +341,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_parse_stdlib:
       setParseStdlib();
-      break;
-
-    case OPT_l:
-      addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
-      break;
-
-    case OPT_framework:
-      addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
       break;
     }
   }

@@ -154,8 +154,6 @@ static bool performCompile(CompilerInstance &Instance,
   IRGenOptions &Options = Invocation.getIRGenOptions();
   Options.MainInputFilename = Invocation.getInputFilenames()[0];
   Options.Triple = Invocation.getTargetTriple();
-  Options.LinkLibraries.append(Invocation.getLinkLibraries().begin(),
-                               Invocation.getLinkLibraries().end());
   Options.OptLevel = 0;
   Options.OutputFilename = Invocation.getOutputFilename();
 

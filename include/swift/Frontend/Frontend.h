@@ -49,8 +49,6 @@ namespace swift {
 class SerializedModuleLoader;
 
 class CompilerInvocation {
-  SmallVector<LinkLibrary, 4> LinkLibraries;
-
   LangOptions LangOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
@@ -121,11 +119,11 @@ public:
   }
 
   void addLinkLibrary(StringRef name, LibraryKind kind) {
-    LinkLibraries.push_back({name, kind});
+    IRGenOpts.LinkLibraries.push_back({name, kind});
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
-    return LinkLibraries;
+    return IRGenOpts.LinkLibraries;
   }
 
   void setMainExecutablePath(StringRef Path);
