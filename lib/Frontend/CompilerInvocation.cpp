@@ -304,21 +304,21 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
   for (auto InputArg : *ParsedArgs) {
     switch (InputArg->getOption().getID()) {
-      case OPT_parse_as_library:
-        setInputKind(SourceFileKind::Library);
-        break;
+    case OPT_parse_as_library:
+      setInputKind(SourceFileKind::Library);
+      break;
 
-      case OPT_parse_stdlib:
-        setParseStdlib();
-        break;
+    case OPT_parse_stdlib:
+      setParseStdlib();
+      break;
 
-      case OPT_l:
-        addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
-        break;
+    case OPT_l:
+      addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
+      break;
 
-      case OPT_framework:
-        addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
-        break;
+    case OPT_framework:
+      addLinkLibrary(InputArg->getValue(), LibraryKind::Framework);
+      break;
     }
   }
 
