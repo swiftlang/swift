@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
-PARALLEL_DIRS := swift driver sil-opt swift-ide-test lldb-moduleimport-test swift-demangle
+PARALLEL_DIRS := swift driver sil-opt swift-ide-test lldb-moduleimport-test swift-demangle sil-extract
 
 include $(SWIFT_LEVEL)/../../Makefile.config
 
