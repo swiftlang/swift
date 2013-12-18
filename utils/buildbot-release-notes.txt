@@ -53,6 +53,20 @@
    (swift) nameOf(.Some(42))!     // Non-empty out
    // r2 : String = "<42>"
 
+* Cocoa types declared with the NS_OPTIONS macro are now available in Swift.
+  Like NS_ENUM types, their values are automatically shortened based
+  on the common prefix of the value names in Objective-C, and the name can
+  be elided when type context provides it. They can be used in 'if' statements
+  using the '&', '|', '^', and '~' operators as in C:
+
+    var options: NSJSONWritingOptions = .PrettyPrinted
+    if options & .PrettyPrinted {
+      println("pretty-printing enabled")
+    }
+
+  We haven't yet designed a convenient way to author NS_OPTIONS-like types
+  in Swift.
+
 2013-12-11
 ----------
 
