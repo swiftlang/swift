@@ -7,6 +7,9 @@ import Builtin
 // -- Singleton enum. The representation is just the singleton payload.
 // CHECK: %O4enum9Singleton = type <{ <{ i64, i64 }> }>
 
+// -- Singleton enum with heap object ref payload. <rdar://problem/15679353>
+// CHECK: %O4enum12SingletonRef = type <{ %swift.refcounted* }>
+
 // -- No-payload enums. The representation is just an enum tag.
 // CHECK: %O4enum10NoPayloads = type <{ i2 }>
 // CHECK: %O4enum11NoPayloads2 = type <{ i3 }>
@@ -148,6 +151,10 @@ enum EmptySingleton {
 
 enum Singleton {
   case val(Builtin.Int64, Builtin.Int64)
+}
+
+enum SingletonRef {
+  case val(Builtin.ObjectPointer)
 }
 
 enum DynamicSingleton<T> {
@@ -1983,6 +1990,7 @@ typealias AllConcreteTestEnums = (
   Empty,
   EmptySingleton,
   Singleton,
+  SingletonRef,
   NoPayloads,
   NoPayloads2,
   SinglePayloadNoXI,

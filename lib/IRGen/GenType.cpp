@@ -370,7 +370,7 @@ unsigned irgen::getHeapObjectExtraInhabitantCount(IRGenModule &IGM) {
     >> getNumLowObjCReservedBits(IGM);
   
   // The runtime limits the count to INT_MAX.
-  return std::max((uint64_t)INT_MAX, rawCount);
+  return std::min((uint64_t)INT_MAX, rawCount);
 }
 
 llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
