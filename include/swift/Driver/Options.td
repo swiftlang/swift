@@ -138,6 +138,13 @@ def l : JoinedOrSeparate<["-"], "l">, Flags<[FrontendOption]>,
 def framework : Separate<["-"], "framework">, Flags<[FrontendOption]>,
   HelpText<"Specifies a framework which should be linked against">;
 
+// Optimization levels
+
+def O_Group : OptionGroup<"<optimization level options>">;
+
+def O0 : Flag<["-"], "O0">, Group<O_Group>, Flags<[FrontendOption]>;
+def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,

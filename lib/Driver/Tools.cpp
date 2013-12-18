@@ -109,6 +109,9 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   }
 
   Args.AddLastArg(Arguments, options::OPT_g);
+
+  // Pass the optimization level down to the frontend.
+  Args.AddLastArg(Arguments, options::OPT_O_Group);
   
   // Set the SDK for the frontend.
   Args.AddLastArg(Arguments, options::OPT_sdk);
