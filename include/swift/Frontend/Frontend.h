@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/TargetOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
@@ -56,6 +57,7 @@ class CompilerInvocation {
   SearchPathOptions SearchPathOpts;
   TargetOptions TargetOpts;
   DiagnosticOptions DiagnosticOpts;
+  IRGenOptions IRGenOpts;
 
   bool ParseStdlib = false;
   bool Immediate = false;
@@ -185,6 +187,9 @@ public:
   const DiagnosticOptions &getDiagnosticOptions() const {
     return DiagnosticOpts;
   }
+
+  IRGenOptions &getIRGenOptions() { return IRGenOpts; }
+  const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
 
   void setParseStdlib() {
     ParseStdlib = true;
