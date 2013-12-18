@@ -80,6 +80,9 @@ namespace {
     /// Resolve a (non-type) witness via derivation.
     ResolveWitnessResult resolveWitnessViaDerivation(ValueDecl *requirement);
 
+    /// Resolve a (non-type) witness via default definition or @optional.
+    ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
+
     /// Attempt to resolve a type witness via member name lookup.
     ResolveWitnessResult resolveTypeWitnessViaLookup(
                            AssociatedTypeDecl *assocType);
@@ -831,17 +834,17 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
   // If we can derive a definition for this requirement, just call it missing.
   // FIXME: Hoist this computation out of here.
 
-  // Find the declaration that derives the protocol conformance.
+  // If we can derive protocol conformance, report
   if (auto *nominal = Adoptee->getAnyNominal()) {
     if (nominal->derivesProtocolConformance(Proto))
       return ResolveWitnessResult::Missing;
   }
 
-  // If the requirement is optional, it's okay: just record that the
-  // requirement was not satisfied.
+  // If the requirement is optional, it's okay. We'll satisfy this via
+  // our handling of default definitions.
+  // FIXME: also check for a default definition here.
   if (requirement->getAttrs().isOptional()) {
-    Witnesses[requirement] = ConcreteDeclRef();
-    return ResolveWitnessResult::Success;
+    return ResolveWitnessResult::Missing;
   }
 
   // Diagnose the error.
@@ -921,6 +924,35 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     TC.diagnose(Loc, diag::protocol_derivation_is_broken,
                 Proto->getDeclaredType(), Adoptee);
   }
+  return ResolveWitnessResult::ExplicitFailed;
+}
+
+ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
+                       ValueDecl *requirement) {
+  // An optional requirement is trivially satisfied with an empty requirement.
+  if (requirement->getAttrs().isOptional()) {
+    Witnesses[requirement] = ConcreteDeclRef();
+    return ResolveWitnessResult::Success;
+  }
+
+  // FIXME: Default definition.
+
+  // Complain that this type does not conform to this protocol.
+  if (!AlreadyComplained) {
+    TC.diagnose(Loc, diag::type_does_not_conform,
+                Adoptee, Proto->getDeclaredType());
+  }
+
+  // Determine the type that the requirement is expected to have.
+  Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
+                                              Adoptee, requirement,
+                                              TypeWitnesses);
+
+  // Point out the requirement that wasn't met.
+  TC.diagnose(requirement, diag::no_witnesses,
+              getRequirementKind(requirement),
+              requirement->getName(),
+              reqType);
   return ResolveWitnessResult::ExplicitFailed;
 }
 
@@ -1238,7 +1270,20 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       break;
     }
 
-    // FIXME: Try to resolve the witness via defaults.
+    // Try to resolve the witness via defaults.
+    switch (checker.resolveWitnessViaDefault(requirement)) {
+    case ResolveWitnessResult::Success:
+      continue;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      Complained = true;
+      invalid = true;
+      continue;
+
+    case ResolveWitnessResult::Missing:
+      // Continue trying below.
+      break;
+    }
   }
   
   if (Complained || invalid)
