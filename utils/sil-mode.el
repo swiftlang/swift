@@ -54,6 +54,7 @@
    ;; Literals
    `(,(regexp-opt '("function_ref" "builtin_function_ref" "global_addr"
                     "integer_literal" "float_literal" "string_literal"
+                    "sil_global_addr"
                     ) 'words) . font-lock-keyword-face)
    ;; Dynamic Dispatch
    `(,(regexp-opt '("class_method" "super_method" "archetype_method"
