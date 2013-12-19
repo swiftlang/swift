@@ -1080,6 +1080,8 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
     assert(!typeAlias->isObjC() && "ObjC typealias is not meaningful");
+    assert(typeAlias->getProtocols().empty() &&
+           "concrete typealiases cannot have protocols");
     checkAllowedAttributes<>(typeAlias);
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
@@ -1095,9 +1097,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(underlying),
                                 addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit());
-
-    writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
-                      typeAlias, DeclTypeAbbrCodes);
     break;
   }
 

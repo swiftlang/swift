@@ -1205,8 +1205,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
-                                         SourceLoc(), underlyingType,
-                                         DC, { });
+                                         SourceLoc(), underlyingType, DC);
     declOrOffset = alias;
 
     if (auto interfaceType = getType(interfaceTypeID))
@@ -1215,11 +1214,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       alias->setImplicit();
 
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(underlyingType.getType(),
-                                                   DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, alias, conformances);
     alias->setCheckedInheritanceClause();
     break;
   }

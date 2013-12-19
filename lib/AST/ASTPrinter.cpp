@@ -549,7 +549,6 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   Printer << "typealias ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
-  printInherited(decl);
   if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
     Printer << " = ";
     decl->getUnderlyingType().print(Printer, Options);

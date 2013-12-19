@@ -995,10 +995,11 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
   }
+  template <typename ...T>
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::ExtensionDecl;
   }
-  
+
   using DeclContext::operator new;
 };
 
@@ -1354,7 +1355,7 @@ class TypeAliasDecl : public TypeDecl {
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                 SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                DeclContext *DC, MutableArrayRef<TypeLoc> Inherited);
+                DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;

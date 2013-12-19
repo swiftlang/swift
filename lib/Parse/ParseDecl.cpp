@@ -991,7 +991,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
-  if (Tok.is(tok::colon))
+  if (isAssociatedType && Tok.is(tok::colon))
     Status |= parseInheritance(Inherited);
 
   ParserResult<TypeRepr> UnderlyingTy;
@@ -1022,8 +1022,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   TypeAliasDecl *TAD =
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                 UnderlyingTy.getPtrOrNull(),
-                                CurDeclContext,
-                                Context.AllocateCopy(Inherited));
+                                CurDeclContext);
   addToScope(TAD);
   return makeParserResult(Status, TAD);
 }

@@ -72,7 +72,7 @@ void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
     if (Type Ty = getBuiltinType(Ctx, Name.str()))
       Entry = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
                                       TypeLoc::withoutLoc(Ty),
-                                      const_cast<BuiltinUnit*>(&M), {});
+                                      const_cast<BuiltinUnit*>(&M));
 
   if (Entry == 0)
     Entry = getBuiltinValueDecl(Ctx, Name);

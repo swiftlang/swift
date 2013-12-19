@@ -643,8 +643,7 @@ namespace {
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
-                                      DC,
-                                      { });
+                                      DC);
     }
 
     Decl *

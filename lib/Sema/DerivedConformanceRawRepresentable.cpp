@@ -78,8 +78,7 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
                                    C.getIdentifier("RawType"),
                                    SourceLoc(),
                                    TypeLoc::withoutLoc(enumDecl->getRawType()),
-                                   enumDecl,
-                                   {});
+                                   enumDecl);
   rawTypeDecl->setImplicit();
   tc.typeCheckDecl(rawTypeDecl, /*FirstPass*/ true);
   

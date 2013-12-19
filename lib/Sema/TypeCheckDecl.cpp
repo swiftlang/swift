@@ -1030,46 +1030,22 @@ public:
   //===--------------------------------------------------------------------===//
 
   template<typename DeclType>
-  void gatherExplicitConformances(DeclType *D, DeclContext *DC, Type T) {
+  void checkExplicitConformance(DeclType *D, Type T) {
+    assert(isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D));
     SmallVector<ProtocolConformance *, 4> conformances;
     for (auto proto : D->getProtocols()) {
       ProtocolConformance *conformance = nullptr;
       // FIXME: Better location info
-      if (TC.conformsToProtocol(T, proto, DC, &conformance,
+      if (TC.conformsToProtocol(T, proto, D, &conformance,
                                 D->getStartLoc(), D)) {
         // For nominal types and extensions thereof, record conformance
         // to known protocols.
         if (auto kind = proto->getKnownProtocolKind())
-          if (isa<NominalTypeDecl>((Decl *)D) || isa<ExtensionDecl>((Decl *)D))
             TC.Context.recordConformance(kind.getValue(), D);
       }
       conformances.push_back(conformance);
     }
 
-    D->setConformances(D->getASTContext().AllocateCopy(conformances));
-  }
-
-  void checkExplicitConformance(NominalTypeDecl *D, Type T) {
-    gatherExplicitConformances(D, D, T);
-  }
-
-  void checkExplicitConformance(TypeDecl *D, Type T) {
-    gatherExplicitConformances(D, D->getDeclContext(), T);
-  }
-
-  void checkExplicitConformance(ExtensionDecl *D, Type T) {
-    gatherExplicitConformances(D, D, T);
-  }
-
-  void checkExplicitConformance(TypeAliasDecl *D, Type T) {
-    SmallVector<ProtocolConformance *, 4> conformances;
-    for (auto proto : D->getProtocols()) {
-      ProtocolConformance *conformance = nullptr;
-      TC.conformsToProtocol(D->getUnderlyingType(), proto,
-                            D->getDeclContext(), &conformance,
-                            D->getLoc());
-      conformances.push_back(conformance);
-    }
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
   }
 
@@ -1230,9 +1206,6 @@ public:
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         TC.checkInheritanceClause(TAD);
     }
-
-    if (!IsFirstPass)
-      checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {

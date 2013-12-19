@@ -682,9 +682,8 @@ void NominalTypeDecl::getImplicitProtocols(
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             DeclContext *DC,
-                             MutableArrayRef<TypeLoc> Inherited)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, Inherited),
+                             DeclContext *DC)
+  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}),
     TypeAliasLoc(TypeAliasLoc),
     UnderlyingTy(UnderlyingTy)
 {

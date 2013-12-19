@@ -482,7 +482,6 @@ namespace decls_block {
     TypeIDField, // underlying type
     TypeIDField, // interface type
     BCFixed<1>  // implicit flag
-    // Trailed by the conformance info (if any).
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<
