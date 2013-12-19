@@ -717,6 +717,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // based on the attributes we see.
   Type ty;
 
+  // In SIL *only*, allow @thin to apply to a metatype.
+  if (attrs.has(TAK_thin)) {
+    if (auto SF = DC->getParentSourceFile()) {
+      if (SF->Kind == SourceFileKind::SIL) {
+        if (auto metatypeRepr = dyn_cast<MetaTypeTypeRepr>(repr)) {
+          auto instanceTy = resolveType(metatypeRepr->getBase(), isSILType);
+          ty = MetaTypeType::get(instanceTy, /*thin*/ true, Context);
+          attrs.clearAttribute(TAK_thin);
+        }
+      }
+    }
+  }
+  
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
@@ -786,7 +799,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, isSILType);
-
   if (ty->is<ErrorType>())
     return ty;
 

@@ -121,11 +121,20 @@ protected:
     unsigned NumParameters : 32 - 11 - NumTypeBaseBits;
   };
 
+  struct MetaTypeTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    /// \brief Does the metatype use a 'thin' representation?
+    unsigned Thin : 1;
+  };
+  enum { NumMetaTypeTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumMetaTypeTypeBits <= 32, "fits in an unsigned");
+  
   union {
     TypeBaseBitfields TypeBaseBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
+    MetaTypeTypeBitfields MetaTypeTypeBits;
   };
 
 protected:
@@ -1237,18 +1246,33 @@ class MetaTypeType : public TypeBase {
   Type InstanceType;
   
 public:
-  /// get - Return the MetaTypeType for the specified type declaration.
+  /// Return the MetaTypeType for the specified type declaration.
   static MetaTypeType *get(Type T, const ASTContext &C);
+  
+  /// Return the MetaTypeType for the specified type declaration with
+  /// the given thinness.
+  ///
+  /// Metatype thinness is a SIL-only property. Unitary metatypes can be
+  /// lowered away to empty types in IR.
+  static MetaTypeType *get(Type T, bool IsThin, const ASTContext &C);
 
   Type getInstanceType() const { return InstanceType; }
 
+  /// Is this a thin metatype type?
+  ///
+  /// Metatype thinness is a SIL-only property. Unitary metatypes can be
+  /// lowered away to empty types in IR, unless a metatype value is required
+  /// at an abstraction level.
+  bool isThin() const { return MetaTypeTypeBits.Thin; }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::MetaType;
   }
   
 private:
-  MetaTypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable);
+  MetaTypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable,
+               bool IsThin);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)

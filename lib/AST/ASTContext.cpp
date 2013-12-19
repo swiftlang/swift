@@ -110,7 +110,7 @@ struct ASTContext::Implementation {
   /// arenas.
   struct Arena {
     llvm::FoldingSet<TupleType> TupleTypes;
-    llvm::DenseMap<Type, MetaTypeType*> MetaTypeTypes;
+    llvm::DenseMap<std::pair<Type,char>, MetaTypeType*> MetaTypeTypes;
     llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
       FunctionTypes;
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
@@ -1199,19 +1199,26 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
 }
 
 MetaTypeType *MetaTypeType::get(Type T, const ASTContext &C) {
+  return get(T, /*isThin*/ false, C);
+}
+
+MetaTypeType *MetaTypeType::get(Type T, bool IsThin, const ASTContext &C) {
   bool hasTypeVariable = T->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
-  MetaTypeType *&Entry = C.Impl.getArena(arena).MetaTypeTypes[T];
+  MetaTypeType *&Entry = C.Impl.getArena(arena).MetaTypeTypes[{T, IsThin}];
   if (Entry) return Entry;
 
   return Entry = new (C, arena) MetaTypeType(T, T->isCanonical() ? &C : 0,
-                                             hasTypeVariable);
+                                             hasTypeVariable,
+                                             IsThin);
 }
 
-MetaTypeType::MetaTypeType(Type T, const ASTContext *C, bool HasTypeVariable)
+MetaTypeType::MetaTypeType(Type T, const ASTContext *C, bool HasTypeVariable,
+                           bool IsThin)
   : TypeBase(TypeKind::MetaType, C, HasTypeVariable),
     InstanceType(T) {
+  MetaTypeTypeBits.Thin = (unsigned)IsThin;
 }
 
 ModuleType *ModuleType::get(Module *M) {

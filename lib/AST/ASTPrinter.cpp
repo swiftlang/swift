@@ -1382,6 +1382,8 @@ public:
   }
 
   void visitMetaTypeType(MetaTypeType *T) {
+    if (T->isThin())
+      Printer << "@thin ";
     printWithParensIfNotSimple(T->getInstanceType());
     Printer << ".metatype";
   }

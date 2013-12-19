@@ -1046,6 +1046,9 @@ bb0:
   return %7 : $Builtin.RawPointer
 }
 
+// CHECK-LABEL: sil @thin_metatype : $@thin (@thin Int64.metatype) -> Int64.metatype
+sil @thin_metatype : $@thin (@thin Int64.metatype) -> Int64.metatype
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
@@ -1060,3 +1063,4 @@ bb0:
   store undef to undef : $*Builtin.Int1
   unreachable
 }
+
