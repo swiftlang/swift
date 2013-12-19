@@ -3093,11 +3093,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                            ConstraintLocator::ApplyArgument));
 
     if (!arg) {
-      // FIXME: Shouldn't ever happen.
-      tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
-                  fnType->getInput())
-        .highlight(origArg->getSourceRange());
-
       return nullptr;
     }
 

@@ -891,8 +891,6 @@ NOTE(decl_declared_here,sema,none,
 
 NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
-NOTE(while_converting_function_argument,sema,none,
-     "while converting function argument to expected type %0", (Type))
 NOTE(while_converting_subscript_index,sema,none,
      "while converting subscript index to expected type %0", (Type))
 
