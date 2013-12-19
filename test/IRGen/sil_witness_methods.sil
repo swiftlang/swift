@@ -1,0 +1,75 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -emit-sil-protocol-witness-tables | FileCheck %s
+
+sil_stage canonical
+
+struct Foo {}
+struct Bar<T, U, V> {}
+
+// CHECK-LABEL: define void @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias, %swift.type* %Self)
+sil @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> Foo.metatype {
+entry(%x : $*Foo):
+  %m = metatype $Foo.metatype
+  return %m : $Foo.metatype
+}
+
+// CHECK-LABEL: define void @generic_type_concrete_method_witness(%V19sil_witness_methods3Bar* noalias, %swift.type* %Self)
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 3
+// CHECK:         %T = load %swift.type** [[T1]], align 8
+// CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 4
+// CHECK:         %U = load %swift.type** [[U1]], align 8
+// CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 5
+// CHECK:         %V = load %swift.type** [[V1]], align 8
+sil @generic_type_concrete_method_witness : $@thin @cc(witness_method) <T, U, V> (@in Bar<T, U, V>) -> Bar<T, U, V>.metatype {
+entry(%x : $*Bar<T, U, V>):
+  %t = metatype $T.metatype
+  %u = metatype $U.metatype
+  %v = metatype $V.metatype
+  %m = metatype $Bar<T, U, V>.metatype
+
+  return %m : $Bar<T, U, V>.metatype
+}
+
+// CHECK-LABEL: define void @generic_type_concrete_static_method_witness(%swift.type* %Self)
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 3
+// CHECK:         %T = load %swift.type** [[T1]], align 8
+// CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 4
+// CHECK:         %U = load %swift.type** [[U1]], align 8
+// CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 5
+// CHECK:         %V = load %swift.type** [[V1]], align 8
+sil @generic_type_concrete_static_method_witness : $@thin @cc(witness_method) <T, U, V> (Bar<T, U, V>.metatype) -> Bar<T, U, V>.metatype {
+entry(%x : $Bar<T, U, V>.metatype):
+  %t = metatype $T.metatype
+  %u = metatype $U.metatype
+  %v = metatype $V.metatype
+  %m = metatype $Bar<T, U, V>.metatype
+
+  return %m : $Bar<T, U, V>.metatype
+}
+
+// CHECK-LABEL: define void @concrete_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Foo* noalias, %swift.type* %Z, %swift.type* %Self)
+sil @concrete_type_generic_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @in Foo) -> Foo.metatype {
+entry(%z : $*Z, %x : $*Foo):
+  %m = metatype $Foo.metatype
+  return %m : $Foo.metatype
+}
+
+// CHECK-LABEL: define void @generic_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Bar* noalias, %swift.type* %Z, %swift.type* %Self)
+sil @generic_type_generic_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> Bar<T, U, V>.metatype {
+entry(%z : $*Z, %x : $*Bar<T, U, V>):
+  %t = metatype $T.metatype
+  %u = metatype $U.metatype
+  %v = metatype $V.metatype
+  %m = metatype $Bar<T, U, V>.metatype
+
+  return %m : $Bar<T, U, V>.metatype
+}
+
+// call concrete
+// call archetype
+// call thick (protocol)

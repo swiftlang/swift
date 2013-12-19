@@ -3213,6 +3213,26 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   }
 }
 
+/// True if a function's signature in LLVM carries polymorphic parameters.
+/// Generic functions and protocol witnesses carry polymorphic parameters.
+bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
+  switch (ty->getAbstractCC()) {
+  case AbstractCC::ObjCMethod:
+  case AbstractCC::C:
+    // Should never be polymorphic.
+    assert(!ty->isPolymorphic() && "polymorphic C function?!");
+    return false;
+      
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    return ty->isPolymorphic();
+      
+  case AbstractCC::WitnessMethod:
+    // Always carries polymorphic parameters for the Self type.
+    return true;
+  }
+}
+
 namespace {
   struct Fulfillment {
     Fulfillment() = default;
@@ -3246,7 +3266,11 @@ namespace {
 
       /// The polymorphic arguments are passed from generic type
       /// metadata for the origin type.
-      GenericLValueMetadata
+      GenericLValueMetadata,
+      
+      /// The polymorphic arguments are derived from a Self type binding
+      /// passed via the WitnessMethod convention.
+      WitnessSelf,
     };
 
   protected:
@@ -3259,8 +3283,30 @@ namespace {
   public:
     PolymorphicConvention(CanSILFunctionType fnType)
         : FnType(fnType) {
-      assert(fnType->isPolymorphic());
+      assert(hasPolymorphicParameters(fnType));
 
+      // Protocol witnesses always derive all polymorphic parameter information
+      // from the Self argument. We also *cannot* consider other arguments;
+      // doing so would potentially make the signature incompatible with other
+      // witnesses for the same method.
+      if (fnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+        TheSourceKind = SourceKind::WitnessSelf;
+        // Testify to archetypes in the Self type.
+        auto params = fnType->getParameters();
+        CanType selfTy = params.back().getType();
+        if (auto metaTy = dyn_cast<MetaTypeType>(selfTy))
+          selfTy = metaTy.getInstanceType();
+        
+        if (auto nomTy = dyn_cast<NominalType>(selfTy))
+          considerNominalType(nomTy, 0);
+        else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
+          considerBoundGenericType(bgTy, 0);
+        else
+          llvm_unreachable("witness for non-nominal type?!");
+        
+        return;
+      }
+      
       // We don't need to pass anything extra as long as all of the
       // archetypes (and their requirements) are producible from the
       // class-pointer argument.
@@ -3289,6 +3335,12 @@ namespace {
     
     SourceKind getSourceKind() const { return TheSourceKind; }
 
+    ArrayRef<ArchetypeType *> getAllArchetypes() const {
+      if (auto gp = FnType->getGenericParams())
+        return gp->getAllArchetypes();
+      return {};
+    }
+    
   private:
     static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
       ASTContext &ctx = D->getASTContext();
@@ -3487,6 +3539,16 @@ namespace {
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }
+          
+      case SourceKind::WitnessSelf: {
+        // The 'Self' parameter is provided last.
+        // TODO: For default implementations, the witness table pointer for
+        // the 'Self : P' conformance must be provided last along with the
+        // metatype.
+        llvm::Value *metatype = in.takeLast();
+        metatype->setName("Self");
+        return metatype;
+      }
       }
       llvm_unreachable("bad source kind!");
     }
@@ -3528,7 +3590,8 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
 
 void
 EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
-  for (auto archetype : FnType->getGenericParams()->getAllArchetypes()) {
+  
+  for (auto archetype : getAllArchetypes()) {
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
 
@@ -3778,6 +3841,10 @@ namespace {
         out.add(IGF.emitTypeMetadataRef(substInputType));
         return;
       }
+      case SourceKind::WitnessSelf: {
+        // The 'Self' argument(s) are added as a special case in
+        // EmitPolymorphicArguments::emit.
+      }
       }
       llvm_unreachable("bad source kind!");
     }
@@ -3817,7 +3884,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // because non-primary archetypes (which correspond to associated types)
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
-  for (auto *archetype : FnType->getGenericParams()->getAllArchetypes()) {
+  for (auto *archetype : getAllArchetypes()) {
     // Find the substitution for the archetype.
     auto const *subp = std::find_if(subs.begin(), subs.end(),
                                     [&](Substitution const &sub) {
@@ -3868,6 +3935,14 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       out.add(wtable);
     }
   }
+  
+  // For a witness call, add the Self argument metadata arguments last.
+  if (getSourceKind() == SourceKind::WitnessSelf) {
+    auto self = IGF.emitTypeMetadataRef(substInputType);
+    out.add(self);
+    // TODO: Should also provide the protocol witness table,
+    // for default implementations.
+  }
 }
 
 namespace {
@@ -3881,7 +3956,7 @@ namespace {
     void expand(SmallVectorImpl<llvm::Type*> &out) {
       addSource(out);
 
-      for (auto archetype : FnType->getGenericParams()->getAllArchetypes()) {
+      for (auto archetype : getAllArchetypes()) {
         // Pass the type argument if not fulfilled.
         if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);
@@ -3890,6 +3965,13 @@ namespace {
         for (auto protocol : archetype->getConformsTo())
           if (!Fulfillments.count(FulfillmentKey(archetype, protocol)))
             out.push_back(IGM.WitnessTablePtrTy);
+      }
+      
+      // For a witness method, add the 'self' parameter.
+      if (getSourceKind() == SourceKind::WitnessSelf) {
+        out.push_back(IGM.TypeMetadataPtrTy);
+        // TODO: Should also provide the protocol witness table,
+        // for default implementations.
       }
     }
 
@@ -3902,6 +3984,8 @@ namespace {
       case SourceKind::Metadata: return; // already accounted for
       case SourceKind::GenericLValueMetadata:
         return out.push_back(IGM.TypeMetadataPtrTy);
+      case SourceKind::WitnessSelf:
+        return; // handled as a special case in expand()
       }
       llvm_unreachable("bad source kind");
     }

@@ -78,6 +78,8 @@ namespace irgen {
                            ArrayRef<Substitution> subs,
                            Explosion &src, Explosion &dest);
 
+  /// True if a function's signature in LLVM carries polymorphic parameters.
+  bool hasPolymorphicParameters(CanSILFunctionType ty);
 } // end namespace irgen
 } // end namespace swift
 

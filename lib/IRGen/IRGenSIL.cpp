@@ -780,7 +780,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
   
   // Bind polymorphic arguments.
-  if (funcTy->isPolymorphic())
+  if (hasPolymorphicParameters(funcTy))
     emitPolymorphicParameters(IGF, funcTy, allParamValues);
 }
 
@@ -901,10 +901,9 @@ void IRGenSILFunction::emitSILFunction() {
   switch (CurSILFn->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     emitEntryPointArgumentsNativeCC(*this, entry->first, params, funcTy);
     break;
-  case AbstractCC::WitnessMethod:
-    llvm_unreachable("@cc(witness_method) not implemented");
   case AbstractCC::ObjCMethod:
     emitEntryPointArgumentsObjCMethodCC(*this, entry->first, params, funcTy);
     break;
@@ -1580,7 +1579,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   }
 
   // Pass the generic arguments first.
-  if (origCalleeType->isPolymorphic()) {
+  if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
                              i->getSubstitutions(), llArgs);
   }

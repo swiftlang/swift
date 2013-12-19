@@ -818,14 +818,12 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       }
       SWIFT_FALLTHROUGH;
     case AbstractCC::Freestanding:
-    case AbstractCC::Method: {
+    case AbstractCC::Method:
+    case AbstractCC::WitnessMethod: {
       auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
       schema.addToArgTypes(IGM, ParamIRTypes);
       return;
     }
-        
-    case AbstractCC::WitnessMethod:
-      llvm_unreachable("@cc(witness_method) not implemented");
     }
     llvm_unreachable("bad abstract CC");
   }
@@ -877,7 +875,7 @@ void SignatureExpansion::expandParameters() {
     expand(param);
   }
 
-  if (FnType->isPolymorphic())
+  if (hasPolymorphicParameters(FnType))
     expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
 }
 
@@ -1855,10 +1853,9 @@ void CallEmission::addArg(Explosion &arg) {
   }
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
     // Nothing to do.
     break;
-  case AbstractCC::WitnessMethod:
-    llvm_unreachable("@cc(witness_method) not implemented)");
   }
 
   // Add the given number of arguments.
@@ -2144,7 +2141,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   }
   
   // Collect the polymorphic arguments.
-  if (origType->isPolymorphic()) {
+  if (hasPolymorphicParameters(origType)) {
     assert(!subs.empty() && "no substitutions for polymorphic argument?!");
     Explosion polymorphicArgs(args.getKind());
     emitPolymorphicArguments(IGF, origType, substType, subs, polymorphicArgs);
