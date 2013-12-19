@@ -18,6 +18,10 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/LLVM.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
 namespace Demangle {
 
@@ -53,8 +57,8 @@ public:
     Class,
     Constructor,
     Deallocator,
-    Declaration,
     DeclContext,
+    DefaultArgumentInitializer,
     DependentProtocolWitnessTableGenerator,
     DependentProtocolWitnessTableTemplate,
     Destructor,
@@ -62,13 +66,16 @@ public:
     Enum,
     ErrorType,
     FieldOffset,
+    Function,
     FunctionType,
     GenericType,
     GenericTypeMetadataPattern,
     Getter,
+    Global,
     Identifier,
     InOut,
     InfixOperator,
+    Initializer,
     LazyProtocolWitnessTableAccessor,
     LazyProtocolWitnessTableTemplate,
     LocalEntity,
@@ -80,7 +87,6 @@ public:
     Number,
     ObjCAttribute,
     ObjCBlock,
-    Path,
     PostfixOperator,
     PrefixOperator,
     Protocol,
@@ -97,6 +103,7 @@ public:
     TupleElementName,
     TupleElementType,
     Type,
+    TypeAlias,
     TypeList,
     TypeMetadata,
     UncurriedFunctionType,
@@ -104,6 +111,7 @@ public:
     Unowned,
     ValueWitnessKind,
     ValueWitnessTable,
+    Variable,
     VariadicTuple,
     Weak,
     WitnessTableOffset
@@ -113,16 +121,14 @@ private:
   Kind NodeKind;
   std::string NodeText;
 
-  typedef llvm::SmallVector<NodePointer, 10> NodeVector;
+  // It might even be worthwhile to use TinyPtrVector here.
+  typedef llvm::SmallVector<NodePointer, 2> NodeVector;
   NodeVector Children;
-  Node *Parent = nullptr;
-  Node *Predecessor = nullptr;
-  NodePointer Successor = nullptr;
 
   Node(Kind k) : NodeKind(k) {}
   Node(Kind k, StringRef t) : NodeKind(k), NodeText(t) {}
   Node(Kind k, std::string &&t) : NodeKind(k), NodeText(std::move(t)) {}
-  Node(const Node &);
+  Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
 public:  
   static NodePointer create(Kind k) {
@@ -139,10 +145,6 @@ public:
     return NodePointer(new Node(k, llvm::StringRef(text)));
   }
 
-  /// Perform a deep copy of this node, leaving it ultimately
-  /// unparented.
-  NodePointer clone() const { return NodePointer(new Node(*this)); }
-  
   Kind getKind() const { return NodeKind; }
 
   const std::string &getText() const { return NodeText; }
@@ -158,55 +160,28 @@ public:
   const_iterator begin() const { return Children.begin(); }
   const_iterator end() const { return Children.end(); }
 
-  NodePointer getFirstChild() const { return Children.front(); }
-  NodePointer getChild(size_t index) const { return Children[index]; }
-
-  Node *getParent() const { return Parent; }
-  
-  Node *getPreviousNode() const { return Predecessor; }
-  NodePointer getNextNode() const { return Successor; }
-  void setNextNode(NodePointer next) {
-    assert(next->isUnlinked());
-    assert(getNextNode() == nullptr && "this node already has a next node");
-
-    if (Parent) {
-      next->Parent = Parent;
-      Parent->Children.push_back(next);
-    }
-    setSuccessorImpl(std::move(next));
-  }
+  Node *getFirstChild() const { return Children.front().getPtr(); }
+  Node *getChild(size_t index) const { return Children[index].getPtr(); }
 
   /// Add a new node as a child of this one.
   ///
   /// \param child - should have no parent or siblings
   /// \returns child
-  NodePointer addChild(NodePointer child) {
-    assert(child->isUnlinked());
-    if (!Children.empty())
-      Children.back()->setSuccessorImpl(child);
-    Children.push_back(child);
-    child->Parent = this;
-    return child;
+  Node *addChild(NodePointer child) {
+    assert(child && "adding null child!");
+    auto childRaw = child.getPtr();
+    Children.push_back(std::move(child));
+    return childRaw;
   }
 
   /// A convenience method for adding two children at once.
   void addChildren(NodePointer child1, NodePointer child2) {
-    addChild(child1);
-    addChild(child2);
-  }
-  
-private:
-  bool isUnlinked() const {
-    return (getParent() == nullptr &&
-            getNextNode() == nullptr &&
-            getPreviousNode() == nullptr);
+    addChild(std::move(child1));
+    addChild(std::move(child2));
   }
 
-  void setSuccessorImpl(NodePointer successor) {
-    Successor = std::move(successor);
-    Successor->Predecessor = this;
-  }
-  void insertSiblingImpl(NodePointer child);
+  void dump() const;
+  void print(llvm::raw_ostream &out) const;
 };
   
 /// \brief Demangle the given string as a Swift symbol.
