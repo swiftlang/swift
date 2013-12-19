@@ -161,16 +161,17 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::ObjCBool:
-    if (!ClangCtx.hasSameType(ClangType, ClangCtx.ObjCBuiltinBoolTy))
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.ObjCBuiltinBoolTy) &&
+        !(ClangCtx.getBOOLDecl() &&
+          ClangCtx.hasSameType(ClangType, ClangCtx.getBOOLType())))
       return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::ObjCSel:
-    if (auto PT = ClangType->getAs<clang::PointerType>()) {
-      if (!PT->getPointeeType()->isSpecificBuiltinType(
-                                  clang::BuiltinType::ObjCSel))
-        return std::make_pair(Type(), "");
-    }
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCSelType()) &&
+        !ClangCtx.hasSameType(ClangType,
+                              ClangCtx.getObjCSelRedefinitionType()))
+      return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::ObjCId:
