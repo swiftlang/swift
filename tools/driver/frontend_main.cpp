@@ -121,8 +121,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   SM->verify();
 
-  // TODO: perform SIL optimization passes, once we know the optimization level.
+  // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  if (IRGenOpts.OptLevel != 0) {
+    runSILOptimizationPasses(*SM);
+    SM->verify();
+  }
 
   // TODO: emit module, if requested.
   if (Action == FrontendOptions::EmitModuleOnly) {
@@ -148,22 +153,20 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Cleanup instructions/builtin calls not suitable for IRGen.
   performSILCleanup(SM.get());
-
-  IRGenOptions &Options = Invocation.getIRGenOptions();
   
   // TODO: remove once the frontend understands what action it should perform  
   switch (Action) {
   case FrontendOptions::EmitIR:
-    Options.OutputKind = IRGenOutputKind::LLVMAssembly;
+    IRGenOpts.OutputKind = IRGenOutputKind::LLVMAssembly;
     break;
   case FrontendOptions::EmitBC:
-    Options.OutputKind = IRGenOutputKind::LLVMBitcode;
+    IRGenOpts.OutputKind = IRGenOutputKind::LLVMBitcode;
     break;
   case FrontendOptions::EmitAssembly:
-    Options.OutputKind = IRGenOutputKind::NativeAssembly;
+    IRGenOpts.OutputKind = IRGenOutputKind::NativeAssembly;
     break;
   case FrontendOptions::EmitObject:
-    Options.OutputKind = IRGenOutputKind::ObjectFile;
+    IRGenOpts.OutputKind = IRGenOutputKind::ObjectFile;
     break;
   case FrontendOptions::Immediate:
     llvm_unreachable("Immediate mode is not yet implemented");
@@ -173,7 +176,7 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
-  performIRGeneration(Options, nullptr, Instance.getMainModule(), SM.get());
+  performIRGeneration(IRGenOpts, nullptr, Instance.getMainModule(), SM.get());
 
   return false;
 }
