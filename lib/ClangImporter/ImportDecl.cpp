@@ -174,12 +174,16 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::ObjCId:
-    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCIdType()))
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCIdType()) &&
+        !ClangCtx.hasSameType(ClangType,
+                              ClangCtx.getObjCIdRedefinitionType()))
       return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::ObjCClass:
-    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCClassType()))
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.getObjCClassType()) &&
+        !ClangCtx.hasSameType(ClangType,
+                              ClangCtx.getObjCClassRedefinitionType()))
       return std::make_pair(Type(), "");
     break;
   }
