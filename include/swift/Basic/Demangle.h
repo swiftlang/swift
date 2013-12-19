@@ -144,7 +144,6 @@ public:
   NodePointer clone() const { return NodePointer(new Node(*this)); }
   
   Kind getKind() const { return NodeKind; }
-  void setKind(Kind kind) { NodeKind = kind; }
 
   const std::string &getText() const { return NodeText; }
   

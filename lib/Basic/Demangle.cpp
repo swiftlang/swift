@@ -550,10 +550,14 @@ private:
     return "";
   }
 
-  NodePointer demangleIdentifier() {
+  NodePointer demangleIdentifier(Node::Kind kind = Node::Kind::Unknown) {
     if (!Mangled)
       return nullptr;
     if (Mangled.nextIf('o')) {
+      // Operator identifiers aren't valid in the contexts that are
+      // building more specific identifiers.
+      if (kind != Node::Kind::Unknown) return nullptr;
+
       char op_mode = Mangled.next();
       if (op_mode != 'p' && op_mode != 'P' && op_mode != 'i')
         return nullptr;
@@ -571,12 +575,15 @@ private:
         }
       }
     }
+
+    if (kind == Node::Kind::Unknown) kind = Node::Kind::Identifier;
+
     size_t length;
     if (demangleNatural(length)) {
       if (Mangled.hasAtLeast(length)) {
         auto identifier = Mangled.slice(length);
         Mangled.advanceOffset(length);
-        return Node::create(Node::Kind::Identifier, identifier);
+        return Node::create(kind, identifier);
       }
     }
     return nullptr;
@@ -695,11 +702,9 @@ private:
   NodePointer demangleModule() {
     char c = Mangled.peek();
     if (isStartOfIdentifier(c)) {
-      NodePointer identifier = demangleIdentifier();
+      NodePointer identifier = demangleIdentifier(Node::Kind::Module);
       if (!identifier)
         return nullptr;
-      if (identifier->getKind() == Node::Kind::Identifier)
-        identifier->setKind(Node::Kind::Module);
       NodePointer copy_identifier = Node::create(identifier->getKind(),identifier->getText());
       Substitutions.push_back( { copy_identifier, IsProtocol::no });
       return identifier;
@@ -708,8 +713,9 @@ private:
       NodePointer identifier = demangleSubstitution();
       if (!identifier)
         return nullptr;
-      if (identifier->getKind() != Node::Kind::Path)
-        identifier->setKind(Node::Kind::Module);
+      if (identifier->getKind() != Node::Kind::Path &&
+          identifier->getKind() != Node::Kind::Module)
+        return nullptr;
       return identifier;
     }
     return nullptr;
@@ -722,20 +728,16 @@ private:
     context = demangleContextImpl(&context_type);
     if (!context)
       return nullptr;
-    identifier = demangleIdentifier();
+
+    if (identifier_type == Node::Kind::Unknown)
+      identifier_type = context_type;
+    identifier = demangleIdentifier(identifier_type);
     if (!identifier)
       return nullptr;
-    IsProtocol is_proto = IsProtocol::no;
-    if (identifier_type != Node::Kind::Unknown) {
-      identifier->setKind(identifier_type);
-      if (identifier_type == Node::Kind::Protocol)
-        is_proto = IsProtocol::yes;
-    }
-    else if (context_type != Node::Kind::Unknown) {
-      identifier->setKind(context_type);
-      if (context_type == Node::Kind::Protocol)
-        is_proto = IsProtocol::yes;
-    }
+
+    IsProtocol is_proto = (identifier_type == Node::Kind::Protocol
+                             ? IsProtocol::yes : IsProtocol::no);
+
     if (context->getKind() == Node::Kind::Path) {
       context->push_back_child(identifier);
       NodePointer path = Node::create(Node::Kind::Path);
@@ -776,12 +778,11 @@ private:
         }
         return subProto;
       }
-      NodePointer identifier = demangleIdentifier();
+      NodePointer identifier = demangleIdentifier(Node::Kind::Protocol);
       if (!identifier)
         return nullptr;
       NodePointer nominaltype = Node::create(Node::Kind::Path);
       NodePointer copy_context = sub.first->clone();
-      identifier->setKind(Node::Kind::Protocol);
       NodePointer copy_identifier = Node::create(identifier->getKind(),identifier->getText());
       nominaltype->push_back_child(copy_context)->setNextNode(copy_identifier);
       Substitutions.push_back({ nominaltype, IsProtocol::yes });
@@ -1177,10 +1178,9 @@ private:
       NodePointer identifier;
       NodePointer type;
       if (isStartOfIdentifier(Mangled.peek())) {
-        identifier = demangleIdentifier();
+        identifier = demangleIdentifier(Node::Kind::TupleElementName);
         if (!identifier)
           return nullptr;
-        identifier->setKind(Node::Kind::TupleElementName);
       }
       type = demangleType();
       if (!type)
