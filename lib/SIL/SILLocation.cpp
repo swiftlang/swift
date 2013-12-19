@@ -107,6 +107,11 @@ void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
 InlinedLocation InlinedLocation::getInlinedLocation(SILLocation L) {
   if (Expr *E = L.getAsASTNode<Expr>())
     return InlinedLocation(E);
+  if (Stmt *S = L.getAsASTNode<Stmt>())
+    return InlinedLocation(S);
+  if (Pattern *P = L.getAsASTNode<Pattern>())
+    return InlinedLocation(P);
+
   if (Optional<SILFileLocation> FileLoc = L.getAs<SILFileLocation>())
     return InlinedLocation(FileLoc.getValue().getFileLocation());
   // Otherwise, it can be an inlined location wrapping a file location.
@@ -129,6 +134,11 @@ MandatoryInlinedLocation
 MandatoryInlinedLocation::getMandatoryInlinedLocation(SILLocation L) {
   if (Expr *E = L.getAsASTNode<Expr>())
     return MandatoryInlinedLocation(E);
+  if (Stmt *S = L.getAsASTNode<Stmt>())
+    return MandatoryInlinedLocation(S);
+  if (Pattern *P = L.getAsASTNode<Pattern>())
+    return MandatoryInlinedLocation(P);
+
   if (Optional<SILFileLocation> FileLoc = L.getAs<SILFileLocation>())
     return MandatoryInlinedLocation(FileLoc.getValue().getFileLocation());
   // Otherwise, it can be an inlined location wrapping a file location.

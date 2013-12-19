@@ -380,7 +380,8 @@ private:
 class InlinedLocation : public SILLocation {
 public:
   InlinedLocation(Expr *CallSite) : SILLocation(CallSite, InlinedKind) {}
-
+  InlinedLocation(Stmt *S) : SILLocation(S, InlinedKind) {}
+  InlinedLocation(Pattern *P) : SILLocation(P, InlinedKind) {}
   InlinedLocation(Decl *D) : SILLocation(D, InlinedKind) {}
 
   /// Constructs an inlined location when the call site is represented by a
@@ -417,7 +418,8 @@ class MandatoryInlinedLocation : public SILLocation {
 public:
   MandatoryInlinedLocation(Expr *CallSite) :
     SILLocation(CallSite, MandatoryInlinedKind) {}
-
+  MandatoryInlinedLocation(Stmt *S) : SILLocation(S, InlinedKind) {}
+  MandatoryInlinedLocation(Pattern *P) : SILLocation(P, InlinedKind) {}
   MandatoryInlinedLocation(Decl *D) : SILLocation(D, MandatoryInlinedKind) {}
 
   /// Constructs an inlined location when the call site is represented by a
