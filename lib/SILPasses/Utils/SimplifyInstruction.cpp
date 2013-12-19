@@ -27,6 +27,8 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitIntegerLiteralInst(IntegerLiteralInst *ILI);
     SILValue visitEnumInst(EnumInst *EI);
+    SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
+    SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
   };
 } // end anonymous namespace
 
@@ -92,6 +94,24 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     if (BB == SEI->getCaseDestination(EI->getElement()))
       return SEI->getOperand();
   }
+
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
+  // (address_to_pointer (pointer_to_address x)) -> x
+  if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand().getDef()))
+    if (PTAI->getType() == ATPI->getOperand().getType())
+      return PTAI->getOperand();
+
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  // (pointer_to_address (address_to_pointer x)) -> x
+  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand().getDef()))
+    if (ATPI->getType(0) == PTAI->getOperand().getType())
+      return ATPI->getOperand();
 
   return SILValue();
 }

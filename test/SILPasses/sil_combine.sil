@@ -316,3 +316,19 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
   %4 = tuple(%2 : $Builtin.Int8, %3 : $Builtin.ObjectPointer)
   return %4 : $(Builtin.Int8, Builtin.ObjectPointer)
 }
+
+// CHECK-LABEL: sil @a2p_p2a_test
+// CHECK: bb0([[ADR:%[0-9]+]] : $*Builtin.Word, [[RAWPTR:%[0-9]+]] : $Builtin.RawPointer):
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @a2p_p2a_test : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> (Builtin.Word, Builtin.RawPointer) {
+bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
+  %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word 
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*Builtin.Word
+  %5 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
+  %6 = load %4 : $*Builtin.Word
+  %7 = tuple(%6 : $Builtin.Word, %5 : $Builtin.RawPointer)
+  return %7 : $(Builtin.Word, Builtin.RawPointer)
+}
