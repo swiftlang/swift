@@ -475,17 +475,14 @@ public:
     require(SI->getType().isObject(),
             "StructInst must produce an object");
 
-    CanType structTy = SI->getType().getSwiftRValueType();
+    SILType structTy = SI->getType();
     auto opi = SI->getElements().begin(), opEnd = SI->getElements().end();
     for (VarDecl *field : structDecl->getStoredProperties()) {
       require(opi != opEnd,
               "number of struct operands does not match number of stored "
               "member variables of struct");
 
-      auto origFormalType = AbstractionPattern(field->getType());
-      Type substFormalType = structTy->getTypeOfMember(M, field, nullptr);
-      SILType loweredType = TC.getLoweredType(origFormalType, substFormalType);
-      
+      SILType loweredType = structTy.getFieldType(field, F.getModule());
       require((*opi).getType() == loweredType,
               "struct operand type does not match field type");
       ++opi;
@@ -505,10 +502,9 @@ public:
     if (UI->getElement()->hasArgumentType()) {
       require(UI->getOperand().getType().isObject(),
               "EnumInst operand must be an object");
-      Type caseTy = UI->getType().getSwiftRValueType()
-        ->getTypeOfMember(M, UI->getElement(), nullptr,
-                          UI->getElement()->getArgumentType());
-      require(caseTy->isEqual(UI->getOperand().getType().getSwiftRValueType()),
+      SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
+                                                        F.getModule());
+      require(caseTy == UI->getOperand().getType(),
               "EnumInst operand type does not match type of case");
     }
   }
@@ -681,10 +677,8 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
 
-    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
-    Type substFormalTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(M, EI->getField(), nullptr);
-    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
+    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
+                                                    F.getModule());
     require(loweredFieldTy == EI->getType(),
             "result of struct_extract does not match type of field");
   }
@@ -724,11 +718,9 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
-    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
-    Type substFormalTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(M, EI->getField(), nullptr);
-    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
-    require(loweredFieldTy.getAddressType() == EI->getType(),
+    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
+                                                    F.getModule());
+    require(loweredFieldTy == EI->getType(),
             "result of struct_element_addr does not match type of field");
   }
 
@@ -747,11 +739,9 @@ public:
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
 
-    auto origFormalTy = AbstractionPattern(EI->getField()->getType());
-    Type substFormalTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(M, EI->getField(), nullptr);
-    SILType loweredFieldTy = TC.getLoweredType(origFormalTy, substFormalTy);
-    require(loweredFieldTy.getAddressType() == EI->getType(),
+    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
+                                                    F.getModule());
+    require(loweredFieldTy == EI->getType(),
             "result of ref_element_addr does not match type of field");
   }
   
@@ -1379,8 +1369,8 @@ public:
     require(SOI->getOperand().getType().isObject(),
             "switch_enum operand must be an object");
     
-    CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
-    EnumDecl *uDecl = uTy->getEnumOrBoundGenericEnum();
+    SILType uTy = SOI->getOperand().getType();
+    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum operand is not an enum");
     
     // Find the set of enum elements for the type so we can verify
@@ -1412,10 +1402,9 @@ public:
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
-          Type eltArgTy = uTy->getTypeOfMember(M, elt, nullptr,
-                                               elt->getArgumentType());
-          CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
-          require(eltArgTy->isEqual(bbArgTy),
+          SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
+          SILType bbArgTy = dest->getBBArgs()[0]->getType();
+          require(eltArgTy == bbArgTy,
                   "switch_enum destination bbarg must match case arg type");
           require(!dest->getBBArgs()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
@@ -1440,8 +1429,8 @@ public:
     require(SOI->getOperand().getType().isAddress(),
             "destructive_switch_enum_addr operand must be an object");
     
-    CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
-    EnumDecl *uDecl = uTy->getEnumOrBoundGenericEnum();
+    SILType uTy = SOI->getOperand().getType();
+    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "destructive_switch_enum_addr operand must be an enum");
     
     // Find the set of enum elements for the type so we can verify
@@ -1472,10 +1461,9 @@ public:
                 "destructive_switch_enum_addr destination for case w/ args "
                 "must take an argument");
         
-        Type eltArgTy = uTy->getTypeOfMember(M, elt, nullptr,
-                                             elt->getArgumentType());
-        CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
-        require(eltArgTy->isEqual(bbArgTy),
+        SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
+        SILType bbArgTy = dest->getBBArgs()[0]->getType();
+        require(eltArgTy == bbArgTy,
                 "destructive_switch_enum_addr destination bbarg must match "
                 "case arg type");
         require(dest->getBBArgs()[0]->getType().isAddress(),

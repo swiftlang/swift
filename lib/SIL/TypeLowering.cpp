@@ -1359,7 +1359,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
   auto origFieldTy = AbstractionPattern(field->getType());
   auto substFieldTy =
-    getSwiftRValueType()->getTypeOfMember(field->getModuleContext(),
+    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
                                           field, nullptr);
   auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
@@ -1374,7 +1374,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->hasArgumentType());
   auto origEltTy = elt->getArgumentType();
   auto substEltTy =
-    getSwiftRValueType()->getTypeOfMember(elt->getModuleContext(),
+    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
                                           elt, nullptr, origEltTy);
   auto loweredTy =
     M.Types.getLoweredType(AbstractionPattern(origEltTy), substEltTy);

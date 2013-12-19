@@ -2037,8 +2037,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     for (VarDecl *field : decl->getStoredProperties()) {
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      auto fieldTy = selfTy.getSwiftRValueType()
-        ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
+      auto fieldTy = selfTy.getFieldType(field, gen.SGM.M);
       auto &fieldTL = gen.getTypeLowering(fieldTy);
       SILValue slot = gen.B.createStructElementAddr(Loc, resultSlot, field,
                                     fieldTL.getLoweredType().getAddressType());
@@ -2058,12 +2057,10 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   for (VarDecl *field : decl->getStoredProperties()) {
     assert(elti != eltEnd && "number of args does not match number of fields");
     (void)eltEnd;
-    auto fieldTy = selfTy.getSwiftRValueType()
-      ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
-    auto fieldSILTy = gen.getLoweredLoadableType(fieldTy);
+    auto fieldTy = selfTy.getFieldType(field, gen.SGM.M);
     
     SILValue v
-      = std::move(*elti).forwardAsSingleStorageValue(gen, fieldSILTy, Loc);
+      = std::move(*elti).forwardAsSingleStorageValue(gen, fieldTy, Loc);
     
     eltValues.push_back(v);
     

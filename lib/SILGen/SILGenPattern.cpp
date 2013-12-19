@@ -391,13 +391,9 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       // Create a BB argument to receive the enum case data if it has any.
       SILValue eltValue;
       if (elt->hasArgumentType()) {
-        auto argSwiftTy = v.getType().getSwiftRValueType()
-          ->getTypeOfMember(elt->getModuleContext(), elt, nullptr,
-                            elt->getArgumentType());
-        if (!argSwiftTy->isVoid()) {
-          
-          auto &argLowering = gen.getTypeLowering(argSwiftTy);
-          SILType argTy = argLowering.getLoweredType();
+        auto argTy = v.getType().getEnumElementType(elt, gen.SGM.M);
+        if (!argTy.getSwiftRValueType()->isVoid()) {
+          auto &argLowering = gen.getTypeLowering(argTy);
           if (addressOnlyEnum)
             argTy = argTy.getAddressType();
           eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
