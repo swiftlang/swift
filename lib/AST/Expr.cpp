@@ -212,7 +212,7 @@ ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
 ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
   Type BaseTy = getBase()->getType()->getRValueType();
-  if (auto Meta = BaseTy->getAs<MetaTypeType>())
+  if (auto Meta = BaseTy->getAs<MetatypeType>())
     return Meta->getInstanceType()->castTo<ArchetypeType>();
 
   return BaseTy->castTo<ArchetypeType>();
@@ -237,7 +237,7 @@ Type OverloadSetRefExpr::getBaseType() const {
 
 bool OverloadSetRefExpr::hasBaseObject() const {
   if (Type BaseTy = getBaseType())
-    return !BaseTy->is<MetaTypeType>();
+    return !BaseTy->is<MetatypeType>();
 
   return false;
 }

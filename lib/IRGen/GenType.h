@@ -31,7 +31,7 @@ namespace swift {
   class ClassDecl;
   class AnyFunctionType;
   class LValueType;
-  class MetaTypeType;
+  class MetatypeType;
   class ModuleType;
   class NominalTypeDecl;
   class EnumDecl;
@@ -84,7 +84,7 @@ private:
   const TypeInfo *convertFunctionType(SILFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertLValueType(LValueType *T);
-  const TypeInfo *convertMetaTypeType(MetaTypeType *T);
+  const TypeInfo *convertMetatypeType(MetatypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);

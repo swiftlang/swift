@@ -276,7 +276,7 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
 bool ValueDecl::isSettableOnBase(Type baseType) const {
   if (!isSettable()) return false;
   if (!baseType) return true;
-  if (!isInstanceMember() && baseType->is<MetaTypeType>()) return true;
+  if (!isInstanceMember() && baseType->is<MetatypeType>()) return true;
   return (baseType->isSettableLValue() ||
           baseType->getRValueType()->hasReferenceSemantics());
 }
@@ -460,7 +460,7 @@ Type ValueDecl::getInterfaceType() const {
                     selfTy,
                     const_cast<AssociatedTypeDecl *>(assocType),
                     ctx);
-    InterfaceTy = MetaTypeType::get(InterfaceTy, ctx);
+    InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
     return InterfaceTy;
   }
 
@@ -492,12 +492,12 @@ Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this))
-    return typeParam->getType()->castTo<MetaTypeType>()->getInstanceType();
+    return typeParam->getType()->castTo<MetatypeType>()->getInstanceType();
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
-  return getInterfaceType()->castTo<MetaTypeType>()->getInstanceType();
+  return getInterfaceType()->castTo<MetatypeType>()->getInstanceType();
 }
 
 bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
@@ -558,7 +558,7 @@ void NominalTypeDecl::computeType() {
   }
 
   // Set the type.
-  setType(MetaTypeType::get(DeclaredTy, ctx));
+  setType(MetatypeType::get(DeclaredTy, ctx));
 
   // A protocol has an implicit generic parameter list consisting of a single
   // generic parameter, Self, that conforms to the protocol itself. This
@@ -635,7 +635,7 @@ Type NominalTypeDecl::computeInterfaceType() const {
                             getASTContext());
   }
 
-  InterfaceTy = MetaTypeType::get(type, getASTContext());
+  InterfaceTy = MetatypeType::get(type, getASTContext());
   return InterfaceTy;
 
 }
@@ -688,10 +688,10 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
     TypeAliasLoc(TypeAliasLoc),
     UnderlyingTy(UnderlyingTy)
 {
-  // Set the type of the TypeAlias to the right MetaTypeType.
+  // Set the type of the TypeAlias to the right MetatypeType.
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-  setType(MetaTypeType::get(AliasTy, Ctx));
+  setType(MetatypeType::get(AliasTy, Ctx));
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -709,7 +709,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
-  setType(MetaTypeType::get(type, ctx));
+  setType(MetatypeType::get(type, ctx));
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
@@ -729,7 +729,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
-  setType(MetaTypeType::get(type, ctx));
+  setType(MetatypeType::get(type, ctx));
 }
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
@@ -1315,7 +1315,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   }
 
   // Unwrap metatypes for remaining checks.
-  if (auto metaTy = type->getAs<MetaTypeType>())
+  if (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
 
   // Class types are Objective-C object types.

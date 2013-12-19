@@ -296,7 +296,7 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
     return type;
 
   auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
-  auto selfTy = nominal->getInterfaceType()->castTo<MetaTypeType>()
+  auto selfTy = nominal->getInterfaceType()->castTo<MetatypeType>()
                   ->getInstanceType();
   if (nominal->isGenericContext())
     return GenericFunctionType::get(nominal->getGenericParamTypes(),

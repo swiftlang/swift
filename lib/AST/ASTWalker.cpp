@@ -1120,7 +1120,7 @@ bool Traversal::visitProtocolCompositionTypeRepr(
   return false;
 }
 
-bool Traversal::visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
+bool Traversal::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
   if (doIt(T->getBase()))
     return true;
   return false;

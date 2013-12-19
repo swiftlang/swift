@@ -121,20 +121,20 @@ protected:
     unsigned NumParameters : 32 - 11 - NumTypeBaseBits;
   };
 
-  struct MetaTypeTypeBitfields {
+  struct MetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
     /// \brief Does the metatype use a 'thin' representation?
     unsigned Thin : 1;
   };
-  enum { NumMetaTypeTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumMetaTypeTypeBits <= 32, "fits in an unsigned");
+  enum { NumMetatypeTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumMetatypeTypeBits <= 32, "fits in an unsigned");
   
   union {
     TypeBaseBitfields TypeBaseBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
-    MetaTypeTypeBitfields MetaTypeTypeBits;
+    MetatypeTypeBitfields MetatypeTypeBits;
   };
 
 protected:
@@ -1236,25 +1236,25 @@ private:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 
-/// MetaTypeType - This is the type given to a metatype value.  When a type is
+/// MetatypeType - This is the type given to a metatype value.  When a type is
 /// declared, a 'metatype' value is injected into the value namespace to
 /// resolve references to the type.  An example:
 ///
 ///  struct x { ... }  // declares type 'x' and metatype 'x'.
 ///  x.a()             // use of the metatype value since its a value context.
-class MetaTypeType : public TypeBase {
+class MetatypeType : public TypeBase {
   Type InstanceType;
   
 public:
-  /// Return the MetaTypeType for the specified type declaration.
-  static MetaTypeType *get(Type T, const ASTContext &C);
+  /// Return the MetatypeType for the specified type declaration.
+  static MetatypeType *get(Type T, const ASTContext &C);
   
-  /// Return the MetaTypeType for the specified type declaration with
+  /// Return the MetatypeType for the specified type declaration with
   /// the given thinness.
   ///
   /// Metatype thinness is a SIL-only property. Unitary metatypes can be
   /// lowered away to empty types in IR.
-  static MetaTypeType *get(Type T, bool IsThin, const ASTContext &C);
+  static MetatypeType *get(Type T, bool IsThin, const ASTContext &C);
 
   Type getInstanceType() const { return InstanceType; }
 
@@ -1263,24 +1263,24 @@ public:
   /// Metatype thinness is a SIL-only property. Unitary metatypes can be
   /// lowered away to empty types in IR, unless a metatype value is required
   /// at an abstraction level.
-  bool isThin() const { return MetaTypeTypeBits.Thin; }
+  bool isThin() const { return MetatypeTypeBits.Thin; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::MetaType;
+    return T->getKind() == TypeKind::Metatype;
   }
   
 private:
-  MetaTypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable,
+  MetatypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable,
                bool IsThin);
   friend class TypeDecl;
 };
-BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
-  static CanMetaTypeType get(CanType type, const ASTContext &C) {
-    return CanMetaTypeType(MetaTypeType::get(type, C));
+  static CanMetatypeType get(CanType type, const ASTContext &C) {
+    return CanMetatypeType(MetatypeType::get(type, C));
   }
-END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+END_CAN_TYPE_WRAPPER(MetatypeType, Type)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
@@ -2931,8 +2931,8 @@ case TypeKind::Id:
       return false;
     }
 
-    case TypeKind::MetaType:
-      return cast<MetaTypeType>(base)->getInstanceType().findIf(pred);
+    case TypeKind::Metatype:
+      return cast<MetatypeType>(base)->getInstanceType().findIf(pred);
 
     case TypeKind::NameAlias: {
       auto dependentDecl
@@ -3150,8 +3150,8 @@ case TypeKind::Id:
     return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
   }
 
-  case TypeKind::MetaType: {
-    auto meta = cast<MetaTypeType>(base);
+  case TypeKind::Metatype: {
+    auto meta = cast<MetatypeType>(base);
     auto instanceTy = meta->getInstanceType().transform(ctx, fn);
     if (!instanceTy)
       return Type();
@@ -3159,7 +3159,7 @@ case TypeKind::Id:
     if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
       return *this;
 
-    return MetaTypeType::get(instanceTy, ctx);
+    return MetatypeType::get(instanceTy, ctx);
   }
 
   case TypeKind::NameAlias: {

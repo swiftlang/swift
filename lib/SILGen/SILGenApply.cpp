@@ -148,7 +148,7 @@ private:
   }
 
   static CanArchetypeType getArchetypeForSelf(CanType selfType) {
-    if (auto mt = dyn_cast<MetaTypeType>(selfType)) {
+    if (auto mt = dyn_cast<MetatypeType>(selfType)) {
       return cast<ArchetypeType>(mt.getInstanceType());
     } else {
       return cast<ArchetypeType>(selfType);
@@ -176,7 +176,7 @@ private:
     // they're actually wrong.
     assert(getArchetypeForSelf(origParamType));
     assert(getArchetypeForSelf(selfType));
-    assert(isa<MetaTypeType>(origParamType) == isa<MetaTypeType>(selfType));
+    assert(isa<MetatypeType>(origParamType) == isa<MetatypeType>(selfType));
     return selfType;
   }
 
@@ -201,7 +201,7 @@ private:
       auto proto = cast<ProtocolDecl>(member->getDeclContext());
       auto type = proto->getSelf()->getArchetype()->getCanonicalType();
       if (!member->isInstanceMember())
-        type = CanType(MetaTypeType::get(type, SGM.getASTContext()));
+        type = CanType(MetatypeType::get(type, SGM.getASTContext()));
       return type;
     } else if (kind == Kind::ArchetypeMethod) {
       return method.selfValue.getType().getSwiftRValueType();
@@ -817,7 +817,7 @@ public:
 
       setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
     } else {
-      assert(existential.getType().is<MetaTypeType>() &&
+      assert(existential.getType().is<MetatypeType>() &&
              "non-existential-metatype for existential static method?!");
       
       setSelfParam(RValue(gen, e, existential.getType().getSwiftRValueType(),
@@ -1028,7 +1028,7 @@ public:
                           proj.getType().getSwiftRValueType(), proj),
                    dynamicMemberRef);
     } else {
-      assert(existential.getType().is<MetaTypeType>() &&
+      assert(existential.getType().is<MetatypeType>() &&
              "non-dynamic-lookup-metatype for static method?!");
       val = existential.getValue();
       ManagedValue proj(val, existential.getCleanup());

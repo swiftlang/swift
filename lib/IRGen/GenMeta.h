@@ -55,7 +55,7 @@ namespace irgen {
   bool hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod);
 
   /// Emit a declaration reference to a metatype object.
-  void emitMetaTypeRef(IRGenFunction &IGF, CanType type, Explosion &explosion);
+  void emitMetatypeRef(IRGenFunction &IGF, CanType type, Explosion &explosion);
 
   /// Emit a reference to a compile-time constant piece of type metadata, or
   /// return a null pointer if the type's metadata cannot be represented by a

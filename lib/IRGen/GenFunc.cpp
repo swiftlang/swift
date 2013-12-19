@@ -1657,13 +1657,13 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
   // If they do differ, we need to remap.
   case ResultDifference::Divergent:
-    if (isa<MetaTypeType>(substResultType) &&
-        isa<MetaTypeType>(origResultType)) {
+    if (isa<MetatypeType>(substResultType) &&
+        isa<MetatypeType>(origResultType)) {
       // If we got here, it's because the substituted metatype is trivial.
       // Remapping is easy--the substituted type is empty, so we drop the
       // nontrivial representation of the original type.
       assert(IGF.IGM.hasTrivialMetatype(
-                      CanType(cast<MetaTypeType>(substResultType)->getInstanceType()))
+                      CanType(cast<MetatypeType>(substResultType)->getInstanceType()))
              && "remapping to nontrivial metatype?!");
       
       Explosion temp(getCallee().getExplosionLevel());

@@ -67,7 +67,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(LazyProtocolWitnessTableAccessor)
   CASE(LazyProtocolWitnessTableTemplate)
   CASE(LocalEntity)
-  CASE(MetaType)
+  CASE(Metatype)
   CASE(Metaclass)
   CASE(Module)
   CASE(NominalTypeDescriptor)
@@ -1236,7 +1236,7 @@ private:
       NodePointer type = demangleType();
       if (!type)
         return nullptr;
-      NodePointer metatype = Node::create(Node::Kind::MetaType);
+      NodePointer metatype = Node::create(Node::Kind::Metatype);
       metatype->addChild(type);
       return metatype;
     }
@@ -1849,7 +1849,7 @@ private:
       toString(rettype);
       return;
     }
-    case swift::Demangle::Node::Kind::MetaType: {
+    case swift::Demangle::Node::Kind::Metatype: {
       Node *type = pointer->getChild(0);
       toString(type);
       Printer << ".metatype";

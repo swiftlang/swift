@@ -1408,7 +1408,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // Set the initializer type of the constructor.
     auto allocType = ctor->getType();
     auto selfTy = allocType->castTo<AnyFunctionType>()->getInput()
-                    ->castTo<MetaTypeType>()->getInstanceType();
+                    ->castTo<MetatypeType>()->getInstanceType();
     if (auto polyFn = allocType->getAs<PolymorphicFunctionType>()) {
       ctor->setInitializerType(
         PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
@@ -1426,7 +1426,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // Set the initializer interface type of the constructor.
     allocType = ctor->getInterfaceType();
     selfTy = allocType->castTo<AnyFunctionType>()->getInput()
-               ->castTo<MetaTypeType>()->getInstanceType();
+               ->castTo<MetatypeType>()->getInstanceType();
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
               GenericFunctionType::get(polyFn->getGenericParams(),
@@ -2234,8 +2234,8 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::METATYPE_TYPE: {
     TypeID instanceID;
-    decls_block::MetaTypeTypeLayout::readRecord(scratch, instanceID);
-    typeOrOffset = MetaTypeType::get(getType(instanceID), ctx);
+    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID);
+    typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
     break;
   }
 

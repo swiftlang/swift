@@ -190,7 +190,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
 
   // If we aren't performing dynamic lookup, we're done.
   auto instanceTy = base->getRValueType();
-  if (auto metaTy = instanceTy->getAs<MetaTypeType>())
+  if (auto metaTy = instanceTy->getAs<MetatypeType>())
     instanceTy = metaTy->getInstanceType();
   auto protoTy = instanceTy->getAs<ProtocolType>();
   if (!*result ||
@@ -654,7 +654,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       return { type, type };
 
     // If it's a value reference, refer to the metatype.
-    type = MetaTypeType::get(type, getASTContext());
+    type = MetatypeType::get(type, getASTContext());
     return { type, type };
   }
 
@@ -802,7 +802,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
                                          /*wantRValue=*/true);
   bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
+  if (auto baseMeta = baseObjTy->getAs<MetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
     isInstance = false;
   }
@@ -820,7 +820,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
       Type memberTy = archetype->getNestedType(value->getName());
       if (!isTypeReference)
-        memberTy = MetaTypeType::get(memberTy, TC.Context);
+        memberTy = MetatypeType::get(memberTy, TC.Context);
 
       auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
       return { openedType, memberTy };
@@ -837,7 +837,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance)) {
         auto memberTy = conformance->getTypeWitness(assocType, &TC).Replacement;
         if (!isTypeReference)
-          memberTy = MetaTypeType::get(memberTy, TC.Context);
+          memberTy = MetatypeType::get(memberTy, TC.Context);
 
         auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
         return { openedType, memberTy };
@@ -894,7 +894,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
-      openedType = openedType->castTo<MetaTypeType>()->getInstanceType();
+      openedType = openedType->castTo<MetatypeType>()->getInstanceType();
 
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.

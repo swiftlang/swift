@@ -168,9 +168,9 @@ template <> struct CanTypeWrapperTraits<Type> { typedef CanType type; };
 // Intended to be used as follows:
 //   DEFINE_LEAF_CAN_TYPE_WRAPPER(BuiltinObjectPointer, BuiltinType)
 // or
-//   BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+//   BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
 //     PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
-//   END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+//   END_CAN_TYPE_WRAPPER(MetatypeType, Type)
 #define BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                          \
 typedef CanTypeWrapper<TYPE> Can##TYPE;                             \
 template <>                                                         \

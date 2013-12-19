@@ -1774,7 +1774,7 @@ public:
       // lowered to the type itself.  It is mutable when lowered to an lvalue.
       SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
                        (!SelfTy->is<LValueType>() &&
-                        !SelfTy->is<MetaTypeType>()));
+                        !SelfTy->is<MetatypeType>()));
 
       TypedPattern *selfPattern =
           cast<TypedPattern>(FD->getArgParamPatterns()[0]);
@@ -1919,7 +1919,7 @@ public:
 
     // If we have a simple element, just set the type.
     if (EED->getArgumentType().isNull()) {
-      Type argTy = MetaTypeType::get(ElemTy, TC.Context);
+      Type argTy = MetatypeType::get(ElemTy, TC.Context);
       Type fnTy;
       if (auto gp = ED->getGenericParamsOfContext())
         fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp, TC.Context);
@@ -1933,10 +1933,10 @@ public:
 
     Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy, TC.Context);
     if (auto gp = ED->getGenericParamsOfContext())
-      fnTy = PolymorphicFunctionType::get(MetaTypeType::get(ElemTy, TC.Context),
+      fnTy = PolymorphicFunctionType::get(MetatypeType::get(ElemTy, TC.Context),
                                           fnTy, gp, TC.Context);
     else
-      fnTy = FunctionType::get(MetaTypeType::get(ElemTy, TC.Context), fnTy,
+      fnTy = FunctionType::get(MetatypeType::get(ElemTy, TC.Context), fnTy,
                                TC.Context);
     EED->setType(fnTy);
 
@@ -2026,7 +2026,7 @@ public:
     SelfDecl->setType(SelfTy);
     SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
                      (!SelfTy->is<LValueType>() &&
-                      !SelfTy->is<MetaTypeType>()));
+                      !SelfTy->is<MetatypeType>()));
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2087,7 +2087,7 @@ public:
       } else
         FnTy = FunctionType::get(CD->getArgParams()->getType(),
                                  ResultTy, TC.Context);
-      Type SelfMetaTy = MetaTypeType::get(ResultTy, TC.Context);
+      Type SelfMetaTy = MetatypeType::get(ResultTy, TC.Context);
       if (outerGenericParams) {
         AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
                                                 outerGenericParams, TC.Context);
@@ -2164,7 +2164,7 @@ public:
     SelfDecl->setType(SelfTy);
     SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
                      (!SelfTy->is<LValueType>() &&
-                      !SelfTy->is<MetaTypeType>()));
+                      !SelfTy->is<MetatypeType>()));
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.

@@ -63,7 +63,7 @@ static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
 static LValueTypeData getValueTypeData(SILValue value) {
   assert(value.getType().isObject());
   assert(value.getType().hasReferenceSemantics() ||
-         value.getType().is<MetaTypeType>());
+         value.getType().is<MetatypeType>());
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
@@ -316,7 +316,7 @@ namespace {
     MetatypeComponent(SILValue metatype) :
       PhysicalPathComponent(getValueTypeData(metatype)), value(metatype) {
       
-      assert(metatype.getType().is<MetaTypeType>()
+      assert(metatype.getType().is<MetatypeType>()
              && "metatype component must be of metatype type");
     }
     
@@ -348,7 +348,7 @@ namespace {
     {
       assert((!base
               || base.getType().isAddress()
-              || base.getType().is<MetaTypeType>()
+              || base.getType().is<MetatypeType>()
               || base.getType().hasReferenceSemantics())
              && "base of getter/setter component must be invalid, lvalue, or "
                 "of reference type");
@@ -459,7 +459,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
     LValue lv;
     lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
     return lv;
-  } else if (e->getType()->is<MetaTypeType>()) {
+  } else if (e->getType()->is<MetatypeType>()) {
     LValue lv;
     lv.add<MetatypeComponent>(
                             gen.emitRValue(e).getUnmanagedSingleValue(gen, e));
@@ -557,7 +557,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       // FIXME: This has to be dynamically looked up for classes, and
       // dynamically instantiated for generics.
       if (var->isStatic()) {
-        auto baseMeta = e->getBase()->getType()->castTo<MetaTypeType>()
+        auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
           ->getInstanceType();
         (void)baseMeta;
         assert(!baseMeta->is<BoundGenericType>()
@@ -1051,7 +1051,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
                                    SILValue base) {
   assert(!base ||
          base.getType().isAddress() ||
-         base.getType().is<MetaTypeType>() ||
+         base.getType().is<MetatypeType>() ||
          base.getType().hasReferenceSemantics());
 
   SILValue addr;
@@ -1064,7 +1064,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
   }
 
   assert(addr.getType().isAddress() ||
-         addr.getType().is<MetaTypeType>() ||
+         addr.getType().is<MetatypeType>() ||
          addr.getType().hasReferenceSemantics());
   return addr;
 }

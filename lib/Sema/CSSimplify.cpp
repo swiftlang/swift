@@ -725,9 +725,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Nothing to do here; try existential and user-defined conversions below.
       break;
 
-    case TypeKind::MetaType: {
-      auto meta1 = cast<MetaTypeType>(desugar1);
-      auto meta2 = cast<MetaTypeType>(desugar2);
+    case TypeKind::Metatype: {
+      auto meta1 = cast<MetatypeType>(desugar1);
+      auto meta2 = cast<MetatypeType>(desugar2);
 
       // metatype<B> < metatype<A> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
@@ -1088,7 +1088,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::MetaType:
+  case TypeKind::Metatype:
   case TypeKind::Function:
   case TypeKind::Array:
   case TypeKind::ProtocolComposition:
@@ -1320,7 +1320,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Dig out the instance type.
   bool isMetatype = false;
   Type instanceTy = baseObjTy;
-  if (auto baseObjMeta = baseObjTy->getAs<MetaTypeType>()) {
+  if (auto baseObjMeta = baseObjTy->getAs<MetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
     isMetatype = true;
   }
@@ -1682,8 +1682,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   }
 
   // For a metatype, perform a construction.
-  if (desugar2->getKind() == TypeKind::MetaType) {
-    auto meta2 = cast<MetaTypeType>(desugar2);
+  if (desugar2->getKind() == TypeKind::Metatype) {
+    auto meta2 = cast<MetatypeType>(desugar2);
     auto instanceTy2 = meta2->getInstanceType();
 
     // Bind the result type to the instance type.

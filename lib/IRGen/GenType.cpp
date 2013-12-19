@@ -804,8 +804,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::MetaType:
-    return convertMetaTypeType(cast<MetaTypeType>(ty));
+  case TypeKind::Metatype:
+    return convertMetatypeType(cast<MetatypeType>(ty));
   case TypeKind::Module:
     return convertModuleType(cast<ModuleType>(ty));
   case TypeKind::BuiltinObjectPointer:
@@ -990,7 +990,7 @@ const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
   return new EmptyTypeInfo(IGM.Int8Ty);
 }
 
-const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
+const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
   // Certain metatypes have trivial representation, and we only
   // actually need to materialize them when converting to a more
   // generic representation.

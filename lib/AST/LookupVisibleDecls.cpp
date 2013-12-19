@@ -273,7 +273,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
-  if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
+  if (MetatypeType *MTT = BaseTy->getAs<MetatypeType>()) {
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
@@ -598,7 +598,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
-            ExtendedType = MetaTypeType::get(ExtendedType, M.getASTContext());
+            ExtendedType = MetatypeType::get(ExtendedType, M.getASTContext());
       }
 
       // Look in the generic parameters after checking our local declaration.

@@ -343,7 +343,7 @@ namespace {
                                           substTy.getObjectType());
     }
 
-    bool visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
+    bool visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       // Metatypes can differ by abstraction if the substitution
       // reveals that the type is actually not a class type.
       return (IGM.hasTrivialMetatype(substTy.getInstanceType()) &&
@@ -419,7 +419,7 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   // All these types are leaves, in the sense that they don't directly
   // store any other types.
   bool visitBuiltinType(CanBuiltinType type) { return false; }
-  bool visitMetaTypeType(CanMetaTypeType type) { return false; }
+  bool visitMetatypeType(CanMetatypeType type) { return false; }
   bool visitModuleType(CanModuleType type) { return false; }
   bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
   bool visitSILFunctionType(CanSILFunctionType type) { return false; }
@@ -649,7 +649,7 @@ namespace {
       Out.add(origValue);
     }
 
-    void visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
+    void visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       CanType origInstanceTy = origTy.getInstanceType();
       CanType substInstanceTy = substTy.getInstanceType();
 
@@ -811,7 +811,7 @@ namespace {
       Out.add(substValue);
     }
 
-    void visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
+    void visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       CanType origInstanceTy = origTy.getInstanceType();
       CanType substInstanceTy = substTy.getInstanceType();
 

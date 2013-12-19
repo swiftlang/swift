@@ -443,9 +443,9 @@ static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
   GenericParamList *ParamList;
   std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgParamElts[] = { MetaTypeType::get(GenericTy, Context),
+  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy, Context),
                                   Context.TheRawPointerType };
-  TupleTypeElt ArgBodyElts[] = { MetaTypeType::get(ArchetypeTy, Context),
+  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy, Context),
                                  Context.TheRawPointerType };
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
@@ -459,8 +459,8 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
   GenericParamList *ParamList;
   std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgParamElts[] = { MetaTypeType::get(GenericTy, Context) };
-  TupleTypeElt ArgBodyElts[] = { MetaTypeType::get(ArchetypeTy, Context) };
+  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy, Context) };
+  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy, Context) };
   Type ResultTy = BuiltinIntegerType::getWordType(Context);
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
@@ -560,8 +560,8 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
 
   TupleTypeElt ArgParamElts[] = { GenericTy };
   TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
-  Type ResultTy = MetaTypeType::get(GenericTy, Context);
-  Type BodyResultTy = MetaTypeType::get(ArchetypeTy, Context);
+  Type ResultTy = MetatypeType::get(GenericTy, Context);
+  Type BodyResultTy = MetatypeType::get(ArchetypeTy, Context);
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, BodyResultTy, ParamList);
 }

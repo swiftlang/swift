@@ -2839,7 +2839,7 @@ namespace {
         // FIXME: This is an ugly hack: we're pretending that the function
         // has a different type from its actual type.  This works because the
         // LLVM representation happens to be the same.
-        CanType concreteMeta = CanType(MetaTypeType::get(ConcreteType, IGM.Context));
+        CanType concreteMeta = CanType(MetatypeType::get(ConcreteType, IGM.Context));
         auto implTy =  CanFunctionType::get(concreteMeta,
                                             impl->getType()->getCanonicalType(),
                                             IGM.Context);
@@ -3294,7 +3294,7 @@ namespace {
         // Testify to archetypes in the Self type.
         auto params = fnType->getParameters();
         CanType selfTy = params.back().getType();
-        if (auto metaTy = dyn_cast<MetaTypeType>(selfTy))
+        if (auto metaTy = dyn_cast<MetatypeType>(selfTy))
           selfTy = metaTy.getInstanceType();
         
         if (auto nomTy = dyn_cast<NominalType>(selfTy))
@@ -3386,7 +3386,7 @@ namespace {
         } else if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
           considerBoundGenericType(boundTy, 0);
           return SourceKind::ClassPointer;
-        } else if (auto metatypeTy = dyn_cast<MetaTypeType>(type)) {
+        } else if (auto metatypeTy = dyn_cast<MetatypeType>(type)) {
           CanType objTy = metatypeTy.getInstanceType();
           if (auto nomTy = dyn_cast<ClassType>(objTy)) {
             considerNominalType(nomTy, 0);
@@ -3693,7 +3693,7 @@ namespace {
     void visitAnyFunctionType(CanAnyFunctionType fn) {}
     void visitSILFunctionType(CanSILFunctionType fn) {}
     void visitBuiltinType(CanBuiltinType type) {}
-    void visitMetaTypeType(CanMetaTypeType type) {}
+    void visitMetatypeType(CanMetatypeType type) {}
     void visitModuleType(CanModuleType type) {}
     void visitProtocolCompositionType(CanProtocolCompositionType type) {}
     void visitReferenceStorageType(CanReferenceStorageType type) {}

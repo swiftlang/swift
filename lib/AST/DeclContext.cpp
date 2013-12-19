@@ -108,7 +108,7 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return MetaTypeType::get(containerTy, dc->getASTContext());
+    return MetatypeType::get(containerTy, dc->getASTContext());
 
   // Reference types have 'self' of type T.
   if (containerTy->hasReferenceSemantics())

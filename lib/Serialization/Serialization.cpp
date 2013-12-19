@@ -1540,11 +1540,11 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::MetaType: {
-    auto metatypeTy = cast<MetaTypeType>(ty.getPointer());
+  case TypeKind::Metatype: {
+    auto metatypeTy = cast<MetatypeType>(ty.getPointer());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[MetaTypeTypeLayout::Code];
-    MetaTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
+    MetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(metatypeTy->getInstanceType()));
     break;
   }
@@ -1851,7 +1851,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TupleTypeLayout>();
     registerDeclTypeAbbr<TupleTypeEltLayout>();
     registerDeclTypeAbbr<FunctionTypeLayout>();
-    registerDeclTypeAbbr<MetaTypeTypeLayout>();
+    registerDeclTypeAbbr<MetatypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
     registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();

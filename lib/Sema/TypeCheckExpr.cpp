@@ -97,7 +97,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
   // Build the expression "Slice<T>".
   Expr *sliceTypeRef =
     new (Context) MetatypeExpr(nullptr, Loc,
-                               MetaTypeType::get(sliceType, Context));
+                               MetatypeType::get(sliceType, Context));
 
   // Build the expression "Slice<T>.convertFromHeapArray".
   Expr *injectionFn = new (Context) UnresolvedDotExpr(

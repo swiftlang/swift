@@ -81,7 +81,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   LookupTypeResult result;
 
   // Look through the metatype.
-  if (auto metaT = type->getAs<MetaTypeType>())
+  if (auto metaT = type->getAs<MetatypeType>())
     type = metaT->getInstanceType();
 
   // Callers must cope with dependent types directly.

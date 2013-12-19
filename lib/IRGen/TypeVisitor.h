@@ -40,7 +40,7 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   TYPE(BuiltinRawPointer)
   TYPE(BuiltinVector)
   TYPE(LValue)
-  TYPE(MetaType)
+  TYPE(Metatype)
   TYPE(Module)
   TYPE(Enum)
   TYPE(ReferenceStorage)

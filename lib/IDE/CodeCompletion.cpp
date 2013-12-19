@@ -1040,7 +1040,7 @@ public:
     bool IsImlicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
-      IsImlicitlyCurriedInstanceMethod = ExprType->is<MetaTypeType>() &&
+      IsImlicitlyCurriedInstanceMethod = ExprType->is<MetatypeType>() &&
                                          !FD->isStatic();
       break;
     case LookupKind::ValueInDeclContext:
@@ -1174,7 +1174,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(NTD->getDeclaredType(), Ctx));
+                      MetatypeType::get(NTD->getDeclaredType(), Ctx));
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
@@ -1188,10 +1188,10 @@ public:
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType())
       addTypeAnnotation(Builder,
-                        MetaTypeType::get(TAD->getUnderlyingType(), Ctx));
+                        MetatypeType::get(TAD->getUnderlyingType(), Ctx));
     else {
       addTypeAnnotation(Builder,
-                        MetaTypeType::get(TAD->getDeclaredType(), Ctx));
+                        MetatypeType::get(TAD->getDeclaredType(), Ctx));
     }
   }
 
@@ -1206,7 +1206,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(GP->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(GP->getDeclaredType(), Ctx));
+                      MetatypeType::get(GP->getDeclaredType(), Ctx));
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
@@ -1220,7 +1220,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(AT->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(AT->getDeclaredType(), Ctx));
+                      MetatypeType::get(AT->getDeclaredType(), Ctx));
   }
 
   void addEnumElementRef(const EnumElementDecl *EED,
@@ -1312,7 +1312,7 @@ public:
       }
 
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (ExprType->is<MetaTypeType>()) {
+        if (ExprType->is<MetatypeType>()) {
           if (HaveDot)
             return;
           addConstructorCall(CD, Reason);
@@ -1334,7 +1334,7 @@ public:
         return;
 
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-        if (ExprType->is<MetaTypeType>())
+        if (ExprType->is<MetatypeType>())
           return;
         addSubscriptCall(SD, Reason);
         return;
@@ -1515,7 +1515,7 @@ public:
         Annotation = LVT->getObjectType();
       }
 
-      Annotation = MetaTypeType::get(Annotation, Ctx);
+      Annotation = MetatypeType::get(Annotation, Ctx);
 
       // Use the canonical type as a type annotation because looking at the
       // '.metatype' in the IDE is a way to understand what type the expression
@@ -1574,7 +1574,7 @@ public:
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     NeedLeadingDot = !HaveDot;
-    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, Ctx),
+    lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType, Ctx),
                              CurrDeclContext, TypeResolver.get());
   }
 

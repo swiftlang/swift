@@ -431,22 +431,22 @@ private:
 /// \code
 ///   Foo.metatype
 /// \endcode
-class MetaTypeTypeRepr : public TypeRepr {
+class MetatypeTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc MetaLoc;
 
 public:
-  MetaTypeTypeRepr(TypeRepr *Base, SourceLoc MetaLoc)
-    : TypeRepr(TypeReprKind::MetaType), Base(Base), MetaLoc(MetaLoc) {
+  MetatypeTypeRepr(TypeRepr *Base, SourceLoc MetaLoc)
+    : TypeRepr(TypeReprKind::Metatype), Base(Base), MetaLoc(MetaLoc) {
   }
 
   TypeRepr *getBase() const { return Base; }
   SourceLoc getMetaLoc() const { return MetaLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::MetaType;
+    return T->getKind() == TypeReprKind::Metatype;
   }
-  static bool classof(const MetaTypeTypeRepr *T) { return true; }
+  static bool classof(const MetatypeTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }

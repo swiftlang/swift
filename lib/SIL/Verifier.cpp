@@ -557,35 +557,35 @@ public:
   }
   
   void checkMetatypeInst(MetatypeInst *MI) {
-    require(MI->getType(0).is<MetaTypeType>(),
+    require(MI->getType(0).is<MetatypeType>(),
             "metatype instruction must be of metatype type");
   }
   void checkClassMetatypeInst(ClassMetatypeInst *MI) {
-    require(MI->getType().is<MetaTypeType>(),
+    require(MI->getType().is<MetatypeType>(),
             "class_metatype instruction must be of metatype type");
     require(MI->getOperand().getType().getSwiftType()
             ->getClassOrBoundGenericClass(),
             "class_metatype base must be of class type");
     require(MI->getOperand().getType().getSwiftType() ==
-             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+             CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
             "class_metatype result must be metatype of base class type");
   }
   void checkArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
-    require(MI->getType().is<MetaTypeType>(),
+    require(MI->getType().is<MetatypeType>(),
             "archetype_metatype instruction must be of metatype type");
     require(MI->getOperand().getType().getSwiftRValueType()->is<ArchetypeType>(),
             "archetype_metatype operand must be of archetype type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
-            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+            CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
             "archetype_metatype result must be metatype of operand type");
   }
   void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
-    require(MI->getType().is<MetaTypeType>(),
+    require(MI->getType().is<MetatypeType>(),
             "protocol_metatype instruction must be of metatype type");
     require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
             "protocol_metatype operand must be of protocol type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
-            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+            CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
             "protocol_metatype result must be metatype of operand type");
   }
   
@@ -797,7 +797,7 @@ public:
             llvm::dbgs() << "\n");
       
       SILType selfType = getMethodSelfType(methodType);
-      if (auto selfMT = selfType.getAs<MetaTypeType>()) {
+      if (auto selfMT = selfType.getAs<MetatypeType>()) {
         require(selfType.isObject(),
                 "archetype_method taking metatype must take it directly");
         require(selfMT.getInstanceType() == operandType,
@@ -879,9 +879,9 @@ public:
     } else {
       require(operandType.isObject(),
               "static protocol_method cannot apply to an address");
-      require(operandType.is<MetaTypeType>(),
+      require(operandType.is<MetatypeType>(),
               "static protocol_method must apply to an existential metatype");
-      require(operandType.castTo<MetaTypeType>()
+      require(operandType.castTo<MetatypeType>()
                 ->getInstanceType()->isExistentialType(),
               "static protocol_method must apply to an existential metatype");
       require(getMethodSelfType(methodType) == EMI->getOperand().getType(),
@@ -898,12 +898,12 @@ public:
       require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
               "operand must have Builtin.ObjCPointer type");
     } else {
-      require(operandType.getSwiftType()->is<MetaTypeType>(),
+      require(operandType.getSwiftType()->is<MetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
                 ->getInstanceType()->is<ProtocolType>(),
               "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
                 ->getInstanceType()->castTo<ProtocolType>()->getDecl()
                 ->isSpecificProtocol(KnownProtocolKind::DynamicLookup),
               "operand must have metatype of DynamicLookup type");
@@ -911,7 +911,7 @@ public:
   }
 
   static bool isClassOrClassMetatype(Type t) {
-    if (auto *meta = t->getAs<MetaTypeType>()) {
+    if (auto *meta = t->getAs<MetatypeType>()) {
       return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
     } else {
       return bool(t->getClassOrBoundGenericClass());
@@ -1212,11 +1212,11 @@ public:
     require(UI->getType() != UI->getOperand().getType(),
             "can't upcast to same type");
     
-    if (UI->getType().is<MetaTypeType>()) {
-      CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());
-      require(UI->getOperand().getType().is<MetaTypeType>(),
+    if (UI->getType().is<MetatypeType>()) {
+      CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
+      require(UI->getOperand().getType().is<MetatypeType>(),
               "upcast operand must be a class or class metatype instance");
-      CanType opInstTy(UI->getOperand().getType().castTo<MetaTypeType>()
+      CanType opInstTy(UI->getOperand().getType().castTo<MetatypeType>()
                          ->getInstanceType());
       require(opInstTy->getClassOrBoundGenericClass(),
               "upcast operand must be a class or class metatype instance");
@@ -1542,12 +1542,12 @@ public:
       require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
               "operand must have Builtin.ObjCPointer type");
     } else {
-      require(operandType.getSwiftType()->is<MetaTypeType>(),
+      require(operandType.getSwiftType()->is<MetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
               ->getInstanceType()->is<ProtocolType>(),
               "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
               ->getInstanceType()->castTo<ProtocolType>()->getDecl()
               ->isSpecificProtocol(KnownProtocolKind::DynamicLookup),
               "operand must have metatype of DynamicLookup type");

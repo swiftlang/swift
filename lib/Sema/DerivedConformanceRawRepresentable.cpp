@@ -185,7 +185,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                       enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  auto metaTy = MetaTypeType::get(enumType, C);
+  auto metaTy = MetatypeType::get(enumType, C);
   selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
   selfParam->setImplicit();
   

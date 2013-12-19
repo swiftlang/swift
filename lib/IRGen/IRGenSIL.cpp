@@ -1279,7 +1279,7 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
   
   if (isUsedAsSwiftMetatype) {
     Explosion e(ExplosionKind::Maximal);
-    emitMetaTypeRef(IGF, instanceType, e);
+    emitMetatypeRef(IGF, instanceType, e);
     if (!isUsedAsObjCClass) {
       IGF.setLoweredExplosion(SILValue(i, 0), e);
       return;
@@ -1293,7 +1293,7 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
-  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
+  CanType instanceType(i->getType().castTo<MetatypeType>()->getInstanceType());
   emitMetatypeInst(*this, i, instanceType);
 }
 
@@ -1484,7 +1484,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::Explosion: {
     Explosion e = lv.getExplosion(IGF);
     llvm::Value *swiftMeta = e.claimNext();
-    CanType instanceType(v.getType().castTo<MetaTypeType>()->getInstanceType());
+    CanType instanceType(v.getType().castTo<MetatypeType>()->getInstanceType());
     return emitClassHeapMetadataRefForMetatype(IGF, swiftMeta, instanceType);
   }
   }
@@ -1559,7 +1559,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
-    if (selfValue.getType().is<MetaTypeType>()) {
+    if (selfValue.getType().is<MetatypeType>()) {
       selfArg = getObjCClassForValue(*this, selfValue);
     } else {
       Explosion selfExplosion = getLoweredExplosion(selfValue);

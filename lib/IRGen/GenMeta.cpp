@@ -465,7 +465,7 @@ namespace {
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitMetaTypeType(CanMetaTypeType type) {
+    llvm::Value *visitMetatypeType(CanMetatypeType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
@@ -618,7 +618,7 @@ namespace {
     }
     
     /// All levels of class metatypes support subtyping.
-    bool visitMetaTypeType(CanMetaTypeType type) {
+    bool visitMetatypeType(CanMetatypeType type) {
       return visit(type.getInstanceType());
     }
 
@@ -636,7 +636,7 @@ bool IRGenModule::hasTrivialMetatype(CanType instanceType) {
 }
 
 /// Emit a DeclRefExpr which refers to a metatype.
-void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
+void irgen::emitMetatypeRef(IRGenFunction &IGF, CanType type,
                             Explosion &explosion) {
   // Some metatypes have trivial representation.
   if (IGF.IGM.hasTrivialMetatype(type))

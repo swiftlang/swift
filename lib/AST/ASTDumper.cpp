@@ -1579,7 +1579,7 @@ public:
     OS << ')';
   }
 
-  void visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
+  void visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
     printCommon(T, "type_metatype") << '\n';
     printRec(T->getBase());
     OS << ')';

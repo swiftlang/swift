@@ -104,7 +104,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::Tuple:
   case TypeKind::Enum:
   case TypeKind::Struct:
-  case TypeKind::MetaType:
+  case TypeKind::Metatype:
   case TypeKind::Module:
   case TypeKind::Array:
   case TypeKind::LValue:
@@ -232,8 +232,8 @@ bool TypeBase::isUnspecializedGeneric() {
       return parentTy->isUnspecializedGeneric();
     return false;
 
-  case TypeKind::MetaType:
-    return cast<MetaTypeType>(this)->getInstanceType()
+  case TypeKind::Metatype:
+    return cast<MetatypeType>(this)->getInstanceType()
              ->isUnspecializedGeneric();
 
   case TypeKind::UnownedStorage:
@@ -445,7 +445,7 @@ Type TypeBase::getRValueInstanceType() {
         !tupleTy->getFields()[0].isVararg())
       type = tupleTy->getElementType(0)->getRValueType();
   }
-  if (auto metaTy = type->getAs<MetaTypeType>())
+  if (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
 
   return type;
@@ -724,10 +724,10 @@ CanType TypeBase::getCanonicalType() {
     Result = Composition.getPointer();
     break;
   }
-  case TypeKind::MetaType: {
-    MetaTypeType *MT = cast<MetaTypeType>(this);
+  case TypeKind::Metatype: {
+    MetatypeType *MT = cast<MetatypeType>(this);
     Type InstanceTy = MT->getInstanceType()->getCanonicalType();
-    Result = MetaTypeType::get(InstanceTy, InstanceTy->getASTContext());
+    Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
     break;
   }
   case TypeKind::UnboundGeneric: {
@@ -774,7 +774,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
-  case TypeKind::MetaType:
+  case TypeKind::Metatype:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
@@ -1010,9 +1010,9 @@ bool TypeBase::isSpelledLike(Type other) {
         return false;
     return true;
   }
-  case TypeKind::MetaType: {
-    auto mMe = cast<MetaTypeType>(me);
-    auto mThem = cast<MetaTypeType>(them);
+  case TypeKind::Metatype: {
+    auto mMe = cast<MetatypeType>(me);
+    auto mThem = cast<MetatypeType>(them);
     return mMe->getInstanceType()->isSpelledLike(mThem->getInstanceType());
   }
   case TypeKind::Paren: {
@@ -1506,7 +1506,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
   Type baseTy(getRValueType());
 
   // Look through the metatype; it has no bearing on the result.
-  if (auto metaBase = baseTy->getAs<MetaTypeType>()) {
+  if (auto metaBase = baseTy->getAs<MetatypeType>()) {
     baseTy = metaBase->getInstanceType()->getRValueType();
   }
 

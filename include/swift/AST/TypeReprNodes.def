@@ -30,6 +30,6 @@ TYPEREPR(Optional, TypeRepr)
 TYPEREPR(Tuple, TypeRepr)
 TYPEREPR(Named, TypeRepr)
 TYPEREPR(ProtocolComposition, TypeRepr)
-TYPEREPR(MetaType, TypeRepr)
+TYPEREPR(Metatype, TypeRepr)
 
 #undef TYPEREPR

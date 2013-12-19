@@ -426,7 +426,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   if (isa<TypeDecl>(decl)) {
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized type references");
-    assert(decl->getType()->is<MetaTypeType>() &&
+    assert(decl->getType()->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
@@ -1237,9 +1237,9 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                          SGFContext C) {
-  if (E->getBase()->getType()->is<MetaTypeType>()) {
+  if (E->getBase()->getType()->is<MetatypeType>()) {
     // Emit the metatype for the associated type.
-    assert(E->getType()->is<MetaTypeType>() &&
+    assert(E->getType()->is<MetatypeType>() &&
            "generic_member_ref of metatype should give metatype");
     visit(E->getBase());
     return RValue(SGF, E,
@@ -1261,7 +1261,7 @@ RValue RValueEmitter::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
   SILValue archetype = visit(E->getBase()).getUnmanagedSingleValue(SGF,
                                                                   E->getBase());
   assert((archetype.getType().isAddress() ||
-          archetype.getType().is<MetaTypeType>()) &&
+          archetype.getType().is<MetatypeType>()) &&
          "archetype must be an address or metatype");
   // FIXME: curried archetype
   // FIXME: archetype properties
@@ -1562,7 +1562,7 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   // For class, archetype, and protocol types, look up the dynamic metatype.
   SILType metaTy = getLoweredLoadableType(
-    MetaTypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
+    MetatypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
   if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
     return B.createClassMetatype(loc, metaTy, base);
   } else if (base.getType().getSwiftRValueType()->is<ArchetypeType>()) {
@@ -2995,7 +2995,7 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringDefaultInitFn());
   SILValue strMetaty
     = gen.B.createMetatype(loc, gen.getLoweredLoadableType(
-                   MetaTypeType::get(gen.SGM.Types.getStringType(),
+                   MetatypeType::get(gen.SGM.Types.getStringType(),
                                      gen.getASTContext())->getCanonicalType()));
   SILValue strInit = gen.B.createApply(loc, strInitFn,
                       strInitFn.getType(),

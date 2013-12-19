@@ -469,7 +469,7 @@ namespace {
 
       // Class maps to DynamicLookup.metatype.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
-      return MetaTypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
+      return MetatypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
     }
   };
 }

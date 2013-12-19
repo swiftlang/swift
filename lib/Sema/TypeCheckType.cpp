@@ -640,7 +640,7 @@ namespace {
     Type resolveTupleType(TupleTypeRepr *repr, bool isSILType);
     Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr,
                                         bool isSILType);
-    Type resolveMetaTypeType(MetaTypeTypeRepr *repr, bool isSILType);
+    Type resolveMetatypeType(MetatypeTypeRepr *repr, bool isSILType);
   };
 }
 
@@ -695,8 +695,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, bool isSILType) {
                                     cast<ProtocolCompositionTypeRepr>(repr),
                                           isSILType);
 
-  case TypeReprKind::MetaType:
-    return resolveMetaTypeType(cast<MetaTypeTypeRepr>(repr), isSILType);
+  case TypeReprKind::Metatype:
+    return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), isSILType);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -721,9 +721,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (attrs.has(TAK_thin)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
-        if (auto metatypeRepr = dyn_cast<MetaTypeTypeRepr>(repr)) {
+        if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
           auto instanceTy = resolveType(metatypeRepr->getBase(), isSILType);
-          ty = MetaTypeType::get(instanceTy, /*thin*/ true, Context);
+          ty = MetatypeType::get(instanceTy, /*thin*/ true, Context);
           attrs.clearAttribute(TAK_thin);
         }
       }
@@ -1060,12 +1060,12 @@ Type TypeResolver::resolveProtocolCompositionType(
   return ProtocolCompositionType::get(Context, ProtocolTypes);
 }
 
-Type TypeResolver::resolveMetaTypeType(MetaTypeTypeRepr *repr, bool isSILType) {
+Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr, bool isSILType) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), false);
   if (ty->is<ErrorType>())
     return ty;
-  return MetaTypeType::get(ty, Context);
+  return MetatypeType::get(ty, Context);
 }
 
 Type TypeChecker::transformType(Type type,
@@ -1287,7 +1287,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   if (isClassOrObjCProtocol(*this, T))
     return true;
 
-  if (auto MTT = T->getAs<MetaTypeType>()) {
+  if (auto MTT = T->getAs<MetatypeType>()) {
     if (isClassOrObjCProtocol(*this, MTT->getInstanceType()))
       return true;
   }
@@ -1434,7 +1434,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
         DynamicLookup->getDeclaredType()->getCanonicalType();
     ObjCMappedTypes.insert(DynamicLookupType);
     ObjCMappedTypes.insert(
-        MetaTypeType::get(DynamicLookupType, Context)->getCanonicalType());
+        MetatypeType::get(DynamicLookupType, Context)->getCanonicalType());
   }
 }
 

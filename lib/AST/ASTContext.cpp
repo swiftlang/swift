@@ -110,7 +110,7 @@ struct ASTContext::Implementation {
   /// arenas.
   struct Arena {
     llvm::FoldingSet<TupleType> TupleTypes;
-    llvm::DenseMap<std::pair<Type,char>, MetaTypeType*> MetaTypeTypes;
+    llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
       FunctionTypes;
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
@@ -1198,27 +1198,27 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   llvm_unreachable("bad ownership");
 }
 
-MetaTypeType *MetaTypeType::get(Type T, const ASTContext &C) {
+MetatypeType *MetatypeType::get(Type T, const ASTContext &C) {
   return get(T, /*isThin*/ false, C);
 }
 
-MetaTypeType *MetaTypeType::get(Type T, bool IsThin, const ASTContext &C) {
+MetatypeType *MetatypeType::get(Type T, bool IsThin, const ASTContext &C) {
   bool hasTypeVariable = T->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
-  MetaTypeType *&Entry = C.Impl.getArena(arena).MetaTypeTypes[{T, IsThin}];
+  MetatypeType *&Entry = C.Impl.getArena(arena).MetatypeTypes[{T, IsThin}];
   if (Entry) return Entry;
 
-  return Entry = new (C, arena) MetaTypeType(T, T->isCanonical() ? &C : 0,
+  return Entry = new (C, arena) MetatypeType(T, T->isCanonical() ? &C : 0,
                                              hasTypeVariable,
                                              IsThin);
 }
 
-MetaTypeType::MetaTypeType(Type T, const ASTContext *C, bool HasTypeVariable,
+MetatypeType::MetatypeType(Type T, const ASTContext *C, bool HasTypeVariable,
                            bool IsThin)
-  : TypeBase(TypeKind::MetaType, C, HasTypeVariable),
+  : TypeBase(TypeKind::Metatype, C, HasTypeVariable),
     InstanceType(T) {
-  MetaTypeTypeBits.Thin = (unsigned)IsThin;
+  MetatypeTypeBits.Thin = (unsigned)IsThin;
 }
 
 ModuleType *ModuleType::get(Module *M) {

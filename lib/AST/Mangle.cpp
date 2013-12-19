@@ -572,9 +572,9 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::MetaType:
+  case TypeKind::Metatype:
     Buffer << 'M';
-    return mangleType(cast<MetaTypeType>(type).getInstanceType(),
+    return mangleType(cast<MetatypeType>(type).getInstanceType(),
                       ExplosionKind::Minimal, 0);
 
   case TypeKind::LValue:

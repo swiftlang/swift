@@ -110,7 +110,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
       consumeToken();
       SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
       ty = makeParserResult(ty,
-          new (Context) MetaTypeTypeRepr(ty.get(), metatypeLoc));
+          new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
       continue;
     }
     if (!Tok.isAtStartOfLine() && Tok.is(tok::question_postfix)) {

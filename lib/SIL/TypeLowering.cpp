@@ -135,7 +135,7 @@ namespace {
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
-    IMPL(MetaType, Trivial)
+    IMPL(Metatype, Trivial)
     IMPL(AnyFunction, Reference)
     IMPL(SILFunction, Reference)
     IMPL(Array, AddressOnly) // who knows?

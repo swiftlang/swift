@@ -1342,7 +1342,7 @@ public:
 ///
 ///    typealias foo = int
 ///
-/// TypeAliasDecl's always have 'MetaTypeType' type.
+/// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public TypeDecl {
   /// The type that represents this (sugared) name alias.
@@ -1843,7 +1843,7 @@ public:
 ///    }
 /// \endcode
 ///
-/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Bool" or "Optional" in the above example).
 class EnumDecl : public NominalTypeDecl {
   SourceLoc EnumLoc;
@@ -1915,7 +1915,7 @@ public:
 ///
 ///    struct Complex { var R : Double, I : Double }
 ///
-/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
@@ -1946,7 +1946,7 @@ public:
 ///
 ///    class Complex { var R : Double, I : Double }
 ///
-/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;

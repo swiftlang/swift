@@ -241,7 +241,7 @@ void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ">";
 }
 
-void MetaTypeTypeRepr::printImpl(ASTPrinter &Printer,
+void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Base->print(Printer, Opts);
   Printer << ".metatype";

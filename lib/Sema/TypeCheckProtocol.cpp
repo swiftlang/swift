@@ -698,7 +698,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
                        ValueDecl *requirement) {
-  auto metaType = MetaTypeType::get(Adoptee, TC.Context);
+  auto metaType = MetatypeType::get(Adoptee, TC.Context);
 
   // Gather the witnesses.
   SmallVector<ValueDecl *, 4> witnesses;
@@ -998,7 +998,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
-  auto metaType = MetaTypeType::get(Adoptee, TC.Context);
+  auto metaType = MetatypeType::get(Adoptee, TC.Context);
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(metaType, assocType->getName(), DC);

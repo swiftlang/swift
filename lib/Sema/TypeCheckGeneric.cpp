@@ -650,7 +650,7 @@ static Type computeSelfType(AbstractFunctionDecl *func,
   // For a static function or constructor, 'self' has type T.metatype.
   if ((!isInitializing && isa<ConstructorDecl>(func)) ||
       (isa<FuncDecl>(func) && cast<FuncDecl>(func)->isStatic()))
-    return MetaTypeType::get(selfTy, func->getASTContext());
+    return MetatypeType::get(selfTy, func->getASTContext());
 
   // For a type with reference semantics, 'self' is passed by value.
   if (containerTy->hasReferenceSemantics())

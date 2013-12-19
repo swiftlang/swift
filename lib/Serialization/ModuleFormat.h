@@ -354,7 +354,7 @@ namespace decls_block {
     BCFixed<1>  // block-compatible?
   >;
 
-  using MetaTypeTypeLayout = BCRecordLayout<
+  using MetatypeTypeLayout = BCRecordLayout<
     METATYPE_TYPE,
     TypeIDField  // instance type
   >;

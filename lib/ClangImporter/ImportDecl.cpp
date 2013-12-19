@@ -273,7 +273,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
-  auto metaTy = MetaTypeType::get(optionSetType, C);
+  auto metaTy = MetatypeType::get(optionSetType, C);
   selfDecl->setType(metaTy);
 
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
@@ -664,7 +664,7 @@ namespace {
 
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
-      auto selfMetaType = MetaTypeType::get(selfType, context);
+      auto selfMetatype = MetatypeType::get(selfType, context);
       auto selfName = context.SelfIdentifier;
       auto selfDecl = new (context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                             SourceLoc(), selfName, selfType,
@@ -708,7 +708,7 @@ namespace {
 
       // Set the constructor's type.
       auto fnTy = FunctionType::get(paramTy, selfType, context);
-      auto allocFnTy = FunctionType::get(selfMetaType, fnTy, context);
+      auto allocFnTy = FunctionType::get(selfMetatype, fnTy, context);
       auto initFnTy = FunctionType::get(selfType, fnTy, context);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
@@ -828,7 +828,7 @@ namespace {
                                         theEnum);
 
       // Give the enum element the appropriate type.
-      auto argTy = MetaTypeType::get(theEnum->getDeclaredType(), context);
+      auto argTy = MetatypeType::get(theEnum->getDeclaredType(), context);
       element->overwriteType(FunctionType::get(argTy,
                                                theEnum->getDeclaredType(),
                                                context));
@@ -1488,7 +1488,7 @@ namespace {
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
       if (decl->isClassMethod())
-        selfTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
+        selfTy = MetatypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      /*IsLet*/ true,
@@ -1764,7 +1764,7 @@ namespace {
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
-      auto selfMetaTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
+      auto selfMetaTy = MetatypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                          /*IsLet*/ true,
@@ -1891,8 +1891,8 @@ namespace {
         if (tupleTy->getNumElements() == 1)
           inputTy = tupleTy->getElementType(0);
       }
-      if (inputTy->is<MetaTypeType>())
-        interfaceInputTy = MetaTypeType::get(interfaceInputTy,
+      if (inputTy->is<MetatypeType>())
+        interfaceInputTy = MetatypeType::get(interfaceInputTy,
                                              Impl.SwiftContext);
 
       Type interfaceType = GenericFunctionType::get(
@@ -3152,7 +3152,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   if (dc->isTypeContext()) {
     auto selfTy = dc->getDeclaredTypeInContext();
     if (isStatic)
-      selfTy = MetaTypeType::get(selfTy, context);
+      selfTy = MetatypeType::get(selfTy, context);
     Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
     anyP->setType(selfTy);
     getterArgs.push_back(anyP);
@@ -3245,7 +3245,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   case ConstantConvertKind::Construction: {
     auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
-                                              MetaTypeType::get(type, context));
+                                              MetatypeType::get(type, context));
     expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
     break;
    }

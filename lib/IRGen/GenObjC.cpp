@@ -400,7 +400,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     searchValue = emitClassHeapMetadataRef(IGF, searchClass);
   } else {
     ClassDecl *searchClassDecl =
-      searchClass.castTo<MetaTypeType>()->getInstanceType()
+      searchClass.castTo<MetatypeType>()->getInstanceType()
         ->getClassOrBoundGenericClass();
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl);
   }
@@ -523,7 +523,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
   SILParameterInfo inputs[] = {
     SILParameterInfo(CanType(ctx.TheRawPointerType), /* (NSZone*), kindof */
                      ParameterConvention::Direct_Unowned),
-    SILParameterInfo(CanType(MetaTypeType::get(classType, ctx)),
+    SILParameterInfo(CanType(MetatypeType::get(classType, ctx)),
                      ParameterConvention::Direct_Unowned)
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);

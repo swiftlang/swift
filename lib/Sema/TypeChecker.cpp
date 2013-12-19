@@ -231,7 +231,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
   // the method introduces a new overload.
 
   Type superclassTy = CD->getSuperclass();
-  auto superclassMetaTy = MetaTypeType::get(superclassTy, TC.Context);
+  auto superclassMetaTy = MetatypeType::get(superclassTy, TC.Context);
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
   SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;

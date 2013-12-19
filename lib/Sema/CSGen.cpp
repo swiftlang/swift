@@ -391,7 +391,7 @@ namespace {
       // for fresh type variables T0 and T1, which pulls out a static
       // member, i.e., an enum case or a static variable.
       auto &ctx = CS.getASTContext();
-      auto baseMetaTy = MetaTypeType::get(baseTy, ctx);
+      auto baseMetaTy = MetatypeType::get(baseTy, ctx);
       CS.addValueMemberConstraint(baseMetaTy, expr->getName(), memberTy,
                                   memberLocator);
 
@@ -439,7 +439,7 @@ namespace {
         return Type();
       }
       
-      if (MetaTypeType *meta = baseTy->getAs<MetaTypeType>()) {
+      if (MetatypeType *meta = baseTy->getAs<MetatypeType>()) {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
@@ -856,13 +856,13 @@ namespace {
         CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
-        return MetaTypeType::get(tv, CS.getASTContext());
+        return MetatypeType::get(tv, CS.getASTContext());
       }
 
       if (auto baseTyR = expr->getBaseTypeRepr()) {
         auto type = CS.TC.resolveType(baseTyR, /*SIL*/ false, CS.DC);
         if (type)
-          return MetaTypeType::get(type, CS.getASTContext());
+          return MetatypeType::get(type, CS.getASTContext());
 
         return Type();
       }
@@ -920,8 +920,8 @@ namespace {
 
       Type superclassTy = typeContext->getDeclaredTypeInContext()
                             ->getSuperclass(&tc);
-      if (selfDecl->getType()->is<MetaTypeType>())
-        superclassTy = MetaTypeType::get(superclassTy, CS.getASTContext());
+      if (selfDecl->getType()->is<MetatypeType>())
+        superclassTy = MetatypeType::get(superclassTy, CS.getASTContext());
       return superclassTy;
     }
     

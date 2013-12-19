@@ -207,7 +207,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   }
 
   // Non-function members are always access
-  if (baseTy->hasReferenceSemantics() || baseTy->is<MetaTypeType>())
+  if (baseTy->hasReferenceSemantics() || baseTy->is<MetatypeType>())
     return baseTy;
       
   return LValueType::get(baseTy,
@@ -302,7 +302,7 @@ namespace {
                         ->getRValueInstanceType();
 
         Expr * base = new (ctx) MetatypeExpr(nullptr, loc,
-                                             MetaTypeType::get(baseTy, ctx));
+                                             MetatypeType::get(baseTy, ctx));
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
@@ -338,7 +338,7 @@ namespace {
       // that type or its metatype.
       Type baseTy = base->getType()->getRValueType();
       bool baseIsInstance = true;
-      if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
+      if (auto baseMeta = baseTy->getAs<MetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
       }
@@ -410,7 +410,7 @@ namespace {
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetaTypeType::get(isArchetypeOrExistentialRef
+                            MetatypeType::get(isArchetypeOrExistentialRef
                                                 ? baseTy
                                                 : containerTy,
                                               context),
@@ -1055,7 +1055,7 @@ namespace {
       // Build a reference to the convertFromStringInterpolation member.
       auto typeRef = new (tc.Context) MetatypeExpr(
                                         nullptr, expr->getStartLoc(),
-                                        MetaTypeType::get(type, tc.Context));
+                                        MetatypeType::get(type, tc.Context));
       Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
                                                        expr->getStartLoc(),
                                                        member,
@@ -1125,7 +1125,7 @@ namespace {
           return nullptr;
 
         // Refer to the metatype of this type.
-        return MetaTypeType::get(type, cs.getASTContext());
+        return MetatypeType::get(type, cs.getASTContext());
       }
 
       Type type = cs.TC.getUnopenedTypeOfReference(decl, Type(),
@@ -1286,7 +1286,7 @@ namespace {
       // type of this expression.
       Type baseTy = simplifyType(expr->getType())->getRValueType();
       auto &tc = cs.getTypeChecker();
-      auto baseMetaTy = MetaTypeType::get(baseTy, tc.Context);
+      auto baseMetaTy = MetatypeType::get(baseTy, tc.Context);
 
       // Find the selected member.
       auto selected = getOverloadChoice(
@@ -1479,7 +1479,7 @@ namespace {
       // FIXME: Cache the name.
       Expr *typeRef = new (tc.Context) MetatypeExpr(nullptr,
                                          expr->getLoc(),
-                                         MetaTypeType::get(arrayTy,
+                                         MetatypeType::get(arrayTy,
                                                            tc.Context));
       auto name = tc.Context.getIdentifier("convertFromArrayLiteral");
       auto arg = expr->getSubExpr();
@@ -1516,7 +1516,7 @@ namespace {
       Expr *typeRef = new (tc.Context) MetatypeExpr(
                                          nullptr,
                                          expr->getLoc(),
-                                         MetaTypeType::get(dictionaryTy,
+                                         MetatypeType::get(dictionaryTy,
                                                            tc.Context));
       auto name = tc.Context.getIdentifier("convertFromDictionaryLiteral");
       auto arg = expr->getSubExpr();
@@ -1693,7 +1693,7 @@ namespace {
                                SourceLoc(),
                                /*implicit*/ true);
         Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
-                               MetaTypeType::get(baseElementType, tc.Context));
+                               MetatypeType::get(baseElementType, tc.Context));
         Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);
         if (tc.typeCheckExpression(applyExpr, dc, Type(), /*discarded*/ false))
           llvm_unreachable("should not fail");
@@ -1711,7 +1711,7 @@ namespace {
         base = tc.coerceToRValue(base);
         if (!base) return nullptr;
         expr->setBase(base);
-        expr->setType(MetaTypeType::get(base->getType(), tc.Context));
+        expr->setType(MetatypeType::get(base->getType(), tc.Context));
       }
 
       return expr;
@@ -2573,7 +2573,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   Expr *typeBase = new (tc.Context) MetatypeExpr(
                                       nullptr,
                                       expr->getStartLoc(),
-                                      MetaTypeType::get(toType,tc.Context));
+                                      MetatypeType::get(toType,tc.Context));
   Expr *declRef = buildMemberRef(typeBase,
                                  selected.openedFullType,
                                  expr->getStartLoc(),
@@ -2919,8 +2919,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (fromType->is<MetaTypeType>()) {
-    if (auto toMeta = toType->getAs<MetaTypeType>()) {
+  if (fromType->is<MetatypeType>()) {
+    if (auto toMeta = toType->getAs<MetatypeType>()) {
       return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
     }
   }
@@ -3007,7 +3007,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
     // Call the builtin conversion operation.
     Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                               MetaTypeType::get(type,
+                                               MetatypeType::get(type,
                                                                  tc.Context));
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, builtinConformance,
@@ -3050,7 +3050,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Convert the resulting expression to the final literal type.
   Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                             MetaTypeType::get(type,
+                                             MetatypeType::get(type,
                                                                tc.Context));
   literal = tc.callWitness(base, dc,
                            protocol, conformance, literalFuncName,
@@ -3106,7 +3106,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We have a type constructor.
-  auto metaTy = fn->getType()->castTo<MetaTypeType>();
+  auto metaTy = fn->getType()->castTo<MetatypeType>();
   auto ty = metaTy->getInstanceType();
 
   // If we're "constructing" a tuple type, it's simply a conversion.
@@ -3285,7 +3285,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Find the witness we need to use.
   auto type = base->getType();
-  if (auto metaType = type->getAs<MetaTypeType>())
+  if (auto metaType = type->getAs<MetatypeType>())
     type = metaType->getInstanceType();
   
   auto witness = findNamedWitness(*this, dc, type->getRValueType(), protocol,
