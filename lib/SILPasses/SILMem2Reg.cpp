@@ -429,21 +429,15 @@ StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
   llvm_unreachable("Could not find a definition");
 }
 
-void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
-                                              SILBasicBlock *Dest,
-                                              SILBasicBlock *Pred) {
-  TermInst *TI = Pred->getTerminator();
-  DEBUG(llvm::errs() << "*** Fixing the terminator " << TI << ".\n");
 
-  SILValue Def = getDefinitionForValue(PhiBlocks, Pred);
-  if (!Def.isValid())
-    Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
+/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// block \p Dest. Return a new instruction and do not erase the old
+/// instruction.
+static TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
+                                     TermInst *Branch) {
+  SILBuilder Builder(Branch);
 
-  DEBUG(llvm::errs() << "*** Found the definition: " << *Def);
-
-  SILBuilder Builder(TI);
-
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(TI)) {
+  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
     DEBUG(llvm::errs() << "*** Fixing CondBranchInst.\n");
 
     SmallVector<SILValue, 8> TrueArgs;
@@ -456,18 +450,16 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
       FalseArgs.push_back(A);
 
     if (Dest == CBI->getTrueBB())
-      TrueArgs.push_back(Def);
+      TrueArgs.push_back(Val);
     else
-      FalseArgs.push_back(Def);
+      FalseArgs.push_back(Val);
 
-    Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                             CBI->getTrueBB(), TrueArgs, CBI->getFalseBB(),
-                             FalseArgs);
-    TI->eraseFromParent();
-    return;
+    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
+                                    CBI->getTrueBB(), TrueArgs,
+                                    CBI->getFalseBB(), FalseArgs);
   }
 
-  if (BranchInst *BI = dyn_cast<BranchInst>(TI)) {
+  if (BranchInst *BI = dyn_cast<BranchInst>(Branch)) {
     DEBUG(llvm::errs() << "*** Fixing BranchInst.\n");
 
     SmallVector<SILValue, 8> Args;
@@ -475,13 +467,27 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
     for (auto A : BI->getArgs())
       Args.push_back(A);
 
-    Args.push_back(Def);
-    Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
-    TI->eraseFromParent();
-    return;
+    Args.push_back(Val);
+    return Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
   }
 
   llvm_unreachable("unsupported terminator");
+}
+
+void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
+                                              SILBasicBlock *Dest,
+                                              SILBasicBlock *Pred) {
+  TermInst *TI = Pred->getTerminator();
+  DEBUG(llvm::errs() << "*** Fixing the terminator " << TI << ".\n");
+
+  SILValue Def = getDefinitionForValue(PhiBlocks, Pred);
+  if (!Def.isValid())
+    Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
+
+  DEBUG(llvm::errs() << "*** Found the definition: " << *Def);
+
+  addArgumentToBranch(Def, Dest, TI);
+  TI->eraseFromParent();
 }
 
 void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
