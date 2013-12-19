@@ -539,6 +539,11 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   Functions[LinkageName] = llvm::WeakVH(SP);
 }
 
+void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {
+  Functions.erase(Fn->getName());
+}
+
+
 static bool isNonAscii(StringRef str) {
   for (unsigned char c : str) {
     if (c >= 0x80)
@@ -601,6 +606,8 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
       break;
 
     auto SP = llvm::DISubprogram(cast<llvm::MDNode>(F->second));
+    assert(SP.Verify());
+
     // RAUW the context of the function with the namespace.
     auto Scope = SP.getContext().resolve(DIRefMap);
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())

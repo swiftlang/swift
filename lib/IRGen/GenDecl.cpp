@@ -385,6 +385,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     // We don't need global init to call main().
   } else if (isTrivialGlobalInit(topLevelCodeFn)) {
     // Not all source files need a global initialization function.
+    if (DebugInfo) {
+      DebugInfo->eraseFunction(initFn);
+      DebugInfo->eraseFunction(topLevelCodeFn);
+    }
     initFn->eraseFromParent();
     topLevelCodeFn->eraseFromParent();
   } else {
