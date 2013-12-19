@@ -151,50 +151,60 @@ public:
   typedef NodeVector::const_iterator const_iterator;
   typedef NodeVector::size_type size_type;
 
-  size_type size() const { return Children.size(); }
+  bool hasChildren() const { return !Children.empty(); }
+  size_t getNumChildren() const { return Children.size(); }
   iterator begin() { return Children.begin(); }
   iterator end() { return Children.end(); }
   const_iterator begin() const { return Children.begin(); }
   const_iterator end() const { return Children.end(); }
-  
-  NodePointer front() const { return Children.front(); }
-  NodePointer back() const { return Children.back(); }
-  
-  NodePointer child_at(size_type idx) const { return Children[idx]; }
+
+  NodePointer getFirstChild() const { return Children.front(); }
+  NodePointer getChild(size_t index) const { return Children[index]; }
 
   Node *getParent() const { return Parent; }
   
+  Node *getPreviousNode() const { return Predecessor; }
   NodePointer getNextNode() const { return Successor; }
-  NodePointer getPreviousNode() const { return NodePointer(Predecessor); }
-  
-  NodePointer push_back_child(NodePointer child);
-  
-  void setParent(Node *parent) {
-    Node *ptr = this;
-    while (ptr) {
-      ptr->setParentImpl(parent);
-      ptr = ptr->getNextNode().getPtr();
+  void setNextNode(NodePointer next) {
+    assert(next->isUnlinked());
+    assert(getNextNode() == nullptr && "this node already has a next node");
+
+    if (Parent) {
+      next->Parent = Parent;
+      Parent->Children.push_back(next);
     }
+    setSuccessorImpl(std::move(next));
   }
 
-  void setNextNode(NodePointer successor) {
-    if (getParent())
-      insertSiblingImpl(successor);
-    else
-      setSuccessorImpl(successor);
+  /// Add a new node as a child of this one.
+  ///
+  /// \param child - should have no parent or siblings
+  /// \returns child
+  NodePointer addChild(NodePointer child) {
+    assert(child->isUnlinked());
+    if (!Children.empty())
+      Children.back()->setSuccessorImpl(child);
+    Children.push_back(child);
+    child->Parent = this;
+    return child;
+  }
+
+  /// A convenience method for adding two children at once.
+  void addChildren(NodePointer child1, NodePointer child2) {
+    addChild(child1);
+    addChild(child2);
   }
   
 private:
-  void setParentImpl(Node *parent) {
-    Parent = parent;    
+  bool isUnlinked() const {
+    return (getParent() == nullptr &&
+            getNextNode() == nullptr &&
+            getPreviousNode() == nullptr);
   }
 
   void setSuccessorImpl(NodePointer successor) {
     Successor = std::move(successor);
     Successor->Predecessor = this;
-  }
-  void push_back_childImpl(NodePointer child) {
-    Children.push_back(std::move(child));
   }
   void insertSiblingImpl(NodePointer child);
 };
