@@ -167,7 +167,7 @@ public:
   /// The callback is consulted before reporting the diagnostics in case
   /// typechecking fails.
   ///
-  /// \returns false if diagnostic reporting should be suppressed.
+  /// \returns true if diagnostic reporting should be suppressed.
   virtual bool suppressDiagnostics() const;
 };
 
