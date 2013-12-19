@@ -1564,6 +1564,9 @@ ERROR(variable_inout_before_initialized,sil_analysis,none,
 ERROR(variable_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",
       (StringRef))
+ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
+      "address of variable '%0' taken before it is initialized",
+      (StringRef))
 ERROR(ivar_in_base_object_use_before_initialized,sil_analysis,none,
       "use of property '%0' in base object before super.init"
       " initializes it",

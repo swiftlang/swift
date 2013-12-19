@@ -564,6 +564,8 @@ void LifetimeChecker::doIt() {
         // This is a use of an uninitialized value.  Emit a diagnostic.
         if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
+        else if (isa<AddressToPointerInst>(Inst))
+          DiagMessage = diag::variable_addrtaken_before_initialized;
         else
           DiagMessage = diag::variable_escape_before_initialized;
 
