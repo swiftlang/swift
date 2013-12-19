@@ -418,8 +418,8 @@ class MandatoryInlinedLocation : public SILLocation {
 public:
   MandatoryInlinedLocation(Expr *CallSite) :
     SILLocation(CallSite, MandatoryInlinedKind) {}
-  MandatoryInlinedLocation(Stmt *S) : SILLocation(S, InlinedKind) {}
-  MandatoryInlinedLocation(Pattern *P) : SILLocation(P, InlinedKind) {}
+  MandatoryInlinedLocation(Stmt *S) : SILLocation(S, MandatoryInlinedKind) {}
+  MandatoryInlinedLocation(Pattern *P) : SILLocation(P, MandatoryInlinedKind) {}
   MandatoryInlinedLocation(Decl *D) : SILLocation(D, MandatoryInlinedKind) {}
 
   /// Constructs an inlined location when the call site is represented by a
