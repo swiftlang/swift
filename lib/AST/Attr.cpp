@@ -28,7 +28,7 @@ const DeclAttributes Decl::EmptyAttrs;
 DeclAttributes &Decl::getMutableAttrs() {
   // If we don't have mutable attribute storage yet, allocate some.
   if (&getAttrs() == &EmptyAttrs)
-    AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(1),
+    AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(),
                       AttrsAndIsObjC.getInt()};
   return *const_cast<DeclAttributes*>(&getAttrs());
 }

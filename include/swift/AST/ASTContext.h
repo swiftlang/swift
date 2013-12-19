@@ -233,14 +233,20 @@ public:
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
+  template <typename T>
+  T *Allocate(AllocationArena arena = AllocationArena::Permanent) const {
+    T *res = (T*)Allocate(sizeof(T), __alignof__(T), arena);
+    new (res) T();
+    return res;
+  }
 
   template <typename T>
-  T *Allocate(unsigned numElts,
+  MutableArrayRef<T> Allocate(unsigned numElts,
               AllocationArena arena = AllocationArena::Permanent) const {
     T *res = (T*)Allocate(sizeof(T)*numElts, __alignof__(T), arena);
     for (unsigned i = 0; i != numElts; ++i)
       new (res+i) T();
-    return res;
+    return {res, numElts};
   }
 
   /// Allocate a copy of the specified object.

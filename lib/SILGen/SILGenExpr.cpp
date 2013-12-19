@@ -2315,8 +2315,7 @@ SILGenFunction::buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params) {
   ASTContext &C = F.getASTContext();
   
   size_t paramCount = params.size();
-  Substitution *resultBuf = C.Allocate<Substitution>(paramCount);
-  MutableArrayRef<Substitution> results{resultBuf, paramCount};
+  MutableArrayRef<Substitution> results = C.Allocate<Substitution>(paramCount);
   
   for (size_t i = 0; i < paramCount; ++i) {
     // FIXME: better way to do this?

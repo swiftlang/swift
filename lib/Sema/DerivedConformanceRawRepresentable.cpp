@@ -28,15 +28,14 @@ using namespace DerivedConformance;
 
 namespace {
   static void _insertDecl(NominalTypeDecl *scope, Decl *member) {
-    auto oldSize = scope->getMembers().size();
-    Decl **newMembers
-      = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
-    
-    memcpy(newMembers, scope->getMembers().begin(),
-           sizeof(Decl*) * oldSize);
+    auto oldMembers = scope->getMembers();
+    auto oldSize = oldMembers.size();
+    auto newMembers = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
+
+    std::move(oldMembers.begin(), oldMembers.end(), newMembers.begin());
     newMembers[oldSize] = member;
     
-    scope->setMembers({newMembers, oldSize + 1}, scope->getBraces());
+    scope->setMembers(newMembers, scope->getBraces());
   }
   
   template<typename DECL>

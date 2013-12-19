@@ -809,8 +809,8 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
     return MutableArrayRef<Decl *>();
 
   ASTContext &ctx = getContext();
-  MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(rawMemberIDs.size()),
-                                  rawMemberIDs.size());
+  MutableArrayRef<Decl *> members = ctx.Allocate<Decl *>(rawMemberIDs.size());
+
   auto nextMember = members.begin();
   for (DeclID rawID : rawMemberIDs) {
     *nextMember = getDecl(rawID);

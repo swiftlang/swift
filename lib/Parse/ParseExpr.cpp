@@ -46,9 +46,8 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
 
   Identifier *names = nullptr;
   if (namesIn) {
-    names = context.Allocate<Identifier>(elements.size());
+    names = context.Allocate<Identifier>(elements.size()).data();
     std::copy(namesIn, namesIn + elements.size() - 1, names);
-    new (names + elements.size() - 1) Identifier();
   }
 
   // Form a full tuple expression.
