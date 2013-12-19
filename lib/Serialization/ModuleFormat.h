@@ -492,8 +492,8 @@ namespace decls_block {
     BCVBR<4>,    // depth
     BCVBR<4>,    // index
     TypeIDField, // superclass type
-    TypeIDField  // archetype type
-                 // Trailed by the conformance info (if any).
+    TypeIDField, // archetype type
+    BCArray<DeclIDField> // protocols
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
@@ -503,8 +503,8 @@ namespace decls_block {
     TypeIDField,       // underlying type
     TypeIDField,       // archetype type
     TypeIDField,       // default definition
-    BCFixed<1>         // implicit flag
-                       // Trailed by the conformance info (if any).
+    BCFixed<1>,        // implicit flag
+    BCArray<DeclIDField> // protocols
   >;
 
   template <unsigned Code>

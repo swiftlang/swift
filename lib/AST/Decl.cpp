@@ -500,7 +500,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return getInterfaceType()->castTo<MetatypeType>()->getInstanceType();
 }
 
-bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
+bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   // Enums with raw types can derive their RawRepresentable conformance.
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
     auto rawRepresentable
@@ -508,10 +508,6 @@ bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     return enumDecl->hasRawType() && protocol == rawRepresentable;
   }
   return false;
-}
-
-void TypeDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
-  Conformances = c;
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,

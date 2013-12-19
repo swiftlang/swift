@@ -421,19 +421,12 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
       cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
   }
 
-  // For protocols, generic parameters, and associated types, fill in null
-  // conformances.
-  if (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
-     // Set null conformances.
-     unsigned conformancesSize
-         = sizeof(ProtocolConformance *) * allProtocols.size();
-     ProtocolConformance **conformances
-         = (ProtocolConformance **)Context.Allocate(
-             conformancesSize,
-             alignof(ProtocolConformance *));
-     memset(conformances, 0, conformancesSize);
-     cast<TypeDecl>(decl)->setConformances(
-       llvm::makeArrayRef(conformances, allProtocols.size()));
+  // For protocol decls, fill in null conformances.
+  // FIXME: This shouldn't really be necessary, but for now the conformances
+  // array is supposed to have a 1-to-1 mapping with the protocols array.
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    auto nulls = Context.Allocate<ProtocolConformance *>(allProtocols.size());
+    proto->setConformances(nulls);
   }
 }
 

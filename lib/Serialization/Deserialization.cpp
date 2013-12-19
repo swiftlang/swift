@@ -1226,6 +1226,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     unsigned index;
     TypeID superclassID;
     TypeID archetypeID;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
                                                         contextID,
@@ -1233,7 +1234,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                         depth,
                                                         index,
                                                         superclassID,
-                                                        archetypeID);
+                                                        archetypeID,
+                                                        rawProtocolIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -1253,12 +1255,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     genericParam->setSuperclass(getType(superclassID));
     genericParam->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
 
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance
-           = maybeReadConformance(genericParam->getDeclaredType(),
-                                  DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, genericParam, conformances);
+    auto protos = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protos, rawProtocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    genericParam->setProtocols(protos);
+
     genericParam->setCheckedInheritanceClause();
     break;
   }
@@ -1270,13 +1272,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     TypeID archetypeID;
     TypeID defaultDefinitionID;
     bool isImplicit;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       superclassID,
                                                       archetypeID,
                                                       defaultDefinitionID,
-                                                      isImplicit);
+                                                      isImplicit,
+                                                      rawProtocolIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -1296,11 +1300,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       assocType->setImplicit();
 
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance
-           = maybeReadConformance(assocType->getDeclaredType(), DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, assocType, conformances);
+    auto protos = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protos, rawProtocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    assocType->setProtocols(protos);
+
     assocType->setCheckedInheritanceClause();
     break;
   }
@@ -1675,11 +1680,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     proto->computeType();
 
     // Deserialize the list of protocols.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    for (auto protoID : protocolIDs) {
-      protocols.push_back(cast<ProtocolDecl>(getDecl(protoID)));
-    }
-    proto->setProtocols(ctx.AllocateCopy(protocols));
+    auto inherited = ctx.Allocate<ProtocolDecl *>(protocolIDs.size());
+    for_each(inherited, protocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    proto->setProtocols(inherited);
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCheckedInheritanceClause();

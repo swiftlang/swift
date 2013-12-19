@@ -1264,10 +1264,6 @@ class TypeDecl : public ValueDecl {
 
   /// \brief The set of protocols to which this type conforms.
   ArrayRef<ProtocolDecl *> Protocols;
-  
-  /// \brief The set of protocol conformance mappings. The element order
-  /// corresponds to the order of Protocols.
-  ArrayRef<ProtocolConformance *> Conformances;
 
 protected:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc,
@@ -1314,22 +1310,6 @@ public:
     TypeDeclBits.ProtocolsSet = true;
     Protocols = protocols;
   }
-
-  /// \brief True if the type can implicitly derive a conformance for the given
-  /// protocol.
-  ///
-  /// If true, explicit conformance checking will synthesize implicit
-  /// declarations for requirements of the protocol that are not satisfied by
-  /// the type's explicit members.
-  bool derivesProtocolConformance(ProtocolDecl *protocol) const;
-
-  /// \brief Retrieve the set of protocol conformance mappings for this type.
-  ///
-  /// Calculated during type-checking.
-  ArrayRef<ProtocolConformance *> getConformances() const {
-    return Conformances;
-  }
-  void setConformances(ArrayRef<ProtocolConformance *> c);
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
@@ -1676,6 +1656,11 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
 
+  /// \brief The set of protocol conformance mappings. The element order
+  /// corresponds to the order of Protocols returned by getProtocols().
+  // FIXME: We don't really need this correspondence any more.
+  ArrayRef<ProtocolConformance *> Conformances;
+
   /// \brief The generic signature of this type.
   ///
   /// This is the semantic representation of a generic parameters and the
@@ -1798,6 +1783,24 @@ public:
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as DynamicLookup (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+
+  /// \brief True if the type can implicitly derive a conformance for the given
+  /// protocol.
+  ///
+  /// If true, explicit conformance checking will synthesize implicit
+  /// declarations for requirements of the protocol that are not satisfied by
+  /// the type's explicit members.
+  bool derivesProtocolConformance(ProtocolDecl *protocol) const;
+
+  /// \brief Retrieve the set of protocol conformance mappings for this type.
+  ///
+  /// Calculated during type-checking.
+  ArrayRef<ProtocolConformance *> getConformances() const {
+    return Conformances;
+  }
+  void setConformances(ArrayRef<ProtocolConformance *> c) {
+    Conformances = c;
+  }
 
   using TypeDecl::getDeclaredInterfaceType;
   

@@ -1106,6 +1106,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
+    SmallVector<DeclID, 4> protocols;
+    for (auto proto : genericParam->getProtocols())
+      protocols.push_back(addDeclRef(proto));
+
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
@@ -1114,11 +1118,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 genericParam->getDepth(),
                                 genericParam->getIndex(),
                                 addTypeRef(genericParam->getSuperclass()),
-                                addTypeRef(genericParam->getArchetype()));
-
-    writeConformances(genericParam->getProtocols(),
-                      genericParam->getConformances(),
-                      genericParam, DeclTypeAbbrCodes);
+                                addTypeRef(genericParam->getArchetype()),
+                                protocols);
     break;
   }
 
@@ -1128,6 +1129,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
+    SmallVector<DeclID, 4> protocols;
+    for (auto proto : assocType->getProtocols())
+      protocols.push_back(addDeclRef(proto));
+
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
     AssociatedTypeDeclLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
@@ -1136,11 +1141,8 @@ void Serializer::writeDecl(const Decl *D) {
       addTypeRef(assocType->getSuperclass()),
       addTypeRef(assocType->getArchetype()),
       addTypeRef(assocType->getDefaultDefinitionType()),
-      assocType->isImplicit());
-
-    writeConformances(assocType->getProtocols(),
-                      assocType->getConformances(),
-                      assocType, DeclTypeAbbrCodes);
+      assocType->isImplicit(),
+      protocols);
     break;
   }
 
