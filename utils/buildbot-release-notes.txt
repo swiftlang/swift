@@ -6,6 +6,8 @@
 * The setters of properties on value types (structs/enums) are now @mutating by
   default.  To mark a setter non-mutating, use the @!mutating attribute.
 
+* Compiler inserts calls to super.init() into the class initializers that do
+  not call any initializers explicitly.
 
 2013-12-18
 ----------
