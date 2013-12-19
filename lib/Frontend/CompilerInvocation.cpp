@@ -329,7 +329,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
-  Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
+  if (!FrontendOpts.InputFilenames.empty())
+    Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
   Opts.OutputFilename = FrontendOpts.OutputFilename;
 
   if (const Arg *A = Args.getLastArg(OPT_target)) {
