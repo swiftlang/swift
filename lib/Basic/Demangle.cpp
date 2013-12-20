@@ -17,6 +17,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 #include <tuple>
@@ -31,7 +32,6 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(Addressor)
   CASE(Allocator)
   CASE(ArchetypeAndProtocol)
-  CASE(ArchetypeList)
   CASE(ArchetypeRef)
   CASE(ArgumentTuple)
   CASE(ArrayType)
@@ -56,11 +56,17 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(FieldOffset)
   CASE(Function)
   CASE(FunctionType)
+  CASE(Generics)
   CASE(GenericType)
   CASE(GenericTypeMetadataPattern)
   CASE(Getter)
   CASE(Global)
   CASE(Identifier)
+  CASE(ImplConvention)
+  CASE(ImplFunctionAttribute)
+  CASE(ImplFunctionType)
+  CASE(ImplParameter)
+  CASE(ImplResult)
   CASE(InOut)
   CASE(InfixOperator)
   CASE(Initializer)
@@ -83,6 +89,8 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(ProtocolWitness)
   CASE(ProtocolWitnessTable)
   CASE(QualifiedArchetype)
+  CASE(ReabstractionThunk)
+  CASE(ReabstractionThunkHelper)
   CASE(ReturnType)
   CASE(SelfTypeRef)
   CASE(Setter)
@@ -555,6 +563,14 @@ private:
         appendNode(Node::Kind::BridgeToBlockFunction)->addChild(type);
         return true;
       }
+      if (Mangled.nextIf('R')) {
+        NodePointer thunk = appendNode(Node::Kind::ReabstractionThunkHelper);
+        return demangleReabstractSignature(thunk);
+      }
+      if (Mangled.nextIf('r')) {
+        NodePointer thunk = appendNode(Node::Kind::ReabstractionThunk);
+        return demangleReabstractSignature(thunk);
+      }
       return failure();
     }
     if (Mangled.nextIf('L'))
@@ -909,9 +925,25 @@ private:
     return entity;
   }
 
-  NodePointer demangleArchetypes() {
+  /// A RAII object designed for parsing generic signatures.
+  class GenericContext {
+    Demangler &D;
+  public:
+    GenericContext(Demangler &D) : D(D) {
+      D.ArchetypeCounts.push_back(D.ArchetypeCount);
+    }
+    ~GenericContext() {
+      D.ArchetypeCount = D.ArchetypeCounts.pop_back_val();
+    }
+  };
+
+  /// Demangle a generic clause.
+  ///
+  /// \param C - not really required; just a token to prove that the caller
+  ///   has thought to enter a generic context
+  NodePointer demangleGenerics(GenericContext &C) {
     DemanglerPrinter result_printer;
-    NodePointer archetypes = Node::create(Node::Kind::ArchetypeList);
+    NodePointer archetypes = Node::create(Node::Kind::Generics);
     while (true) {
       if (Mangled.nextIf('_')) {
         if (!Mangled)
@@ -1264,19 +1296,17 @@ private:
       return demangleTuple(IsVariadic::yes);
     }
     if (c == 'U') {
-      ArchetypeCounts.push_back(ArchetypeCount);
-      NodePointer archetypes = demangleArchetypes();
-      if (!archetypes)
+      GenericContext genericContext(*this);
+      NodePointer generics = demangleGenerics(genericContext);
+      if (!generics)
         return nullptr;
       NodePointer base = demangleType();
       if (!base)
         return nullptr;
-      ArchetypeCount = ArchetypeCounts.back();
-      ArchetypeCounts.pop_back();
-      NodePointer generics = Node::create(Node::Kind::GenericType);
-      generics->addChild(archetypes);
-      generics->addChild(base);
-      return generics;
+      NodePointer genericType = Node::create(Node::Kind::GenericType);
+      genericType->addChild(generics);
+      genericType->addChild(base);
+      return genericType;
     }
     if (c == 'X') {
       if (Mangled.nextIf('o')) {
@@ -1295,6 +1325,12 @@ private:
         weak->addChild(type);
         return weak;
       }
+
+      // type ::= 'XF' impl-function-type
+      if (Mangled.nextIf('F')) {
+        return demangleImplFunctionType();
+      }
+
       return nullptr;
     }
     if (isStartOfNominalType(c)) {
@@ -1302,6 +1338,178 @@ private:
       return nominal_type;
     }
     return nullptr;
+  }
+
+  bool demangleReabstractSignature(NodePointer signature) {
+    Optional<GenericContext> genericContext;
+
+    if (Mangled.nextIf('G')) {
+      genericContext.emplace(*this);
+      NodePointer generics = demangleGenerics(genericContext.getValue());
+      if (!generics) return failure();
+      signature->addChild(std::move(generics));
+    }
+
+    NodePointer srcType = demangleType();
+    if (!srcType) return failure();
+    signature->addChild(std::move(srcType));
+
+    NodePointer destType = demangleType();
+    if (!destType) return failure();
+    signature->addChild(std::move(destType));
+
+    return true;
+  }
+
+  // impl-function-type ::= impl-callee-convention impl-function-attribute*
+  //                        generics? '_' impl-parameter* '_' impl-result* '_'
+  // impl-function-attribute ::= 'Cb'            // compatible with C block invocation function
+  // impl-function-attribute ::= 'Cc'            // compatible with C global function
+  // impl-function-attribute ::= 'Cm'            // compatible with Swift method
+  // impl-function-attribute ::= 'CO'            // compatible with ObjC method
+  // impl-function-attribute ::= 'Cw'            // compatible with protocol witness
+  // impl-function-attribute ::= 'N'             // noreturn
+  // impl-function-attribute ::= 'G'             // generic
+  NodePointer demangleImplFunctionType() {
+    NodePointer type = Node::create(Node::Kind::ImplFunctionType);
+
+    if (!demangleImplCalleeConvention(type))
+      return nullptr;
+
+    if (Mangled.nextIf('C')) {
+      if (Mangled.nextIf('b'))
+        addImplFunctionAttribute(type, "@objc_block");
+      else if (Mangled.nextIf('c'))
+        addImplFunctionAttribute(type, "@cc(cdecl)");
+      else if (Mangled.nextIf('m'))
+        addImplFunctionAttribute(type, "@cc(method)");
+      else if (Mangled.nextIf('O'))
+        addImplFunctionAttribute(type, "@cc(objc_method)");
+      else if (Mangled.nextIf('w'))
+        addImplFunctionAttribute(type, "@cc(witness_method)");
+      else
+        return nullptr;
+    }
+
+    if (Mangled.nextIf('N'))
+      addImplFunctionAttribute(type, "@noreturn");
+
+    // Enter a new generic context if this type is generic.
+    Optional<GenericContext> genericContext;
+    if (Mangled.nextIf('G')) {
+      genericContext.emplace(*this);
+      NodePointer generics = demangleGenerics(genericContext.getValue());
+      if (!generics)
+        return nullptr;
+      type->addChild(generics);
+    }
+
+    // Expect the attribute terminator.
+    if (!Mangled.nextIf('_'))
+      return nullptr;
+
+    // Demangle the parameters.
+    if (!demangleImplParameters(type.getPtr()))
+      return nullptr;
+
+    // Demangle the result type.
+    if (!demangleImplResults(type.getPtr()))
+      return nullptr;
+
+    return type;
+  }
+
+  enum class ImplConventionContext { Callee, Parameter, Result };
+
+  // impl-convention ::= 'a'                     // direct, autoreleased
+  // impl-convention ::= 'd'                     // direct, no ownership transfer
+  // impl-convention ::= 'g'                     // direct, guaranteed
+  // impl-convention ::= 'i'                     // indirect, ownership transfer
+  // impl-convention ::= 'l'                     // indirect, inout
+  // impl-convention ::= 'o'                     // direct, ownership transfer
+  Optional<StringRef> demangleImplConvention(ImplConventionContext ctxt) {
+#define CASE(CHAR, FOR_CALLEE, FOR_PARAMETER, FOR_RESULT)            \
+    if (Mangled.nextIf(CHAR)) {                                      \
+      switch (ctxt) {                                                \
+      case ImplConventionContext::Callee: return (FOR_CALLEE);       \
+      case ImplConventionContext::Parameter: return (FOR_PARAMETER); \
+      case ImplConventionContext::Result: return (FOR_RESULT);       \
+      }                                                              \
+      llvm_unreachable("bad context");                               \
+    }
+
+    CASE('a',   Nothing,                Nothing,         "@autoreleased")
+    CASE('d',   "@callee_unowned",      "@unowned",      "@unowned")
+    CASE('g',   "@callee_guaranteed",   "@guaranteed",   Nothing)
+    CASE('i',   Nothing,                "@in",           "@out")
+    CASE('l',   Nothing,                "@inout",        Nothing)
+    CASE('o',   "@callee_owned",        "@owned",        "@owned")
+    return Nothing;
+
+#undef RETURN
+  }
+
+  // impl-callee-convention ::= 't'
+  // impl-callee-convention ::= impl-convention
+  bool demangleImplCalleeConvention(NodePointer type) {
+    StringRef attr;
+    if (Mangled.nextIf('t')) {
+      attr = "@thin";
+    } else if (auto optConv =
+                 demangleImplConvention(ImplConventionContext::Callee)) {
+      attr = optConv.getValue();
+    } else {
+      return failure();
+    }
+    type->addChild(Node::create(Node::Kind::ImplConvention, attr));
+    return true;
+  }
+
+  void addImplFunctionAttribute(NodePointer parent, StringRef attr,
+                         Node::Kind kind = Node::Kind::ImplFunctionAttribute) {
+    parent->addChild(Node::create(kind, attr));
+  }
+
+  // impl-parameter ::= impl-convention type
+  bool demangleImplParameters(Node *parent) {
+    while (!Mangled.nextIf('_')) {
+      auto input = demangleImplParameterOrResult(Node::Kind::ImplParameter);
+      if (!input) return false;
+      parent->addChild(input);
+    }
+    return true;
+  }
+
+  // impl-result ::= impl-convention type
+  bool demangleImplResults(Node *parent) {
+    while (!Mangled.nextIf('_')) {
+      auto res = demangleImplParameterOrResult(Node::Kind::ImplResult);
+      if (!res) return false;
+      parent->addChild(res);
+    }
+    return true;
+  }
+
+  NodePointer demangleImplParameterOrResult(Node::Kind kind) {
+    auto getContext = [](Node::Kind kind) -> ImplConventionContext {
+      if (kind == Node::Kind::ImplParameter)
+        return ImplConventionContext::Parameter;
+      else if (kind == Node::Kind::ImplResult)
+        return ImplConventionContext::Result;
+      else
+        llvm_unreachable("unexpected node kind");
+    };
+
+    auto convention = demangleImplConvention(getContext(kind));
+    if (!convention) return nullptr;
+    auto type = demangleType();
+    if (!type) return nullptr;
+
+    NodePointer node = Node::create(kind);
+    node->addChild(Node::create(Node::Kind::ImplConvention,
+                                convention.getValue()));
+    node->addChild(type);
+    return node;
   }
 
   class MangledNameSource {
@@ -1342,8 +1550,8 @@ private:
     size_t Offset;
   };
 
-  std::vector<NodePointer> Substitutions;
-  std::vector<unsigned> ArchetypeCounts;
+  SmallVector<NodePointer, 10> Substitutions;
+  SmallVector<unsigned, 4> ArchetypeCounts;
   unsigned ArchetypeCount = 0;
   MangledNameSource Mangled;
   NodePointer RootNode;
@@ -1590,6 +1798,39 @@ private:
     }
   }
 
+  void toStringImplFunctionType(Node *fn) {
+    enum State { Attrs, Inputs, Results } curState = Attrs;
+    auto transitionTo = [&](State newState) {
+      assert(newState >= curState);
+      for (; curState != newState; curState = State(curState + 1)) {
+        switch (curState) {
+        case Attrs: Printer << '('; continue;
+        case Inputs: Printer << ") -> ("; continue;
+        case Results: llvm_unreachable("no state after Results");
+        }
+        llvm_unreachable("bad state");
+      }
+    };
+
+    for (auto &child : *fn) {
+      if (child->getKind() == Node::Kind::ImplParameter) {
+        if (curState == Inputs) Printer << ", ";
+        transitionTo(Inputs);
+        toString(child.getPtr());
+      } else if (child->getKind() == Node::Kind::ImplResult) {
+        if (curState == Results) Printer << ", ";
+        transitionTo(Results);
+        toString(child.getPtr());
+      } else {
+        assert(curState == Attrs);
+        toString(child.getPtr());
+        Printer << ' ';
+      }
+    }
+    transitionTo(Results);
+    Printer << ')';
+  }
+
   void toStringContext(Node *context) {
     // TODO: parenthesize local contexts?
     toString(context, /*asContext*/ true);
@@ -1808,6 +2049,23 @@ private:
       Printer << "bridge-to-block function for ";
       toString(pointer->getFirstChild());
       return;
+    case swift::Demangle::Node::Kind::ReabstractionThunk:
+    case swift::Demangle::Node::Kind::ReabstractionThunkHelper: {
+      Printer << "reabstraction thunk ";
+      if (pointer->getKind() == Node::Kind::ReabstractionThunkHelper)
+        Printer << "helper ";
+      auto generics = getFirstChildOfKind(pointer, Node::Kind::Generics);
+      assert(pointer->getNumChildren() == 2 + unsigned(generics != nullptr));
+      if (generics) {
+        toString(generics);
+        Printer << " ";
+      }
+      Printer << "from ";
+      toString(pointer->getChild(pointer->getNumChildren() - 2));
+      Printer << " to ";
+      toString(pointer->getChild(pointer->getNumChildren() - 1));
+      return;
+    }
     case swift::Demangle::Node::Kind::GenericTypeMetadataPattern:
       Printer << "generic type metadata pattern for ";
       toString(pointer->getFirstChild());
@@ -1878,7 +2136,7 @@ private:
         Printer << ">";
       return;
     }
-    case swift::Demangle::Node::Kind::ArchetypeList: {
+    case swift::Demangle::Node::Kind::Generics: {
       if (pointer->getNumChildren() == 0)
         return;
       Printer << "<";
@@ -1946,6 +2204,19 @@ private:
       toString(child1);
       return;
     }
+    case swift::Demangle::Node::Kind::ImplConvention:
+      Printer << pointer->getText();
+      return;
+    case swift::Demangle::Node::Kind::ImplFunctionAttribute:
+      Printer << pointer->getText();
+      return;
+    case swift::Demangle::Node::Kind::ImplParameter:
+    case swift::Demangle::Node::Kind::ImplResult:
+      toStringChildren(pointer, " ");
+      return;
+    case swift::Demangle::Node::Kind::ImplFunctionType:
+      toStringImplFunctionType(pointer);
+      return;
     case swift::Demangle::Node::Kind::Unknown:
       return;
     case swift::Demangle::Node::Kind::ErrorType:
