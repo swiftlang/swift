@@ -1929,11 +1929,9 @@ private:
       toStringEntity(true, false, "");
       return;
     case swift::Demangle::Node::Kind::LocalDeclName:
-      Printer << "(local ";
+      Printer << '(';
       toString(pointer->getChild(1));
-      Printer << " #";
-      toString(pointer->getChild(0));
-      Printer << ')';
+      Printer << " #" << (pointer->getChild(0)->getIndex() + 1) << ')';
       return;
     case swift::Demangle::Node::Kind::Module:
     case swift::Demangle::Node::Kind::Identifier:
