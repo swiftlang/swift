@@ -28,6 +28,20 @@ struct Trio {
   double k;
 };
 
+struct IntPair {
+  int a;
+  int b;
+};
+
+struct NestedInts {
+  struct A {
+    int value;
+  } a;
+  struct B {
+    int value;
+  } b;
+};
+
 typedef long NSInteger;
 
 @interface Gizmo : NSObject
@@ -72,6 +86,8 @@ NSString *NSStringFromRect(struct NSRect r);
 @interface NSStructReturns
 - (struct Rect)newRect;
 - (struct Trio)newTrio;
+- (struct IntPair)newPair;
+- (struct NestedInts)newNestedInts;
 @end
 
 typedef NS_ENUM(unsigned short, NSRuncingOptions) {

@@ -106,7 +106,7 @@ public:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters(ExplosionKind explosionLevel);
-  void emitScalarReturn(Explosion &scalars);
+  void emitScalarReturn(SILType resultTy, Explosion &scalars);
   
   void emitBBForReturn();
   bool emitBranchToReturnBB();

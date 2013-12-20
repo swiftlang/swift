@@ -656,7 +656,9 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     Explosion result(ExplosionKind::Minimal);
     emission.emitToExplosion(result);
     subIGF.emitRelease(context);
-    subIGF.emitScalarReturn(result);
+    auto &callee = emission.getCallee();
+    auto resultType = callee.getOrigFunctionType()->getSILResult();
+    subIGF.emitScalarReturn(resultType, result);
   }
   
   return fwd;

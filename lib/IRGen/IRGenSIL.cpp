@@ -1790,7 +1790,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     retTI.initialize(IGF, result, IGF.IndirectReturn);
     IGF.Builder.CreateRetVoid();
   } else {
-    IGF.emitScalarReturn(result);
+    IGF.emitScalarReturn(resultTy, result);
   }
 }
 

@@ -733,6 +733,7 @@ namespace {
 
   private:
     void expand(SILParameterInfo param);
+    llvm::Type *addIndirectResult();
 
     unsigned getCurParamIndex() {
       return ParamIRTypes.size();
@@ -743,6 +744,31 @@ namespace {
       ParamIRTypes.push_back(storageType->getPointerTo());
     }
   };
+}
+
+/// Given a Swift type, attempt to return an appropriate Clang
+/// CanQualType for the purpose of generating correct code for the
+/// ABI.
+static clang::CanQualType getClangABIType(CanType swiftType) {
+  // FIXME: ProtocolType generates a struct and might need special
+  //        handling here for some platforms.
+  if (auto structType = swiftType->getAs<StructType>())
+    if (auto *clangDecl = structType->getDecl()->getClangDecl()) {
+      auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
+      return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
+    }
+
+  // FIXME: For parameters, we need to be able to generate a Clang
+  // type for all Swift types.
+  return clang::CanQualType();
+}
+
+llvm::Type *SignatureExpansion::addIndirectResult() {
+  auto resultType = FnType->getResult().getSILType();
+  const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
+  addPointerParameter(resultTI.getStorageType());
+  addIndirectReturnAttributes(IGM, Attrs);
+  return IGM.VoidTy;
 }
 
 llvm::Type *SignatureExpansion::expandResult() {
@@ -758,25 +784,35 @@ llvm::Type *SignatureExpansion::expandResult() {
   ExplosionSchema schema = IGM.getSchema(resultType, ExplosionLevel);
   switch (FnType->getAbstractCC()) {
   case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    HasIndirectResult =
-      requiresExternalIndirectResult(IGM, FnType, ExplosionLevel);
-    break;
+  case AbstractCC::ObjCMethod: {
+    if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
+      return addIndirectResult();
+
+    auto clangType = getClangABIType(resultType.getSwiftRValueType());
+
+    // Fall back on native Swift type lowering for things that we
+    // cannot generate a Clang type from.
+    if (!clangType)
+      return schema.getScalarResultType(IGM);
+
+    auto &ABITypes = *IGM.ABITypes;
+    SmallVector<clang::CanQualType,1> args;
+
+    auto extInfo = clang::FunctionType::ExtInfo();
+    auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangType, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+    auto &returnInfo = FI.getReturnInfo();
+    return returnInfo.getCoerceToType();
+  }
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-    HasIndirectResult = schema.requiresIndirectResult(IGM);
-    break;
+  case AbstractCC::WitnessMethod: {
+    if (schema.requiresIndirectResult(IGM))
+      return addIndirectResult();
+    return schema.getScalarResultType(IGM);
   }
-
-  if (HasIndirectResult) {
-    const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
-    addPointerParameter(resultTI.getStorageType());
-    addIndirectReturnAttributes(IGM, Attrs);
-    return IGM.VoidTy;
   }
-
-  return schema.getScalarResultType(IGM);
 }
 
 void SignatureExpansion::expand(SILParameterInfo param) {
@@ -984,18 +1020,39 @@ llvm::Value *Callee::getDataPointer(IRGenFunction &IGF) const {
   return IGF.IGM.RefCountedNull;
 }
 
-static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
-                                 Explosion &out) {
-  if (llvm::StructType *structType
-        = dyn_cast<llvm::StructType>(call->getType())) {
-    for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
-      llvm::Value *scalar = IGF.Builder.CreateExtractValue(call, i);
-      out.add(scalar);
+static void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
+                                  llvm::Value *call, Explosion &out) {
+  assert(!bodyType->isVoidTy() && "Unexpected void result type!");
+
+  auto *returned = call;
+  auto *callType = call->getType();
+
+  // If the type of the result of the call differs from the type used
+  // elsewhere in the caller due to ABI type coercion, we need to
+  // coerce the result back from the ABI type before extracting the
+  // elements.
+  if (bodyType != callType) {
+    assert(!callType->isVoidTy() && "Unexpected void type in call result!");
+
+    // If both are pointers, we can simply insert a bitcast, otherwise
+    // we need to store, bitcast, and load.
+    if (bodyType->isPointerTy() && callType->isPointerTy()) {
+      returned = IGF.Builder.CreateBitCast(call, bodyType);
+    } else {
+      auto address = IGF.createAlloca(callType, Alignment(0),
+                                      "call.coerced");
+      IGF.Builder.CreateStore(call, address.getAddress());
+      auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
+                                                bodyType->getPointerTo());
+      returned = IGF.Builder.CreateLoad(coerced);
     }
-  } else {
-    assert(!call->getType()->isVoidTy());
-    out.add(call);
   }
+
+  if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
+    for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
+      out.add(IGF.Builder.CreateExtractValue(returned, i));
+  else
+    out.add(returned);
 }
 
 static void emitCastBuiltin(IRGenFunction &IGF, CanSILFunctionType substFnType,
@@ -1130,7 +1187,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
 
     if (!TheCall->getType()->isVoidTy())
-      extractScalarResults(IGF, TheCall, *out);
+      extractScalarResults(IGF, TheCall->getType(), TheCall, *out);
 
     return;
   }
@@ -1170,7 +1227,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   IRArgs.push_back(args.claimNext()); \
   args.claimNext();\
   llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs); \
-  extractScalarResults(IGF, TheCall, *out); \
+  extractScalarResults(IGF, TheCall->getType(), TheCall, *out);  \
   return; \
 }
   // FIXME: We could generate the code to dynamically report the overflow if the
@@ -1470,8 +1527,16 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   llvm::Value *result = call.getInstruction();
   if (result->getType()->isVoidTy()) return;
 
+  // Get the natural IR type in the body of the function that makes
+  // the call. This may be different than the IR type returned by the
+  // call itself due to ABI type coercion.
+  auto resultType = getCallee().getOrigFunctionType()->getSILResult();
+  auto &resultTI = IGF.IGM.getTypeInfo(resultType);
+  auto schema = resultTI.getSchema(out.getKind());
+  auto *bodyType = schema.getScalarResultType(IGF.IGM);
+
   // Extract out the scalar results.
-  extractScalarResults(IGF, result, out);
+  extractScalarResults(IGF, bodyType, result, out);
 }
 
 /// Emit the unsubstituted result of this call to the given address.
@@ -1645,7 +1710,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
     // We can emit directly if the explosion levels match.
     if (out.getKind() == getCallee().getExplosionLevel()) {
       emitToUnmappedExplosion(out);
-
     // Otherwise we have to re-explode.
     } else {
       Explosion temp(getCallee().getExplosionLevel());
@@ -1734,21 +1798,6 @@ void CallEmission::setFromCallee() {
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
   }
-}
-
-/// Given a Swift type, attempt to return an appropriate Clang
-/// CanQualType for the purpose of generating correct code for the
-/// ABI.
-static clang::CanQualType getClangABIType(CanType swiftTy) {
-  // FIXME: ProtocolType generates a struct and might need special
-  //        handling here for some platforms.
-  if (auto structTy = swiftTy->getAs<StructType>())
-    if (auto *clangDecl = structTy->getDecl()->getClangDecl()) {
-      auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-      return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
-    }
-
-  return clang::CanQualType();
 }
 
 /// Does an ObjC method or C function returning the given type require an
@@ -1953,21 +2002,45 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
-void IRGenFunction::emitScalarReturn(Explosion &result) {
+void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   if (result.size() == 0) {
     Builder.CreateRetVoid();
-  } else if (result.size() == 1) {
-    Builder.CreateRet(result.claimNext());
-  } else {
-    assert(cast<llvm::StructType>(CurFn->getReturnType())->getNumElements()
-             == result.size());
-    llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
-    for (unsigned i = 0, e = result.size(); i != e; ++i) {
-      llvm::Value *elt = result.claimNext();
-      resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
-    }
-    Builder.CreateRet(resultAgg);
+    return;
   }
+
+  if (result.size() == 1) {
+    Builder.CreateRet(result.claimNext());
+    return;
+  }
+
+  // Multiple return values are returned as a struct.
+  auto &resultTI = IGM.getTypeInfo(resultType);
+  auto schema = resultTI.getSchema(result.getKind());
+  auto *bodyType = cast<llvm::StructType>(schema.getScalarResultType(IGM));
+
+  assert(bodyType->getNumElements() == result.size());
+  llvm::Value *resultAgg = llvm::UndefValue::get(bodyType);
+  for (unsigned i = 0, e = result.size(); i != e; ++i) {
+    llvm::Value *elt = result.claimNext();
+    resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
+  }
+
+  // The typical case - the result IR type used within the function
+  // matches the ABI result type of the function.
+  auto *ABIType = cast<llvm::StructType>(CurFn->getReturnType());
+  if (bodyType == ABIType) {
+    Builder.CreateRet(resultAgg);
+    return;
+  }
+
+  // Otherwise we need to store the return value, bitcast a pointer
+  // to the location we stored to, and load it back with the ABI
+  // return type.
+  auto *storage = new llvm::AllocaInst(bodyType, "return.coerced", AllocaIP);
+  Builder.CreateStore(resultAgg, storage);
+  auto *coerced = Builder.CreateBitCast(storage, ABIType->getPointerTo());
+  auto *returned = Builder.CreateLoad(coerced);
+  Builder.CreateRet(returned);
 }
 
 /// Emit the forwarding stub function for a partial application.

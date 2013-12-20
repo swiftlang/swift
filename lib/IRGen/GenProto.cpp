@@ -2653,15 +2653,18 @@ namespace {
       Explosion implResult(ExplosionLevel);
       emission.emitToExplosion(implResult);
 
+      auto &callee = emission.getCallee();
+      auto resultType = callee.getOrigFunctionType()->getSILResult();
+
       // Fast-path an exact match.
       if (sigResultType == implResultType)
-        return IGF.emitScalarReturn(implResult);
+        return IGF.emitScalarReturn(resultType, implResult);
 
       // Otherwise, re-emit.
       Explosion sigResult(ExplosionLevel);
       reemitAsUnsubstituted(IGF, sigResultType, implResultType,
                             WitnessSubstitutions, implResult, sigResult);
-      IGF.emitScalarReturn(sigResult);
+      IGF.emitScalarReturn(resultType, sigResult);
     }
 
     unsigned getExplosionSizeForUnlowered(CanType type) {
