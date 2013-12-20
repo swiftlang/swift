@@ -72,6 +72,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(Initializer)
   CASE(LazyProtocolWitnessTableAccessor)
   CASE(LazyProtocolWitnessTableTemplate)
+  CASE(LocalDeclName)
   CASE(LocalEntity)
   CASE(Metatype)
   CASE(Metaclass)
@@ -124,8 +125,11 @@ static void printNode(llvm::raw_ostream &out, const Node *node,
     out << "  ";
   }
   out << "kind=" << getNodeKindString(node->getKind());
-  if (!node->getText().empty()) {
+  if (node->hasText()) {
     out << ", text=\"" << node->getText() << '\"';
+  }
+  if (node->hasIndex()) {
+    out << ", index=" << node->getIndex();
   }
   out << '\n';
   for (auto &child : *node) {
@@ -139,6 +143,15 @@ void Node::dump() const {
 
 void Node::print(llvm::raw_ostream &out) const {
   printNode(out, this, 0);
+}
+
+Node::~Node() {
+  switch (NodePayloadKind) {
+  case PayloadKind::None: return;
+  case PayloadKind::Index: return;
+  case PayloadKind::Text: TextPayload.~basic_string(); return;
+  }
+  llvm_unreachable("bad payload kind");
 }
 
 namespace {
@@ -210,7 +223,7 @@ static Node::Kind nominalTypeMarkerToNodeKind(char c) {
   return Node::Kind::Identifier;
 }
 
-static std::string archetypeName(size_t i) {
+static std::string archetypeName(Node::IndexType i) {
   DemanglerPrinter name;
   do {
     name << (char)('A' + (i % 26));
@@ -298,7 +311,7 @@ private:
     return Directness::Unkown;
   }
 
-  bool demangleNatural(size_t &num) {
+  bool demangleNatural(Node::IndexType &num) {
     if (!Mangled)
       return false;
     char c = Mangled.next();
@@ -319,7 +332,7 @@ private:
     }
   }
 
-  bool demangleBuiltinSize(size_t &num) {
+  bool demangleBuiltinSize(Node::IndexType &num) {
     if (!demangleNatural(num))
       return false;
     if (Mangled.nextIf('_'))
@@ -582,7 +595,7 @@ private:
 
   std::string demangleOperator() {
     static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
-    size_t length;
+    Node::IndexType length;
     if (demangleNatural(length)) {
       if (Mangled.hasAtLeast(length)) {
         std::string op_base = Mangled.slice(length);
@@ -606,6 +619,21 @@ private:
   }
 
   NodePointer demangleDeclName() {
+    // decl-name ::= local-decl-name
+    // local-decl-name ::= 'L' index identifier
+    if (Mangled.nextIf('L')) {
+      Node::IndexType discriminator;
+      if (!demangleIndex(discriminator)) return nullptr;
+
+      NodePointer name = demangleIdentifier();
+      if (!name) return nullptr;
+
+      NodePointer localName = Node::create(Node::Kind::LocalDeclName);
+      localName->addChild(Node::create(Node::Kind::Number, discriminator));
+      localName->addChild(std::move(name));
+      return localName;
+    }
+
     // decl-name ::= identifier
     return demangleIdentifier();
   }
@@ -638,7 +666,7 @@ private:
 
     if (kind == Node::Kind::Unknown) kind = Node::Kind::Identifier;
 
-    size_t length;
+    Node::IndexType length;
     if (demangleNatural(length)) {
       if (Mangled.hasAtLeast(length)) {
         auto identifier = Mangled.slice(length);
@@ -649,7 +677,7 @@ private:
     return nullptr;
   }
 
-  bool demangleIndex(size_t &natural) {
+  bool demangleIndex(Node::IndexType &natural) {
     if (Mangled.nextIf('_')) {
       natural = 0;
       return true;
@@ -698,7 +726,7 @@ private:
       return createSwiftType(Node::Kind::Structure, "String");
     if (Mangled.nextIf('u'))
       return createSwiftType(Node::Kind::Structure, "UInt64");
-    size_t index_sub;
+    Node::IndexType index_sub;
     if (!demangleIndex(index_sub))
       return Node::create(Node::Kind::Failure);
     if (index_sub >= Substitutions.size())
@@ -894,11 +922,9 @@ private:
       // entity-name ::= 'A' index
       if (Mangled.nextIf('A')) {
         entityKind = Node::Kind::DefaultArgumentInitializer;
-        size_t index;
+        Node::IndexType index;
         if (!demangleIndex(index)) return nullptr;
-        DemanglerPrinter indexStr;
-        indexStr << index;
-        name = Node::create(Node::Kind::Number, indexStr.str());
+        name = Node::create(Node::Kind::Number, index);
       // entity-name ::= 'i'
       } else if (Mangled.nextIf('i')) {
         entityKind = Node::Kind::Initializer;
@@ -969,7 +995,7 @@ private:
     return archetypes;
   }
 
-  NodePointer demangleArchetypeRef(size_t depth, size_t i) {
+  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
     if (depth == 0 && ArchetypeCount == 0)
       return Node::create(Node::Kind::ArchetypeRef, archetypeName(i));
     size_t length = ArchetypeCounts.size();
@@ -1024,7 +1050,7 @@ private:
         return makeAssociatedType(sub);
     }
     if (Mangled.nextIf('d')) {
-      size_t depth, index;
+      Node::IndexType depth, index;
       if (!demangleIndex(depth))
         return nullptr;
       if (!demangleIndex(index))
@@ -1032,12 +1058,10 @@ private:
       return demangleArchetypeRef(depth + 1, index);
     }
     if (Mangled.nextIf('q')) {
-      size_t index;
+      Node::IndexType index;
       if (!demangleIndex(index))
         return nullptr;
-      DemanglerPrinter printer;
-      printer << index;
-      NodePointer index_node = Node::create(Node::Kind::Number,printer.str());
+      NodePointer index_node = Node::create(Node::Kind::Number, index);
       NodePointer decl_ctx = Node::create(Node::Kind::DeclContext);
       NodePointer ctx = demangleContext();
       if (!ctx)
@@ -1048,7 +1072,7 @@ private:
       qual_atype->addChild(decl_ctx);
       return qual_atype;
     }
-    size_t index;
+    Node::IndexType index;
     if (!demangleIndex(index))
       return nullptr;
     return demangleArchetypeRef(0, index);
@@ -1100,15 +1124,14 @@ private:
       return nullptr;
     char c = Mangled.next();
     if (c == 'A') {
-      size_t size;
+      Node::IndexType size;
       if (demangleNatural(size)) {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
         NodePointer array = Node::create(Node::Kind::ArrayType);
         array->addChild(type);
-        array->addChild(Node::create(
-            Node::Kind::Number, (DemanglerPrinter() << size).str()));
+        array->addChild(Node::create(Node::Kind::Number, size));
         return array;
       }
       return nullptr;
@@ -1118,7 +1141,7 @@ private:
         return nullptr;
       c = Mangled.next();
       if (c == 'f') {
-        size_t size;
+        Node::IndexType size;
         if (demangleBuiltinSize(size)) {
           return Node::create(
               Node::Kind::BuiltinTypeName,
@@ -1126,7 +1149,7 @@ private:
         }
       }
       if (c == 'i') {
-        size_t size;
+        Node::IndexType size;
         if (demangleBuiltinSize(size)) {
           return Node::create(
               Node::Kind::BuiltinTypeName,
@@ -1134,12 +1157,12 @@ private:
         }
       }
       if (c == 'v') {
-        size_t elts;
+        Node::IndexType elts;
         if (demangleNatural(elts)) {
           if (!Mangled.nextIf('B'))
             return nullptr;
           if (Mangled.nextIf('i')) {
-            size_t size;
+            Node::IndexType size;
             if (!demangleBuiltinSize(size))
               return nullptr;
             return Node::create(
@@ -1148,7 +1171,7 @@ private:
                     .str());
           }
           if (Mangled.nextIf('f')) {
-            size_t size;
+            Node::IndexType size;
             if (!demangleBuiltinSize(size))
               return nullptr;
             return Node::create(
@@ -1887,8 +1910,9 @@ private:
       return;
     case swift::Demangle::Node::Kind::DefaultArgumentInitializer: {
       auto index = pointer->getChild(1);
-      std::string name = "(default argument " + index->getText() + ")";
-      toStringEntity(false, false, name);
+      DemanglerPrinter strPrinter;
+      strPrinter << "(default argument " << index->getIndex() << ")";
+      toStringEntity(false, false, strPrinter.str());
       return;
     }
     case swift::Demangle::Node::Kind::DeclContext:
@@ -1903,6 +1927,13 @@ private:
     case swift::Demangle::Node::Kind::Protocol:
     case swift::Demangle::Node::Kind::TypeAlias:
       toStringEntity(true, false, "");
+      return;
+    case swift::Demangle::Node::Kind::LocalDeclName:
+      Printer << "(local ";
+      toString(pointer->getChild(1));
+      Printer << " #";
+      toString(pointer->getChild(0));
+      Printer << ')';
       return;
     case swift::Demangle::Node::Kind::Module:
     case swift::Demangle::Node::Kind::Identifier:
@@ -1992,8 +2023,10 @@ private:
       Printer << "@objc ";
       return;
     case swift::Demangle::Node::Kind::BuiltinTypeName:
-    case swift::Demangle::Node::Kind::Number:
       Printer << pointer->getText();
+      return;
+    case swift::Demangle::Node::Kind::Number:
+      Printer << pointer->getIndex();
       return;
     case swift::Demangle::Node::Kind::ArrayType: {
       Node *type = pointer->getChild(0);
@@ -2149,7 +2182,7 @@ private:
         return;
       Node *number = pointer->getChild(0);
       Node *decl_ctx = pointer->getChild(1);
-      Printer << "(archetype " << number->getText() << " of ";
+      Printer << "(archetype " << number->getIndex() << " of ";
       toString(decl_ctx);
       Printer << ")";
       return;

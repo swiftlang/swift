@@ -387,7 +387,12 @@ static OperatorFixity getDeclFixity(ValueDecl *decl) {
 }
 
 void Mangler::mangleDeclName(ValueDecl *decl) {
-  // TODO: local discriminators
+  // decl-name ::= 'L' index identifier
+  if (decl->getDeclContext()->isLocalContext()) {
+    Buffer << 'L' << Index(decl->getLocalDiscriminator());
+  }
+
+  // decl-name ::= identifier
   mangleIdentifier(decl->getName(), getDeclFixity(decl));
 }
 

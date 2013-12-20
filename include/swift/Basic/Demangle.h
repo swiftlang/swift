@@ -38,8 +38,7 @@ typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
 
 class Node : public llvm::RefCountedBase<Node> {
 public:
-  
-  enum class Kind {
+  enum class Kind : uint16_t {
     Failure = 0,
     Addressor,
     Allocator,
@@ -83,6 +82,7 @@ public:
     Initializer,
     LazyProtocolWitnessTableAccessor,
     LazyProtocolWitnessTableTemplate,
+    LocalDeclName,
     LocalEntity,
     Metatype,
     Metaclass,
@@ -124,22 +124,48 @@ public:
     WitnessTableOffset
   };
 
+  typedef uint64_t IndexType;
+
 private:
   Kind NodeKind;
-  std::string NodeText;
+
+  enum class PayloadKind : uint8_t {
+    None, Text, Index
+  };
+  PayloadKind NodePayloadKind;
+
+  union {
+    std::string TextPayload;
+    IndexType IndexPayload;
+  };
 
   // It might even be worthwhile to use TinyPtrVector here.
   typedef llvm::SmallVector<NodePointer, 2> NodeVector;
   NodeVector Children;
 
-  Node(Kind k) : NodeKind(k) {}
-  Node(Kind k, StringRef t) : NodeKind(k), NodeText(t) {}
-  Node(Kind k, std::string &&t) : NodeKind(k), NodeText(std::move(t)) {}
+  Node(Kind k)
+      : NodeKind(k), NodePayloadKind(PayloadKind::None) {
+  }
+  Node(Kind k, StringRef t)
+      : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
+    new (&TextPayload) std::string(t);
+  }
+  Node(Kind k, std::string &&t)
+      : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
+    new (&TextPayload) std::string(std::move(t));
+  }
+  Node(Kind k, IndexType index)
+      : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
+    IndexPayload = index;
+  }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
 public:  
   static NodePointer create(Kind k) {
     return NodePointer(new Node(k));
+  }
+  static NodePointer create(Kind k, IndexType index) {
+    return NodePointer(new Node(k, index));
   }
   static NodePointer create(Kind k, llvm::StringRef text) {
     return NodePointer(new Node(k, text));
@@ -152,9 +178,21 @@ public:
     return NodePointer(new Node(k, llvm::StringRef(text)));
   }
 
+  ~Node();
+
   Kind getKind() const { return NodeKind; }
 
-  const std::string &getText() const { return NodeText; }
+  bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
+  const std::string &getText() const {
+    assert(hasText());
+    return TextPayload;
+  }
+
+  bool hasIndex() const { return NodePayloadKind == PayloadKind::Index; }
+  uint64_t getIndex() const {
+    assert(hasIndex());
+    return IndexPayload;
+  }
   
   typedef NodeVector::iterator iterator;
   typedef NodeVector::const_iterator const_iterator;

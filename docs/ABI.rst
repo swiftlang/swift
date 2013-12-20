@@ -689,11 +689,16 @@ Globals
   entity-name ::= 'A' index              // default argument generator
   entity-name ::= 'i'                    // non-local variable initializer
   decl-name ::= identifier
+  decl-name ::= local-decl-name
+  local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
   reabstract-signature ::= ('G' generics)? type type
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``
 (``[FIv]``).
+
+An ``entity-name`` starts with ``[AaCcDFgIisv]`` or a ``decl-name``.
+A ``decl-name`` starts with a ``[L]`` or an ``identifier`` (``[0-9oX]``).
 
 A ``context`` starts with either an ``entity`` or a ``module``, which
 might be an ``identifier`` (``[0-9oX]``) or a substitution of a module
