@@ -21,10 +21,10 @@ public:
   /// Indicates whether the diagnostics produced during compilation should be
   /// checked against expectated diagnostics, indicated by markers in the
   /// input source file.
-  bool VerifyDiagnostics;
+  bool VerifyDiagnostics = false;
 
   /// Indicates whether diagnostic passes should be skipped.
-  bool SkipDiagnosticPasses;
+  bool SkipDiagnosticPasses = false;
 };
 
 }
