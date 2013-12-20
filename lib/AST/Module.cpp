@@ -501,91 +501,119 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
                         LazyResolver *resolver) {
   // FIXME: Introduce a cache/lazy lookup structure to make this more efficient?
 
+  using NominalOrConformance =
+    llvm::PointerUnion<NominalTypeDecl *, ProtocolConformance *>;
+
+  if (!nominal->hasType())
+    resolver->resolveDeclSignature(nominal);
+
   // Walk the nominal type, its extensions, superclasses, and so on.
   llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
-  SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>,4> stack;
-  NominalTypeDecl *owningNominal = nullptr;
+  SmallVector<std::pair<NominalOrConformance, Decl *>, 4> stack;
   Decl *declaresConformance = nullptr;
-  ProtocolConformance *nominalConformance = nullptr;
+  ProtocolConformance *foundConformance = nullptr;
 
   // Local function that checks for our protocol in the given array of
   // protocols.
   auto isProtocolInList
-    = [&](NominalTypeDecl *currentNominal,
-          Decl *currentOwner,
+    = [&](Decl *currentOwner,
           ArrayRef<ProtocolDecl *> protocols,
-          ArrayRef<ProtocolConformance *> conformances) -> bool {
+          ArrayRef<ProtocolConformance *> nominalConformances) -> bool {
       for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
         auto testProto = protocols[i];
         if (testProto == protocol) {
-          owningNominal = currentNominal;
           declaresConformance = currentOwner;
-          if (i < conformances.size())
-            nominalConformance = conformances[i];
+          if (i < nominalConformances.size())
+            foundConformance = nominalConformances[i];
           return true;
         }
 
-        if (visitedProtocols.insert(testProto))
-          stack.push_back(
-              std::make_tuple(testProto, currentNominal, currentOwner));
+        if (visitedProtocols.insert(testProto)) {
+          NominalOrConformance next = {};
+          if (i < nominalConformances.size())
+            next = nominalConformances[i];
+          if (next.isNull())
+            next = testProto;
+          stack.push_back({next, currentOwner});
+        }
       }
 
       return false;
     };
 
-  if (!nominal->hasType())
-    resolver->resolveDeclSignature(nominal);
-
   // Walk the stack of types to find a conformance.
-  stack.push_back(std::make_tuple(nominal, nominal, nominal));
+  stack.push_back({nominal, nominal});
   while (!stack.empty()) {
-    NominalTypeDecl *current;
-    NominalTypeDecl *currentNominal;
+    NominalOrConformance current;
     Decl *currentOwner;
-    std::tie(current, currentNominal, currentOwner) = stack.back();
-    stack.pop_back();
+    std::tie(current, currentOwner) = stack.pop_back_val();
+    assert(!current.isNull());
 
-    // Visit the superclass of a class.
-    if (auto classDecl = dyn_cast<ClassDecl>(current)) {
-      if (auto superclassTy = classDecl->getSuperclass()) {
-        auto nominal = superclassTy->getAnyNominal();
-        stack.push_back(std::make_tuple(nominal, nominal, nominal));
+    if (auto currentNominal = current.dyn_cast<NominalTypeDecl *>()) {
+      // Visit the superclass of a class.
+      if (auto classDecl = dyn_cast<ClassDecl>(currentNominal)) {
+        if (auto superclassTy = classDecl->getSuperclass()) {
+          auto super = superclassTy->getAnyNominal();
+          stack.push_back({super, super});
+        }
       }
-    }
 
-    // Visit the protocols this type conforms to directly.
-    if (isProtocolInList(currentNominal, currentOwner,
-                         current->getProtocols(),
-                         current->getConformances()))
-      break;
-
-    // Visit the extensions of this type.
-    for (auto ext : current->getExtensions()) {
-      if (isProtocolInList(currentNominal, ext, ext->getProtocols(),
-                           ext->getConformances()))
+      // Visit the protocols this type conforms to directly.
+      if (isProtocolInList(currentOwner,
+                           currentNominal->getProtocols(),
+                           currentNominal->getConformances()))
         break;
+
+      // Visit the extensions of this type.
+      for (auto ext : currentNominal->getExtensions()) {
+        if (isProtocolInList(ext, ext->getProtocols(), ext->getConformances())) {
+          // Break outer loop as well.
+          stack.clear();
+          break;
+        }
+      }
+    } else {
+      auto currentConformance = current.get<ProtocolConformance *>();
+      for (auto inherited : currentConformance->getInheritedConformances()) {
+        if (inherited.first == protocol) {
+          declaresConformance = currentOwner;
+          foundConformance = inherited.second;
+          // Break outer loop as well.
+          stack.clear();
+          break;
+        }
+
+        if (visitedProtocols.insert(inherited.first))
+          stack.push_back({inherited.second, currentOwner});
+      }
     }
   }
 
   // If we didn't find the protocol, we don't conform. Cache the negative result
   // and return.
-  if (!owningNominal) {
+  if (!declaresConformance)
     return std::make_tuple(nullptr, nullptr, nullptr);
-  }
+
+  NominalTypeDecl *owningNominal;
+  if (auto ext = dyn_cast<ExtensionDecl>(declaresConformance))
+    owningNominal = ext->getExtendedType()->getAnyNominal();
+  else
+    owningNominal = cast<NominalTypeDecl>(declaresConformance);
+  assert(owningNominal);
 
   // If we don't have a nominal conformance, but we do have a resolver, try
   // to resolve the nominal conformance now.
-  if (!nominalConformance && resolver) {
-    nominalConformance = resolver->resolveConformance(
+  if (!foundConformance && resolver) {
+    foundConformance = resolver->resolveConformance(
                            owningNominal,
                            protocol,
                            dyn_cast<ExtensionDecl>(declaresConformance));
   }
 
   // If we have a nominal conformance, we're done.
-  if (nominalConformance) {
+  if (foundConformance) {
     return std::make_tuple(owningNominal, declaresConformance,
-                           nominalConformance);
+                           foundConformance);
   }
 
   return std::make_tuple(nullptr, nullptr, nullptr);
