@@ -635,6 +635,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     execute_process(COMMAND sw_vers -productVersion
                     OUTPUT_VARIABLE SWIFT_DEPLOYMENT_TARGET
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX MATCH "[0-9]+\\.[0-9]" SWIFT_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
   endif()
 
   # Choose a deployment OS if none was set.
