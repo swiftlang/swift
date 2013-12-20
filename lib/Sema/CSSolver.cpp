@@ -824,15 +824,13 @@ static bool tryTypeVariableBindings(
         // FIXME: It's horrible that we have to enumerate different
         // bits on the lvalue type.
         auto subtype = LValueType::get(type,
-                                       LValueType::Qual::DefaultForVar,
-                                       tc.Context);
+                                       LValueType::Qual::DefaultForVar);
         if (exploredTypes.insert(subtype->getCanonicalType()))
           newBindings.push_back({subtype, binding.Kind, Nothing});
 
         subtype = LValueType::get(type,
                                   (LValueType::Qual::DefaultForVar|
-                                   LValueType::Qual::NonSettable),
-                                  tc.Context);
+                                   LValueType::Qual::NonSettable));
         if (exploredTypes.insert(subtype->getCanonicalType()))
           newBindings.push_back({subtype, binding.Kind, Nothing});
         

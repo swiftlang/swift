@@ -227,8 +227,7 @@ namespace {
         if (var->isAnonClosureParam()) {
           auto tv = CS.createTypeVariable(locator, /*options=*/0);
           CS.addConstraint(ConstraintKind::Equal, tv, E->getDecl()->getType());
-          return LValueType::get(tv, LValueType::Qual::DefaultForVar,
-                                 CS.getASTContext());
+          return LValueType::get(tv, LValueType::Qual::DefaultForVar);
         }
       }
 
@@ -256,12 +255,10 @@ namespace {
           return nullptr;
         
         superTy = LValueType::get(superTy,
-                                  LValueType::Qual::DefaultForVar,
-                                  CS.getASTContext());
+                                  LValueType::Qual::DefaultForVar);
         
         return adjustLValueForReference(superTy,
-                                        E->getSelf()->getAttrs().isAssignment(),
-                                        CS.getASTContext());
+                                      E->getSelf()->getAttrs().isAssignment());
       }
       
       return E->getType();
@@ -775,11 +772,8 @@ namespace {
                                       /*options=*/0);
       auto bound = LValueType::get(tv,
                                    LValueType::Qual::DefaultForType|
-                                   LValueType::Qual::Implicit,
-                                   CS.getASTContext());
-      auto result = LValueType::get(tv,
-                                    LValueType::Qual::DefaultForType,
-                                    CS.getASTContext());
+                                   LValueType::Qual::Implicit);
+      auto result = LValueType::get(tv, LValueType::Qual::DefaultForType);
 
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,

@@ -534,17 +534,17 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
-  // <T> ([inout] T) -> RawPointer
+  // <T> (@inout T) -> RawPointer
   Type GenericTy;
   Type ArchetypeTy;
   GenericParamList *ParamList;
   std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
   TupleTypeElt ArgParamElts[] = {
-    LValueType::get(GenericTy, LValueType::Qual::DefaultForType, Context)
+    LValueType::get(GenericTy, LValueType::Qual::DefaultForType)
   };
   TupleTypeElt ArgBodyElts[] = {
-    LValueType::get(ArchetypeTy, LValueType::Qual::DefaultForType, Context)
+    LValueType::get(ArchetypeTy, LValueType::Qual::DefaultForType)
   };
   Type ResultTy = Context.TheRawPointerType;
   return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,

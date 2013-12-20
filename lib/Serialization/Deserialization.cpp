@@ -2268,7 +2268,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (isNonSettable)
       quals |= LValueType::Qual::NonSettable;
 
-    typeOrOffset = LValueType::get(getType(objectTypeID), quals, ctx);
+    typeOrOffset = LValueType::get(getType(objectTypeID), quals);
     break;
   }
 

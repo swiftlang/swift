@@ -1264,20 +1264,21 @@ llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                WitnessTableTy, WitnessTablePtrTy, DbgTy);
 }
 
-static CanType addOwnerArgument(ASTContext &ctx, DeclContext *DC,
-                                CanType resultType) {
+static CanType addOwnerArgument(DeclContext *DC, CanType resultType) {
   Type argType = DC->getDeclaredTypeInContext();
   if (!argType->hasReferenceSemantics()) {
-    argType = LValueType::get(argType, LValueType::Qual::DefaultForMemberAccess,
-                              ctx);
+    argType = LValueType::get(argType,
+                              LValueType::Qual::DefaultForMemberAccess);
   }
   if (auto params = DC->getGenericParamsOfContext())
-    return PolymorphicFunctionType::get(argType, resultType, params, ctx)
+    return PolymorphicFunctionType::get(argType, resultType, params,
+                                        resultType->getASTContext())
              ->getCanonicalType();
-  return CanType(FunctionType::get(CanType(argType), resultType, ctx));
+  return CanType(FunctionType::get(CanType(argType), resultType,
+                                   resultType->getASTContext()));
 }
 
-static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
+static AbstractCC addOwnerArgument(ValueDecl *value,
                                    CanType &resultType, unsigned &uncurryLevel) {
   DeclContext *DC = value->getDeclContext();
   switch (DC->getContextKind()) {
@@ -1291,7 +1292,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
 
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::NominalTypeDecl:
-    resultType = addOwnerArgument(ctx, DC, resultType);
+    resultType = addOwnerArgument(DC, resultType);
     uncurryLevel++;
     return AbstractCC::Method;
   }
@@ -1299,8 +1300,9 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
 }
 
 /// Add the 'index' argument to a getter or setter.
-static void addIndexArgument(ASTContext &Context, ValueDecl *value,
+static void addIndexArgument(ValueDecl *value,
                              CanType &formalType, unsigned &uncurryLevel) {
+  ASTContext &Context = value->getASTContext();
   if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
     formalType = FunctionType::get(sub->getIndices()->getType(),
                                    formalType, Context)->getCanonicalType();
@@ -1325,8 +1327,8 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   unsigned uncurryLevel = 0;
   CanType formalType = CanType(FunctionType::get(TupleType::getEmpty(Context),
                                               getObjectType(value), Context));
-  addIndexArgument(Context, value, formalType, uncurryLevel);
-  AbstractCC cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
+  addIndexArgument(value, formalType, uncurryLevel);
+  AbstractCC cc = addOwnerArgument(value, formalType, uncurryLevel);
 
   return FormalType(formalType, cc, uncurryLevel);
 }
@@ -1369,8 +1371,8 @@ FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   CanType formalType = CanType(FunctionType::get(argType,
                                                  TupleType::getEmpty(Context),
                                                  Context));
-  addIndexArgument(Context, value, formalType, uncurryLevel);
-  auto cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
+  addIndexArgument(value, formalType, uncurryLevel);
+  auto cc = addOwnerArgument(value, formalType, uncurryLevel);
 
   return FormalType(formalType, cc, uncurryLevel);
 }

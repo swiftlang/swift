@@ -1825,8 +1825,7 @@ public:
 ///
 /// For the function type of an assignment operator, makes the first argument
 /// an implicit inout(settable).
-Type adjustLValueForReference(Type type, bool isAssignment,
-                              ASTContext &context);
+Type adjustLValueForReference(Type type, bool isAssignment);
 
 /// \brief Compute the shuffle required to map from a given tuple type to
 /// another tuple type.

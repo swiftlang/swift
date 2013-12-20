@@ -868,9 +868,8 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     if (auto substLV = dyn_cast<LValueType>(substEltType)) {
       SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
                                           substLV.getObjectType());
-      loweredSubstEltType = CanType(LValueType::get(silType.getSwiftRValueType(),
-                                                    substLV->getQualifiers(),
-                                                    tc.Context));
+      loweredSubstEltType =CanType(LValueType::get(silType.getSwiftRValueType(),
+                                                   substLV->getQualifiers()));
     } else {
       // If the original type was an archetype, use that archetype as
       // the original type of the element --- the actual archetype
@@ -1069,8 +1068,7 @@ CanType TypeConverter::getMethodSelfType(CanType selfType) const {
   if (selfType->hasReferenceSemantics()) {
     return selfType;
   } else {
-    return CanType(LValueType::get(selfType, LValueType::Qual::DefaultForType,
-                                   Context));
+    return CanType(LValueType::get(selfType, LValueType::Qual::DefaultForType));
   }
 }
 

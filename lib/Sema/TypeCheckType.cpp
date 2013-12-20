@@ -815,7 +815,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   if (attrs.has(TAK_inout)) {
     LValueType::Qual quals;
-    ty = LValueType::get(ty, quals, Context);
+    ty = LValueType::get(ty, quals);
     attrs.clearAttribute(TAK_inout);
   }
 

@@ -1482,13 +1482,15 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
                 /*HasTypeVariable=*/false) { }
 
-LValueType *LValueType::get(Type objectTy, Qual quals, const ASTContext &C) {
+LValueType *LValueType::get(Type objectTy, Qual quals) {
   assert(!objectTy->is<ErrorType>() &&
          "can not have ErrorType wrapped inside LValueType");
 
   bool hasTypeVariable = objectTy->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
+  auto &C = objectTy->getASTContext();
+  
   auto key = std::make_pair(objectTy, quals.getOpaqueData());
   auto &entry = C.Impl.getArena(arena).LValueTypes[key];
   if (entry)

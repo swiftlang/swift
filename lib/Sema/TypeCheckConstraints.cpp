@@ -84,8 +84,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-Type constraints::adjustLValueForReference(Type type, bool isAssignment,
-                                           ASTContext &context) {
+Type constraints::adjustLValueForReference(Type type, bool isAssignment) {
   LValueType::Qual quals = LValueType::Qual::Implicit;
   if (auto lv = type->getAs<LValueType>()) {
     // FIXME: The introduction of 'non-heap' here is an artifact of the type
@@ -95,8 +94,7 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
     // concrete expression, the 'implicit' bits will be dropped and the
     // appropriate 'heap' bits will be re-introduced.
     return LValueType::get(lv->getObjectType(),
-                           quals | lv->getQualifiers(),
-                           context);
+                           quals | lv->getQualifiers());
   }
 
   // For an assignment operator, the first parameter is an implicit inout.
@@ -107,22 +105,22 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
         if (inputTupleTy->getFields().size() > 0) {
           auto &firstParam = inputTupleTy->getFields()[0];
           auto firstParamTy
-            = adjustLValueForReference(firstParam.getType(), false, context);
+            = adjustLValueForReference(firstParam.getType(), false);
           SmallVector<TupleTypeElt, 2> elements;
           elements.push_back(firstParam.getWithType(firstParamTy));
           elements.append(inputTupleTy->getFields().begin() + 1,
                           inputTupleTy->getFields().end());
-          inputTy = TupleType::get(elements, context);
+          inputTy = TupleType::get(elements, type->getASTContext());
         } else {
           inputTy = funcTy->getInput();
         }
       } else {
-        inputTy = adjustLValueForReference(funcTy->getInput(), false, context);
+        inputTy = adjustLValueForReference(funcTy->getInput(), false);
       }
 
       return FunctionType::get(inputTy, funcTy->getResult(),
                                funcTy->getExtInfo(),
-                               context);
+                               type->getASTContext());
     }
   }
 
@@ -969,9 +967,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
                       TVO_CanBindToLValue);
-    auto refTv = LValueType::get(objectTv,
-                                 LValueType::Qual::Implicit,
-                                 getASTContext());
+    auto refTv = LValueType::get(objectTv, LValueType::Qual::Implicit);
     addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;
   } else {

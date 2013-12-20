@@ -2346,7 +2346,7 @@ private:
       ObjectTy(objectTy), Quals(quals) {}
 
 public:
-  static LValueType *get(Type type, Qual quals, const ASTContext &C);
+  static LValueType *get(Type type, Qual quals);
 
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
@@ -2371,7 +2371,7 @@ BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
   static CanLValueType get(CanType type, LValueType::Qual quals,
                            const ASTContext &C) {
-    return CanLValueType(LValueType::get(type, quals, C));
+    return CanLValueType(LValueType::get(type, quals));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
 
@@ -3407,7 +3407,7 @@ case TypeKind::Id:
     if (objectTy.getPointer() == lvalue->getObjectType().getPointer())
       return *this;
 
-    return LValueType::get(objectTy, lvalue->getQualifiers(), ctx);
+    return LValueType::get(objectTy, lvalue->getQualifiers());
   }
 
   case TypeKind::ProtocolComposition: {

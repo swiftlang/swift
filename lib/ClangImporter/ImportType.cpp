@@ -187,8 +187,7 @@ namespace {
       if (!objectType)
         return nullptr;
 
-      return LValueType::get(objectType, LValueType::Qual::DefaultForType,
-                             Impl.SwiftContext);
+      return LValueType::get(objectType, LValueType::Qual::DefaultForType);
     }
 
     Type VisitMemberPointer(const clang::MemberPointerType *type) {

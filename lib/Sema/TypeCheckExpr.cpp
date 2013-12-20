@@ -396,8 +396,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
     if (!value->isSettableOnBase(baseType))
       quals |= LValueType::Qual::NonSettable;
 
-    return LValueType::get(getTypeOfRValue(value, wantInterfaceType), quals,
-                           Context);
+    return LValueType::get(getTypeOfRValue(value, wantInterfaceType), quals);
   }
 
   if (wantInterfaceType) {

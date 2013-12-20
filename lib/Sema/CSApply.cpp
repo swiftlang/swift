@@ -198,9 +198,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
     // type.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
     if (selfTy->is<LValueType>())
-      return LValueType::get(baseTy,
-                             LValueType::Qual::DefaultForMemberAccess,
-                             member->getASTContext());
+      return LValueType::get(baseTy, LValueType::Qual::DefaultForMemberAccess);
 
     // Otherwise, return the rvalue type.
     return baseTy;
@@ -210,9 +208,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   if (baseTy->hasReferenceSemantics() || baseTy->is<MetatypeType>())
     return baseTy;
       
-  return LValueType::get(baseTy,
-                         LValueType::Qual::DefaultForMemberAccess,
-                         member->getASTContext());  
+  return LValueType::get(baseTy, LValueType::Qual::DefaultForMemberAccess);
 }
 
 namespace {
@@ -711,8 +707,7 @@ namespace {
 
       // The remaining subscript kinds
       resultTy = LValueType::get(resultTy,
-                                 LValueType::Qual::DefaultForMemberAccess,
-                                 tc.Context);
+                                 LValueType::Qual::DefaultForMemberAccess);
 
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
@@ -806,8 +801,7 @@ namespace {
         auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
         if (!selfTy->hasReferenceSemantics())
           selfTy = LValueType::get(selfTy,
-                                   LValueType::Qual::DefaultForMemberAccess,
-                                   ctx);
+                                   LValueType::Qual::DefaultForMemberAccess);
 
         resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
                                      resultFnTy->getExtInfo(), ctx);
@@ -1130,8 +1124,7 @@ namespace {
 
       Type type = cs.TC.getUnopenedTypeOfReference(decl, Type(),
                                                    /*wantInterfaceType=*/true);
-      return adjustLValueForReference(type, decl->getAttrs().isAssignment(),
-                                      cs.TC.Context);
+      return adjustLValueForReference(type, decl->getAttrs().isAssignment());
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -1607,8 +1600,7 @@ namespace {
              "Solved an address-of constraint with a non-settable lvalue?!");
 
       auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
-      expr->setType(LValueType::get(lv->getObjectType(), destQuals,
-                                    cs.getASTContext()));
+      expr->setType(LValueType::get(lv->getObjectType(), destQuals));
       return expr;
     }
 
@@ -2747,18 +2739,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                             toType->getRValueType(), dc)
              && "coercing super expr to non-supertype?!");
       fromLValue = LValueType::get(toType->getRValueType(),
-                                   fromLValue->getQualifiers(),
-                                   tc.Context);
+                                   fromLValue->getQualifiers());
       superRef->setType(fromLValue);
     }
 
     if (auto toLValue = toType->getAs<LValueType>()) {
       // Update the qualifiers on the lvalue.
-      expr = new (tc.Context) RequalifyExpr(
-                                expr,
+      expr = new (tc.Context) RequalifyExpr(expr,
                                 LValueType::get(fromLValue->getObjectType(),
-                                                toLValue->getQualifiers(),
-                                                tc.Context));
+                                                toLValue->getQualifiers()));
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
@@ -2942,8 +2931,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   // Form the lvalue type we will be producing.
   auto &tc = cs.getTypeChecker();
   Type destType = LValueType::get(containerType,
-                                  LValueType::Qual::DefaultForMemberAccess,
-                                  tc.Context);
+                                  LValueType::Qual::DefaultForMemberAccess);
 
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();

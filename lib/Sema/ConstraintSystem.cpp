@@ -668,8 +668,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                          value->getPotentialGenericDeclContext(),
                          /*skipProtocolSelfConstraint=*/false,
                          opener),
-                value->getAttrs().isAssignment(),
-                TC.Context);
+                value->getAttrs().isAssignment());
   return { valueType, valueType };
 }
 
@@ -926,8 +925,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     else
       elementTy = LValueType::get(elementTy,
                                   LValueType::Qual::DefaultForMemberAccess|
-                                  settableQualForDecl(baseTy, subscript),
-                                  TC.Context);
+                                  settableQualForDecl(baseTy, subscript));
     type = FunctionType::get(fnType->getInput(), elementTy, TC.Context);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {
@@ -1062,8 +1060,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       // Otherwise, adjust the lvalue type for this reference.
       bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
-      refType = adjustLValueForReference(refType, isAssignment,
-                                         getASTContext());
+      refType = adjustLValueForReference(refType, isAssignment);
     }
 
     break;
@@ -1078,8 +1075,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
       refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
-      refType = LValueType::get(refType, lvalueTy->getQualifiers(),
-                                getASTContext());
+      refType = LValueType::get(refType, lvalueTy->getQualifiers());
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       // FIXME: Do we have to strip several levels here? Possible.

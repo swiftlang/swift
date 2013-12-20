@@ -654,8 +654,7 @@ CanType TypeBase::getCanonicalType() {
     LValueType *lvalue = cast<LValueType>(this);
     Type objectType = lvalue->getObjectType();
     objectType = objectType->getCanonicalType();
-    Result = LValueType::get(objectType, lvalue->getQualifiers(),
-                             objectType->getASTContext());
+    Result = LValueType::get(objectType, lvalue->getQualifiers());
     break;
   }
   case TypeKind::PolymorphicFunction: {

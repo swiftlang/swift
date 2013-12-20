@@ -380,7 +380,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
 
   // TODO: Shouldn't be an @inout method.
   auto lvType = LValueType::get(optionSetType,
-                                LValueType::Qual::DefaultForInOutSelf, C);
+                                LValueType::Qual::DefaultForInOutSelf);
   
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
                                       SourceLoc(),
@@ -480,7 +480,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
 
   // TODO: Shouldn't be an @inout method.
   auto lvType = LValueType::get(optionSetType,
-                                LValueType::Qual::DefaultForInOutSelf, C);
+                                LValueType::Qual::DefaultForInOutSelf);
 
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
                                       SourceLoc(),
