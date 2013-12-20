@@ -45,6 +45,10 @@ class StackAllocationPromoter {
   /// The AllocStackInst that we are handling.
   AllocStackInst *ASI;
 
+  /// The deallocation Instruction. This value could be NULL if there are
+  /// multiple deallocations.
+  DeallocStackInst *DSI;
+
   /// Dominator info.
   DominanceInfo *DT;
 
@@ -61,7 +65,19 @@ class StackAllocationPromoter {
 public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di)
-      : ASI(Asi), DT(Di) {}
+      : ASI(Asi), DSI(0), DT(Di) {
+        // Scan the users in search of a deallocation instruction.
+        for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
+          if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+            // Don't record multiple dealloc instructions.
+            if (DSI) {
+              DSI = 0;
+              break;
+            }
+            // Record the deallocation instruction.
+            DSI = D;
+          }
+      }
 
   /// Promote the Allocation.
   void run();
@@ -607,6 +623,18 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
     unsigned NewStores = 0;
     for (auto &NewPhiBlock : Frontier) {
       assert(NewPhiBlock && "Invalid block");
+
+      // Don't place PHIs in blocks in which the allocated value is obviously
+      // dead.
+      // If the PHI is not dominated by the allocation then it must be dead:
+      if (!DT->dominates(ASI->getParent(), NewPhiBlock))
+        continue;
+
+      // If the PHI is properly dominated by the deallocation then it can't be
+      // alive.
+      if (DSI && DT->properlyDominates(DSI->getParent(), NewPhiBlock))
+        continue;
+
       // If this is a new Phi node then it is also a new definition of a value
       // so we need to push this block to the work list.
       if (PhiBlocks.insert(NewPhiBlock).second) {
