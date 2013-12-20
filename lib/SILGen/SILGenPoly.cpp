@@ -160,6 +160,11 @@ namespace {
                            CanType substType,
                            SGFContext ctxt);
 
+    /// Transform a metatype value.
+    virtual ManagedValue transformMetatype(ManagedValue fn,
+                                           AbstractionPattern origType,
+                                           CanMetatypeType substType) = 0;
+    
     /// Transform a tuple value.
     ManagedValue transformTuple(ManagedValue input,
                                 AbstractionPattern origType,
@@ -195,8 +200,11 @@ ManagedValue Transform::transform(ManagedValue v,
     return transformTuple(v, origFormalType, substTupleType, ctxt);
   }
 
-  // (metatypes?)
-
+  //  - metatypes
+  if (auto substMetaType = dyn_cast<MetatypeType>(substFormalType)) {
+    return transformMetatype(v, origFormalType, substMetaType);
+  }
+  
   // Nothing else.
   return v;
 }
@@ -980,9 +988,58 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   return fn;
 }
 
+// Convert a metatype to 'thin' if it is naturally a thin metatype in
+// substituted context.
+static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ManagedValue meta,
+                                            AbstractionPattern origType,
+                                            CanMetatypeType substType) {
+  assert(!meta.hasCleanup() && "metatype with cleanup?!");
+
+  auto substSILType = gen.getLoweredLoadableType(substType);
+  
+  bool wasThin = meta.getType().castTo<MetatypeType>()->isThin();
+  bool willBeThin = substSILType.castTo<MetatypeType>()->isThin();
+  
+  // If the value is already of the right thinness, we're done.
+  if (wasThin == willBeThin)
+    return meta;
+  
+  // Otherwise, create a thin metatype. If it can be thin, the metatype is
+  // unitary, so we can just create an equivalent thin value from thin air.
+  assert(willBeThin && "substituting thin to thick metatype?!");
+  auto metaTy = gen.B.createMetatype(loc, substSILType);
+  return ManagedValue(metaTy, ManagedValue::Unmanaged);
+}
+
+// Convert a metatype to 'thick' if its abstraction pattern requires it.
+static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ManagedValue meta,
+                                            AbstractionPattern origType,
+                                            CanMetatypeType substType) {
+  assert(!meta.hasCleanup() && "metatype with cleanup?!");
+  
+  auto loweredTy = gen.getLoweredType(origType, substType);
+
+  bool wasThin = meta.getType().castTo<MetatypeType>()->isThin();
+  bool willBeThin = loweredTy.castTo<MetatypeType>()->isThin();
+  
+  // If the value is already of the right thinness, we're done.
+  if (wasThin == willBeThin)
+    return meta;
+  
+  // Otherwise, create a thick metatype. If it can be thin, the metatype is
+  // unitary, so we can just create an equivalent thick value from thin air.
+  assert(wasThin && "abstracting thick to thin metatype?!");
+  auto metaTy = gen.B.createMetatype(loc, loweredTy);
+  return ManagedValue(metaTy, ManagedValue::Unmanaged);
+}
+
 namespace {
   /// A transformation for applying value generalization.
-  struct Generalize : Transform {
+  struct Generalize final : Transform {
     using Transform::Transform;
     ManagedValue transformFunction(ManagedValue fn,
                                    AbstractionPattern origType,
@@ -993,6 +1050,12 @@ namespace {
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
                                                 CanType substType) override {
       return SGF.getTypeLowering(substType);
+    }
+    
+    ManagedValue transformMetatype(ManagedValue meta,
+                                   AbstractionPattern origType,
+                                   CanMetatypeType substType) override {
+      return emitOrigToSubstMetatype(SGF, Loc, meta, origType, substType);
     }
   };
 }
@@ -1013,12 +1076,18 @@ SILGenFunction::emitGeneralizedValue(SILLocation loc, ManagedValue v,
 
 namespace {
   /// A transformation for applying orig-to-subst re-abstraction.
-  struct OrigToSubst : Transform {
+  struct OrigToSubst final : Transform {
     using Transform::Transform;
     ManagedValue transformFunction(ManagedValue fn,
                                    AbstractionPattern origType,
                                    CanAnyFunctionType substType) override;
 
+    ManagedValue transformMetatype(ManagedValue meta,
+                                   AbstractionPattern origType,
+                                   CanMetatypeType substType) override {
+      return emitOrigToSubstMetatype(SGF, Loc, meta, origType, substType);
+    }
+    
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
                                                 CanType substType) override {
       return SGF.getTypeLowering(substType);
@@ -1048,8 +1117,8 @@ SILGenFunction::emitOrigToSubstValue(SILLocation loc, ManagedValue v,
 }
 
 namespace {
-  /// A transformation for applying subst-to-orig re-abstraction.
-  struct SubstToOrig : Transform {
+  /// A transformation for applying subst-to-orig reabstraction.
+  struct SubstToOrig final : Transform {
     using Transform::Transform;
     ManagedValue transformFunction(ManagedValue fn,
                                    AbstractionPattern origType,
@@ -1058,6 +1127,12 @@ namespace {
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
                                                 CanType substType) override {
       return SGF.getTypeLowering(origType, substType);
+    }
+    
+    ManagedValue transformMetatype(ManagedValue meta,
+                                   AbstractionPattern origType,
+                                   CanMetatypeType substType) override {
+      return emitSubstToOrigMetatype(SGF, Loc, meta, origType, substType);
     }
   };
 }

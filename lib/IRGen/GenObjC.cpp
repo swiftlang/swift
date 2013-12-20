@@ -523,7 +523,9 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
   SILParameterInfo inputs[] = {
     SILParameterInfo(CanType(ctx.TheRawPointerType), /* (NSZone*), kindof */
                      ParameterConvention::Direct_Unowned),
-    SILParameterInfo(CanType(MetatypeType::get(classType, ctx)),
+    SILParameterInfo(CanType(MetatypeType::get(classType,
+                                               /*thin*/ false,
+                                               ctx)),
                      ParameterConvention::Direct_Unowned)
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);

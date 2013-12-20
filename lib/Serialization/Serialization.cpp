@@ -1545,8 +1545,11 @@ void Serializer::writeType(Type ty) {
     auto metatypeTy = cast<MetatypeType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
+    bool hasThin = metatypeTy->hasThin();
+    bool isThin = hasThin ? metatypeTy->isThin() : false;
     MetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(metatypeTy->getInstanceType()));
+                                   addTypeRef(metatypeTy->getInstanceType()),
+                                   hasThin, isThin);
     break;
   }
 

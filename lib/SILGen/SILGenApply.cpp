@@ -1067,6 +1067,14 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   }
   if (isa<TupleType>(type2)) return false;
 
+  // Either both types should be metatypes or neither should be.
+  if (auto meta1 = dyn_cast<MetatypeType>(type1)) {
+    auto meta2 = dyn_cast<MetatypeType>(type2);
+    if (!meta2) return false;
+    if (meta1.getInstanceType() != meta2.getInstanceType()) return false;
+    return true;
+  }
+  
   // Either both types should be functions or neither should be.
   if (auto fn1 = dyn_cast<SILFunctionType>(type1)) {
     auto fn2 = dyn_cast<SILFunctionType>(type2);

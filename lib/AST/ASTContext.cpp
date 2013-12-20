@@ -1191,15 +1191,19 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   llvm_unreachable("bad ownership");
 }
 
-MetatypeType *MetatypeType::get(Type T, const ASTContext &C) {
-  return get(T, /*isThin*/ false, C);
-}
-
-MetatypeType *MetatypeType::get(Type T, bool IsThin, const ASTContext &C) {
+MetatypeType *MetatypeType::get(Type T, Optional<bool> IsThin,
+                                const ASTContext &C) {
   bool hasTypeVariable = T->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
-  MetatypeType *&Entry = C.Impl.getArena(arena).MetatypeTypes[{T, IsThin}];
+  char thinKey;
+  if (IsThin.hasValue())
+    thinKey = *IsThin ? 1 : 0;
+  else
+    thinKey = 2;
+  
+  MetatypeType *&Entry = C.Impl.getArena(arena)
+    .MetatypeTypes[{T, thinKey}];
   if (Entry) return Entry;
 
   return Entry = new (C, arena) MetatypeType(T, T->isCanonical() ? &C : 0,
@@ -1208,10 +1212,12 @@ MetatypeType *MetatypeType::get(Type T, bool IsThin, const ASTContext &C) {
 }
 
 MetatypeType::MetatypeType(Type T, const ASTContext *C, bool HasTypeVariable,
-                           bool IsThin)
+                           Optional<bool> IsThin)
   : TypeBase(TypeKind::Metatype, C, HasTypeVariable),
     InstanceType(T) {
-  MetatypeTypeBits.Thin = (unsigned)IsThin;
+  MetatypeTypeBits.HasThin = IsThin.hasValue();
+  if (IsThin.hasValue())
+    MetatypeTypeBits.Thin = *IsThin;
 }
 
 ModuleType *ModuleType::get(Module *M) {

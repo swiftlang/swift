@@ -49,9 +49,9 @@ bb0(%0 : $Bas):
   %1 = tuple ()
   %2 = alloc_box $Bas
   store %0 to %2#1 : $*Bas
-  %4 = function_ref @_TSSCfMSSFT_SS : $@thin (String.metatype) -> String
-  %5 = metatype $String.metatype
-  %6 = apply %4(%5) : $@thin (String.metatype) -> String
+  %4 = function_ref @_TSSCfMSSFT_SS : $@thin (@thin String.metatype) -> String
+  %5 = metatype $@thin String.metatype
+  %6 = apply %4(%5) : $@thin (@thin String.metatype) -> String
   %7 = load %2#1 : $*Bas
   strong_retain %7 : $Bas
   %9 = ref_element_addr %7 : $Bas, #strRealProp
@@ -78,5 +78,5 @@ bb0(%0 : $Bas):
   strong_release %2#0 : $Builtin.ObjectPointer
   return %27 : $Bas
 }
-sil @_TSSCfMSSFT_SS : $@thin (String.metatype) -> String
+sil @_TSSCfMSSFT_SS : $@thin (@thin String.metatype) -> String
 

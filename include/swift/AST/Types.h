@@ -123,10 +123,12 @@ protected:
 
   struct MetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
+    /// \brief Is the 'thin' bit set?
+    unsigned HasThin : 1;
     /// \brief Does the metatype use a 'thin' representation?
     unsigned Thin : 1;
   };
-  enum { NumMetatypeTypeBits = NumTypeBaseBits + 1 };
+  enum { NumMetatypeTypeBits = NumTypeBaseBits + 2 };
   static_assert(NumMetatypeTypeBits <= 32, "fits in an unsigned");
   
   union {
@@ -1245,26 +1247,44 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 ///  x.a()             // use of the metatype value since its a value context.
 class MetatypeType : public TypeBase {
   Type InstanceType;
-  
+
+  static MetatypeType *get(Type T, Optional<bool> IsThin, const ASTContext &C);
+
 public:
-  /// Return the MetatypeType for the specified type declaration.
-  static MetatypeType *get(Type T, const ASTContext &C);
+  /// \brief Return the MetatypeType for the specified type declaration.
+  ///
+  /// This leaves the 'thin' property unavailable.
+  static MetatypeType *get(Type T, const ASTContext &C) {
+    return get(T, Optional<bool>(), C);
+  }
   
   /// Return the MetatypeType for the specified type declaration with
   /// the given thinness.
   ///
   /// Metatype thinness is a SIL-only property. Unitary metatypes can be
   /// lowered away to empty types in IR.
-  static MetatypeType *get(Type T, bool IsThin, const ASTContext &C);
+  static MetatypeType *get(Type T, bool IsThin, const ASTContext &C) {
+    return get(T, Optional<bool>(IsThin), C);
+  }
 
   Type getInstanceType() const { return InstanceType; }
 
+  /// Does this metatype have a 'thin' property?
+  ///
+  /// Only SIL metatype types have a 'thin' bit.
+  bool hasThin() const {
+    return MetatypeTypeBits.HasThin;
+  }
+  
   /// Is this a thin metatype type?
   ///
   /// Metatype thinness is a SIL-only property. Unitary metatypes can be
   /// lowered away to empty types in IR, unless a metatype value is required
   /// at an abstraction level.
-  bool isThin() const { return MetatypeTypeBits.Thin; }
+  bool isThin() const {
+    assert(MetatypeTypeBits.HasThin && "metatype has no thinness");
+    return MetatypeTypeBits.Thin;
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1273,13 +1293,16 @@ public:
   
 private:
   MetatypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable,
-               bool IsThin);
+               Optional<bool> IsThin);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
   static CanMetatypeType get(CanType type, const ASTContext &C) {
     return CanMetatypeType(MetatypeType::get(type, C));
+  }
+  static CanMetatypeType get(CanType type, bool isThin, const ASTContext &C) {
+    return CanMetatypeType(MetatypeType::get(type, isThin, C));
   }
 END_CAN_TYPE_WRAPPER(MetatypeType, Type)
   
@@ -1738,7 +1761,9 @@ class SILParameterInfo {
 public:
   SILParameterInfo() = default;
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {}
+    : TypeAndConvention(type, conv) {
+    assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
+  }
 
   CanType getType() const {
     return TypeAndConvention.getPointer();
@@ -1834,7 +1859,9 @@ class SILResultInfo {
 public:
   SILResultInfo() = default;
   SILResultInfo(CanType type, ResultConvention conv)
-    : TypeAndConvention(type, conv) {}
+    : TypeAndConvention(type, conv) {
+    assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
+  }
 
   CanType getType() const {
     return TypeAndConvention.getPointer();

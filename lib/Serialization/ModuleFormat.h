@@ -356,7 +356,9 @@ namespace decls_block {
 
   using MetatypeTypeLayout = BCRecordLayout<
     METATYPE_TYPE,
-    TypeIDField  // instance type
+    TypeIDField,  // instance type
+    BCFixed<1>,   // has thin?
+    BCFixed<1>    // is thin?
   >;
 
   using LValueTypeLayout = BCRecordLayout<

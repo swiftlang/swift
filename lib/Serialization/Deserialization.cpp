@@ -2248,8 +2248,13 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::METATYPE_TYPE: {
     TypeID instanceID;
-    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID);
-    typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
+    bool hasThin, isThin;
+    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID,
+                                                hasThin, isThin);
+    if (hasThin)
+      typeOrOffset = MetatypeType::get(getType(instanceID), isThin, ctx);
+    else
+      typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
     break;
   }
 

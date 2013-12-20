@@ -295,6 +295,8 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 static bool isLegalSILType(CanType type) {
   if (isa<LValueType>(type)) return false;
   if (isa<AnyFunctionType>(type)) return false;
+  if (auto meta = dyn_cast<MetatypeType>(type))
+    return meta->hasThin();
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
       if (!isLegalSILType(eltType)) return false;
@@ -721,7 +723,11 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::Metatype: {
     MetatypeType *MT = cast<MetatypeType>(this);
     Type InstanceTy = MT->getInstanceType()->getCanonicalType();
-    Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
+    if (MT->hasThin())
+      Result = MetatypeType::get(InstanceTy, MT->isThin(),
+                                 InstanceTy->getASTContext());
+    else
+      Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
     break;
   }
   case TypeKind::UnboundGeneric: {

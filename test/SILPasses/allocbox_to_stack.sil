@@ -144,8 +144,8 @@ protocol LogicValue {
 }
 
 // CHECK-LABEL: @protocols
-sil @protocols : $@thin (@in LogicValue, Bool.metatype) -> Bool {
-bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
+sil @protocols : $@thin (@in LogicValue, @thin Bool.metatype) -> Bool {
+bb0(%0 : $*LogicValue, %1 : $@thin Bool.metatype):
   %2 = alloc_box $LogicValue
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
@@ -183,19 +183,19 @@ enum SomeUnion {
 
 
 
-sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, SomeUnion.metatype) -> @owned SomeUnion 
-sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (SomeClass.metatype) -> @owned SomeClass 
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, @thin SomeUnion.metatype) -> @owned SomeUnion 
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.metatype) -> @owned SomeClass 
 
 // CHECK-LABEL: sil @union_test
 sil @union_test : $@thin () -> () {
 bb0:
   %1 = alloc_box $SomeUnion
-  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, SomeUnion.metatype) -> @owned SomeUnion // user: %7
-  %3 = metatype $SomeUnion.metatype
-  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (SomeClass.metatype) -> @owned SomeClass // user: %6
-  %5 = metatype $SomeClass.metatype
-  %6 = apply %4(%5) : $@thin (SomeClass.metatype) -> @owned SomeClass
-  %7 = apply %2(%6, %3) : $@thin (@owned SomeClass, SomeUnion.metatype) -> @owned SomeUnion
+  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, @thin SomeUnion.metatype) -> @owned SomeUnion // user: %7
+  %3 = metatype $@thin SomeUnion.metatype
+  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.metatype) -> @owned SomeClass // user: %6
+  %5 = metatype $@thick SomeClass.metatype
+  %6 = apply %4(%5) : $@thin (@thick SomeClass.metatype) -> @owned SomeClass
+  %7 = apply %2(%6, %3) : $@thin (@owned SomeClass, @thin SomeUnion.metatype) -> @owned SomeUnion
   store %7 to %1#1 : $*SomeUnion
   strong_release %1#0 : $Builtin.ObjectPointer
   %10 = tuple ()

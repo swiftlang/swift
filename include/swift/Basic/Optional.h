@@ -31,10 +31,11 @@
 namespace swift {
   /// An enum whose purpose is to make it easier to initialize an
   /// empty optional.
-  enum Nothing_t {
-    Nothing
-  };
+  static const enum class Nothing_t { Nothing } Nothing = Nothing_t::Nothing;
 
+  static_assert(!std::is_convertible<Nothing_t, bool>::value,
+                "Nothing must not be implicitly convertible to bool");
+  
   template<typename T>
   class Optional {
     // Place Value in an anonymous union to suppress implicit value semantics.

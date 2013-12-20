@@ -717,14 +717,30 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // based on the attributes we see.
   Type ty;
 
-  // In SIL *only*, allow @thin to apply to a metatype.
-  if (attrs.has(TAK_thin)) {
+  // In SIL *only*, allow @thin or @thick to apply to a metatype.
+  if (attrs.has(TAK_thin) || attrs.has(TAK_thick)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
           auto instanceTy = resolveType(metatypeRepr->getBase(), isSILType);
-          ty = MetatypeType::get(instanceTy, /*thin*/ true, Context);
-          attrs.clearAttribute(TAK_thin);
+          bool isThin;
+          if (attrs.has(TAK_thin) && attrs.has(TAK_thick)) {
+            TC.diagnose(repr->getStartLoc(),
+                        diag::sil_metatype_thin_and_thick);
+            isThin = false;
+            attrs.clearAttribute(TAK_thin);
+            attrs.clearAttribute(TAK_thick);
+          } else if (attrs.has(TAK_thin)) {
+            isThin = true;
+            attrs.clearAttribute(TAK_thin);
+          } else if (attrs.has(TAK_thick)) {
+            isThin = false;
+            attrs.clearAttribute(TAK_thick);
+          } else {
+            llvm_unreachable("neither thin nor thick");
+          }
+          
+          ty = MetatypeType::get(instanceTy, /*thin*/ isThin, Context);
         }
       }
     }
@@ -1065,6 +1081,15 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr, bool isSILType) {
   Type ty = resolveType(repr->getBase(), false);
   if (ty->is<ErrorType>())
     return ty;
+  
+  // In SIL mode, a metatype must have a @thin or @!thin attribute, so metatypes
+  // should have been lowered in resolveAttributedType.
+  if (isSILType) {
+    TC.diagnose(repr->getStartLoc(),
+                diag::sil_metatype_without_thinness_attribute);
+    return MetatypeType::get(ty, /*isThin*/ false, Context);
+  }
+  
   return MetatypeType::get(ty, Context);
 }
 

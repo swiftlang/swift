@@ -22,9 +22,9 @@ struct Baz {
   var x: Int
 }
 
-sil @convert_from_integer_literal : $@thin (Builtin.Int64, Int64.metatype) -> Int64
-sil @foo_allocating_init : $@thin (Foo.metatype) -> @owned Foo
-sil @baz_init : $@thin (Baz.metatype) -> @owned Baz
+sil @convert_from_integer_literal : $@thin (Builtin.Int64, @thin Int64.metatype) -> Int64
+sil @foo_allocating_init : $@thin (@thick Foo.metatype) -> @owned Foo
+sil @baz_init : $@thin (@thin Baz.metatype) -> @owned Baz
 sil @dummy_func : $@thin (Int64, Int64, Int64) -> Int64
 
 // CHECK-LABEL: sil @test_capture_promotion
@@ -32,20 +32,20 @@ sil @test_capture_promotion : $@thin () -> @owned @callee_owned () -> Int64 {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $Foo
-  %2 = function_ref @foo_allocating_init : $@thin (Foo.metatype) -> @owned Foo
-  %3 = metatype $Foo.metatype
-  %4 = apply %2(%3) : $@thin (Foo.metatype) -> @owned Foo
+  %2 = function_ref @foo_allocating_init : $@thin (@thick Foo.metatype) -> @owned Foo
+  %3 = metatype $@thick Foo.metatype
+  %4 = apply %2(%3) : $@thin (@thick Foo.metatype) -> @owned Foo
   store %4 to %1#1 : $*Foo
   %6 = alloc_box $Baz
-  %7 = function_ref @baz_init : $@thin (Baz.metatype) -> @owned Baz
-  %8 = metatype $Baz.metatype
-  %9 = apply %7(%8) : $@thin (Baz.metatype) -> @owned Baz
+  %7 = function_ref @baz_init : $@thin (@thin Baz.metatype) -> @owned Baz
+  %8 = metatype $@thin Baz.metatype
+  %9 = apply %7(%8) : $@thin (@thin Baz.metatype) -> @owned Baz
   store %9 to %6#1 : $*Baz
   %11 = alloc_box $Int64
-  %12 = function_ref @convert_from_integer_literal : $@thin (Builtin.Int64, Int64.metatype) -> Int64
-  %13 = metatype $Int64.metatype
+  %12 = function_ref @convert_from_integer_literal : $@thin (Builtin.Int64, @thin Int64.metatype) -> Int64
+  %13 = metatype $@thin Int64.metatype
   %14 = integer_literal $Builtin.Int64, 3
-  %15 = apply [transparent] %12(%14, %13) : $@thin (Builtin.Int64, Int64.metatype) -> Int64
+  %15 = apply [transparent] %12(%14, %13) : $@thin (Builtin.Int64, @thin Int64.metatype) -> Int64
   store %15 to %11#1 : $*Int64
 
 // CHECK-NOT: function_ref @closure0 :
@@ -133,9 +133,9 @@ sil @test_unpromotable : $@thin () -> @owned @callee_owned () -> Int64 {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $Foo
-  %2 = function_ref @foo_allocating_init : $@thin (Foo.metatype) -> @owned Foo
-  %3 = metatype $Foo.metatype
-  %4 = apply %2(%3) : $@thin (Foo.metatype) -> @owned Foo
+  %2 = function_ref @foo_allocating_init : $@thin (@thick Foo.metatype) -> @owned Foo
+  %3 = metatype $@thick Foo.metatype
+  %4 = apply %2(%3) : $@thin (@thick Foo.metatype) -> @owned Foo
   store %4 to %1#1 : $*Foo
   %17 = function_ref @closure1 : $@thin (Builtin.ObjectPointer, @inout Foo) -> Int64
   strong_retain %1#0 : $Builtin.ObjectPointer

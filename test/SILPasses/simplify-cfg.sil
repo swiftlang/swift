@@ -71,13 +71,13 @@ bb4:                                              // Preds: bb2
   cond_br %6, bb5, bb6                            // id: %10
 
 bb5:                                              // Preds: bb4
-  %11 = metatype $Int64.metatype
+  %11 = metatype $@thin Int64.metatype
   %12 = integer_literal $Builtin.Int64, 42        // user: %13
   %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
   br bb7(%13 : $Int64)                            // id: %14
 
 bb6:                                              // Preds: bb4
-  %15 = metatype $Int64.metatype
+  %15 = metatype $@thin Int64.metatype
   %16 = integer_literal $Builtin.Int64, 17        // user: %17
   %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
   br bb7(%17 : $Int64)                            // id: %18

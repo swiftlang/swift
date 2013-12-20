@@ -518,6 +518,12 @@ ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
 // Optional Types
 ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
       "optional array type requires parentheses", ())
+      
+// Metatypes
+ERROR(sil_metatype_without_thinness_attribute,type_parsing,none,
+      "metatypes in SIL must have @thin or @thick attribute", ())
+ERROR(sil_metatype_thin_and_thick,type_parsing,none,
+      "metatypes in SIL cannot be both @thin and @thick", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics

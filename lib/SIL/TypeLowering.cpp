@@ -28,6 +28,43 @@
 using namespace swift;
 using namespace Lowering;
 
+namespace {
+  /// A CRTP type visitor for deciding whether the metatype for a type
+  /// has trivial representation.
+  struct HasTrivialMetatype : CanTypeVisitor<HasTrivialMetatype, bool> {
+    /// Class metatypes have non-trivial representation due to the
+    /// possibility of subclassing.
+    bool visitClassType(CanClassType type) {
+      return false;
+    }
+    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
+      return false;
+    }
+
+    /// Archetype metatypes have non-trivial representation in case
+    /// they instantiate to a class metatype.
+    bool visitArchetypeType(CanArchetypeType type) {
+      return false;
+    }
+    
+    /// All levels of class metatypes support subtyping.
+    bool visitMetatypeType(CanMetatypeType type) {
+      return visit(type.getInstanceType());
+    }
+
+    /// Existential metatypes have non-trivial representation because
+    /// they can refer to an arbitrary metatype. Everything else is trivial.
+    bool visitType(CanType type) {
+      return !type->isExistentialType();
+    }
+  };
+}
+
+/// Does the metatype for the given type have a trivial representation?
+static bool hasTrivialMetatype(CanType instanceType) {
+  return HasTrivialMetatype().visit(instanceType);
+}
+
 static CanType getKnownType(Optional<CanType> &cacheSlot,
                             ASTContext &C,
                             StringRef moduleName,
@@ -843,6 +880,9 @@ static bool isLoweredType(CanType type) {
         return false;
     return true;
   }
+  if (auto meta = dyn_cast<MetatypeType>(type)) {
+    return meta->hasThin();
+  }
   return true;
 }
 #endif
@@ -910,6 +950,34 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     assert(existing->second && "reentered getTypeLowering");
     return *existing->second;
   }
+  
+  // Static metatypes are unitary and can optimized to a "thin" empty
+  // representation if the type also appears as a static metatype in the
+  // original abstraction pattern.
+  if (auto substMeta = dyn_cast<MetatypeType>(substType)) {
+    bool isThin;
+    
+    auto origMeta = dyn_cast<MetatypeType>(origType.getAsType());
+    if (!origMeta) {
+      // If the metatype matches an archetype T, it cannot be thin.
+      assert(isa<ArchetypeType>(origType.getAsType()) &&
+         "metatype matches in position that isn't an archetype or metatype?!");
+      isThin = false;
+    } else {
+      // Otherwise, we're thin if the metatype is thinnable both substituted and
+      // in the abstraction pattern.
+      isThin = hasTrivialMetatype(substMeta.getInstanceType())
+        && hasTrivialMetatype(origMeta.getInstanceType());
+    }
+    
+    // Regardless of thinness, metatypes are always trivial.
+    auto thinnedTy = CanMetatypeType::get(substMeta.getInstanceType(),
+                                          isThin, substMeta->getASTContext());
+    auto loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
+    auto *theInfo = new (*this) TrivialTypeLowering(loweredTy);
+    Types[key] = theInfo;
+    return *theInfo;
+  }
 
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
@@ -963,7 +1031,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     return *theInfo;
   }
 
-  // We need to lower function types within tuples.
+  // We need to lower function and metatype types within tuples.
   if (auto substTupleType = dyn_cast<TupleType>(substType)) {
     auto loweredType = getLoweredTupleType(*this, origType, substTupleType);
 
