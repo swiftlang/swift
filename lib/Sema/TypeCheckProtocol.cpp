@@ -53,7 +53,6 @@ namespace {
     DeclContext *DC;
     SourceLoc Loc;
     SmallVectorImpl<AssociatedTypeDecl *> &UnresolvedAssocTypes;
-    SmallVectorImpl<std::pair<AssociatedTypeDecl *, Type>> &DeducedAssocTypes;
     bool &AlreadyComplained;
 
     /// Record a (non-type) witness for the given requirement.
@@ -79,15 +78,12 @@ namespace {
                        DeclContext *dc,
                        SmallVectorImpl<AssociatedTypeDecl *> &
                          unresolvedAssocTypes,
-                       SmallVectorImpl<std::pair<AssociatedTypeDecl *,Type>> &
-                         deducedAssocTypes,
                        bool &alreadyComplained)
       : TC(tc), Conformance(conformance),
         Proto(conformance->getProtocol()),
         Adoptee(conformance->getType()), DC(dc),
         Loc(conformance->getLoc()),
         UnresolvedAssocTypes(unresolvedAssocTypes),
-        DeducedAssocTypes(deducedAssocTypes),
         AlreadyComplained(alreadyComplained) { }
 
     /// Resolve a (non-type) witness via name lookup.
@@ -632,14 +628,20 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
 
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
-diagnoseMatch(TypeChecker &tc, Module *module, Type model, ValueDecl *req,
-              const RequirementMatch &match,
-              ArrayRef<std::pair<AssociatedTypeDecl *,Type>> deducedAssocTypes){
+diagnoseMatch(TypeChecker &tc, Module *module,
+              NormalProtocolConformance *conformance, ValueDecl *req,
+              const RequirementMatch &match){
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
-  for (const auto &deduced : deducedAssocTypes) {
-    addAssocTypeDeductionString(withAssocTypes, deduced.first, deduced.second);
+  for (auto member : conformance->getProtocol()->getMembers()) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (conformance->usesDefaultDefinition(assocType)) {
+        auto &witness = conformance->getTypeWitness(assocType, nullptr);
+        addAssocTypeDeductionString(withAssocTypes, assocType,
+                                    witness.Replacement);
+      }
+    }
   }
   for (const auto &deduced : match.AssociatedTypeDeductions) {
     addAssocTypeDeductionString(withAssocTypes, deduced.first, deduced.second);
@@ -755,10 +757,6 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                    UnresolvedAssocTypes.end(),
                    [&](AssociatedTypeDecl *assocType) {
                      if (Conformance->hasTypeWitness(assocType)) {
-                       DeducedAssocTypes.push_back(
-                         {assocType,
-                          Conformance->getTypeWitness(assocType, nullptr)
-                             .Replacement});
                        return true;
                      }
 
@@ -949,8 +947,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
   if (!didDerive) {
     // Diagnose each of the matches.
     for (const auto &match : matches)
-      diagnoseMatch(TC, DC->getParentModule(), Adoptee, requirement, match,
-                    DeducedAssocTypes);
+      diagnoseMatch(TC, DC->getParentModule(), Conformance, requirement, match);
   }
 
   // FIXME: Suggest a new declaration that does match?
@@ -1275,11 +1272,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   bool Complained = false;
   SmallVector<AssociatedTypeDecl *, 4> unresolvedAssocTypes;
-  SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
 
   // The conformance checker we're using.
-  ConformanceChecker checker(TC, conformance, DC,
-                             unresolvedAssocTypes, deducedAssocTypes,
+  ConformanceChecker checker(TC, conformance, DC, unresolvedAssocTypes,
                              Complained);
 
   // First, resolve any associated type members that have bindings. We'll
@@ -1386,9 +1381,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // Default implementations.
     switch (checker.resolveTypeWitnessViaDefault(assocType)) {
     case ResolveWitnessResult::Success:
-      deducedAssocTypes.push_back(
-        {assocType,
-         conformance->getTypeWitness(assocType, nullptr).Replacement});
       return true;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -1401,9 +1393,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     switch (checker.resolveTypeWitnessViaDerivation(assocType)) {
     case ResolveWitnessResult::Success:
-      deducedAssocTypes.push_back(
-        {assocType,
-          conformance->getTypeWitness(assocType, nullptr).Replacement});
       return true;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -1447,11 +1436,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
 
     return conformance;
-  }
-
-  // FIXME: Do this as soon as we select a default.
-  for (auto deduced : deducedAssocTypes) {
-    conformance->addDefaultDefinition(deduced.first);
   }
 
   conformance->setState(ProtocolConformanceState::Complete);
