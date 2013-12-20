@@ -73,7 +73,8 @@ ifndef MODULES_SDK
 endif
 
 ifndef SWIFT_HEADER_DIR
-  SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
+  SWIFT_HEADER0_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
+  SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/macosx
 endif
 
 
@@ -136,7 +137,10 @@ endif
 # Create a symlink lib/swift to lib so that we can provide a consistent
 # path schema for installed and build-directory environments.
 
-$(SWIFT_HEADER_DIR):
+$(SWIFT_HEADER0_DIR):
+	ln -s . $(SWIFT_HEADER0_DIR)
+
+$(SWIFT_HEADER_DIR): $(SWIFT_HEADER0_DIR)
 	ln -s . $(SWIFT_HEADER_DIR)
 
 # Create lib/swift symlink when building the swift compiler
