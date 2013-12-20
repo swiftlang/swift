@@ -1837,7 +1837,6 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
   ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
   for (auto p : make_range(protocols, protocols + numProtocols)) {
     if (p->Flags.needsWitnessTable()) {
-      printf("%s\n", p->Name);
       ++numWitnessTables;
     }
     if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
