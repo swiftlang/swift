@@ -265,15 +265,18 @@ namespace {
     TypeVariableType *SelfTypeVar = nullptr;
 
     DeclContext *DC;
+    ProtocolDecl *Proto;
     TypeWitnessMap &TypeWitnesses;
     llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> &OpenedAssocTypes;
 
   public:
-    RequirementTypeOpener(DeclContext *dc,
-                         TypeWitnessMap &typeWitnesses,
-                         llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
-                           &openedAssocTypes)
-      : DC(dc), TypeWitnesses(typeWitnesses), OpenedAssocTypes(openedAssocTypes)
+    RequirementTypeOpener(
+        DeclContext *dc, ProtocolDecl *proto,
+        TypeWitnessMap &typeWitnesses,
+        llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
+          &openedAssocTypes)
+      : DC(dc), Proto(proto), TypeWitnesses(typeWitnesses),
+        OpenedAssocTypes(openedAssocTypes)
     {
     }
 
@@ -300,7 +303,7 @@ namespace {
         auto known = TypeWitnesses.find(assocType);
         if (known != TypeWitnesses.end())
           replacementType = known->second.Replacement;
-        else
+        else if (cast<ProtocolDecl>(assocType->getDeclContext()) == Proto)
           OpenedAssocTypes[memberTypeVar] = assocType;
 
         // Let the member type variable float; we don't want to
@@ -411,7 +414,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   // mapped to their archetypes directly.
   llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
   DeclContext *reqDC = req->getPotentialGenericDeclContext();
-  RequirementTypeOpener reqTypeOpener(reqDC, typeWitnesses, openedAssocTypes);
+  RequirementTypeOpener reqTypeOpener(reqDC, protocol, typeWitnesses,
+                                      openedAssocTypes);
   Type reqType, openedFullReqType;
   std::tie(openedFullReqType, reqType)
     = cs.getTypeOfMemberReference(model, req,
@@ -1433,9 +1437,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   // Set any missing type witnesses.
   for (auto typeWitness : TypeWitnesses) {
-    // FIXME: Hack when we've deduced an associated type we shouldn't.
-    if (!conformance->hasTypeWitness(typeWitness.first) &&
-        cast<ProtocolDecl>(typeWitness.first->getDeclContext()) == Proto)
+    if (!conformance->hasTypeWitness(typeWitness.first))
       conformance->setTypeWitness(typeWitness.first, typeWitness.second);
   }
 
