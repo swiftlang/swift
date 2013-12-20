@@ -113,7 +113,7 @@ namespace {
 /// \brief Retrieve the kind of requirement described by the given declaration,
 /// for use in some diagnostics.
 /// FIXME: Enumify this.
-int getRequirementKind(ValueDecl *VD) {
+static int getRequirementKind(ValueDecl *VD) {
   if (isa<FuncDecl>(VD))
     return 0;
 
