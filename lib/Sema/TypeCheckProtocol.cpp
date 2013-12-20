@@ -52,7 +52,6 @@ namespace {
     Type Adoptee;
     DeclContext *DC;
     SourceLoc Loc;
-    TypeWitnessMap &TypeWitnesses;
     SmallVectorImpl<AssociatedTypeDecl *> &UnresolvedAssocTypes;
     SmallVectorImpl<std::pair<AssociatedTypeDecl *, Type>> &DeducedAssocTypes;
     bool &AlreadyComplained;
@@ -63,11 +62,21 @@ namespace {
     /// Record that the given optional requirement has no witness.
     void recordOptionalWitness(ValueDecl *requirement);
 
+    /// Record a type witness.
+    ///
+    /// \param assocType The associated type whose witness is being recorded.
+    ///
+    /// \param type The witness type.
+    ///
+    /// \param wasDeducedOrDefaulted Whether this witness was deduced or
+    /// defaulted (rather than being explicitly provided).
+    void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
+                           bool wasDeducedOrDefaulted);
+
   public:
     ConformanceChecker(TypeChecker &tc,
                        NormalProtocolConformance *conformance,
                        DeclContext *dc,
-                       TypeWitnessMap &typeWitnesses,
                        SmallVectorImpl<AssociatedTypeDecl *> &
                          unresolvedAssocTypes,
                        SmallVectorImpl<std::pair<AssociatedTypeDecl *,Type>> &
@@ -77,7 +86,6 @@ namespace {
         Proto(conformance->getProtocol()),
         Adoptee(conformance->getType()), DC(dc),
         Loc(conformance->getLoc()),
-        TypeWitnesses(typeWitnesses),
         UnresolvedAssocTypes(unresolvedAssocTypes),
         DeducedAssocTypes(deducedAssocTypes),
         AlreadyComplained(alreadyComplained) { }
@@ -264,18 +272,18 @@ namespace {
     /// The type variable that represents the 'Self' type.
     TypeVariableType *SelfTypeVar = nullptr;
 
+    NormalProtocolConformance *Conformance;
     DeclContext *DC;
     ProtocolDecl *Proto;
-    TypeWitnessMap &TypeWitnesses;
     llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> &OpenedAssocTypes;
 
   public:
     RequirementTypeOpener(
-        DeclContext *dc, ProtocolDecl *proto,
-        TypeWitnessMap &typeWitnesses,
+        NormalProtocolConformance *conformance,
+        DeclContext *dc,
         llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl*>
           &openedAssocTypes)
-      : DC(dc), Proto(proto), TypeWitnesses(typeWitnesses),
+      : Conformance(conformance), DC(dc), Proto(conformance->getProtocol()),
         OpenedAssocTypes(openedAssocTypes)
     {
     }
@@ -297,13 +305,14 @@ namespace {
                                           Type &replacementType) {
       // If the base is our 'Self' type, we might have a witness for this
       // associated type already.
-      if (baseTypeVar == SelfTypeVar) {
+      if (baseTypeVar == SelfTypeVar &&
+          cast<ProtocolDecl>(assocType->getDeclContext()) == Proto) {
         // If we know about this associated type already, we know its
         // replacement type. Otherwise, record it.
-        auto known = TypeWitnesses.find(assocType);
-        if (known != TypeWitnesses.end())
-          replacementType = known->second.Replacement;
-        else if (cast<ProtocolDecl>(assocType->getDeclContext()) == Proto)
+        if (Conformance->hasTypeWitness(assocType))
+          replacementType = Conformance->getTypeWitness(assocType, nullptr)
+                              .Replacement;
+        else
           OpenedAssocTypes[memberTypeVar] = assocType;
 
         // Let the member type variable float; we don't want to
@@ -338,11 +347,12 @@ namespace {
 ///
 /// \returns the result of performing the match.
 static RequirementMatch
-matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
-             ValueDecl *req,
-             Type model, ValueDecl *witness,
-             TypeWitnessMap &typeWitnesses) {
+matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
+
+  auto protocol = conformance->getProtocol();
+  auto model = conformance->getType();
 
   /// Make sure the witness is of the same kind as the requirement.
   if (req->getKind() != witness->getKind())
@@ -414,8 +424,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
   // mapped to their archetypes directly.
   llvm::DenseMap<TypeVariableType *, AssociatedTypeDecl *> openedAssocTypes;
   DeclContext *reqDC = req->getPotentialGenericDeclContext();
-  RequirementTypeOpener reqTypeOpener(reqDC, protocol, typeWitnesses,
-                                      openedAssocTypes);
+  RequirementTypeOpener reqTypeOpener(conformance, reqDC, openedAssocTypes);
   Type reqType, openedFullReqType;
   std::tie(openedFullReqType, reqType)
     = cs.getTypeOfMemberReference(model, req,
@@ -592,8 +601,8 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
 
 /// Clean up the given requirement type for display purposes.
 static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
-                                         Type model, ValueDecl *req,
-                                         const TypeWitnessMap &typeWitnesses) {
+                                         NormalProtocolConformance *conformance,
+                                         ValueDecl *req) {
   auto type = getTypeForDisplay(tc, module, req);
 
   // Replace generic type parameters and associated types with their
@@ -603,15 +612,16 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
     // If a dependent member refers to an associated type, replace it.
     if (auto member = type->getAs<DependentMemberType>()) {
       if (member->getBase()->isEqual(selfTy)) {
-        auto witness = typeWitnesses.find(member->getAssocType());
-        if (witness != typeWitnesses.end())
-          return witness->second.Replacement;
+        // FIXME: Could handle inherited conformances here.
+        if (conformance->hasTypeWitness(member->getAssocType()))
+          return conformance->getTypeWitness(member->getAssocType(), nullptr)
+                   .Replacement;
       }
     }
 
-    // Replace 'Self' with the model type.
+    // Replace 'Self' with the conforming type type.
     if (type->isEqual(selfTy))
-      return model;
+      return conformance->getType();
 
     return type;
   });
@@ -735,12 +745,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 
   // Record the associated type deductions.
   for (auto deduction : match.AssociatedTypeDeductions) {
-    auto assocType = deduction.first;
-    auto archetype = assocType->getArchetype();
-
-    // Compute the archetype substitution.
-    TypeWitnesses[assocType]
-      = getArchetypeSubstitution(TC, DC, archetype, deduction.second);
+    recordTypeWitness(deduction.first, deduction.second, true);
   }
 
   // Remove the now-resolved associated types from the set of
@@ -749,13 +754,15 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
     std::remove_if(UnresolvedAssocTypes.begin(),
                    UnresolvedAssocTypes.end(),
                    [&](AssociatedTypeDecl *assocType) {
-                     auto known = TypeWitnesses.find(assocType);
-                     if (known == TypeWitnesses.end())
-                       return false;
+                     if (Conformance->hasTypeWitness(assocType)) {
+                       DeducedAssocTypes.push_back(
+                         {assocType,
+                          Conformance->getTypeWitness(assocType, nullptr)
+                             .Replacement});
+                       return true;
+                     }
 
-                     DeducedAssocTypes.push_back(
-                       {assocType, known->second.Replacement});
-                     return true;
+                     return false;
                    }),
     UnresolvedAssocTypes.end());
 }
@@ -770,6 +777,26 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
   // Record that there is no witness.
   Conformance->setWitness(requirement, ConcreteDeclRef());
+}
+
+void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
+                                           Type type,
+                                           bool wasDeducedOrDefaulted) {
+  // If we already recoded this type witness, there's nothing to do.
+  if (Conformance->hasTypeWitness(assocType)) {
+    assert(Conformance->getTypeWitness(assocType, nullptr).Replacement
+             ->isEqual(type) && "Conflicting type witness deductions");
+    return;
+  }
+
+  // Record the type witness.
+  Conformance->setTypeWitness(
+    assocType,
+    getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type));
+
+  // Note whether this witness was deduced or defaulted.
+  if (wasDeducedOrDefaulted)
+    Conformance->addDefaultDefinition(assocType);
 }
 
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
@@ -815,8 +842,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
     if (!witness->hasType())
       TC.validateDecl(witness, true);
 
-    auto match = matchWitness(TC, Proto, DC, requirement, Adoptee, witness,
-                              TypeWitnesses);
+    auto match = matchWitness(TC, Conformance, DC, requirement, witness);
     if (match.isViable()) {
       ++numViable;
       bestIdx = matches.size();
@@ -910,7 +936,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
 
   // Determine the type that the requirement is expected to have.
   Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
-                                              Adoptee, requirement, TypeWitnesses);
+                                              Conformance, requirement);
 
   // Point out the requirement that wasn't met.
   TC.diagnose(requirement,
@@ -952,8 +978,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto match = matchWitness(TC, Proto, DC, requirement, Adoptee, derived,
-                            TypeWitnesses);
+  auto match = matchWitness(TC, Conformance, DC, requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
     return ResolveWitnessResult::Success;
@@ -985,8 +1010,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
   // Determine the type that the requirement is expected to have.
   Type reqType = getRequirementTypeForDisplay(TC, DC->getParentModule(),
-                                              Adoptee, requirement,
-                                              TypeWitnesses);
+                                              Conformance, requirement);
 
   // Point out the requirement that wasn't met.
   TC.diagnose(requirement, diag::no_witnesses,
@@ -1063,10 +1087,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   // If there is a single viable candidate, form a substitution for it.
-  auto archetype = assocType->getArchetype();
   if (viable.size() == 1) {
-    TypeWitnesses[assocType] =
-      getArchetypeSubstitution(TC, DC, archetype, viable.front().second);
+    recordTypeWitness(assocType, viable.front().second, false);
     return ResolveWitnessResult::Success;
   }
 
@@ -1114,8 +1136,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
   // FIXME: Base this on dependent types rather than archetypes?
   TypeSubstitutionMap substitutions;
   substitutions[Proto->getSelf()->getArchetype()] = Adoptee;
-  for (const auto &witness: TypeWitnesses) {
-    substitutions[witness.second.Archetype] = witness.second.Replacement;
+  for (auto member : Proto->getMembers()) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (Conformance->hasTypeWitness(assocType))
+        substitutions[assocType->getArchetype()]
+          = Conformance->getTypeWitness(assocType, nullptr).Replacement;
+    }
   }
   auto defaultType = TC.substType(DC->getParentModule(),
                                   assocType->getDefaultDefinitionLoc().getType(),
@@ -1136,9 +1162,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
   } 
   
   // Fill in the type witness and declare success.
-  auto archetype = assocType->getArchetype();
-  TypeWitnesses[assocType] = getArchetypeSubstitution(TC, DC, archetype, 
-                                                      defaultType);
+  recordTypeWitness(assocType, defaultType, true);
   return ResolveWitnessResult::Success;
 }
 
@@ -1172,9 +1196,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
   } 
   
   // Fill in the type witness and declare success.
-  auto archetype = assocType->getArchetype();
-  TypeWitnesses[assocType] = getArchetypeSubstitution(TC, DC, archetype, 
-                                                      derivedType);
+  recordTypeWitness(assocType, derivedType, true);
   return ResolveWitnessResult::Success;
 }
 
@@ -1210,8 +1232,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     bool isExplicit = ExplicitConformance != nullptr;
     TC.Context.ConformsTo[key] = ConformanceEntry(conformance, isExplicit);
   }
-
-  TypeWitnessMap TypeWitnesses;
 
   // See whether we can derive members of this conformance.
   NominalTypeDecl *DerivingTypeDecl = nullptr;
@@ -1258,7 +1278,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
 
   // The conformance checker we're using.
-  ConformanceChecker checker(TC, conformance, DC, TypeWitnesses,
+  ConformanceChecker checker(TC, conformance, DC,
                              unresolvedAssocTypes, deducedAssocTypes,
                              Complained);
 
@@ -1367,7 +1387,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     switch (checker.resolveTypeWitnessViaDefault(assocType)) {
     case ResolveWitnessResult::Success:
       deducedAssocTypes.push_back(
-        {assocType, TypeWitnesses[assocType].Replacement});
+        {assocType,
+         conformance->getTypeWitness(assocType, nullptr).Replacement});
       return true;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -1381,7 +1402,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     switch (checker.resolveTypeWitnessViaDerivation(assocType)) {
     case ResolveWitnessResult::Success:
       deducedAssocTypes.push_back(
-        {assocType, TypeWitnesses[assocType].Replacement});
+        {assocType,
+          conformance->getTypeWitness(assocType, nullptr).Replacement});
       return true;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -1430,15 +1452,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // FIXME: Do this as soon as we select a default.
   for (auto deduced : deducedAssocTypes) {
     conformance->addDefaultDefinition(deduced.first);
-  }
-
-  // FIXME: There's no need to have two copies of these maps. Poke at the
-  // conformance directly.
-
-  // Set any missing type witnesses.
-  for (auto typeWitness : TypeWitnesses) {
-    if (!conformance->hasTypeWitness(typeWitness.first))
-      conformance->setTypeWitness(typeWitness.first, typeWitness.second);
   }
 
   conformance->setState(ProtocolConformanceState::Complete);
