@@ -1150,9 +1150,25 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                                ? ExplicitConformance->getModuleContext()
                                : nullptr;
 
-  NormalProtocolConformance *conformance
-    = TC.Context.getConformance(T, Proto, ComplainLoc, conformingModule,
-                                ProtocolConformanceState::Incomplete);
+  // Find or create the conformance for this type.
+  NormalProtocolConformance *conformance;
+  ASTContext::ConformsToMap::key_type key(T->getCanonicalType(), Proto);
+  auto knownConformance = TC.Context.ConformsTo.find(key);
+  if (knownConformance != TC.Context.ConformsTo.end() &&
+      knownConformance->second.getPointer()) {
+    // Get the normal protocol conformance.
+    conformance = cast<NormalProtocolConformance>(
+                    knownConformance->second.getPointer());
+  } else {
+    // Create and record this conformance.
+    conformance = TC.Context.getConformance(
+                    T, Proto, ComplainLoc,
+                    conformingModule,
+                    ProtocolConformanceState::Incomplete);
+
+    bool isExplicit = ExplicitConformance != nullptr;
+    TC.Context.ConformsTo[key] = ConformanceEntry(conformance, isExplicit);
+  }
 
   WitnessMap Mapping;
   TypeWitnessMap TypeWitnesses;
@@ -1515,121 +1531,6 @@ existentialConformsToItself(TypeChecker &tc,
   return true;
 }
 
-/// Retrieve the given declaration context as either a nominal or extension
-/// declaration, or null if it is neither.
-static Decl *getNominalOrExtensionDecl(DeclContext *dc) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal;
-
-  return dyn_cast<ExtensionDecl>(dc);
-}
-
-/// Given an implicitly-generated protocol conformance, complain and
-/// suggest explicit conformance.
-static void suggestExplicitConformance(TypeChecker &tc,
-                                       SourceLoc complainLoc,
-                                       Type type,
-                                       ProtocolConformance *conformance) {
-  auto proto = conformance->getProtocol();
-
-  // Complain that we don't have explicit conformance.
-  tc.diagnose(complainLoc, diag::type_does_not_explicitly_conform,
-              type, proto->getDeclaredType());
-
-  // Figure out where to hang the explicit conformance for the Fix-It.
-  Decl *owner = nullptr;
-  for (auto req : proto->getMembers()) {
-    auto valueReq = dyn_cast<ValueDecl>(req);
-    if (!valueReq)
-      continue;
-
-    // If we used a default definition, ignore this requirement.
-    if (conformance->usesDefaultDefinition(valueReq))
-      continue;
-
-    // Look for the owner of this witness.
-    Decl *witnessOwner = nullptr;
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      auto witnessTy = conformance->getTypeWitness(assocType, &tc).Replacement;
-      if (auto nameAlias = dyn_cast<NameAliasType>(witnessTy.getPointer())) {
-        witnessOwner = getNominalOrExtensionDecl(
-                         nameAlias->getDecl()->getDeclContext());
-      } else if (auto nominal = witnessTy->getAnyNominal()) {
-        witnessOwner = getNominalOrExtensionDecl(nominal->getDeclContext());
-      }
-    } else if (auto witness = conformance->getWitness(valueReq, &tc).getDecl()) {
-      witnessOwner = getNominalOrExtensionDecl(witness->getDeclContext());
-    }
-
-    // If the owner was not a declaration, or if we found the same owner
-    // twice, there's nothing to update.
-    if (!witnessOwner || witnessOwner == owner)
-      continue;
-
-    // If the witness owner is not a source file in this module, then we don't
-    // want to suggest it as a place to hang the explicit conformance.
-    // FIXME: Distinguish user source files from imported source files.
-    auto ownerDC = witnessOwner->getDeclContext();
-    if (!isa<SourceFile>(ownerDC->getModuleScopeContext()))
-      continue;
-
-    // We have an owner.
-
-    // If we didn't have an owner, record this as our owner.
-    if (!owner) {
-      owner = witnessOwner;
-      continue;
-    }
-
-    // We have two potential owners. Keep the owner that occurs earlier in the
-    // source file.
-    assert(owner != witnessOwner && "Owners cannot match here.");
-
-    if (tc.Context.SourceMgr.isBeforeInBuffer(witnessOwner->getLoc(),
-                                              owner->getLoc()))
-      owner = witnessOwner;
-  }
-
-  // If we don't have an owner, don't even try to suggest where the explicit
-  // conformance should go.
-  if (!owner)
-    return;
-
-  // Find the inheritance clause and the location where the inheritance clause
-  // would be (if it were missing).
-  ArrayRef<TypeLoc> inherited;
-  SourceLoc inheritedStartLoc;
-  if (auto type = dyn_cast<TypeDecl>(owner)) {
-    inherited = type->getInherited();
-    inheritedStartLoc = type->getLoc();
-  } else {
-    auto ext = cast<ExtensionDecl>(owner);
-    inherited = ext->getInherited();
-    inheritedStartLoc = ext->getExtendedTypeLoc().getSourceRange().End;
-  }
-
-  // If there is no inheritance clause, introduce a new one with just this
-  // conformance...
-  if (inherited.empty()) {
-    auto insertLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                inheritedStartLoc);
-    tc.diagnose(owner->getLoc(), diag::note_add_conformance,
-                proto->getDeclaredType())
-      .fixItInsert(insertLoc, " : " + proto->getDeclaredType()->getString());
-  } else {
-    // ... or tack this conformance onto the end of the existing clause.
-    auto insertLoc
-      = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                   inherited.back().getSourceRange().End);
-    tc.diagnose(inheritedStartLoc, diag::note_add_conformance,
-                proto->getDeclaredType())
-      .fixItInsert(insertLoc, ", " + proto->getDeclaredType()->getString());
-  }
-
-  // FIXME: Update the list of conformances? Update the inheritance clause
-  // itself?
-}
-
 /// Check whether the given archetype conforms to the protocol.
 static bool archetypeConformsToProtocol(TypeChecker &tc, Type type,
                                         ArchetypeType *archetype,
@@ -1724,19 +1625,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
     // If we're just checking for conformance, we already know the answer.
     if (!ExplicitConformance) {
-      // Check whether we know we implicitly conform...
-      if (Known->second.getPointer()) {
-        // We're not allowed to complain; fail.
-        if (ComplainLoc.isInvalid() || Known->second.getPointer()->isInvalid())
-          return false;
-
-        // Complain about explicit conformance and continue as if the user
-        // had written the explicit conformance.
-        suggestExplicitConformance(*this, ComplainLoc, T,
-                                   Known->second.getPointer());
-        return true;
-      }
-
       // If we need to complain, do so.
       if (ComplainLoc.isValid()) {
         diagnose(ComplainLoc, diag::type_does_not_conform, T,
@@ -1747,8 +1635,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     }
 
     // For explicit conformance, force the check again.
-    // FIXME: Detect duplicates here?
-    Context.ConformsTo.erase(Known);
   }
 
   // If we're checking for conformance (rather than stating it),
@@ -1778,64 +1664,23 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return true;
 
     case ConformanceKind::DoesNotConform:
-      // Handled below.
-      break;
+      // FIXME: Could try implicit conformance.
+      if (ComplainLoc.isValid()) {
+        diagnose(ComplainLoc, diag::type_does_not_conform,
+                 T, Proto->getDeclaredType());
+      }
+      return false;
 
     case ConformanceKind::UncheckedConforms:
       llvm_unreachable("Can't get here!");
     }
-
-    // If the type has a type variable, there's nothing to record. Just
-    // report failure.
-    if (T->hasTypeVariable()) {
-      return false;
-    }
-
-    // Cache the failure
-    Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
-
-    // Check whether the type *implicitly* conforms to the protocol.
-    auto *result = checkConformsToProtocol(*this, T, Proto, DC, nullptr,
-                                           SourceLoc());
-    assert(result && "Didn't build any protocol conformance");
-    assert(!result->isIncomplete() && "Retrieved incomplete conformance");
-
-    if (!result->isInvalid()) {
-      // Success! Record the conformance in the cache.
-      Context.ConformsTo[Key].setPointer(result);
-
-      if (Conformance)
-        *Conformance = result;
-
-      // If we can't complain about this, just return now.
-      if (ComplainLoc.isInvalid()) {
-        return false;
-      }
-
-      // Suggest the addition of the explicit conformance.
-      suggestExplicitConformance(*this, ComplainLoc, T, result);
-      return true;
-    }
-
-    if (ComplainLoc.isValid()) {
-      diagnose(ComplainLoc, diag::type_does_not_conform,
-               T, Proto->getDeclaredType());
-    }
-
-    return false;
   }
 
-  // Assume that the type does not conform to this protocol while checking
-  // whether it does in fact conform. This eliminates both infinite recursion
-  // (if the protocol hierarchies are circular) as well as tautologies.
-  Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
+  // Check this protocol's conformance.
   auto result = checkConformsToProtocol(*this, T, Proto, DC,
                                         ExplicitConformance, ComplainLoc);
   assert(result && "Didn't build any protocol conformance");
   assert(!result->isIncomplete() && "Retrieved incomplete conformance");
-
-  // Record the conformance we just computed.
-  Context.ConformsTo[Key] = ConformanceEntry(result, true);
 
   if (Conformance)
     *Conformance = result;

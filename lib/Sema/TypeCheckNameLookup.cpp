@@ -123,7 +123,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
         // FIXME: This is an error path. Should we try to recover?
         ProtocolConformance *conformance = nullptr;
         if (!conformsToProtocol(type, protocol, dc, &conformance) ||
-            !conformance)
+            !conformance || !conformance->isComplete())
           continue;
 
         // Use the type witness.

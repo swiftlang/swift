@@ -1120,11 +1120,6 @@ ERROR(protocol_derivation_is_broken,sema_tcd,none,
       "protocol %1 is broken; cannot derive conformance for type %0", (Type, Type))
 ERROR(type_does_not_inherit,sema_tcd,none,
       "type %0 does not inherit from %1", (Type, Type))
-ERROR(type_does_not_explicitly_conform,sema_tcd,none,
-      "type %0 does not explicitly conform to protocol %1 (but appears to conform)", 
-   (Type, Type))
-NOTE(note_add_conformance,sema_tcd,none,
-     "specify explicit conformance to protocol %0", (Type))
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
