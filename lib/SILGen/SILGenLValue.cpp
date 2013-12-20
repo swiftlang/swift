@@ -198,10 +198,6 @@ SILGenFunction::Writeback::Writeback(SILLocation loc,
 {
 }
 
-LValue SILGenFunction::emitLValue(Expr *e) {
-  return SILGenLValue(*this).visit(e);
-}
-
 RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
   LValue lv = emitLValue(e);
   return RValue(*this, e, emitAddressOfLValue(e, lv));
@@ -448,6 +444,64 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
   };
+  
+  /// Remap an lvalue referencing a generic type to an lvalue of its substituted
+  /// type in a concrete context.
+  class OrigToSubstComponent : public LogicalPathComponent {
+    AbstractionPattern origType;
+    CanType substType;
+    
+  public:
+    OrigToSubstComponent(SILGenFunction &gen,
+                         AbstractionPattern origType, CanType substType)
+      : LogicalPathComponent(getUnsubstitutedTypeData(gen, substType)),
+        origType(origType), substType(substType)
+    {}
+    
+    bool isSettable() const override {
+      return true;
+    }
+    
+    void set(SILGenFunction &gen, SILLocation loc,
+             RValueSource &&rvalue, SILValue base) const override {
+      // Map the value to the original abstraction level.
+      ManagedValue mv = std::move(rvalue).getAsSingleValue(gen);
+      mv = gen.emitSubstToOrigValue(loc, mv, origType, substType);
+      // Store to the base.
+      mv.assignInto(gen, loc, base);
+    }
+    
+    ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                     SILValue base, SGFContext c) const override {
+      // Load the original value.
+      ManagedValue baseVal = gen.emitLoad(loc, base,
+                                          gen.getTypeLowering(base.getType()),
+                                          SGFContext(),
+                                          IsNotTake);
+      // Map the base value to its substituted representation.
+      return gen.emitOrigToSubstValue(loc, baseVal,
+                                      origType, substType, c);
+    }
+    
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &gen, SILLocation loc) const override {
+      LogicalPathComponent *clone
+        = new OrigToSubstComponent(gen, origType, substType);
+      return std::unique_ptr<LogicalPathComponent>(clone);
+    }
+  };
+}
+
+LValue SILGenFunction::emitLValue(Expr *e) {
+  LValue r = SILGenLValue(*this).visit(e);
+  // If the final component is physical with an abstraction change, introduce a
+  // reabstraction component.
+  if (r.isLastComponentPhysical()) {
+    if (r.getOrigFormalType().getAsType() != r.getSubstFormalType())
+      r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
+                                  r.getSubstFormalType());
+  }
+  return r;
 }
 
 LValue SILGenLValue::visitRec(Expr *e) {

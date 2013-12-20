@@ -1319,15 +1319,16 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   // same substitutions to value->getType().
 
   // Canonicalize and lower the l-value's object type.
-  CanType substType =
-    cast<LValueType>(lvalueType->getCanonicalType()).getObjectType();
-  SILType silSubstType = getLoweredType(substType).getAddressType();
+  CanType origType = value->getType()->getCanonicalType();
+  CanType substType
+    = cast<LValueType>(lvalueType->getCanonicalType()).getObjectType();
+  SILType silSubstType
+    = getLoweredType(AbstractionPattern(origType), substType).getAddressType();
   substType = silSubstType.getSwiftRValueType();
 
   // Fast path: if the unsubstituted type from the variable equals the
   // substituted type from the l-value, there's nothing to do.
-  CanType valueType = value->getType()->getCanonicalType();
-  if (valueType == substType)
+  if (origType == substType)
     return silSubstType;
 
   // Type substitution preserves structural type structure, and the
@@ -1337,7 +1338,7 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
 
   // The only really significant manipulation there is with [weak] and
   // [unowned].
-  if (auto refType = dyn_cast<ReferenceStorageType>(valueType)) {
+  if (auto refType = dyn_cast<ReferenceStorageType>(origType)) {
     // Strip Optional<> off of [weak] types.
     if (isa<WeakStorageType>(refType))
       substType = cast<BoundGenericType>(substType).getGenericArgs()[0];

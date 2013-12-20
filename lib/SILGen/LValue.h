@@ -195,6 +195,15 @@ public:
     return true;
   }
   
+  /// Is the lvalue's final component physical?
+  bool isLastComponentPhysical() const {
+    assert(isValid());
+    auto component = begin(), next = begin(), e = end();
+    ++next;
+    for (; next != e; component = next, ++next) { }
+    return component->isPhysical();
+  }
+  
   /// Add a new component at the end of the access path of this lvalue.
   template <class T, class... A> T &add(A &&...args) {
     T &component = Path.add<T>(std::forward<A>(args)...);
