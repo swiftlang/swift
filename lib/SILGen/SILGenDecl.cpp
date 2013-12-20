@@ -190,6 +190,7 @@ class DestroyValueCleanup : public Cleanup {
   SILValue v;
 public:
   DestroyValueCleanup(SILValue v) : v(v) {}
+  
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.emitDestroyValueOperation(l, v);
   }
@@ -207,7 +208,7 @@ public:
   }
 };
 
-/// Cleanup to destroy an initialized variable.
+/// Cleanup to destroy an initialized 'var' variable.
 class DestroyLocalVariable : public Cleanup {
   VarDecl *Var;
 public:
@@ -240,7 +241,7 @@ public:
   }
 };
 
-/// An initialization of a local variable.
+/// An initialization of a local 'var'.
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
   VarDecl *Var;
@@ -288,6 +289,53 @@ public:
     DidFinish = true;
   }
 };
+
+/// Initialize a writeback buffer that receives the value of a 'let'
+/// declaration.
+class LetValueInitialization : public Initialization {
+  /// The VarDecl for the let decl.
+  VarDecl *vd;
+  SILGenFunction &Gen;
+  /// The cleanup we pushed to destroy the local variable.
+  CleanupHandle DestroyCleanup;
+  
+  bool DidFinish = false;
+public:
+  LetValueInitialization(VarDecl *vd, SILGenFunction &gen)
+  : Initialization(Initialization::Kind::LetValue), vd(vd), Gen(gen) {
+    // Push a cleanup to destroy the let declaration.  This has to be
+    // inactive until the variable is initialized: if control flow exits the
+    // before the value is bound, we don't want to destroy the value.
+    gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(
+                                                CleanupState::Dormant, vd);
+    DestroyCleanup = gen.Cleanups.getTopCleanup();
+  }
+  
+  ~LetValueInitialization() override {
+    assert(DidFinish && "did not call LetValueInit::finishInitialization!");
+  }
+  
+  SILValue getAddressOrNull() override {
+    llvm_unreachable("let arguments are not addressable");
+  }
+  ArrayRef<InitializationPtr> getSubInitializations() override {
+    return {};
+  }
+  
+  void bindValue(SILValue value, SILGenFunction &gen) override{
+    assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
+    gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
+  }
+  
+  void finishInitialization(SILGenFunction &gen) override {
+    assert(!DidFinish &&
+           "called LetValueInit::finishInitialization twice!");
+    Gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
+    DidFinish = true;
+  }
+};
+
+
   
 /// An initialization for a global variable.
 class GlobalInitialization : public SingleBufferInitialization {
@@ -381,30 +429,6 @@ public:
   }
 };
 
-/// Initialize a writeback buffer that receives the "in" value of a inout
-/// argument on function entry and writes the "out" value back to the inout
-/// address on function exit.
-class LetValueInitialization : public Initialization {
-  /// The VarDecl for the let decl.
-  VarDecl *vd;
-public:
-  LetValueInitialization(VarDecl *vd)
-  : Initialization(Initialization::Kind::LetValue), vd(vd) {}
-
-  SILValue getAddressOrNull() override {
-    llvm_unreachable("let arguments are not addressable");
-  }
-  ArrayRef<InitializationPtr> getSubInitializations() override {
-    return {};
-  }
-
-  void bindValue(SILValue value, SILGenFunction &gen) override{
-    assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
-    gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
-  }
-};
-
-
   
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -463,7 +487,7 @@ struct InitializationForPattern
     // If this is a 'let' initialization for a non-address-only type, set up a
     // let binding, which stores the initialization value into VarLocs directly.
     if (vd->isLet() && !Gen.getTypeLowering(vd->getType()).isAddressOnly())
-      return InitializationPtr(new LetValueInitialization(vd));
+      return InitializationPtr(new LetValueInitialization(vd, Gen));
     
     // Otherwise, we have a normal local-variable initialization.
     auto varInit = Gen.emitLocalVariableWithCleanup(vd);
@@ -679,7 +703,6 @@ struct ArgumentInitVisitor :
       SILValue arg = makeArgument(P->getType(), f.begin(), loc);
       assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(arg);
-      gen.Cleanups.pushCleanup<DestroyValueCleanup>(arg);
       I->finishInitialization(gen);
       return arg;
     }
@@ -1347,6 +1370,13 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
   
   auto loc = VarLocs[vd];
+  assert(loc.isConstant() == vd->isLet());
+  
+  // For a 'let' binding, we just emit a destroy_value of the value.
+  if (vd->isLet()) {
+    B.emitDestroyValueOperation(silLoc, loc.getConstant());
+    return;
+  }
   
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.

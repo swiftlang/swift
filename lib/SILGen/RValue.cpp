@@ -241,6 +241,12 @@ public:
 
     case Initialization::Kind::LetValue:
       I->bindValue(result.getValue(), gen);
+        
+      // Disable the rvalue expression cleanup, since the let value
+      // initialization has a cleanup that lives for the entire scope of the let
+      // declaration.
+      if (result.hasCleanup())
+        result.forwardCleanup(gen);
       I->finishInitialization(gen);
       return;
     }
