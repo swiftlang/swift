@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
+#include <functional>
 #include <string>
 
 namespace swift {
@@ -56,17 +57,15 @@ public:
   /// Look through the given type and its children to find a type for
   /// which the given predicate returns true.
   ///
-  /// \param pred A predicate function object with the signature
-  /// \c bool(Type). It should return true if the give type node satisfies the
-  /// criteria.
+  /// \param pred A predicate function object. It should return true if the give
+  /// type node satisfies the criteria.
   ///
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
-  template<typename Pred>
-  bool findIf(const Pred &pred) const;
+  bool findIf(const std::function<bool(Type)> &pred) const;
 
   /// Transform the given type by applying the user-provided function to
-  /// each type
+  /// each type.
   ///
   /// This routine applies the given function to transform one type into
   /// another. If the function leaves the type unchanged, recurse into the
@@ -80,8 +79,7 @@ public:
   /// accepts a type and returns either a transformed type or a null type.
   ///
   /// \returns the result of transforming the type.
-  template<typename F>
-  Type transform(const F &fn) const;
+  Type transform(const std::function<Type(Type)> &fn) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.

@@ -1565,3 +1565,584 @@ Identifier DependentMemberType::getName() const {
   return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
 }
 
+
+Type Type::transform(const std::function<Type(Type)> &fn) const {
+  // Transform this type node.
+  Type transformed = fn(*this);
+
+  // If the client changed the type, we're done.
+  if (!transformed || transformed.getPointer() != getPointer())
+    return transformed;
+
+  // Recursive into children of this type.
+  TypeBase *base = getPointer();
+  switch (base->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::TypeVariable:
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
+    return *this;
+
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Class: {
+    auto nominalTy = cast<NominalType>(base);
+    if (auto parentTy = nominalTy->getParent()) {
+      parentTy = parentTy.transform(fn);
+      if (!parentTy)
+        return Type();
+
+      if (parentTy.getPointer() == nominalTy->getParent().getPointer())
+        return *this;
+
+      return NominalType::get(nominalTy->getDecl(), parentTy,
+                              Ptr->getASTContext());
+    }
+
+    return *this;
+  }
+
+  case TypeKind::SILFunction: {
+    auto fnTy = cast<SILFunctionType>(base);
+    SILResultInfo origResult = fnTy->getResult();
+    Type transResult = origResult.getType().transform(fn);
+    if (!transResult)
+      return Type();
+    auto canTransResult = transResult->getCanonicalType();
+    bool changed = (canTransResult != origResult.getType());
+
+    SmallVector<SILParameterInfo, 8> transParams;
+    for (auto origParam : fnTy->getParameters()) {
+      Type transParam = origParam.getType().transform(fn);
+      if (!transParam) return Type();
+
+      CanType canTransParam = transParam->getCanonicalType();
+      transParams.push_back(SILParameterInfo(canTransParam,
+                                             origParam.getConvention()));
+      changed = changed || (canTransParam != origParam.getType());
+    }
+
+    if (!changed) return *this;
+
+    return SILFunctionType::get(fnTy->getGenericParams(), fnTy->getExtInfo(),
+                                fnTy->getCalleeConvention(),
+                                transParams,
+                                SILResultInfo(canTransResult,
+                                              origResult.getConvention()),
+                                Ptr->getASTContext());
+  }
+
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage: {
+    auto storageTy = cast<ReferenceStorageType>(base);
+    Type refTy = storageTy->getReferentType();
+    Type substRefTy = refTy.transform(fn);
+    if (!substRefTy)
+      return Type();
+
+    if (substRefTy.getPointer() == refTy.getPointer())
+      return *this;
+
+    return ReferenceStorageType::get(substRefTy, storageTy->getOwnership(),
+                                     Ptr->getASTContext());
+  }
+
+  case TypeKind::UnboundGeneric: {
+    auto unbound = cast<UnboundGenericType>(base);
+    Type substParentTy;
+    if (auto parentTy = unbound->getParent()) {
+      substParentTy = parentTy.transform(fn);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() == parentTy.getPointer())
+        return *this;
+
+      return UnboundGenericType::get(unbound->getDecl(), substParentTy,
+                                     Ptr->getASTContext());
+    }
+
+    return *this;
+  }
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct: {
+    auto bound = cast<BoundGenericType>(base);
+    SmallVector<Type, 4> substArgs;
+    bool anyChanged = false;
+    Type substParentTy;
+    if (auto parentTy = bound->getParent()) {
+      substParentTy = parentTy.transform(fn);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() != parentTy.getPointer())
+        anyChanged = true;
+    }
+
+    for (auto arg : bound->getGenericArgs()) {
+      Type substArg = arg.transform(fn);
+      if (!substArg)
+        return Type();
+      substArgs.push_back(substArg);
+      if (substArg.getPointer() != arg.getPointer())
+        anyChanged = true;
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
+  }
+
+  case TypeKind::Metatype: {
+    auto meta = cast<MetatypeType>(base);
+    auto instanceTy = meta->getInstanceType().transform(fn);
+    if (!instanceTy)
+      return Type();
+
+    if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
+      return *this;
+
+    return MetatypeType::get(instanceTy, Ptr->getASTContext());
+  }
+
+  case TypeKind::NameAlias: {
+    auto alias = cast<NameAliasType>(base);
+    auto underlyingTy = alias->getDecl()->getUnderlyingType().transform(fn);
+    if (!underlyingTy)
+      return Type();
+
+    if (underlyingTy.getPointer() ==
+          alias->getDecl()->getUnderlyingType().getPointer())
+      return *this;
+
+    return SubstitutedType::get(*this, underlyingTy, Ptr->getASTContext());
+  }
+
+  case TypeKind::Paren: {
+    auto paren = cast<ParenType>(base);
+    Type underlying = paren->getUnderlyingType().transform(fn);
+    if (!underlying)
+      return Type();
+
+    if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
+      return *this;
+
+    return ParenType::get(Ptr->getASTContext(), underlying);
+  }
+
+  case TypeKind::Tuple: {
+    auto tuple = cast<TupleType>(base);
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 4> elements;
+    unsigned Index = 0;
+    for (const auto &elt : tuple->getFields()) {
+      Type eltTy = elt.getType().transform(fn);
+      if (!eltTy)
+        return Type();
+
+      // If nothing has changd, just keep going.
+      if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer()) {
+        ++Index;
+        continue;
+      }
+
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
+      if (!anyChanged) {
+        // Copy all of the previous elements.
+        for (unsigned I = 0; I != Index; ++I) {
+          const TupleTypeElt &FromElt =tuple->getFields()[I];
+          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
+                                          FromElt.getDefaultArgKind(),
+                                          FromElt.isVararg()));
+        }
+
+        anyChanged = true;
+      }
+
+      // Add the new tuple element, with the new type, no initializer,
+      elements.push_back(TupleTypeElt(eltTy, elt.getName(),
+                                      elt.getDefaultArgKind(), elt.isVararg()));
+      ++Index;
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return TupleType::get(elements, Ptr->getASTContext());
+  }
+
+
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(base);
+    auto dependentBase = dependent->getBase().transform(fn);
+    if (!dependentBase)
+      return Type();
+
+    if (dependentBase.getPointer() == dependent->getBase().getPointer())
+      return *this;
+
+    return DependentMemberType::get(dependentBase, dependent->getName(),
+                                    Ptr->getASTContext());
+  }
+
+  case TypeKind::Substituted: {
+    auto substAT = cast<SubstitutedType>(base);
+    auto substTy = substAT->getReplacementType().transform(fn);
+    if (!substTy)
+      return Type();
+
+    if (substTy.getPointer() == substAT->getReplacementType().getPointer())
+      return *this;
+
+    return SubstitutedType::get(substAT->getOriginal(), substTy,
+                                Ptr->getASTContext());
+  }
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto function = cast<AnyFunctionType>(base);
+    auto inputTy = function->getInput().transform(fn);
+    if (!inputTy)
+      return Type();
+    auto resultTy = function->getResult().transform(fn);
+    if (!resultTy)
+      return Type();
+
+    if (inputTy.getPointer() == function->getInput().getPointer() &&
+        resultTy.getPointer() == function->getResult().getPointer())
+      return *this;
+
+    // Function types always parenthesized input types, but some clients
+    // (e.g., the type-checker) occasionally perform transformations that
+    // don't abide this. Fix up the input type appropriately.
+    if (!inputTy->hasTypeVariable() &&
+        !isa<ParenType>(inputTy.getPointer()) &&
+        !isa<TupleType>(inputTy.getPointer())) {
+      inputTy = ParenType::get(Ptr->getASTContext(), inputTy);
+    }
+
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(function)) {
+      return PolymorphicFunctionType::get(inputTy, resultTy,
+                                          &polyFn->getGenericParams(),
+                                          function->getExtInfo());
+    }
+
+    return FunctionType::get(inputTy, resultTy,
+                             function->getExtInfo());
+  }
+
+  case TypeKind::GenericFunction: {
+    GenericFunctionType *function = cast<GenericFunctionType>(base);
+    bool anyChanges = false;
+
+    // Transform generic parameters.
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    for (auto param : function->getGenericParams()) {
+      Type paramTy = Type(param).transform(fn);
+      if (!paramTy)
+        return Type();
+
+      if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
+        if (newParam != param)
+          anyChanges = true;
+
+        genericParams.push_back(newParam);
+      } else {
+        anyChanges = true;
+      }
+    }
+
+    // Transform requirements.
+    SmallVector<Requirement, 4> requirements;
+    for (const auto &req : function->getRequirements()) {
+      auto firstType = req.getFirstType().transform(fn);
+      if (!firstType)
+        return Type();
+
+      Type secondType = req.getSecondType();
+      if (secondType) {
+        secondType = secondType.transform(fn);
+        if (!secondType)
+          return Type();
+      }
+
+      if (firstType->isDependentType() || secondType->isDependentType()) {
+        if (firstType.getPointer() != req.getFirstType().getPointer() ||
+            secondType.getPointer() != req.getSecondType().getPointer())
+          anyChanges = true;
+
+        requirements.push_back(Requirement(req.getKind(), firstType,
+                                           secondType));
+      } else
+        anyChanges = true;
+    }
+
+    // Transform input type.
+    auto inputTy = function->getInput().transform(fn);
+    if (!inputTy)
+      return Type();
+
+    // Transform result type.
+    auto resultTy = function->getResult().transform(fn);
+    if (!resultTy)
+      return Type();
+
+    // Check whether anything changed.
+    if (!anyChanges &&
+        inputTy.getPointer() == function->getInput().getPointer() &&
+        resultTy.getPointer() == function->getResult().getPointer())
+      return *this;
+
+    // If no generic parameters remain, this is a non-generic function type.
+    if (genericParams.empty())
+      return FunctionType::get(inputTy, resultTy, function->getExtInfo());
+
+    // Produce the new generic function type.
+    return GenericFunctionType::get(genericParams, requirements, inputTy,
+                                    resultTy, function->getExtInfo());
+  }
+
+  case TypeKind::Array: {
+    auto array = cast<ArrayType>(base);
+    auto baseTy = array->getBaseType().transform(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == array->getBaseType().getPointer())
+      return *this;
+
+    return ArrayType::get(baseTy, array->getSize());
+  }
+
+  case TypeKind::ArraySlice: {
+    auto slice = cast<ArraySliceType>(base);
+    auto baseTy = slice->getBaseType().transform(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == slice->getBaseType().getPointer())
+      return *this;
+
+    return ArraySliceType::get(baseTy);
+  }
+
+  case TypeKind::Optional: {
+    auto optional = cast<OptionalType>(base);
+    auto baseTy = optional->getBaseType().transform(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == optional->getBaseType().getPointer())
+      return *this;
+
+    return OptionalType::get(baseTy);
+  }
+
+  case TypeKind::LValue: {
+    auto lvalue = cast<LValueType>(base);
+    auto objectTy = lvalue->getObjectType().transform(fn);
+    if (!objectTy)
+      return Type();
+
+    if (objectTy.getPointer() == lvalue->getObjectType().getPointer())
+      return *this;
+
+    return LValueType::get(objectTy, lvalue->getQualifiers());
+  }
+
+  case TypeKind::ProtocolComposition: {
+    auto pc = cast<ProtocolCompositionType>(base);
+    SmallVector<Type, 4> protocols;
+    bool anyChanged = false;
+    unsigned index = 0;
+    for (auto proto : pc->getProtocols()) {
+      auto substProto = proto.transform(fn);
+      if (!substProto)
+        return Type();
+      
+      if (anyChanged) {
+        protocols.push_back(substProto);
+        ++index;
+        continue;
+      }
+      
+      if (substProto.getPointer() != proto.getPointer()) {
+        anyChanged = true;
+        protocols.append(protocols.begin(), protocols.begin() + index);
+        protocols.push_back(substProto);
+      }
+      
+      ++index;
+    }
+    
+    if (!anyChanged)
+      return *this;
+    
+    return ProtocolCompositionType::get(Ptr->getASTContext(), protocols);
+  }
+  }
+  
+  llvm_unreachable("Unhandled type in transformation");
+}
+
+
+bool Type::findIf(const std::function<bool(Type)> &pred) const {
+  // Check this type node.
+  if (pred(*this))
+    return true;
+
+  // Recursive into children of this type.
+  TypeBase *base = getPointer();
+  switch (base->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+    case TypeKind::Error:
+    case TypeKind::TypeVariable:
+    case TypeKind::AssociatedType:
+    case TypeKind::GenericTypeParam:
+      return false;
+
+    case TypeKind::Enum:
+    case TypeKind::Struct:
+    case TypeKind::Class:
+      if (auto parentTy = cast<NominalType>(base)->getParent()) {
+        return parentTy.findIf(pred);
+      }
+
+      return false;
+
+    case TypeKind::WeakStorage:
+    case TypeKind::UnownedStorage:
+      return cast<ReferenceStorageType>(base)->getReferentType().findIf(pred);
+
+    case TypeKind::SILFunction: {
+      auto fnTy = cast<SILFunctionType>(base);
+      if (fnTy->getResult().getType().findIf(pred))
+        return true;
+      for (auto param : fnTy->getParameters())
+        if (param.getType().findIf(pred))
+          return true;
+      return false;
+    }
+
+    case TypeKind::UnboundGeneric: {
+      if (auto parentTy = cast<UnboundGenericType>(base)->getParent()) {
+        return parentTy.findIf(pred);
+      }
+
+      return false;
+    }
+
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericEnum:
+    case TypeKind::BoundGenericStruct: {
+      auto bound = cast<BoundGenericType>(base);
+
+      // Check the parent.
+      if (auto parentTy = bound->getParent()) {
+        if (parentTy.findIf(pred))
+          return true;
+      }
+
+      for (auto arg : bound->getGenericArgs()) {
+        if (arg.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::Metatype:
+      return cast<MetatypeType>(base)->getInstanceType().findIf(pred);
+
+    case TypeKind::NameAlias: {
+      auto dependentDecl = cast<NameAliasType>(base)->getDecl();
+      return dependentDecl->getUnderlyingType().findIf(pred);
+    }
+
+    case TypeKind::Paren:
+      return cast<ParenType>(base)->getUnderlyingType().findIf(pred);
+
+    case TypeKind::Tuple: {
+      auto tuple = cast<TupleType>(base);
+      for (const auto &elt : tuple->getFields()) {
+        if (elt.getType().findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::DependentMember:
+      return cast<DependentMemberType>(base)->getBase().findIf(pred);
+
+    case TypeKind::Substituted:
+      return cast<SubstitutedType>(base)->getReplacementType().findIf(pred);
+
+    case TypeKind::Function:
+    case TypeKind::PolymorphicFunction: {
+      auto function = cast<AnyFunctionType>(base);
+      // FIXME: Polymorphic function's generic parameters and requirements.
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
+    case TypeKind::GenericFunction: {
+      auto function = cast<GenericFunctionType>(base);
+      for (auto param : function->getGenericParams())
+        if (Type(param).findIf(pred))
+          return true;
+      for (const auto &req : function->getRequirements()) {
+        if (req.getFirstType().findIf(pred))
+          return true;
+
+        switch (req.getKind()) {
+        case RequirementKind::SameType:
+        case RequirementKind::Conformance:
+          if (req.getSecondType().findIf(pred))
+            return true;
+          break;
+
+        case RequirementKind::ValueWitnessMarker:
+          break;
+        }
+      }
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
+    case TypeKind::Array:
+      return cast<ArrayType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::ArraySlice:
+      return cast<ArraySliceType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::Optional:
+      return cast<OptionalType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::LValue:
+      return cast<LValueType>(base)->getObjectType().findIf(pred);
+
+    case TypeKind::ProtocolComposition: {
+      auto pc = cast<ProtocolCompositionType>(base);
+      for (auto proto : pc->getProtocols()) {
+        if (proto.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+  }
+  
+  llvm_unreachable("Unhandled type in transformation");
+}
