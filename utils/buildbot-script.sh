@@ -34,6 +34,7 @@ KNOWN_SETTINGS=(
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-package-sourcekit      ""               "set to skip packaging SourceKit"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
+    run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
 )
 
 function toupper() {
@@ -278,6 +279,17 @@ SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
 )
 
+ASAN_CMAKE_OPTIONS=(
+    -DCMAKE_C_COMPILER="${RUN_WITH_ASAN_COMPILER}"
+    -DCMAKE_CXX_COMPILER="${RUN_WITH_ASAN_COMPILER}++"
+    -DCMAKE_C_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    -DCMAKE_CXX_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
+    -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+    -DSOURCEKIT_USE_INPROC_LIBRARY="ON"
+    -DSWIFT_ASAN_BUILD="ON"
+)
+
 # Build each one. Note: in this block, names beginning with underscore
 # are used indirectly to access product-specific variables.
 for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
@@ -293,9 +305,14 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
             mkdir -p "${!_PRODUCT_BUILD_DIR}"
 
             _PRODUCT_CMAKE_OPTIONS=${PRODUCT}_CMAKE_OPTIONS[@]
+            if [[ "${RUN_WITH_ASAN_COMPILER}" ]]; then
+              _ASAN_OPTIONS=ASAN_CMAKE_OPTIONS[@]
+            fi
+              
             (cd "${!_PRODUCT_BUILD_DIR}" &&
                 "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
                     "${!_PRODUCT_CMAKE_OPTIONS}" \
+                    "${!_ASAN_OPTIONS}" \
                     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
                     -D${PRODUCT}_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
                     -D${PRODUCT}_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \

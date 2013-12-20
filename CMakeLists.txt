@@ -142,6 +142,7 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
+set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
@@ -561,12 +562,22 @@ macro(add_swift_executable name)
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
   link_system_libs( ${name} )
 
-  set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
-  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set_target_properties(${name}
-      PROPERTIES
-      LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main    -Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+  set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
+  # ASan does not play well with exported_symbol option. This should be fixed soon.
+  if(${SWIFT_ASAN_BUILD} MATCHES OFF OR ${SWIFT_ASAN_BUILD} MATCHES NO) 
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      set_target_properties(${name}
+        PROPERTIES
+        LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main    -Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+    endif()
+  else()
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      set_target_properties(${name}
+        PROPERTIES
+        LINK_FLAGS "-Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+    endif()
   endif()
+
 endmacro(add_swift_executable)
 
 # Add compiler flags for a target.
