@@ -1635,7 +1635,7 @@ void ProtocolConformance::printName(llvm::raw_ostream &os) const {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
-       << " module " << normal->getContainingModule()->Name;
+       << " module " << normal->getDeclContext()->getParentModule()->Name;
     break;
   }
   case ProtocolConformanceKind::Specialized: {

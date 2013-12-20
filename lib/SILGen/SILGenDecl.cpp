@@ -1954,7 +1954,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // witness type.
   auto witnessSubstTy = cast<AnyFunctionType>(
     requirementTy
-      ->substGenericArgs(conformance->getContainingModule(),
+      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
                          conformance->getType())
       ->getCanonicalType());
   // If the conformance is generic, its generic parameters apply to

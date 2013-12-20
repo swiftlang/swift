@@ -486,7 +486,7 @@ public:
   getConformance(Type conformingType,
                  ProtocolDecl *protocol,
                  SourceLoc loc,
-                 Module *containingModule,
+                 DeclContext *dc,
                  ProtocolConformanceState state);
 
   /// \brief Produce a specialized conformance, which takes a generic

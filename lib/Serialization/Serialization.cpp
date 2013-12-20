@@ -592,7 +592,7 @@ Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
 
     // BUILTIN_MODULE_ID is a sentinel for a trailing underlying conformance
     // record.
-    moduleID = addModuleRef(conformance->getContainingModule());
+    moduleID = addModuleRef(conformance->getDeclContext()->getParentModule());
     assert(moduleID != serialization::BUILTIN_MODULE_ID);
   }
 

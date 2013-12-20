@@ -794,12 +794,11 @@ NormalProtocolConformance *
 ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
                            SourceLoc loc,
-                           Module *containingModule,
+                           DeclContext *dc,
                            ProtocolConformanceState state) {
   auto result
     = new (*this) NormalProtocolConformance(conformingType, protocol, loc,
-                                            containingModule,
-                                            state);
+                                            dc, state);
   Impl.NormalConformances.push_back(result);
   return result;
 }

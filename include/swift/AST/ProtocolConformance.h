@@ -103,8 +103,9 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const;
 
-  /// Get the module that contains the conforming extension or type declaration.
-  Module *getContainingModule() const;
+  /// Get the declaration context that contains the conforming extension or
+  /// nominal type declaration.
+  DeclContext *getDeclContext() const;
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const;
@@ -237,9 +238,9 @@ class NormalProtocolConformance : public ProtocolConformance {
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
-  /// \brief The module containing the ExtensionDecl or NominalTypeDecl that
-  /// declared the conformance.
-  Module *ContainingModule;
+  /// \brief The declaration context containing the ExtensionDecl or
+  /// NominalTypeDecl that declared the conformance.
+  DeclContext *DC;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -259,15 +260,11 @@ class NormalProtocolConformance : public ProtocolConformance {
 
   friend class ASTContext;
 
-  NormalProtocolConformance(Type conformingType,
-                            ProtocolDecl *protocol,
-                            SourceLoc loc,
-                            Module *containingModule,
+  NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
+                            SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state),
-      Loc(loc),
-      ContainingModule(containingModule)
+      ProtocolAndState(protocol, state), Loc(loc), DC(dc)
   {
   }
 
@@ -278,12 +275,16 @@ public:
   /// Retrieve the location of this 
   SourceLoc getLoc() const { return Loc; }
 
-  /// Get the module that contains the conforming extension or type declaration.
-  Module *getContainingModule() const { return ContainingModule; }
+  /// Get the declaration context that contains the conforming extension or
+  /// nominal type declaration.
+  DeclContext *getDeclContext() const {
+    return DC;
+  }
 
-  /// Override the declaration that provides the conformance.
-  void setContainingModule(Module *containing) {
-    ContainingModule = containing;
+  /// Set the declaration context that contains the conforming extension or
+  /// nominal type declaration.
+  void setDeclContext(DeclContext *dc) {
+    DC = dc;
   }
 
   /// Retrieve the state of this conformance.
@@ -434,9 +435,10 @@ public:
     return GenericConformance->getProtocol();
   }
 
-  /// Get the module that contains the conforming extension or type declaration.
-  Module *getContainingModule() const {
-    return GenericConformance->getContainingModule();
+  /// Get the declaration context that contains the conforming extension or
+  /// nominal type declaration.
+  DeclContext *getDeclContext() const {
+    return GenericConformance->getDeclContext();
   }
 
   /// Retrieve the state of this conformance.
@@ -521,9 +523,10 @@ public:
     return InheritedConformance->getProtocol();
   }
 
-  /// Get the module that contains the conforming extension or type declaration.
-  Module *getContainingModule() const {
-    return InheritedConformance->getContainingModule();
+  /// Get the declaration context that contains the conforming extension or
+  /// nominal type declaration.
+  DeclContext *getDeclContext() const {
+    return InheritedConformance->getDeclContext();
   }
 
   /// Retrieve the state of this conformance.

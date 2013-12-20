@@ -306,7 +306,7 @@ static ProtocolConformance *findConformance(ProtocolDecl *proto,
     return nullptr;
 
   if (conformance->getProtocol() == proto) {
-    if (conformance->getContainingModule() == module)
+    if (conformance->getDeclContext()->getParentModule() == module)
       return conformance;
     return nullptr;
   }
@@ -314,7 +314,7 @@ static ProtocolConformance *findConformance(ProtocolDecl *proto,
   auto &inheritedMap = conformance->getInheritedConformances();
   auto directIter = inheritedMap.find(proto);
   if (directIter != inheritedMap.end()) {
-    if (directIter->second->getContainingModule() == module)
+    if (directIter->second->getDeclContext()->getParentModule() == module)
       return directIter->second;
     return nullptr;
   }
@@ -513,7 +513,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   lastRecordOffset.reset();
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        FileContext->getParentModule(),
+                                        FileContext,
                                         ProtocolConformanceState::Incomplete);
 
   // Set inherited conformances.

@@ -51,9 +51,8 @@ ProtocolDecl *ProtocolConformance::getProtocol() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getProtocol, ())
 }
 
-/// Get the module that contains the conforming extension or type declaration.
-Module *ProtocolConformance::getContainingModule() const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getContainingModule, ())
+DeclContext *ProtocolConformance::getDeclContext() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getDeclContext, ())
 }
 
 /// Retrieve the state of this conformance.
@@ -139,9 +138,11 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   }
 
   auto &genericWitness = GenericConformance->getTypeWitness(assocType, resolver);
-  auto module = getContainingModule();
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
   auto specializedType
-    = genericWitness.Replacement.subst(module, substitutionMap,
+    = genericWitness.Replacement.subst(conformingModule,
+                                       substitutionMap,
                                        /*ignoreMissing=*/false,
                                        resolver);
 
@@ -155,7 +156,8 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   SmallVector<ProtocolConformance *, 4> conformances;
   auto archetype = genericWitness.Archetype;
   for (auto proto : archetype->getConformsTo()) {
-    auto conforms = module->lookupConformance(specializedType, proto, resolver);
+    auto conforms = conformingModule->lookupConformance(specializedType, proto,
+                                                    resolver);
     assert(conforms.getInt() == ConformanceKind::Conforms &&
            "Improperly checked substitution");
     conformances.push_back(conforms.getPointer());

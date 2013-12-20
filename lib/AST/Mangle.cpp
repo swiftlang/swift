@@ -1097,5 +1097,5 @@ void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
   mangleType(conformance->getType()->getCanonicalType(),
              ExplosionKind::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
-  mangleContext(conformance->getContainingModule());
+  mangleContext(conformance->getDeclContext()->getParentModule());
 }

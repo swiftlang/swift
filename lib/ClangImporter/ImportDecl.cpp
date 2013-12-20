@@ -2417,7 +2417,7 @@ namespace {
         NormalProtocolConformance *conformance
           = Ctx.getConformance(dc->getDeclaredTypeOfContext(),
                                proto, SourceLoc(),
-                               dc->getParentModule(),
+                               dc->getModuleScopeContext(),
                                ProtocolConformanceState::Incomplete);
 
         for (auto member : proto->getMembers()) {

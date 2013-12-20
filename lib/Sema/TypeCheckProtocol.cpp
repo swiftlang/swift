@@ -1206,9 +1206,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         DeclContext *DC,
                         Decl *ExplicitConformance,
                         SourceLoc ComplainLoc) {
-  Module *conformingModule = ExplicitConformance
-                               ? ExplicitConformance->getModuleContext()
-                               : nullptr;
+  DeclContext *conformingDC
+    = ExplicitConformance->getDeclContext()->getModuleScopeContext();
 
   // Find or create the conformance for this type.
   NormalProtocolConformance *conformance;
@@ -1223,11 +1222,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // Create and record this conformance.
     conformance = TC.Context.getConformance(
                     T, Proto, ComplainLoc,
-                    conformingModule,
+                    conformingDC,
                     ProtocolConformanceState::Incomplete);
 
-    bool isExplicit = ExplicitConformance != nullptr;
-    TC.Context.ConformsTo[key] = ConformanceEntry(conformance, isExplicit);
+    TC.Context.ConformsTo[key] = ConformanceEntry(conformance, true);
   }
 
   // See whether we can derive members of this conformance.
