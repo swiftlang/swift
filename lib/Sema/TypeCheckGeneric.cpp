@@ -779,16 +779,15 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
     if (i == e-1) {
       funcTy = GenericFunctionType::get(allGenericParams, requirements,
-                                        argTy, funcTy, info, Context);
+                                        argTy, funcTy, info);
       if (initFuncTy)
         initFuncTy = GenericFunctionType::get(allGenericParams, requirements,
-                                              initArgTy, initFuncTy, info,
-                                              Context);
+                                              initArgTy, initFuncTy, info);
     } else {
-      funcTy = FunctionType::get(argTy, funcTy, info, Context);
+      funcTy = FunctionType::get(argTy, funcTy, info);
 
       if (initFuncTy)
-        initFuncTy = FunctionType::get(initArgTy, initFuncTy, info, Context);
+        initFuncTy = FunctionType::get(initArgTy, initFuncTy, info);
     }
   }
 

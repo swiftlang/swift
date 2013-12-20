@@ -571,8 +571,7 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
       return GenericFunctionType::get(genericFn->getGenericParams(), { },
                                       resultFn->getInput(),
                                       resultFn->getResult(),
-                                      resultFn->getExtInfo(),
-                                      tc.Context);
+                                      resultFn->getExtInfo());
     }
   }
 

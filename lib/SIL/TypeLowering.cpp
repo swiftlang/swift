@@ -1073,9 +1073,9 @@ CanType TypeConverter::getMethodSelfType(CanType selfType) const {
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
-static CanAnyFunctionType getGlobalAccessorType(CanType varType,
-                                                ASTContext &C) {
-  return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType, C);
+static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
+  ASTContext &C = varType->getASTContext();
+  return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType);
 }
 
 /// Get the type of a default argument generator, () -> T.
@@ -1084,7 +1084,7 @@ static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
                                                      ASTContext &context) {
   auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
   assert(resultTy && "Didn't find default argument?");
-  return CanFunctionType::get(TupleType::getEmpty(context), resultTy, context);
+  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
 }
 
 /// Get the type of a destructor function, This -> ().
@@ -1100,11 +1100,10 @@ static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
     return CanPolymorphicFunctionType::get(classType,
                                            CanType(C.TheObjectPointerType),
                                            cd->getGenericParams(),
-                                           extInfo,
-                                           C);
+                                           extInfo);
 
   return CanFunctionType::get(classType, CanType(C.TheObjectPointerType),
-                              extInfo, C);
+                              extInfo);
 }
 
 GenericParamList *
@@ -1141,8 +1140,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
     return CanPolymorphicFunctionType::get(funcType.getInput(),
                                            funcType.getResult(),
-                                           genericParams, extInfo,
-                                           Context);
+                                           genericParams, extInfo);
 
   }
 
@@ -1210,10 +1208,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   if (genericParams)
     return CanPolymorphicFunctionType::get(capturedInputs, funcType,
-                                           genericParams, extInfo,
-                                           Context);
+                                           genericParams, extInfo);
   
-  return CanFunctionType::get(capturedInputs, funcType, extInfo, Context);
+  return CanFunctionType::get(capturedInputs, funcType, extInfo);
 }
 
 template <class T>
@@ -1288,7 +1285,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(!var->isComputed() && "constant ref to computed global var");
-    return getGlobalAccessorType(var->getType()->getCanonicalType(), Context);
+    return getGlobalAccessorType(var->getType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator: {
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),

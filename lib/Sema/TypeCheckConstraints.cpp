@@ -119,8 +119,7 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment) {
       }
 
       return FunctionType::get(inputTy, funcTy->getResult(),
-                               funcTy->getExtInfo(),
-                               type->getASTContext());
+                               funcTy->getExtInfo());
     }
   }
 

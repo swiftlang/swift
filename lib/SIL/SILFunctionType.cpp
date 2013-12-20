@@ -29,14 +29,12 @@ CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
     return t;
 
   if (auto ft = dyn_cast<FunctionType>(t))
-    return CanFunctionType::get(ft.getInput(), ft.getResult(),
-                                extInfo, ft->getASTContext());
+    return CanFunctionType::get(ft.getInput(), ft.getResult(), extInfo);
   
   if (auto pft = dyn_cast<PolymorphicFunctionType>(t))
     return CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
                                            &pft->getGenericParams(),
-                                           extInfo,
-                                           pft->getASTContext());
+                                           extInfo);
 
   llvm_unreachable("bad type to pass to adjustFunctionType");
 }
@@ -862,9 +860,9 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
     if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
       return CanPolymorphicFunctionType::get(input, result,
                                              &pft->getGenericParams(),
-                                             extInfo, tc.Context);
+                                             extInfo);
     } else {
-      return CanFunctionType::get(input, result, extInfo, tc.Context);
+      return CanFunctionType::get(input, result, extInfo);
     }
   };
 
@@ -974,9 +972,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
     
     return CanPolymorphicFunctionType::get(inputType, resultType,
                                            curriedGenericParams,
-                                           extInfo, Context);
+                                           extInfo);
   } else {
-    return CanFunctionType::get(inputType, resultType, extInfo, Context);
+    return CanFunctionType::get(inputType, resultType, extInfo);
   }    
 }
 

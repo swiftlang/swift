@@ -202,7 +202,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   Pattern *argParams[] = {selfParam->clone(C, /*Implicit=*/true),
                           rawParam->clone(C, /*Implicit=*/true)};
   Pattern *bodyParams[] = {selfParam, rawParam};
-  auto retTy = OptionalType::get(enumType, C);
+  auto retTy = OptionalType::get(enumType);
   auto fromRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
                                  C.getIdentifier("fromRaw"),
                                  SourceLoc(), nullptr, Type(),

@@ -804,7 +804,7 @@ namespace {
                                    LValueType::Qual::DefaultForMemberAccess);
 
         resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
-                                     resultFnTy->getExtInfo(), ctx);
+                                     resultFnTy->getExtInfo());
       } else {
         ref = ConcreteDeclRef(ctor);
         resultTy = ctor->getInitializerType();
@@ -1647,12 +1647,11 @@ namespace {
       // IndexType -> ElementType type.
       if (expr->hasConstructionFunction()) {
         // FIXME: Assume the index type is DefaultIntegerLiteralType for now.
-        auto intProto = tc.getProtocol(expr->getConstructionFunction()->getLoc(),
-                                       KnownProtocolKind::IntegerLiteralConvertible);
+        auto intProto =
+          tc.getProtocol(expr->getConstructionFunction()->getLoc(),
+                         KnownProtocolKind::IntegerLiteralConvertible);
         Type intTy = tc.getDefaultType(intProto, dc);
-        Type constructionTy = FunctionType::get(intTy,
-                                                elementType,
-                                                tc.Context);
+        Type constructionTy = FunctionType::get(intTy, elementType);
 
         auto constructionFn = expr->getConstructionFunction();
         auto locator = cs.getConstraintLocator(
@@ -1987,7 +1986,7 @@ namespace {
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
-      Type optType = OptionalType::get(valueType, cs.getASTContext());
+      Type optType = OptionalType::get(valueType);
 
       // If the subexpression is of DynamicLookup type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
@@ -2867,8 +2866,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (toFunc->isBlock() && (!fromFunc || !fromFunc->isBlock())) {
       // Coerce the expression to the non-block form of the function type.
       auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
-                                            toFunc->getResult(),
-                                            tc.Context);
+                                            toFunc->getResult());
       expr = coerceToType(expr, toNonBlockTy, locator);
 
       // Bridge to the block form of this function type.

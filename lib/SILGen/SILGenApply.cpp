@@ -43,7 +43,7 @@ static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
                    .withIsThin(true);
 
   return CanFunctionType::get(selfTy, memberType->getCanonicalType(),
-                              extInfo, ctx);
+                              extInfo);
 }
 
 namespace {
@@ -240,9 +240,8 @@ private:
     auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, isThin,
                                          /*noreturn*/ false);
 
-    SubstFormalType = CanFunctionType::get(substSelfType,
-                                           SubstFormalType,
-                                           extInfo, ctx);
+    SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
+                                           extInfo);
   }
 
   SILType getProtocolClosureType(SILGenModule &SGM,
@@ -296,8 +295,7 @@ private:
     auto origFormalType = cast<AnyFunctionType>(OrigFormalType);
     auto selfType = origFormalType.getInput();
     SubstFormalType = CanFunctionType::get(selfType, SubstFormalType,
-                                           origFormalType->getExtInfo(),
-                                           SGM.getASTContext());
+                                           origFormalType->getExtInfo());
   }
 
 public:
@@ -646,10 +644,8 @@ public:
         return;
       }
 
-      fnType = CanFunctionType::get(siteType.getInput(),
-                                    fnType,
-                                    siteType->getExtInfo(),
-                                    gen.getASTContext());
+      fnType = CanFunctionType::get(siteType.getInput(), fnType,
+                                    siteType->getExtInfo());
     };
 
     for (auto callSite : callSites) {
@@ -2377,7 +2373,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // For a computed variable, we want the getter.
     if (member.isAccessor())
       methodTy = CanFunctionType::get(TupleType::getEmpty(getASTContext()),
-                                      methodTy, getASTContext());
+                                      methodTy);
 
     auto dynamicMethodTy = getDynamicMethodType(SGM, operand, member,
                                                 methodTy);

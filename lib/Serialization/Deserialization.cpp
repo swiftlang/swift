@@ -1431,14 +1431,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       ctor->setInitializerType(
         PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
                                      &polyFn->getGenericParams(),
-                                     polyFn->getExtInfo(),
-                                     ctx));
+                                     polyFn->getExtInfo()));
     } else {
       auto fn = allocType->castTo<FunctionType>();
       ctor->setInitializerType(FunctionType::get(selfTy,
                                                  fn->getResult(),
-                                                 fn->getExtInfo(),
-                                                 ctx));
+                                                 fn->getExtInfo()));
     }
 
     // Set the initializer interface type of the constructor.
@@ -1450,14 +1448,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
               GenericFunctionType::get(polyFn->getGenericParams(),
                                        polyFn->getRequirements(),
                                        selfTy, polyFn->getResult(),
-                                       polyFn->getExtInfo(),
-                                       ctx));
+                                       polyFn->getExtInfo()));
     } else {
       auto fn = allocType->castTo<FunctionType>();
       ctor->setInitializerInterfaceType(FunctionType::get(selfTy,
                                                           fn->getResult(),
-                                                          fn->getExtInfo(),
-                                                          ctx));
+                                                          fn->getExtInfo()));
     }
 
     if (isImplicit)
@@ -2246,7 +2242,7 @@ Type ModuleFile::getType(TypeID TID) {
                                       blockCompatible);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
-                                     Info, ctx);
+                                     Info);
     break;
   }
 
@@ -2514,9 +2510,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
                                                 getType(resultID),
-                                                paramList,
-                                                Info,
-                                                ctx);
+                                                paramList, Info);
     break;
   }
 
@@ -2566,8 +2560,7 @@ Type ModuleFile::getType(TypeID TID) {
                                             requirements,
                                             getType(inputID),
                                             getType(resultID),
-                                            info,
-                                            ctx);
+                                            info);
     break;
   }
 
@@ -2648,7 +2641,7 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID baseID;
     decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID);
 
-    auto sliceTy = ArraySliceType::get(getType(baseID), ctx);
+    auto sliceTy = ArraySliceType::get(getType(baseID));
     typeOrOffset = sliceTy;
     break;
   }
@@ -2657,7 +2650,7 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID baseID;
     decls_block::OptionalTypeLayout::readRecord(scratch, baseID);
 
-    auto optionalTy = OptionalType::get(getType(baseID), ctx);
+    auto optionalTy = OptionalType::get(getType(baseID));
     typeOrOffset = optionalTy;
     break;
   }
@@ -2667,7 +2660,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint64_t size;
     decls_block::ArrayTypeLayout::readRecord(scratch, baseID, size);
 
-    typeOrOffset = ArrayType::get(getType(baseID), size, ctx);
+    typeOrOffset = ArrayType::get(getType(baseID), size);
     break;
   }
 

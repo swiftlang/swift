@@ -36,7 +36,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
     return Type();
   }
 
-  return ArraySliceType::get(elementType, Context);
+  return ArraySliceType::get(elementType);
 }
 
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
@@ -45,7 +45,7 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
     return Type();
   }
 
-  return OptionalType::get(elementType, Context);
+  return OptionalType::get(elementType);
 }
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
@@ -858,7 +858,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   Type outputTy = resolveType(repr->getResultTypeRepr(), false);
   if (outputTy->is<ErrorType>())
     return outputTy;
-  return FunctionType::get(inputTy, outputTy, extInfo, Context);
+  return FunctionType::get(inputTy, outputTy, extInfo);
 }
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -1070,7 +1070,7 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr, bool isSILType) {
 
 Type TypeChecker::transformType(Type type,
                                 const std::function<Type(Type)> &fn) {
-  return type.transform(Context, fn);
+  return type.transform(fn);
 }
 
 Type TypeChecker::substType(Module *module, Type type,

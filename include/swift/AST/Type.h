@@ -27,7 +27,6 @@ namespace swift {
 
 class ASTPrinter;
 class ArchetypeType;
-class ASTContext;
 class LazyResolver;
 class Module;
 class TypeBase;
@@ -77,14 +76,12 @@ public:
   /// If at any time the function returns a null type, the null will be
   /// propagated out.
   ///
-  /// \param ctx The ASTContext in which the type resides.
-  ///
   /// \param fn A function object with the signature \c Type(Type), which
   /// accepts a type and returns either a transformed type or a null type.
   ///
   /// \returns the result of transforming the type.
   template<typename F>
-  Type transform(const ASTContext &ctx, const F &fn) const;
+  Type transform(const F &fn) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.

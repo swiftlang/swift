@@ -504,7 +504,7 @@ namespace {
           return Type();
 
         // Build the resulting (non-generic) function type.
-        return FunctionType::get(inputTy, resultTy, cs.TC.Context);
+        return FunctionType::get(inputTy, resultTy);
       }
 
       // Open up unbound generic types, turning them into bound generic
@@ -821,7 +821,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       if (!isTypeReference)
         memberTy = MetatypeType::get(memberTy, TC.Context);
 
-      auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+      auto openedType = FunctionType::get(baseObjTy, memberTy);
       return { openedType, memberTy };
     }
 
@@ -838,7 +838,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         if (!isTypeReference)
           memberTy = MetatypeType::get(memberTy, TC.Context);
 
-        auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+        auto openedType = FunctionType::get(baseObjTy, memberTy);
         return { openedType, memberTy };
       }
     }
@@ -846,7 +846,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // FIXME: Totally bogus fallthrough.
     Type memberTy = isTypeReference? assocType->getDeclaredType()
                                    : assocType->getType();
-    auto openedType = FunctionType::get(baseObjTy, memberTy, TC.Context);
+    auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }
 
@@ -898,7 +898,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
     if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value))
-      openedType = FunctionType::get(selfTy, openedType, TC.Context);
+      openedType = FunctionType::get(selfTy, openedType);
   }
 
   // Constrain the 'self' object type.
@@ -921,12 +921,12 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
     if (isDynamicResult || subscript->getAttrs().isOptional())
-      elementTy = OptionalType::get(elementTy, TC.Context);
+      elementTy = OptionalType::get(elementTy);
     else
       elementTy = LValueType::get(elementTy,
                                   LValueType::Qual::DefaultForMemberAccess|
                                   settableQualForDecl(baseTy, subscript));
-    type = FunctionType::get(fnType->getInput(), elementTy, TC.Context);
+    type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {
     // When we have an associated type, the base type conforms to the
@@ -966,8 +966,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     Type resultTy = funcTy->getResult();
     Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::DynamicLookup)
                      ->getDeclaredTypeOfContext();
-    type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo(),
-                             TC.Context);
+    type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
   } else {
     type = openedType;
   }
@@ -1056,7 +1055,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
       if (!isa<SubscriptDecl>(choice.getDecl()))
-        refType = OptionalType::get(refType->getRValueType(), TC.Context);
+        refType = OptionalType::get(refType->getRValueType());
     } else {
       // Otherwise, adjust the lvalue type for this reference.
       bool isAssignment = choice.getDecl()->getAttrs().isAssignment();

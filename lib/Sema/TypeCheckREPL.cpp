@@ -577,8 +577,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
       new (Context) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
                                 discriminator, newTopLevel);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
-                                  TupleType::getEmpty(Context),
-                                  Context);
+                                  TupleType::getEmpty(Context));
   CE->setType(FuncTy);
   Arg->setDeclContext(CE);
   

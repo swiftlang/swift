@@ -168,12 +168,13 @@ public:
   CanType getCanonicalType();
   
   /// getASTContext - Return the ASTContext that this type belongs to.
-  const ASTContext &getASTContext() {
+  ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.
     if (CanonicalType.is<const ASTContext *>())
-      return *CanonicalType.get<const ASTContext *>();
+      return const_cast<ASTContext&>(*CanonicalType.get<const ASTContext *>());
     // If not, canonicalize it to get the Context.
-    return *getCanonicalType()->CanonicalType.get<const ASTContext *>();
+    return const_cast<ASTContext&>(*getCanonicalType()->
+                                   CanonicalType.get<const ASTContext *>());
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
@@ -1508,12 +1509,11 @@ END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result, const ASTContext &C) {
-    return get(Input, Result, ExtInfo(), C);
+  static FunctionType *get(Type Input, Type Result) {
+    return get(Input, Result, ExtInfo());
   }
 
-  static FunctionType *get(Type Input, Type Result,
-                           const ExtInfo &Info, const ASTContext &C);
+  static FunctionType *get(Type Input, Type Result, const ExtInfo &Info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1526,14 +1526,12 @@ private:
                const ExtInfo &Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanType input, CanType result,
-                             const ASTContext &C) {
-    return CanFunctionType(FunctionType::get(input, result, C));
+  static CanFunctionType get(CanType input, CanType result) {
+    return CanFunctionType(FunctionType::get(input, result));
   }
   static CanFunctionType get(CanType input, CanType result,
-                             const ExtInfo &info,
-                             const ASTContext &C) {
-    return CanFunctionType(FunctionType::get(input, result, info, C));
+                             const ExtInfo &info) {
+    return CanFunctionType(FunctionType::get(input, result, info));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   
@@ -1545,15 +1543,13 @@ class PolymorphicFunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function
   static PolymorphicFunctionType *get(Type input, Type output,
-                                      GenericParamList *params,
-                                      const ASTContext &C) {
-    return get(input, output, params, ExtInfo(), C);
+                                      GenericParamList *params) {
+    return get(input, output, params, ExtInfo());
   }
 
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
-                                      const ExtInfo &Info,
-                                      const ASTContext &C);
+                                      const ExtInfo &Info);
 
   ArrayRef<GenericParam> getGenericParameters() const;
   ArrayRef<ArchetypeType *> getAllArchetypes() const;
@@ -1583,10 +1579,9 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
   static CanPolymorphicFunctionType get(CanType input, CanType result,
                                         GenericParamList *params,
-                                        const ExtInfo &info,
-                                        const ASTContext &C) {
+                                        const ExtInfo &info) {
     return CanPolymorphicFunctionType(
-             PolymorphicFunctionType::get(input, result, params, info, C));
+             PolymorphicFunctionType::get(input, result, params, info));
   }
 END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
 
@@ -1631,8 +1626,7 @@ public:
                                   ArrayRef<Requirement> requirements,
                                   Type input,
                                   Type result,
-                                  const ExtInfo &info,
-                                  const ASTContext &ctx);
+                                  const ExtInfo &info);
 
   /// Retrieve the generic parameters of this polymorphic function type.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -1678,10 +1672,9 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   static CanGenericFunctionType get(ArrayRef<GenericTypeParamType*> params,
                                     ArrayRef<Requirement> reqts,
                                     CanType input, CanType result,
-                                    const ExtInfo &info,
-                                    const ASTContext &C) {
+                                    const ExtInfo &info) {
     return CanGenericFunctionType(
-              GenericFunctionType::get(params, reqts, input, result, info, C));
+              GenericFunctionType::get(params, reqts, input, result, info));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
@@ -2044,7 +2037,7 @@ class ArrayType : public TypeBase {
   
 public:
   /// 'Constructor' Factory Function.
-  static ArrayType *get(Type BaseType, uint64_t Size, const ASTContext &C);
+  static ArrayType *get(Type BaseType, uint64_t Size);
 
   Type getBaseType() const { return Base; }
   uint64_t getSize() const { return Size; }
@@ -2097,7 +2090,7 @@ class ArraySliceType : public SyntaxSugarType {
 
 public:
   /// Return a uniqued array slice type with the specified base type.
-  static ArraySliceType *get(Type baseTy, const ASTContext &C);
+  static ArraySliceType *get(Type baseTy);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ArraySlice;
@@ -2111,7 +2104,7 @@ class OptionalType : public SyntaxSugarType {
 
 public:
   /// Return a uniqued optional type with the specified base type.
-  static OptionalType *get(Type baseTy, const ASTContext &C);
+  static OptionalType *get(Type baseTy);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3018,7 +3011,7 @@ case TypeKind::Id:
 }
 
 template<typename F>
-Type Type::transform(const ASTContext &ctx, const F &fn) const {
+Type Type::transform(const F &fn) const {
   // Transform this type node.
   Type transformed = fn(*this);
 
@@ -3044,14 +3037,15 @@ case TypeKind::Id:
   case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
-      parentTy = parentTy.transform(ctx, fn);
+      parentTy = parentTy.transform(fn);
       if (!parentTy)
         return Type();
 
       if (parentTy.getPointer() == nominalTy->getParent().getPointer())
         return *this;
 
-      return NominalType::get(nominalTy->getDecl(), parentTy, ctx);
+      return NominalType::get(nominalTy->getDecl(), parentTy,
+                              Ptr->getASTContext());
     }
 
     return *this;
@@ -3060,7 +3054,7 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     SILResultInfo origResult = fnTy->getResult();
-    Type transResult = origResult.getType().transform(ctx, fn);
+    Type transResult = origResult.getType().transform(fn);
     if (!transResult)
       return Type();
     auto canTransResult = transResult->getCanonicalType();
@@ -3068,7 +3062,7 @@ case TypeKind::Id:
 
     SmallVector<SILParameterInfo, 8> transParams;
     for (auto origParam : fnTy->getParameters()) {
-      Type transParam = origParam.getType().transform(ctx, fn);
+      Type transParam = origParam.getType().transform(fn);
       if (!transParam) return Type();
 
       CanType canTransParam = transParam->getCanonicalType();
@@ -3084,14 +3078,14 @@ case TypeKind::Id:
                                 transParams,
                                 SILResultInfo(canTransResult,
                                               origResult.getConvention()),
-                                ctx);
+                                Ptr->getASTContext());
   }
 
   case TypeKind::UnownedStorage:
   case TypeKind::WeakStorage: {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();
-    Type substRefTy = refTy.transform(ctx, fn);
+    Type substRefTy = refTy.transform(fn);
     if (!substRefTy)
       return Type();
 
@@ -3099,21 +3093,22 @@ case TypeKind::Id:
       return *this;
 
     return ReferenceStorageType::get(substRefTy, storageTy->getOwnership(),
-                                     ctx);
+                                     Ptr->getASTContext());
   }
 
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(base);
     Type substParentTy;
     if (auto parentTy = unbound->getParent()) {
-      substParentTy = parentTy.transform(ctx, fn);
+      substParentTy = parentTy.transform(fn);
       if (!substParentTy)
         return Type();
 
       if (substParentTy.getPointer() == parentTy.getPointer())
         return *this;
 
-      return UnboundGenericType::get(unbound->getDecl(), substParentTy, ctx);
+      return UnboundGenericType::get(unbound->getDecl(), substParentTy,
+                                     Ptr->getASTContext());
     }
 
     return *this;
@@ -3127,7 +3122,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     Type substParentTy;
     if (auto parentTy = bound->getParent()) {
-      substParentTy = parentTy.transform(ctx, fn);
+      substParentTy = parentTy.transform(fn);
       if (!substParentTy)
         return Type();
 
@@ -3136,7 +3131,7 @@ case TypeKind::Id:
     }
 
     for (auto arg : bound->getGenericArgs()) {
-      Type substArg = arg.transform(ctx, fn);
+      Type substArg = arg.transform(fn);
       if (!substArg)
         return Type();
       substArgs.push_back(substArg);
@@ -3152,20 +3147,20 @@ case TypeKind::Id:
 
   case TypeKind::Metatype: {
     auto meta = cast<MetatypeType>(base);
-    auto instanceTy = meta->getInstanceType().transform(ctx, fn);
+    auto instanceTy = meta->getInstanceType().transform(fn);
     if (!instanceTy)
       return Type();
 
     if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
       return *this;
 
-    return MetatypeType::get(instanceTy, ctx);
+    return MetatypeType::get(instanceTy, Ptr->getASTContext());
   }
 
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
     auto dependentDecl = detail::dependentIdentity<F>(alias->getDecl());
-    auto underlyingTy = dependentDecl->getUnderlyingType().transform(ctx,fn);
+    auto underlyingTy = dependentDecl->getUnderlyingType().transform(fn);
     if (!underlyingTy)
       return Type();
 
@@ -3173,19 +3168,19 @@ case TypeKind::Id:
           == dependentDecl->getUnderlyingType().getPointer())
       return *this;
 
-    return SubstitutedType::get(*this, underlyingTy, ctx);
+    return SubstitutedType::get(*this, underlyingTy, Ptr->getASTContext());
   }
 
   case TypeKind::Paren: {
     auto paren = cast<ParenType>(base);
-    Type underlying = paren->getUnderlyingType().transform(ctx, fn);
+    Type underlying = paren->getUnderlyingType().transform(fn);
     if (!underlying)
       return Type();
 
     if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
       return *this;
 
-    return ParenType::get(ctx, underlying);
+    return ParenType::get(Ptr->getASTContext(), underlying);
   }
 
   case TypeKind::Tuple: {
@@ -3194,7 +3189,7 @@ case TypeKind::Id:
     SmallVector<TupleTypeElt, 4> elements;
     unsigned Index = 0;
     for (const auto &elt : tuple->getFields()) {
-      Type eltTy = elt.getType().transform(ctx, fn);
+      Type eltTy = elt.getType().transform(fn);
       if (!eltTy)
         return Type();
 
@@ -3227,13 +3222,13 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
 
-    return TupleType::get(elements, ctx);
+    return TupleType::get(elements, Ptr->getASTContext());
   }
 
 
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(base);
-    auto dependentBase = dependent->getBase().transform(ctx, fn);
+    auto dependentBase = dependent->getBase().transform(fn);
     if (!dependentBase)
       return Type();
 
@@ -3241,28 +3236,29 @@ case TypeKind::Id:
       return *this;
 
     return DependentMemberType::get(dependentBase, dependent->getName(),
-                                    ctx);
+                                    Ptr->getASTContext());
   }
 
   case TypeKind::Substituted: {
     auto substAT = cast<SubstitutedType>(base);
-    auto substTy = substAT->getReplacementType().transform(ctx, fn);
+    auto substTy = substAT->getReplacementType().transform(fn);
     if (!substTy)
       return Type();
 
     if (substTy.getPointer() == substAT->getReplacementType().getPointer())
       return *this;
 
-    return SubstitutedType::get(substAT->getOriginal(), substTy, ctx);
+    return SubstitutedType::get(substAT->getOriginal(), substTy,
+                                Ptr->getASTContext());
   }
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
     auto function = cast<AnyFunctionType>(base);
-    auto inputTy = function->getInput().transform(ctx, fn);
+    auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
       return Type();
-    auto resultTy = function->getResult().transform(ctx, fn);
+    auto resultTy = function->getResult().transform(fn);
     if (!resultTy)
       return Type();
 
@@ -3276,19 +3272,17 @@ case TypeKind::Id:
     if (!inputTy->hasTypeVariable() &&
         !isa<ParenType>(inputTy.getPointer()) &&
         !isa<TupleType>(inputTy.getPointer())) {
-      inputTy = ParenType::get(ctx, inputTy);
+      inputTy = ParenType::get(Ptr->getASTContext(), inputTy);
     }
 
     if (auto polyFn = dyn_cast<PolymorphicFunctionType>(function)) {
       return PolymorphicFunctionType::get(inputTy, resultTy,
                                           &polyFn->getGenericParams(),
-                                          function->getExtInfo(),
-                                          ctx);
+                                          function->getExtInfo());
     }
 
     return FunctionType::get(inputTy, resultTy,
-                             function->getExtInfo(),
-                             ctx);
+                             function->getExtInfo());
   }
 
   case TypeKind::GenericFunction: {
@@ -3298,7 +3292,7 @@ case TypeKind::Id:
     // Transform generic parameters.
     SmallVector<GenericTypeParamType *, 4> genericParams;
     for (auto param : function->getGenericParams()) {
-      Type paramTy = Type(param).transform(ctx, fn);
+      Type paramTy = Type(param).transform(fn);
       if (!paramTy)
         return Type();
 
@@ -3315,13 +3309,13 @@ case TypeKind::Id:
     // Transform requirements.
     SmallVector<Requirement, 4> requirements;
     for (const auto &req : function->getRequirements()) {
-      auto firstType = req.getFirstType().transform(ctx, fn);
+      auto firstType = req.getFirstType().transform(fn);
       if (!firstType)
         return Type();
 
       Type secondType = req.getSecondType();
       if (secondType) {
-        secondType = secondType.transform(ctx, fn);
+        secondType = secondType.transform(fn);
         if (!secondType)
           return Type();
       }
@@ -3338,12 +3332,12 @@ case TypeKind::Id:
     }
 
     // Transform input type.
-    auto inputTy = function->getInput().transform(ctx, fn);
+    auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
       return Type();
 
     // Transform result type.
-    auto resultTy = function->getResult().transform(ctx, fn);
+    auto resultTy = function->getResult().transform(fn);
     if (!resultTy)
       return Type();
 
@@ -3355,52 +3349,52 @@ case TypeKind::Id:
 
     // If no generic parameters remain, this is a non-generic function type.
     if (genericParams.empty())
-      return FunctionType::get(inputTy, resultTy, function->getExtInfo(), ctx);
+      return FunctionType::get(inputTy, resultTy, function->getExtInfo());
 
     // Produce the new generic function type.
     return GenericFunctionType::get(genericParams, requirements, inputTy,
-                                    resultTy, function->getExtInfo(), ctx);
+                                    resultTy, function->getExtInfo());
   }
 
   case TypeKind::Array: {
     auto array = cast<ArrayType>(base);
-    auto baseTy = array->getBaseType().transform(ctx, fn);
+    auto baseTy = array->getBaseType().transform(fn);
     if (!baseTy)
       return Type();
 
     if (baseTy.getPointer() == array->getBaseType().getPointer())
       return *this;
 
-    return ArrayType::get(baseTy, array->getSize(), ctx);
+    return ArrayType::get(baseTy, array->getSize());
   }
 
   case TypeKind::ArraySlice: {
     auto slice = cast<ArraySliceType>(base);
-    auto baseTy = slice->getBaseType().transform(ctx, fn);
+    auto baseTy = slice->getBaseType().transform(fn);
     if (!baseTy)
       return Type();
 
     if (baseTy.getPointer() == slice->getBaseType().getPointer())
       return *this;
 
-    return ArraySliceType::get(baseTy, ctx);
+    return ArraySliceType::get(baseTy);
   }
 
   case TypeKind::Optional: {
     auto optional = cast<OptionalType>(base);
-    auto baseTy = optional->getBaseType().transform(ctx, fn);
+    auto baseTy = optional->getBaseType().transform(fn);
     if (!baseTy)
       return Type();
 
     if (baseTy.getPointer() == optional->getBaseType().getPointer())
       return *this;
 
-    return OptionalType::get(baseTy, ctx);
+    return OptionalType::get(baseTy);
   }
 
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
-    auto objectTy = lvalue->getObjectType().transform(ctx, fn);
+    auto objectTy = lvalue->getObjectType().transform(fn);
     if (!objectTy)
       return Type();
 
@@ -3416,7 +3410,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     unsigned index = 0;
     for (auto proto : pc->getProtocols()) {
-      auto substProto = proto.transform(ctx, fn);
+      auto substProto = proto.transform(fn);
       if (!substProto)
         return Type();
       
@@ -3438,7 +3432,7 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
     
-    return ProtocolCompositionType::get(ctx, protocols);
+    return ProtocolCompositionType::get(Ptr->getASTContext(), protocols);
   }
   }
   

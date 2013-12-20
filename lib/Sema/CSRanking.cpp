@@ -301,9 +301,8 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   if (nominal->isGenericContext())
     return GenericFunctionType::get(nominal->getGenericParamTypes(),
                                     nominal->getGenericRequirements(),
-                                    selfTy, type, AnyFunctionType::ExtInfo(),
-                                    ctx);
-  return FunctionType::get(selfTy, type, ctx);
+                                    selfTy, type, AnyFunctionType::ExtInfo());
+  return FunctionType::get(selfTy, type);
 }
 
 /// \brief Determine whether the first declaration is as "specialized" as

@@ -496,7 +496,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   // The conversion function will have function type TI -> TO, for fresh
   // type variables TI and TO.
   cs.addValueMemberConstraint(type, name,
-                              FunctionType::get(inputTV, outputTV, ctx),
+                              FunctionType::get(inputTV, outputTV),
                               memberLocator);
 
   // A conversion function must accept an empty parameter list ().
@@ -1128,7 +1128,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   // match on the result type because the constructors for enums and struct
   // types always return a value of exactly that type.
   addValueMemberConstraint(valueType, name,
-                           FunctionType::get(tv, valueType, context),
+                           FunctionType::get(tv, valueType),
                            getConstraintLocator(
                              locator, 
                              ConstraintLocator::ConstructorMember));

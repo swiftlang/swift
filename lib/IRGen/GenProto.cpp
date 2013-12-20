@@ -2841,8 +2841,7 @@ namespace {
         // LLVM representation happens to be the same.
         CanType concreteMeta = CanType(MetatypeType::get(ConcreteType, IGM.Context));
         auto implTy =  CanFunctionType::get(concreteMeta,
-                                            impl->getType()->getCanonicalType(),
-                                            IGM.Context);
+                                            impl->getType()->getCanonicalType());
         return getWitness(implPtr, implTy, ifaceType, 1, witnessSubs);
       }
       llvm::Constant *implPtr =

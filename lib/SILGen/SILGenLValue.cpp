@@ -36,13 +36,12 @@ static CanType getSubstFormalRValueType(Expr *expr) {
   return lv.getObjectType();
 }
 
-static AbstractionPattern getOrigFormalRValueType(ASTContext &ctx,
-                                                  Type formalStorageType) {
+static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
   auto type = formalStorageType->getCanonicalType();
   if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
     type = ref.getReferentType();
     if (isa<WeakStorageType>(ref))
-      type = OptionalType::get(type, ctx)->getCanonicalType();
+      type = OptionalType::get(type)->getCanonicalType();
   }
   return AbstractionPattern(type);
 }
@@ -74,8 +73,7 @@ static LValueTypeData getValueTypeData(SILValue value) {
 static LValueTypeData getMemberTypeData(SILGenFunction &gen,
                                         Type memberStorageType,
                                         Expr *lvalueExpr) {
-  auto origFormalType = getOrigFormalRValueType(gen.getASTContext(),
-                                                memberStorageType);
+  auto origFormalType = getOrigFormalRValueType(memberStorageType);
   auto substFormalType = getSubstFormalRValueType(lvalueExpr);
   return {
     origFormalType,

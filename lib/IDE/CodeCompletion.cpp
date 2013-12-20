@@ -943,7 +943,7 @@ public:
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have
       // Optional<T> type.
-      VarType = OptionalType::get(VarType, Ctx);
+      VarType = OptionalType::get(VarType);
     }
     addTypeAnnotation(Builder, VarType);
   }
@@ -1158,7 +1158,7 @@ public:
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have
       // Optional<T> type.
-      T = OptionalType::get(T, Ctx);
+      T = OptionalType::get(T);
     }
     addTypeAnnotation(Builder, T);
   }

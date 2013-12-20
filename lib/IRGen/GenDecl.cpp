@@ -1271,11 +1271,9 @@ static CanType addOwnerArgument(DeclContext *DC, CanType resultType) {
                               LValueType::Qual::DefaultForMemberAccess);
   }
   if (auto params = DC->getGenericParamsOfContext())
-    return PolymorphicFunctionType::get(argType, resultType, params,
-                                        resultType->getASTContext())
+    return PolymorphicFunctionType::get(argType, resultType, params)
              ->getCanonicalType();
-  return CanType(FunctionType::get(CanType(argType), resultType,
-                                   resultType->getASTContext()));
+  return CanType(FunctionType::get(CanType(argType), resultType));
 }
 
 static AbstractCC addOwnerArgument(ValueDecl *value,
@@ -1302,10 +1300,9 @@ static AbstractCC addOwnerArgument(ValueDecl *value,
 /// Add the 'index' argument to a getter or setter.
 static void addIndexArgument(ValueDecl *value,
                              CanType &formalType, unsigned &uncurryLevel) {
-  ASTContext &Context = value->getASTContext();
   if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
     formalType = FunctionType::get(sub->getIndices()->getType(),
-                                   formalType, Context)->getCanonicalType();
+                                   formalType)->getCanonicalType();
     uncurryLevel++;
   }
 }
@@ -1326,7 +1323,7 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   // (this clause is skipped for a non-subscript getter).
   unsigned uncurryLevel = 0;
   CanType formalType = CanType(FunctionType::get(TupleType::getEmpty(Context),
-                                              getObjectType(value), Context));
+                                              getObjectType(value)));
   addIndexArgument(value, formalType, uncurryLevel);
   AbstractCC cc = addOwnerArgument(value, formalType, uncurryLevel);
 
@@ -1369,8 +1366,7 @@ FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   unsigned uncurryLevel = 0;
   CanType argType = getObjectType(value);
   CanType formalType = CanType(FunctionType::get(argType,
-                                                 TupleType::getEmpty(Context),
-                                                 Context));
+                                                 TupleType::getEmpty(Context)));
   addIndexArgument(value, formalType, uncurryLevel);
   auto cc = addOwnerArgument(value, formalType, uncurryLevel);
 

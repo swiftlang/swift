@@ -1227,12 +1227,13 @@ ModuleType *ModuleType::get(Module *M) {
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result,
-                                const ExtInfo &Info,
-                                const ASTContext &C) {
+                                const ExtInfo &Info) {
   bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
   char attrKey = Info.getFuncAttrKey();
 
+  const ASTContext &C = Input->getASTContext();
+  
   FunctionType *&Entry
     = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
   if (Entry) return Entry;
@@ -1259,11 +1260,12 @@ FunctionType::FunctionType(Type input, Type output,
 /// input and result.
 PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
-                                                      const ExtInfo &Info,
-                                                      const ASTContext &C) {
+                                                      const ExtInfo &Info) {
   // FIXME: one day we should do canonicalization properly.
   bool hasTypeVariable = input->hasTypeVariable() || output->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
+
+  const ASTContext &C = input->getASTContext();
 
   return new (C, arena) PolymorphicFunctionType(input, output, params,
                                                 Info, C);
@@ -1308,12 +1310,13 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
                          ArrayRef<Requirement> requirements,
                          Type input,
                          Type output,
-                         const ExtInfo &info,
-                         const ASTContext &ctx) {
+                         const ExtInfo &info) {
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, params, requirements, input, output, info);
+
+  const ASTContext &ctx = input->getASTContext();
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -1429,12 +1432,14 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
 
 /// Return a uniqued array type with the specified base type and the
 /// specified size.
-ArrayType *ArrayType::get(Type BaseType, uint64_t Size, const ASTContext &C) {
+ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
   assert(Size != 0);
 
   bool hasTypeVariable = BaseType->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
+  const ASTContext &C = BaseType->getASTContext();
+  
   ArrayType *&Entry
     = C.Impl.getArena(arena).ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
@@ -1449,9 +1454,11 @@ ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
     Base(base), Size(size) {}
 
 
-ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
+ArraySliceType *ArraySliceType::get(Type base) {
   bool hasTypeVariable = base->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
+
+  const ASTContext &C = base->getASTContext();
 
   ArraySliceType *&entry = C.Impl.getArena(arena).ArraySliceTypes[base];
   if (entry) return entry;
@@ -1459,9 +1466,11 @@ ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
   return entry = new (C, arena) ArraySliceType(C, base, hasTypeVariable);
 }
 
-OptionalType *OptionalType::get(Type base, const ASTContext &C) {
+OptionalType *OptionalType::get(Type base) {
   bool hasTypeVariable = base->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
+
+  const ASTContext &C = base->getASTContext();
 
   OptionalType *&entry = C.Impl.getArena(arena).OptionalTypes[base];
   if (entry) return entry;

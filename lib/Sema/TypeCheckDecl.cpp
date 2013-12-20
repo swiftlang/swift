@@ -1154,7 +1154,7 @@ public:
       SD->setInvalid();
     } else {
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
-                                    SD->getElementType(), TC.Context));
+                                    SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
       if (dc->isGenericContext()) {
@@ -1162,8 +1162,7 @@ public:
                            dc, SD->getIndices()->getType());
         auto elementTy = TC.getInterfaceTypeFromInternalType(
                            dc, SD->getElementType());
-        SD->setInterfaceType(FunctionType::get(indicesTy, elementTy,
-                                               TC.Context));
+        SD->setInterfaceType(FunctionType::get(indicesTy, elementTy));
       }
     }
 
@@ -1581,12 +1580,9 @@ public:
       auto Info = validateAndConsumeFunctionTypeAttributes(FD,
                                                            consumeAttributes);
       if (params) {
-        funcTy = PolymorphicFunctionType::get(argTy, funcTy,
-                                              params,
-                                              Info,
-                                              TC.Context);
+        funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
-        funcTy = FunctionType::get(argTy, funcTy, Info, TC.Context);
+        funcTy = FunctionType::get(argTy, funcTy, Info);
       }
 
     }
@@ -1849,8 +1845,7 @@ public:
     auto interfaceTy
       = GenericFunctionType::get(enumDecl->getGenericParamTypes(),
                                  enumDecl->getGenericRequirements(),
-                                 inputTy, resultTy, funcTy->getExtInfo(),
-                                 TC.Context);
+                                 inputTy, resultTy, funcTy->getExtInfo());
 
     // Record the interface type.
     elt->setInterfaceType(interfaceTy);
@@ -1889,22 +1884,21 @@ public:
       Type argTy = MetatypeType::get(ElemTy, TC.Context);
       Type fnTy;
       if (auto gp = ED->getGenericParamsOfContext())
-        fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp, TC.Context);
+        fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp);
       else
-        fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
+        fnTy = FunctionType::get(argTy, ElemTy);
       EED->setType(fnTy);
       if (EED->getDeclContext()->isGenericContext())
         computeEnumElementInterfaceType(EED);
       return;
     }
 
-    Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy, TC.Context);
+    Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy);
     if (auto gp = ED->getGenericParamsOfContext())
       fnTy = PolymorphicFunctionType::get(MetatypeType::get(ElemTy, TC.Context),
-                                          fnTy, gp, TC.Context);
+                                          fnTy, gp);
     else
-      fnTy = FunctionType::get(MetatypeType::get(ElemTy, TC.Context), fnTy,
-                               TC.Context);
+      fnTy = FunctionType::get(MetatypeType::get(ElemTy, TC.Context), fnTy);
     EED->setType(fnTy);
 
     if (EED->getDeclContext()->isGenericContext())
@@ -2049,20 +2043,18 @@ public:
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
         FnTy = PolymorphicFunctionType::get(CD->getArgParams()->getType(),
-                                            ResultTy, innerGenericParams,
-                                            TC.Context);
+                                            ResultTy, innerGenericParams);
       } else
-        FnTy = FunctionType::get(CD->getArgParams()->getType(),
-                                 ResultTy, TC.Context);
+        FnTy = FunctionType::get(CD->getArgParams()->getType(), ResultTy);
       Type SelfMetaTy = MetatypeType::get(ResultTy, TC.Context);
       if (outerGenericParams) {
         AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
-                                                outerGenericParams, TC.Context);
+                                                outerGenericParams);
         InitFnTy = PolymorphicFunctionType::get(SelfTy, FnTy,
-                                                outerGenericParams, TC.Context);
+                                                outerGenericParams);
       } else {
-        AllocFnTy = FunctionType::get(SelfMetaTy, FnTy, TC.Context);
-        InitFnTy = FunctionType::get(SelfTy, FnTy, TC.Context);
+        AllocFnTy = FunctionType::get(SelfMetaTy, FnTy);
+        InitFnTy = FunctionType::get(SelfTy, FnTy);
       }
       CD->setType(AllocFnTy);
       CD->setInitializerType(InitFnTy);
@@ -2121,10 +2113,9 @@ public:
     if (outerGenericParams)
       FnTy = PolymorphicFunctionType::get(SelfTy,
                                           TupleType::getEmpty(TC.Context),
-                                          outerGenericParams, TC.Context);
+                                          outerGenericParams);
     else
-      FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context),
-                               TC.Context);
+      FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
 
     DD->setType(FnTy);
     auto SelfDecl = DD->getImplicitSelfDecl();
@@ -2774,7 +2765,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       if (!objType && type->allowsOwnership()) {
         TC.diagnose(VarD->getStartLoc(),
                     diag::invalid_weak_ownership_not_optional,
-                    OptionalType::get(type, TC.Context));
+                    OptionalType::get(type));
         VarD->getMutableAttrs().clearOwnership();
         return;
       } else if (objType) {

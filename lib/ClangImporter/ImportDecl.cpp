@@ -311,7 +311,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
     retType = optionSetType;
     break;
   case OptionSetFactoryMethod::FromRaw:
-    retType = OptionalType::get(optionSetType, C);
+    retType = OptionalType::get(optionSetType);
     break;
   }
   
@@ -338,8 +338,8 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   selfDecl->setDeclContext(factoryDecl);
   rawDecl->setDeclContext(factoryDecl);
   
-  Type factoryType = FunctionType::get(rawArgType, retType, C);
-  factoryType = FunctionType::get(metaTy, factoryType, C);
+  Type factoryType = FunctionType::get(rawArgType, retType);
+  factoryType = FunctionType::get(metaTy, factoryType);
   factoryDecl->setType(factoryType);
   factoryDecl->setBodyResultType(retType);
 
@@ -406,8 +406,8 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   toRawDecl->setImplicit();
   
   auto toRawArgType = TupleType::getEmpty(C);
-  Type toRawType = FunctionType::get(toRawArgType, rawType, C);
-  toRawType = FunctionType::get(lvType, toRawType, C);
+  Type toRawType = FunctionType::get(toRawArgType, rawType);
+  toRawType = FunctionType::get(lvType, toRawType);
   toRawDecl->setType(toRawType);
   toRawDecl->setBodyResultType(rawType);
   
@@ -506,8 +506,8 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   getLVDecl->setImplicit();
   
   auto toRawArgType = TupleType::getEmpty(C);
-  Type toRawType = FunctionType::get(toRawArgType, boolType, C);
-  toRawType = FunctionType::get(lvType, toRawType, C);
+  Type toRawType = FunctionType::get(toRawArgType, boolType);
+  toRawType = FunctionType::get(lvType, toRawType);
   getLVDecl->setType(toRawType);
   getLVDecl->setBodyResultType(boolType);
   
@@ -706,9 +706,9 @@ namespace {
                                                        nullptr, structDecl);
 
       // Set the constructor's type.
-      auto fnTy = FunctionType::get(paramTy, selfType, context);
-      auto allocFnTy = FunctionType::get(selfMetatype, fnTy, context);
-      auto initFnTy = FunctionType::get(selfType, fnTy, context);
+      auto fnTy = FunctionType::get(paramTy, selfType);
+      auto allocFnTy = FunctionType::get(selfMetatype, fnTy);
+      auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
 
@@ -829,8 +829,7 @@ namespace {
       // Give the enum element the appropriate type.
       auto argTy = MetatypeType::get(theEnum->getDeclaredType(), context);
       element->overwriteType(FunctionType::get(argTy,
-                                               theEnum->getDeclaredType(),
-                                               context));
+                                               theEnum->getDeclaredType()));
       return element;
     }
     
@@ -1524,7 +1523,7 @@ namespace {
       auto resultTy = type->castTo<FunctionType>()->getResult();
 
       // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfTy, type, Impl.SwiftContext);
+      type = FunctionType::get(selfTy, type);
 
       Type interfaceType;
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
@@ -1798,11 +1797,11 @@ namespace {
       // FIXME: Perhaps actually check whether the routine has a related result
       // type?
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
-                               selfTy, Impl.SwiftContext);
+                               selfTy);
 
       // Add the 'self' parameter to the function types.
-      Type allocType = FunctionType::get(selfMetaTy, type, Impl.SwiftContext);
-      Type initType = FunctionType::get(selfTy, type, Impl.SwiftContext);
+      Type allocType = FunctionType::get(selfMetaTy, type);
+      Type initType = FunctionType::get(selfTy, type);
 
       VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                          /*IsLet*/ true,
@@ -1879,8 +1878,7 @@ namespace {
                                                 AnyFunctionType *fnType) {
       Type type = PolymorphicFunctionType::get(fnType->getInput(),
                                                fnType->getResult(),
-                                               proto->getGenericParams(),
-                                               Impl.SwiftContext);
+                                               proto->getGenericParams());
 
       // Figure out the curried 'self' type for the interface type. It's always
       // either the generic parameter type 'Self' or a metatype thereof.
@@ -1899,8 +1897,7 @@ namespace {
                              proto->getGenericRequirements(),
                              interfaceInputTy,
                              fnType->getResult(),
-                             AnyFunctionType::ExtInfo(),
-                             Impl.SwiftContext);
+                             AnyFunctionType::ExtInfo());
       return { type, interfaceType };
     }
 
@@ -1951,9 +1948,7 @@ namespace {
       auto getterType = elementTy;
       for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
            it != itEnd; ++it) {
-        getterType = FunctionType::get((*it)->getType(),
-                                       getterType,
-                                       context);
+        getterType = FunctionType::get((*it)->getType(), getterType);
       }
 
       // If we're in a protocol, the getter thunk will be polymorphic.
@@ -2040,9 +2035,7 @@ namespace {
       Type setterType = TupleType::getEmpty(context);
       for (auto it = setterArgs.rbegin(), itEnd = setterArgs.rend();
            it != itEnd; ++it) {
-        setterType = FunctionType::get((*it)->getType(),
-                                       setterType,
-                                       context);
+        setterType = FunctionType::get((*it)->getType(), setterType);
       }
 
       // If we're in a protocol, the setter thunk will be polymorphic.
@@ -2251,8 +2244,7 @@ namespace {
       setVarDeclContexts(argPatterns, subscript->getDeclContext());
 
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
-                                           subscript->getElementType(),
-                                           context));
+                                           subscript->getElementType()));
       getterThunk->makeGetter(subscript);
       if (setterThunk)
         setterThunk->makeSetter(subscript);
@@ -3163,9 +3155,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto getterType = type;
   for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
        it != itEnd; ++it) {
-    getterType = FunctionType::get((*it)->getType(),
-                                   getterType,
-                                   context);
+    getterType = FunctionType::get((*it)->getType(), getterType);
   }
 
   // Create the getter function declaration.

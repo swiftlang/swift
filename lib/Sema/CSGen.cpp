@@ -132,7 +132,7 @@ namespace {
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = base->getType();
-      auto fnTy = FunctionType::get(inputTv, outputTv, Context);
+      auto fnTy = FunctionType::get(inputTv, outputTv);
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("subscript"),
                                   fnTy,
                                   CS.getConstraintLocator(expr,
@@ -271,7 +271,7 @@ namespace {
       auto baseTy = expr->getSubExpr()->getType()->getRValueType();
       auto argsTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                           TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
-      auto methodTy = FunctionType::get(argsTy, baseTy, C);
+      auto methodTy = FunctionType::get(argsTy, baseTy);
       CS.addValueMemberConstraint(baseTy, C.getIdentifier("init"),
         methodTy,
         CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
@@ -403,7 +403,7 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
         // The function/enum case must be callable with the given argument.
-        auto funcTy = FunctionType::get(arg->getType(), outputTy, ctx);
+        auto funcTy = FunctionType::get(arg->getType(), outputTy);
         CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
           memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
@@ -746,7 +746,7 @@ namespace {
                        CS.getConstraintLocator(
                          expr,
                          LocatorPathElt::getTupleElement(0)));
-      funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
+      funcTy = FunctionType::get(paramTy, funcTy);
 
       return funcTy;
     }
@@ -822,9 +822,7 @@ namespace {
         assert(intTy && "No default integer type?");
 
         Expr *constructionFn = expr->getConstructionFunction();
-        Type constructionTy = FunctionType::get(intTy,
-                                                elementTy,
-                                                tc.Context);
+        Type constructionTy = FunctionType::get(intTy, elementTy);
 
         CS.addConstraint(ConstraintKind::Conversion, constructionFn->getType(),
                          constructionTy,
@@ -833,8 +831,7 @@ namespace {
       } else {
         // Otherwise, ElementType must be default constructible.
         Type defaultCtorTy = FunctionType::get(TupleType::getEmpty(tc.Context),
-                                               elementTy,
-                                               tc.Context);
+                                               elementTy);
         CS.addValueMemberConstraint(elementTy, tc.Context.getIdentifier("init"),
             defaultCtorTy,
             CS.getConstraintLocator(expr, ConstraintLocator::NewArrayElement));
@@ -875,8 +872,6 @@ namespace {
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
-      ASTContext &Context = CS.getASTContext();
-
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
       auto outputTy
@@ -884,8 +879,7 @@ namespace {
             CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
             /*options=*/0);
 
-      auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy, 
-                                      Context);
+      auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),

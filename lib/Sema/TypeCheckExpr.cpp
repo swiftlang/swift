@@ -126,7 +126,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
   // The result is just the slice type.
   Type result = sliceType;
 
-  FunctionType *fnTy = FunctionType::get(input, result, Context);
+  FunctionType *fnTy = FunctionType::get(input, result);
 
   // FIXME: this produces terrible diagnostics.
   if (convertToType(injectionFn, fnTy, dc))

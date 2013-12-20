@@ -978,7 +978,7 @@ struct ASTNodeBase {};
 
     void verifyChecked(ForceValueExpr *E) {
       auto valueTy = E->getType();
-      auto optTy = OptionalType::get(valueTy, Ctx);
+      auto optTy = OptionalType::get(valueTy);
       checkSameType(optTy, E->getSubExpr()->getType(), "optional type");
       verifyCheckedBase(E);
     }

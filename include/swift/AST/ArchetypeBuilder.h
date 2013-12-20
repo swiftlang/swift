@@ -250,8 +250,7 @@ private:
   /// SILFunction::mapTypeIntoContext.
   friend class SILFunction;
   
-  static Type mapTypeIntoContext(ASTContext &C,
-                                 GenericParamList *genericParams,
+  static Type mapTypeIntoContext(GenericParamList *genericParams,
                                  Type type);
 };
 

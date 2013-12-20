@@ -909,15 +909,14 @@ Type VarDecl::getGetterType() const {
 
   // Form the getter type.
   auto &ctx = getASTContext();
-  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getType(), ctx);
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getType());
 
   // Add 'self', if we have one.
   if (selfTy) {
     if (outerParams)
-      getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams,
-                                              ctx);
+      getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams);
     else
-      getterTy = FunctionType::get(selfTy, getterTy, ctx);
+      getterTy = FunctionType::get(selfTy, getterTy);
   }
 
   return getterTy;
@@ -935,7 +934,7 @@ Type VarDecl::getGetterInterfaceType() const {
   // Form the getter type.
   auto &ctx = getASTContext();
   Type getterTy = FunctionType::get(TupleType::getEmpty(ctx),
-                                    getInterfaceType(), ctx);
+                                    getInterfaceType());
 
   // Add 'self', if we have one.
   if (selfTy) {
@@ -945,11 +944,11 @@ Type VarDecl::getGetterInterfaceType() const {
       = getDeclContext()->getGenericSignatureOfContext();
     
     if (genericParams.empty() && requirements.empty())
-      getterTy = FunctionType::get(selfTy, getterTy, ctx);
+      getterTy = FunctionType::get(selfTy, getterTy);
     else
       getterTy = GenericFunctionType::get(genericParams, requirements,
                                           selfTy, getterTy,
-                                          AnyFunctionType::ExtInfo(), ctx);
+                                          AnyFunctionType::ExtInfo());
   }
 
   return getterTy;
@@ -970,16 +969,14 @@ Type VarDecl::getSetterType() const {
   auto &ctx = getASTContext();
   TupleTypeElt valueElt(getType(), ctx.getIdentifier("value"));
   Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
-                                    TupleType::getEmpty(ctx),
-                                    ctx);
+                                    TupleType::getEmpty(ctx));
 
   // Add the 'self' type, if we have one.
   if (selfTy) {
     if (outerParams)
-      setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams,
-                                              ctx);
+      setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams);
     else
-      setterTy = FunctionType::get(selfTy, setterTy, ctx);
+      setterTy = FunctionType::get(selfTy, setterTy);
   }
 
   return setterTy;
@@ -998,8 +995,7 @@ Type VarDecl::getSetterInterfaceType() const {
   auto &ctx = getASTContext();
   TupleTypeElt valueElt(getInterfaceType(), ctx.getIdentifier("value"));
   Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx),
-                                    TupleType::getEmpty(ctx),
-                                    ctx);
+                                    TupleType::getEmpty(ctx));
   
   // Add the 'self' type, if we have one.
   if (selfTy) {
@@ -1009,11 +1005,11 @@ Type VarDecl::getSetterInterfaceType() const {
       = getDeclContext()->getGenericSignatureOfContext();
     
     if (genericParams.empty() && requirements.empty())
-      setterTy = FunctionType::get(selfTy, setterTy, ctx);
+      setterTy = FunctionType::get(selfTy, setterTy);
     else
       setterTy = GenericFunctionType::get(genericParams, requirements,
                                           selfTy, setterTy,
-                                          AnyFunctionType::ExtInfo(), ctx);
+                                          AnyFunctionType::ExtInfo());
   }
   
   return setterTy;
@@ -1373,17 +1369,16 @@ Type SubscriptDecl::getGetterType() const {
 
   // Form the () -> element function type.
   auto &ctx = getASTContext();
-  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getElementType(),
-                                    ctx);
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getElementType());
 
   // Prepend the indices.
-  getterTy = FunctionType::get(getIndices()->getType(), getterTy, ctx);
+  getterTy = FunctionType::get(getIndices()->getType(), getterTy);
   
   // Prepend the 'self' type.
   if (outerParams)
-    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams, ctx);
+    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams);
   else
-    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+    getterTy = FunctionType::get(selfTy, getterTy);
 
   return getterTy;
 }
@@ -1403,11 +1398,10 @@ Type SubscriptDecl::getGetterInterfaceType() const {
   
   // Form the () -> element function type.
   auto &ctx = getASTContext();
-  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), elementTy,
-                                    ctx);
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), elementTy);
 
   // Prepend the indices.
-  getterTy = FunctionType::get(indicesTy, getterTy, ctx);
+  getterTy = FunctionType::get(indicesTy, getterTy);
   
   // Prepend the 'self' type.
   ArrayRef<GenericTypeParamType*> genericParams;
@@ -1416,11 +1410,11 @@ Type SubscriptDecl::getGetterInterfaceType() const {
     = getDeclContext()->getGenericSignatureOfContext();
   
   if (genericParams.empty() && requirements.empty())
-    getterTy = FunctionType::get(selfTy, getterTy, ctx);
+    getterTy = FunctionType::get(selfTy, getterTy);
   else
     getterTy = GenericFunctionType::get(genericParams, requirements,
                                         selfTy, getterTy,
-                                        AnyFunctionType::ExtInfo(), ctx);
+                                        AnyFunctionType::ExtInfo());
 
   return getterTy;
 }
@@ -1440,17 +1434,16 @@ Type SubscriptDecl::getSetterType() const {
   auto &ctx = getASTContext();
   TupleTypeElt valueElt(getElementType(), ctx.getIdentifier("value"));
   Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
-                                    TupleType::getEmpty(ctx),
-                                    ctx);
+                                    TupleType::getEmpty(ctx));
 
   // Prepend the indices.
-  setterTy = FunctionType::get(getIndices()->getType(), setterTy, ctx);
+  setterTy = FunctionType::get(getIndices()->getType(), setterTy);
 
   // Prepend the 'self' type.
   if (outerParams)
-    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams, ctx);
+    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams);
   else
-    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+    setterTy = FunctionType::get(selfTy, setterTy);
 
   return setterTy;
 }
@@ -1472,11 +1465,10 @@ Type SubscriptDecl::getSetterInterfaceType() const {
   auto &ctx = getASTContext();
   TupleTypeElt valueElt(elementTy, ctx.getIdentifier("value"));
   Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
-                                    TupleType::getEmpty(ctx),
-                                    ctx);
+                                    TupleType::getEmpty(ctx));
 
   // Prepend the indices.
-  setterTy = FunctionType::get(indicesTy, setterTy, ctx);
+  setterTy = FunctionType::get(indicesTy, setterTy);
 
   // Prepend the 'self' type.
   ArrayRef<GenericTypeParamType*> genericParams;
@@ -1485,11 +1477,11 @@ Type SubscriptDecl::getSetterInterfaceType() const {
     = getDeclContext()->getGenericSignatureOfContext();
   
   if (genericParams.empty() && requirements.empty())
-    setterTy = FunctionType::get(selfTy, setterTy, ctx);
+    setterTy = FunctionType::get(selfTy, setterTy);
   else
     setterTy = GenericFunctionType::get(genericParams, requirements,
                                         selfTy, setterTy,
-                                        AnyFunctionType::ExtInfo(), ctx);
+                                        AnyFunctionType::ExtInfo());
 
   return setterTy;
 }

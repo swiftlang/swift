@@ -624,8 +624,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    ArgTys[ArgNo++]));
 
     Type ArgTy = TupleType::get(NewArgTypes, Ctx);
-    Type ResTy = FunctionType::get(ArgTy, FTI->getResult().getType(),
-                                   Ctx);
+    Type ResTy = FunctionType::get(ArgTy, FTI->getResult().getType());
 
     unsigned NumSub = NumSubs;
     SmallVector<Substitution, 4> Substitutions;

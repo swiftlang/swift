@@ -374,8 +374,7 @@ Type TypeBase::getOptionalObjectType(const ASTContext &context) {
 
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
-  return type.transform(context,
-                        [&](Type type) -> Type {
+  return type.transform([&](Type type) -> Type {
     auto *tuple = dyn_cast<TupleType>(type.getPointer());
     if (!tuple)
       return type;
@@ -662,8 +661,7 @@ CanType TypeBase::getCanonicalType() {
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
     Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
-                                          FT->getExtInfo(),
-                                          In->getASTContext());
+                                          FT->getExtInfo());
     break;
   }
   case TypeKind::GenericFunction: {
@@ -690,8 +688,7 @@ CanType TypeBase::getCanonicalType() {
     auto resultTy = function->getResult()->getCanonicalType();
 
     Result = GenericFunctionType::get(genericParams, requirements, inputTy,
-                                      resultTy, function->getExtInfo(),
-                                      inputTy->getASTContext());
+                                      resultTy, function->getExtInfo());
     break;
   }
 
@@ -702,15 +699,13 @@ CanType TypeBase::getCanonicalType() {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out,
-                               FT->getExtInfo(),
-                               In->getASTContext());
+    Result = FunctionType::get(In, Out, FT->getExtInfo());
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(this);
     Type EltTy = AT->getBaseType()->getCanonicalType();
-    Result = ArrayType::get(EltTy, AT->getSize(), EltTy->getASTContext());
+    Result = ArrayType::get(EltTy, AT->getSize());
     break;
   }
   case TypeKind::ProtocolComposition: {
@@ -1336,8 +1331,7 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   }
   Type input = getInput().subst(module, subs, true, nullptr);
   Type result = getResult().subst(module, subs, true, nullptr);
-  return FunctionType::get(input, result, getExtInfo(),
-                           module->getASTContext());
+  return FunctionType::get(input, result, getExtInfo());
 }
 
 static void getReplacementTypes(GenericParamList &genericParams,
@@ -1382,8 +1376,7 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
   
   Type input = getInput().subst(M, subs, true, nullptr);
   Type result = getResult().subst(M, subs, true, nullptr);
-  return FunctionType::get(input, result, getExtInfo(),
-                           M->getASTContext());
+  return FunctionType::get(input, result, getExtInfo());
 }
 
 FunctionType *
@@ -1399,13 +1392,12 @@ const {
 
   Type input = getInput().subst(M, subs, true, nullptr);
   Type result = getResult().subst(M, subs, true, nullptr);
-  return FunctionType::get(input, result, getExtInfo(),
-                           M->getASTContext());
+  return FunctionType::get(input, result, getExtInfo());
 }
 
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
-  return transform(module->getASTContext(), [&](Type type) -> Type {
+  return transform([&](Type type) -> Type {
     assert(!isa<SILFunctionType>(type.getPointer()) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");

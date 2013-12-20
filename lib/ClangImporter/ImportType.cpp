@@ -172,8 +172,7 @@ namespace {
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       return FunctionType::get(fTy->getInput(),
                                fTy->getResult(),
-                               AnyFunctionType::ExtInfo().withIsBlock(true),
-                               fTy->getASTContext());
+                               AnyFunctionType::ExtInfo().withIsBlock(true));
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {
@@ -263,7 +262,7 @@ namespace {
       auto paramsTy = TupleType::get(params, Impl.SwiftContext);
 
       // Form the function type.
-      return FunctionType::get(paramsTy, resultTy, Impl.SwiftContext);
+      return FunctionType::get(paramsTy, resultTy);
     }
 
     Type VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
@@ -708,7 +707,7 @@ Type ClangImporter::Implementation::importFunctionType(
   argPatterns.back()->setType(argParamsTy);
 
   // Form the function type.
-  return FunctionType::get(argParamsTy, swiftResultTy, SwiftContext);
+  return FunctionType::get(argParamsTy, swiftResultTy);
 }
 
 Module *ClangImporter::Implementation::getSwiftModule() {

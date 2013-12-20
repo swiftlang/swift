@@ -1934,8 +1934,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     witnessSubstTy = CanPolymorphicFunctionType::get(witnessSubstTy.getInput(),
                                                    witnessSubstTy.getResult(),
                                                    conformanceParams,
-                                                   witnessSubstTy->getExtInfo(),
-                                                   getASTContext());
+                                                   witnessSubstTy->getExtInfo());
   }
   
   // If the witness is a free function, consider the self argument

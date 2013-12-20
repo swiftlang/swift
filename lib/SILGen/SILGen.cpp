@@ -230,7 +230,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   auto extInfo = FunctionType::ExtInfo().withIsThin(true);
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
                                         TupleType::getEmpty(C),
-                                        extInfo, C);
+                                        extInfo);
   auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
   return new (M) SILFunction(M, SILLinkage::Internal,
                              "top_level_code", loweredType, Loc);
@@ -492,9 +492,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   ASTContext &C = M.getASTContext();
   Type initType = FunctionType::get(TupleType::getEmpty(C),
                                     TupleType::getEmpty(C),
-                                    FunctionType::ExtInfo()
-                                      .withIsThin(true),
-                                    C);
+                                    FunctionType::ExtInfo().withIsThin(true));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
   
   auto *f = new (M)

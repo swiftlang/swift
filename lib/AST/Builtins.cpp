@@ -127,13 +127,14 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
 
 /// Build a builtin function declaration.
 static FuncDecl *
-getBuiltinFunction(ASTContext &Context, Identifier Id,
+getBuiltinFunction(Identifier Id,
                    ArrayRef<TupleTypeElt> ArgTypes,
                    Type ResType,
                    FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+  auto &Context = ResType->getASTContext();
   Type ArgType = TupleType::get(ArgTypes, Context);
   Type FnType;
-  FnType = FunctionType::get(ArgType, ResType, Info, Context);
+  FnType = FunctionType::get(ArgType, ResType, Info);
 
   SmallVector<TuplePatternElt, 4> ArgPatternElts;
   for (auto &ArgTupleElt : ArgTypes) {
@@ -155,7 +156,7 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
 
 /// Build a builtin function declaration.
 static FuncDecl *
-getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
+getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<TupleTypeElt> ArgParamTypes,
                           ArrayRef<TupleTypeElt> ArgBodyTypes,
                           Type ResType,
@@ -163,12 +164,14 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
                           GenericParamList *GenericParams,
                           FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
   assert(GenericParams && "Missing generic parameters");
+  auto &Context = ResType->getASTContext();
+
   Type ArgParamType = TupleType::get(ArgParamTypes, Context);
   Type ArgBodyType = TupleType::get(ArgBodyTypes, Context);
 
   // Compute the function type.
   Type FnType = PolymorphicFunctionType::get(ArgBodyType, ResBodyType,
-                                             GenericParams, Info, Context);
+                                             GenericParams, Info);
 
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
@@ -181,7 +184,7 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
                      GenericParamTypes[0], Type());
   Type InterfaceType = GenericFunctionType::get(GenericParamTypes, Marker,
                                                 ArgParamType, ResType,
-                                                Info, Context);
+                                                Info);
 
   SmallVector<TuplePatternElt, 4> ArgPatternElts;
   for (auto &ArgTupleElt : ArgBodyTypes) {
@@ -203,51 +206,51 @@ getBuiltinGenericFunction(ASTContext &Context, Identifier Id,
 }
 
 /// Build a getelementptr operation declaration.
-static ValueDecl *getGepOperation(ASTContext &Context, Identifier Id,
-                                  Type ArgType) {
+static ValueDecl *getGepOperation(Identifier Id, Type ArgType) {
+  auto &Context = ArgType->getASTContext();
+  
   // This is always "(i8*, IntTy) -> i8*"
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType, ArgType };
   Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 /// Build a binary operation declaration.
-static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
-                                     Type ArgType) {
+static ValueDecl *getBinaryOperation(Identifier Id, Type ArgType) {
   TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type ResultTy = ArgType;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 /// Build a declaration for a binary operation with overflow.
-static ValueDecl *getBinaryOperationWithOverflow(ASTContext &Context,
-                                                 Identifier Id,
+static ValueDecl *getBinaryOperationWithOverflow(Identifier Id,
                                                  Type ArgType) {
+  auto &Context = ArgType->getASTContext();
   Type ShouldCheckForOverflowTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ArgElts[] = { ArgType, ArgType, ShouldCheckForOverflowTy };
   Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ResultElts[] = { ArgType, OverflowBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
-                                    Type ArgType) {
+static ValueDecl *getUnaryOperation(Identifier Id, Type ArgType) {
   TupleTypeElt ArgElts[] = { ArgType };
   Type ResultTy = ArgType;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 /// Build a binary predicate declaration.
-static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
-                                     Type ArgType) {
+static ValueDecl *getBinaryPredicate(Identifier Id, Type ArgType) {
+  auto &Context = ArgType->getASTContext();
+
   TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type ResultTy = BuiltinIntegerType::get(1, Context);
   if (auto VecTy = ArgType->getAs<BuiltinVectorType>()) {
     ResultTy = BuiltinVectorType::get(Context, ResultTy,
                                       VecTy->getNumElements());
   }
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 /// Build a cast.  There is some custom type checking here.
@@ -379,7 +382,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   }
 
   TupleTypeElt ArgElts[] = { Input };
-  return getBuiltinFunction(Context, Id, ArgElts, Output);
+  return getBuiltinFunction(Id, ArgElts, Output);
 }
 
 /// Create a generic parameter list with a single generic parameter.
@@ -420,7 +423,7 @@ static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
   Type ResultTy = GenericTy;
   Type BodyResultTy = ArchetypeTy;
-  return getBuiltinGenericFunction(Context, Id, ArgElts, ArgElts,
+  return getBuiltinGenericFunction(Id, ArgElts, ArgElts,
                                    ResultTy, BodyResultTy, ParamList);
 }
 
@@ -433,7 +436,7 @@ static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgParamElts[] = { GenericTy, Context.TheRawPointerType };
   TupleTypeElt ArgBodyElts[] = { ArchetypeTy, Context.TheRawPointerType };
   Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
 
@@ -448,7 +451,7 @@ static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy, Context),
                                  Context.TheRawPointerType };
   Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
 
@@ -462,7 +465,7 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
   TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy, Context) };
   TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy, Context) };
   Type ResultTy = BuiltinIntegerType::getWordType(Context);
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
 
@@ -470,33 +473,32 @@ static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   TupleTypeElt ArgElts[] = { PtrSizeTy, PtrSizeTy };
   Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType,
                              BuiltinIntegerType::getWordType(Context) };
   Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
-  Type ResultTy = TupleType::getEmpty(Context);
-  return getBuiltinFunction(Context, Id, {}, ResultTy);
+  return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
                                       Type T) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T, T };
   Type ResultTy = T;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
                                         Type T) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T };
   Type ResultTy = T;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
@@ -529,7 +531,7 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
 
   TupleTypeElt ArgParamElts[] = { ArgParam };
   TupleTypeElt ArgBodyElts[] = { ArgBody };
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, BodyResultTy, ParamList);
 }
 
@@ -547,7 +549,7 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
     LValueType::get(ArchetypeTy, LValueType::Qual::DefaultForType)
   };
   Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
 
@@ -562,7 +564,7 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
   Type ResultTy = MetatypeType::get(GenericTy, Context);
   Type BodyResultTy = MetatypeType::get(ArchetypeTy, Context);
-  return getBuiltinGenericFunction(Context, Id, ArgParamElts, ArgBodyElts,
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, BodyResultTy, ParamList);
 }
 
@@ -571,7 +573,7 @@ static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
   TupleTypeElt CondElt(CondTy);
-  return getBuiltinFunction(C, Id, CondElt, VoidTy);
+  return getBuiltinFunction(Id, CondElt, VoidTy);
 }
 
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
@@ -587,7 +589,7 @@ static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
 
   TupleTypeElt ArgElts[] = { VecTy, IndexTy };
   Type ResultTy = VecTy->getElementType();
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
@@ -608,7 +610,7 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
 
   TupleTypeElt ArgElts[] = { VecTy, ElementTy, IndexTy };
   Type ResultTy = VecTy;
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
@@ -618,7 +620,7 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   TupleTypeElt ArgElts[] = { BoolTy, BoolTy, MessageTy };
   Type ResultTy = TupleType::getEmpty(Context);
   
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
@@ -637,7 +639,7 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
   TupleTypeElt ResultElts[] = { OutTy, OverflowBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
 
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
@@ -652,7 +654,7 @@ static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
   TupleTypeElt ResultElts[] = { BuiltinTy, SignErrorBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
 
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
@@ -666,7 +668,7 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   TupleTypeElt ArgElts[] = { InTy };
   Type ResultTy = OutTy;
 
-  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getOnceOperation(ASTContext &Context,
@@ -675,12 +677,12 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto BlockTy = FunctionType::get(VoidTy, VoidTy, Context);
+  auto BlockTy = FunctionType::get(VoidTy, VoidTy);
   
   TupleTypeElt InFields[] = {HandleTy, BlockTy};
   auto OutTy = VoidTy;
   
-  return getBuiltinFunction(Context, Id, InFields, OutTy);
+  return getBuiltinFunction(Id, InFields, OutTy);
 }
 
 /// An array of the overloaded builtin kinds.
@@ -895,7 +897,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     FunctionType::ExtInfo Info;
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,
                                          Info))
-      return getBuiltinFunction(Context, Id, ArgElts, ResultTy, Info);
+      return getBuiltinFunction(Id, ArgElts, ResultTy, Info);
   }
   
   // If this starts with fence, we have special suffixes to handle.
@@ -1008,31 +1010,31 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
-    return getGepOperation(Context, Id, Types[0]);
+    return getGepOperation(Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
-    return getBinaryOperation(Context, Id, Types[0]);
+    return getBinaryOperation(Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       if (Types.size() != 1) return nullptr;
-      return getBinaryOperationWithOverflow(Context, Id, Types[0]);
+      return getBinaryOperationWithOverflow(Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
-    return getBinaryPredicate(Context, Id, Types[0]);
+    return getBinaryPredicate(Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_UNARY_OPERATION(id, name, attrs, overload)   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
-    return getUnaryOperation(Context, Id, Types[0]);
+    return getUnaryOperation(Id, Types[0]);
       
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_CAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
