@@ -1172,8 +1172,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   WitnessMap Mapping;
   TypeWitnessMap TypeWitnesses;
-  InheritedConformanceMap InheritedMapping;
-  
+
   // See whether we can derive members of this conformance.
   NominalTypeDecl *DerivingTypeDecl = nullptr;
   if (auto *NT = T->getAnyNominal()) {
@@ -1186,7 +1185,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     ProtocolConformance *InheritedConformance = nullptr;
     if (TC.conformsToProtocol(T, InheritedProto, DC, &InheritedConformance,
                               ComplainLoc, ExplicitConformance)) {
-      InheritedMapping[InheritedProto] = InheritedConformance;
+      if (!conformance->hasInheritedConformance(InheritedProto))
+        conformance->setInheritedConformance(InheritedProto,
+                                             InheritedConformance);
     } else {
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
@@ -1393,12 +1394,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   // FIXME: There's no need to have two copies of these maps. Poke at the
   // conformance directly.
-
-  // Set any missing inherited conformances.
-  for (auto inherited : InheritedMapping) {
-    if (!conformance->hasInheritedConformance(inherited.first))
-      conformance->setInheritedConformance(inherited.first, inherited.second);
-  }
 
   // Set any missing type witnesses.
   for (auto typeWitness : TypeWitnesses) {

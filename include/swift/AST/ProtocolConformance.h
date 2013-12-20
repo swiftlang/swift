@@ -307,11 +307,7 @@ public:
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
-  ///
-  /// Only usable on incomplete or invalid protocol conformances.
   bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
-    assert(getState() != ProtocolConformanceState::Complete &&
-           "doesn't make sense on a complete protocol conformance");
     return TypeWitnesses.count(assocType) > 0;
   }
 
@@ -330,11 +326,7 @@ public:
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
-  ///
-  /// Only usable on incomplete or invalid protocol conformances.
   bool hasWitness(ValueDecl *requirement) const {
-    assert(getState() != ProtocolConformanceState::Complete &&
-           "doesn't make sense on a complete protocol conformance");
     return Mapping.count(requirement) > 0;
   }
 
@@ -351,8 +343,6 @@ public:
   ///
   /// Only usable on incomplete or invalid protocol conformances.
   bool hasInheritedConformance(ProtocolDecl *proto) const {
-    assert(getState() != ProtocolConformanceState::Complete &&
-           "doesn't make sense on a complete protocol conformance");
     return InheritedMapping.count(proto) > 0;
   }
 
