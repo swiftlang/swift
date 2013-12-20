@@ -1068,11 +1068,6 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr, bool isSILType) {
   return MetatypeType::get(ty, Context);
 }
 
-Type TypeChecker::transformType(Type type,
-                                const std::function<Type(Type)> &fn) {
-  return type.transform(fn);
-}
-
 Type TypeChecker::substType(Module *module, Type type,
                             TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {

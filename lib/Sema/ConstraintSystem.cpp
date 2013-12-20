@@ -495,11 +495,11 @@ namespace {
                        replacements);
 
         // Transform the input and output types.
-        Type inputTy = cs.TC.transformType(genericFn->getInput(), *this);
+        Type inputTy = genericFn->getInput().transform(*this);
         if (!inputTy)
           return Type();
 
-        Type resultTy = cs.TC.transformType(genericFn->getResult(), *this);
+        Type resultTy = genericFn->getResult().transform(*this);
         if (!resultTy)
           return Type();
 
@@ -512,7 +512,7 @@ namespace {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         auto parentTy = unbound->getParent();
         if (parentTy)
-          parentTy = cs.TC.transformType(parentTy, *this);
+          parentTy = parentTy.transform(*this);
 
         auto unboundDecl = unbound->getDecl();
 
@@ -551,7 +551,7 @@ Type ConstraintSystem::openType(
                                               skipProtocolSelfConstraint,
                                               opener,
                                               replacements, getTypeVariable);
-  return TC.transformType(startingType, replaceDependentTypes);
+  return startingType.transform(replaceDependentTypes);
 }
 
 Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
@@ -710,8 +710,7 @@ void ConstraintSystem::openGeneric(
   for (auto req : requirements) {
   switch (req.getKind()) {
     case RequirementKind::Conformance: {
-      auto subjectTy = TC.transformType(req.getFirstType(),
-                                        replaceDependentTypes);
+      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
       if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
         if (!skipProtocolSelfConstraint ||
             !(isa<ProtocolDecl>(dc) || isa<ProtocolDecl>(dc->getParent())) ||
@@ -727,10 +726,8 @@ void ConstraintSystem::openGeneric(
     }
 
     case RequirementKind::SameType: {
-      auto firstTy = TC.transformType(req.getFirstType(),
-                                      replaceDependentTypes);
-      auto secondTy = TC.transformType(req.getSecondType(),
-                                       replaceDependentTypes);
+      auto firstTy = req.getFirstType().transform(replaceDependentTypes);
+      auto secondTy = req.getSecondType().transform(replaceDependentTypes);
       addConstraint(ConstraintKind::Bind, firstTy, secondTy);
       break;
     }
@@ -1108,8 +1105,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
 Type ConstraintSystem::simplifyType(Type type,
        llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
-  return TC.transformType(type,
-                          [&](Type type) -> Type {
+  return type.transform([&](Type type) -> Type {
             if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
               tvt = getRepresentative(tvt);
               if (auto fixed = getFixedType(tvt)) {
@@ -1128,8 +1124,7 @@ Type ConstraintSystem::simplifyType(Type type,
 }
 
 Type Solution::simplifyType(TypeChecker &tc, Type type) const {
-  return tc.transformType(type,
-           [&](Type type) -> Type {
+  return type.transform([&](Type type) -> Type {
              if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
                auto known = typeBindings.find(tvt);
                assert(known != typeBindings.end());

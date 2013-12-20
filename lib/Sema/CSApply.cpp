@@ -48,8 +48,7 @@ Type Solution::computeSubstitutions(
   // FIXME: It's unfortunate that we're using archetypes here, but we don't
   // have another way to map from type variables back to dependent types (yet);
   TypeSubstitutionMap typeSubstitutions;
-  auto type = tc.transformType(openedType,
-                               [&](Type type) -> Type {
+  auto type = openedType.transform([&](Type type) -> Type {
                 if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
                   auto archetype = tv->getImpl().getArchetype();
                   auto simplified = getFixedType(tv);

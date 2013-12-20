@@ -57,9 +57,8 @@ llvm::raw_ostream &constraints::operator<<(llvm::raw_ostream &out,
 
 /// \brief Remove the initializers from any tuple types within the
 /// given type.
-static Type stripInitializers(TypeChecker &tc, Type origType) {
-  return tc.transformType(origType, 
-           [&](Type type) -> Type {
+static Type stripInitializers(Type origType) {
+  return origType.transform([&](Type type) -> Type {
              if (auto tupleTy = type->getAs<TupleType>()) {
                SmallVector<TupleTypeElt, 4> fields;
                for (const auto &field : tupleTy->getFields()) {
@@ -69,7 +68,7 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
                                                field.isVararg()));
                                                
                }
-               return TupleType::get(fields, tc.Context);
+               return TupleType::get(fields, type->getASTContext());
              }
              return type;
            });
@@ -576,8 +575,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     // Strip any initializers from tuples in the type; they aren't
     // to be compared.
-    type1 = stripInitializers(cs.getTypeChecker(), type1);
-    type2 = stripInitializers(cs.getTypeChecker(), type2);
+    type1 = stripInitializers(type1);
+    type2 = stripInitializers(type2);
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))

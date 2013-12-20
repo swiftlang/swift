@@ -311,13 +311,6 @@ public:
                             bool isSpecialized,
                             GenericTypeResolver *resolver = nullptr);
 
-  /// \brief Transform the given type by applying the given function to
-  /// each type node. If the function returns null, the transformation aborts.
-  /// If it leaves the given type unchanged, then the transformation will be
-  /// applied to all of the child types. If any of those types change, their
-  /// parent node will be rebuilt.
-  Type transformType(Type type, const std::function<Type(Type)> &fn);
-
   /// \brief Substitute the given archetypes for their substitution types
   /// within the given type.
   ///

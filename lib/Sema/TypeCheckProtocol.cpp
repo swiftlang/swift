@@ -587,7 +587,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
   auto selfTy = GenericTypeParamType::get(0, 0, tc.Context);
-  type = tc.transformType(type, [&](Type type) -> Type {
+  type = type.transform([&](Type type) -> Type {
     // If a dependent member refers to an associated type, replace it.
     if (auto member = type->getAs<DependentMemberType>()) {
       if (member->getBase()->isEqual(selfTy)) {
@@ -1486,7 +1486,7 @@ existentialConformsToItself(TypeChecker &tc,
     // "Transform" the type to walk the whole type. If we find 'Self', return
     // null. Otherwise, make this the identity transform and throw away the
     // result.
-    if (tc.transformType(memberTy, [&](Type type) -> Type {
+    if (memberTy.transform([&](Type type) -> Type {
           // If we found our archetype, return null.
           if (auto archetype = type->getAs<ArchetypeType>()) {
             return archetype == selfType? nullptr : type;
