@@ -56,6 +56,11 @@ Module *ProtocolConformance::getContainingModule() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getContainingModule, ())
 }
 
+/// Retrieve the state of this conformance.
+ProtocolConformanceState ProtocolConformance::getState() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
+}
+
 const Substitution &
 ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
                                     LazyResolver *resolver) const {
@@ -96,6 +101,26 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
     // FIXME: These could reasonably have open type variables.
     return nullptr;
   }
+}
+
+void NormalProtocolConformance::setTypeWitness(
+       AssociatedTypeDecl *assocType,
+       const Substitution &substitution) {
+  assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
+         "associated type in wrong protocol");
+  assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
+  assert(!isComplete() && "Conformance already complete?");
+  TypeWitnesses[assocType] = substitution;
+}
+
+void NormalProtocolConformance::setWitness(ValueDecl *requirement,
+                                           ConcreteDeclRef witness) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+  assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
+         "requirement in wrong protocol");
+  assert(Mapping.count(requirement) == 0 && "Witness already known");
+  assert(!isComplete() && "Conformance already complete?");
+  Mapping[requirement] = witness;
 }
 
 const Substitution &SpecializedProtocolConformance::getTypeWitness(

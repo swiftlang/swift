@@ -1147,6 +1147,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         DeclContext *DC,
                         Decl *ExplicitConformance,
                         SourceLoc ComplainLoc) {
+  Module *conformingModule = ExplicitConformance
+                               ? ExplicitConformance->getModuleContext()
+                               : nullptr;
+
+  NormalProtocolConformance *conformance
+    = TC.Context.getConformance(T, Proto, ComplainLoc, conformingModule,
+                                ProtocolConformanceState::Incomplete);
+
   WitnessMap Mapping;
   TypeWitnessMap TypeWitnesses;
   InheritedConformanceMap InheritedMapping;
@@ -1172,7 +1180,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     diag::inherited_protocol_does_not_conform, T,
                     InheritedProto->getDeclaredType());
       }
-      return nullptr;
+
+      conformance->setState(ProtocolConformanceState::Invalid);
+      return conformance;
     }
   }
   
@@ -1183,7 +1193,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       TC.diagnose(ComplainLoc,
                   diag::non_class_cannot_conform_to_class_protocol,
                   T, Proto->getDeclaredType());
-    return nullptr;
+    conformance->setState(ProtocolConformanceState::Invalid);
+    return conformance;
   }
 
   bool Complained = false;
@@ -1219,8 +1230,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   // If we complain about any associated types, there is no point in continuing.
-  if (Complained)
-    return nullptr;
+  if (Complained) {
+    conformance->setState(ProtocolConformanceState::Invalid);
+    return conformance;
+  }
 
   // Check that T provides all of the required func/variable/subscript members.
   bool invalid = false;
@@ -1286,8 +1299,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
   }
   
-  if (Complained || invalid)
-    return nullptr;
+  if (Complained || invalid) {
+    conformance->setState(ProtocolConformanceState::Invalid);
+    return conformance;
+  }
 
   // If any associated types were left unresolved, try default types
   // or compiler-supported derivation.
@@ -1330,8 +1345,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                              unresolvedAssocTypes.end());
 
   if (!unresolvedAssocTypes.empty()) {
-    if (ComplainLoc.isInvalid())
-      return nullptr;
+    conformance->setState(ProtocolConformanceState::Invalid);
+
+    if (ComplainLoc.isInvalid()) {
+      return conformance;
+    }
 
     // Diagnose all missing associated types.
     for (auto assocType : unresolvedAssocTypes) {
@@ -1350,23 +1368,39 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                   assocType->getName());
     }
 
-    return nullptr;
+    return conformance;
   }
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions;
+  // FIXME: Do this as soon as we select a default.
   for (auto deduced : deducedAssocTypes) {
-    defaultedDefinitions.push_back(deduced.first);
+    conformance->addDefaultDefinition(deduced.first);
   }
 
-  Module *conformingModule = ExplicitConformance
-    ? ExplicitConformance->getModuleContext()
-    : nullptr;
+  // FIXME: There's no need to have two copies of these maps. Poke at the
+  // conformance directly.
 
-  return TC.Context.getConformance(T, Proto, ComplainLoc, conformingModule,
-                                   std::move(Mapping),
-                                   std::move(TypeWitnesses),
-                                   std::move(InheritedMapping),
-                                   defaultedDefinitions);
+  // Set any missing inherited conformances.
+  for (auto inherited : InheritedMapping) {
+    if (!conformance->hasInheritedConformance(inherited.first))
+      conformance->setInheritedConformance(inherited.first, inherited.second);
+  }
+
+  // Set any missing type witnesses.
+  for (auto typeWitness : TypeWitnesses) {
+    // FIXME: Hack when we've deduced an associated type we shouldn't.
+    if (!conformance->hasTypeWitness(typeWitness.first) &&
+        cast<ProtocolDecl>(typeWitness.first->getDeclContext()) == Proto)
+      conformance->setTypeWitness(typeWitness.first, typeWitness.second);
+  }
+
+  // Set any missing witnesses.
+  for (auto witness : Mapping) {
+    if (!conformance->hasWitness(witness.first))
+      conformance->setWitness(witness.first, witness.second);
+  }
+
+  conformance->setState(ProtocolConformanceState::Complete);
+  return conformance;
 }
 
 /// \brief Check whether an existential value of the given protocol conforms
@@ -1686,7 +1720,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (Conformance)
         *Conformance = Known->second.getPointer();
 
-      return true;
+      return Known->second.getPointer()->isComplete();
     }
 
     // If we're just checking for conformance, we already know the answer.
@@ -1694,7 +1728,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       // Check whether we know we implicitly conform...
       if (Known->second.getPointer()) {
         // We're not allowed to complain; fail.
-        if (ComplainLoc.isInvalid())
+        if (ComplainLoc.isInvalid() || Known->second.getPointer()->isInvalid())
           return false;
 
         // Complain about explicit conformance and continue as if the user
@@ -1762,8 +1796,12 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
 
     // Check whether the type *implicitly* conforms to the protocol.
-    if (auto *result = checkConformsToProtocol(*this, T, Proto, DC, nullptr,
-                                               SourceLoc())) {
+    auto *result = checkConformsToProtocol(*this, T, Proto, DC, nullptr,
+                                           SourceLoc());
+    assert(result && "Didn't build any protocol conformance");
+    assert(!result->isIncomplete() && "Retrieved incomplete conformance");
+
+    if (!result->isInvalid()) {
       // Success! Record the conformance in the cache.
       Context.ConformsTo[Key].setPointer(result);
 
@@ -1794,8 +1832,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
   auto result = checkConformsToProtocol(*this, T, Proto, DC,
                                         ExplicitConformance, ComplainLoc);
-  if (!result)
-    return false;
+  assert(result && "Didn't build any protocol conformance");
+  assert(!result->isIncomplete() && "Retrieved incomplete conformance");
 
   // Record the conformance we just computed.
   Context.ConformsTo[Key] = ConformanceEntry(result, true);

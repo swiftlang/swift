@@ -1416,7 +1416,8 @@ public:
 
   void checkObjCConformance(ProtocolDecl *protocol,
                             ProtocolConformance *conformance) {
-    if (!conformance)
+    // FIXME: Put the invalid-conformance check below?
+    if (!conformance || conformance->isInvalid())
       return;
     if (protocol->isObjC()) {
       conformance->forEachValueWitness(&TC,

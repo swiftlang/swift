@@ -2422,10 +2422,11 @@ namespace {
                            SmallVectorImpl<ProtocolConformance *> &Conformances,
                                        ASTContext &Ctx) {
       for (auto proto : protocols) {
-        WitnessMap Mapping;
-        TypeWitnessMap TypeWitnesses;
-        TypeSubstitutionMap TypeMapping;
-        InheritedConformanceMap InheritedMapping;
+        NormalProtocolConformance *conformance
+          = Ctx.getConformance(dc->getDeclaredTypeOfContext(),
+                               proto, SourceLoc(),
+                               dc->getParentModule(),
+                               ProtocolConformanceState::Incomplete);
 
         for (auto member : proto->getMembers()) {
           if (auto func = dyn_cast<FuncDecl>(member)) {
@@ -2435,7 +2436,8 @@ namespace {
                                    objcMethod->isInstanceMethod())) {
                 if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
                   members.push_back(imported);
-                  Mapping[cast<ValueDecl>(member)] = cast<ValueDecl>(imported);
+                  conformance->setWitness(cast<ValueDecl>(member),
+                                          cast<ValueDecl>(imported));
 
                   // Import any special methods based on this member.
                   if (auto special = importSpecialMethod(imported, dc)) {
@@ -2454,17 +2456,12 @@ namespace {
           if (!valueReq)
             continue;
 
-          if (Mapping.count(valueReq) == 0)
-            Mapping[valueReq] = valueReq;
+          if (!conformance->hasWitness(valueReq))
+            conformance->setWitness(valueReq, valueReq);
         }
 
-        Conformances.push_back(Ctx.getConformance(dc->getDeclaredTypeOfContext(),
-                                                  proto, SourceLoc(),
-                                                  dc->getParentModule(),
-                                                  std::move(Mapping),
-                                                  std::move(TypeWitnesses),
-                                                  std::move(InheritedMapping),
-                                                  ArrayRef<ValueDecl *>()));
+        conformance->setState(ProtocolConformanceState::Complete);
+        Conformances.push_back(conformance);
       }
     }
 

@@ -795,17 +795,11 @@ ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
                            SourceLoc loc,
                            Module *containingModule,
-                           WitnessMap &&witnesses,
-                           TypeWitnessMap &&typeWitnesses,
-                           InheritedConformanceMap &&inheritedConformances,
-                           ArrayRef<ValueDecl *> defaultedDefinitions) {
+                           ProtocolConformanceState state) {
   auto result
     = new (*this) NormalProtocolConformance(conformingType, protocol, loc,
                                             containingModule,
-                                            std::move(witnesses),
-                                            std::move(typeWitnesses),
-                                            std::move(inheritedConformances),
-                                            defaultedDefinitions);
+                                            state);
   Impl.NormalConformances.push_back(result);
   return result;
 }

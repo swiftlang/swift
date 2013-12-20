@@ -512,13 +512,32 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
-  return { proto,
-           ctx.getConformance(conformingType, proto, SourceLoc(),
-                              FileContext->getParentModule(),
-                              std::move(witnesses),
-                              std::move(typeWitnesses),
-                              std::move(inheritedConformances),
-                              defaultedDefinitions) };
+  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
+                                        FileContext->getParentModule(),
+                                        ProtocolConformanceState::Incomplete);
+
+  // Set inherited conformances.
+  for (auto inherited : inheritedConformances) {
+    conformance->setInheritedConformance(inherited.first, inherited.second);
+  }
+
+  // Set type witnesses.
+  for (auto typeWitness : typeWitnesses) {
+    conformance->setTypeWitness(typeWitness.first, typeWitness.second);
+  }
+
+  // Set witnesses.
+  for (auto witness : witnesses) {
+    conformance->setWitness(witness.first, witness.second);
+  }
+
+  // Note any defaulted definitions.
+  for (auto defaulted : defaultedDefinitions) {
+    conformance->addDefaultDefinition(defaulted);
+  }
+
+  conformance->setState(ProtocolConformanceState::Complete);
+  return { proto, conformance };
 }
 
 /// Applies protocol conformances to a decl.

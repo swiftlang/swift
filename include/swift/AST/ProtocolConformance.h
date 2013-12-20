@@ -64,6 +64,18 @@ enum class ProtocolConformanceKind {
   Inherited
 };
 
+/// Describes the state of a protocol conformance, which may be complete,
+/// incomplete, or invalid.
+enum class ProtocolConformanceState {
+  /// The conformance has been fully checked and is complete and well-formed.
+  Complete,
+  /// The conformance is being checked but is not yet complete.
+  Incomplete,
+  /// The conformance has been found to be invalid and should not be
+  /// used.
+  Invalid
+};
+
 /// \brief Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
@@ -93,6 +105,24 @@ public:
 
   /// Get the module that contains the conforming extension or type declaration.
   Module *getContainingModule() const;
+
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const;
+
+  /// Determine whether this conformance is complete and well-formed.
+  bool isComplete() const {
+    return getState() == ProtocolConformanceState::Complete;
+  }
+
+  /// Determine whether this conformance is invalid.
+  bool isInvalid() const {
+    return getState() == ProtocolConformanceState::Invalid;
+  }
+
+  /// Determine whether this conformance is incomplete.
+  bool isIncomplete() const {
+    return getState() == ProtocolConformanceState::Incomplete;
+  }
 
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType,
@@ -200,8 +230,9 @@ public:
 /// providing the witnesses \c A.foo and \c B<T>.foo, respectively, for the
 /// requirement \c foo.
 class NormalProtocolConformance : public ProtocolConformance {
-  /// \brief The protocol being conformed to.
-  ProtocolDecl *Protocol;
+  /// \brief The protocol being conformed to and its current state.
+  llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
+    ProtocolAndState;
 
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
@@ -232,25 +263,17 @@ class NormalProtocolConformance : public ProtocolConformance {
                             ProtocolDecl *protocol,
                             SourceLoc loc,
                             Module *containingModule,
-                            WitnessMap &&witnesses,
-                            TypeWitnessMap &&typeWitnesses,
-                            InheritedConformanceMap &&inheritedConformances,
-                            ArrayRef<ValueDecl *> defaultedDefinitions)
+                            ProtocolConformanceState state)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      Protocol(protocol),
+      ProtocolAndState(protocol, state),
       Loc(loc),
-      ContainingModule(containingModule),
-      Mapping(std::move(witnesses)),
-      TypeWitnesses(std::move(typeWitnesses)),
-      InheritedMapping(std::move(inheritedConformances))
+      ContainingModule(containingModule)
   {
-    for (auto def : defaultedDefinitions)
-      DefaultedDefinitions.insert(def);
   }
 
 public:
   /// Get the protocol being conformed to.
-  ProtocolDecl *getProtocol() const { return Protocol; }
+  ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 
   /// Retrieve the location of this 
   SourceLoc getLoc() const { return Loc; }
@@ -263,6 +286,16 @@ public:
     ContainingModule = containing;
   }
 
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const {
+    return ProtocolAndState.getInt();
+  }
+
+  /// Set the state of this conformance.
+  void setState(ProtocolConformanceState state) {
+    ProtocolAndState.setInt(state);
+  }
+
   /// Retrieve the type witness corresponding to the given associated type
   /// requirement.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
@@ -271,6 +304,20 @@ public:
     assert(known != TypeWitnesses.end());
     return known->second;
   }
+
+  /// Determine whether the protocol conformance has a type witness for the
+  /// given associated type.
+  ///
+  /// Only usable on incomplete or invalid protocol conformances.
+  bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
+    assert(getState() != ProtocolConformanceState::Complete &&
+           "doesn't make sense on a complete protocol conformance");
+    return TypeWitnesses.count(assocType) > 0;
+  }
+
+  /// Set the type witness for the given associated type.
+  void setTypeWitness(AssociatedTypeDecl *assocType,
+                      const Substitution &substitution);
 
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement, 
@@ -281,11 +328,42 @@ public:
     return known->second;
   }
 
+  /// Determine whether the protocol conformance has a witness for the given
+  /// requirement.
+  ///
+  /// Only usable on incomplete or invalid protocol conformances.
+  bool hasWitness(ValueDecl *requirement) const {
+    assert(getState() != ProtocolConformanceState::Complete &&
+           "doesn't make sense on a complete protocol conformance");
+    return Mapping.count(requirement) > 0;
+  }
+
+  /// Set the witness for the given requirement.
+  void setWitness(ValueDecl *requirement, ConcreteDeclRef witness);
+
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {
     return InheritedMapping;
   }
 
+  /// Determine whether the protocol conformance has a particular inherited
+  /// conformance.
+  ///
+  /// Only usable on incomplete or invalid protocol conformances.
+  bool hasInheritedConformance(ProtocolDecl *proto) const {
+    assert(getState() != ProtocolConformanceState::Complete &&
+           "doesn't make sense on a complete protocol conformance");
+    return InheritedMapping.count(proto) > 0;
+  }
+
+  /// Set the given inherited conformance.
+  void setInheritedConformance(ProtocolDecl *proto,
+                               ProtocolConformance *conformance) {
+    assert(InheritedMapping.count(proto) == 0 &&
+           "Already recorded inherited conformance");
+    assert(!isComplete() && "Conformance already complete?");
+    InheritedMapping[proto] = conformance;
+  }
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(ValueDecl *requirement) const {
@@ -295,6 +373,11 @@ public:
   /// Retrieve the complete set of defaulted definitions.
   const llvm::SmallPtrSet<ValueDecl *, 4> &getDefaultedDefinitions() const {
     return DefaultedDefinitions;
+  }
+
+  /// Note that the given requirement was a default definition.
+  void addDefaultDefinition(ValueDecl *requirement) {
+    DefaultedDefinitions.insert(requirement);
   }
 
   static bool classof(const ProtocolConformance *conformance) {
@@ -364,6 +447,11 @@ public:
   /// Get the module that contains the conforming extension or type declaration.
   Module *getContainingModule() const {
     return GenericConformance->getContainingModule();
+  }
+
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const {
+    return GenericConformance->getState();
   }
 
   /// Retrieve the type witness for the given associated type.
@@ -446,6 +534,11 @@ public:
   /// Get the module that contains the conforming extension or type declaration.
   Module *getContainingModule() const {
     return InheritedConformance->getContainingModule();
+  }
+
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const {
+    return InheritedConformance->getState();
   }
 
   /// Retrieve the type witness for the given associated type.

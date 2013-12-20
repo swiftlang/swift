@@ -487,10 +487,7 @@ public:
                  ProtocolDecl *protocol,
                  SourceLoc loc,
                  Module *containingModule,
-                 WitnessMap &&witnesses,
-                 TypeWitnessMap &&typeWitnesses,
-                 InheritedConformanceMap &&inheritedConformances,
-                 ArrayRef<ValueDecl *> defaultedDefinitions);
+                 ProtocolConformanceState state);
 
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutes
