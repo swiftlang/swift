@@ -2926,7 +2926,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
   /// The typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
-  Expr *CallToSuperInit = 0;
+  Expr *CallToSuperInit = nullptr;
 
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
