@@ -770,6 +770,11 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
   /// \brief Declarations that should get ExpressionSpecific semantic context.
   llvm::SmallSet<const Decl *, 4> ExpressionSpecificDecls;
 
+  using DeducedAssociatedTypes =
+      llvm::DenseMap<const AssociatedTypeDecl *, Type>;
+  std::map<const NominalTypeDecl *, DeducedAssociatedTypes>
+      DeducedAssociatedTypeCache;
+
 public:
   struct RequestedResultsTy {
     const Module *TheModule;
@@ -912,6 +917,46 @@ public:
     }
 
     return VD->getType();
+  }
+
+  const DeducedAssociatedTypes &
+  getAssociatedTypeMap(const NominalTypeDecl *NTD) {
+    {
+      auto It = DeducedAssociatedTypeCache.find(NTD);
+      if (It != DeducedAssociatedTypeCache.end())
+        return It->second;
+    }
+
+    DeducedAssociatedTypes Types;
+    auto TopConformances = NTD->getConformances();
+    SmallVector<ProtocolConformance *, 8> Worklist(TopConformances.begin(),
+                                                   TopConformances.end());
+    while (!Worklist.empty()) {
+      auto Conformance = Worklist.pop_back_val();
+      Conformance->forEachTypeWitness(TypeResolver.get(),
+                                      [&](const AssociatedTypeDecl *ATD,
+                                          const Substitution &Subst) -> bool {
+        Types[ATD] = Subst.Replacement;
+        return false;
+      });
+      for (auto It : Conformance->getInheritedConformances())
+        Worklist.push_back(It.second);
+    }
+
+    auto ItAndInserted = DeducedAssociatedTypeCache.insert({ NTD, Types });
+    assert(ItAndInserted.second == true && "should not be in the map");
+    return ItAndInserted.first->second;
+  }
+
+  Type getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
+    if (BaseType) {
+      if (auto NTD = BaseType->getAnyNominal()) {
+        auto &Types = getAssociatedTypeMap(NTD);
+        if (Type T = Types.lookup(ATD))
+          return MetatypeType::get(T, Ctx);
+      }
+    }
+    return Type();
   }
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
@@ -1219,8 +1264,8 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(AT->getName().str());
-    addTypeAnnotation(Builder,
-                      MetatypeType::get(AT->getDeclaredType(), Ctx));
+    if (Type T = getAssociatedTypeType(AT))
+      addTypeAnnotation(Builder, T);
   }
 
   void addEnumElementRef(const EnumElementDecl *EED,
@@ -1573,6 +1618,7 @@ public:
 
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
+    this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType, Ctx),
                              CurrDeclContext, TypeResolver.get());
