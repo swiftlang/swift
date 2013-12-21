@@ -748,6 +748,12 @@ public:
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return ft->getParameters().back().getSILType();
   }
+  CanType getMethodSelfInstanceType(CanSILFunctionType ft) {
+    auto selfTy = getMethodSelfType(ft);
+    if (auto metaTy = selfTy.getAs<MetatypeType>())
+      return metaTy.getInstanceType();
+    return selfTy.getSwiftRValueType();
+  }
 
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
@@ -772,8 +778,8 @@ public:
       require(methodType->getGenericParams()->hasSelfArchetype(),
               "method should be polymorphic on Self archetype");
       
-      SILType selfType = getMethodSelfType(methodType);
-      require(selfType.castTo<ArchetypeType>()->getSelfProtocol(),
+      CanType selfType = getMethodSelfInstanceType(methodType);
+      require(cast<ArchetypeType>(selfType)->getSelfProtocol(),
               "method should be a Self archetype method");
     } else {
       require(methodType->isThin()
