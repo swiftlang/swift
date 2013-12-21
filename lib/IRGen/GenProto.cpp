@@ -3863,7 +3863,17 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   // we're not going to try to access this anyway.
   CanType substInputType;
   if (!substFnType->getParameters().empty()) {
-    substInputType = substFnType->getParameters().back().getType();
+    auto selfParam = substFnType->getParameters().back();
+    substInputType = selfParam.getType();
+    // If the parameter is a direct metatype parameter, this is a static method
+    // of the instance type. We can assume this because:
+    // - metatypes cannot directly conform to protocols
+    // - even if they could, they would conform as a value type 'self' and thus
+    //   be passed indirectly as an @in or @inout parameter.
+    if (auto meta = dyn_cast<MetatypeType>(substInputType)) {
+      if (!selfParam.isIndirect())
+        substInputType = meta.getInstanceType();
+    }
   }
   emitPolymorphicArgumentsWithInput(IGF, origFnType, substInputType, subs, out);
 }
