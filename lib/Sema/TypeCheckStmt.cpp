@@ -66,6 +66,13 @@ namespace {
       //     parented to the outer context, not the outer autoclosure
       //   - non-local initializers
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
+        // FIXME: Work around an apparent reentrancy problem with the REPL.
+        // I don't understand what's going on here well enough to fix the
+        // underlying issue. -Joe
+        if (CE->getParent() == ParentDC
+            && CE->getDiscriminator() != AutoClosureExpr::InvalidDiscriminator)
+          return { false, E };
+        
         assert(CE->getDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
         CE->setDiscriminator(NextDiscriminator++);
         CE->setParent(ParentDC);
