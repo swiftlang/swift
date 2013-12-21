@@ -337,8 +337,18 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
+  if (CurNominal) {
+    for (auto Proto : CurNominal->getProtocols()) {
+      for (auto Member : Proto->getMembers()) {
+        if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member))
+          Consumer.foundDecl(ATD, getReasonForSuper(Reason));
+      }
+    }
+  }
+
   do {
-    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
+    CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
       break;
 
