@@ -404,11 +404,24 @@ struct FoundDeclTy {
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> FoundDecls;
+  llvm::DenseSet<Identifier> FoundAssociatedTypes;
   llvm::SetVector<FoundDeclTy> DeclsToReport;
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (FoundDecls.count(VD))
       return;
+
+    if (auto ATD = dyn_cast<AssociatedTypeDecl>(VD)) {
+      // AssociatedTypeDecls don't track overriding. They can come from
+      // multiple implemented protocols (where there is no overriding
+      // relationship), so we need to track them separately.
+      //
+      // In any case, don't report multiple AssociatedTypeDecls with same name.
+      auto Res = FoundAssociatedTypes.insert(ATD->getName());
+      if (Res.second)
+        DeclsToReport.insert(FoundDeclTy(ATD, Reason));
+      return;
+    }
 
     // Insert all overridden decls into FoundDecls.
     ValueDecl *OverriddenDecl = nullptr;
