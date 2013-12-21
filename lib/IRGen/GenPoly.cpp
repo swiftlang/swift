@@ -346,8 +346,8 @@ namespace {
     bool visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       // Metatypes can differ by abstraction if the substitution
       // reveals that the type is actually not a class type.
-      return (IGM.hasTrivialMetatype(substTy.getInstanceType()) &&
-              !IGM.hasTrivialMetatype(origTy.getInstanceType()));
+      return (IGM.isTrivialMetatype(substTy) &&
+              !IGM.isTrivialMetatype(origTy));
     }
 
     /// Whether we're checking for memory or for an explosion, tuples
@@ -658,8 +658,8 @@ namespace {
       // nature under substitution, so if the substituted type is
       // trivial, the original type either must also be or must be an
       // archetype.
-      if (IGF.IGM.hasTrivialMetatype(substInstanceTy)) {
-        assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
+      if (IGF.IGM.isTrivialMetatype(substTy)) {
+        assert(IGF.IGM.isTrivialMetatype(origTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
           Out.add(IGF.emitTypeMetadataRef(substInstanceTy));
@@ -668,7 +668,7 @@ namespace {
 
       // Otherwise, the original type is either a class type or an
       // archetype, and in either case it has a non-trivial representation.
-      assert(!IGF.IGM.hasTrivialMetatype(origInstanceTy));
+      assert(!IGF.IGM.isTrivialMetatype(origTy));
       In.transferInto(Out, 1);
     }
 
@@ -813,15 +813,14 @@ namespace {
 
     void visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       CanType origInstanceTy = origTy.getInstanceType();
-      CanType substInstanceTy = substTy.getInstanceType();
 
       // The only metatypes with non-trivial representations are those
       // for archetypes and class types.  A type can't lose the class
       // nature under substitution, so if the substituted type is
       // trivial, the original type either must also be or must be an
       // archetype.
-      if (IGF.IGM.hasTrivialMetatype(substInstanceTy)) {
-        assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
+      if (IGF.IGM.isTrivialMetatype(substTy)) {
+        assert(IGF.IGM.isTrivialMetatype(origTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
           In.markClaimed(1);
@@ -830,7 +829,7 @@ namespace {
 
       // Otherwise, the original type is either a class type or an
       // archetype, and in either case it has a non-trivial representation.
-      assert(!IGF.IGM.hasTrivialMetatype(origInstanceTy));
+      assert(!IGF.IGM.isTrivialMetatype(origTy));
       In.transferInto(Out, 1);
     }
 

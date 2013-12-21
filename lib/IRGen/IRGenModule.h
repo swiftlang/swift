@@ -230,7 +230,7 @@ public:
   unsigned getExplosionSize(SILType T, Mangle::ExplosionKind kind);
   llvm::PointerType *isSingleIndirectValue(SILType T, Mangle::ExplosionKind kind);
   llvm::PointerType *requiresIndirectResult(SILType T, Mangle::ExplosionKind kind);
-  bool hasTrivialMetatype(CanType type);
+  bool isTrivialMetatype(CanMetatypeType type);
   bool isPOD(SILType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
 

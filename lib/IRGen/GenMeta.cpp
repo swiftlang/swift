@@ -631,19 +631,24 @@ namespace {
 }
 
 /// Does the metatype for the given type have a trivial representation?
-bool IRGenModule::hasTrivialMetatype(CanType instanceType) {
-  return HasTrivialMetatype().visit(instanceType);
+bool IRGenModule::isTrivialMetatype(CanMetatypeType metaTy) {
+  // FIXME: We still need to handle unlowered metatypes from the AST for
+  // IRGen protocol witnesses. This can go away (with the HasTrivialMetatype
+  // visitor) when we enable SIL witnesses.
+  if (!metaTy->hasThin())
+    return HasTrivialMetatype().visit(metaTy.getInstanceType());
+  return metaTy->isThin();
 }
 
 /// Emit a DeclRefExpr which refers to a metatype.
-void irgen::emitMetatypeRef(IRGenFunction &IGF, CanType type,
+void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
   // Some metatypes have trivial representation.
-  if (IGF.IGM.hasTrivialMetatype(type))
+  if (type->isThin())
     return;
 
   // Otherwise, emit a metadata reference.
-  llvm::Value *metadata = IGF.emitTypeMetadataRef(type);
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(type.getInstanceType());
   explosion.add(metadata);
 }
 

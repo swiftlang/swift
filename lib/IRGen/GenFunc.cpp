@@ -1726,9 +1726,8 @@ void CallEmission::emitToExplosion(Explosion &out) {
       // If we got here, it's because the substituted metatype is trivial.
       // Remapping is easy--the substituted type is empty, so we drop the
       // nontrivial representation of the original type.
-      assert(IGF.IGM.hasTrivialMetatype(
-                      CanType(cast<MetatypeType>(substResultType)->getInstanceType()))
-             && "remapping to nontrivial metatype?!");
+      assert(cast<MetatypeType>(substResultType)->isThin()
+             && "remapping to thick metatype?!");
       
       Explosion temp(getCallee().getExplosionLevel());
       emitToUnmappedExplosion(temp);

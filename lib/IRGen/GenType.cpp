@@ -991,12 +991,14 @@ const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
 }
 
 const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
-  // Certain metatypes have trivial representation, and we only
-  // actually need to materialize them when converting to a more
-  // generic representation.
-  if (IGM.hasTrivialMetatype(CanType(T->getInstanceType())))
+  assert(T->hasThin() &&
+         "metatype should have been assigned a thinness by SIL");
+  
+  // Thin metatypes are empty.
+  if (T->isThin())
     return new EmptyTypeInfo(IGM.Int8Ty);
 
+  // Thick metatypes are represented with a metadata pointer.
   return &getTypeMetadataPtrTypeInfo();
 }
 

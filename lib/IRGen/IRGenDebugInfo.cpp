@@ -1262,7 +1262,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Value *, 4> Protocols;
     for (auto ProtocolDecl : Archetype->getConformsTo()) {
-      auto PTy = ProtocolDecl->getType()->getCanonicalType();
+      auto PTy = IGM.SILMod->Types.getLoweredType(ProtocolDecl->getType())
+        .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy, Scope);
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));

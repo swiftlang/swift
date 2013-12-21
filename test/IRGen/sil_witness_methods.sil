@@ -3,24 +3,24 @@
 sil_stage canonical
 
 struct Foo {}
-struct Bar<T, U, V> {}
+class Bar<T, U, V> {}
 
-// CHECK-LABEL: define void @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias, %swift.type* %Self)
 sil @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.metatype {
 entry(%x : $*Foo):
   %m = metatype $@thick Foo.metatype
   return %m : $@thick Foo.metatype
 }
 
-// CHECK-LABEL: define void @generic_type_concrete_method_witness(%V19sil_witness_methods3Bar* noalias, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @generic_type_concrete_method_witness(%C19sil_witness_methods3Bar** noalias, %swift.type* %Self)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 3
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 8
 // CHECK:         %T = load %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 4
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 9
 // CHECK:         %U = load %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 5
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 10
 // CHECK:         %V = load %swift.type** [[V1]], align 8
 sil @generic_type_concrete_method_witness : $@thin @cc(witness_method) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.metatype {
 entry(%x : $*Bar<T, U, V>):
@@ -32,15 +32,22 @@ entry(%x : $*Bar<T, U, V>):
   return %m : $@thick Bar<T, U, V>.metatype
 }
 
-// CHECK-LABEL: define void @generic_type_concrete_static_method_witness(%swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @concrete_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self)
+sil @concrete_type_concrete_static_method_witness : $@thin @cc(witness_method) (@thick Foo.metatype) -> @thick Foo.metatype {
+entry(%x : $@thick Foo.metatype):
+  %m = metatype $@thick Foo.metatype
+  return %m : $@thick Foo.metatype
+}
+
+// CHECK-LABEL: define %swift.type* @generic_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 3
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 8
 // CHECK:         %T = load %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 4
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 9
 // CHECK:         %U = load %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 5
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 10
 // CHECK:         %V = load %swift.type** [[V1]], align 8
 sil @generic_type_concrete_static_method_witness : $@thin @cc(witness_method) <T, U, V> (@thick Bar<T, U, V>.metatype) -> @thick Bar<T, U, V>.metatype {
 entry(%x : $@thick Bar<T, U, V>.metatype):
@@ -52,16 +59,36 @@ entry(%x : $@thick Bar<T, U, V>.metatype):
   return %m : $@thick Bar<T, U, V>.metatype
 }
 
-// CHECK-LABEL: define void @concrete_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Foo* noalias, %swift.type* %Z, %swift.type* %Self)
+// TODO: %Self metatype arg is redundant for class method witness
+
+// CHECK-LABEL: define %swift.type* @concrete_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Foo* noalias, %swift.type* %Z, %swift.type* %Self)
 sil @concrete_type_generic_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @in Foo) -> @thick Foo.metatype {
 entry(%z : $*Z, %x : $*Foo):
   %m = metatype $@thick Foo.metatype
   return %m : $@thick Foo.metatype
 }
 
-// CHECK-LABEL: define void @generic_type_generic_method_witness(%swift.opaque* noalias, %V19sil_witness_methods3Bar* noalias, %swift.type* %Z, %swift.type* %Self)
+// CHECK-LABEL: define %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias, %C19sil_witness_methods3Bar** noalias, %swift.type* %Z, %swift.type* %Self)
 sil @generic_type_generic_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.metatype {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
+  %t = metatype $@thick T.metatype
+  %u = metatype $@thick U.metatype
+  %v = metatype $@thick V.metatype
+  %m = metatype $@thick Bar<T, U, V>.metatype
+
+  return %m : $@thick Bar<T, U, V>.metatype
+}
+
+// CHECK-LABEL: define %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque* noalias, %swift.type*, %swift.type* %Z, %swift.type* %Self)
+sil @concrete_type_generic_static_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @thick Foo.metatype) -> @thick Foo.metatype {
+entry(%z : $*Z, %x : $@thick Foo.metatype):
+  %m = metatype $@thick Foo.metatype
+  return %m : $@thick Foo.metatype
+}
+
+// CHECK-LABEL: define %swift.type* @generic_type_generic_static_method_witness(%swift.opaque* noalias, %swift.type*, %swift.type* %Z, %swift.type* %Self)
+sil @generic_type_generic_static_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @thick Bar<T, U, V>.metatype) -> @thick Bar<T, U, V>.metatype {
+entry(%z : $*Z, %x : $@thick Bar<T, U, V>.metatype):
   %t = metatype $@thick T.metatype
   %u = metatype $@thick U.metatype
   %v = metatype $@thick V.metatype

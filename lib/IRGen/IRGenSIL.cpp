@@ -1271,7 +1271,7 @@ static void getMetatypeUses(ValueBase *i,
 }
 
 static void emitMetatypeInst(IRGenSILFunction &IGF,
-                             SILInstruction *i, CanType instanceType) {
+                             SILInstruction *i, CanMetatypeType metatype) {
   llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
   
   bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
@@ -1279,7 +1279,7 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
   
   if (isUsedAsSwiftMetatype) {
     Explosion e(ExplosionKind::Maximal);
-    emitMetatypeRef(IGF, instanceType, e);
+    emitMetatypeRef(IGF, metatype, e);
     if (!isUsedAsObjCClass) {
       IGF.setLoweredExplosion(SILValue(i, 0), e);
       return;
@@ -1287,14 +1287,13 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
     swiftMetatype = e.claimNext();
   }
   if (isUsedAsObjCClass) {
-    objcClass = emitClassHeapMetadataRef(IGF, instanceType);
+    objcClass = emitClassHeapMetadataRef(IGF, metatype.getInstanceType());
   }
   IGF.setLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
-  CanType instanceType(i->getType().castTo<MetatypeType>()->getInstanceType());
-  emitMetatypeInst(*this, i, instanceType);
+  emitMetatypeInst(*this, i, i->getType().castTo<MetatypeType>());
 }
 
 void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
