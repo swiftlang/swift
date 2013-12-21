@@ -3843,10 +3843,10 @@ namespace {
         out.add(IGF.emitTypeMetadataRef(substInputType));
         return;
       }
-      case SourceKind::WitnessSelf: {
+      case SourceKind::WitnessSelf:
         // The 'Self' argument(s) are added as a special case in
         // EmitPolymorphicArguments::emit.
-      }
+        return;
       }
       llvm_unreachable("bad source kind!");
     }

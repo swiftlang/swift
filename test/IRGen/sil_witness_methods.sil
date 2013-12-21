@@ -5,6 +5,16 @@ sil_stage canonical
 struct Foo {}
 class Bar<T, U, V> {}
 
+struct X {}
+struct Y {}
+struct Z {}
+
+protocol P {
+  func concrete_method()
+  static func concrete_static_method()
+  func generic_method<Z>(x: Z)
+}
+
 // CHECK-LABEL: define %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias, %swift.type* %Self)
 sil @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.metatype {
 entry(%x : $*Foo):
@@ -31,6 +41,8 @@ entry(%x : $*Bar<T, U, V>):
 
   return %m : $@thick Bar<T, U, V>.metatype
 }
+
+// TODO: %Self metatype arg is redundant for static method witness
 
 // CHECK-LABEL: define %swift.type* @concrete_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self)
 sil @concrete_type_concrete_static_method_witness : $@thin @cc(witness_method) (@thick Foo.metatype) -> @thick Foo.metatype {
@@ -97,6 +109,23 @@ entry(%z : $*Z, %x : $@thick Bar<T, U, V>.metatype):
   return %m : $@thick Bar<T, U, V>.metatype
 }
 
-// call concrete
-// call archetype
-// call thick (protocol)
+// CHECK-LABEL: define void @call_concrete_witness() {
+// CHECK:         call %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* {{.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV19sil_witness_methods3Foo {{.*}}))
+sil @call_concrete_witness : $(Foo) -> () {
+entry(%x : $Foo):
+  %m = alloc_stack $Foo
+  store %x to %m#1 : $*Foo
+  %w = function_ref @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.metatype
+  %z = apply %w(%m#1) : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.metatype
+  dealloc_stack %m#0 : $*@local_storage Foo
+  return undef : $()
+}
+
+sil @call_concrete_static_witness : $() -> () {
+entry:
+  %m = metatype $@thick Foo.metatype
+  %w = function_ref @concrete_type_concrete_static_method_witness : $@thin @cc(witness_method) (@thick Foo.metatype) -> @thick Foo.metatype
+  %z = apply %w(%m) : $@thin @cc(witness_method) (@thick Foo.metatype) -> @thick Foo.metatype
+  return undef : $()
+}
+
