@@ -71,17 +71,6 @@ namespace {
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
                            bool wasDeducedOrDefaulted);
 
-  public:
-    ConformanceChecker(TypeChecker &tc,
-                       NormalProtocolConformance *conformance,
-                       DeclContext *dc,
-                       bool &alreadyComplained)
-      : TC(tc), Conformance(conformance),
-        Proto(conformance->getProtocol()),
-        Adoptee(conformance->getType()), DC(dc),
-        Loc(conformance->getLoc()),
-        AlreadyComplained(alreadyComplained) { }
-
     /// Resolve a (non-type) witness via name lookup.
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
 
@@ -102,6 +91,21 @@ namespace {
     /// Attempt to resolve a type witness via derivation.
     ResolveWitnessResult resolveTypeWitnessViaDerivation(
                            AssociatedTypeDecl *assocType);
+
+  public:
+    ConformanceChecker(TypeChecker &tc,
+                       NormalProtocolConformance *conformance,
+                       DeclContext *dc,
+                       bool &alreadyComplained)
+      : TC(tc), Conformance(conformance),
+        Proto(conformance->getProtocol()),
+        Adoptee(conformance->getType()), DC(dc),
+        Loc(conformance->getLoc()),
+        AlreadyComplained(alreadyComplained) { }
+
+    /// Check the entire protocol conformance, ensuring that all
+    /// witnesses are resolved and emitting any diagnostics.
+    void checkConformance();
   };
 }
 
@@ -896,17 +900,13 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
     return ResolveWitnessResult::Missing;
   }
 
-  // Diagnose the error.
-    
-  // If the location is invalid, we can't complain. Just report the
-  // error to the caller.
-  if (Loc.isInvalid())
-    return ResolveWitnessResult::ExplicitFailed;
+  // Diagnose the error.    
 
   // Complain that this type does not conform to this protocol.
   if (!AlreadyComplained) {
     TC.diagnose(Loc, diag::type_does_not_conform,
                 Adoptee, Proto->getDeclaredType());
+    AlreadyComplained = true;
   }
 
   // If there was an invalid witness that might have worked, just
@@ -971,6 +971,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   if (!AlreadyComplained) {
     TC.diagnose(Loc, diag::protocol_derivation_is_broken,
                 Proto->getDeclaredType(), Adoptee);
+    AlreadyComplained = true;
   }
   return ResolveWitnessResult::ExplicitFailed;
 }
@@ -991,6 +992,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
   if (!AlreadyComplained) {
     TC.diagnose(Loc, diag::type_does_not_conform,
                 Adoptee, Proto->getDeclaredType());
+    AlreadyComplained = true;
   }
 
   // Determine the type that the requirement is expected to have.
@@ -1079,9 +1081,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
-    if (!AlreadyComplained)
+    if (!AlreadyComplained) {
       TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
                   Proto->getDeclaredType());
+      AlreadyComplained = true;
+    }
 
     TC.diagnose(assocType, diag::ambiguous_witnesses_type,
                 assocType->getName());
@@ -1093,9 +1097,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   // None of the candidates were viable.
-  if (!AlreadyComplained)
+  if (!AlreadyComplained) {
     TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
                 Proto->getDeclaredType());
+    AlreadyComplained = true;
+  }
 
   TC.diagnose(assocType, diag::no_witnesses_type,
               assocType->getName());
@@ -1136,10 +1142,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
     return ResolveWitnessResult::Missing;
 
   if (auto checkResult = checkTypeWitness(TC, DC, assocType, defaultType)) {
-    if (!AlreadyComplained)
+    if (!AlreadyComplained) {
       TC.diagnose(Loc, diag::type_does_not_conform, Adoptee, 
                   Proto->getDeclaredType());
-    
+      AlreadyComplained = true;
+    }
+
     TC.diagnose(assocType, diag::default_assocated_type_req_fail,
                 defaultType, checkResult.getProtocol()->getDeclaredType());
 
@@ -1186,6 +1194,170 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
 }
 
 # pragma mark Protocol conformance checking
+void ConformanceChecker::checkConformance() {
+  assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  // If the protocol requires a class, non-classes are a non-starter.
+  if (Proto->getAttrs().isClassProtocol()
+      && !Adoptee->getClassOrBoundGenericClass()) {
+    TC.diagnose(Loc, diag::non_class_cannot_conform_to_class_protocol,
+                Adoptee, Proto->getDeclaredType());
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+  }
+
+  // FIXME: Caller checks that this the type conforms to all of the
+  // inherited protocols.
+  
+  // Resolve any associated type members via lookup.
+  for (auto member : Proto->getMembers()) {
+    auto assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (!assocType)
+      continue;
+
+    // If we've already determined this type witness, skip it.
+    if (Conformance->hasTypeWitness(assocType))
+      continue;
+
+    // Try to resolve the type witness via name lookup.
+    (void)resolveTypeWitnessViaLookup(assocType);
+  }
+
+  // If we complain about any associated types, there is no point in continuing.
+  // FIXME: Not really true. We could check witnesses that don't involve the
+  // failed associated types.
+  if (AlreadyComplained) {
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+  }
+
+  // Check non-type requirements.
+  bool invalid = false;
+  for (auto member : Proto->getMembers()) {
+    auto requirement = dyn_cast<ValueDecl>(member);
+    if (!requirement)
+      continue;
+
+    // Associated type requirements handled above.
+    if (isa<AssociatedTypeDecl>(requirement))
+      continue;
+
+    // If we've already determined this witness, skip it.
+    if (Conformance->hasWitness(requirement))
+      continue;
+
+    // Make sure we've validated the requirement.
+    if (!requirement->hasType())
+      TC.validateDecl(requirement, true);
+
+    if (requirement->isInvalid()) {
+      invalid = true;
+      continue;
+    }
+
+    // Try to resolve the witness via explicit definitions.
+    switch (resolveWitnessViaLookup(requirement)) {
+    case ResolveWitnessResult::Success:
+      continue;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      invalid = true;
+      continue;
+
+    case ResolveWitnessResult::Missing:
+      // Continue trying below.
+      break;
+    }
+
+    // Try to resolve the witness via derivation.
+    switch (resolveWitnessViaDerivation(requirement)) {
+    case ResolveWitnessResult::Success:
+      continue;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      invalid = true;
+      continue;
+
+    case ResolveWitnessResult::Missing:
+      // Continue trying below.
+      break;
+    }
+
+    // Try to resolve the witness via defaults.
+    switch (resolveWitnessViaDefault(requirement)) {
+    case ResolveWitnessResult::Success:
+      continue;
+
+    case ResolveWitnessResult::ExplicitFailed:
+      invalid = true;
+      continue;
+
+    case ResolveWitnessResult::Missing:
+      // Continue trying below.
+      break;
+    }
+  }
+
+  if (AlreadyComplained || invalid) {
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+  }
+
+  // For any requirements that do not yet have witnesses, try default
+  // definitions or compiler-supported derivation.
+  for (auto member : Proto->getMembers()) {
+    // For an associated type.
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      // If we already have a type witness, there's nothing to do.
+      if (Conformance->hasTypeWitness(assocType))
+        continue;
+
+      // Otherwise, try to resolve via a default.
+      switch (resolveTypeWitnessViaDefault(assocType)) {
+      case ResolveWitnessResult::Success:
+      case ResolveWitnessResult::ExplicitFailed:
+        continue;
+
+      case ResolveWitnessResult::Missing:
+        // Keep trying.
+        break;
+      }
+
+      // Otherwise, try to derive an answer.
+      switch (resolveTypeWitnessViaDerivation(assocType)) {
+      case ResolveWitnessResult::Success:
+      case ResolveWitnessResult::ExplicitFailed:
+        continue;
+
+      case ResolveWitnessResult::Missing:
+        // Diagnose failure below.
+        break;
+      }
+
+      if (!AlreadyComplained) {
+        TC.diagnose(Loc, diag::type_does_not_conform,
+                    Adoptee, Proto->getDeclaredType());
+        AlreadyComplained = true;
+      }
+
+      TC.diagnose(assocType, diag::no_witnesses_type,
+                  assocType->getName());
+      continue;
+    }
+
+    // For a non-type witness.
+    if (auto value = dyn_cast<ValueDecl>(member)) {
+      assert((AlreadyComplained || Conformance->hasWitness(value)) &&
+             "Failed to handle witness");
+    }
+  }
+
+  if (AlreadyComplained) {
+    Conformance->setState(ProtocolConformanceState::Invalid);
+  } else {
+    Conformance->setState(ProtocolConformanceState::Complete);
+  }
+}
 
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
@@ -1237,191 +1409,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       return conformance;
     }
   }
-  
-  // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->getAttrs().isClassProtocol()
-      && !T->getClassOrBoundGenericClass()) {
-    if (ComplainLoc.isValid())
-      TC.diagnose(ComplainLoc,
-                  diag::non_class_cannot_conform_to_class_protocol,
-                  T, Proto->getDeclaredType());
-    conformance->setState(ProtocolConformanceState::Invalid);
-    return conformance;
-  }
-
-  bool Complained = false;
 
   // The conformance checker we're using.
+  bool Complained = false;
   ConformanceChecker checker(TC, conformance, DC, Complained);
-
-  // First, resolve any associated type members that have bindings. We'll
-  // attempt to deduce any associated types that don't have explicit
-  // definitions.
-  for (auto Member : Proto->getMembers()) {
-    auto AssociatedType = dyn_cast<AssociatedTypeDecl>(Member);
-    if (!AssociatedType)
-      continue;
-
-    // If we've already determined this type witness, skip it.
-    if (conformance->hasTypeWitness(AssociatedType))
-      continue;
-
-    // Try to resolve the type witness via name lookup.
-    switch (checker.resolveTypeWitnessViaLookup(AssociatedType)) {
-    case ResolveWitnessResult::Success:
-      break;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Complained = true;
-      break;
-
-    case ResolveWitnessResult::Missing:
-      break;
-    }
-  }
-
-  // If we complain about any associated types, there is no point in continuing.
-  if (Complained) {
-    conformance->setState(ProtocolConformanceState::Invalid);
-    return conformance;
-  }
-
-  // Check that T provides all of the required func/variable/subscript members.
-  bool invalid = false;
-  for (auto member : Proto->getMembers()) {
-    auto requirement = dyn_cast<ValueDecl>(member);
-    if (!requirement)
-      continue;
-
-    // Associated type requirements handled above.
-    if (isa<AssociatedTypeDecl>(requirement))
-      continue;
-
-    // If we've already determined this witness, skip it.
-    if (conformance->hasWitness(requirement))
-      continue;
-
-    // Make sure we've validated the requirement.
-    if (!requirement->hasType())
-      TC.validateDecl(requirement, true);
-
-    if (requirement->isInvalid()) {
-      invalid = true;
-      continue;
-    }
-
-    // Try to resolve the witness via explicit definitions.
-    switch (checker.resolveWitnessViaLookup(requirement)) {
-    case ResolveWitnessResult::Success:
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Complained = true;
-      invalid = true;
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via derivation.
-    switch (checker.resolveWitnessViaDerivation(requirement)) {
-    case ResolveWitnessResult::Success:
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Complained = true;
-      invalid = true;
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via defaults.
-    switch (checker.resolveWitnessViaDefault(requirement)) {
-    case ResolveWitnessResult::Success:
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Complained = true;
-      invalid = true;
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-  }
-  
-  if (Complained || invalid) {
-    conformance->setState(ProtocolConformanceState::Invalid);
-    return conformance;
-  }
-
-  // For any requires that do not yet have witnesses, try default
-  // definitions or compiler-supported derivation.
-  for (auto member : Proto->getMembers()) {
-    // For an associated type.
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      // If we already have a type witness, there's nothing to do.
-      if (conformance->hasTypeWitness(assocType))
-        continue;
-
-      // Otherwise, try to resolve via a default.
-      switch (checker.resolveTypeWitnessViaDefault(assocType)) {
-      case ResolveWitnessResult::Success:
-        continue;
-      
-      case ResolveWitnessResult::ExplicitFailed:
-        Complained = true;
-        continue;
-
-      case ResolveWitnessResult::Missing:
-        // Keep trying.
-        break;
-      }
-
-      // Otherwise, try to derive an answer.
-      switch (checker.resolveTypeWitnessViaDerivation(assocType)) {
-      case ResolveWitnessResult::Success:
-        continue;
-
-      case ResolveWitnessResult::ExplicitFailed:
-        Complained = true;
-        continue;
-
-      case ResolveWitnessResult::Missing:
-        // Diagnose failure below.
-        break;
-      }
-
-      if (!Complained) {
-        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                    T, Proto->getDeclaredType());
-        Complained = true;
-      }
-
-      TC.diagnose(assocType, diag::no_witnesses_type,
-                  assocType->getName());
-      continue;
-    }
-
-    // For a non-type witness.
-    if (auto value = dyn_cast<ValueDecl>(member)) {
-      assert((Complained || conformance->hasWitness(value)) &&
-             "Failed to handle witness");
-    }
-  }
-
-  if (Complained) {
-    conformance->setState(ProtocolConformanceState::Invalid);
-    return conformance;
-  }
-
-  conformance->setState(ProtocolConformanceState::Complete);
+  checker.checkConformance();
   return conformance;
 }
 
