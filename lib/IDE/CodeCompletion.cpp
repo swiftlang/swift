@@ -949,8 +949,12 @@ public:
   }
 
   Type getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
-    if (BaseType) {
-      if (auto NTD = BaseType->getAnyNominal()) {
+    Type BaseTy = BaseType;
+    if (!BaseTy)
+      BaseTy = ExprType;
+    if (BaseTy) {
+      BaseTy = BaseTy->getRValueInstanceType();
+      if (auto NTD = BaseTy->getAnyNominal()) {
         auto &Types = getAssociatedTypeMap(NTD);
         if (Type T = Types.lookup(ATD))
           return MetatypeType::get(T, Ctx);
