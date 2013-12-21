@@ -52,7 +52,9 @@ namespace {
     Type Adoptee;
     DeclContext *DC;
     SourceLoc Loc;
-    bool &AlreadyComplained;
+
+    /// Whether we've already complained about problems with this conformance.
+    bool AlreadyComplained = false;
 
     /// Record a (non-type) witness for the given requirement.
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -93,15 +95,12 @@ namespace {
                            AssociatedTypeDecl *assocType);
 
   public:
-    ConformanceChecker(TypeChecker &tc,
-                       NormalProtocolConformance *conformance,
-                       DeclContext *dc,
-                       bool &alreadyComplained)
+    ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance)
       : TC(tc), Conformance(conformance),
         Proto(conformance->getProtocol()),
-        Adoptee(conformance->getType()), DC(dc),
-        Loc(conformance->getLoc()),
-        AlreadyComplained(alreadyComplained) { }
+        Adoptee(conformance->getType()), 
+        DC(conformance->getDeclContext()),
+        Loc(conformance->getLoc()) { }
 
     /// Check the entire protocol conformance, ensuring that all
     /// witnesses are resolved and emitting any diagnostics.
@@ -1411,8 +1410,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   // The conformance checker we're using.
-  bool Complained = false;
-  ConformanceChecker checker(TC, conformance, DC, Complained);
+  ConformanceChecker checker(TC, conformance);
   checker.checkConformance();
   return conformance;
 }
