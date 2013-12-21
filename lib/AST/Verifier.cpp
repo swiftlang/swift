@@ -577,11 +577,13 @@ struct ASTNodeBase {};
       // it should be parented by the innermost function.
       auto enclosingScope = Scopes[Scopes.size() - 2];
       auto enclosingDC = enclosingScope.dyn_cast<DeclContext*>();
-      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)) {
+      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)
+          && !(isa<SourceFile>(enclosingDC)
+               && cast<SourceFile>(enclosingDC)->Kind == SourceFileKind::REPL)){
         auto parentDC = E->getParent();
         if (!isa<Initializer>(parentDC)) {
           Out << "a closure in non-local context should be parented "
-                 "by an initializer";
+                 "by an initializer or REPL context";
           E->print(Out);
           Out << "\n";
           abort();
