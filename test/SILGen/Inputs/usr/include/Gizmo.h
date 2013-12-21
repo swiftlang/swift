@@ -58,7 +58,8 @@ typedef long NSInteger;
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end
 
-#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 
 struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);

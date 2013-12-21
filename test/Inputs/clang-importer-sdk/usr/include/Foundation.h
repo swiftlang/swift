@@ -59,8 +59,10 @@ void *allocate(NSZone *zone);
 // Enums.
 //===---
 
-#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
-#define NS_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
+#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
+#define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 
 typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
