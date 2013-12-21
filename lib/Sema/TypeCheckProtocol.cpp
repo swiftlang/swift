@@ -781,6 +781,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
                        ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
+
   auto metaType = MetatypeType::get(Adoptee, TC.Context);
 
   // Gather the witnesses.
@@ -940,6 +942,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
 /// Attempt to resolve a witness via derivation.
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
                        ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
+
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
   if (auto *nominal = Adoptee->getAnyNominal()) {
@@ -973,6 +977,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
                        ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
+
   // An optional requirement is trivially satisfied with an empty requirement.
   if (requirement->getAttrs().isOptional()) {
     recordOptionalWitness(requirement);
@@ -1210,13 +1216,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     TC.Context.ConformsTo[key] = ConformanceEntry(conformance, true);
   }
 
-  // See whether we can derive members of this conformance.
-  NominalTypeDecl *DerivingTypeDecl = nullptr;
-  if (auto *NT = T->getAnyNominal()) {
-    if (NT->derivesProtocolConformance(Proto))
-      DerivingTypeDecl = NT;
-  }
-
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
@@ -1263,6 +1262,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (!AssociatedType)
       continue;
 
+    // If we've already determined this type witness, skip it.
+    if (conformance->hasTypeWitness(AssociatedType))
+      continue;
+
     // Try to resolve the type witness via name lookup.
     switch (checker.resolveTypeWitnessViaLookup(AssociatedType)) {
     case ResolveWitnessResult::Success:
@@ -1292,6 +1295,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     // Associated type requirements handled above.
     if (isa<AssociatedTypeDecl>(requirement))
+      continue;
+
+    // If we've already determined this witness, skip it.
+    if (conformance->hasWitness(requirement))
       continue;
 
     // Make sure we've validated the requirement.
