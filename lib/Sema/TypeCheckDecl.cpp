@@ -1791,6 +1791,9 @@ public:
     GenericTypeToArchetypeResolver resolver;
     semaFuncDecl(FD, /*consumeAttributes=*/true, &resolver);
 
+    if (FD->isInvalid())
+      return;
+
     // This type check should have created a non-dependent type.
     assert(!FD->getType()->isDependentType());
 
