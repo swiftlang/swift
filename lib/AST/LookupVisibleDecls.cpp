@@ -264,6 +264,30 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   }
 }
 
+static void lookupAssociatedTypes(Type BaseTy, VisibleDeclConsumer &Consumer,
+                                  DeclVisibilityKind Reason) {
+  NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
+  if (!CurNominal)
+    return;
+
+  VisitedSet Visited;
+  auto TopProtocols = CurNominal->getProtocols();
+  SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
+                                          TopProtocols.end());
+  while (!Worklist.empty()) {
+    auto Proto = Worklist.pop_back_val();
+    if (!Visited.insert(Proto))
+      return;
+
+    for (auto Member : Proto->getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member))
+        Consumer.foundDecl(ATD, getReasonForSuper(Reason));
+    }
+    auto Protocols = Proto->getProtocols();
+    Worklist.append(Protocols.begin(), Protocols.end());
+  }
+}
+
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
@@ -337,18 +361,10 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
-  NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
-  if (CurNominal) {
-    for (auto Proto : CurNominal->getProtocols()) {
-      for (auto Member : Proto->getMembers()) {
-        if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member))
-          Consumer.foundDecl(ATD, getReasonForSuper(Reason));
-      }
-    }
-  }
+  lookupAssociatedTypes(BaseTy, Consumer, Reason);
 
   do {
-    CurNominal = BaseTy->getAnyNominal();
+    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
       break;
 
