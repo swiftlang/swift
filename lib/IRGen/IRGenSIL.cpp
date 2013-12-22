@@ -1426,7 +1426,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       calleeData = nullptr;
 
     // Guess the "ExtraData" kind from the type of CalleeData.
-    // FIXME: Should these be typed differently by SIL?
+    // FIXME: Should get from the type info.
     if (!calleeData)
       extraData = ExtraData::None;
     else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)

@@ -3273,6 +3273,10 @@ namespace {
       /// The polymorphic arguments are derived from a Self type binding
       /// passed via the WitnessMethod convention.
       WitnessSelf,
+      
+      /// The polymorphic arguments are derived from a Self type binding
+      /// embedded in a thick WitnessMethod function value.
+      WitnessExtraData,
     };
 
   protected:
@@ -3292,7 +3296,14 @@ namespace {
       // doing so would potentially make the signature incompatible with other
       // witnesses for the same method.
       if (fnType->getAbstractCC() == AbstractCC::WitnessMethod) {
-        TheSourceKind = SourceKind::WitnessSelf;
+        // If the type is thick, the metadata is derived from the extra data
+        // in the function value. Otherwise, it's provided from the type of the
+        // self argument.
+        if (fnType->isThin())
+          TheSourceKind = SourceKind::WitnessSelf;
+        else
+          TheSourceKind = SourceKind::WitnessExtraData;
+          
         // Testify to archetypes in the Self type.
         auto params = fnType->getParameters();
         CanType selfTy = params.back().getType();
@@ -3544,7 +3555,8 @@ namespace {
         return metatype;
       }
           
-      case SourceKind::WitnessSelf: {
+      case SourceKind::WitnessSelf:
+      case SourceKind::WitnessExtraData: {
         // The 'Self' parameter is provided last.
         // TODO: For default implementations, the witness table pointer for
         // the 'Self : P' conformance must be provided last along with the
@@ -3849,6 +3861,10 @@ namespace {
         // The 'Self' argument(s) are added as a special case in
         // EmitPolymorphicArguments::emit.
         return;
+      case SourceKind::WitnessExtraData:
+        // The 'Self' argument(s) are added implicitly from ExtraData of the
+        // function value.
+        return;
       }
       llvm_unreachable("bad source kind!");
     }
@@ -4000,6 +4016,8 @@ namespace {
         return out.push_back(IGM.TypeMetadataPtrTy);
       case SourceKind::WitnessSelf:
         return; // handled as a special case in expand()
+      case SourceKind::WitnessExtraData:
+        return; // added implicitly as ExtraData
       }
       llvm_unreachable("bad source kind");
     }
@@ -4386,6 +4404,9 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
 
   // The protocol we're calling on.
   auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
+  ArrayRef<llvm::Value *> witnesses;
+  llvm::Value *object;
+  std::tie(witnesses, object) = baseTI.getWitnessTablesAndValue(in);
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -4396,10 +4417,18 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
   // Load the witness table.
-  llvm::Value *wtable = baseTI.findWitnessTable(IGF, in, fnProto);
+  llvm::Value *wtable = baseTI.findWitnessTable(IGF, witnesses, fnProto);
+
+  llvm::Value *metadata = nullptr;
+  if (IGF.IGM.Context.LangOpts.EmitSILProtocolWitnessTables) {
+    // TODO: Load the metadata from the class reference. This is redundant,
+    // but for simplicity in bringing up @cc(witness_method) we always provide
+    // a metadata argument.
+    metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, object);
+  }
   
   // Build the value.
-  getWitnessMethodValue(IGF, fn, fnProto, wtable, /*metadata*/nullptr, out);
+  getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
 llvm::Value *
