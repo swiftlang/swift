@@ -67,6 +67,47 @@ SILFunction *SILModule::lookup(StringRef Name) {
   return nullptr;
 }
 
+std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
+  // Walk down to the base NormalProtocolConformance.
+  const ProtocolConformance *ParentC = C;
+  ArrayRef<Substitution> Subs;
+  while (!isa<NormalProtocolConformance>(ParentC)) {
+    switch (ParentC->getKind()) {
+    case ProtocolConformanceKind::Normal:
+      llvm_unreachable("should have exited the loop?!");
+    case ProtocolConformanceKind::Inherited:
+      ParentC = cast<InheritedProtocolConformance>(ParentC)
+        ->getInheritedConformance();
+      break;
+    case ProtocolConformanceKind::Specialized: {
+      auto SC = cast<SpecializedProtocolConformance>(ParentC);
+      ParentC = SC->getGenericConformance();
+      assert(Subs.empty() && "multiple conformance specializations?!");
+      Subs = SC->getGenericSubstitutions();
+      break;
+    }
+    }
+  }
+  const NormalProtocolConformance *NormalC
+    = cast<NormalProtocolConformance>(ParentC);
+  
+  // Did we already find this?
+  auto found = WitnessTableLookupCache.find(NormalC);
+  if (found != WitnessTableLookupCache.end())
+    return {found->second, Subs};
+  
+  // If not, search through the witness table list, caching the entries we
+  // visit.
+  for (SILWitnessTable &WT : witnessTables) {
+    WitnessTableLookupCache[WT.getConformance()] = &WT;
+    
+    if (WT.getConformance() == NormalC)
+      return {&WT, Subs};
+  }
+  return {nullptr, Subs};
+}
+
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,

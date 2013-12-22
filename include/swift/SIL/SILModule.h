@@ -114,6 +114,10 @@ private:
   /// Lookup cache for SIL functions.
   llvm::StringMap<SILFunction*> FunctionLookupCache;
   
+  /// Lookup cache for SIL witness tables.
+  llvm::DenseMap<const NormalProtocolConformance*,SILWitnessTable*>
+    WitnessTableLookupCache;
+  
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
@@ -259,6 +263,12 @@ public:
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent);
+  
+  /// Look up the SILWitnessTable representing the lowering of a protocol
+  /// conformance, and collect the substitutions to apply to the referenced
+  /// witnesses, if any.
+  std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+  lookUpWitnessTable(const ProtocolConformance *C);
   
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
