@@ -84,17 +84,29 @@ bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
 
 GenericParamList *ProtocolConformance::getGenericParams() const {
   switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
     // FIXME: This should be an independent property of the conformance.
     // Assuming a BoundGenericType conformance is always for the
     // DeclaredTypeInContext is unsound if we ever add constrained extensions.
-    if (auto bgt = getType()->getAs<BoundGenericType>()) {
+    Type ty = getType();
+    while (ty) {
+      if (auto nt = ty->getAs<NominalType>())
+        ty = nt->getParent();
+      else
+        break;
+    }
+    
+    if (!ty)
+      return nullptr;
+    
+    if (auto bgt = ty->getAs<BoundGenericType>()) {
       auto decl = bgt->getDecl();
       assert(bgt->isEqual(decl->getDeclaredTypeInContext())
              && "conformance for constrained generic type not implemented");
       return decl->getGenericParams();
     }
     return nullptr;
+  }
   case ProtocolConformanceKind::Specialized:
   case ProtocolConformanceKind::Inherited:
     // FIXME: These could reasonably have open type variables.
