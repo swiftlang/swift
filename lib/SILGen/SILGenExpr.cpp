@@ -472,9 +472,14 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
-      if (It->second.isConstant())
-        return ManagedValue(It->second.getConstant(), ManagedValue::Unmanaged);
-      return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
+      if (!It->second.isConstant())
+        return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
+
+      SILValue V = It->second.getConstant();
+      auto &TL = getTypeLowering(refType);
+      // The value must be copied for the duration of the expression.
+      V = TL.emitCopyValue(B, loc, V);
+      return ManagedValue(V, ManagedValue::Unmanaged);
     }
 
     // If this is a global variable, invoke its accessor function to get its
