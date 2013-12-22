@@ -242,7 +242,7 @@ public:
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (ResultTy->is<ErrorType>())
+    if (!ResultTy || ResultTy->is<ErrorType>())
       return 0;
 
     if (!RS->hasResult()) {
@@ -618,6 +618,8 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
   switch (pattern->getKind()) {
   case PatternKind::Tuple:
     for (auto &field : cast<TuplePattern>(pattern)->getFields()) {
+      if (field.getPattern()->getType()->is<ErrorType>())
+        continue;
       unsigned curArgIndex = nextArgIndex++;
       if (field.getInit()) {
         assert(!field.getInit()->alreadyChecked() &&
@@ -695,9 +697,6 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
-  if (FD->isInvalid())
-    return true;
-
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
   for (auto pattern : FD->getBodyParamPatterns()) {
