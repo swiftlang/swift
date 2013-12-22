@@ -30,6 +30,32 @@ using namespace swift;
 namespace {
   struct RequirementMatch;
 
+  /// Helper class whose objects invoke a function when destroyed.
+  ///
+  /// Use this via the SCOPE_GUARD macro.
+  template <typename F>
+  class ScopeGuard {
+    F &TheFunc;
+
+  public:
+    ScopeGuard(F &func) : TheFunc(func) { }
+    ~ScopeGuard() { TheFunc(); }
+
+    ScopeGuard(const ScopeGuard &) = delete;
+    ScopeGuard &operator=(const ScopeGuard &) = delete;
+  };
+
+#define JOIN(X, Y) JOIN2(X, Y)
+#define JOIN2(X, Y) X ## Y
+
+/// Provides a block of code that will be executed when exiting the
+/// current scope, e.g., to clean up resources not held by some other
+/// RAII object.
+#define SCOPE_GUARD(Code)                                 \
+  auto JOIN(scope_guard_func_, __LINE__) = [&] {Code;};   \
+  ScopeGuard<decltype(JOIN(scope_guard_func_, __LINE__))> \
+    JOIN(scope_guard_, __LINE__)(JOIN(scope_guard_func_, __LINE__));
+  
   /// The result of attempting to resolve a witness.
   enum class ResolveWitnessResult {
     /// The resolution succeeded.
@@ -52,6 +78,12 @@ namespace {
     Type Adoptee;
     DeclContext *DC;
     SourceLoc Loc;
+    
+    /// Type witnesses that are currently being resolved.
+    llvm::SmallPtrSet<AssociatedTypeDecl *, 4> ResolvingTypeWitnesses;
+
+    /// Witnesses that are currently being resolved.
+    llvm::SmallPtrSet<ValueDecl *, 4> ResolvingWitnesses;
 
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
@@ -101,6 +133,25 @@ namespace {
         Adoptee(conformance->getType()), 
         DC(conformance->getDeclContext()),
         Loc(conformance->getLoc()) { }
+
+    /// Resolve the type witness for the given associated type as
+    /// directly as possible, only resolving other witnesses if
+    /// needed, e.g., to deduce this type witness.
+    ///
+    /// This entry point is designed to be used when the type witness
+    /// for a particular associated type and adoptee is required,
+    /// before the conformance has been completed checked.
+    void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
+
+    /// Resolve the witness for the given non-type requirement as
+    /// directly as possible, only resolving other witnesses if
+    /// needed, e.g., to determine type witnesses used within the
+    /// requirement.
+    ///
+    /// This entry point is designed to be used when the witness for a
+    /// particular requirement and adoptee is required, before the
+    /// conformance has been completed checked.
+    void resolveSingleWitness(ValueDecl *requirement);
 
     /// Check the entire protocol conformance, ensuring that all
     /// witnesses are resolved and emitting any diagnostics.
@@ -1192,7 +1243,216 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
   return ResolveWitnessResult::Success;
 }
 
-# pragma mark Protocol conformance checking
+void 
+ConformanceChecker::resolveSingleTypeWitness(AssociatedTypeDecl *assocType) {
+  assert(!Conformance->hasTypeWitness(assocType) && "Already resolved");
+
+  // Note that we're resolving this witness.
+  assert(ResolvingTypeWitnesses.count(assocType) == 0 && "Currently resolving");
+  ResolvingTypeWitnesses.insert(assocType);
+  SCOPE_GUARD(ResolvingTypeWitnesses.erase(assocType));
+
+  // Try to resolve this type witness via name lookup, which is the
+  // most direct mechanism.
+  switch (resolveTypeWitnessViaLookup(assocType)) {
+  case ResolveWitnessResult::Success:
+    return;
+
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // Keep trying.
+    break;
+  }
+
+  // Look for requirements that refer to this associated type;
+  // determining their witnesses can deduce this associated type.
+  for (auto member : Proto->getMembers()) {
+    // Ignore associated types.
+    if (isa<AssociatedTypeDecl>(member))
+      continue;
+
+    auto requirement = dyn_cast<ValueDecl>(member);
+    if (!requirement)
+      continue;
+
+    if (!requirement->hasType())
+      TC.validateDecl(requirement, true);
+
+    // If we have or are trying to resolve this witness, don't try again.
+    if (ResolvingWitnesses.count(requirement) > 0 ||
+        Conformance->hasWitness(requirement))
+      continue;
+
+    // Determine whether this requirement refers to the associated
+    // type we're resolving.
+    // FIXME: Cache this dependency information somewhere?
+    bool hasAssocType = requirement->getInterfaceType().findIf([&](Type type) {
+        if (auto dependentMember = type->getAs<DependentMemberType>()) {
+          return dependentMember->getAssocType() == assocType;
+        }
+
+        return false;
+      });
+
+    // If the requirement doesn't refer to the associated type we're
+    // resolving, ignore it.
+    if (!hasAssocType)
+      continue;
+
+    // Try to resolve that witness.
+    resolveSingleWitness(requirement);
+
+    // If resolving the witness deduced our associated type, we're done.
+    if (Conformance->hasTypeWitness(assocType))
+      return;
+  }
+
+  // Otherwise, try to resolve via a default.
+  switch (resolveTypeWitnessViaDefault(assocType)) {
+  case ResolveWitnessResult::Success:
+    return;
+
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // Keep trying.
+    break;
+  }
+
+  // Otherwise, try to derive an answer.
+  switch (resolveTypeWitnessViaDerivation(assocType)) {
+  case ResolveWitnessResult::Success:
+    return;
+
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // Diagnose failure below.
+    break;
+  }
+
+  // FIXME: Note this failure so we don't try again?
+
+  TC.diagnose(Loc, diag::type_does_not_conform,
+              Adoptee, Proto->getDeclaredType());
+
+  TC.diagnose(assocType, diag::no_witnesses_type,
+              assocType->getName());
+  Conformance->setState(ProtocolConformanceState::Invalid);
+}
+
+void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
+  assert(!Conformance->hasWitness(requirement) && "Already resolved");
+
+  // Note that we're resolving this witness.
+  assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
+  ResolvingWitnesses.insert(requirement);
+  SCOPE_GUARD(ResolvingWitnesses.erase(requirement));
+
+  // Make sure we've validated the requirement.
+  if (!requirement->hasType())
+    TC.validateDecl(requirement, true);
+
+  if (requirement->isInvalid()) {
+    // FIXME: Note that there is no witness?
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+  }
+
+  // Try to resolve each of the associated types referenced within the
+  // requirement's type to type witnesses via name lookup. Such
+  // bindings can inform the choice of witness.
+  bool failed = requirement->getInterfaceType().findIf([&](Type type) -> bool {
+      if (auto dependentMember = type->getAs<DependentMemberType>()) {
+        auto assocType = dependentMember->getAssocType();
+        if (cast<ProtocolDecl>(assocType->getDeclContext()) == Proto) {
+          // If we don't already have a type witness and aren't in the
+          // process of trying to resolve it already...
+          if (!Conformance->hasTypeWitness(assocType) &&
+              ResolvingTypeWitnesses.count(assocType) == 0) {
+            switch (resolveTypeWitnessViaLookup(assocType)) {
+            case ResolveWitnessResult::Success:
+              break;
+
+            case ResolveWitnessResult::ExplicitFailed:
+              return true;
+
+            case ResolveWitnessResult::Missing:
+              // Okay: this associated type can be deduced.
+              break;
+            }
+          }
+
+          // If the type witness is an error, just fail quietly.
+          if (Conformance->hasTypeWitness(assocType) &&
+              Conformance->getTypeWitness(assocType, nullptr).Replacement
+                ->is<ErrorType>())
+            return true;
+        }
+      }
+      return false;
+    });
+
+  // If one of the associated types had an outright error, don't bother
+  // trying to check this witness: we won't be able to meaningfully
+  // compare the types anyway.
+  if (failed) {
+    Conformance->setState(ProtocolConformanceState::Invalid);    
+    return;
+  }
+
+  // Try to resolve the witness via explicit definitions.
+  switch (resolveWitnessViaLookup(requirement)) {
+  case ResolveWitnessResult::Success:
+    return;
+  
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // Continue trying below.
+    break;
+  }
+
+  // Try to resolve the witness via derivation.
+  switch (resolveWitnessViaDerivation(requirement)) {
+  case ResolveWitnessResult::Success:
+    return;
+
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // Continue trying below.
+    break;
+  }
+
+  // Try to resolve the witness via defaults.
+  switch (resolveWitnessViaDefault(requirement)) {
+  case ResolveWitnessResult::Success:
+    return;
+
+  case ResolveWitnessResult::ExplicitFailed:
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+
+  case ResolveWitnessResult::Missing:
+    llvm_unreachable("Should have failed");
+    break;
+  }
+}
+
+#pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
@@ -1208,6 +1468,25 @@ void ConformanceChecker::checkConformance() {
   // FIXME: Caller checks that this the type conforms to all of the
   // inherited protocols.
   
+  if (/*FIXME: resolve via temporary slower path*/false) {
+    llvm::SmallVector<Decl *, 4> members;
+    members.append(Proto->getMembers().rbegin(), Proto->getMembers().rend());
+    for (auto member : members) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (!Conformance->hasTypeWitness(assocType))
+          resolveSingleTypeWitness(assocType);
+      } else if (auto requirement = dyn_cast<ValueDecl>(member))
+        if (!Conformance->hasWitness(requirement))
+          resolveSingleWitness(requirement);
+    }
+
+    // We've checked everything. If we haven't managed to fail, then
+    // this conformance is complete.
+    if (!Conformance->isInvalid())
+      Conformance->setState(ProtocolConformanceState::Complete);
+    return;
+  }
+
   // Resolve any associated type members via lookup.
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
