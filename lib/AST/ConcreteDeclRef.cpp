@@ -31,6 +31,13 @@ ConcreteDeclRef::SpecializedDeclRef::create(
   return new (memory) SpecializedDeclRef(decl, substitutions);
 }
 
+ArrayRef<Substitution>
+ConcreteDeclRef::SpecializedDeclRef::getPrimarySubstitutions() const {
+  return getSubstitutions().slice(0,
+    TheDecl->getPotentialGenericDeclContext()
+           ->getGenericParamsOfContext()->totalSize());
+}
+
 void ConcreteDeclRef::dump(raw_ostream &os) {
   getDecl()->dumpRef(os);
 

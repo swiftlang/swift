@@ -60,6 +60,9 @@ class ConcreteDeclRef {
       return llvm::makeArrayRef(reinterpret_cast<const Substitution *>(this+1),
                                 NumSubstitutions);
     }
+    
+    /// Retrieve the primary substitutions.
+    ArrayRef<Substitution> getPrimarySubstitutions() const;
 
     /// Allocate a new specialized declaration reference.
     static SpecializedDeclRef *create(ASTContext &ctx, ValueDecl *decl,
@@ -115,6 +118,14 @@ public:
       return { };
     
     return Data.get<SpecializedDeclRef *>()->getSubstitutions();
+  }
+  
+  /// For a specialized reference, return the set of substitutions applied to
+  /// the primary generic parameters of the declaration reference.
+  ArrayRef<Substitution> getPrimarySubstitutions() const {
+    if (!isSpecialized())
+      return {};
+    return Data.get<SpecializedDeclRef *>()->getPrimarySubstitutions();
   }
 
   /// Dump a debug representation of this reference.

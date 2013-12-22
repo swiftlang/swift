@@ -699,6 +699,12 @@ public:
   const GenericParam *begin() const { return getParams().begin(); }
   const GenericParam *end()   const { return getParams().end(); }
 
+  /// Get the total number of parameters, including those from parent generic
+  /// parameter lists.
+  unsigned totalSize() const {
+    return NumParams + (OuterParameters ? OuterParameters->totalSize() : 0);
+  }
+  
   /// \brief Retrieve the location of the 'where' keyword, or an invalid
   /// location if 'where' was not present.
   SourceLoc getWhereLoc() const { return WhereLoc; }

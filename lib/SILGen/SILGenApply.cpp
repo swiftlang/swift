@@ -850,7 +850,7 @@ public:
 
     ArrayRef<Substitution> subs;
     if (gen.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      subs = e->getDeclRef().getSubstitutions();
+      subs = e->getDeclRef().getPrimarySubstitutions();
     } else {
       // The declaration is always specialized (due to Self); ignore the
       // substitutions related to Self. Skip the substitutions involving Self.
