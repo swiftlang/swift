@@ -186,7 +186,8 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
 
 namespace {
   class RValueEmitter
-      : public Lowering::ExprVisitor<RValueEmitter, RValue, SGFContext> {
+      : public Lowering::ExprVisitor<RValueEmitter, RValue, SGFContext>
+  {
     SILGenFunction &SGF;
     typedef Lowering::ExprVisitor<RValueEmitter,RValue,SGFContext> super;
   public:
@@ -194,9 +195,22 @@ namespace {
 
     using super::visit;
     RValue visit(Expr *E) {
+      assert(!E->getType()->is<LValueType>() &&
+             "RValueEmitter shouldn't be called on lvalues");
       return visit(E, SGFContext());
     }
 
+    // These always produce lvalues.
+    RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C) {
+      abort();
+    }
+    RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
+      abort();
+    }
+    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
+      abort();
+    }
+        
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C);
@@ -213,7 +227,6 @@ namespace {
         
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
-    RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
@@ -228,7 +241,6 @@ namespace {
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
-    RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
@@ -239,7 +251,6 @@ namespace {
                                          SGFContext C);
     RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
-    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
                                        SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
@@ -539,16 +550,16 @@ RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  if (E->getType()->is<LValueType>())
-    return SGF.emitLValueAsRValue(E);
+  assert(!E->getType()->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
 
   return RValue(SGF, E,
                 SGF.emitReferenceToDecl(E, E->getDeclRef(), E->getType(), 0));
 }
 
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
-  if (E->getType()->is<LValueType>())
-    return SGF.emitLValueAsRValue(E);
+  assert(!E->getType()->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
   return RValue(SGF, E,
                 SGF.emitReferenceToDecl(E, E->getSelf(), E->getType(), 0));
 }
@@ -703,11 +714,6 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   }
   
   return Materialize{tmpMem, valueCleanup};
-}
-
-RValue RValueEmitter::visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
-  // Always an lvalue.
-  return SGF.emitLValueAsRValue(E);
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
@@ -1152,17 +1158,13 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   
   RValue result(type);
   for (Expr *elt : E->getElements()) {
-    result.addElement(visit(elt));
+    // FIXME: Remove this when tuple elements cannot be inout.
+    result.addElement(SGF.emitLValueOrRValueAsRValue(elt));
   }
   return result;
 }
 
-RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
-                                          SGFContext C) {
-  return SGF.emitLValueAsRValue(E);
-}
-
-/// Retrieve the outer substitutions 
+/// Retrieve the outer substitutions
 static ArrayRef<Substitution> 
 getOuterSubstitutions(Type type, Module *module,
                       SmallVectorImpl<Substitution> &allSubstitutions) {
@@ -1237,6 +1239,9 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                          SGFContext C) {
+  assert(!E->getType()->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
+
   if (E->getBase()->getType()->is<MetatypeType>()) {
     // Emit the metatype for the associated type.
     assert(E->getType()->is<MetatypeType>() &&
@@ -1248,7 +1253,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                ManagedValue::Unmanaged));
   }
 
-  return SGF.emitLValueAsRValue(E);
+  assert(0 && "Unknown rvalue result");
+  abort();
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
@@ -1296,18 +1302,11 @@ RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
   return RValue(SGF, E, ManagedValue(module, ManagedValue::Unmanaged));
 }
 
-RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E,
-                                         SGFContext C) {
-  return SGF.emitLValueAsRValue(E);
-}
-
 RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
                                             SGFContext C) {
-  if (E->getType()->is<LValueType>()) {
-    return SGF.emitLValueAsRValue(E);
-  } else {
-    return visit(E->getBase()).extractElement(E->getFieldNumber());
-  }
+  assert(!E->getType()->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
+  return visit(E->getBase()).extractElement(E->getFieldNumber());
 }
 
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
@@ -1477,7 +1476,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   }
 
   // Emit the scalar member.
-  RValue scalar = visit(E->getSubExpr());
+  RValue scalar = SGF.emitLValueOrRValueAsRValue(E->getSubExpr());
 
   // Prepare a tuple rvalue to house the result.
   RValue result(E->getType()->getCanonicalType());

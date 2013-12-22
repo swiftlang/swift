@@ -787,7 +787,8 @@ public:
 
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential =
-      gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
+      gen.emitLValueOrRValueAsRValue(e->getBase())
+         .getAsSingleValue(gen, e->getBase());
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
@@ -838,7 +839,7 @@ public:
     }
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
-    setSelfParam(gen.emitRValue(e->getBase()), e);
+    setSelfParam(gen.emitLValueOrRValueAsRValue(e->getBase()), e);
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
@@ -1497,7 +1498,7 @@ namespace {
                   origType, substType);
       } else {
         Expr *e = std::move(arg).asKnownExpr();
-        emitInOut(e, SGF.emitRValue(e),
+        emitInOut(e, SGF.emitLValueAsRValue(e),
                   loweredSubstArgType, loweredSubstParamType,
                   origType, substType);
       }

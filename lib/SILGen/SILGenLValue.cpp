@@ -198,6 +198,14 @@ SILGenFunction::Writeback::Writeback(SILLocation loc,
 {
 }
 
+/// Evaluate an Expr, which might be an rvalue or an lvalue, and return it
+/// wrapped in an rvalue.
+RValue SILGenFunction::emitLValueOrRValueAsRValue(Expr *E) {
+  if (E->getType()->is<LValueType>())
+    return emitLValueAsRValue(E);
+  return emitRValue(E);
+}
+
 RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
   LValue lv = emitLValue(e);
   return RValue(*this, e, emitAddressOfLValue(e, lv));
