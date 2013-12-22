@@ -9,6 +9,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// This pass promotes AllocStack instructions into memory references. It only
+// handles load, store and deallocation instructions. The algorithm is based on:
+//
+//  Sreedhar and Gao. A linear time algorithm for placing phi-nodes. POPL '95.
+//
+//===----------------------------------------------------------------------===//
+
 
 #define DEBUG_TYPE "sil-mem2reg"
 #include "swift/SILPasses/Passes.h"
@@ -23,8 +31,10 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/ImmutableSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
+#include <queue>
 using namespace swift;
 
 STATISTIC(NumAllocStackRemoved,  "Number of AllocStack promoted");
@@ -41,6 +51,12 @@ class StackAllocationPromoter {
   typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
   typedef llvm::DenseSet<SILBasicBlock *> BlockSet;
   typedef llvm::DenseMap<SILBasicBlock *, SILInstruction *> BlockToInstMap;
+
+  // Use a priority queue keyed on dominator tree level so that inserted nodes
+  // are handled from the bottom of the dom tree upwards.
+  typedef std::pair<DomTreeNode *, unsigned> DomTreeNodePair;
+  typedef std::priority_queue<DomTreeNodePair, SmallVector<DomTreeNodePair, 32>,
+                                 llvm::less_second> NodePriorityQueue;
 
   /// The AllocStackInst that we are handling.
   AllocStackInst *ASI;
@@ -592,60 +608,107 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
 void StackAllocationPromoter::promoteAllocationToPhi() {
   DEBUG(llvm::errs() << "*** Placing Phis for : " << *ASI);
 
-  // A Worklist of defining values (StoreInst).
-  llvm::SmallVector<SILBasicBlock *, 32> WorkList;
+  /// Maps dom tree nodes to their dom tree levels.
+  llvm::DenseMap<DomTreeNode *, unsigned> DomTreeLevels;
+
+  // Assign tree levels to dom tree nodes.
+  // TODO: This should happen once per function.
+  SmallVector<DomTreeNode *, 32> Worklist;
+  DomTreeNode *Root = DT->getRootNode();
+  DomTreeLevels[Root] = 0;
+  Worklist.push_back(Root);
+  while (!Worklist.empty()) {
+    DomTreeNode *Node = Worklist.pop_back_val();
+    unsigned ChildLevel = DomTreeLevels[Node] + 1;
+    for (auto CI = Node->begin(), CE = Node->end(); CI != CE; ++CI) {
+      DomTreeLevels[*CI] = ChildLevel;
+      Worklist.push_back(*CI);
+    }
+  }
 
   // A list of blocks that will require new Phi values.
   BlockSet PhiBlocks;
+
+  // The "piggy-bank" data-structure that we use for processing the dom-tree
+  // bottom-up.
+  NodePriorityQueue PQ;
 
   // Collect all of the stores into the AllocStack. We know that at this point
   // we have at most one store per block.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
     // We need to place Phis for this block.
-    if (isa<StoreInst>(II))
-      WorkList.push_back(II->getParent());
-  }
-
-  // Find all of the blocks that require Phi values using a dominator frontier.
-  // The blocks with Phis are also definitions that may require generating new
-  // Phi values.
-  while (WorkList.size()) {
-    SILBasicBlock *BB = WorkList.back();
-    WorkList.pop_back();
-    DEBUG(llvm::errs() << "*** Looking at &BB: " << BB << "\n");
-
-    BlockList Frontier;
-    calculateDomFrontier(BB, Frontier);
-
-    DEBUG(llvm::errs() << "*** Found frontier (" << Frontier.size() << ")\n");
-
-    unsigned NewStores = 0;
-    for (auto &NewPhiBlock : Frontier) {
-      assert(NewPhiBlock && "Invalid block");
-
-      // Don't place PHIs in blocks in which the allocated value is obviously
-      // dead.
-      // If the PHI is not dominated by the allocation then it must be dead:
-      if (!DT->dominates(ASI->getParent(), NewPhiBlock))
-        continue;
-
-      // If the PHI is properly dominated by the deallocation then it can't be
-      // alive.
-      if (DSI && DT->properlyDominates(DSI->getParent(), NewPhiBlock))
-        continue;
-
-      // If this is a new Phi node then it is also a new definition of a value
-      // so we need to push this block to the work list.
-      if (PhiBlocks.insert(NewPhiBlock).second) {
-        NewStores++;
-        NumPhiPlaces++;
-        WorkList.push_back(NewPhiBlock);
-      }
+    if (isa<StoreInst>(II)) {
+      DomTreeNode *Node = DT->getNode(II->getParent());
+      PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
     }
-
-    DEBUG(llvm::errs() << "*** New Phis required (" << NewStores << ")\n");
   }
+
+  DEBUG(llvm::errs() << "*** Found: " << PQ.size() << " Defs\n");
+
+  // A list of nodes for which we already calculated the dominator frontier.
+  llvm::SmallPtrSet<DomTreeNode *, 32> Visited;
+
+  // Scan all of the definitions in the function bottom-up using the priority
+  // queue.
+  while (!PQ.empty()) {
+    DomTreeNodePair RootPair = PQ.top();
+    PQ.pop();
+    DomTreeNode *Root = RootPair.first;
+    unsigned RootLevel = RootPair.second;
+
+    // Walk all dom tree children of Root, inspecting their successors. Only
+    // J-edges, whose target level is at most Root's level are added to the
+    // dominance frontier.
+    Worklist.clear();
+    Worklist.push_back(Root);
+
+    while (!Worklist.empty()) {
+      DomTreeNode *Node = Worklist.pop_back_val();
+      SILBasicBlock *BB = Node->getBlock();
+
+      // For all successors of the node:
+      for (auto &Succ : BB->getSuccs()) {
+        DomTreeNode *SuccNode = DT->getNode(Succ);
+
+        // Skip D-edges (edges that are dom-tree edges).
+        if (SuccNode->getIDom() == Node)
+          continue;
+
+        // Ignore J-edges that point to nodes that are not smaller or equal
+        // to the root level.
+        unsigned SuccLevel = DomTreeLevels[SuccNode];
+        if (SuccLevel > RootLevel)
+          continue;
+
+        // Ignore visited nodes.
+        if (!Visited.insert(SuccNode))
+          continue;
+
+        // If the new PHInode is not dominated by the allocation then it's dead.
+        if (!DT->dominates(ASI->getParent(), SuccNode->getBlock()))
+            continue;
+
+        // If the new PHInode is properly dominated by the deallocation then it
+        // is obviously a dead PHInode, so we don't need to insert it.
+        if (DSI && DT->properlyDominates(DSI->getParent(),
+                                         SuccNode->getBlock()))
+          continue;
+
+        // The successor node is a new PHINode. If this is a new PHI node
+        // then it may require additional definitions, so add it to the PQ.
+        if (PhiBlocks.insert(Succ).second)
+          PQ.push(std::make_pair(SuccNode, SuccLevel));
+      }
+
+      // Add the children in the dom-tree to the worklist.
+      for (auto CI = Node->begin(), CE = Node->end(); CI != CE; ++CI)
+        if (!Visited.count(*CI))
+          Worklist.push_back(*CI);
+    }
+  }
+
+  DEBUG(llvm::errs() << "*** Found: " << PhiBlocks.size() << " new PHIs\n");
 
   // At this point we calculated the locations of all of the new Phi values.
   // Next, add the Phi values and promote all of the loads and stores into the
