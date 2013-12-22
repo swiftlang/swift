@@ -2734,6 +2734,8 @@ namespace {
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
     ArrayRef<Substitution> Substitutions;
+    SILWitnessTable *SILWT = nullptr;
+    ArrayRef<SILWitnessTable::Entry> SILEntries;
 
     void computeSubstitutionsForType() {
       // FIXME: This is a bit of a hack; the AST doesn't directly encode
@@ -2765,11 +2767,29 @@ namespace {
         ConcreteType(concreteType), ConcreteTI(concreteTI),
         Conformance(conformance) {
       computeSubstitutionsForType();
+          
+      if (IGM.Context.LangOpts.EmitSILProtocolWitnessTables) {
+        ArrayRef<Substitution> Subs;
+        std::tie(SILWT, Subs) = IGM.SILMod->lookUpWitnessTable(&conformance);
+        assert(SILWT && "no SIL witness table for conformance?!");
+        SILEntries = SILWT->getEntries();
+      }
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
     /// of this type to that protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+      if (SILWT) {
+        auto &entry = SILEntries.front();
+        assert(entry.getKind() == SILWitnessTable::BaseProtocol
+               && "sil witness table does not match protocol");
+        assert(entry.getBaseProtocolWitness().Requirement == baseProto
+               && "sil witness table does not match protocol");
+        SILEntries = SILEntries.slice(1);
+        
+        // TODO: Use the witness entry instead of falling through here.
+      }
+      
       // Look for a protocol type info.
       const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
       const ProtocolConformance *astConf
@@ -2783,7 +2803,29 @@ namespace {
       Table.push_back(asOpaquePtr(IGM, baseWitness));
     }
 
+    void addMethodFromSILWitnessTable(FuncDecl *iface) {
+      assert(SILWT);
+      auto &entry = SILEntries.front();
+      assert(entry.getKind() == SILWitnessTable::Method
+             && "sil witness table does not match protocol");
+      assert(entry.getMethodWitness().Requirement.getDecl() == iface
+             && "sil witness table does not match protocol");
+      
+      llvm::Constant *witness
+        = IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
+                                   ExplosionKind::Minimal);
+      witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+      Table.push_back(witness);
+      
+      SILEntries = SILEntries.slice(1);
+      return;
+    }
+    
     void addStaticMethod(FuncDecl *iface) {
+      if (SILWT) {
+        return addMethodFromSILWitnessTable(iface);
+      }
+      
       const auto &witness = Conformance.getWitness(iface, nullptr);
       assert(witness && "Cannot handle missing optional requirements");
 
@@ -2794,6 +2836,10 @@ namespace {
     }
 
     void addInstanceMethod(FuncDecl *iface) {
+      if (SILWT) {
+        return addMethodFromSILWitnessTable(iface);
+      }
+
       const auto &witness = Conformance.getWitness(iface, nullptr);
       assert(witness && "Cannot handle missing optional requirements");
 
@@ -2804,6 +2850,18 @@ namespace {
     }
     
     void addAssociatedType(AssociatedTypeDecl *ty) {
+      if (SILWT) {
+        auto &entry = SILEntries.front();
+        assert(entry.getKind() == SILWitnessTable::AssociatedType
+               && "sil witness table does not match protocol");
+        assert(entry.getAssociatedTypeWitness().Requirement == ty
+               && "sil witness table does not match protocol");
+        
+        SILEntries = SILEntries.slice(1);
+        
+        // FIXME: Use info from SILWitnessTable instead of falling through.
+      }
+      
       // Determine whether the associated type has static metadata. If it
       // doesn't, then this witness table is a template that requires runtime
       // instantiation.
@@ -2813,7 +2871,21 @@ namespace {
 
       // FIXME: Add static witness tables for type conformances.
       for (auto protocol : ty->getProtocols()) {
-        (void)protocol;
+        if (SILWT) {
+          auto &entry = SILEntries.front();
+          assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
+                 && "sil witness table does not match protocol");
+          assert(entry.getAssociatedTypeProtocolWitness().Requirement == ty
+                 && "sil witness table does not match protocol");
+          assert(entry.getAssociatedTypeProtocolWitness().Protocol == protocol
+                 && "sil witness table does not match protocol");
+          
+          SILEntries = SILEntries.slice(1);
+          
+          // FIXME: Use info from SILWitnessTable instead of falling through.
+        }
+        
+        // FIXME: Add static witness table reference.
         Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
       }
     }
