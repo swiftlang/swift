@@ -50,6 +50,23 @@ SILModule::~SILModule() {
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
+SILFunction *SILModule::lookup(StringRef Name) {
+  // Did we already find this?
+  auto found = FunctionLookupCache.find(Name);
+  if (found != FunctionLookupCache.end()) {
+    return found->second;
+  }
+  
+  // If not, search through the function list, caching the entries we visit.
+  for (SILFunction &F : *this) {
+    FunctionLookupCache[F.getName()] = &F;
+    if (F.getName() == Name) {
+      return &F;
+    }
+  }
+  return nullptr;
+}
+
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,

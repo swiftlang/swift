@@ -111,6 +111,9 @@ private:
   /// FIXME: Remove this when SILGlobalVariable is ready.
   llvm::SetVector<VarDecl*> globals;
 
+  /// Lookup cache for SIL functions.
+  llvm::StringMap<SILFunction*> FunctionLookupCache;
+  
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
@@ -247,13 +250,7 @@ public:
     return {silGlobals.begin(), silGlobals.end()};
   }
 
-  SILFunction *lookup(StringRef Name) {
-    // FIXME: Linear lookup is ridiculous here.
-    for (SILFunction &F : *this)
-      if (F.getName() == Name)
-        return &F;
-    return nullptr;
-  }
+  SILFunction *lookup(StringRef Name);
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.

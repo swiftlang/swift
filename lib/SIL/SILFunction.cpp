@@ -40,6 +40,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 SILFunction::~SILFunction() {
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+  getModule().FunctionLookupCache.erase(Name);
 }
 
 void SILFunction::setDeclContext(Decl *D) {
