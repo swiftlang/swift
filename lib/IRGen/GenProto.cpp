@@ -3303,6 +3303,8 @@ namespace {
           considerNominalType(nomTy, 0);
         else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
           considerBoundGenericType(bgTy, 0);
+        else if (auto archeTy = dyn_cast<ArchetypeType>(selfTy))
+          considerArchetype(archeTy, archeTy, 0, 0);
         else
           llvm_unreachable("witness for non-nominal type?!");
         
@@ -4314,8 +4316,10 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
                       conformance); // FIXME conformance for concrete type
   
   // Acquire the archetype metadata for fully opaque archetype methods.
+  // TODO: Unneede in -emit-sil-protocol-witness-tables.
   llvm::Value *metadata = nullptr;
-  if (!fnProto->requiresClass())
+  if (!IGF.IGM.Context.LangOpts.EmitSILProtocolWitnessTables
+      && !fnProto->requiresClass())
     metadata = IGF.emitTypeMetadataRef(baseTy.getSwiftRValueType());
   
   // Build the value.
