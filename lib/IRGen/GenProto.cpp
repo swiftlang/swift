@@ -3277,14 +3277,16 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
 
   // Set the protocol witness tables.
 
-  assert(wtables.size() == archetype->getConformsTo().size());
+  unsigned wtableI = 0;
   for (unsigned i = 0, e = wtables.size(); i != e; ++i) {
     auto proto = archetype->getConformsTo()[i];
-    auto wtable = wtables[i];
+    if (!requiresProtocolWitnessTable(proto)) continue;
+    auto wtable = wtables[wtableI++];
     wtable->setName(Twine(archetype->getFullName()) + "." +
                       proto->getName().str());
     setWitnessTable(*this, archetype, i, wtable);
   }
+  assert(wtableI == wtables.size());
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
@@ -3700,6 +3702,9 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
     // Collect all the witness tables.
     SmallVector<llvm::Value *, 8> wtables;
     for (auto protocol : archetype->getConformsTo()) {
+      if (!requiresProtocolWitnessTable(protocol))
+        continue;
+      
       llvm::Value *wtable;
 
       // If the protocol witness table is fulfilled by the source, go for it.
@@ -4012,6 +4017,10 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     // Add witness tables for each of the required protocols.
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
       auto protocol = protocols[i];
+      
+      // Skip this if the protocol doesn't require a witness table.
+      if (!requiresProtocolWitnessTable(protocol))
+        continue;
 
       // Skip this if it's fulfilled by the source.
       if (Fulfillments.count(FulfillmentKey(archetype, protocol)))
@@ -4063,10 +4072,15 @@ namespace {
         if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);
 
-        // Pass each signature requirement separately (unless fulfilled).
-        for (auto protocol : archetype->getConformsTo())
+        // Pass each signature requirement that needs a witness table
+        // separately (unless fulfilled).
+        for (auto protocol : archetype->getConformsTo()) {
+          if (!requiresProtocolWitnessTable(protocol))
+            continue;
+          
           if (!Fulfillments.count(FulfillmentKey(archetype, protocol)))
             out.push_back(IGM.WitnessTablePtrTy);
+        }
       }
       
       // For a witness method, add the 'self' parameter.
