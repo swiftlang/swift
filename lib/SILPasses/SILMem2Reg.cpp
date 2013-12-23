@@ -41,6 +41,7 @@ STATISTIC(NumAllocStackRemoved,  "Number of AllocStack promoted");
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
+STATISTIC(NumPhiPlaced,          "Number of Phi blocks placed");
 
 namespace {
 
@@ -708,6 +709,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   }
 
   DEBUG(llvm::errs() << "*** Found: " << PhiBlocks.size() << " new PHIs\n");
+  NumPhiPlaced += PhiBlocks.size();
 
   // At this point we calculated the locations of all of the new Phi values.
   // Next, add the Phi values and promote all of the loads and stores into the
