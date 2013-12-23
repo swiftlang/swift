@@ -798,11 +798,15 @@ BranchInst *BranchInst::create(SILLocation Loc,
 
 CondBranchInst::CondBranchInst(SILLocation Loc, SILValue Condition,
                                SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                               ArrayRef<SILValue> Args)
+                               ArrayRef<SILValue> Args, unsigned NumTrue,
+                               unsigned NumFalse)
   : TermInst(ValueKind::CondBranchInst, Loc),
     DestBBs{{this, TrueBB}, {this, FalseBB}},
+    NumTrueArgs(NumTrue), NumFalseArgs(NumFalse),
     Operands(this, Args, Condition)
 {
+  assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&
+         "Invalid number of args");
 }
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
@@ -823,16 +827,16 @@ CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
   void *Buffer = F.getModule().allocate(sizeof(CondBranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(CondBranchInst));
-  return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args);
+  return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args,
+                                       TrueArgs.size(), FalseArgs.size());
 }
 
 OperandValueArrayRef CondBranchInst::getTrueArgs() const {
-  return Operands.asValueArray().slice(1, getTrueBB()->bbarg_size());
+  return Operands.asValueArray().slice(1, NumTrueArgs);
 }
 
 OperandValueArrayRef CondBranchInst::getFalseArgs() const {
-  return Operands.asValueArray().slice(1 + getTrueBB()->bbarg_size(),
-                                       getFalseBB()->bbarg_size());
+  return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
 SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,

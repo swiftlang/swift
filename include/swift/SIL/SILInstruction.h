@@ -2038,13 +2038,18 @@ class CondBranchInst : public TermInst {
   };
 
   SILSuccessor DestBBs[2];
+  // The number of arguments for the True branch.
+  unsigned NumTrueArgs;
+  // The number of arguments for the False branch.
+  unsigned NumFalseArgs;
+
   // The first argument is the condition; the rest are BB arguments.
   TailAllocatedOperandList<1> Operands;
-  
   CondBranchInst(SILLocation Loc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                 ArrayRef<SILValue> Args);
-  
+                 ArrayRef<SILValue> Args, unsigned NumTrue,
+                 unsigned NumFalse);
+
 public:
   /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
   /// the Condition value. Both blocks must not take any arguments.
