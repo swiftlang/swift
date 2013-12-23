@@ -141,9 +141,27 @@ protected:
   // This constructor is used to support getAs operation.
   SILLocation() {}
 
+  // Constructors for specifying the kind and the special flags for a
+  // specific SILLocation. Meant to be used in conjunction with
+  // getSpecialFlags.
+  SILLocation(LocationKind K, unsigned Flags) : KindData(unsigned(K) | Flags) {}
+  SILLocation(Stmt *S, LocationKind K,
+              unsigned Flags) : ASTNode(S), KindData(unsigned(K) | Flags) {}
+  SILLocation(Expr *E, LocationKind K,
+              unsigned Flags) : ASTNode(E), KindData(unsigned(K) | Flags) {}
+  SILLocation(Decl *D, LocationKind K,
+              unsigned Flags) : ASTNode(D), KindData(unsigned(K) | Flags) {}
+  SILLocation(Pattern *P, LocationKind K,
+              unsigned Flags) : ASTNode(P), KindData(unsigned(K) | Flags) {}
+
 private:
   friend class ImplicitReturnLocation;
+  friend class MandatoryInlinedLocation;
+  friend class InlinedLocation;
+  friend class CleanupLocation;
+
   void setKind(LocationKind K) { KindData |= (K & BaseMask); }
+  unsigned getSpecialFlags() const { return unsigned(KindData) & ~BaseMask; }
 public:
 
   /// When an ASTNode gets implicitely converted into a SILLocation we
@@ -405,6 +423,15 @@ private:
     return L.getKind() == InlinedKind;
   }
   InlinedLocation() : SILLocation(InlinedKind) {}
+
+  InlinedLocation(Expr *E, unsigned F) : SILLocation(E, InlinedKind, F) {}
+  InlinedLocation(Stmt *S, unsigned F) : SILLocation(S, InlinedKind, F) {}
+  InlinedLocation(Pattern *P, unsigned F) : SILLocation(P, InlinedKind, F) {}
+  InlinedLocation(Decl *D, unsigned F) : SILLocation(D, InlinedKind, F) {}
+  InlinedLocation(SourceLoc L, unsigned F) : SILLocation(InlinedKind, F) {
+    SILFileSourceLoc = L;
+  }
+
 };
 
 /// \brief Marks instructions that correspond to inlined function body and
@@ -443,6 +470,22 @@ private:
     return L.getKind() == MandatoryInlinedKind;
   }
   MandatoryInlinedLocation() : SILLocation(MandatoryInlinedKind) {}
+  MandatoryInlinedLocation(Expr *E,
+                           unsigned F) : SILLocation(E, MandatoryInlinedKind,
+                                                     F) {}
+  MandatoryInlinedLocation(Stmt *S,
+                           unsigned F) : SILLocation(S, MandatoryInlinedKind,
+                                                     F) {}
+  MandatoryInlinedLocation(Pattern *P,
+                           unsigned F) : SILLocation(P, MandatoryInlinedKind,
+                                                     F) {}
+  MandatoryInlinedLocation(Decl *D,
+                           unsigned F) : SILLocation(D, MandatoryInlinedKind,
+                                                     F) {}
+  MandatoryInlinedLocation(SourceLoc L,
+                           unsigned F) : SILLocation(MandatoryInlinedKind, F) {
+    SILFileSourceLoc = L;
+  }
 };
 
 /// \brief Used on the instruction performing auto-generated cleanup such as
@@ -478,6 +521,11 @@ private:
     return L.getKind() == CleanupKind;
   }
   CleanupLocation() : SILLocation(CleanupKind) {}
+
+  CleanupLocation(Expr *E, unsigned F) : SILLocation(E, CleanupKind, F) {}
+  CleanupLocation(Stmt *S, unsigned F) : SILLocation(S, CleanupKind, F) {}
+  CleanupLocation(Pattern *P, unsigned F) : SILLocation(P, CleanupKind, F) {}
+  CleanupLocation(Decl *D, unsigned F) : SILLocation(D, CleanupKind, F) {}
 };
 
 /// \brief Used to represent an unreachable location that was
