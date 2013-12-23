@@ -1146,7 +1146,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   fn = link.createFunction(*this, fnType, cc, attrs);
 
   // Unless this is an external reference, emit debug info for it.
-  if (DebugInfo && !f->isExternalDeclaration())
+  // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
+  // correctly handle the generic parameters of a witness, which can come from
+  // both the requirement and witness contexts.
+  if (DebugInfo && !f->isExternalDeclaration()
+      && f->getAbstractCC() != AbstractCC::WitnessMethod)
     DebugInfo->emitFunction(f, fn);
 
   return fn;
