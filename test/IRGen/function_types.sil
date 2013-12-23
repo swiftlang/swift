@@ -51,3 +51,19 @@ entry(%x : $@cc(witness_method) () -> ()):
   strong_release %x : $@cc(witness_method) () -> ()
   return %x : $@cc(witness_method) () -> ()
 }
+
+struct X {}
+
+sil @out_void_return : $@thin (@out X) -> ()
+
+// CHECK-LABEL: define void @use_void_return_value(%V14function_types1X* noalias sret) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    call void @out_void_return(%V14function_types1X* noalias sret %0)
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @use_void_return_value : $@thin (@out X) -> () {
+entry(%x : $*X):
+  %f = function_ref @out_void_return : $@thin (@out X) -> ()
+  %z = apply %f(%x) : $@thin (@out X) -> ()
+  return %z : $()
+}

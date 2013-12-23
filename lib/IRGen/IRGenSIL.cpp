@@ -1591,6 +1591,10 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     Address a = getLoweredAddress(indirectResult);
     auto &retTI = getTypeInfo(indirectResult.getType());
     emission.emitToMemory(a, retTI);
+    
+    // Create a void value for the formal return.
+    Explosion voidValue(ExplosionKind::Minimal);
+    setLoweredExplosion(SILValue(i, 0), voidValue);
     return;
   }
   
