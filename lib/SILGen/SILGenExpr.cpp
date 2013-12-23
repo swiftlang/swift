@@ -1274,7 +1274,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
 
   // For non-address-only structs, we emit a struct_extract sequence.
   auto &lowering = SGF.getTypeLowering(E->getType());
-  if (!lowering.isAddressOnly()) {
+  if (!base.getType().isAddress()) {
     SILValue ElementVal =
       SGF.B.createStructExtract(E, base.getValue(), FieldDecl);
 
@@ -1291,7 +1291,13 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   // base expression out.
   SILValue ElementPtr =
     SGF.B.createStructElementAddr(E, base.getValue(), FieldDecl);
-    
+  
+  // If we're loading a non-address-only element out of an address-only
+  // struct, just do a load.
+  if (!lowering.isAddressOnly())
+    return RValue(SGF, E,
+                  SGF.emitLoad(E, ElementPtr, lowering, C, IsNotTake));
+  
   return RValue(SGF, E,
                 ManagedValue(ElementPtr, base.getCleanup()));
 }
