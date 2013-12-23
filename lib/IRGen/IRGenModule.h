@@ -65,12 +65,15 @@ namespace swift {
   class EnumElementDecl;
   class EnumDecl;
   class IRGenOptions;
+  class NormalProtocolConformance;
+  class ProtocolConformance;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
   class SILGlobalVariable;
   class SILModule;
   class SILType;
+  class SILWitnessTable;
   class SourceLoc;
   class SourceFile;
   class StructDecl;
@@ -329,9 +332,9 @@ public:
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
-  
   Address emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitSILFunction(SILFunction *f);
+  void emitSILWitnessTable(SILWitnessTable *wt);
   
   /// Generate local decls in the given function body. This skips VarDecls and
   /// other locals that are consumed by SIL.
@@ -380,6 +383,8 @@ public:
                                        ExplosionKind level);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var);
   llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType);
+  llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
+                                        llvm::Type *definitionTy = nullptr);
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
 

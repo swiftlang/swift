@@ -30,6 +30,7 @@ namespace swift {
 
 class ASTContext;
 class GenericParamList;
+class NormalProtocolConformance;
 class ProtocolConformance;
 class SubstitutableType;
 class Module;
@@ -188,13 +189,16 @@ public:
   /// FIXME: Return a dependent generic signature instead.
   GenericParamList *getGenericParams() const;
 
+  /// Get the underlying normal conformance.
+  const NormalProtocolConformance *getRootNormalConformance() const;
+  
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   ///
   /// FIXME: This is a crummy API. This information should be recorded in the
   /// witnesses themselves.
   bool usesDefaultDefinition(ValueDecl *requirement) const;
-
+  
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) = delete;

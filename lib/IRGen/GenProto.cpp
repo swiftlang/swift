@@ -56,6 +56,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 #include "NecessaryBindings.h"
 #include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
@@ -2759,21 +2760,33 @@ namespace {
     }
 
   public:
+    /// TODO: Remove this entry point when SIL witness tables are turned on.
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
                         CanType concreteType, const TypeInfo &concreteTI,
                         const ProtocolConformance &conformance)
       : WitnessVisitor(IGM), Table(table),
         ConcreteType(concreteType), ConcreteTI(concreteTI),
-        Conformance(conformance) {
+        Conformance(conformance)
+    {
+      assert(!IGM.Context.LangOpts.EmitSILProtocolWitnessTables);
+
       computeSubstitutionsForType();
-          
-      if (IGM.Context.LangOpts.EmitSILProtocolWitnessTables) {
-        ArrayRef<Substitution> Subs;
-        std::tie(SILWT, Subs) = IGM.SILMod->lookUpWitnessTable(&conformance);
-        assert(SILWT && "no SIL witness table for conformance?!");
-        SILEntries = SILWT->getEntries();
-      }
+    }
+    
+    WitnessTableBuilder(IRGenModule &IGM,
+                        SmallVectorImpl<llvm::Constant*> &table,
+                        SILWitnessTable *SILWT)
+      : WitnessVisitor(IGM), Table(table),
+        ConcreteType(SILWT->getConformance()->getType()),
+        ConcreteTI(
+               IGM.getTypeInfoForUnlowered(SILWT->getConformance()->getType())),
+        Conformance(*SILWT->getConformance()),
+        SILWT(SILWT),
+        SILEntries(SILWT->getEntries())
+    {
+      assert(IGM.Context.LangOpts.EmitSILProtocolWitnessTables);
+      computeSubstitutionsForType();
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -3115,32 +3128,62 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
   auto it = Conformances.find(&conformance);
   if (it != Conformances.end()) return *it->second;
 
-  // We key above based only on the protocol conformance, which for a
-  // generic type is common across all specializations.  Thus we need
-  // to map that type to its type-in-context so that we don't build
-  // conformances that only work for the first specialization we
-  // encounter.  This also means that the generic param list for the
-  // type will actually properly close over any archetypes that might
-  // otherwise appear in concreteType.
-  auto realConcreteType = getTypeInContext(concreteType);
-  auto &realConcreteTI =
-    (concreteType == realConcreteType ? concreteTI
-                              : IGM.getTypeInfoForUnlowered(realConcreteType));
+  llvm::Constant *table;
+  
+  if (IGM.Context.LangOpts.EmitSILProtocolWitnessTables) {
+    // Drill down to the root normal conformance.
+    auto normalConformance = conformance.getRootNormalConformance();
+    
+    // Emit a reference to the witness table symbol.
+    // FIXME: For some conformances we need to do lazy initialization or runtime
+    // instantiation.
+    table = IGM.getAddrOfWitnessTable(normalConformance);
+  } else {
+    // We key above based only on the protocol conformance, which for a
+    // generic type is common across all specializations.  Thus we need
+    // to map that type to its type-in-context so that we don't build
+    // conformances that only work for the first specialization we
+    // encounter.  This also means that the generic param list for the
+    // type will actually properly close over any archetypes that might
+    // otherwise appear in concreteType.
+    auto realConcreteType = getTypeInContext(concreteType);
+    auto &realConcreteTI =
+      (concreteType == realConcreteType ? concreteTI
+                                : IGM.getTypeInfoForUnlowered(realConcreteType));
 
-  // Build the witnesses:
-  SmallVector<llvm::Constant*, 32> witnesses;
-  WitnessTableBuilder(IGM, witnesses, realConcreteType, realConcreteTI,
-                      conformance).visit(protocol);
+    // Build the witnesses:
+    SmallVector<llvm::Constant*, 32> witnesses;
+    WitnessTableBuilder(IGM, witnesses, realConcreteType, realConcreteTI,
+                        conformance).visit(protocol);
 
-  // Build the actual global variable.
-  llvm::Constant *table =
-    buildWitnessTable(IGM, realConcreteType, protocol, witnesses);
+    // Build the actual global variable.
+    table = buildWitnessTable(IGM, realConcreteType, protocol, witnesses);
+  }
 
   ConformanceInfo *info = new ConformanceInfo;
   info->Table = table;
 
   auto res = Conformances.insert(std::make_pair(&conformance, info));
   return *res.first->second;
+}
+
+void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
+  // Build the witnesses.
+  SmallVector<llvm::Constant*, 32> witnesses;
+  WitnessTableBuilder(*this, witnesses, wt)
+    .visit(wt->getConformance()->getProtocol());
+  
+  // Produce the initializer value.
+  auto tableTy = llvm::ArrayType::get(FunctionPtrTy, witnesses.size());
+  auto initializer = llvm::ConstantArray::get(tableTy, witnesses);
+  
+  auto global = cast<llvm::GlobalVariable>(
+                         getAddrOfWitnessTable(wt->getConformance(), tableTy));
+  global->setConstant(true);
+  global->setInitializer(initializer);
+  
+  // TODO: We should record what access mode the witness table requires:
+  // direct, lazily initialized, or runtime instantiated template.
 }
 
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,

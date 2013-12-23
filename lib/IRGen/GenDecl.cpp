@@ -505,6 +505,13 @@ void IRGenModule::emitGlobalTopLevel() {
     emitSILFunction(&f);
   }
 
+  // Emit witness tables.
+  if (Context.LangOpts.EmitSILProtocolWitnessTables) {
+    for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
+      emitSILWitnessTable(&wt);
+    }
+  }
+  
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
     std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
@@ -642,7 +649,9 @@ bool LinkEntity::isThunk() const {
     return
       (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
        (isa<VarDecl>(D) && cast<VarDecl>(D)->isComputed()));
-  } else { // isTypeKind(getKind())
+  } else if (isProtocolConformanceKind(getKind())) {
+    return false;
+  } else if (isTypeKind(getKind())) {
     CanType ty = CanType(static_cast<TypeBase*>(Pointer));
     NominalTypeDecl *decl = ty->getNominalOrBoundGenericNominal();
 
@@ -651,6 +660,8 @@ bool LinkEntity::isThunk() const {
 
     const DeclContext *DC = decl->getDeclContext();
     return isa<ClangModuleUnit>(DC->getModuleScopeContext());
+  } else {
+    llvm_unreachable("invalid entity kind");
   }
 }
 
@@ -1628,4 +1639,17 @@ bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
   }
 
   return false;
+}
+
+/// Look up the address of a witness table.
+///
+/// TODO: This needs to take a flag for the access mode of the witness table,
+/// which may be direct, lazy, or a runtime instantiation template.
+llvm::Constant*
+IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *C,
+                                   llvm::Type *storageTy) {
+  auto entity = LinkEntity::forDirectProtocolWitnessTable(C);
+  return getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                               storageTy, WitnessTableTy, WitnessTablePtrTy,
+                               DebugTypeInfo());
 }

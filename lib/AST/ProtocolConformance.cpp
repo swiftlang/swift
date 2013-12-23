@@ -189,3 +189,22 @@ SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
   return GenericConformance->getWitness(requirement, resolver);
 }
 
+const NormalProtocolConformance *
+ProtocolConformance::getRootNormalConformance() const {
+  const ProtocolConformance *C = this;
+  while (!isa<NormalProtocolConformance>(C)) {
+    switch (C->getKind()) {
+    case ProtocolConformanceKind::Normal:
+      llvm_unreachable("should have broken out of loop");
+    case ProtocolConformanceKind::Inherited:
+      C = cast<InheritedProtocolConformance>(C)
+          ->getInheritedConformance();
+      break;
+    case ProtocolConformanceKind::Specialized:
+      C = cast<SpecializedProtocolConformance>(C)
+        ->getGenericConformance();
+      break;
+    }
+  }
+  return cast<NormalProtocolConformance>(C);
+}

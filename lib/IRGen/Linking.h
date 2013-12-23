@@ -424,6 +424,14 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
     return entity;
   }
+  
+  static LinkEntity forDirectProtocolWitnessTable(const ProtocolConformance *C){
+    LinkEntity entity;
+    entity.Pointer = const_cast<ProtocolConformance*>(C);
+    entity.Data
+      = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DirectProtocolWitnessTable));
+    return entity;
+  }
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
