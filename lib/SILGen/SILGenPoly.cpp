@@ -478,11 +478,29 @@ namespace {
         OutputTypes(outputTypes) {}
 
     void translate(AbstractionPattern origType, CanType substType) {
+    recur:
+      // Start by stripping the labels off single-element tuples.
+      auto origTuple = dyn_cast<TupleType>(origType.getAsType());
+      if (origTuple
+          && origTuple->getNumElements() == 1
+          && !origTuple->getFields()[0].isVararg()) {
+        origType = AbstractionPattern(origTuple.getElementType(0));
+        goto recur;
+      }
+      
+      auto substTuple = dyn_cast<TupleType>(substType);
+      if (substTuple
+          && substTuple->getNumElements() == 1
+          && !substTuple->getFields()[0].isVararg()) {
+        substType = substTuple.getElementType(0);
+        goto recur;
+      }
+      
       // Tuples are exploded recursively.
-      if (isa<TupleType>(origType.getAsType())) {
+      if (origTuple) {
         return translateParallelExploded(origType, cast<TupleType>(substType));
       }
-      if (auto substTuple = dyn_cast<TupleType>(substType)) {
+      if (substTuple) {
         if (!substTuple->isMaterializable())
           return translateParallelExploded(origType, substTuple);
         return translateExplodedIndirect(origType, substTuple);
