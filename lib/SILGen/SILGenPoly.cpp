@@ -478,29 +478,29 @@ namespace {
         OutputTypes(outputTypes) {}
 
     void translate(AbstractionPattern origType, CanType substType) {
-    recur:
-      // Start by stripping the labels off single-element tuples.
       auto origTuple = dyn_cast<TupleType>(origType.getAsType());
-      if (origTuple
-          && origTuple->getNumElements() == 1
-          && !origTuple->getFields()[0].isVararg()) {
-        origType = AbstractionPattern(origTuple.getElementType(0));
-        goto recur;
-      }
-      
       auto substTuple = dyn_cast<TupleType>(substType);
-      if (substTuple
-          && substTuple->getNumElements() == 1
-          && !substTuple->getFields()[0].isVararg()) {
-        substType = substTuple.getElementType(0);
-        goto recur;
-      }
       
       // Tuples are exploded recursively.
       if (origTuple) {
-        return translateParallelExploded(origType, cast<TupleType>(substType));
+        if (substTuple)
+          return translateParallelExploded(origType, substTuple);
+        
+        // Match a (foo: T) abstraction pattern to a single scalar.
+        assert(origTuple->getNumElements() == 1
+               && !origTuple->getFields()[0].isVararg()
+               && "orig type is compound tuple but subst type isn't?!");
+        return translate(AbstractionPattern(origTuple.getElementType(0)),
+                         substType);
       }
       if (substTuple) {
+        // If the substituted tuple is a single-element labeled tuple and
+        // matches the formal original scalar type, drop the label.
+        if (substTuple->getNumElements() == 1
+            && !substTuple->getFields()[0].isVararg()
+            && substTuple.getElementType(0) == origType.getAsType())
+          return translate(origType, substTuple.getElementType(0));
+        
         if (!substTuple->isMaterializable())
           return translateParallelExploded(origType, substTuple);
         return translateExplodedIndirect(origType, substTuple);
