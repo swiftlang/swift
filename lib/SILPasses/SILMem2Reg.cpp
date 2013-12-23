@@ -70,13 +70,6 @@ class StackAllocationPromoter {
   /// Records the last store instruction in each block for a specific
   /// AllocStackInst.
   BlockToInstMap LastStoreInBlock;
-
-  /// We place DummyInstructions during the Phi placement phase because we can't
-  /// mutate the block phi values without changing the predecessors at the
-  /// same time. This maps basic blocks to the dummy instructions that represent
-  /// a new value.
-  BlockToInstMap DummyPhiVal;
-
 public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di)
@@ -100,10 +93,6 @@ public:
 private:
   /// \brief Promote AllocStacks into SSA.
   void promoteAllocationToPhi();
-
-  /// \brief Extend the basic block argument list for all of the blocks in
-  /// \p Blocks.
-  void placeDummyPhiValues(BlockSet &PhiBlocks);
 
   /// \brief Replace the dummy nodes with new block arguments.
   void addBlockArguments(BlockSet &PhiBlocks);
@@ -350,34 +339,12 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 }
 
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
-  DEBUG(llvm::errs() << "*** Replacing dummy vals with new block arguments.\n");
+  DEBUG(llvm::errs() << "*** Adding new block arguments.\n");
 
   SILModule &M = ASI->getModule();
 
-  for (auto Block : PhiBlocks) {
-    SILInstruction *Dummy = DummyPhiVal[Block];
-    SILType Ty = Dummy->getType(0);
-    SILArgument *Arg = new (M) SILArgument(Ty, Block);
-    SILValue(Dummy, 0).replaceAllUsesWith(Arg);
-    Dummy->eraseFromParent();
-  }
-}
-
-void StackAllocationPromoter::placeDummyPhiValues(BlockSet &PhiBlocks) {
-  DEBUG(llvm::errs() << "*** Placing dummy values for " << PhiBlocks.size()
-                     << " Blocks.\n");
-
-  SILModule &M = ASI->getModule();
-  SILType Ty = ASI->getElementType();
-  SILFunction *F = ASI->getParent()->getParent();
-
-  for (auto Block : PhiBlocks) {
-    SILBuilder Builder(F->begin()->begin());
-    // Add a dummy value that will emulate the new argument that we will add
-    // to the Phi later on.
-    DummyPhiVal[Block] =
-        Builder.createLoad(ASI->getLoc(), SILUndef::get(Ty, M));
-  }
+  for (auto Block : PhiBlocks)
+    new (M) SILArgument(ASI->getElementType(), Block);
 }
 
 SILValue
@@ -401,10 +368,9 @@ StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
     if (PhiBlocks.count(BB)) {
       // Return the dummy instruction that represents the new value that we will
       // add to the basic block.
-      assert(DummyPhiVal.count(BB) && "Can't find ");
-      SILValue Arg = DummyPhiVal[BB];
-      DEBUG(llvm::errs() << "*** Found a dummy Phi def " << *Arg);
-      return Arg;
+      SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
+      DEBUG(llvm::errs() << "*** Found a dummy Phi def " << *Phi);
+      return Phi;
     }
 
     // Move to the next dominating block.
@@ -496,9 +462,9 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     SILBasicBlock *BB = LI->getParent();
     if (PhiBlocks.count(BB)) {
       DEBUG(llvm::errs() << "*** Found a local Phi definiton.\n");
+      SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
       // Replace the load with the last argument of the BB, which is our Phi.
-      assert(DummyPhiVal.count(BB) && "Can't find dummy val for current block");
-      SILValue(LI, 0).replaceAllUsesWith(DummyPhiVal[BB]);
+      SILValue(LI, 0).replaceAllUsesWith(Phi);
       LI->eraseFromParent();
       NumInstRemoved++;
       // We are done with this Load. Move on to the next Load.
@@ -554,7 +520,6 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
 
   // Clear AllocStack state.
   LastStoreInBlock.clear();
-  DummyPhiVal.clear();
 
   for (auto Block : Blocks) {
     StoreInst *SI = promoteAllocationInBlock(Block);
@@ -674,15 +639,11 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   // Next, add the Phi values and promote all of the loads and stores into the
   // new locations.
 
-  // Place dummy Phi values that will imitate the new argument that we'll add
-  // to each basic block.
-  placeDummyPhiValues(PhiBlocks);
+  // Replace the dummy values with new block arguments.
+  addBlockArguments(PhiBlocks);
 
   // Hook up the Phi nodes and the loads with storing values.
   fixBranchesAndLoads(PhiBlocks);
-
-  // Replace the dummy values with new block arguments.
-  addBlockArguments(PhiBlocks);
 
   DEBUG(llvm::errs() << "*** Finished placing Phis ***\n");
 }
