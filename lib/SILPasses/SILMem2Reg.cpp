@@ -102,10 +102,6 @@ private:
   /// \brief Promote AllocStacks into SSA.
   void promoteAllocationToPhi();
 
-  /// \brief Calculate the dominator frontier for block \p SBB and store the
-  /// frontier blocks in \p Blocks.
-  void calculateDomFrontier(SILBasicBlock *SBB, BlockList &Blocks);
-
   /// \brief Extend the basic block argument list for all of the blocks in
   /// \p Blocks.
   void placeDummyPhiValues(BlockSet &PhiBlocks);
@@ -175,42 +171,6 @@ public:
 };
 
 } // end anonymous namespace.
-
-void StackAllocationPromoter::calculateDomFrontier(SILBasicBlock *SBB,
-                                                   BlockList &Blocks) {
-  // Dominated blocks to visit.
-  SmallVector<DomTreeNode *, 16> Worklist;
-
-  // Visited successors.
-  llvm::DenseSet<SILBasicBlock *> VisitedSucc;
-
-  // Start with the first node.
-  Worklist.push_back(DT->getNode(SBB));
-
-  // For all blocks that are dominated by SBB:
-  while (Worklist.size()) {
-    DomTreeNode *Node = Worklist.back();
-    Worklist.pop_back();
-
-    // For all of the children of the node in the dom tree:
-    for (DomTreeNode *Child : Node->getChildren())
-      Worklist.push_back(Child);
-
-    // Find successors that are not dominated by SBB.
-    SILBasicBlock *BB = Node->getBlock();
-    for (SILBasicBlock *SuccBB : BB->getSuccs()) {
-      // If this block is dominated by our node then it is not in the dom
-      // frontier.
-      if (SuccBB->getSinglePredecessor() || DT->properlyDominates(SBB, SuccBB))
-        continue;
-
-      // If this is the first time we visited this node insert it to the
-      // Dominance Frontier list.
-      if (VisitedSucc.insert(SuccBB).second)
-        Blocks.push_back(SuccBB);
-    }
-  }
-}
 
 /// Returns true if this AllocStacks is captured.
 bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
