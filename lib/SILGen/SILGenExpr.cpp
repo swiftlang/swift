@@ -479,7 +479,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       auto &TL = getTypeLowering(refType);
       // The value must be copied for the duration of the expression.
       V = TL.emitCopyValue(B, loc, V);
-      return ManagedValue(V, ManagedValue::Unmanaged);
+      return emitManagedRValueWithCleanup(V);
     }
 
     // If this is a global variable, invoke its accessor function to get its
