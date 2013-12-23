@@ -191,23 +191,35 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 /// Adjust the given type to become the self type when referring to
 /// the given member.
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
-  baseTy = baseTy->getRValueType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an lvalue type, turn the base type into an lvalue
-    // type.
+    // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
-    if (selfTy->is<LValueType>())
-      return LValueType::get(baseTy, LValueType::Qual::DefaultForMemberAccess);
+    if (auto *SelfLV = selfTy->getAs<LValueType>())
+      return LValueType::get(baseTy->getRValueType(), SelfLV->getQualifiers());
 
     // Otherwise, return the rvalue type.
-    return baseTy;
+    return baseTy->getRValueType();
   }
 
-  // Non-function members are always access
-  if (baseTy->hasReferenceSemantics() || baseTy->is<MetatypeType>())
-    return baseTy;
-      
-  return LValueType::get(baseTy, LValueType::Qual::DefaultForMemberAccess);
+  // Computed vardecls are always lvalues (for now).
+  // FIXME: Remove this when materialization is dead.
+  if (auto *VD = dyn_cast<VarDecl>(member))
+    if (VD->isComputed() && !baseTy->hasReferenceSemantics())
+      return LValueType::get(baseTy->getRValueType(),
+                             LValueType::Qual::DefaultForMemberAccess);
+  
+  // Accesses to non-function members in value types are done through an lvalue
+  // with whatever access permissions the base has.  We just set the implicit
+  // bit.
+  if (auto *SelfLV = baseTy->getAs<LValueType>())
+    return LValueType::get(baseTy->getRValueType(),
+                           SelfLV->getQualifiers()|LValueType::Qual::Implicit);
+  
+  // Accesses to members in values of reference type (classes, metatypes) are
+  // always done through a the reference to self.  Accesses to value types with
+  // a non-mutable self are also done through the base type.
+  return baseTy;
 }
 
 namespace {
@@ -397,7 +409,17 @@ namespace {
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
-        auto selfTy = isArchetypeOrExistentialRef ? baseTy : containerTy;
+        Type selfTy;
+        if (isArchetypeOrExistentialRef)
+          selfTy = baseTy;
+        else {
+          // If the base is already an lvalue with the right base type, we can
+          // use it as the lvalue qualified type.
+          selfTy = containerTy;
+          if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
+            if (auto *LV = base->getType()->getAs<LValueType>())
+              selfTy = LValueType::get(selfTy, LV->getQualifiers());
+        }
         base = coerceObjectArgumentToType(
                  base, 
                  adjustSelfTypeForMember(selfTy, member),
@@ -707,6 +729,9 @@ namespace {
       // The remaining subscript kinds
       resultTy = LValueType::get(resultTy,
                                  LValueType::Qual::DefaultForMemberAccess);
+      if (!containerTy->hasReferenceSemantics())
+        containerTy = LValueType::get(containerTy,
+                                      LValueType::Qual::DefaultForMemberAccess);
 
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
@@ -721,8 +746,7 @@ namespace {
 
         // Convert the base.
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
-        auto openedBaseType = openedFullFnType->getInput()
-                                ->getRValueInstanceType();
+        auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
         base = coerceObjectArgumentToType(base, 
                                           adjustSelfTypeForMember(containerTy, 
@@ -2918,9 +2942,8 @@ Expr *
 ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
                                          ConstraintLocatorBuilder locator) {
   // If we're coercing to an rvalue type, just do it.
-  if (!toType->is<LValueType>()) {
+  if (!toType->is<LValueType>())
     return coerceToType(expr, toType, locator);
-  }
 
   // Map down to the underlying object type.
   Type containerType = toType->getRValueType();

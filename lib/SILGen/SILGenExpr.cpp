@@ -1258,8 +1258,42 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                ManagedValue::Unmanaged));
   }
 
-  assert(0 && "Unknown rvalue result");
-  abort();
+  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
+  // decl member (TODO), and when the base is a struct.
+  assert(isa<StructDecl>(E->getBase()->getType()->getAnyNominal()) &&
+         "The base of an rvalue MemberRefExpr should be an rvalue value");
+
+  // If the accessed field is stored, emit a StructExtract on the base.
+  auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
+  assert(!FieldDecl->isComputed() &&
+         "Don't handle computed rvalue memberrefs yet");
+
+  // Evaluate the base of the member reference.
+  ManagedValue base =
+    visit(E->getBase()).getAsSingleValue(SGF, E->getBase());
+
+  // For non-address-only structs, we emit a struct_extract sequence.
+  auto &lowering = SGF.getTypeLowering(E->getType());
+  if (!lowering.isAddressOnly()) {
+    SILValue ElementVal =
+      SGF.B.createStructExtract(E, base.getValue(), FieldDecl);
+
+    // Emit a copyvalue to +1 the returned element, since the entire aggregate
+    // will be destroyed.
+    ElementVal = lowering.emitCopyValue(SGF.B, E, ElementVal);
+    
+    return RValue(SGF, E,
+                  ManagedValue(ElementVal, ManagedValue::Unmanaged));
+  }
+  
+  // For address-only sequences, the base is in memory.  Emit a
+  // struct_element_addr to get to the field, and propagate the cleanup for the
+  // base expression out.
+  SILValue ElementPtr =
+    SGF.B.createStructElementAddr(E, base.getValue(), FieldDecl);
+    
+  return RValue(SGF, E,
+                ManagedValue(ElementPtr, base.getCleanup()));
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
@@ -1427,7 +1461,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     ManagedValue scalar = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen,
                                                               E->getSubExpr());
     ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
-                                       scalar, E->getVarargsInjectionFunction());
+                                       scalar,E->getVarargsInjectionFunction());
     varargs.forwardInto(gen, E, scalarInit->getAddress());
     scalarInit->finishInitialization(gen);
   }
@@ -1440,7 +1474,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     // Fill the vararg field with an empty array.
     if (outerFields[i].isVararg()) {
       assert(i == e - 1 && "vararg isn't last?!");
-      ManagedValue varargs = emitVarargs(gen, E, outerFields[i].getVarargBaseTy(),
+      ManagedValue varargs = emitVarargs(gen, E,
+                                         outerFields[i].getVarargBaseTy(),
                                          {}, E->getVarargsInjectionFunction());
       varargs.forwardInto(gen, E, subInitializations[i]->getAddress());
       subInitializations[i]->finishInitialization(gen);
@@ -3133,9 +3168,9 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
     if (!isa<TupleExpr>(E->getDest())
         && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType()) &&
         !isLoadPropagatedValue(LE->getSubExpr(), SGF)) {
-      SGF.emitAssignLValueToLValue(E,
-                   SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr()),
-                   SGF.emitLValue(E->getDest()));
+      auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr());
+      SGF.emitAssignLValueToLValue(E, SrcLV,
+                                   SGF.emitLValue(E->getDest()));
       return SGF.emitEmptyTupleRValue(E);
     }
   }

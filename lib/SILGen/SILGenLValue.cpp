@@ -652,6 +652,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
 
+  assert((e->getBase()->getType()->is<LValueType>() ||
+          e->getBase()->getType()->hasReferenceSemantics()) &&
+         "Base of lvalue subscript expr is not an lvalue!");
+  
   LValue lv = visitRec(e->getBase());
   lv.add<GetterSetterComponent>(gen, 
                                 e->getDecl().getDecl(),

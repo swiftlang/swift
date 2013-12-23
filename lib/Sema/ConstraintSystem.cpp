@@ -867,7 +867,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       llvm::DenseMap<CanType, TypeVariableType *> replacements;
       SmallVector<GenericTypeParamType *, 4> genericParams;
       SmallVector<Requirement, 4> genericRequirements;
-      collectContextParamsAndRequirements(dc, genericParams, genericRequirements);
+      collectContextParamsAndRequirements(dc, genericParams,
+                                          genericRequirements);
       openGeneric(dc, genericParams, genericRequirements,
                   /*skipProtocolSelfConstraint=*/true,
                   opener,
@@ -888,15 +889,25 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     } else {
       selfTy = value->getDeclContext()->getDeclaredTypeOfContext();
     }
-
+    
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
       openedType = openedType->castTo<MetatypeType>()->getInstanceType();
 
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
-    if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value))
+    if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value)) {
+      // If self is a struct, properly qualify it based on our base
+      // qualification.  If we have an lvalue coming in, we expect an lvalue.
+      // TODO: Not for @mutable methods, they don't require self to be an
+      // lvalue.
+      if (!selfTy->hasReferenceSemantics() &&
+          baseTy->is<LValueType>())
+        selfTy = LValueType::get(selfTy,
+                                 LValueType::Qual::DefaultForMemberAccess);
+
       openedType = FunctionType::get(selfTy, openedType);
+    }
   }
 
   // Constrain the 'self' object type.

@@ -779,14 +779,18 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MemberRefExpr *E) {
-      if (!E->getType()->is<LValueType>() && !E->getType()->is<MetatypeType>()) {
-        Out << "Member reference type is not an lvalue or metatype\n";
+      if (!E->getMember()) {
+        Out << "Member reference is missing declaration\n";
         E->dump(Out);
         abort();
       }
       
-      if (!E->getMember()) {
-        Out << "Member reference is missing declaration\n";
+      Type ResultTy = E->getType(), BaseTy = E->getBase()->getType();
+      
+      // rvalue producing member_ref_exprs should have rvalue type themselves.
+      if (!ResultTy->is<LValueType>() && !ResultTy->is<MetatypeType>() &&
+          (BaseTy->is<LValueType>() || BaseTy->hasReferenceSemantics())) {
+        Out << "invalid rvalue-producing member_ref_expr!\n";
         E->dump(Out);
         abort();
       }
