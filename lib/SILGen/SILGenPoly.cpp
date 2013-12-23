@@ -478,29 +478,11 @@ namespace {
         OutputTypes(outputTypes) {}
 
     void translate(AbstractionPattern origType, CanType substType) {
-      auto origTuple = dyn_cast<TupleType>(origType.getAsType());
-      auto substTuple = dyn_cast<TupleType>(substType);
-      
       // Tuples are exploded recursively.
-      if (origTuple) {
-        if (substTuple)
-          return translateParallelExploded(origType, substTuple);
-        
-        // Match a (foo: T) abstraction pattern to a single scalar.
-        assert(origTuple->getNumElements() == 1
-               && !origTuple->getFields()[0].isVararg()
-               && "orig type is compound tuple but subst type isn't?!");
-        return translate(AbstractionPattern(origTuple.getElementType(0)),
-                         substType);
+      if (isa<TupleType>(origType.getAsType())) {
+        return translateParallelExploded(origType, cast<TupleType>(substType));
       }
-      if (substTuple) {
-        // If the substituted tuple is a single-element labeled tuple and
-        // matches the formal original scalar type, drop the label.
-        if (substTuple->getNumElements() == 1
-            && !substTuple->getFields()[0].isVararg()
-            && substTuple.getElementType(0) == origType.getAsType())
-          return translate(origType, substTuple.getElementType(0));
-        
+      if (auto substTuple = dyn_cast<TupleType>(substType)) {
         if (!substTuple->isMaterializable())
           return translateParallelExploded(origType, substTuple);
         return translateExplodedIndirect(origType, substTuple);
@@ -1245,6 +1227,36 @@ void RValueSource::forwardInto(SILGenFunction &SGF,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
+// FIxME: Witnesses are label-invariant to their requirement, so you end up with
+// the obnoxious corner case:
+//
+// protocol LabeledSelfRequirement {
+//   func method(x: Self)
+// }
+//
+// struct UnlabeledSelfWitness : LabeledSelfRequirement {
+//   func method(_: UnlabeledSelfWitness) {}
+// }
+//
+// (or vice versa). Deal with this by stripping the labels off of tuple types
+// before using them to reabstract arguments. The keyword arguments overhaul
+// should obviate the need for this hack.
+static CanType stripInputTupleLabels(CanType inputTy) {
+  auto tupleTy = dyn_cast<TupleType>(inputTy);
+  if (!tupleTy)
+    return inputTy;
+  auto unlabeled = map<SmallVector<TupleTypeElt, 4>>(tupleTy->getFields(),
+    [&](const TupleTypeElt &orig) {
+      return TupleTypeElt(stripInputTupleLabels(CanType(orig.getType())));
+    });
+  return TupleType::get(unlabeled, inputTy->getASTContext())
+    ->getCanonicalType();
+}
+
+static AbstractionPattern stripInputTupleLabels(AbstractionPattern p) {
+  return AbstractionPattern(stripInputTupleLabels(p.getAsType()));
+}
+
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                SILDeclRef requirement,
                                SILDeclRef witness,
@@ -1322,10 +1334,13 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   auto witnessSubstSILTy
     = SGM.Types.getLoweredType(witnessSubstTy);
   auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
+  auto witnessSubstInputTys = stripInputTupleLabels(witnessSubstTy.getInput());
+  
   TranslateArguments(*this, loc, TranslationKind::OrigToSubst,
                      origParams, witnessParams,
                      witnessSubstFTy->getParametersWithoutIndirectResult())
-    .translate(reqtOrigInputTy, witnessSubstTy.getInput());
+    .translate(stripInputTupleLabels(reqtOrigInputTy),
+               witnessSubstInputTys);
 
   // Create an indirect result buffer if needed.
   SILValue witnessSubstResultAddr
@@ -1348,8 +1363,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     TranslateArguments(*this, loc, TranslationKind::SubstToOrig,
                        witnessParams, genParams,
                        witnessFTy->getParametersWithoutIndirectResult())
-      .translate(witnessOrigTy.getFunctionInputType(),
-                 witnessSubstTy.getInput());
+      .translate(stripInputTupleLabels(witnessOrigTy.getFunctionInputType()),
+                 witnessSubstInputTys);
     witnessParams = std::move(genParams);
     
     witnessResultAddr
