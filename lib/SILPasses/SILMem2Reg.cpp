@@ -37,7 +37,6 @@
 #include <queue>
 using namespace swift;
 
-STATISTIC(NumAllocStackRemoved,  "Number of AllocStack promoted");
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
@@ -729,7 +728,6 @@ void MemoryToRegisters::run() {
         I++;
         ASI->eraseFromParent();
         NumInstRemoved++;
-        NumAllocStackRemoved++;
         continue;
       }
 
@@ -741,7 +739,6 @@ void MemoryToRegisters::run() {
         I++;
         ASI->eraseFromParent();
         NumInstRemoved++;
-        NumAllocStackRemoved++;
         continue;
       }
 
@@ -758,7 +755,6 @@ void MemoryToRegisters::run() {
       I++;
       ASI->eraseFromParent();
       NumInstRemoved++;
-      NumAllocStackRemoved++;
     }
   }
 }
