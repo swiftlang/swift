@@ -1,0 +1,510 @@
+// RUN: %sil-opt %s -inline -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import swift
+
+/////////////////////
+// CallGraph Tests //
+/////////////////////
+
+// *NOTE* These tests currently validate whether or not the callgraph
+// visits nodes in the correct order since we do not explore inlined
+// code for more apply inst to inline. After that point, we will
+// probably need to do one of the following:
+//
+// 1. Introduce a flag to turn off the exploration behavior.
+// 2. Introduce some sort of debug output that displays the callgraph
+//    traversal order.
+
+// Node -> Node
+
+sil @test1_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test1
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64)
+// CHECK: [[MUL_BUILTIN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: integer_literal $Builtin.Int1, 0 {{.*}}
+// CHECK: [[MUL_TUPLE_RESULT:%[0-9]+]] = apply [[MUL_BUILTIN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[MUL_RESULT:%[0-9]+]] = tuple_extract [[MUL_TUPLE_RESULT]]
+// CHECK: return [[MUL_RESULT]]
+sil @test1 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test1_multiply_leaf : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  return %2 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node -> Node
+
+// CHECK-LABEL: sil @test2_add_leaf
+
+sil @test2_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test2_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test2_add_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test2_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test2_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+// bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[INPUT]], [[INPUT]], {{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]] : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK: [[UADD_FUN2:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = apply [[UADD_FUN2]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
+// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[UADD_RESULT2]], [[UADD_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+// CHECK: return [[UMUL_RESULT]] : $Builtin.Int64
+sil @test2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test2_add_leaf: $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test2_add_then_multiply : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node    Node
+//    \      /
+//     v    v
+//      Node
+
+// CHECK-LABEL: sil @test3_add_leaf
+
+sil @test3_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_add_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test3_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+sil @test3_sub_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test3_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test3 : $@thin (Builtin.Int64) -> Builtin.Int64
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[USUB_FUN:%[0-9]+]] = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = apply [[USUB_FUN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[USUB_RESULT:%[0-9]+]] = tuple_extract [[USUB_RESULT_TUPLE]]
+// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[USUB_RESULT]], [[USUB_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[UMUL_RESULT]], [[UMUL_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
+// CHECK: [[UMUL_FUN2:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = apply [[UMUL_FUN2]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
+// CHECK: return [[UMUL_RESULT]]
+sil @test3 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_sub_then_multiply : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test3_add_then_multiply : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node -> Node
+//    \      /
+//     v    v
+//       Node
+
+// CHECK-LABEL: sil @test4_add_leaf
+
+sil @test4_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_add_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test4_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+sil @test4_add_then_multiply_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_then_multiply : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test4_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test4 : $@thin (Builtin.Int64) -> Builtin.Int64
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
+// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+
+// CHECK: [[UADD_FUN2:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = apply [[UADD_FUN2]]([[UMUL_RESULT]], [[UMUL_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
+// CHECK: [[UMUL_FUN2:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = apply [[UMUL_FUN2]]([[UADD_RESULT2]], [[UADD_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT2:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
+
+// CHECK: [[UMUL_FUN3:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE3:%[0-9]+]] = apply [[UMUL_FUN3]]([[UMUL_RESULT2]], [[UMUL_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT3:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE3]]
+// CHECK: return [[UMUL_RESULT3]] : $Builtin.Int64
+sil @test4 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_then_multiply : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test4_add_then_multiply_then_multiply : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@thin (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+// Circular Inline.
+
+// CHECK-LABEL: sil @test5
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[FUN:%[0-9]+]] = function_ref @test5 : $@thin (Builtin.Int64) -> Builtin.Int64
+// CHECK: [[FUN_RESULT:%[0-9]+]] = apply [[FUN]]([[INPUT]]) : $@thin (Builtin.Int64) -> Builtin.Int64
+// CHECK: return [[FUN_RESULT]] : $Builtin.Int64
+sil @test5 : $@thin(Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test5 : $@thin (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@thin(Builtin.Int64) -> Builtin.Int64
+  return %2 : $Builtin.Int64
+}
+
+//////////////////////
+// Apply Type Tests //
+//////////////////////
+
+// CHECK-LABEL: sil @generic_function
+sil @generic_function : $@thin <T> (@in T, @in T) -> Builtin.Int8 {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = integer_literal $Builtin.Int8, 2
+  return %2 : $Builtin.Int8
+}
+
+// IGNORE-THIS-CHECK-LABEL: sil @ignore_applies_with_substitutions
+
+// We can't deserialize apply_inst with subst lists. When radar://14443304
+// is fixed then we should uncomment this test.
+
+// sil @ignore_applies_with_substitutions : $@thin (Builtin.Int64) -> Builtin.Int8 {
+// bb0(%0 : $Builtin.Int64):
+//   %1 = function_ref @generic_function : $@thin <T> (@in T, @in T) -> Builtin.Int8
+//   %2 = apply %1<T = Builtin.Int64>(%0, %0) : $@thin <T> (@in T, @in T) -> Builtin.Int8
+//   return %2 : $Builtin.Int8
+// }
+
+// CHECK-LABEL: sil @trivial_fun
+
+sil @trivial_fun : $@thin () -> (Builtin.Int64) {
+  %0 = integer_literal $Builtin.Int64, 32
+  return %0 : $Builtin.Int64
+}
+
+// Once the DI issues have been resolved, look into this.
+// CHECK-LABEL: sil [transparent] @dont_inline_into_transparent_functions
+// CHECK: bb0:
+// CHECK-NEXT: function_ref trivial_fun
+// CHECK-NEXT: [[FUN_REF:%[0-9]+]] = function_ref @trivial_fun : $@thin () -> Builtin.Int64
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[FUN_REF]]() : $@thin () -> Builtin.Int64
+// CHECK-NEXT: return [[RESULT]] : $Builtin.Int64
+sil [transparent] @dont_inline_into_transparent_functions : $@thin () -> Builtin.Int64 {
+bb0:
+  %0 = function_ref @trivial_fun : $@thin () -> Builtin.Int64
+  %1 = apply %0() : $@thin () -> Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+//////////////////////
+// Cost Model Check //
+//////////////////////
+
+// Make sure we do not inline if we go over our cost limit.
+
+// This function consists of 132 strong_retains. Note that 132 + 132 =
+// 264 which is greater than our inline cost limit.
+sil @large_function : $@thin (Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_release %0 : $Builtin.ObjectPointer
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @small_function_that_calls_large_function_twice
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.ObjectPointer):
+// CHECK: [[FUN:%[0-9]+]] = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK: apply [[FUN]]([[INPUT]])
+// CHECK-NOT: apply [[FUN]]([[INPUT]])
+sil @small_function_that_calls_large_function_twice : $@thin (Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  %1 = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1(%0) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1(%0) : $@thin (Builtin.ObjectPointer) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+//////////
+// Misc //
+//////////
+
+// Make sure SILCloner does not get into an infinite loop here.
+// swift.^ [infix] (lhs : swift.UWord, rhs : swift.UWord) -> swift.UWord
+sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord {
+bb0(%0 : $UWord, %1 : $UWord):
+  %2 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %5
+  %3 = struct_extract %0 : $UWord, #value         // user: %5
+  %4 = struct_extract %1 : $UWord, #value         // user: %5
+  %5 = apply %2(%3, %4) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %6
+  %6 = struct $UWord (%5 : $Builtin.Word)         // user: %7
+  return %6 : $UWord                              // id: %7
+}
+
+// function_ref swift.~ [prefix] (a : swift.UWord) -> swift.UWord
+sil @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord {
+bb0(%0 : $UWord):
+  // function_ref swift.^ [infix] (lhs : swift.UWord, rhs : swift.UWord) -> swift.UWord
+  %1 = function_ref @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord // user: %6
+  // function_ref swift.~ [prefix] (a : swift.UWord) -> swift.UWord
+  %2 = function_ref @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord // user: %5
+  %3 = integer_literal $Builtin.Word, 0           // user: %4
+  %4 = struct $UWord (%3 : $Builtin.Word)         // user: %5
+  %5 = apply %2(%4) : $@thin (UWord) -> UWord     // user: %6
+  %6 = apply %1(%0, %5) : $@thin (UWord, UWord) -> UWord // user: %7
+  return %6 : $UWord                              // id: %7
+}

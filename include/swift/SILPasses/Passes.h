@@ -91,6 +91,9 @@ namespace swift {
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
   void performSILCleanup(SILModule *M);
 
+  /// \brief Perform SIL Inlining for Performance.
+  void performSILPerformanceInlining(SILModule *M);
+
 } // end namespace swift
 
 #endif

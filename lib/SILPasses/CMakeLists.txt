@@ -18,5 +18,6 @@ add_swift_library(swiftSILPasses
   SILMem2Reg.cpp
   Specializer.cpp
   SimplifyCFG.cpp
+  PerformanceInliner.cpp
   DEPENDS swiftSILPassesUtils)
 

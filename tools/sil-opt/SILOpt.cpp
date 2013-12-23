@@ -42,6 +42,7 @@ enum class PassKind {
   SILCombine,
   SILSpecialization,
   SimplifyCFG,
+  PerformanceInlining,
 };
 
 static llvm::cl::opt<std::string>
@@ -99,6 +100,10 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SimplifyCFG,
                                    "simplify-cfg",
                                    "Clean up the CFG of SIL functions"),
+                        clEnumValN(PassKind::PerformanceInlining,
+                                   "inline",
+                                   "Inline functions which are determined to be"
+                                   " less than a pre-set cost."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -211,6 +216,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::SimplifyCFG:
       performSimplifyCFG(CI.getSILModule());
+      break;
+    case PassKind::PerformanceInlining:
+      performSILPerformanceInlining(CI.getSILModule());
       break;
     }
 
