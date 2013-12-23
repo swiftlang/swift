@@ -1370,10 +1370,11 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
   
   auto loc = VarLocs[vd];
-  assert(loc.isConstant() == vd->isLet());
   
-  // For a 'let' binding, we just emit a destroy_value of the value.
-  if (vd->isLet()) {
+  // For a non-address-only 'let' binding, we just emit a destroy_value of the
+  // value.
+  if (loc.isConstant()) {
+    assert(vd->isLet() && "Mutable vardecl assigned a constant value?");
     B.emitDestroyValueOperation(silLoc, loc.getConstant());
     return;
   }
