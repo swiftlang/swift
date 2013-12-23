@@ -2005,6 +2005,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                 IsNotBare,
                                 IsNotTransparent);
   
+  f->setDebugScope(new (M) SILDebugScope(RegularLocation(witness.getDecl())));
+  
   // Mangle the name of the witness thunk.
   llvm::raw_string_ostream buffer(f->getMutableName());
   buffer << "_TTW";
