@@ -3293,10 +3293,13 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
 /// Generic functions and protocol witnesses carry polymorphic parameters.
 bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   switch (ty->getAbstractCC()) {
-  case AbstractCC::ObjCMethod:
   case AbstractCC::C:
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
+  case AbstractCC::ObjCMethod:
+    // An ObjC archetype_method reference will notionally have polymorphic type
+    // <Self: P> (...) -> (...), but there are no polymorphic parameters that
+    // can't be solved from the usual ObjC metadata.
     return false;
       
   case AbstractCC::Freestanding:

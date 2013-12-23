@@ -212,7 +212,7 @@ private:
 
   /// Add the 'self' clause back to the substituted formal type of
   /// this protocol method.
-  void addProtocolSelfToFormalType(SILGenModule &SGM) {
+  void addProtocolSelfToFormalType(SILGenModule &SGM, SILDeclRef name) {
     // The result types of the expressions yielding protocol values
     // (reflected in SubstFormalType) reflect an implicit level of
     // function application, including some extra polymorphic
@@ -230,8 +230,9 @@ private:
 
     bool isThin;
     if (SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      // Existential witnesses are always "thick" with the polymorphic info
-      isThin = false;
+      // Existential witnesses are always "thick" with the polymorphic info,
+      // unless @objc.
+      isThin = name.isForeign;
     } else {
       // This function is thin only if it's a class archetype, because
       // otherwise it implicitly binds up the metatype value.
@@ -324,14 +325,14 @@ public:
                              SILDeclRef name, CanAnyFunctionType substFormalType,
                              SILLocation l) {
     Callee callee(Kind::ArchetypeMethod, gen, value, name, substFormalType, l);
-    callee.addProtocolSelfToFormalType(gen.SGM);
+    callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
   }
   static Callee forProtocol(SILGenFunction &gen, SILValue proto,
                             SILDeclRef name, CanAnyFunctionType substFormalType,
                             SILLocation l) {
     Callee callee(Kind::ProtocolMethod, gen, proto, name, substFormalType, l);
-    callee.addProtocolSelfToFormalType(gen.SGM);
+    callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
   }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,

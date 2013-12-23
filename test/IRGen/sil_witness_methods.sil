@@ -130,4 +130,3 @@ entry:
   %z = apply %w(%m) : $@thin @cc(witness_method) (@thick Foo.metatype) -> @thick Foo.metatype
   return undef : $()
 }
-

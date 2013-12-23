@@ -851,8 +851,8 @@ public:
       require(methodType->getAbstractCC()
                 == F.getModule().Types.getProtocolWitnessCC(proto),
               "result of protocol_method must have correct @cc for protocol");
-      require(!methodType->isThin(),
-              "result of protocol_method must be thick");
+      require(methodType->isThin() == EMI->getMember().isForeign,
+              "result of protocol_method must be thick unless foreign");
     } else {
       require(methodType->isThin()
                 == operandType.isClassExistentialType(),
