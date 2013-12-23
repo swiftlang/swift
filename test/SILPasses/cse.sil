@@ -522,3 +522,19 @@ sil @metatype_test : $@thin () -> () {
   %3 = tuple()
   return %3 : $()
 }
+
+struct StringData {
+  var size: Builtin.Int64
+}
+
+// CHECK-LABEL: sil @sil_extract_of_string
+//
+// Make sure we only forward the first field of the string_literal
+// instead of the whole string literal. Otherwise we run into arity
+// issues.
+sil @sil_extract_of_string : $@thin () -> Builtin.Int64 {
+  %0 = string_literal ""
+  %1 = struct $StringData (%0#1 : $Builtin.Int64)
+  %2 = struct_extract %1 : $StringData, #size  
+  return %2 : $Builtin.Int64
+}

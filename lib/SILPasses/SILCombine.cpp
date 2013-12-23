@@ -363,7 +363,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
                          << "    New = " << *Result.getDef() << '\n');
 
       // Everything uses the new instruction now.
-      replaceInstUsesWith(*I, Result.getDef());
+      replaceInstUsesWith(*I, Result.getDef(), 0, Result.getResultNumber());
 
       // Push the new instruction and any users onto the worklist.
       Worklist.addUsersToWorklist(Result.getDef());
