@@ -120,6 +120,10 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
     llvm_unreachable("Unmapped instruction while cloning?");
   }
 
+  // If we have undef, just copy it.
+  if (SILUndef *U = dyn_cast<SILUndef>(Value.getDef()))
+    return SILValue(U, Value.getResultNumber());
+
   llvm_unreachable("Unmapped value while cloning?");
 }
 
