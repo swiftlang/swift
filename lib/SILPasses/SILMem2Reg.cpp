@@ -41,7 +41,6 @@ STATISTIC(NumAllocStackRemoved,  "Number of AllocStack promoted");
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
-STATISTIC(NumPhiPlaces,          "Number of Phi blocks placed");
 
 namespace {
 
