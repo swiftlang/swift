@@ -1915,10 +1915,14 @@ public:
       });
     }
   }
+  
+  void visitPatternBindingDecl(PatternBindingDecl *pbd) {
+    // We only care about the contained VarDecls.
+  }
 
   void visitVarDecl(VarDecl *vd) {
     // FIXME: Emit getter and setter (if settable) witnesses.
-    assert(false && "property requirements in protocols not implemented");
+    // For now we ignore them, like the IRGen witness table builder did.
   }
 };
   
