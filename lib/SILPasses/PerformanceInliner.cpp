@@ -152,7 +152,18 @@ static void TopDownCallGraphOrder(SILModule *M,
 ///
 /// TODO: Fill this out.
 static unsigned instructionInlineCost(SILInstruction &I) {
-  return 1;
+  switch (I.getKind()) {
+    case ValueKind::FunctionRefInst:
+    case ValueKind::BuiltinFunctionRefInst:
+    case ValueKind::GlobalAddrInst:
+    case ValueKind::SILGlobalAddrInst:
+    case ValueKind::IntegerLiteralInst:
+    case ValueKind::FloatLiteralInst:
+    case ValueKind::StringLiteralInst:
+      return 0;
+    default:
+      return 1;
+  }
 }
 
 /// Just sum over all of the instructions.
