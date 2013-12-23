@@ -83,9 +83,7 @@ namespace {
 class ModelASTWalker : public ASTWalker {
   const SourceManager &SM;
   std::vector<SyntaxStructureNode> SubStructureStack;
-#ifndef NDEBUG
   SourceLoc LastLoc;
-#endif
 
 public:
   SyntaxModelWalker &Walker;
@@ -283,6 +281,13 @@ bool ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
 }
 
 bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
+  // Skip out of order non-token nodes.
+  // Ideally this shouldn't happen, but the AST can contain overlapping nodes,
+  // such as multiple PatternBindingDecl in code like: var a, b : Int. Which
+  // would cause us to report the TypeRepr twice.
+  if (!SM.isBeforeInBuffer(LastLoc, Node.Range.getStart()))
+    return false;
+
   if (!passTokenNodesUntil(Node.Range.getStart(), DisplaceNodeAtLocation))
     return false;
   if (!passNode(Node))
@@ -291,10 +296,9 @@ bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
 }
 
 bool ModelASTWalker::passNode(const SyntaxNode &Node) {
-#ifndef NDEBUG
   assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
   LastLoc = Node.Range.getStart();
-#endif
+
   Walker.walkToNodePre(Node);
   if (!Walker.walkToNodePost(Node))
     return false;
