@@ -209,6 +209,12 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
       return LValueType::get(baseTy->getRValueType(),
                              LValueType::Qual::DefaultForMemberAccess);
   
+  // Subscripts are always lvalues (for now).
+  // FIXME: Remove this when materialization is dead.
+  if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
+      return LValueType::get(baseTy->getRValueType(),
+                             LValueType::Qual::DefaultForMemberAccess);
+  
   // Accesses to non-function members in value types are done through an lvalue
   // with whatever access permissions the base has.  We just set the implicit
   // bit.
@@ -726,7 +732,7 @@ namespace {
         return subscriptExpr;
       }
 
-      // The remaining subscript kinds
+      // The remaining subscript kinds produce lvalue results
       resultTy = LValueType::get(resultTy,
                                  LValueType::Qual::DefaultForMemberAccess);
       if (!containerTy->hasReferenceSemantics())
