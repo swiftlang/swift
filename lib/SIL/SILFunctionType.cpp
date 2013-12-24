@@ -763,10 +763,8 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (Context.LangOpts.EmitSILProtocolWitnessTables) {
-    if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
-      return getProtocolWitnessCC(proto);
-  }
+  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
+    return getProtocolWitnessCC(proto);
   
   if (c.getDecl()->isInstanceMember() ||
       c.kind == SILDeclRef::Kind::Initializer)

@@ -764,61 +764,22 @@ public:
     require(protocol,
             "archetype_method method must be a protocol method");
 
-    if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      require(methodType->isThin(),
-              "result of archetype_method must be thin function");
-      
-      require(methodType->getAbstractCC()
-                == F.getModule().Types.getProtocolWitnessCC(protocol),
-              "result of archetype_method must have correct @cc for protocol");
-
-      require(methodType->isPolymorphic(),
-              "result of archetype_method must be polymorphic");
-
-      require(methodType->getGenericParams()->hasSelfArchetype(),
-              "method should be polymorphic on Self archetype");
-      
-      CanType selfType = getMethodSelfInstanceType(methodType);
-      require(cast<ArchetypeType>(selfType)->getSelfProtocol(),
-              "method should be a Self archetype method");
-    } else {
-      require(methodType->isThin()
-                == protocol->requiresClass(),
-              "result method must be thin function type if class archetype, "
-              "thick if not class");
+    require(methodType->isThin(),
+            "result of archetype_method must be thin function");
     
-      CanType operandType = AMI->getLookupType().getSwiftRValueType();
-      DEBUG(llvm::dbgs() << "operand type ";
-            operandType.print(llvm::dbgs());
-            llvm::dbgs() << "\n");
-      
-      SILType selfType = getMethodSelfType(methodType);
-      if (auto selfMT = selfType.getAs<MetatypeType>()) {
-        require(selfType.isObject(),
-                "archetype_method taking metatype must take it directly");
-        require(selfMT.getInstanceType() == operandType,
-                "archetype_method must apply to an archetype metatype");
-      } else {
-        require(selfType.getSwiftRValueType() == operandType,
-                "archetype_method must apply to an archetype or archetype metatype");
-        require(selfType.isObject() == protocol->requiresClass(),
-                "archetype_method should take class archetypes by value");
-      }
-      
-      bool isArchetype = AMI->getLookupType().is<ArchetypeType>();
-      if (isArchetype) {
-        require(AMI->getConformance() == nullptr,
-                "archetypes should not have conformance");
-      } else {
-        require(AMI->getConformance(),
-                "archetype_method for concrete type must have conformance");
-        require(AMI->getConformance()->getProtocol() == protocol,
-                "archetype_method conformance is not for method's protocol");
-        require(AMI->getConformance()->getType()
-                  ->isEqual(AMI->getLookupType().getSwiftRValueType()),
-                "archetype_method conformance is not for type");
-      }
-    }
+    require(methodType->getAbstractCC()
+              == F.getModule().Types.getProtocolWitnessCC(protocol),
+            "result of archetype_method must have correct @cc for protocol");
+
+    require(methodType->isPolymorphic(),
+            "result of archetype_method must be polymorphic");
+
+    require(methodType->getGenericParams()->hasSelfArchetype(),
+            "method should be polymorphic on Self archetype");
+    
+    CanType selfType = getMethodSelfInstanceType(methodType);
+    require(cast<ArchetypeType>(selfType)->getSelfProtocol(),
+            "method should be a Self archetype method");
   }
   
   bool isSelfArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
@@ -847,18 +808,11 @@ public:
     require(proto, "protocol_method must take a method of a protocol");
     SILType operandType = EMI->getOperand().getType();
     
-    if (F.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      require(methodType->getAbstractCC()
-                == F.getModule().Types.getProtocolWitnessCC(proto),
-              "result of protocol_method must have correct @cc for protocol");
-      require(methodType->isThin() == EMI->getMember().isForeign,
-              "result of protocol_method must be thick unless foreign");
-    } else {
-      require(methodType->isThin()
-                == operandType.isClassExistentialType(),
-              "result method must be thin function type if class protocol, or "
-              "thick if not class");
-    }
+    require(methodType->getAbstractCC()
+              == F.getModule().Types.getProtocolWitnessCC(proto),
+            "result of protocol_method must have correct @cc for protocol");
+    require(methodType->isThin() == EMI->getMember().isForeign,
+            "result of protocol_method must be thick unless foreign");
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),

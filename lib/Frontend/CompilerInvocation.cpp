@@ -224,10 +224,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugConstraintSolverAttempt = attempt;
   }
 
-  if (Args.hasArg(OPT_emit_sil_protocol_witness_tables)) {
-    Opts.EmitSILProtocolWitnessTables = true;
-  }
-
   return false;
 }
 

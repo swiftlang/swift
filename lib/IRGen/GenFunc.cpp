@@ -283,11 +283,6 @@ namespace {
   /// Calculate the extra data kind for a function type.
   static ExtraData getExtraDataKind(IRGenModule &IGM,
                                     CanSILFunctionType formalType) {
-    // FIXME: We always lowered all function types as thick with retainable
-    // context in the old regime.
-    if (!IGM.Context.LangOpts.EmitSILProtocolWitnessTables)
-      return ExtraData::Retainable;
-    
     // If the type is thin, there is no extra data.
     if (formalType->isThin())
       return ExtraData::None;

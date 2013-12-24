@@ -228,16 +228,9 @@ private:
     auto substSelfType =
       buildSubstSelfType(polyFormalType.getInput(), selfType, ctx);
 
-    bool isThin;
-    if (SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      // Existential witnesses are always "thick" with the polymorphic info,
-      // unless @objc.
-      isThin = name.isForeign;
-    } else {
-      // This function is thin only if it's a class archetype, because
-      // otherwise it implicitly binds up the metatype value.
-      isThin = getArchetypeForSelf(selfType)->requiresClass();
-    }
+    // Existential witnesses are always "thick" with the polymorphic info,
+    // unless @objc.
+    bool isThin = name.isForeign;
     auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, isThin,
                                          /*noreturn*/ false);
 
@@ -464,30 +457,16 @@ public:
       auto constant = method.methodName.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(constant);
 
-      if (gen.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-        // Look up the witness for the archetype.
-        auto selfType = getProtocolSelfType(gen.SGM);
-        auto archetype = getArchetypeForSelf(selfType);
-        SILValue fn = gen.B.createArchetypeMethod(Loc,
-                                    SILType::getPrimitiveObjectType(archetype),
-                                    /*conformance*/ nullptr,
-                                    constant,
-                                    constantInfo.getSILType(),
-                                    constant.isForeign);
-        mv = ManagedValue(fn, ManagedValue::Unmanaged);
-      } else {
-        CanArchetypeType archetype;
-        SILType closureType =
-          getProtocolClosureType(gen.SGM, constant, constantInfo, archetype);
-
-        SILValue fn = gen.B.createArchetypeMethod(Loc,
-                                      SILType::getPrimitiveObjectType(archetype),
-                                              /*conformance*/ nullptr,
-                                              constant,
-                                              closureType,
-                                              /*volatile*/ constant.isForeign);
-        mv = ManagedValue(fn, ManagedValue::Unmanaged);
-      }
+      // Look up the witness for the archetype.
+      auto selfType = getProtocolSelfType(gen.SGM);
+      auto archetype = getArchetypeForSelf(selfType);
+      SILValue fn = gen.B.createArchetypeMethod(Loc,
+                                  SILType::getPrimitiveObjectType(archetype),
+                                  /*conformance*/ nullptr,
+                                  constant,
+                                  constantInfo.getSILType(),
+                                  constant.isForeign);
+      mv = ManagedValue(fn, ManagedValue::Unmanaged);
       break;
     }
     case Kind::ProtocolMethod: {
@@ -850,13 +829,7 @@ public:
     bool isObjC = proto->isObjC();
 
     ArrayRef<Substitution> subs;
-    if (gen.getASTContext().LangOpts.EmitSILProtocolWitnessTables) {
-      subs = e->getDeclRef().getPrimarySubstitutions();
-    } else {
-      // The declaration is always specialized (due to Self); ignore the
-      // substitutions related to Self. Skip the substitutions involving Self.
-      subs = getNonSelfSubstitutions(e->getDeclRef().getSubstitutions());
-    }
+    subs = e->getDeclRef().getPrimarySubstitutions();
 
     // Figure out the result type of this expression. If we had any
     // substitutions not related to 'Self', we'll need to produce a

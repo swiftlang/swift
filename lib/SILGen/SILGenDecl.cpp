@@ -1093,9 +1093,6 @@ public:
     
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
-    if (!SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables)
-      return;
-
     if (isa<ProtocolDecl>(theType))
       return;
     
@@ -1262,8 +1259,7 @@ public:
     for (Decl *member : e->getMembers())
       visit(member);
 
-    if (SGM.getASTContext().LangOpts.EmitSILProtocolWitnessTables
-        && !e->getExtendedType()->isExistentialType()) {
+    if (!e->getExtendedType()->isExistentialType()) {
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getConformances())

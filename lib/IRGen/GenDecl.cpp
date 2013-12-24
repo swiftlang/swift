@@ -496,21 +496,16 @@ void IRGenModule::emitGlobalTopLevel() {
     emitGlobalVariable(global, ti);
   }
   
-  for (SILGlobalVariable &v : SILMod->getSILGlobals()) {
+  for (SILGlobalVariable &v : SILMod->getSILGlobals())
     emitSILGlobalVariable(&v);
-  }
   
   // Emit SIL functions.
-  for (SILFunction &f : *SILMod) {
+  for (SILFunction &f : *SILMod)
     emitSILFunction(&f);
-  }
 
   // Emit witness tables.
-  if (Context.LangOpts.EmitSILProtocolWitnessTables) {
-    for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
-      emitSILWitnessTable(&wt);
-    }
-  }
+  for (SILWitnessTable &wt : SILMod->getWitnessTableList())
+    emitSILWitnessTable(&wt);
   
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {

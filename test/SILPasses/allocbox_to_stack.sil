@@ -150,8 +150,8 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.metatype):
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
   %6 = project_existential %2#1 : $*LogicValue to $*@sil_self LogicValue
-  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $@cc(method) @callee_owned (@inout @sil_self LogicValue) -> Bool
-  %8 = apply %7(%6) : $@cc(method) @callee_owned (@inout @sil_self LogicValue) -> Bool
+  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $@cc(witness_method) @callee_owned (@inout @sil_self LogicValue) -> Bool
+  %8 = apply %7(%6) : $@cc(witness_method) @callee_owned (@inout @sil_self LogicValue) -> Bool
   strong_release %2#0 : $Builtin.ObjectPointer
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*@local_storage LogicValue

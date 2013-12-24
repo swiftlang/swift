@@ -141,9 +141,9 @@ bb0(%0 : $*P):
   %1 = project_existential %0 : $*P to $*@sil_self P // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) (@inout @sil_self P) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(witness_method) (@inout @sil_self P) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $@cc(method) (@inout @sil_self P) -> ()
+  %3 = apply %2(%1) : $@cc(witness_method) (@inout @sil_self P) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return
@@ -258,8 +258,8 @@ bb0(%0 : $ClassBound):
   // CHECK: project_existential_ref {{%.*}} : $ClassBound to $@sil_self ClassBound
   %5 = project_existential_ref %3 : $ClassBound to $@sil_self ClassBound
   // CHECK: protocol_method
-  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : $@cc(method) @thin (@sil_self ClassBound) -> ()
-  %7 = apply %6(%5) : $@cc(method) @thin (@sil_self ClassBound) -> ()
+  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : $@cc(witness_method) (@sil_self ClassBound) -> ()
+  %7 = apply %6(%5) : $@cc(witness_method) (@sil_self ClassBound) -> ()
   %8 = tuple ()
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $()
