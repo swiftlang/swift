@@ -34,8 +34,8 @@ if "@MODULES_SDK@" != "" and platform.system() != 'Linux':
 if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
   config.available_features.add("long_tests")
 
-if "@SWIFT_ASAN_BUILD@" != "ON" and "@SWIFT_ASAN_BUILD@" != "YES":
-  config.available_features.add("not_asan_build")
+if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
+  config.available_features.add("asan")
 
 # Enable interpreter-based tests on platforms where the interpterer is known to
 # work.
