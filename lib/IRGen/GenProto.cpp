@@ -224,16 +224,16 @@ namespace {
       case DeclKind::GenericTypeParam:
         llvm_unreachable("declaration not legal as a protocol member");
 
+      case DeclKind::PatternBinding:
+        // We only care about the var decls in the pattern binding.
+        return;
+
       case DeclKind::Func:
         return visitFunc(cast<FuncDecl>(member));
 
       case DeclKind::Subscript:
-        IGM.unimplemented(member->getLoc(),
-                          "subscript declaration in protocol");
-        return;
-
       case DeclKind::Var:
-        IGM.unimplemented(member->getLoc(), "var declaration in protocol");
+        // FIXME: To be implemented.
         return;
 
       case DeclKind::AssociatedType:
