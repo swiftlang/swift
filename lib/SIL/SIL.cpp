@@ -36,6 +36,7 @@ void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
 
 void SILValue::replaceAllUsesWith(SILValue V) {
   assert(*this != V && "Cannot RAUW a value with itself");
+  assert(getType() == V.getType() && "Invalid type");
   while (!use_empty())
     (**use_begin()).set(V);
 }
