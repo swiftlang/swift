@@ -166,6 +166,11 @@ namespace {
       return parseSILType(Result);
     }
 
+    /// Parse a SIL type without the leading '$' or value category specifier.
+    bool parseSILTypeWithoutQualifiers(SILType &Result,
+                                       SILValueCategory category,
+                                       const TypeAttributes &attrs);
+
     bool parseSILDeclRef(SILDeclRef &Result);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
@@ -615,6 +620,30 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   return Lookup[0];
 }
 
+bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
+                                              SILValueCategory category,
+                                              const TypeAttributes &attrs) {
+  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
+  if (TyR.isNull())
+    return true;
+
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
+    if (auto generics = fnType->getGenericParams())
+      handleGenericParams(generics);
+  }
+  
+  // Apply attributes to the type.
+  TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
+
+  if (performTypeLocChecking(Ty))
+    return true;
+
+  Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
+                                     category);
+  return false;
+
+}
+
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
@@ -642,25 +671,8 @@ bool SILParser::parseSILType(SILType &Result) {
     category = SILValueCategory::LocalStorage;
     attrs.clearAttribute(TAK_local_storage);
   }
-
-  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
-  if (TyR.isNull())
-    return true;
-
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
-    if (auto generics = fnType->getGenericParams())
-      handleGenericParams(generics);
-  }
   
-  // Apply attributes to the type.
-  TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
-
-  if (performTypeLocChecking(Ty))
-    return true;
-
-  Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
-                                     category);
-  return false;
+  return parseSILTypeWithoutQualifiers(Result, category, attrs);
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
@@ -995,9 +1007,11 @@ bool parseApplySubstitutions(SILParser &SP,
     Substitution Sub;
     SILType Replace;
     Identifier ArcheId;
+    TypeAttributes emptyAttrs;
     if (SP.parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
         SP.P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
-        SP.parseSILType(Replace))
+        SP.parseSILTypeWithoutQualifiers(Replace, SILValueCategory::Object,
+                                         emptyAttrs))
       return true;
     
     parsed.push_back({Loc, ArcheId, Replace});
