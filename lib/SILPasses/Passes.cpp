@@ -56,6 +56,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 }
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
+  performSILPerformanceInlining(&Module);
   performSILMem2Reg(&Module);
   performSILCSE(&Module);
   performSILCombine(&Module);
