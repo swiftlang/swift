@@ -277,9 +277,17 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // If the original type is an archetype, we'll want the most general type.
   auto origFnType = dyn_cast<AnyFunctionType>(origType);
   assert(origFnType || isa<ArchetypeType>(origType));
+  
+  // Get an abstraction pattern to apply against the result.
+  // If the unsubstituted type is an archetype, use the most general type for
+  // the result; otherwise, match the original abstraction level.
+  AbstractionPattern origResultPattern = origFnType
+    ? AbstractionPattern(origFnType.getResult())
+    : AbstractionPattern(origType);
 
   CanType substFormalResultType = substFnType.getResult();
-  auto &substResultTL = M.Types.getTypeLowering(substFormalResultType);
+  auto &substResultTL = M.Types.getTypeLowering(origResultPattern,
+                                                substFormalResultType);
   bool hasIndirectResult;
 
   // If the substituted result type is returned indirectly, then the
