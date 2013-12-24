@@ -12,6 +12,7 @@ typedef long NSInteger;
 - performSelector:(SEL)selector withObject:(id)obj;
 - (Class)myClass;
 + description;
+- description;
 @end
 
 @interface A : NSObject
@@ -59,6 +60,10 @@ typedef long NSInteger;
 - notAnInit __attribute__((objc_method_family(init), ns_returns_retained));
 - (id)_initFoo;
 - (void)anotherMethodOnB;
+
++ (void)instanceTakesObjectClassTakesFloat:(float)x;
+- (void)instanceTakesObjectClassTakesFloat:(id)x;
+
 @end
 
 @interface A(Cat1) <Cat1>

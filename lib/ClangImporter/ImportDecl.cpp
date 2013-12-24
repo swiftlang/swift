@@ -1473,7 +1473,7 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                              DeclContext *dc) {
+                              DeclContext *dc, bool forceClassMethod = false) {
       auto loc = Impl.importSourceLoc(decl->getLocStart());
 
       // The name of the method is the first part of the selector.
@@ -1488,14 +1488,13 @@ namespace {
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
-      if (decl->isClassMethod())
+      if (decl->isClassMethod() || forceClassMethod)
         selfTy = MetatypeType::get(selfTy, Impl.SwiftContext);
       auto selfName = Impl.SwiftContext.SelfIdentifier;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      /*IsLet*/ true,
                                                      SourceLoc(), selfName,
-                                                     selfTy,
-                                                     Impl.firstClangModule);
+                                                     selfTy, dc);
       Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
       selfPat->setType(selfVar->getType());
       selfPat
@@ -1560,14 +1559,14 @@ namespace {
       result->setIsObjC(true);
 
       // Mark class methods as static.
-      if (decl->isClassMethod())
+      if (decl->isClassMethod() || forceClassMethod)
         result->setStatic();
 
       // If this method overrides another method, mark it as such.
 
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
-      if (auto selfClassTy = selfTy->getAs<ClassType>()) {
+      if (auto selfClassTy = getSelfTypeForContext(dc)->getAs<ClassType>()) {
         if (auto superTy = selfClassTy->getDecl()->getSuperclass()) {
           auto superDecl = superTy->castTo<ClassType>()->getDecl();
           if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
@@ -1605,12 +1604,14 @@ namespace {
 
       // Check whether there's some special method to import.
       result->setClangNode(decl);
-      if (!Impl.ImportedDecls[decl->getCanonicalDecl()])
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      if (!forceClassMethod) {
+        if (!Impl.ImportedDecls[decl->getCanonicalDecl()])
+          Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-      if (decl->getMethodFamily() != clang::OMF_init ||
-          !isReallyInitMethod(decl)) {
-        importSpecialMethod(result, dc);
+        if (decl->getMethodFamily() != clang::OMF_init ||
+            !isReallyInitMethod(decl)) {
+          importSpecialMethod(result, dc);
+        }
       }
       return result;
     }
@@ -2395,6 +2396,21 @@ namespace {
             // visible.
             if (isa<ConstructorDecl>(special))
               continue;
+          }
+
+          // Objective-C root class instance methods are reflected on the
+          // metatype as well.
+          if (objcMethod->isInstanceMethod()) {
+            Type swiftTy = swiftContext->getDeclaredTypeInContext();
+            auto swiftClass = swiftTy->getClassOrBoundGenericClass();
+            if (swiftClass && !swiftClass->getSuperclass() &&
+                !decl->getClassMethod(objcMethod->getSelector(),
+                                      /*AllowHidden=*/true)) {
+              auto classMember = VisitObjCMethodDecl(objcMethod, swiftContext,
+                                                     true);
+              if (classMember)
+                members.push_back(classMember);
+            }
           }
         }
         
