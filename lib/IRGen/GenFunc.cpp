@@ -2037,12 +2037,53 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   Builder.CreateRet(returned);
 }
 
+static void emitApplyArgument(IRGenFunction &IGF,
+                              SILParameterInfo origParam,
+                              SILParameterInfo substParam,
+                              ArrayRef<Substitution> subs,
+                              Explosion &in,
+                              Explosion &out) {
+  bool isSubstituted = (substParam.getSILType() != origParam.getSILType());
+  
+  // For indirect arguments, we just need to pass a pointer.
+  if (origParam.isIndirect()) {
+    // This address is of the substituted type.
+    auto addr = in.claimNext();
+    
+    // If a substitution is in play, just bitcast the address.
+    if (isSubstituted) {
+      auto origType = IGF.IGM.getStoragePointerType(origParam.getSILType());
+      addr = IGF.Builder.CreateBitCast(addr, origType);
+    }
+    
+    out.add(addr);
+    return;
+  }
+  
+  // Otherwise, it's an explosion, which we may need to translate,
+  // both in terms of explosion level and substitution levels.
+
+  // Handle the last unsubstituted case.
+  if (!isSubstituted) {
+    auto &substArgTI
+      = cast<LoadableTypeInfo>(IGF.getTypeInfo(substParam.getSILType()));
+    substArgTI.reexplode(IGF, in, out);
+    return;
+  }
+  
+  reemitAsUnsubstituted(IGF, origParam.getType(), substParam.getType(),
+                        subs, in, out);
+}
+
+
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Function *staticFnPtr,
                                        llvm::Type *fnTy,
                                        ExplosionKind explosionLevel,
+                                       CanSILFunctionType origType,
                                        CanSILFunctionType outType,
+                                       ArrayRef<Substitution> subs,
                                        HeapLayout const &layout) {
   llvm::AttributeSet attrs;
   ExtraData extraData
@@ -2070,7 +2111,15 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
   
-  Explosion params = subIGF.collectParameters(explosionLevel);
+  Explosion origParams = subIGF.collectParameters(explosionLevel);
+  
+  // Reemit the parameters as unsubstituted.
+  Explosion params(explosionLevel);
+  for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
+    emitApplyArgument(subIGF, origType->getParameters()[i],
+                      outType->getParameters()[i],
+                      subs, origParams, params);
+  }
 
   typedef std::pair<const TypeInfo &, Address> AddressToDeallocate;
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
@@ -2082,7 +2131,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // last parameter) and load out the extra, previously-curried
   // parameters.
   if (!layout.isKnownEmpty()) {
-    llvm::Value *rawData = params.takeLast();
+    llvm::Value *rawData = origParams.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
 
     // Perform the loads.
@@ -2126,8 +2175,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
   }
-
+  
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
+  
   // FIXME: Default Swift attributes for indirect calls?
   if (staticFnPtr) {
     call->setAttributes(staticFnPtr->getAttributes());
@@ -2282,7 +2332,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               staticFn,
                                                               fnPtrTy,
                                                               args.getKind(),
+                                                              origType,
                                                               outType,
+                                                              subs,
                                                               layout);
   llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
                                                           IGF.IGM.Int8PtrTy);
