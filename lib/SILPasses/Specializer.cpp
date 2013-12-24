@@ -17,8 +17,9 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -35,16 +36,16 @@ public:
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F, TypeSubstitutionMap &Subs,
-                                    unsigned &Counter) {
+                                    StringRef NewName) {
     // Clone and specialize the function.
-    TypeSubCloner TSC(F, Subs, Counter);
+    TypeSubCloner TSC(F, Subs, NewName);
     TSC.populateCloned();
     return TSC.getCloned();
   }
 
 private:
-  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, unsigned &Counter)
-      : SILCloner(*initCloned(F, Subst, Counter)),
+  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, StringRef NewName)
+      : SILCloner(*initCloned(F, Subst, NewName)),
         SwiftMod(F->getModule().getSwiftModule()), SubsMap(Subst), OrigFunc(F) {
   }
 
@@ -79,17 +80,9 @@ private:
   /// Create a new empty function with the correct arguments and a unique name.
   static SILFunction *initCloned(SILFunction *Orig,
                                  TypeSubstitutionMap &Subst,
-                                 unsigned &Counter) {
+                                 StringRef NewName) {
     SILModule &M = Orig->getModule();
     Module *SM = M.getSwiftModule();
-
-    // Suffix the function name with "_specX", where X is a running counter.
-    std::string ClonedName;
-    do {
-      ClonedName.clear();
-      llvm::raw_string_ostream buffer(ClonedName);
-      buffer << Orig->getName() << "_spec" << Counter++;
-    } while (M.lookup(ClonedName));
 
     CanSILFunctionType FTy =
         SILType::substFuncType(M, SM, Subst, Orig->getLoweredFunctionType(),
@@ -97,7 +90,7 @@ private:
 
     // Create a new empty function.
     SILFunction *NewF =
-        new (M) SILFunction(M, SILLinkage::Internal, ClonedName, FTy,
+        new (M) SILFunction(M, SILLinkage::Internal, NewName, FTy,
                             Orig->getLocation(), Orig->isBare(),
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());
@@ -225,6 +218,25 @@ struct SILSpecializer {
   /// A list of ApplyInst instructions.
   typedef SmallVector<ApplyInst *, 16> AIList;
 
+  /// The SIL Module.
+  SILModule *M;
+
+  /// A list of declared function names.
+  llvm::StringSet<> FunctionNameCache;
+
+  /// Maps a function to all of the ApplyInst that call it.
+  llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
+
+  /// A worklist of functions to specialize.
+  std::vector<SILFunction*> Worklist;
+
+  SILSpecializer(SILModule *Mod) : M(Mod) {
+
+    // Save the list of function names at the beginning of the specialization.
+    for (SILFunction &F : *Mod)
+      FunctionNameCache.insert(F.getName());
+  }
+
   bool specializeApplyInstGroup(SILFunction *F, AIList &List);
 
   /// Scan the function and collect all of the ApplyInst with generic
@@ -232,7 +244,7 @@ struct SILSpecializer {
   void collectApplyInst(SILFunction &F);
 
   /// The driver for the generic specialization pass.
-  void specialize(SILModule *M) {
+  void specialize() {
     for (auto &F : *M)
       collectApplyInst(F);
 
@@ -247,10 +259,6 @@ struct SILSpecializer {
         specializeApplyInstGroup(F, ApplyInstMap[F]);
     }
   }
-
-  /// Maps a function to all of the ApplyInst that call it.
-  llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
-  std::vector<SILFunction*> Worklist;
 };
 
 } // end anonymous namespace.
@@ -326,9 +334,6 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
   SmallVector<AIList, 4> Buckets;
 
-  /// A running counter that we use to name functions.
-  unsigned Counter = 0;
-
   // Sort the incoming ApplyInst instructions into multiple buckets of AI with
   // exactly the same substitution lists.
   for (auto &AI : List) {
@@ -367,8 +372,21 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     if (!canSpecializeFunctionWithSubList(F, Subs))
       continue;
 
+    // TODO: We need to mangle the subst types into the new function name.
+    // for now use a running counter. rdar://15658321
+    unsigned Counter = 0;
+    std::string ClonedName;
+    do {
+      ClonedName.clear();
+      llvm::raw_string_ostream buffer(ClonedName);
+      buffer << F->getName() << "_spec" << Counter++;
+    } while (FunctionNameCache.count(ClonedName));
+
+    // Add the new name to the list of module function names.
+    FunctionNameCache.insert(ClonedName);
+
     // Create a new function.
-    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, Counter);
+    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName);
 
     // Replace all of the AI functions with the new function.
     for (auto &AI : Bucket)
@@ -388,5 +406,5 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 }
 
 void swift::performSILSpecialization(SILModule *M) {
-  SILSpecializer().specialize(M);
+  SILSpecializer(M).specialize();
 }
