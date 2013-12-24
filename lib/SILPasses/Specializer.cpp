@@ -22,6 +22,8 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
+STATISTIC(NumSpecialized, "Number of functions specialized");
+
 namespace {
 
 /// TypeSubCloner - a utility class for cloning and remapping types.
@@ -100,6 +102,7 @@ private:
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());
 
+    NumSpecialized++;
     return NewF;
   }
 
