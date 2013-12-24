@@ -1900,19 +1900,42 @@ public:
     assert(td->getProtocols().size() == witness.Conformance.size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
+    // The conformances should be all null or all nonnull.
+    assert(witness.Conformance.empty()
+           || (witness.Conformance[0]
+                 ? std::all_of(witness.Conformance.begin(),
+                               witness.Conformance.end(),
+                               [&](const ProtocolConformance *C) -> bool {
+                                 return C;
+                               })
+                 : std::all_of(witness.Conformance.begin(),
+                               witness.Conformance.end(),
+                               [&](const ProtocolConformance *C) -> bool {
+                                 return !C;
+                               })));
+    
     for (unsigned i = 0, e = td->getProtocols().size(); i < e; ++i) {
       auto protocol = td->getProtocols()[i];
       
       // Only reference the witness if the protocol requires it.
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))
         continue;
+
+      ProtocolConformance *conformance = nullptr;
+      // If the associated type requirement is satisfied by an associated type,
+      // these will all be null.
+      if (witness.Conformance[0]) {
+        auto foundConformance = std::find_if(witness.Conformance.begin(),
+                                        witness.Conformance.end(),
+                                        [&](ProtocolConformance *c) {
+                                          return c->getProtocol() == protocol;
+                                        });
+        assert(foundConformance != witness.Conformance.end());
+        conformance = *foundConformance;
+      }
       
-      auto conformance = witness.Conformance[i];
-      assert((!conformance || conformance->getProtocol() == protocol)
-             && "conformance order does not match protocol order");
       Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        td, protocol,
-        conformance
+        td, protocol, conformance
       });
     }
   }
