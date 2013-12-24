@@ -332,7 +332,27 @@ namespace {
 
     bool visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
-      llvm_unreachable("unimplemented! will be subsumed anyway");
+      // Function abstraction changes should have been handled in SILGen.
+#ifndef NDEBUG
+      assert(origTy->getResult() == substTy->getResult()
+             && "result abstraction difference survived to IRGen");
+      assert(origTy->getParameters().size() == substTy->getParameters().size()
+             && "parameter abstraction difference survived to IRGen");
+      for (unsigned i = 0, e = origTy->getParameters().size(); i < e; ++i) {
+        auto &origParam = origTy->getParameters()[i];
+        auto &substParam = substTy->getParameters()[i];
+        // Direct parameters must match up exactly.
+        if (!origParam.isIndirect())
+          assert(origParam == substParam
+                 && "parameter abstraction difference survived to IRGen");
+        // Indirect parameters can differ in type; they're just pointers.
+        // The convention must still match.
+        else
+          assert(origParam.getConvention() == substParam.getConvention()
+                 && "parameter abstraction difference survived to IRGen");
+      }
+#endif
+      return false;
     }
 
     // L-values go by the object type;  note that we ask the ordinary
