@@ -1287,19 +1287,13 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   }
   
   // For address-only sequences, the base is in memory.  Emit a
-  // struct_element_addr to get to the field, and propagate the cleanup for the
-  // base expression out.
+  // struct_element_addr to get to the field, and then load the element as an
+  // rvalue.
   SILValue ElementPtr =
     SGF.B.createStructElementAddr(E, base.getValue(), FieldDecl);
   
-  // If we're loading a non-address-only element out of an address-only
-  // struct, just do a load.
-  if (!lowering.isAddressOnly())
-    return RValue(SGF, E,
-                  SGF.emitLoad(E, ElementPtr, lowering, C, IsNotTake));
-  
   return RValue(SGF, E,
-                ManagedValue(ElementPtr, base.getCleanup()));
+                SGF.emitLoad(E, ElementPtr, lowering, C, IsNotTake));
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
