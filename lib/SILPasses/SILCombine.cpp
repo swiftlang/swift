@@ -151,7 +151,7 @@ public:
                               Iteration(0), Builder(0) { }
 
   void runOnFunction(SILFunction &F) {
-    Iteration = 0;
+    clear();
 
     // Create a SILBuilder for F and initialize the tracking list.
     SILBuilder B(F);
@@ -522,9 +522,7 @@ void swift::performSILCombine(SILModule *M) {
     if (F.empty())
       continue;
 
-    // Clear the combiner just in case.
-    Combiner.clear();
-    // Record if we made any changes.
+    // Combine instructions in F.
     Combiner.runOnFunction(F);
   }
 }
