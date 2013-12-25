@@ -2375,12 +2375,6 @@ public:
     return getQualifiers().isSettable();
   }
 
-  /// For now, no l-values are ever materializable.  Maybe in the
-  /// future we'll make heap l-values materializable.
-  bool isMaterializable() const {
-    return false;
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::LValue;
