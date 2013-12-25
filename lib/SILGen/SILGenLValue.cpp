@@ -333,7 +333,7 @@ namespace {
     SILDeclRef getter;
     SILDeclRef setter;
     std::vector<Substitution> substitutions;
-    Expr *subscriptExpr;
+    Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
     
     struct AccessorArgs {
@@ -351,9 +351,9 @@ namespace {
       if (base)
         result.base = gen.prepareAccessorBaseArg(loc, base);
       
-      if (subscriptExpr) {
+      if (subscriptIndexExpr) {
         if (!origSubscripts)
-          origSubscripts = gen.emitRValue(subscriptExpr);
+          origSubscripts = gen.emitRValue(subscriptIndexExpr);
         // TODO: use the subscript expression as the source if we're
         // only using this l-value once.
         result.subscripts = RValueSource(loc, origSubscripts.copy(gen, loc));
@@ -372,7 +372,7 @@ namespace {
 
     GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
-                          Expr *subscriptExpr,
+                          Expr *subscriptIndexExpr,
                           LValueTypeData typeData)
       : LogicalPathComponent(typeData),
         getter(SILDeclRef(decl, SILDeclRef::Kind::Getter,
@@ -384,7 +384,7 @@ namespace {
                               gen.SGM.requiresObjCDispatch(decl))
                  : SILDeclRef()),
         substitutions(substitutions.begin(), substitutions.end()),
-        subscriptExpr(subscriptExpr)
+        subscriptIndexExpr(subscriptIndexExpr)
     {
     }
     
@@ -395,7 +395,7 @@ namespace {
         getter(copied.getter),
         setter(copied.setter),
         substitutions(copied.substitutions),
-        subscriptExpr(copied.subscriptExpr),
+        subscriptIndexExpr(copied.subscriptIndexExpr),
         origSubscripts(copied.origSubscripts.copy(gen, loc))
     {
     }
