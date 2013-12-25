@@ -901,7 +901,7 @@ Type VarDecl::getGetterType() const {
   // If we have a getter, use its type.
   if (auto getter = getGetter())
     return getter->getType();
-
+  
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
@@ -930,7 +930,7 @@ Type VarDecl::getGetterInterfaceType() const {
 
   // Otherwise, compute the type.
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
-                                                       /*inout*/ false);
+                                                       /*@mutating*/ false);
 
   // Form the getter type.
   auto &ctx = getASTContext();
@@ -990,7 +990,7 @@ Type VarDecl::getSetterInterfaceType() const {
   
   // Otherwise, compute the type.
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
-                                                       /*inout*/ !isStatic());
+                                                     /*@mutating*/ !isStatic());
   
   // Form the element -> () function type.
   auto &ctx = getASTContext();
@@ -1036,11 +1036,14 @@ computeSelfType(GenericParamList **outerGenericParams) {
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
+    isMutating = true;
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
     // constructors and destructors of value types have an implicitly
     // @inout self.
     isMutating = !getDeclContext()->getDeclaredTypeInContext()
         ->hasReferenceSemantics();
+    
+    isMutating = true;
   }
 
   return getDeclContext()->getSelfTypeInContext(isStatic, isMutating,
@@ -1391,7 +1394,7 @@ Type SubscriptDecl::getGetterInterfaceType() const {
 
   // Otherwise, compute the type.
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*inout*/ false);
+                                                       /*@mutating*/ false);
 
   auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
   auto indicesTy = interfaceTy->getInput();
@@ -1428,7 +1431,7 @@ Type SubscriptDecl::getSetterType() const {
   // Otherwise, compute the type.
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*@mutating*/false,
+                                                       /*@mutating*/true,
                                                        &outerParams);
 
   // Form the element -> () function type.
@@ -1456,7 +1459,7 @@ Type SubscriptDecl::getSetterInterfaceType() const {
 
   // Otherwise, compute the type.
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*inout*/ true);
+                                                       /*@mutating*/ true);
 
   auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
   auto indicesTy = interfaceTy->getInput();

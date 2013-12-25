@@ -114,12 +114,10 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
   if (containerTy->hasReferenceSemantics())
     return containerTy;
 
-  if (dc->getASTContext().LangOpts.InOutMethods) {
-    // Value type methods which are not marked @inout are of type T since they
-    // cannot mutate a receiver.
-    if (!isMutatingFunc)
-      return containerTy;
-  }
+  // Value type methods which are not marked @inout are of type T since they
+  // cannot mutate a receiver.
+  if (!isMutatingFunc)
+    return containerTy;
 
   // All other types have 'self' of @inout T.
   return LValueType::get(containerTy, LValueType::Qual::DefaultForInOutSelf);
