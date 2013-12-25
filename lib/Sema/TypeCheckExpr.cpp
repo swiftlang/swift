@@ -380,6 +380,21 @@ bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
   return true;
 }
 
+
+/// doesVarDeclMemberProduceLValue - Return true if a reference to the specified
+/// VarDecl should produce an lvalue.  If present, baseType indicates the base
+/// type of a member reference.
+static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType) {
+  // Get-only VarDecls always produce rvalues.
+  if (!VD->isSettable())
+    return false;
+  
+  // If the base type is a struct or enum, and is not lvalue qualified, the
+  // result of an access is always an rvalue.
+  return !baseType || baseType->hasReferenceSemantics() ||
+         baseType->is<LValueType>() || VD->isStatic();
+}
+
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                              bool wantInterfaceType) {
   if (!value->hasType())
@@ -391,23 +406,15 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // Qualify 'var' declarations with an lvalue if the base is a reference or
   // has lvalue type.  If we are accessing a var member on an rvalue, it is
   // returned as an rvalue (and the access must be a load).
-  if (auto *VD = dyn_cast<VarDecl>(value)) {
-    // Get-only VarDecls always produce rvalues.
-    if (VD->isSettable() &&
-        (!baseType || baseType->hasReferenceSemantics() ||
-         baseType->is<LValueType>() || VD->isStatic() ||
-         VD->isComputed())) {
-            
+  if (auto *VD = dyn_cast<VarDecl>(value))
+    if (doesVarDeclMemberProduceLValue(VD, baseType)) {
       // Determine the qualifiers we want.
-      LValueType::Qual quals =
-          (baseType ? LValueType::Qual::DefaultForMemberAccess
-           : LValueType::Qual::DefaultForVar);
+      LValueType::Qual quals = LValueType::Qual::Implicit;
       if (!value->isSettableOnBase(baseType))
         quals |= LValueType::Qual::NonSettable;
-        
+      
       return LValueType::get(getTypeOfRValue(value, wantInterfaceType), quals);
     }
-  }
   
   if (wantInterfaceType)
     return value->getInterfaceType();

@@ -1282,9 +1282,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   // passing in self as an lvalue (for now!).
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
   if (FieldDecl->isComputed()) {
-    assert(!FieldDecl->isSettable() &&
-           "settable properties should be handled through lvalue machinery");
-    
     SILValue baseVal;
     if (!E->getBase()->getType()->is<MetatypeType>() &&
         !E->getBase()->getType()->hasReferenceSemantics()) {
