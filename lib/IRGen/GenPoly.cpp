@@ -40,126 +40,50 @@ enum class AbstractionDifference : bool {
   Explosion
 };
 
-/// Answer the differs-by-abstraction question for the given
-/// function types.  See the comment below.
-bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
-                                           CanAnyFunctionType origTy,
-                                           CanAnyFunctionType substTy,
-                                           ExplosionKind explosionLevel,
-                                           unsigned uncurryLevel) {
-  assert(origTy->isCanonical());
-  assert(substTy->isCanonical());
-
-  // Note that our type-system does not allow types to differ by
-  // polymorphism.
-
-  while (true) {
-    // Arguments will be exploded.
-    if (differsByAbstractionInExplosion(IGM, CanType(origTy->getInput()),
-                                        CanType(substTy->getInput()),
-                                        explosionLevel))
-      return true;
-
-    // Stop processing things as arguments if we're out of uncurryings.
-    if (uncurryLevel == 0) break;
-
-    uncurryLevel--;
-    origTy = cast<AnyFunctionType>(CanType(origTy->getResult()));
-    substTy = cast<AnyFunctionType>(CanType(substTy->getResult()));
-
-    // Fast path.
-    if (origTy == substTy) return false;
-  }
-
-  // For the result, consider whether it will be passed in memory or
-  // exploded.
-  CanType origResult = CanType(origTy->getResult());
-  CanType substResult = CanType(substTy->getResult());
-  if (origResult == substResult) return false;
-
-  auto requiresIndirectResult = [&](CanType type) {
-    return IGM.requiresIndirectResult(SILType::getPrimitiveObjectType(type),
-                                      explosionLevel);
-  };
-
-  // If the abstract type isn't passed indirectly, the substituted
-  // type won't be, either.
-  if (!requiresIndirectResult(origResult)) {
-    assert(!requiresIndirectResult(substResult));
-    // In this case, we must consider whether the exploded difference
-    // will matter.
-    return differsByAbstractionInExplosion(IGM, origResult, substResult,
-                                           explosionLevel);
-  }
-
-  // Otherwise, if the substituted type isn't passed indirectly,
-  // we've got a mismatch.
-  if (!requiresIndirectResult(substResult))
-    return true;
-
-  // Otherwise, we're passing indirectly, so use memory rules.
-  return differsByAbstractionInMemory(IGM, origResult, substResult);
-}
-
-/// If the given type is actually returned indirectly according to the
-/// ABI, is that semantically equivalent to an @out parameter?
-static bool isReturnedOwned(IRGenModule &IGM, SILResultInfo result) {
-  switch (result.getConvention()) {
-  case ResultConvention::Owned: return true;
-  case ResultConvention::Autoreleased: return false;
-  case ResultConvention::Unowned:
-    return result.getSILType().isTrivial(*IGM.SILMod);
-  }
-  llvm_unreachable("bad result convention");
-}
-
-static bool differsByAbstractionAsFunction(IRGenModule &IGM,
-                                           CanSILFunctionType origTy,
-                                           CanSILFunctionType substTy,
-                                           ExplosionKind explosionLevel) {
-  if (origTy->hasIndirectResult()) {
-    SILType substResultType = substTy->getSemanticResultSILType();
-    if (!substTy->hasIndirectResult()) {
-      if (!IGM.requiresIndirectResult(substResultType, explosionLevel))
-        return true;
-      if (!isReturnedOwned(IGM, substTy->getResult()))
-        return true;
-    }
-    if (differsByAbstractionInMemory(IGM, origTy->getIndirectResult().getType(),
-                                     substResultType.getSwiftRValueType()))
-      return true;
+/// Function abstraction changes should have been handled in SILGen.
+/// This function checks that SIL function types are call-compatible.
+void checkFunctionsAreCompatible(CanSILFunctionType origTy,
+                                 CanSILFunctionType substTy) {
+#ifndef NDEBUG
+  // The result types must either both be reference types with the same
+  // convention, or must be equivalent value types.
+  if (origTy->getResult().getType()->hasReferenceSemantics()) {
+    assert(substTy->getResult().getType()->hasReferenceSemantics()
+           && "result abstraction difference survived to IRGen");
+    assert(origTy->getResult().getConvention()
+             == substTy->getResult().getConvention()
+           && "result abstraction difference survived to IRGen");
   } else {
-    assert(!substTy->hasIndirectResult());
-    if (differsByAbstractionInExplosion(IGM, origTy->getResult().getType(),
-                                        substTy->getResult().getType(),
-                                        explosionLevel))
-      return true;
+    // FIXME: Assert that the substTy is a valid substitution of origTy.
+    //assert(origTy->getResult() == substTy->getResult()
+    //       && "result abstraction difference survived to IRGen");
   }
-
-  auto origParams = origTy->getParametersWithoutIndirectResult();
-  auto substParams = substTy->getParametersWithoutIndirectResult();
-  if (origParams.size() != substParams.size())
-    return true;
-  for (unsigned i : indices(origParams)) {
-    auto origParam = origParams[i];
-    auto substParam = origParams[i];
-
-    // FIXME: we might reasonably decide under the ABI to pass
-    // something indirectly despite the formal SIL convention.
-    if (origParam.getConvention() != substParam.getConvention())
-      return true;
-    if (origParam.isIndirect()) {
-      if (differsByAbstractionInMemory(IGM, origParam.getType(),
-                                       substParam.getType()))
-        return true;
-    } else {
-      if (differsByAbstractionInExplosion(IGM, origParam.getType(),
-                                          substParam.getType(), explosionLevel))
-        return true;
+  assert(origTy->getParameters().size() == substTy->getParameters().size()
+         && "parameter abstraction difference survived to IRGen");
+  for (unsigned i = 0, e = origTy->getParameters().size(); i < e; ++i) {
+    auto &origParam = origTy->getParameters()[i];
+    auto &substParam = substTy->getParameters()[i];
+    // Direct parameters must be both reference types or matching value types.
+    if (!origParam.isIndirect()) {
+      if (origParam.getType()->hasReferenceSemantics()) {
+        assert(substParam.getType()->hasReferenceSemantics()
+               && "parameter abstraction difference survived to IRGen");
+        assert(origParam.getConvention() == substParam.getConvention()
+               && "parameter abstraction difference survived to IRGen");
+      } else {
+        // FIXME: Assert that the substTy is a valid substitution of origTy.
+        //assert(origParam == substParam
+        //       && "parameter abstraction difference survived to IRGen");
+      }
+    }
+    // Indirect parameters can differ in type; they're just pointers.
+    // The convention must still match.
+    else {
+      assert(origParam.getConvention() == substParam.getConvention()
+             && "parameter abstraction difference survived to IRGen");
     }
   }
-
-  return false;
+#endif
 }
 
 /// Does the representation of the first type "differ by abstraction"
@@ -321,37 +245,15 @@ namespace {
       return false;
     }
 
-    /// Functions use a more complicated algorithm which calls back
-    /// into this.
     bool visitAnyFunctionType(CanAnyFunctionType origTy,
                               CanAnyFunctionType substTy) {
-      return differsByAbstractionAsFunction(IGM, origTy, substTy,
-                                            ExplosionKind::Minimal,
-                                            /*uncurry*/ 0);
+      llvm_unreachable("should have been lowered by SILGen");
     }
 
     bool visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
       // Function abstraction changes should have been handled in SILGen.
-#ifndef NDEBUG
-      assert(origTy->getResult() == substTy->getResult()
-             && "result abstraction difference survived to IRGen");
-      assert(origTy->getParameters().size() == substTy->getParameters().size()
-             && "parameter abstraction difference survived to IRGen");
-      for (unsigned i = 0, e = origTy->getParameters().size(); i < e; ++i) {
-        auto &origParam = origTy->getParameters()[i];
-        auto &substParam = substTy->getParameters()[i];
-        // Direct parameters must match up exactly.
-        if (!origParam.isIndirect())
-          assert(origParam == substParam
-                 && "parameter abstraction difference survived to IRGen");
-        // Indirect parameters can differ in type; they're just pointers.
-        // The convention must still match.
-        else
-          assert(origParam.getConvention() == substParam.getConvention()
-                 && "parameter abstraction difference survived to IRGen");
-      }
-#endif
+      checkFunctionsAreCompatible(origTy, substTy);
       return false;
     }
 
@@ -632,19 +534,12 @@ namespace {
 
     void visitAnyFunctionType(CanAnyFunctionType origTy,
                               CanAnyFunctionType substTy) {
-      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
-                                         ExplosionKind::Minimal,
-                                         /*uncurry*/ 0))
-        IGF.unimplemented(SourceLoc(), "remapping bound function type");
-      In.transferInto(Out, 2);
+      llvm_unreachable("should have been lowered by SIL");
     }
 
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
-      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
-                                         ExplosionKind::Minimal)) {
-        IGF.unimplemented(SourceLoc(), "remapping bound SIL function type");
-      }
+      checkFunctionsAreCompatible(origTy, substTy);
       In.transferInto(Out, 1 + (origTy->isThin() ? 0 : 1));
     }
 
@@ -799,16 +694,14 @@ namespace {
 
     void visitAnyFunctionType(CanAnyFunctionType origTy,
                               CanAnyFunctionType substTy) {
-      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
-                                         ExplosionKind::Minimal,
-                                         /*uncurry*/ 0))
-        IGF.unimplemented(SourceLoc(), "remapping bound function type");
-      In.transferInto(Out, 2);
+      llvm_unreachable("should have been lowered by SIL");
     }
 
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
-      llvm_unreachable("unimplemented! will be subsumed anyway");
+      // Function abstraction differences should have been handled by SILGen.
+      checkFunctionsAreCompatible(origTy, substTy);
+      In.transferInto(Out, origTy->isThin() ? 1 : 2);
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {

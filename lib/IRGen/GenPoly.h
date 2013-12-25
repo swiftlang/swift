@@ -45,15 +45,6 @@ namespace irgen {
                                        CanType origTy, CanType substTy,
                                        Mangle::ExplosionKind explosionLevel);
 
-  /// Do the given types differ by abstraction when used as a function?
-  ///
-  /// Note that origTy and substTy must be canonical types.
-  bool differsByAbstractionAsFunction(IRGenModule &IGM,
-                                      CanAnyFunctionType origTy,
-                                      CanAnyFunctionType substTy,
-                                      Mangle::ExplosionKind explosionLevel,
-                                      unsigned uncurryLevel);
-
   /// Given a substituted explosion, re-emit it as an unsubstituted one.
   ///
   /// For example, given an explosion which begins with the
