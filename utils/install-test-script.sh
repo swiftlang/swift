@@ -90,7 +90,7 @@ then
   RESULT=1
 elif ! "$TOOLCHAIN/usr/bin/clang" "$TMPDIR/test_compile_$$.o" \
   -o "$TMPDIR/test_compile_$$" \
-  -L/usr/lib/swift -Wl,-rpath -Wl,/usr/lib/swift \
+  -L/usr/lib/swift/macosx -Wl,-rpath -Wl,/usr/lib/swift/macosx \
   -framework Cocoa -lswift_stdlib_core -lswiftFoundation -lswiftObjectiveC \
   -lswiftAppKit
 then
@@ -103,7 +103,7 @@ elif [ "$($TMPDIR/test_compile_$$)" != "Hello world" ]; then
 elif ! "$TOOLCHAIN/usr/bin/clang" "$TMPDIR/test_compile_$$.o" \
   -isysroot "$SYSROOT" \
   -o "$TMPDIR/test_compile_2_$$" \
-  -L/usr/lib/swift -Wl,-rpath -Wl,/usr/lib/swift \
+  -L/usr/lib/swift/macosx -Wl,-rpath -Wl,/usr/lib/swift/macosx \
   -framework Cocoa -lswift_stdlib_core -lswiftFoundation -lswiftObjectiveC \
   -lswiftAppKit
 then
