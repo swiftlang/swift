@@ -1413,8 +1413,6 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
-ERROR(assignment_lhs_not_settable,sema_tcs,none,
-      "cannot assign to read-only variable or subscript", ())
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

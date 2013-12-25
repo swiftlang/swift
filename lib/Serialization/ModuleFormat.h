@@ -364,8 +364,7 @@ namespace decls_block {
   using LValueTypeLayout = BCRecordLayout<
     LVALUE_TYPE,
     TypeIDField, // object type
-    BCFixed<1>,  // implicit?
-    BCFixed<1>   // non-settable?
+    BCFixed<1>   // implicit?
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<

@@ -1582,7 +1582,6 @@ public:
 
       Printer << "(";
       APPEND_QUAL(QS & LValueType::Qual::Implicit, "implicit");
-      APPEND_QUAL(QS & LValueType::Qual::NonSettable, "nonsettable");
       Printer << ")";
 
 #undef APPEND_QUAL

@@ -948,14 +948,6 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 
   Type destTy = simplifyType(dest->getType());
   if (LValueType *destLV = destTy->getAs<LValueType>()) {
-    // If the destination is a settable lvalue, we're good; get its object type.
-    if (!destLV->isSettable()) {
-      // FIXME: error message refers to "variable or subscript" instead of
-      // saying which one it is.
-      getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
-        .highlight(dest->getSourceRange());
-      return Type();
-    }
     destTy = destLV->getObjectType();
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     // The destination is a type variable. This type variable must be an

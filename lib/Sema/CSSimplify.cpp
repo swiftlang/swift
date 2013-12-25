@@ -1509,10 +1509,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // values.
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
         isa<FuncDecl>(result) && cast<FuncDecl>(result)->isMutating() &&
-        result->isInstanceMember() &&
-        // Reject non-values and non-settable lvalues.
-        (!baseTy->is<LValueType>() ||
-         !baseTy->castTo<LValueType>()->isSettable()))
+        result->isInstanceMember() && !baseTy->is<LValueType>())
       continue;
 
     // If we're looking into an existential type, check whether this

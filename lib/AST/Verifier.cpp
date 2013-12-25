@@ -620,15 +620,11 @@ struct ASTNodeBase {};
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
 
-      // As a hack, requalifications in the object operand are
-      // permitted to remove the 'non-settable' qualifier (so that you
-      // can call methods on immutable values) and 'implicit'
-      // qualifier (so that you don't have to explicitly qualify take
-      // the address of the object).
-      if (E->isForObjectOperand()) {
-        dstQuals |= LValueType::Qual::NonSettable;
+      // As a terrible hack, requalifications in the object operand are
+      // permitted to remove the 'implicit' qualifier (so that you don't have to
+      // explicitly qualify take the address of the object).
+      if (E->isForObjectOperand())
         dstQuals |= LValueType::Qual::Implicit;
-      }
       
       // FIXME: Should either properly check implicit here, or model the dropping
       // of 'implicit' differently.

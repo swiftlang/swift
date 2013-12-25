@@ -1631,8 +1631,6 @@ namespace {
       // due to the presence of the 'nonheap' bit?
       auto lv = expr->getSubExpr()->getType()->getAs<LValueType>();
       assert(lv && "Subexpression is not an lvalue?");
-      assert(lv->isSettable() &&
-             "Solved an address-of constraint with a non-settable lvalue?!");
 
       auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
       expr->setType(LValueType::get(lv->getObjectType(), destQuals));

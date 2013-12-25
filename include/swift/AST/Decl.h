@@ -1204,11 +1204,6 @@ public:
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or @assignment operator.
   bool isSettable() const;
-
-  /// Determine whether references to this decl are settable in the
-  /// above sense when used on a base of the given type (which may be
-  /// null to indicate that there is no base).
-  bool isSettableOnBase(Type baseType) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.

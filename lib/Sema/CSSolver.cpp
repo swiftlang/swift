@@ -827,13 +827,6 @@ static bool tryTypeVariableBindings(
                                        LValueType::Qual::DefaultForVar);
         if (exploredTypes.insert(subtype->getCanonicalType()))
           newBindings.push_back({subtype, binding.Kind, Nothing});
-
-        subtype = LValueType::get(type,
-                                  (LValueType::Qual::DefaultForVar|
-                                   LValueType::Qual::NonSettable));
-        if (exploredTypes.insert(subtype->getCanonicalType()))
-          newBindings.push_back({subtype, binding.Kind, Nothing});
-        
       }
 
 

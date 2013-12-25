@@ -348,10 +348,6 @@ public:
   /// tuples, lvalue types, and metatypes.
   Type getRValueInstanceType();
 
-  /// isSettableLValue - Returns true if the type is a settable lvalue, or
-  /// false if the type is an rvalue or non-settable lvalue.
-  bool isSettableLValue();
-
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
   ///
@@ -2258,13 +2254,6 @@ public:
       /// This qualifier is only used by the (constraint-based) type checker.
       Implicit = 0x1,
       
-      /// A non-settable lvalue is an lvalue that cannot be assigned to because
-      /// it is a variable with a `get` but no `set` method, a variable with a
-      /// non-settable lvalue, or a variable of an rvalue. Non-settable
-      /// lvalues cannot be used as the destination of an assignment or as
-      /// [inout] arguments.
-      NonSettable = 0x2,
-      
       /// The default for a [inout] type.
       DefaultForType = 0,
 
@@ -2290,7 +2279,6 @@ public:
     /// The result is hashable by DenseMap.
     opaque_type getOpaqueData() const { return Bits; }
 
-    bool isSettable() const { return !(*this & NonSettable); }
     bool isImplicit() const { return (*this & Implicit); }
     
     friend Qual operator|(QualBits l, QualBits r) {
@@ -2369,11 +2357,6 @@ public:
 
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
-
-  /// Is this lvalue settable?
-  bool isSettable() const {
-    return getQualifiers().isSettable();
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
@@ -2893,13 +2876,6 @@ inline Type TypeBase::getRValueType() {
     return this;
 
   return castTo<LValueType>()->getObjectType();
-}
-
-inline bool TypeBase::isSettableLValue() {
-  if (!is<LValueType>())
-    return false;
-  
-  return castTo<LValueType>()->isSettable();
 }
 
 inline bool TypeBase::mayHaveSuperclass() {

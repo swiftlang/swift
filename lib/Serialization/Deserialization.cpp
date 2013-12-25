@@ -2260,14 +2260,12 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::LVALUE_TYPE: {
     TypeID objectTypeID;
-    bool isImplicit, isNonSettable;
+    bool isImplicit;
     decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID,
-                                              isImplicit, isNonSettable);
+                                              isImplicit);
     LValueType::Qual quals;
     if (isImplicit)
       quals |= LValueType::Qual::Implicit;
-    if (isNonSettable)
-      quals |= LValueType::Qual::NonSettable;
 
     typeOrOffset = LValueType::get(getType(objectTypeID), quals);
     break;

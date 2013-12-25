@@ -282,15 +282,6 @@ bool ValueDecl::isReferencedAsLValue() const {
   return false;
 }
 
-
-bool ValueDecl::isSettableOnBase(Type baseType) const {
-  if (!isSettable()) return false;
-  if (!baseType) return true;
-  if (!isInstanceMember() && baseType->is<MetatypeType>()) return true;
-  return (baseType->isSettableLValue() ||
-          baseType->getRValueType()->hasReferenceSemantics());
-}
-
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {
   case DeclKind::Import:
