@@ -603,19 +603,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   return type;
 }
 
-// A variable or subscript is settable if:
-// - its base type (the type of the 'a' in 'a[n]' or 'a.b') either has
-//   reference semantics or has value semantics and is settable, AND
-// - the 'var' or 'subscript' decl provides a setter
-template<typename SomeValueDecl>
-static LValueType::Qual settableQualForDecl(Type baseType,
-                                            SomeValueDecl *decl) {
-  if (decl->isSettableOnBase(baseType))
-    return LValueType::Qual(0);
-  return LValueType::Qual::NonSettable;
-}
-
-std::pair<Type, Type> 
+std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      bool isTypeReference,
                                      bool isSpecialized,
@@ -926,15 +914,15 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   Type type;
   if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     // For a subscript, turn the element type into an optional or lvalue,
-    // depending on
+    // depending on whether the result type is optional/dynamic, is settable,
+    // or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
     if (isDynamicResult || subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy);
-    else
+    else if (subscript->isSettable())
       elementTy = LValueType::get(elementTy,
-                                  LValueType::Qual::DefaultForMemberAccess|
-                                  settableQualForDecl(baseTy, subscript));
+                                  LValueType::Qual::DefaultForMemberAccess);
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {

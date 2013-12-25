@@ -209,7 +209,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
       return LValueType::get(baseTy->getRValueType(),
                              LValueType::Qual::DefaultForMemberAccess);
   
-  // Subscripts are always lvalues (for now).
+  // The base of subscripts are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
       return LValueType::get(baseTy->getRValueType(),
@@ -732,9 +732,15 @@ namespace {
         return subscriptExpr;
       }
 
-      // The remaining subscript kinds produce lvalue results
-      resultTy = LValueType::get(resultTy,
-                                 LValueType::Qual::DefaultForMemberAccess);
+      // If the subscript expression is non-settable, then this produces an
+      // rvalue, otherwise it produces an lvalue.
+      if (subscript->isSettable()) {
+        // The remaining subscript kinds produce lvalue results
+        resultTy = LValueType::get(resultTy,
+                                   LValueType::Qual::DefaultForMemberAccess);
+      }
+      
+      // Subscripts on a struct always take them as lvalues (for now!)
       if (!containerTy->hasReferenceSemantics())
         containerTy = LValueType::get(containerTy,
                                       LValueType::Qual::DefaultForMemberAccess);

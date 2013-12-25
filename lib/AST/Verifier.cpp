@@ -819,11 +819,6 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(SubscriptExpr *E) {
-      if (!E->getType()->is<LValueType>()) {
-        Out << "Subscript type is not an lvalue";
-        abort();
-      }
-      
       if (!E->getDecl()) {
         Out << "Subscript expression is missing subscript declaration";
         abort();

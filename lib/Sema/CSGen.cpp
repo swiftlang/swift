@@ -122,9 +122,9 @@ namespace {
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
 
       // The base type must have a subscript declaration with type
-      // I -> [inout] O, where I and O are fresh type variables. The index
+      // I -> @inout? O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
-      // itself has type [inout] O, where O may or may not be settable.
+      // itself has type @inout? O, where O may or may not be an lvalue.
       auto inputTv = CS.createTypeVariable(indexLocator, /*options=*/0);
       auto outputTv = CS.createTypeVariable(resultLocator,
                                             TVO_CanBindToLValue);

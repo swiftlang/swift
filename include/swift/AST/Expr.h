@@ -896,13 +896,13 @@ public:
 ///
 /// \code
 /// class C {
-///   subscript [objc] (i : Int) -> String { 
+///   subscript @objc (i : Int) -> String {
 ///   get: 
 ///     ... 
 ///   }
 /// };
 ///
-/// var x : DynamicLookup = <some value>
+/// var x : AnyObject = <some value>
 /// print(x[27]! // x[27] has type String?
 /// \endcode
 class DynamicSubscriptExpr : public DynamicLookupExpr {

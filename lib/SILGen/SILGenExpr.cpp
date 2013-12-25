@@ -207,10 +207,8 @@ namespace {
     RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
       abort();
     }
-    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
-      abort();
-    }
-        
+    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
+    
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C);
@@ -582,6 +580,7 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   
   return RValue(SGF, E, Reference);
 }
+
 
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
@@ -1378,12 +1377,43 @@ RValue RValueEmitter::visitExistentialMemberRefExpr(
   llvm_unreachable("unapplied protocol method not implemented");
 }
 
-RValue RValueEmitter::visitDotSyntaxBaseIgnoredExpr(
-                                                  DotSyntaxBaseIgnoredExpr *E,
-                                                  SGFContext C) {
+RValue RValueEmitter::
+visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
   visit(E->getLHS());
   return visit(E->getRHS());
 }
+
+RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
+  // rvalue subscript expressions are produced for get-only subscript
+  // operations.  Emit a call to the getter.
+  auto decl = cast<SubscriptDecl>(E->getDecl().getDecl());
+
+  // Emit the base.
+  SILValue baseVal;
+  if (!E->getBase()->getType()->is<MetatypeType>() &&
+      !E->getBase()->getType()->hasReferenceSemantics()) {
+    baseVal = SGF.emitLValueAsRValue(E->getBase())
+    .getAsSingleValue(SGF,E).getValue();
+  } else {
+    baseVal = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
+  }
+  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
+
+  // Emit the indices.
+  RValueSource subscriptRV = RValueSource(E, SGF.emitRValue(E->getIndex()));
+  
+  SILDeclRef getter(decl, SILDeclRef::Kind::Getter,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    SGF.SGM.requiresObjCDispatch(decl));
+    
+  return RValue(SGF, E,
+                SGF.emitGetAccessor(E, getter,
+                                    E->getDecl().getSubstitutions(),
+                                    std::move(baseRV),
+                                    std::move(subscriptRV),
+                                    E->getType()->getCanonicalType(), C));
+}
+
 
 RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
   // Produce an undef value. The module value should never actually be used.
