@@ -344,31 +344,12 @@ namespace {
     /// Returns a tuple of RValues holding the accessor value, base (retained if
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
-    prepareAccessorArgs(SILGenFunction &gen,
-                        SILLocation loc,
+    prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
                         SILValue base) const
     {
-      assert((!base
-              || base.getType().isAddress()
-              || base.getType().is<MetatypeType>()
-              || base.getType().hasReferenceSemantics())
-             && "base of getter/setter component must be invalid, lvalue, or "
-                "of reference type");
-      
-      AccessorArgs result;      
-      if (base) {
-        if (base.getType().hasReferenceSemantics()) {
-          if (!isa<FunctionRefInst>(base))
-            gen.B.createStrongRetain(loc, base);
-          result.base = RValueSource(loc, RValue(gen, loc,
-                                                 base.getType().getSwiftType(),
-                                       gen.emitManagedRValueWithCleanup(base)));
-        } else {
-          result.base = RValueSource(loc, RValue(gen, loc,
-                                                 base.getType().getSwiftType(),
-                                     ManagedValue(base, ManagedValue::LValue)));
-        }
-      }
+      AccessorArgs result;
+      if (base)
+        result.base = gen.prepareAccessorBaseArg(loc, base);
       
       if (subscriptExpr) {
         if (!origSubscripts)
@@ -519,14 +500,16 @@ LValue SILGenLValue::visitRec(Expr *e) {
     LValue lv;
     lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
     return lv;
-  } else if (e->getType()->is<MetatypeType>()) {
+  }
+  
+  if (e->getType()->is<MetatypeType>()) {
     LValue lv;
     lv.add<MetatypeComponent>(
                             gen.emitRValue(e).getUnmanagedSingleValue(gen, e));
     return lv;
-  } else {
-    return visit(e);
   }
+  
+  return visit(e);
 }
 
 LValue SILGenLValue::visitExpr(Expr *e) {

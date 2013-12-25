@@ -392,17 +392,19 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // has lvalue type.  If we are accessing a var member on an rvalue, it is
   // returned as an rvalue (and the access must be a load).
   if (auto *VD = dyn_cast<VarDecl>(value)) {
-    if (!baseType || baseType->hasReferenceSemantics() ||
-        baseType->is<LValueType>() || VD->isStatic() ||
-        VD->isComputed()) {
-          
+    // Get-only VarDecls always produce rvalues.
+    if (VD->isSettable() &&
+        (!baseType || baseType->hasReferenceSemantics() ||
+         baseType->is<LValueType>() || VD->isStatic() ||
+         VD->isComputed())) {
+            
       // Determine the qualifiers we want.
       LValueType::Qual quals =
           (baseType ? LValueType::Qual::DefaultForMemberAccess
            : LValueType::Qual::DefaultForVar);
       if (!value->isSettableOnBase(baseType))
         quals |= LValueType::Qual::NonSettable;
-      
+        
       return LValueType::get(getTypeOfRValue(value, wantInterfaceType), quals);
     }
   }

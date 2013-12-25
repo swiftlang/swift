@@ -785,16 +785,6 @@ struct ASTNodeBase {};
         abort();
       }
       
-      Type ResultTy = E->getType(), BaseTy = E->getBase()->getType();
-      
-      // rvalue producing member_ref_exprs should have rvalue type themselves.
-      if (!ResultTy->is<LValueType>() && !ResultTy->is<MetatypeType>() &&
-          (BaseTy->is<LValueType>() || BaseTy->hasReferenceSemantics())) {
-        Out << "invalid rvalue-producing member_ref_expr!\n";
-        E->dump(Out);
-        abort();
-      }
-
       // FIXME: Check container/member types through substitutions.
 
       verifyCheckedBase(E);

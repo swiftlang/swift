@@ -446,8 +446,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                         ManagedValue::Unmanaged);
   }
   
-  // If this is a reference to a var, produce an address.
-  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+  // If this is a reference to a var, produce an address or value.
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
     if (var->isDebuggerVar()) {
       DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
       assert (DebugClient && "Debugger variables with no debugger client");
@@ -455,8 +455,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       assert (SILDebugClient && "Debugger client doesn't support SIL");
       return ManagedValue(SILDebugClient->emitReferenceToDecl(loc, declRef,
                                                               ncRefType,
-                                                              uncurryLevel,
-                                                              B),
+                                                              uncurryLevel, B),
                           ManagedValue::Unmanaged);
     }
 
@@ -466,22 +465,36 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for vars");
 
-    assert(!var->isComputed() &&
-           "computed variables should be handled elsewhere");
-    
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
-      if (!It->second.isConstant())
-        return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
+      if (It->second.isConstant()) {
+        SILValue V = It->second.getConstant();
+        auto &TL = getTypeLowering(refType);
+        // The value must be copied for the duration of the expression.
+        V = TL.emitCopyValue(B, loc, V);
+        return emitManagedRValueWithCleanup(V);
+      }
 
-      SILValue V = It->second.getConstant();
-      auto &TL = getTypeLowering(refType);
-      // The value must be copied for the duration of the expression.
-      V = TL.emitCopyValue(B, loc, V);
-      return emitManagedRValueWithCleanup(V);
+      return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
     }
 
+    if (var->isComputed()) {
+      assert(!var->isSettable() &&
+             "computed lvalue decls are handled by lvalue machinery");
+      // Global properties have no base or subscript.
+      
+      SILDeclRef getter(var, SILDeclRef::Kind::Getter,
+                        SILDeclRef::ConstructAtNaturalUncurryLevel,
+                        SGM.requiresObjCDispatch(var));
+      
+      return emitGetAccessor(loc, getter,
+                             ArrayRef<Substitution>(),
+                             RValueSource(),
+                             RValueSource(), ncRefType->getCanonicalType(),
+                             SGFContext());
+    }
+    
     // If this is a global variable, invoke its accessor function to get its
     // address.
     return emitGlobalVariableRef(*this, loc, var);
@@ -489,7 +502,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
-  assert(!decl->isReferencedAsLValue());
 
   // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
@@ -558,8 +570,17 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
-  return RValue(SGF, E,
-                SGF.emitReferenceToDecl(E, E->getDeclRef(), E->getType(), 0));
+  // Emit the reference to the decl.
+  ManagedValue Reference =
+    SGF.emitReferenceToDecl(E, E->getDeclRef(), E->getType(), 0);
+  
+  // If it comes back as an LValue-style RValue, emit a load to get a real
+  // RValue.
+  if (Reference.isLValue())
+    Reference = SGF.emitLoad(E, Reference.getUnmanagedValue(),
+                             SGF.getTypeLowering(E->getType()), C, IsNotTake);
+  
+  return RValue(SGF, E, Reference);
 }
 
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
@@ -1246,16 +1267,45 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                          SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-
-  if (E->getBase()->getType()->is<MetatypeType>()) {
+  
+  if (E->getType()->is<MetatypeType>()) {
     // Emit the metatype for the associated type.
     assert(E->getType()->is<MetatypeType>() &&
            "generic_member_ref of metatype should give metatype");
     visit(E->getBase());
     return RValue(SGF, E,
                   ManagedValue(SGF.B.createMetatype(E,
-                                 SGF.getLoweredLoadableType(E->getType())),
+                                      SGF.getLoweredLoadableType(E->getType())),
                                ManagedValue::Unmanaged));
+  }
+  
+  // If this is a get-only computed property being accessed, call the getter,
+  // passing in self as an lvalue (for now!).
+  auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
+  if (FieldDecl->isComputed()) {
+    assert(!FieldDecl->isSettable() &&
+           "settable properties should be handled through lvalue machinery");
+    
+    SILValue baseVal;
+    if (!E->getBase()->getType()->is<MetatypeType>() &&
+        !E->getBase()->getType()->hasReferenceSemantics()) {
+      baseVal = SGF.emitLValueAsRValue(E->getBase())
+        .getAsSingleValue(SGF,E).getValue();
+    } else {
+      baseVal = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
+    }
+    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
+  
+    SILDeclRef getter(FieldDecl, SILDeclRef::Kind::Getter,
+                      SILDeclRef::ConstructAtNaturalUncurryLevel,
+                      SGF.SGM.requiresObjCDispatch(FieldDecl));
+    
+    return RValue(SGF, E,
+                  SGF.emitGetAccessor(E, getter,
+                                      E->getMember().getSubstitutions(),
+                                      std::move(baseRV),
+                                      RValueSource(),
+                                      E->getType()->getCanonicalType(), C));
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
@@ -1264,13 +1314,14 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
          "The base of an rvalue MemberRefExpr should be an rvalue value");
 
   // If the accessed field is stored, emit a StructExtract on the base.
-  auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
-  assert(!FieldDecl->isComputed() &&
-         "Don't handle computed rvalue memberrefs yet");
 
   // Evaluate the base of the member reference.
   ManagedValue base =
     visit(E->getBase()).getAsSingleValue(SGF, E->getBase());
+
+  
+  assert(!FieldDecl->isComputed() &&
+         "Don't handle computed rvalue memberrefs yet");
 
   // For non-address-only structs, we emit a struct_extract sequence.
   auto &lowering = SGF.getTypeLowering(E->getType());

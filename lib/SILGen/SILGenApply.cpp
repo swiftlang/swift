@@ -2246,14 +2246,36 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   return callee;
 }
 
+RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
+                                                    SILValue base) {
+  assert((base.getType().isAddress() ||
+          base.getType().is<MetatypeType>() ||
+          base.getType().hasReferenceSemantics()) &&
+         "base of getter/setter component must be invalid, lvalue, or "
+         "of reference type");
+  
+  if (base.getType().hasReferenceSemantics()) {
+    if (!isa<FunctionRefInst>(base))
+      B.createStrongRetain(loc, base);
+    return RValueSource(loc, RValue(*this, loc,
+                                    base.getType().getSwiftType(),
+                                    emitManagedRValueWithCleanup(base)));
+  }
+
+  return RValueSource(loc, RValue(*this, loc,
+                                  base.getType().getSwiftType(),
+                                  ManagedValue(base, ManagedValue::LValue)));
+}
+
+
 /// Emit a call to a getter.
-ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
-                                             SILDeclRef get,
-                                             ArrayRef<Substitution> substitutions,
-                                             RValueSource &&selfValue,
-                                             RValueSource &&subscripts,
-                                             CanType resultType,
-                                             SGFContext c) {
+ManagedValue SILGenFunction::
+emitGetAccessor(SILLocation loc, SILDeclRef get,
+                ArrayRef<Substitution> substitutions,
+                RValueSource &&selfValue,
+                RValueSource &&subscripts,
+                CanType resultType,
+                SGFContext c) {
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue);
   CanAnyFunctionType accessType = getter.getSubstFormalType();

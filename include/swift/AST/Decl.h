@@ -1198,13 +1198,11 @@ public:
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
-  bool isReferencedAsLValue() const {
-    return getKind() == DeclKind::Var;
-  }
-
+  bool isReferencedAsLValue() const;
+  
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or [assignment] operator.
+  /// `&` or @assignment operator.
   bool isSettable() const;
 
   /// Determine whether references to this decl are settable in the

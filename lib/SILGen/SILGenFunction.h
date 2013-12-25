@@ -631,6 +631,9 @@ public:
                                 AnyFunctionRef TheClosure);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
+  
+  RValueSource prepareAccessorBaseArg(SILLocation loc, SILValue base);
+  
   ManagedValue emitGetAccessor(SILLocation loc,
                                SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,

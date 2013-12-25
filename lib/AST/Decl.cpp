@@ -42,6 +42,7 @@ StringRef Decl::getKindName(DeclKind K) {
   }
 }
 
+
 DeclContext *Decl::getInnermostDeclContext() {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func;
@@ -272,6 +273,15 @@ SourceLoc TopLevelCodeDecl::getStartLoc() const {
 SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
+
+/// isReferencedAsLValue - Returns 'true' if references to this
+/// declaration are l-values.
+bool ValueDecl::isReferencedAsLValue() const {
+  if (auto *VD = dyn_cast<VarDecl>(this))
+    return VD->isSettable();
+  return false;
+}
+
 
 bool ValueDecl::isSettableOnBase(Type baseType) const {
   if (!isSettable()) return false;
