@@ -75,9 +75,9 @@ bool TypeBase::isMaterializable() {
     return true;
   }
 
-  // Some l-values may be materializable someday.
-  if (LValueType *lvalue = getAs<LValueType>())
-    return lvalue->isMaterializable();
+  // l-values are never materializable.
+  if (is<LValueType>())
+    return false;
 
   // Everything else is materializable.
   return true;
