@@ -9,6 +9,18 @@
 * Compiler inserts calls to super.init() into the class initializers that do
   not call any initializers explicitly.
 
+* A "map" method with the semantics of Haskell's "fmap" was added to
+  Array<T>.  Map applies a function f: T->U to the values stored in
+  the array and returns an Array<U>.  So,
+
+    (swift) func names(x: Int[]) -> String[] {
+              return x.map { "<" + String($0) + ">" }
+            }
+    (swift) names(Array<Int>())
+    // r0 : String[] = []
+    (swift) names([3, 5, 7, 9])
+    // r1 : String[] = ["<3>", "<5>", "<7>", "<9>"]
+
 2013-12-18
 ----------
 
