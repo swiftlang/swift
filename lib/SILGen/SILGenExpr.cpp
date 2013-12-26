@@ -1328,9 +1328,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
     // Emit a copyvalue to +1 the returned element, since the entire aggregate
     // will be destroyed.
     ElementVal = lowering.emitCopyValue(SGF.B, E, ElementVal);
-    
-    return RValue(SGF, E,
-                  ManagedValue(ElementVal, ManagedValue::Unmanaged));
+
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ElementVal));
   }
   
   // For address-only sequences, the base is in memory.  Emit a

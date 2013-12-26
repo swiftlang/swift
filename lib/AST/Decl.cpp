@@ -1036,9 +1036,14 @@ computeSelfType(GenericParamList **outerGenericParams) {
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
-    isMutating = true;
+    
+    // For now, always make 'self' be lvalue qualified for property/subscript
+    // getters and setters.
+    if (FD->isGetterOrSetter())
+      isMutating = true;
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
-    // constructors and destructors of have an implicitly @inout self.
+    // constructors and destructors of value types always have an implicitly
+    // @inout self.
     isMutating = true;
   }
 

@@ -656,15 +656,21 @@ static Type computeSelfType(AbstractFunctionDecl *func,
   if (containerTy->hasReferenceSemantics())
     return selfTy;
 
-  if (func->getASTContext().LangOpts.InOutMethods) {
-
-    if (auto *FD = dyn_cast<FuncDecl>(func)) {
-      if (FD->isStatic())
-        return selfTy;
-    } else if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
+  if (auto *FD = dyn_cast<FuncDecl>(func)) {
+    if (FD->isStatic())
       return selfTy;
-    }
+    
+    if (!FD->isMutating() &&
+        // For now, always make 'self' be lvalue qualified for
+        // property/subscript getters and setters.
+        !FD->isGetterOrSetter())
+      return selfTy;
+    
+  } else if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
+    return selfTy;
   }
+  
+  
 
   // Otherwise, 'self' is passed inout.
   return LValueType::get(selfTy, LValueType::Qual::DefaultForInOutSelf);

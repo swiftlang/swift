@@ -27,8 +27,8 @@ struct SwiftString;
 
 // String.size()
 extern "C" int64_t
-String_size(SwiftString *swiftString) 
-  asm("__TFSS4sizefRSSFT_Si");
+String_size(const char *base, size_t len, HeapObject *owner)
+  asm("__TFSS4sizefSSFT_Si");
 
 // String[] getter
 extern "C" uint32_t
@@ -66,7 +66,8 @@ __attribute__((visibility("hidden")))
 }
 
 - (NSUInteger)length {
-  return String_size(&swiftString);
+  _swift_retain(swiftString.owner);
+  return String_size(swiftString.base, swiftString.len, swiftString.owner);
 }
 
 // Disable the warning about chaining dealloc to super, we *specifically* don't
