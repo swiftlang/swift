@@ -1038,11 +1038,7 @@ computeSelfType(GenericParamList **outerGenericParams) {
     isMutating = FD->isMutating();
     isMutating = true;
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
-    // constructors and destructors of value types have an implicitly
-    // @inout self.
-    isMutating = !getDeclContext()->getDeclaredTypeInContext()
-        ->hasReferenceSemantics();
-    
+    // constructors and destructors of have an implicitly @inout self.
     isMutating = true;
   }
 

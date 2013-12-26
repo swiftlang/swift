@@ -212,9 +212,9 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   // The base of subscripts are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
-      return LValueType::get(baseTy->getRValueType(),
-                             LValueType::Qual::DefaultForMemberAccess);
-  
+    return LValueType::get(baseTy->getRValueType(),
+                           LValueType::Qual::DefaultForMemberAccess);
+    
   // Accesses to non-function members in value types are done through an lvalue
   // with whatever access permissions the base has.  We just set the implicit
   // bit.
@@ -1392,19 +1392,17 @@ namespace {
         FuncDecl *fn = nullptr;
         unsigned kind;
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
-          auto selfLVT = apply->getArg()->getType()->getAs<LValueType>();
-          if (!selfLVT)
-            goto not_value_type_member;
+          auto selfTy = apply->getArg()->getType()->getRValueType();
           auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
           if (!fnDeclRef)
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-          if (selfLVT->getObjectType()->getStructOrBoundGenericStruct())
+          if (selfTy->getStructOrBoundGenericStruct())
             kind = ValueTypeMemberApplication::Struct;
-          else if (selfLVT->getObjectType()->getEnumOrBoundGenericEnum())
+          else if (selfTy->getEnumOrBoundGenericEnum())
             kind = ValueTypeMemberApplication::Enum;
           else
-            llvm_unreachable("unknown kind of value type?!");
+            goto not_value_type_member;
         } else if (auto amRef = dyn_cast<ArchetypeMemberRefExpr>(member)) {
           auto selfLVT = amRef->getBase()->getType()->getAs<LValueType>();
           if (!selfLVT)

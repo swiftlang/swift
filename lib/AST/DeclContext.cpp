@@ -116,7 +116,10 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
 
   // Value type methods which are not marked @inout are of type T since they
   // cannot mutate a receiver.
-  if (!isMutatingFunc)
+  if (!isMutatingFunc &&
+      containerTy->getAnyNominal() &&
+      (isa<StructDecl>(containerTy->getAnyNominal()) ||
+       isa<EnumDecl>(containerTy->getAnyNominal())))
     return containerTy;
 
   // All other types have 'self' of @inout T.
