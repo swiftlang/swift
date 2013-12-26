@@ -1249,10 +1249,15 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
+    case CaptureKind::Constant:
+      if (!getTypeLowering(captureType).isAddressOnly()) {
+        // Capture the value directly unless they are address-only.
+        inputFields.push_back(TupleTypeElt(captureType));
+        break;
+      }
+      SWIFT_FALLTHROUGH;
     case CaptureKind::Box: {
       // Capture the owning ObjectPointer and the address of the value.
-      assert(capture->isReferencedAsLValue() &&
-             "lvalue capture not an lvalue?!");
       inputFields.push_back(Context.TheObjectPointerType);
       auto lvType = CanLValueType::get(captureType,
                                        LValueType::Qual::DefaultForType,
@@ -1260,10 +1265,6 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
-    case CaptureKind::Constant:
-      // Capture the value directly.
-      inputFields.push_back(TupleTypeElt(captureType));
-      break;
     }
   }
   
