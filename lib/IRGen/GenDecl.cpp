@@ -48,20 +48,7 @@
 using namespace swift;
 using namespace irgen;
 
-static bool isTrivialGlobalInit(llvm::Function *fn) {
-  // Must be exactly one basic block.
-  if (std::next(fn->begin()) != fn->end()) return false;
-
-  // Basic block must have exactly one instruction.
-  llvm::BasicBlock *entry = &fn->getEntryBlock();
-  if (std::next(entry->begin()) != entry->end()) return false;
-
-  // That instruction is necessarily a 'ret' instruction.
-  assert(isa<llvm::ReturnInst>(entry->front()));
-  return true;
-}
-
-/// Generates a function to call +load on all the given classes. 
+/// Generates a function to call +load on all the given classes.
 static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
                                                 ArrayRef<llvm::WeakVH> classes){
   llvm::FunctionType *fnType =
@@ -264,157 +251,90 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
     emitGlobalDecl(SF.Decls[i]);
 
-  // FIXME: All SourceFiles currently write the same top_level_code.
-  llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
-
-  if (SF.isScriptMode()) {
-    // Emit main().
-    // FIXME: We should only emit this in non-JIT modes.
-
-    llvm::Type* argcArgvTypes[2] = {
-      llvm::TypeBuilder<llvm::types::i<32>, true>::get(LLVMContext),
-      llvm::TypeBuilder<llvm::types::i<8>**, true>::get(LLVMContext)
-    };
-
-    llvm::Function *mainFn =
-      llvm::Function::Create(
-        llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
-          llvm::GlobalValue::ExternalLinkage, "main", &Module);
-
-    IRGenFunction mainIGF(*this, mainFn);
-    if (DebugInfo) {
-      // Emit at least the return type.
-      SILParameterInfo paramTy(CanType(BuiltinIntegerType::get(32, Context)),
-                               ParameterConvention::Direct_Unowned);
-      SILResultInfo retTy(TupleType::getEmpty(Context),
-                          ResultConvention::Unowned);
-      auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                              /*thin*/ true,
-                                              /*noreturn*/ false);
-      auto fnTy = SILFunctionType::get(nullptr, extInfo,
-                                       ParameterConvention::Direct_Unowned,
-                                       paramTy, retTy, Context);
-      auto silFnTy = SILType::getPrimitiveLocalStorageType(fnTy);
-      DebugInfo->emitArtificialFunction(mainIGF, mainFn, silFnTy);
-    }
-
-    // Poke argc and argv into variables declared in the Swift stdlib
-    auto args = mainFn->arg_begin();
-    
-    auto accessorTy
-      = llvm::FunctionType::get(Int8PtrTy, {}, /*varArg*/ false);
-    
-    for (auto varNames : {
-      // global accessor for swift.C_ARGC : CInt
-      std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
-      // global accessor for swift.C_ARGV : UnsafePointer<CString>
-      std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerVSs7CString_")
-    }) {
-      StringRef fnParameterName;
-      StringRef accessorName;
-      std::tie(fnParameterName, accessorName) = varNames;
-      
-      llvm::Value* fnParameter = args++;
-      fnParameter->setName(fnParameterName);
-
-      // Access the address of the global.
-      auto accessor = Module.getOrInsertFunction(accessorName, accessorTy);
-      llvm::Value *ptr = mainIGF.Builder.CreateCall(accessor);
-      // Cast to the type of the parameter we're storing.
-      ptr = mainIGF.Builder.CreateBitCast(ptr,
-                                    fnParameter->getType()->getPointerTo());
-      mainIGF.Builder.CreateStore(fnParameter, ptr);
-    }
-
-    // Emit Objective-C runtime interop setup for immediate-mode code.
-    if (ObjCInterop && Opts.UseJIT) {
-      if (!ObjCClasses.empty()) {
-        // Emit an initializer for the Objective-C classes.
-        mainIGF.Builder.CreateCall(emitObjCClassInitializer(*this,ObjCClasses));
-      }
-      if (!ObjCCategoryDecls.empty()) {
-        // Emit an initializer to add declarations from category decls.
-        mainIGF.Builder.CreateCall(emitObjCCategoryInitializer(*this,
-                                                            ObjCCategoryDecls));
-      }
-    }
-    
-    // Call the top-level code.
-    if (topLevelCodeFn)
-      mainIGF.Builder.CreateCall(topLevelCodeFn);
-    mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
-  }
-
-  if (!topLevelCodeFn)
+  // Library files have no entry point.
+  if (!SF.isScriptMode()) {
+    assert(!Module.getFunction(SWIFT_ENTRY_POINT_FUNCTION)
+           && "libraries should not have an entry point");
     return;
-
-  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          /*thin*/ true,
-                                          /*noreturn*/ false);
-  SILResultInfo silResult(TupleType::getEmpty(Context), ResultConvention::Unowned);
-  auto silFnType = SILFunctionType::get(nullptr, extInfo,
-                                        ParameterConvention::Direct_Unowned,
-                                        {}, silResult, Context);
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType =
-      getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None,
-                      attrs);
-  llvm::Function *initFn = nullptr;
-  if (SF.Kind != SourceFileKind::Main && SF.Kind != SourceFileKind::REPL) {
-    // Create a global initializer for library modules.
-    // FIXME: This is completely, utterly, wrong -- we don't want library
-    // initializers at all.
-    StringRef file = llvm::sys::path::filename(SF.getFilename());
-    initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    SF.getParentModule()->Name.str() +
-                                      Twine(".init.") + file,
-                                    &Module);
-    initFn->setAttributes(attrs);
-    
-    // Insert a call to the top_level_code symbol from the SIL module.
-    IRGenFunction initIGF(*this, initFn);
-    if (DebugInfo)
-      DebugInfo->emitArtificialFunction(initIGF, initFn);
-
-    initIGF.Builder.CreateCall(topLevelCodeFn);
-    initIGF.Builder.CreateRetVoid();
   }
   
-  SmallVector<llvm::Constant *, 2> allInits;
-  if (SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL) {
-    // We don't need global init to call main().
-  } else if (isTrivialGlobalInit(topLevelCodeFn)) {
-    // Not all source files need a global initialization function.
-    if (DebugInfo) {
-      DebugInfo->eraseFunction(initFn);
-      DebugInfo->eraseFunction(topLevelCodeFn);
+  // Emit main().
+  // FIXME: We should only emit this in non-JIT modes.
+  llvm::Function *topLevelCodeFn
+    = Module.getFunction(SWIFT_ENTRY_POINT_FUNCTION);
+
+  llvm::Type* argcArgvTypes[2] = {
+    llvm::TypeBuilder<llvm::types::i<32>, true>::get(LLVMContext),
+    llvm::TypeBuilder<llvm::types::i<8>**, true>::get(LLVMContext)
+  };
+
+  llvm::Function *mainFn =
+    llvm::Function::Create(
+      llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
+        llvm::GlobalValue::ExternalLinkage, "main", &Module);
+
+  IRGenFunction mainIGF(*this, mainFn);
+  if (DebugInfo) {
+    // Emit at least the return type.
+    SILParameterInfo paramTy(CanType(BuiltinIntegerType::get(32, Context)),
+                             ParameterConvention::Direct_Unowned);
+    SILResultInfo retTy(TupleType::getEmpty(Context),
+                        ResultConvention::Unowned);
+    auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                            /*thin*/ true,
+                                            /*noreturn*/ false);
+    auto fnTy = SILFunctionType::get(nullptr, extInfo,
+                                     ParameterConvention::Direct_Unowned,
+                                     paramTy, retTy, Context);
+    auto silFnTy = SILType::getPrimitiveLocalStorageType(fnTy);
+    DebugInfo->emitArtificialFunction(mainIGF, mainFn, silFnTy);
+  }
+
+  // Poke argc and argv into variables declared in the Swift stdlib
+  auto args = mainFn->arg_begin();
+  
+  auto accessorTy
+    = llvm::FunctionType::get(Int8PtrTy, {}, /*varArg*/ false);
+  
+  for (auto varNames : {
+    // global accessor for swift.C_ARGC : CInt
+    std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
+    // global accessor for swift.C_ARGV : UnsafePointer<CString>
+    std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerVSs7CString_")
+  }) {
+    StringRef fnParameterName;
+    StringRef accessorName;
+    std::tie(fnParameterName, accessorName) = varNames;
+    
+    llvm::Value* fnParameter = args++;
+    fnParameter->setName(fnParameterName);
+
+    // Access the address of the global.
+    auto accessor = Module.getOrInsertFunction(accessorName, accessorTy);
+    llvm::Value *ptr = mainIGF.Builder.CreateCall(accessor);
+    // Cast to the type of the parameter we're storing.
+    ptr = mainIGF.Builder.CreateBitCast(ptr,
+                                  fnParameter->getType()->getPointerTo());
+    mainIGF.Builder.CreateStore(fnParameter, ptr);
+  }
+
+  // Emit Objective-C runtime interop setup for immediate-mode code.
+  if (ObjCInterop && Opts.UseJIT) {
+    if (!ObjCClasses.empty()) {
+      // Emit an initializer for the Objective-C classes.
+      mainIGF.Builder.CreateCall(emitObjCClassInitializer(*this,ObjCClasses));
     }
-    initFn->eraseFromParent();
-    topLevelCodeFn->eraseFromParent();
-  } else {
-    // Build the initializer for the module.
-    llvm::Constant *initAndPriority[] = {
-      llvm::ConstantInt::get(Int32Ty, 1),
-      initFn
-    };
-    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
-                                                     initAndPriority));
+    if (!ObjCCategoryDecls.empty()) {
+      // Emit an initializer to add declarations from category decls.
+      mainIGF.Builder.CreateCall(emitObjCCategoryInitializer(*this,
+                                                          ObjCCategoryDecls));
+    }
   }
-
-  if (!allInits.empty()) {
-    llvm::ArrayType *initListType =
-      llvm::ArrayType::get(allInits[0]->getType(), allInits.size());
-    llvm::Constant *globalInits =
-      llvm::ConstantArray::get(initListType, allInits);
-
-    // Add this as a global initializer.
-    (void) new llvm::GlobalVariable(Module,
-                                    globalInits->getType(),
-                                    /*is constant*/ false,
-                                    llvm::GlobalValue::AppendingLinkage,
-                                    globalInits,
-                                    "llvm.global_ctors");
-  }
+  
+  // Call the top-level code.
+  if (topLevelCodeFn)
+    mainIGF.Builder.CreateCall(topLevelCodeFn);
+  mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
 }
 
 /// Add the given global value to @llvm.used.

@@ -302,12 +302,6 @@ entry(%c : $NonGenericInheritsGeneric):
   return %w : $Int
 }
 
-sil @top_level_code : $@thin () -> () {
-entry:
-  %v = tuple ()
-  return %v : $()
-}
-
 // -- RootGeneric deallocating destructor
 // CHECK: define void @_TFC15generic_classes11RootGenericD(%swift.refcounted*)
 // CHECK:   [[DESTROYED:%.*]] = call %swift.refcounted* @_TFC15generic_classes11RootGenericd

@@ -67,7 +67,7 @@ public:
   Module *SwiftModule;
   
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
-  /// the module is not a main module.
+  /// the current source file is not a script source file.
   SILGenFunction /*nullable*/ *TopLevelSGF;
   
   /// Mapping from SILDeclRefs to emitted SILFunctions.
@@ -139,6 +139,9 @@ public:
   void visitVarDecl(VarDecl *vd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
+  
+  /// Generate code for a source file of the module.
+  void emitSourceFile(SourceFile *sf, unsigned startElem);
   
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For

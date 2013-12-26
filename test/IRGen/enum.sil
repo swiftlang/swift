@@ -2034,7 +2034,7 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
   return %v : $()
 }
 
-sil @top_level_code : $() -> () {
+sil @force_global_variables_to_materialize : $() -> () {
 entry:
   // Force the global variables to materialize.
   %x = global_addr #x : $*AllConcreteTestEnums

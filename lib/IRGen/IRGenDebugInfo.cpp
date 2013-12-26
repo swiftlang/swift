@@ -488,7 +488,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   auto Line = L.Line;
 
   // We know that top_level_code always comes from MainFile.
-  if (!L.Filename && LinkageName == "top_level_code") {
+  if (!L.Filename && LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
     File = MainFile;
     Line = 1;
   }
@@ -510,7 +510,8 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   // ignore it. Explicit closures are exempt from this rule. We also
   // make an exception for top_level_code, which albeit it does not
   // have a Swift name, it does appear prominently in the source code.
-  if (Name.empty() && LinkageName != "top_level_code" && !isExplicitClosure(DS))
+  if (Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION
+      && !isExplicitClosure(DS))
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
   if (FnTy && FnTy->isBlock())

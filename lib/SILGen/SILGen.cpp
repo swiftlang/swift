@@ -52,26 +52,10 @@ SILGenFunction::~SILGenFunction() {
 
 SILGenModule::SILGenModule(SILModule &M, Module *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
-
-  RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
-  SILFunction *toplevel = emitTopLevelFunction(TopLevelLoc);
-
-  // Assign a debug scope pointing into the void to the top level function.
-  toplevel->setDebugScope(new (M) SILDebugScope(TopLevelLoc));
-
-  TopLevelSGF = new SILGenFunction(*this, *toplevel);
-  TopLevelSGF->prepareEpilog(Type(),
-                             CleanupLocation::getModuleCleanupLocation());
 }
 
 SILGenModule::~SILGenModule() {
-  TopLevelSGF->emitEpilog(RegularLocation::getModuleLocation(),
-                          /* AutoGen */ true);
-  SILFunction *toplevel = &TopLevelSGF->getFunction();
-  delete TopLevelSGF;
-  DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
-        toplevel->print(llvm::dbgs()));
-  toplevel->verify();
+  assert(!TopLevelSGF && "active source file lowering!?");
   M.verify();
 }
 
@@ -233,7 +217,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                         extInfo);
   auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
   return new (M) SILFunction(M, SILLinkage::Internal,
-                             "top_level_code", loweredType, Loc);
+                             SWIFT_ENTRY_POINT_FUNCTION, loweredType, Loc);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -651,6 +635,54 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     addGlobalVariable(vd);
 }
 
+namespace {
+
+/// An RAII class to scope source file codegen.
+class SourceFileScope {
+  SILGenModule &sgm;
+public:
+  SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm) {
+    // If this is the script-mode file for the module, create a toplevel.
+    if (sf->isScriptMode()) {
+      assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
+      assert(!sgm.M.lookup(SWIFT_ENTRY_POINT_FUNCTION)
+             && "already emitted toplevel?!");
+      
+      RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
+      SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
+      
+      // Assign a debug scope pointing into the void to the top level function.
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc));
+      
+      sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
+      sgm.TopLevelSGF->prepareEpilog(Type(),
+                                 CleanupLocation::getModuleCleanupLocation());
+    }
+  }
+  
+  ~SourceFileScope() {
+    if (sgm.TopLevelSGF) {
+      sgm.TopLevelSGF->emitEpilog(RegularLocation::getModuleLocation(),
+                                  /* AutoGen */ true);
+      SILFunction *toplevel = &sgm.TopLevelSGF->getFunction();
+      delete sgm.TopLevelSGF;
+      
+      DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
+            toplevel->print(llvm::dbgs()));
+      toplevel->verify();
+      sgm.TopLevelSGF = nullptr;
+    }
+  }
+};
+
+} // end anonymous namespace
+
+void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
+  SourceFileScope scope(*this, sf);
+  for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
+    visit(D);
+}
+
 //===--------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
@@ -662,16 +694,14 @@ std::unique_ptr<SILModule> SILModule::constructSIL(Module *mod,
   SILGenModule sgm(*m, mod);
 
   if (sf) {
-    for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
-      sgm.visit(D);
+    sgm.emitSourceFile(sf, startElem);
   } else {
     assert(startElem == 0 && "no explicit source file");
     for (auto file : mod->getFiles()) {
       auto nextSF = dyn_cast<SourceFile>(file);
       if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
-      for (Decl *D : llvm::makeArrayRef(nextSF->Decls).slice(startElem))
-        sgm.visit(D);
+      sgm.emitSourceFile(nextSF, startElem);
     }
   }
     

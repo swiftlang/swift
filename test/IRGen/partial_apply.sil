@@ -6,12 +6,6 @@ import swift
 import Foundation
 import gizmo
 
-sil @top_level_code : $() -> () {
-entry:
-  %v = tuple()
-  return %v : $()
-}
-
 @objc class ObjCClass {
   func method(x: Int64) {}
   

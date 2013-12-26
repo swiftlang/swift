@@ -7,4 +7,4 @@ add_swift_optimization_flags(swiftAppKit)
 
 # Link against frameworks
 target_link_libraries(swiftAppKit
-  "-framework AppKit")
+  "-framework AppKit -framework QuartzCore")

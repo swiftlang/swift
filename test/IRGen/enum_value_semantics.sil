@@ -178,9 +178,3 @@ enum GenericFixedLayout<T> {
   case foo(Builtin.Int64)
   case bar(Builtin.ObjectPointer)
 }
-
-sil @top_level_code : $@thin () -> () {
-entry:
-  %x = tuple ()
-  return %x : $()
-}

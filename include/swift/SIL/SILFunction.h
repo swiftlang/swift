@@ -19,6 +19,10 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 
+/// The symbol name used for the program entry point function.
+/// FIXME: Hardcoding this is lame.
+#define SWIFT_ENTRY_POINT_FUNCTION "top_level_code"
+
 namespace swift {
 
 class ASTContext;

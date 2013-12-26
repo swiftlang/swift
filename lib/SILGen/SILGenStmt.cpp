@@ -477,7 +477,7 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
 void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   // Emit top-level statements and expressions into the toplevel function until
   // we hit an unreachable point.
-  assert(TopLevelSGF && "top-level code in a non-main module!");
+  assert(TopLevelSGF && "top-level code in a non-main source file!");
 // TODO:
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
