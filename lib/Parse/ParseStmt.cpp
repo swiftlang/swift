@@ -860,7 +860,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
-  ParserResult<Pattern> Pattern = parsePattern(false);
+  ParserResult<Pattern> Pattern = parsePattern(/*isLet*/true);
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
     Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));

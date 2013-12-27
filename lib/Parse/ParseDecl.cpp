@@ -1272,7 +1272,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     {
       VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
-                                             /*IsLet*/false,
+                                             /*IsLet*/true,
                                              SetNameLoc, SetName,
                                              Type(), CurDeclContext);
       if (IsNameImplicit)
@@ -2398,7 +2398,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   }
 
   ParserResult<Pattern> Indices = parsePatternTuple(/*DefaultArgs=*/nullptr,
-                                                    /*IsLet*/ false);
+                                                    /*IsLet*/ true);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   Indices.get()->walk(SetVarContext(CurDeclContext));
