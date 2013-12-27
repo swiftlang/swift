@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "specialization"
-#include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
@@ -110,23 +110,6 @@ private:
 };
 
 } // end anonymous namespace.
-
-/// Return the bottom up call-graph order for module M. Notice that we don't
-/// include functions that don't participate in any call (caller or callee).
-static void BottomUpCallGraphOrder(SILModule *M,
-                                   std::vector<SILFunction*> &order) {
-  CallGraphSorter<SILFunction*> sorter;
-  for (auto &Caller : *M) {
-    for (auto &BB : Caller)
-      for (auto &I : BB)
-        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          SILFunction *Callee = FRI->getReferencedFunction();
-          sorter.addEdge(&Caller, Callee);
-        }
-  }
-
-  sorter.sort(order);
-}
 
 void TypeSubCloner::populateCloned() {
   SILFunction *Cloned = getCloned();

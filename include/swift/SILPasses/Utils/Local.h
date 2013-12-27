@@ -54,6 +54,10 @@ namespace swift {
   /// dead when this instruction is removed.
   void eraseUsesOfInstruction(SILInstruction *Inst);
 
+  /// Return the bottom up call-graph order for module M. Notice that we don't
+  /// include functions that don't participate in any call (caller or callee).
+  void BottomUpCallGraphOrder(SILModule *M, std::vector<SILFunction*> &order);
+
 } // end namespace swift
 
 #endif

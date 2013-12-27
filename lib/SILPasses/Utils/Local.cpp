@@ -10,6 +10,8 @@
 //
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/CallGraph.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Intrinsics.h"
 #include <deque>
@@ -145,4 +147,18 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
 
     User->eraseFromParent();
   }
+}
+
+void swift::BottomUpCallGraphOrder(SILModule *M,
+                                   std::vector<SILFunction*> &order) {
+  CallGraphSorter<SILFunction*> sorter;
+  for (auto &Caller : *M)
+    for (auto &BB : Caller)
+      for (auto &I : BB)
+        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
+          SILFunction *Callee = FRI->getReferencedFunction();
+          sorter.addEdge(&Caller, Callee);
+        }
+
+  sorter.sort(order);
 }
