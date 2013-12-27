@@ -396,10 +396,14 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
                                  CleanupLocation(S->getBody()));
   
-  // Advance the generator.
-  InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
-  emitExprInto(S->getGeneratorNext(), nextInit.get());
-  nextInit->finishInitialization(*this);
+  // Advance the generator.  Use a scope to ensure that any temporary stack
+  // allocations in the subexpression are immediately released.
+  {
+    Scope InnerForScope(Cleanups, CleanupLocation(S->getGeneratorNext()));
+    InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
+    emitExprInto(S->getGeneratorNext(), nextInit.get());
+    nextInit->finishInitialization(*this);
+  }
   
   // Continue if the value is present.
   Condition Cond = emitCondition(
