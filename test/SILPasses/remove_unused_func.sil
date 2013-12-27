@@ -1,0 +1,18 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import swift
+
+// This function needs to be removed.
+// CHECK-NOT: @remove_me
+
+sil internal @remove_me : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}

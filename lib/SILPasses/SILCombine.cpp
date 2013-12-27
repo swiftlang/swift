@@ -35,6 +35,7 @@ using namespace swift::PatternMatch;
 STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
+STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 //===----------------------------------------------------------------------===//
 //                             SILCombineWorklist
@@ -524,6 +525,37 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   return nullptr;
 }
 
+bool tryToRemoveFunction(SILModule *M, SILFunction *F) {
+  if (F->getLinkage() != SILLinkage::Internal)
+    return false;
+
+  if (F->getRefCount())
+    return false;
+
+  DEBUG(llvm::dbgs() << "SC: Erasing:" << F->getName() << "\n");
+  M->getFunctionList().erase(F);
+  NumDeadFunc++;
+  return true;
+}
+
+/// Removes internal functions that no other function calls.
+void deleteDeadFunctions(SILModule *M) {
+  // Erase trivially dead functions that may not be a part of the call graph.
+  for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
+    SILFunction *F = FI++;
+    tryToRemoveFunction(M, F);
+  }
+
+  std::vector<SILFunction*> Order;
+  // returns a bottom-up list of functions, leafs first.
+  bottomUpCallGraphOrder(M, Order);
+
+  // Scan the call graph top-down (caller first) because eliminating functions
+  // can generate more opportunities.
+  for (int i = Order.size() - 1; i >= 0; i--)
+    tryToRemoveFunction(M, Order[i]);
+ }
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -540,4 +572,6 @@ void swift::performSILCombine(SILModule *M) {
     // Combine instructions in F.
     Combiner.runOnFunction(F);
   }
+
+  deleteDeadFunctions(M);
 }
