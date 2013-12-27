@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
@@ -114,9 +115,23 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
   }
 }
 
+const Substitution &NormalProtocolConformance::getTypeWitness(
+                      AssociatedTypeDecl *assocType, 
+                      LazyResolver *resolver) const {
+  auto known = TypeWitnesses.find(assocType);
+  if (known == TypeWitnesses.end()) {
+    assert(resolver && "Unable to resolve type witness");
+    resolver->resolveTypeWitness(this, assocType);
+    known = TypeWitnesses.find(assocType);
+    assert(known != TypeWitnesses.end() && "Didn't resolve witness?");
+  }
+
+  return known->second;
+}
+
 void NormalProtocolConformance::setTypeWitness(
        AssociatedTypeDecl *assocType,
-       const Substitution &substitution) {
+       const Substitution &substitution) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
@@ -124,8 +139,24 @@ void NormalProtocolConformance::setTypeWitness(
   TypeWitnesses[assocType] = substitution;
 }
 
+  /// Retrieve the value witness corresponding to the given requirement.
+ConcreteDeclRef NormalProtocolConformance::getWitness(
+                  ValueDecl *requirement, 
+                  LazyResolver *resolver) const {
+    assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+    auto known = Mapping.find(requirement);
+    if (known == Mapping.end()) {
+      assert(resolver && "Unable to resolve witness without resolver");
+      resolver->resolveWitness(this, requirement);
+      known = Mapping.find(requirement);
+      assert(known != Mapping.end() && "Resolver did not resolve requirement");
+    }
+
+    return known->second;
+  }
+
 void NormalProtocolConformance::setWitness(ValueDecl *requirement,
-                                           ConcreteDeclRef witness) {
+                                           ConcreteDeclRef witness) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");

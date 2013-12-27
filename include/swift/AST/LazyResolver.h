@@ -21,12 +21,15 @@
 
 namespace swift {
 
+class AssociatedTypeDecl;
 class DeclContext;
 class ExtensionDecl;
 class Identifier;
 class NominalTypeDecl;
+class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
+class Substitution;
 class Type;
 class ValueDecl;
 
@@ -50,6 +53,16 @@ public:
   virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
                                                   ProtocolDecl *protocol,
                                                   ExtensionDecl *ext) = 0;
+
+  /// Resolve the type witness for the given associated type within the given
+  /// protocol conformance.
+  virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
+                                  AssociatedTypeDecl *assocType) = 0;
+
+  /// Resolve the witness for the given non-type requirement within
+  /// the given protocol conformance.
+  virtual void resolveWitness(const NormalProtocolConformance *conformance,
+                              ValueDecl *requirement) = 0;
 
   /// Resolve the "existential conforms to itself" bit for the given protocol.
   virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) = 0;

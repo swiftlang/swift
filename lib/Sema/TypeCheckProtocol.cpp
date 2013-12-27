@@ -1976,6 +1976,23 @@ ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
   return conforms? conformance : nullptr;
 }
 
+void TypeChecker::resolveTypeWitness(
+       const NormalProtocolConformance *conformance,
+       AssociatedTypeDecl *assocType) {
+  ConformanceChecker checker(
+                       *this, 
+                       const_cast<NormalProtocolConformance*>(conformance));
+  checker.resolveSingleTypeWitness(assocType);
+}
+
+void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
+                                 ValueDecl *requirement) {
+  ConformanceChecker checker(
+                       *this, 
+                       const_cast<NormalProtocolConformance*>(conformance));
+  checker.resolveSingleWitness(requirement);
+}
+
 void TypeChecker::resolveExistentialConformsToItself(ProtocolDecl *proto) {
   llvm::SmallPtrSet<ProtocolDecl *, 4> checking;
   existentialConformsToItself(*this, proto->getDeclaredType(), proto,

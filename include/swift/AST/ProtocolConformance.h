@@ -248,10 +248,10 @@ class NormalProtocolConformance : public ProtocolConformance {
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
-  WitnessMap Mapping;
+  mutable WitnessMap Mapping;
 
   /// The mapping from associated type requirements to their substitutions.
-  TypeWitnessMap TypeWitnesses;
+  mutable TypeWitnessMap TypeWitnesses;
 
   /// \brief The mapping from any directly-inherited protocols over to the
   /// protocol conformance structures that indicate how the given type meets
@@ -304,11 +304,7 @@ public:
   /// Retrieve the type witness corresponding to the given associated type
   /// requirement.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
-                                     LazyResolver *resolver) const {
-    auto known = TypeWitnesses.find(assocType);
-    assert(known != TypeWitnesses.end());
-    return known->second;
-  }
+                                     LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -318,16 +314,11 @@ public:
 
   /// Set the type witness for the given associated type.
   void setTypeWitness(AssociatedTypeDecl *assocType,
-                      const Substitution &substitution);
+                      const Substitution &substitution) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
   ConcreteDeclRef getWitness(ValueDecl *requirement, 
-                             LazyResolver *resolver) const {
-    assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
-    auto known = Mapping.find(requirement);
-    assert(known != Mapping.end());
-    return known->second;
-  }
+                             LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
@@ -336,7 +327,7 @@ public:
   }
 
   /// Set the witness for the given requirement.
-  void setWitness(ValueDecl *requirement, ConcreteDeclRef witness);
+  void setWitness(ValueDecl *requirement, ConcreteDeclRef witness) const;
 
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {
