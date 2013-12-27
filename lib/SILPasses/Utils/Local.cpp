@@ -149,7 +149,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
   }
 }
 
-void swift::BottomUpCallGraphOrder(SILModule *M,
+void swift::bottomUpCallGraphOrder(SILModule *M,
                                    std::vector<SILFunction*> &order) {
   CallGraphSorter<SILFunction*> sorter;
   for (auto &Caller : *M)

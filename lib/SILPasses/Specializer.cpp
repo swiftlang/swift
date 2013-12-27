@@ -233,7 +233,7 @@ struct SILSpecializer {
 
     // Collect a call-graph bottom-up list of functions. We specialize
     // the functions in a top-down order, starting from the end of the list.
-    BottomUpCallGraphOrder(M, Worklist);
+    bottomUpCallGraphOrder(M, Worklist);
 
     while (Worklist.size()) {
       SILFunction *F = Worklist.back();
