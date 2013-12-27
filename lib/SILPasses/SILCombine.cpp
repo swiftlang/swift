@@ -470,6 +470,11 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
   SILValue Operand = DI->getOperand();
   SILType OperandTy = Operand.getType();
 
+  // Destroy value of an enum with a trivial payload or no-payload is a no-op.
+  if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
+    if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module))
+      return eraseInstFromFunction(*DI);
+
   // DestroyValueInst of a trivial type is a no-op.
   if (OperandTy.isTrivial(Module)) {
     return eraseInstFromFunction(*DI);
@@ -487,6 +492,16 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
 SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   SILValue Operand = CI->getOperand();
   SILType OperandTy = Operand.getType();
+
+  // copy_value of an enum with a trivial payload or no-payload is a no-op +
+  // RAUW.
+  if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
+    if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module)) {
+      // We need to use eraseInstFromFunction + RAUW here since a copy value can
+      // never be trivially dead since it touches reference counts.      
+      replaceInstUsesWith(*CI, EI, 0);
+      return eraseInstFromFunction(*CI);
+    }
 
   // CopyValueInst of a trivial type is a no-op + use propogation.
   if (OperandTy.isTrivial(Module)) {

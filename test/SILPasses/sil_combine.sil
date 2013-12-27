@@ -1,5 +1,7 @@
 // RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
 
+sil_stage canonical
+
 import Builtin
 import swift
 
@@ -348,3 +350,68 @@ sil @sil_extract_of_string : $@thin () -> Builtin.Int64 {
   %2 = struct_extract %1 : $StringData, #size  
   return %2 : $Builtin.Int64
 }
+
+class C {}
+
+enum U {
+  init()
+  case X
+  case Y(Builtin.Int64)
+  case Z(C)
+}
+
+// CHECK-LABEL: sil @sil_destroyvalue_of_enum
+// CHECK: bb0
+// CHECK-NEXT: enum $U, #U.X!enumelt
+// CHECK-NEXT: integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: destroy_value [[INVALID_CASE]] : $U
+// CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
+// CHECK-NEXT: return
+//
+// destroy_value  of an  enum without  any payload  or with  a trivial
+// typed payload  is a  no-op. Leave  enums with  non-trivial payloads
+// alone.
+//
+// rdar://15568314
+sil @sil_destroyvalue_of_enum : $@thin (@thin U.metatype, C) -> (U, U, U) {
+bb0(%0 : $@thin U.metatype, %1 : $C):
+  %2 = enum $U, #U.X!enumelt
+  destroy_value %2 : $U
+  %3 = integer_literal $Builtin.Int64, 32
+  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  destroy_value %4 : $U
+  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  destroy_value %5 : $U
+  %6 = tuple(%2 : $U, %4 : $U, %5 : $U)  
+  return %6 : $(U, U, U)
+}
+
+// CHECK-LABEL: sil @sil_copyvalue_of_enum
+// CHECK: bb0
+// CHECK-NEXT: enum $U, #U.X!enumelt
+// CHECK-NEXT: integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: copy_value [[INVALID_CASE]] : $U
+// CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
+// CHECK-NEXT: return
+//
+// copy of an enum without any payload or with a trivial typed payload
+// is a no-op. Leave enums with non-trivial payloads alone.
+//
+// rdar://15568314
+sil @sil_copyvalue_of_enum : $@thin (@thin U.metatype, C) -> (U, U, U) {
+bb0(%0 : $@thin U.metatype, %1 : $C):
+  %2 = enum $U, #U.X!enumelt
+  copy_value %2 : $U
+  %3 = integer_literal $Builtin.Int64, 32
+  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  copy_value %4 : $U
+  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  copy_value %5 : $U
+  %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
+  return %6 : $(U, U, U)
+}
+
