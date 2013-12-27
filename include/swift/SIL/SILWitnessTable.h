@@ -148,11 +148,7 @@ private:
   Entry Entries[1];
   
   SILWitnessTable(NormalProtocolConformance *Conformance,
-                  ArrayRef<Entry> entries)
-    : Conformance(Conformance), NumEntries(entries.size())
-  {
-    memcpy(Entries, entries.begin(), sizeof(Entry) * NumEntries);
-  }
+                  ArrayRef<Entry> entries);
 
 public:
   /// Create a new SILWitnessTable with the given entries.
@@ -160,6 +156,8 @@ public:
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
+  ~SILWitnessTable();
+  
   /// Return the AST ProtocolConformance this witness table represents.
   NormalProtocolConformance *getConformance() const { return Conformance; }
   

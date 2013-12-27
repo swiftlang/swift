@@ -49,13 +49,11 @@ private:
   // Tail-allocated.
   Pair Entries[1];
   
-  SILVTable(ClassDecl *c, ArrayRef<Pair> entries)
-    : Class(c), NumEntries(entries.size())
-  {
-    memcpy(Entries, entries.begin(), sizeof(Pair) * NumEntries);
-  }
+  SILVTable(ClassDecl *c, ArrayRef<Pair> entries);
 
 public:
+  ~SILVTable();
+  
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.

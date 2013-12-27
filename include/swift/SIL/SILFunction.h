@@ -85,6 +85,8 @@ private:
   
   /// This is the number of function_ref instructions using this SILFunction.
   friend class FunctionRefInst;
+  friend class SILVTable;
+  friend class SILWitnessTable;
   unsigned RefCount = 0;
 
 public:

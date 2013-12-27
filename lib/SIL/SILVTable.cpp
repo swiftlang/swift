@@ -52,3 +52,21 @@ SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
   
   return nullptr;
 }
+
+SILVTable::SILVTable(ClassDecl *c, ArrayRef<Pair> entries)
+  : Class(c), NumEntries(entries.size())
+{
+  memcpy(Entries, entries.begin(), sizeof(Pair) * NumEntries);
+  
+  // Bump the reference count of functions referenced by this table.
+  for (auto entry : getEntries()) {
+    entry.second->RefCount++;
+  }
+}
+
+SILVTable::~SILVTable() {
+  // Drop the reference count of functions referenced by this table.
+  for (auto entry : getEntries()) {
+    entry.second->RefCount--;
+  }
+}

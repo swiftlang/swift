@@ -34,3 +34,40 @@ SILWitnessTable *SILWitnessTable::create(SILModule &M,
   M.witnessTables.push_back(wt);
   return wt;
 }
+
+SILWitnessTable::SILWitnessTable(NormalProtocolConformance *Conformance,
+                                 ArrayRef<Entry> entries)
+  : Conformance(Conformance), NumEntries(entries.size())
+{
+  memcpy(Entries, entries.begin(), sizeof(Entry) * NumEntries);
+  
+  // Bump the reference count of witness functions referenced by this table.
+  for (auto entry : getEntries()) {
+    switch (entry.getKind()) {
+    case Method:
+      entry.getMethodWitness().Witness->RefCount++;
+      break;
+    case AssociatedType:
+    case AssociatedTypeProtocol:
+    case BaseProtocol:
+    case Invalid:
+      break;
+    }
+  }
+}
+
+SILWitnessTable::~SILWitnessTable() {
+  // Drop the reference count of witness functions referenced by this table.
+  for (auto entry : getEntries()) {
+    switch (entry.getKind()) {
+      case Method:
+        entry.getMethodWitness().Witness->RefCount--;
+        break;
+      case AssociatedType:
+      case AssociatedTypeProtocol:
+      case BaseProtocol:
+      case Invalid:
+        break;
+    }
+  }
+}
