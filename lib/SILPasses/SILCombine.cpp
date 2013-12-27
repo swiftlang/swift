@@ -476,14 +476,14 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
     if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module))
       return eraseInstFromFunction(*DI);
 
-  // DestroyValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(Module)) {
-    return eraseInstFromFunction(*DI);
-  }
-
   // DestroyValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics()) {
     return new (Module) StrongReleaseInst(DI->getLoc(), Operand);
+  }
+
+  // DestroyValueInst of a trivial type is a no-op.
+  if (OperandTy.isTrivial(Module)) {
+    return eraseInstFromFunction(*DI);
   }
 
   // Do nothing for non-trivial non-reference types.
