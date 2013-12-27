@@ -70,6 +70,12 @@ public:
   Initialization(Kind kind) : kind(kind) {}
   virtual ~Initialization() {}
 
+  /// Return true if we can get the addresses of elements with the
+  /// 'getSubInitializationsForTuple' method.
+  bool canSplitIntoSubelementAddresses() const {
+    return kind != Kind::LetValue;
+  }
+  
   /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() = 0;

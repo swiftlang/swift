@@ -1169,18 +1169,20 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
 
   // If we have an Initialization, emit the tuple elements into its elements.
   if (Initialization *I = C.getEmitInto()) {
-    SmallVector<InitializationPtr, 4> subInitializationBuf;
-    auto subInitializations =
-      I->getSubInitializationsForTuple(SGF, type, subInitializationBuf,
-                                       RegularLocation(E));
-    assert(subInitializations.size() == E->getElements().size() &&
-           "initialization for tuple has wrong number of elements");
-    for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
-      SGF.emitExprInto(E->getElements()[i], subInitializations[i].get());
+    if (I->canSplitIntoSubelementAddresses()) {
+      SmallVector<InitializationPtr, 4> subInitializationBuf;
+      auto subInitializations =
+        I->getSubInitializationsForTuple(SGF, type, subInitializationBuf,
+                                         RegularLocation(E));
+      assert(subInitializations.size() == E->getElements().size() &&
+             "initialization for tuple has wrong number of elements");
+      for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
+        SGF.emitExprInto(E->getElements()[i], subInitializations[i].get());
+      }
+      return RValue();
     }
-    return RValue();
   }
-  
+    
   RValue result(type);
   for (Expr *elt : E->getElements()) {
     // FIXME: Remove this when tuple elements cannot be inout.
@@ -1588,8 +1590,10 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   // If we're emitting into an Initialization, we can decompose the
   // initialization.
   if (Initialization *I = C.getEmitInto()) {
-    emitScalarToTupleExprInto(SGF, E, I);
-    return RValue();
+    if (I->canSplitIntoSubelementAddresses()) {
+      emitScalarToTupleExprInto(SGF, E, I);
+      return RValue();
+    }
   }
 
   // Emit the scalar member.

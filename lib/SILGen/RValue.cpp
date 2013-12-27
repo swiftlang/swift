@@ -210,7 +210,7 @@ public:
     // Pop a result off.
     ManagedValue result = values[0];
     values = values.slice(1);
-
+    
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
       llvm_unreachable("cannot emit into a inout binding");
@@ -240,28 +240,36 @@ public:
       return;
 
     case Initialization::Kind::LetValue:
-      I->bindValue(result.getValue(), gen);
-        
       // Disable the rvalue expression cleanup, since the let value
       // initialization has a cleanup that lives for the entire scope of the let
       // declaration.
-      if (result.hasCleanup())
-        result.forwardCleanup(gen);
+      I->bindValue(result.forward(gen), gen);
       I->finishInitialization(gen);
       return;
     }
   }
   
   void visitTupleType(CanTupleType t, Initialization *I) {
-    // Break up the aggregate initialization.
-    SmallVector<InitializationPtr, 4> subInitBuf;
-    auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
+    // Break up the aggregate initialization if we can.
+    if (I->canSplitIntoSubelementAddresses()) {
+      SmallVector<InitializationPtr, 4> subInitBuf;
+      auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
+      
+      assert(subInits.size() == t->getNumElements() &&
+             "initialization does not match tuple?!");
+      
+      for (unsigned i = 0, e = subInits.size(); i < e; ++i)
+        visit(t.getElementType(i), subInits[i].get());
+      return;
+    }
     
-    assert(subInits.size() == t->getNumElements() &&
-           "initialization does not match tuple?!");
-    
-    for (unsigned i = 0, e = subInits.size(); i < e; ++i)
-      visit(t.getElementType(i), subInits[i].get());
+    // Otherwise, process this by turning the values corresponding to the tuple
+    // into a single value (through an implosion) and then binding that value to
+    // our initialization.
+    assert(I->kind == Initialization::Kind::LetValue);
+    SILValue V = implodeTupleValues<ImplodeKind::Forward>(values, gen, t, loc);
+    I->bindValue(V, gen);
+    I->finishInitialization(gen);
   }
 };
   

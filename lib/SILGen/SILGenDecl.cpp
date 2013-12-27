@@ -64,6 +64,7 @@ ArrayRef<InitializationPtr>
 Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                       SmallVectorImpl<InitializationPtr> &buf,
                                       SILLocation Loc) {
+  assert(canSplitIntoSubelementAddresses() && "Client shouldn't call this");
   auto tupleTy = cast<TupleType>(type);
   switch (kind) {
   case Kind::Tuple:
@@ -300,6 +301,7 @@ class LetValueInitialization : public Initialization {
   CleanupHandle DestroyCleanup;
   
   bool DidFinish = false;
+
 public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &gen)
   : Initialization(Initialization::Kind::LetValue), vd(vd), Gen(gen) {
@@ -322,8 +324,8 @@ public:
     return {};
   }
   
-  void bindValue(SILValue value, SILGenFunction &gen) override{
-    assert(!gen.VarLocs.count(vd) && "Already emitted a this vardecl?");
+  void bindValue(SILValue value, SILGenFunction &gen) override {
+    assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
     gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
   }
   
