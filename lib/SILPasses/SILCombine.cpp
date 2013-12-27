@@ -504,17 +504,17 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
       return eraseInstFromFunction(*CI);
     }
 
-  // CopyValueInst of a trivial type is a no-op + use propogation.
-  if (OperandTy.isTrivial(Module)) {
+  // CopyValueInst of a reference type is a strong_release.
+  if (OperandTy.hasReferenceSemantics()) {
+    Builder->createStrongRetain(CI->getLoc(), Operand);
     // We need to use eraseInstFromFunction + RAUW here since a copy value can
     // never be trivially dead since it touches reference counts.
     replaceInstUsesWith(*CI, Operand.getDef(), 0);
     return eraseInstFromFunction(*CI);
   }
 
-  // CopyValueInst of a reference type is a strong_release.
-  if (OperandTy.hasReferenceSemantics()) {
-    Builder->createStrongRetain(CI->getLoc(), Operand);
+  // CopyValueInst of a trivial type is a no-op + use propogation.
+  if (OperandTy.isTrivial(Module)) {
     // We need to use eraseInstFromFunction + RAUW here since a copy value can
     // never be trivially dead since it touches reference counts.
     replaceInstUsesWith(*CI, Operand.getDef(), 0);
