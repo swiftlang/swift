@@ -1768,17 +1768,17 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         // LValues captured by value.
         auto Entry = VarLocs[cast<VarDecl>(capture)];
         ManagedValue v;
-        if (Entry.isConstant()) {
-          SILValue Val = B.createCopyValue(loc, Entry.getConstant());
-          v = ManagedValue(Val, ManagedValue::Unmanaged);
-        } else {
+        if (!Entry.isConstant()) {
           SILValue addr = Entry.getAddress();
           B.createStrongRetain(loc, Entry.box);
           auto &TL = getTypeLowering(capture->getType());
           v = emitLoad(loc, addr, TL, SGFContext(), IsNotTake);
         }
-
-        capturedArgs.push_back(v.forward(*this));
+        SILValue Val = B.createCopyValue(loc, Entry.getConstant());
+        // Use an RValue to explode Val if it is a tuple.
+        RValue RV(*this, loc, capture->getType()->getCanonicalType(),
+                  ManagedValue(Val, ManagedValue::Unmanaged));
+        std::move(RV).forwardAll(*this, capturedArgs);
         break;
       }
       SWIFT_FALLTHROUGH;
@@ -2379,8 +2379,9 @@ namespace {
         for (auto fieldType : tupleTy->getElementTypes())
           makeArgument(fieldType, varDecl);
       } else {
-        SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
-                                                           gen.F.begin(), varDecl);
+        SILValue arg =
+          new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
+                                              gen.F.begin(), varDecl);
         args.push_back(arg);
       }
     }

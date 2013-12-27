@@ -721,6 +721,27 @@ struct ArgumentInitVisitor :
 
 };
 
+/// Tuple values captured by a closure are passed as individual arguments to the
+/// SILFunction since SILFunctionType canonicalizes away tuple types.
+static SILValue
+emitReconstitutedConstantCaptureArguments(SILType ty,
+                                          ValueDecl *capture,
+                                          SILGenFunction &gen) {
+  auto TT = ty.getAs<TupleType>();
+  if (!TT)
+    return new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
+  
+  SmallVector<SILValue, 4> Elts;
+  for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+    auto EltTy = ty.getTupleElementType(i);
+    auto EV =
+      emitReconstitutedConstantCaptureArguments(EltTy, capture, gen);
+    Elts.push_back(EV);
+  }
+  
+  return gen.B.createTuple(capture, ty, Elts);
+}
+  
 static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
@@ -729,9 +750,10 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
 
   case CaptureKind::Constant:
     if (!gen.getTypeLowering(capture->getType()).isAddressOnly()) {
-      // Constant decls are captured by value.
+      // Constant decls are captured by value.  If the captured value is a tuple
+      // value, we need to reconstitute it before sticking it in VarLocs.
       SILType ty = gen.getLoweredType(capture->getType());
-      SILValue val = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
+      SILValue val = emitReconstitutedConstantCaptureArguments(ty, capture,gen);
       gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
       gen.Cleanups.pushCleanup<DestroyValueCleanup>(val);
       break;
