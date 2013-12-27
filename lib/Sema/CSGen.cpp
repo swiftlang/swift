@@ -220,17 +220,6 @@ namespace {
 
       auto locator = CS.getConstraintLocator(E, { });
 
-      // If this is an anonymous closure argument, take it's type and turn it
-      // into an implicit lvalue type. This accounts for the fact that the
-      // closure argument type itself might be inferred to an lvalue type.
-      if (auto var = dyn_cast<VarDecl>(E->getDecl())) {
-        if (var->isAnonClosureParam()) {
-          auto tv = CS.createTypeVariable(locator, /*options=*/0);
-          CS.addConstraint(ConstraintKind::Equal, tv, E->getDecl()->getType());
-          return LValueType::get(tv, LValueType::Qual::DefaultForVar);
-        }
-      }
-
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);

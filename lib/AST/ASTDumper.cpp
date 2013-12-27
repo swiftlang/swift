@@ -1285,8 +1285,10 @@ public:
     if (expr->hasSingleExpressionBody()) {
       OS << " single-expression\n";
       printRec(expr->getSingleExpressionBody());
-    } else
+    } else {
+      OS << '\n';
       printRec(expr->getBody());
+    }
     OS << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {

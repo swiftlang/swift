@@ -1165,16 +1165,6 @@ namespace {
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr, { });
 
-      // If this is an anonymous closure argument, there's no overload
-      // associated with it.
-      if (auto var = dyn_cast<VarDecl>(expr->getDecl())) {
-        if (var->isAnonClosureParam()) {
-          return buildDeclRef(expr->getDecl(), expr->getLoc(), expr->getType(),
-                              locator, expr->isSpecialized(),
-                              expr->isImplicit());
-        }
-      }
-
       // Find the overload choice used for this declaration reference.
       auto selected = getOverloadChoice(locator);
       auto choice = selected.choice;
