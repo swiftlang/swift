@@ -63,5 +63,4 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   performSimplifyCFG(&Module);
   performSILSpecialization(&Module);
   performSILPerformanceInlining(&Module);
-  performSILCombine(&Module);
 }
