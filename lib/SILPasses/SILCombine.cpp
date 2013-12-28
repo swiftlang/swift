@@ -388,8 +388,13 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       ++NumCombined;
       // Should we replace the old instruction with a new one?
       if (Result != I) {
+        // Insert the new instruction into the basic block.
+        SILBasicBlock *InstParent = I->getParent();
+        SILBasicBlock::iterator InsertPos = I;
+        InstParent->getInstList().insert(InsertPos, Result);
+
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
-                     << "    New = " << *Result << '\n');
+                           << "    New = " << *Result << '\n');
 
         // Everything uses the new instruction now.
         replaceInstUsesWith(*I, Result);
@@ -398,11 +403,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
         Worklist.add(Result);
         Worklist.addUsersToWorklist(Result);
 
-        // Insert the new instruction into the basic block.
-        SILBasicBlock *InstParent = I->getParent();
-        SILBasicBlock::iterator InsertPos = I;
-
-        InstParent->getInstList().insert(InsertPos, Result);
 
         eraseInstFromFunction(*I);
       } else {
