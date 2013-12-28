@@ -290,7 +290,7 @@ static void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   ApplyInst *NAI =
       Builder.createApply(Loc, FRI, Arguments, AI->isTransparent());
   SILValue(AI, 0).replaceAllUsesWith(SILValue(NAI, 0));
-  AI->eraseFromParent();
+  recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
 
 static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
