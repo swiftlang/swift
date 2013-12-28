@@ -1004,27 +1004,49 @@ struct ASTNodeBase {};
       verifyCheckedBase(var);
     }
 
+    // Dump a reference to the given declaration.
+    void dumpRef(Decl *decl) {
+      if (auto value = dyn_cast<ValueDecl>(decl))
+        value->dumpRef(Out);
+      else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+        Out << "extension of ";
+        if (ext->getExtendedType())
+          ext->getExtendedType().print(Out);
+      }
+    }
 
-    void verifyChecked(NominalTypeDecl *nominal) {
+    /// Check the given list of protocols.
+    void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
       // Make sure that the protocol list is fully expanded.
-      SmallVector<ProtocolDecl *, 4> nominalProtocols(
-                                       nominal->getProtocols().begin(),
-                                       nominal->getProtocols().end());
+      SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
+                                                      protocols.end());
       ProtocolType::canonicalizeProtocols(nominalProtocols);
 
       SmallVector<Type, 4> protocolTypes;
-      for (auto proto : nominal->getProtocols())
+      for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      ProtocolCompositionType::get(nominal->getASTContext(), protocolTypes)
+      ProtocolCompositionType::get(Ctx, protocolTypes)
         ->isExistentialType(canonicalProtocols);
       if (nominalProtocols != canonicalProtocols) {
-        nominal->dumpRef(Out);
+        dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";
         abort();
-      }
+      }      
+    }
+    
+    void verifyChecked(NominalTypeDecl *nominal) {
+      // Make sure that the protocol list is fully expanded.
+      verifyProtocolList(nominal, nominal->getProtocols());
 
       verifyCheckedBase(nominal);
+    }
+
+    void verifyChecked(ExtensionDecl *ext) {
+      // Make sure that the protocol list is fully expanded.
+      verifyProtocolList(ext, ext->getProtocols());
+
+      verifyCheckedBase(ext);
     }
 
     void verifyParsed(EnumElementDecl *UED) {
