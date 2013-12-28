@@ -403,6 +403,26 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
             eltValue = gen.B.createLoad(Loc, eltValue);
             gen.B.setInsertionPoint(bb);
           }
+          // Reabstract to the substituted type, if needed.
+          auto substArgTy = v.getType().getSwiftRValueType()
+            ->getTypeOfMember(gen.SGM.M.getSwiftModule(),
+                              elt, nullptr, elt->getArgumentType())
+            ->getCanonicalType();
+          auto substTy = gen.getLoweredType(substArgTy);
+          if (substTy != argTy) {
+            gen.B.setInsertionPoint(caseBB);
+            FullExpr reabstractScope(gen.Cleanups,
+                                     const_cast<Pattern*>(headPattern));
+
+            AbstractionPattern origArgPattern(elt->getArgumentType());
+            auto origMV
+              = gen.emitManagedRValueWithCleanup(eltValue);
+            auto substMV
+              = gen.emitOrigToSubstValue(const_cast<Pattern*>(headPattern),
+                                         origMV, origArgPattern, substArgTy);
+            eltValue = substMV.forward(gen);
+            gen.B.setInsertionPoint(bb);
+          }
         }
       } else {
         // If the element pattern for a void enum element has a subpattern, it
