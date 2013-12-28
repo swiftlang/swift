@@ -543,10 +543,10 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
 
   TupleTypeElt ArgParamElts[] = {
-    LValueType::get(GenericTy, LValueType::Qual::DefaultForType)
+    LValueType::getInOut(GenericTy)
   };
   TupleTypeElt ArgBodyElts[] = {
-    LValueType::get(ArchetypeTy, LValueType::Qual::DefaultForType)
+    LValueType::getInOut(ArchetypeTy)
   };
   Type ResultTy = Context.TheRawPointerType;
   return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,

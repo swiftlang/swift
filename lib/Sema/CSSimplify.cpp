@@ -770,7 +770,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto lvalue2 = cast<LValueType>(desugar2);
       if (lvalue1->getQualifiers() != lvalue2->getQualifiers() &&
           !(kind >= TypeMatchKind::TrivialSubtype &&
-            lvalue1->getQualifiers() < lvalue2->getQualifiers())) {
+            lvalue1->isInOut() && lvalue2->isImplicit())) {
         // Record this failure.
         if (shouldRecordFailures()) {
           recordFailure(getConstraintLocator(locator),
@@ -864,7 +864,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
-      if (lvalue1->getQualifiers().isImplicit()) {
+      if (lvalue1->isImplicit()) {
         potentialConversions.push_back(
           ConversionRestrictionKind::LValueToRValue);
       }
@@ -1601,7 +1601,7 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
 
   // Look through implicit lvalue types.
   if (auto lvalueTy = baseTy->getAs<LValueType>()) {
-    if (lvalueTy->getQualifiers().isImplicit())
+    if (lvalueTy->isImplicit())
       baseTy = lvalueTy->getObjectType();
   }
 

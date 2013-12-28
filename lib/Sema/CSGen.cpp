@@ -243,8 +243,7 @@ namespace {
         if (!superTy)
           return nullptr;
         
-        superTy = LValueType::get(superTy,
-                                  LValueType::Qual::DefaultForVar);
+        superTy = LValueType::getImplicit(superTy);
         
         return adjustLValueForReference(superTy,
                                       E->getSelf()->getAttrs().isAssignment());
@@ -759,10 +758,8 @@ namespace {
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                       /*options=*/0);
-      auto bound = LValueType::get(tv,
-                                   LValueType::Qual::DefaultForType|
-                                   LValueType::Qual::Implicit);
-      auto result = LValueType::get(tv, LValueType::Qual::DefaultForType);
+      auto bound = LValueType::getImplicit(tv);
+      auto result = LValueType::getInOut(tv);
 
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,

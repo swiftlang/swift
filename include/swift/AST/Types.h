@@ -2228,7 +2228,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 ///     carries an l-value.
 ///
 /// The type of a function argument may carry an l-value.  This
-/// is done by annotating the bound variable with the [inout]
+/// is done by annotating the bound variable with the @inout
 /// attribute.
 ///
 /// The type of a return value, local variable, or field may not
@@ -2239,113 +2239,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// to their object type.
 class LValueType : public TypeBase {
 public:
-  class Qual {
-  public:
-    typedef unsigned opaque_type;
+  enum class Qual {
+    /// An InOut lvalue is an expression written with '&', or an argument
+    /// qualified with @inout.
+    InOut = 0,
 
-    enum QualBits : opaque_type {
-      // The bits are chosen to make the subtype queries as efficient
-      // as possible.  Basically, we want the subtypes to involve
-      // fewer bits.
-
-      /// An implicit lvalue is an lvalue that has not been explicitly written
-      /// in the source as '&'.
-      ///
-      /// This qualifier is only used by the (constraint-based) type checker.
-      Implicit = 0x1,
-      
-      /// The default for a [inout] type.
-      DefaultForType = 0,
-
-      /// The default for a [inout] 'self' parameter.
-      DefaultForInOutSelf = 0,
-
-      /// The default for a variable reference.
-      DefaultForVar = Implicit,
-  
-      /// The default for the base of a member access.
-      DefaultForMemberAccess = Implicit,
-    };
-
-  private:
-    opaque_type Bits;
-
-  public:
-    Qual() : Bits(0) {}
-    explicit Qual(unsigned bits) : Bits(bits) {}
-    Qual(QualBits qual) : Bits(qual) {}
-
-    /// Return an opaque representation of this qualifier set.
-    /// The result is hashable by DenseMap.
-    opaque_type getOpaqueData() const { return Bits; }
-
-    bool isImplicit() const { return (*this & Implicit); }
-    
-    friend Qual operator|(QualBits l, QualBits r) {
-      return Qual(opaque_type(l) | opaque_type(r));
-    }
-
-    /// Union two qualifier sets, given that they are compatible.
-    friend Qual operator|(Qual l, Qual r) { return Qual(l.Bits | r.Bits); }
-
-    /// Union a qualifier set into this qualifier set, given that
-    /// they are compatible.
-    Qual &operator|=(Qual r) { Bits |= r.Bits; return *this; }
-
-    /// Intersect two qualifier sets, given that they are compatible.
-    friend QualBits operator&(Qual l, Qual r) {
-      // Use QualBits to allow a wider range of conversions to bool.
-      return QualBits(l.Bits & r.Bits);
-    }
-
-    /// Intersect a qualifier set into this qualifier set.
-    Qual &operator&=(Qual r) { Bits &= r.Bits; return *this; }
-
-    /// \brief Remove qualifiers from a qualifier set.
-    friend Qual operator-(Qual l, Qual r) {
-      return Qual(l.Bits & ~r.Bits);
-    }
-
-    /// Invert a qualifier set.  The state of the resulting
-    /// non-boolean qualifiers is non-determined, except that they are
-    /// is compatible with anything.
-    friend Qual operator~(Qual qs) { return Qual(~qs.Bits); }
-    friend Qual operator~(QualBits qs) { return Qual(~opaque_type(qs)); }
-
-    /// Are these qualifier sets equivalent?
-    friend bool operator==(Qual l, Qual r) { return l.Bits == r.Bits; }
-    friend bool operator!=(Qual l, Qual r) { return l.Bits != r.Bits; }
-
-    /// Is one qualifier set 'QL' "smaller than" another set 'QR'?
-    /// This corresponds to the subtype relation on lvalue types
-    /// for a fixed type T;  that is,
-    ///   'QL <= QR' iff 'T [inout(QL)]' <= 'T [inout(QR)]'.
-    /// Recall that this means that the first is implicitly convertible
-    /// to the latter without "coercion", for some sense of that.
-    ///
-    /// This is not a total order.
-    ///
-    /// Right now, the subtyping rules are as follows:
-    ///   An l-value type is a subtype of another l-value of the
-    ///   same object type except:
-    ///   - an implicit l-value is not a subtype of an explicit one.
-    ///   - a non-settable lvalue is not a subtype of a settable one.
-    friend bool operator<=(Qual l, Qual r) {
-      // Right now, all our qualifiers are boolean and independent,
-      // and we've set it up so that 1 bits correspond to supertypes.
-      // Therefore this is just the set-algebraic 'is subset of'
-      // operation and can be performed by intersecting the sets and
-      // testing for identity with the left.
-      return (l & r) == l;
-    }
-    friend bool operator<(Qual l, Qual r) { return l != r && l <= r; }
-    friend bool operator>(Qual l, Qual r) { return r < l; }
-    friend bool operator>=(Qual l, Qual r) { return r <= l; }
+    /// An implicit lvalue is a normal lvalue used for anything else
+    /// assignable.
+    Implicit = 1
   };
 
 private:
   Type ObjectTy;
-  Qual Quals; // TODO: put these bits in TypeBase
+  Qual Quals; // TODO: put this bit in TypeBase
 
   LValueType(Type objectTy, Qual quals, const ASTContext *canonicalContext,
              bool hasTypeVariable)
@@ -2354,7 +2260,12 @@ private:
 
 public:
   static LValueType *get(Type type, Qual quals);
+  static LValueType *getInOut(Type type) { return get(type, Qual::InOut); }
+  static LValueType *getImplicit(Type type) { return get(type, Qual::Implicit);}
 
+  bool isImplicit() const { return Quals == Qual::Implicit; }
+  bool isInOut() const { return Quals == Qual::InOut; }
+  
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
 
@@ -2365,8 +2276,7 @@ public:
 };
 BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
-  static CanLValueType get(CanType type, LValueType::Qual quals,
-                           const ASTContext &C) {
+  static CanLValueType get(CanType type, LValueType::Qual quals) {
     return CanLValueType(LValueType::get(type, quals));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)

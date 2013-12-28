@@ -123,7 +123,7 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
     return containerTy;
 
   // All other types have 'self' of @inout T.
-  return LValueType::get(containerTy, LValueType::Qual::DefaultForInOutSelf);
+  return LValueType::getInOut(containerTy);
 }
 
 Type DeclContext::getSelfTypeInContext(bool isStatic, bool isInOutFunc,

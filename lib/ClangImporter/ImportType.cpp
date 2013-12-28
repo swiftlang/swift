@@ -186,7 +186,7 @@ namespace {
       if (!objectType)
         return nullptr;
 
-      return LValueType::get(objectType, LValueType::Qual::DefaultForType);
+      return LValueType::getInOut(objectType);
     }
 
     Type VisitMemberPointer(const clang::MemberPointerType *type) {

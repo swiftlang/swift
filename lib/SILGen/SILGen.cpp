@@ -137,8 +137,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 }
 
 static SILType getInOutStringTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(LValueType::get(SGM.Types.getStringType(),
-                                            LValueType::Qual::DefaultForType));
+  return SGM.getLoweredType(LValueType::getInOut(SGM.Types.getStringType()));
 }
 
 static SILType getNSStringTy(SILGenModule &SGM) {

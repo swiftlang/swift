@@ -158,8 +158,7 @@ public:
   CanType getSwiftType() const {
     CanType rvalueTy = getSwiftRValueType();
     if (isAddress())
-      return LValueType::get(rvalueTy, LValueType::Qual::DefaultForType)
-              ->getCanonicalType();
+      return LValueType::getInOut(rvalueTy)->getCanonicalType();
     return rvalueTy;
   }
   

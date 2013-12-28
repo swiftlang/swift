@@ -1793,7 +1793,7 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[LValueTypeLayout::Code];
     LValueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addTypeRef(lValueTy->getObjectType()),
-                                 lValueTy->getQualifiers().isImplicit());
+                                 lValueTy->isImplicit());
     break;
   }
 

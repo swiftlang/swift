@@ -1133,11 +1133,9 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
 
 /// Get the type of the 'self' parameter for methods of a type.
 CanType TypeConverter::getMethodSelfType(CanType selfType) const {
-  if (selfType->hasReferenceSemantics()) {
+  if (selfType->hasReferenceSemantics())
     return selfType;
-  } else {
-    return CanType(LValueType::get(selfType, LValueType::Qual::DefaultForType));
-  }
+  return CanType(LValueType::getInOut(selfType));
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
@@ -1259,9 +1257,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::Box: {
       // Capture the owning ObjectPointer and the address of the value.
       inputFields.push_back(Context.TheObjectPointerType);
-      auto lvType = CanLValueType::get(captureType,
-                                       LValueType::Qual::DefaultForType,
-                                       Context);
+      auto lvType = CanLValueType::get(captureType, LValueType::Qual::InOut);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }

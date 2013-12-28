@@ -517,18 +517,16 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(AddressOfExpr *E) {
-      LValueType::Qual resultQuals;
-      Type resultObj = checkLValue(E->getType(), resultQuals,
+      bool resultIsInOut, srcIsInOut;
+      Type resultObj = checkLValue(E->getType(), resultIsInOut,
                                    "result of AddressOfExpr");
 
-      LValueType::Qual srcQuals;
-      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcQuals,
+      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcIsInOut,
                                 "source of AddressOfExpr");
 
       checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
 
-      if ((resultQuals | LValueType::Qual::Implicit) !=
-          (srcQuals | LValueType::Qual::Implicit)) {
+      if (!resultIsInOut || srcIsInOut) {
         Out << "mismatched qualifiers";
         E->print(Out);
         Out << "\n";
@@ -612,14 +610,15 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(RequalifyExpr *E) {
-      LValueType::Qual dstQuals, srcQuals;
-      Type dstObj = checkLValue(E->getType(), dstQuals,
+      bool dstIsInOut, srcIsInOut;
+      Type dstObj = checkLValue(E->getType(), dstIsInOut,
                                 "result of RequalifyExpr");
-      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcQuals,
+      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcIsInOut,
                                 "input to RequalifyExpr");
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
-      if (!(srcQuals < dstQuals) && !(srcQuals == dstQuals)) {
+      // Requalify can only set the implicit bit.
+      if (!srcIsInOut || dstIsInOut) {
         Out << "bad qualifier sets for RequalifyExpr:\n";
         E->print(Out);
         Out << "\n";
@@ -721,17 +720,14 @@ struct ASTNodeBase {};
       if (InputExprTy != FT->getInput()->getCanonicalType()) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
         if (isa<SelfApplyExpr>(E)) {
-          LValueType::Qual InputExprQuals;
           Type InputExprObjectTy;
           if (InputExprTy->hasReferenceSemantics() ||
               InputExprTy->is<MetatypeType>())
             InputExprObjectTy = InputExprTy;
           else
-            InputExprObjectTy = checkLValue(InputExprTy, InputExprQuals,
+            InputExprObjectTy = checkLValue(InputExprTy,
                                             "object argument");
-          LValueType::Qual FunctionInputQuals;
           Type FunctionInputObjectTy = checkLValue(FT->getInput(),
-                                                   FunctionInputQuals,
                                                    "'self' parameter");
           
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
@@ -1489,14 +1485,11 @@ struct ASTNodeBase {};
           type.print(Out);
           Out << "\n";
         }
+        qs = lv->getQualifiers();
         type = objectType;
         return true;
       }
       return false;
-    }
-    bool lookThroughLValue(Type &type) {
-      LValueType::Qual qs;
-      return lookThroughLValue(type, qs);
     }
 
     /// The two types are required to either both be l-values or
@@ -1535,10 +1528,10 @@ struct ASTNodeBase {};
       abort();
     }
 
-    Type checkLValue(Type T, LValueType::Qual &Q, const char *what) {
+    Type checkLValue(Type T, bool &isInOut, const char *what) {
       LValueType *LV = T->getAs<LValueType>();
       if (LV) {
-        Q = LV->getQualifiers() - LValueType::Qual(LValueType::Qual::Implicit);
+        isInOut = LV->isInOut();
         return LV->getObjectType();
       }
 
@@ -1548,8 +1541,8 @@ struct ASTNodeBase {};
       abort();
     }
     Type checkLValue(Type T, const char *what) {
-      LValueType::Qual qs;
-      return checkLValue(T, qs, what);
+      bool isInOut;
+      return checkLValue(T, isInOut, what);
     }
 
     // Verification utilities.

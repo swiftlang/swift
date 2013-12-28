@@ -382,9 +382,8 @@ RequalifyExpr::RequalifyExpr(Expr *subExpr, Type type, bool isForObject)
   assert(subExpr->getType()->is<LValueType>() && type->is<LValueType>() &&
          "RequalifyExpr can only convert from lvalue to lvalue");
 
-  assert((subExpr->getType()->castTo<LValueType>()->getQualifiers() &
-          type->castTo<LValueType>()->getQualifiers()) ==
-         subExpr->getType()->castTo<LValueType>()->getQualifiers() &&
+  assert(subExpr->getType()->castTo<LValueType>()->isInOut() &&
+         type->castTo<LValueType>()->isImplicit() &&
          "RequalifyExpr is stripping lvalue qualifiers!");
 }
 

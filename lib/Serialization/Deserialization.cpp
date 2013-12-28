@@ -2263,9 +2263,9 @@ Type ModuleFile::getType(TypeID TID) {
     bool isImplicit;
     decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID,
                                               isImplicit);
-    LValueType::Qual quals;
+    LValueType::Qual quals = LValueType::Qual::InOut;
     if (isImplicit)
-      quals |= LValueType::Qual::Implicit;
+      quals = LValueType::Qual::Implicit;
 
     typeOrOffset = LValueType::get(getType(objectTypeID), quals);
     break;

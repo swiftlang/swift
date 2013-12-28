@@ -118,8 +118,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
-    llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
-      LValueTypes;
+    llvm::DenseMap<std::pair<Type, unsigned>, LValueType*> LValueTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
@@ -1505,7 +1504,8 @@ LValueType *LValueType::get(Type objectTy, Qual quals) {
 
   auto &C = objectTy->getASTContext();
   
-  auto key = std::make_pair(objectTy, quals.getOpaqueData());
+  auto key = std::make_pair(objectTy,
+                            unsigned(quals == LValueType::Qual::Implicit));
   auto &entry = C.Impl.getArena(arena).LValueTypes[key];
   if (entry)
     return entry;

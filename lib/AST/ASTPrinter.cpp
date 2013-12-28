@@ -1567,24 +1567,9 @@ public:
   void visitLValueType(LValueType *T) {
     Printer << "@inout ";
 
-    LValueType::Qual QS = T->getQualifiers();
-    if (QS != LValueType::Qual::DefaultForType) {
-      bool HasQual = false;
-#define APPEND_QUAL(Cond, Text)        \
-      do {                             \
-        if (Cond) {                    \
-          if (HasQual)                 \
-            Printer << ", ";           \
-          HasQual = true;              \
-          Printer << Text;             \
-        }                              \
-      } while(false)
-
-      Printer << "(";
-      APPEND_QUAL(QS & LValueType::Qual::Implicit, "implicit");
-      Printer << ")";
-
-#undef APPEND_QUAL
+    switch(T->getQualifiers()) {
+    case LValueType::Qual::InOut: break;
+    case LValueType::Qual::Implicit: Printer << "(implicit)"; break;
     }
     visit(T->getObjectType());
   }

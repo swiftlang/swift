@@ -85,17 +85,8 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 }
 
 Type constraints::adjustLValueForReference(Type type, bool isAssignment) {
-  LValueType::Qual quals = LValueType::Qual::Implicit;
-  if (auto lv = type->getAs<LValueType>()) {
-    // FIXME: The introduction of 'non-heap' here is an artifact of the type
-    // checker's inability to model the address-of operator that carries the
-    // heap bit from its input to its output while removing the 'implicit' bit.
-    // When we actually apply the inferred types in a constraint system to a
-    // concrete expression, the 'implicit' bits will be dropped and the
-    // appropriate 'heap' bits will be re-introduced.
-    return LValueType::get(lv->getObjectType(),
-                           quals | lv->getQualifiers());
-  }
+  if (auto lv = type->getAs<LValueType>())
+    return LValueType::getImplicit(lv->getObjectType());
 
   // For an assignment operator, the first parameter is an implicit inout.
   if (isAssignment) {
@@ -707,7 +698,7 @@ bool TypeChecker::typeCheckExpression(
       return true;
     }
   } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
-    if (!lvalueType->getQualifiers().isImplicit()) {
+    if (lvalueType->isInOut()) {
       // We explicitly took a reference to the result, but didn't use it.
       // Complain and emit a Fix-It to zap the '&'.
       auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
@@ -723,8 +714,7 @@ bool TypeChecker::typeCheckExpression(
 
     if (lvalueType && !discardedExpr) {
       // We referenced an lvalue. Load it.
-      assert(lvalueType->getQualifiers().isImplicit() &&
-             "Explicit lvalue diagnosed above");
+      assert(lvalueType->isImplicit() && "Explicit lvalue diagnosed above");
       result = new (Context) LoadExpr(result, lvalueType->getObjectType());
     }
   }
@@ -958,7 +948,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
                       TVO_CanBindToLValue);
-    auto refTv = LValueType::get(objectTv, LValueType::Qual::Implicit);
+    auto refTv = LValueType::getImplicit(objectTv);
     addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;
   } else {

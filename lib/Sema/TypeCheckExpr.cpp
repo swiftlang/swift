@@ -408,8 +408,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // returned as an rvalue (and the access must be a load).
   if (auto *VD = dyn_cast<VarDecl>(value))
     if (doesVarDeclMemberProduceLValue(VD, baseType))
-      return LValueType::get(getTypeOfRValue(value, wantInterfaceType),
-                             LValueType::Qual::Implicit);
+      return LValueType::getImplicit(getTypeOfRValue(value, wantInterfaceType));
   
   if (wantInterfaceType)
     return value->getInterfaceType();

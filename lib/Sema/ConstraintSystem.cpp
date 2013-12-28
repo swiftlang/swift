@@ -891,8 +891,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // lvalue.
       if (!selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>())
-        selfTy = LValueType::get(selfTy,
-                                 LValueType::Qual::DefaultForMemberAccess);
+        selfTy = LValueType::getImplicit(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);
     }
@@ -921,8 +920,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (isDynamicResult || subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy);
     else if (subscript->isSettable())
-      elementTy = LValueType::get(elementTy,
-                                  LValueType::Qual::DefaultForMemberAccess);
+      elementTy = LValueType::getImplicit(elementTy);
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {

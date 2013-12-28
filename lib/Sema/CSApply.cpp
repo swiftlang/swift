@@ -206,21 +206,18 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   // FIXME: Remove this when materialization is dead.
   if (auto *VD = dyn_cast<VarDecl>(member))
     if (VD->isComputed() && !baseTy->hasReferenceSemantics())
-      return LValueType::get(baseTy->getRValueType(),
-                             LValueType::Qual::DefaultForMemberAccess);
+      return LValueType::getImplicit(baseTy->getRValueType());
   
   // The base of subscripts are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
-    return LValueType::get(baseTy->getRValueType(),
-                           LValueType::Qual::DefaultForMemberAccess);
-    
+    return LValueType::getImplicit(baseTy->getRValueType());
+  
   // Accesses to non-function members in value types are done through an lvalue
   // with whatever access permissions the base has.  We just set the implicit
   // bit.
-  if (auto *SelfLV = baseTy->getAs<LValueType>())
-    return LValueType::get(baseTy->getRValueType(),
-                           SelfLV->getQualifiers()|LValueType::Qual::Implicit);
+  if (baseTy->is<LValueType>())
+    return LValueType::getImplicit(baseTy->getRValueType());
   
   // Accesses to members in values of reference type (classes, metatypes) are
   // always done through a the reference to self.  Accesses to value types with
@@ -734,16 +731,12 @@ namespace {
 
       // If the subscript expression is non-settable, then this produces an
       // rvalue, otherwise it produces an lvalue.
-      if (subscript->isSettable()) {
-        // The remaining subscript kinds produce lvalue results
-        resultTy = LValueType::get(resultTy,
-                                   LValueType::Qual::DefaultForMemberAccess);
-      }
+      if (subscript->isSettable())
+        resultTy = LValueType::getImplicit(resultTy);
       
       // Subscripts on a struct always take them as lvalues (for now!)
       if (!containerTy->hasReferenceSemantics())
-        containerTy = LValueType::get(containerTy,
-                                      LValueType::Qual::DefaultForMemberAccess);
+        containerTy = LValueType::getImplicit(containerTy);
 
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
@@ -835,8 +828,7 @@ namespace {
         auto resultFnTy = resultTy->castTo<FunctionType>();
         auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
         if (!selfTy->hasReferenceSemantics())
-          selfTy = LValueType::get(selfTy,
-                                   LValueType::Qual::DefaultForMemberAccess);
+          selfTy = LValueType::getImplicit(selfTy);
 
         resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
                                      resultFnTy->getExtInfo());
@@ -1615,13 +1607,10 @@ namespace {
 
     Expr *visitAddressOfExpr(AddressOfExpr *expr) {
       // Compute the type of the address-of expression.
-      // FIXME: Do we really need to compute this, or is this just a hack
-      // due to the presence of the 'nonheap' bit?
       auto lv = expr->getSubExpr()->getType()->getAs<LValueType>();
-      assert(lv && "Subexpression is not an lvalue?");
+      assert(lv && lv->isImplicit() && "Subexpression is not an lvalue?");
 
-      auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
-      expr->setType(LValueType::get(lv->getObjectType(), destQuals));
+      expr->setType(LValueType::getInOut(lv->getObjectType()));
       return expr;
     }
 
@@ -1988,7 +1977,7 @@ namespace {
     bool isDynamicLookupType(Type type) {
       // Look through lvalues, metatypes.
       if (auto lvalue = type->getAs<LValueType>()) {
-        if (!lvalue->getQualifiers().isImplicit())
+        if (!lvalue->isImplicit())
           return false;
 
         type = lvalue->getObjectType();
@@ -2766,14 +2755,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto toLValue = toType->getAs<LValueType>()) {
       // Update the qualifiers on the lvalue.
       expr = new (tc.Context) RequalifyExpr(expr,
-                                LValueType::get(fromLValue->getObjectType(),
-                                                toLValue->getQualifiers()));
+                          LValueType::getImplicit(fromLValue->getObjectType()));
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
     }
 
-    if (fromLValue->getQualifiers().isImplicit()) {
+    if (fromLValue->isImplicit()) {
       // If we're actually turning this into an lvalue tuple element, don't
       // load.
       bool performLoad = true;
@@ -2948,8 +2936,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
 
   // Form the lvalue type we will be producing.
   auto &tc = cs.getTypeChecker();
-  Type destType = LValueType::get(containerType,
-                                  LValueType::Qual::DefaultForMemberAccess);
+  Type destType = LValueType::getImplicit(containerType);
 
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();

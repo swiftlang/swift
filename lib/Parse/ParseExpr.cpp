@@ -700,14 +700,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto Kind = MagicIdentifierLiteralExpr::File;
     SourceLoc Loc = consumeToken(tok::kw___FILE__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
   case tok::kw___LINE__: {  // __LINE__
     auto Kind = MagicIdentifierLiteralExpr::Line;
     SourceLoc Loc = consumeToken(tok::kw___LINE__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
 
@@ -715,7 +715,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto Kind = MagicIdentifierLiteralExpr::Column;
     SourceLoc Loc = consumeToken(tok::kw___COLUMN__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
       

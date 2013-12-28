@@ -161,7 +161,7 @@ private:
                                     ASTContext &ctx) {
     if (auto lv = dyn_cast<LValueType>(origParamType)) {
       selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
-      return CanLValueType::get(selfType, lv->getQualifiers(), ctx);
+      return CanLValueType::get(selfType, lv->getQualifiers());
     }
 
     if (auto tuple = dyn_cast<TupleType>(origParamType)) {

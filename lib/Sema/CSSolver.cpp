@@ -222,11 +222,9 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
       result.push_back(superclass);
   }
 
-  if (auto lvalue = type->getAs<LValueType>()) {
-    if (lvalue->getQualifiers().isImplicit()) {
+  if (auto lvalue = type->getAs<LValueType>())
+    if (lvalue->isImplicit())
       result.push_back(lvalue->getObjectType());
-    }
-  }
 
   // FIXME: lots of other cases to consider!
   return result;
@@ -821,10 +819,8 @@ static bool tryTypeVariableBindings(
       if (binding.Kind == AllowedBindingKind::Subtypes &&
           typeVar->getImpl().canBindToLValue() &&
           !type->is<LValueType>()) {
-        // FIXME: It's horrible that we have to enumerate different
-        // bits on the lvalue type.
-        auto subtype = LValueType::get(type,
-                                       LValueType::Qual::DefaultForVar);
+        // Try lvalue qualification in addition to rvalue qualification.
+        auto subtype = LValueType::getImplicit(type);
         if (exploredTypes.insert(subtype->getCanonicalType()))
           newBindings.push_back({subtype, binding.Kind, Nothing});
       }
