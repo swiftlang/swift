@@ -81,6 +81,8 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
   //   %1 = enum $Bool, #Bool.true!enumelt
   //
   // we'll return %0
+  if (EI->hasOperand())
+    return SILValue();
 
   auto *BB = EI->getParent();
   auto *Pred = BB->getSinglePredecessor();

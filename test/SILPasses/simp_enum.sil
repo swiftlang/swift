@@ -1,0 +1,41 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import swift
+
+enum SimpleEnum {
+  case Empty
+  case HasInt(Int)
+}
+
+//CHECK: _TF4main12test_union_1FT1EOS_10SimpleEnum_S0_
+//CHECK: switch_enum
+//CHECK: enum $SimpleEnum, #SimpleEnum.HasInt!enumelt.1, %{{[0-9]+}} : $Int64
+//CHECK: return
+
+// main.test_union_1 (E : main.SimpleEnum) -> main.SimpleEnum
+sil @_TF4main12test_union_1FT1EOS_10SimpleEnum_S0_ : $@thin (SimpleEnum) -> SimpleEnum {
+bb0(%0 : $SimpleEnum):
+  %1 = alloc_stack $SimpleEnum  // var E          // users: %16, %2
+  store %0 to %1#1 : $*SimpleEnum                 // id: %2
+  %3 = tuple ()
+  switch_enum %0 : $SimpleEnum, case #SimpleEnum.Empty!enumelt: bb1, case #SimpleEnum.HasInt!enumelt.1: bb3 // id: %4
+
+bb1:                                              // Preds: bb0
+  %6 = enum $SimpleEnum, #SimpleEnum.Empty!enumelt // user: %7
+  br bb5(%6 : $SimpleEnum)                        // id: %7
+
+bb3(%8 : $Int64):                                 // Preds: bb0
+  %9 = alloc_stack $Int64  // var N               // users: %13, %10
+  store %8 to %9#1 : $*Int64                      // id: %10
+  %12 = enum $SimpleEnum, #SimpleEnum.HasInt!enumelt.1, %8 : $Int64 // user: %14
+  dealloc_stack %9#0 : $*@local_storage Int64     // id: %13
+  br bb5(%12 : $SimpleEnum)                       // id: %14
+
+bb5(%15 : $SimpleEnum):                           // Preds: bb2 bb4
+  dealloc_stack %1#0 : $*@local_storage SimpleEnum // id: %16
+  return %15 : $SimpleEnum                        // id: %17
+}
+
