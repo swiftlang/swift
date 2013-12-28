@@ -253,6 +253,7 @@ public:
   SILInstruction *visitStructExtractInst(StructExtractInst *V);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
+  SILInstruction *visitClassMethodInst(ClassMethodInst *CMI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -522,6 +523,45 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   }
 
   // Do nothing for non-trivial non-reference types.
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
+  // Optimize a class_method and alloc_ref pair into a direct function
+  // reference:
+  //
+  // %XX = alloc_ref $Foo
+  // %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+  //
+  //  into
+  //
+  //  %YY = function_ref @...
+  
+  AllocRefInst *ARI = dyn_cast<AllocRefInst>(CMI->getOperand());
+  if (!ARI)
+    return nullptr;
+
+  // Find the type of the class that AllocRefInst is allocating.
+  SILType T = ARI->getType();
+  ClassType *CT = dyn_cast<ClassType>(T.getSwiftRValueType());
+  if (!CT)
+    return nullptr;
+
+  ClassDecl *Class = CT->getDecl();
+  SILDeclRef Member = CMI->getMember();
+
+  // Search all of the vtables in the module.
+  for (auto &VTbl : CMI->getModule().getVTableList()) {
+    if (VTbl.getClass() != Class)
+      continue;
+
+    // Find the requested method.
+    SILFunction *F = VTbl.getImplementation(CMI->getModule(), Member);
+    assert(F && "Can't find the requested method");
+    // Create a direct reference to the method.
+    return new (Module) FunctionRefInst(CMI->getLoc(), F);
+  }
+
   return nullptr;
 }
 
