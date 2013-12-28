@@ -378,21 +378,18 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
 
-  // TODO: Shouldn't be an @inout method.
-  auto lvType = LValueType::getInOut(optionSetType);
-  
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
-  selfDecl->setType(lvType);
+  selfDecl->setType(optionSetType);
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(lvType);
+  selfParam->setType(optionSetType);
   selfParam = new (C) TypedPattern(selfParam,
                                    TypeLoc::withoutLoc(optionSetType));
-  selfParam->setType(lvType);
+  selfParam->setType(optionSetType);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
@@ -406,7 +403,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   
   auto toRawArgType = TupleType::getEmpty(C);
   Type toRawType = FunctionType::get(toRawArgType, rawType);
-  toRawType = FunctionType::get(lvType, toRawType);
+  toRawType = FunctionType::get(optionSetType, toRawType);
   toRawDecl->setType(toRawType);
   toRawDecl->setBodyResultType(rawType);
   
@@ -477,21 +474,18 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
     ->castTo<AnyFunctionType>()
     ->getResult();
 
-  // TODO: Shouldn't be an @inout method.
-  auto lvType = LValueType::getInOut(optionSetType);
-
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
-  selfDecl->setType(lvType);
+  selfDecl->setType(optionSetType);
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(lvType);
+  selfParam->setType(optionSetType);
   selfParam = new (C) TypedPattern(selfParam,
                                    TypeLoc::withoutLoc(optionSetType));
-  selfParam->setType(lvType);
+  selfParam->setType(optionSetType);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
@@ -505,7 +499,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   
   auto toRawArgType = TupleType::getEmpty(C);
   Type toRawType = FunctionType::get(toRawArgType, boolType);
-  toRawType = FunctionType::get(lvType, toRawType);
+  toRawType = FunctionType::get(optionSetType, toRawType);
   getLVDecl->setType(toRawType);
   getLVDecl->setBodyResultType(boolType);
   
