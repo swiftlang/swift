@@ -2752,7 +2752,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       superRef->setType(fromLValue);
     }
 
-    if (auto toLValue = toType->getAs<LValueType>()) {
+    if (toType->is<LValueType>()) {
       // Update the qualifiers on the lvalue.
       expr = new (tc.Context) RequalifyExpr(expr,
                           LValueType::getImplicit(fromLValue->getObjectType()));
