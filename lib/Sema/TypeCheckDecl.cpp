@@ -977,6 +977,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
                           allowUnknownTypes)) {
     setBoundVarsTypeError(binding->getPattern(), tc.Context);
     binding->setInvalid();
+    binding->getPattern()->setType(ErrorType::get(tc.Context));
     return;
   }
 
@@ -986,6 +987,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     if (tc.typeCheckBinding(binding)) {
       setBoundVarsTypeError(binding->getPattern(), tc.Context);
       binding->setInvalid();
+      binding->getPattern()->setType(ErrorType::get(tc.Context));
       return;
     }
   }
