@@ -23,9 +23,6 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
-    // Turn on @inout methods for structs and change self.
-    bool InOutMethods = false;
-
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
