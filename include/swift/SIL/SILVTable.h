@@ -42,6 +42,10 @@ public:
   // generic base class method.
   using Pair = std::pair<SILDeclRef, SILFunction*>;
 
+  // Disallow copying into temporary objects.
+  SILVTable(const SILVTable &other) = delete;
+  SILVTable &operator=(const SILVTable &) = delete;
+
 private:
   ClassDecl *Class;
   unsigned NumEntries;
