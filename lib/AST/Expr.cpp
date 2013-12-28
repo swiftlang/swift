@@ -382,14 +382,10 @@ RequalifyExpr::RequalifyExpr(Expr *subExpr, Type type, bool isForObject)
   assert(subExpr->getType()->is<LValueType>() && type->is<LValueType>() &&
          "RequalifyExpr can only convert from lvalue to lvalue");
 
-  // FIXME: We only get this check in the new mutability model, because the old
-  // model was stripping the settable bit.
-  if (type->getASTContext().LangOpts.InOutMethods) {
-    assert((subExpr->getType()->castTo<LValueType>()->getQualifiers() &
-            type->castTo<LValueType>()->getQualifiers()) ==
-           subExpr->getType()->castTo<LValueType>()->getQualifiers() &&
-           "RequalifyExpr is stripping lvalue qualifiers!");
-  }
+  assert((subExpr->getType()->castTo<LValueType>()->getQualifiers() &
+          type->castTo<LValueType>()->getQualifiers()) ==
+         subExpr->getType()->castTo<LValueType>()->getQualifiers() &&
+         "RequalifyExpr is stripping lvalue qualifiers!");
 }
 
 
