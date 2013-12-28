@@ -1515,19 +1515,6 @@ struct ASTNodeBase {};
       return isLValue0;
     }
 
-    /// The two types are required to either both be l-values or
-    /// both not be l-values, and one or the other is expected.
-    /// They are adjusted to not be l-values.
-    void checkSameLValueness(Type &T0, Type &T1, bool expected,
-                             const char *what) {
-      if (checkSameLValueness(T0, T1, what) == expected)
-        return;
-
-      Out << "lvalue-ness of " << what << " does not match expectation of "
-          << expected << "\n";
-      abort();
-    }
-
     Type checkLValue(Type T, bool &isInOut, const char *what) {
       LValueType *LV = T->getAs<LValueType>();
       if (LV) {

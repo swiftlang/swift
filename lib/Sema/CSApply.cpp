@@ -195,8 +195,10 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
     // If 'self' is an lvalue type, turn the base type into an lvalue
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
-    if (auto *SelfLV = selfTy->getAs<LValueType>())
-      return LValueType::get(baseTy->getRValueType(), SelfLV->getQualifiers());
+    if (auto *SelfLV = selfTy->getAs<LValueType>()) {
+      assert(SelfLV->isImplicit() && "self should always be implicit");
+      return LValueType::getImplicit(baseTy->getRValueType());
+    }
 
     // Otherwise, return the rvalue type.
     return baseTy->getRValueType();
@@ -420,8 +422,10 @@ namespace {
           // use it as the lvalue qualified type.
           selfTy = containerTy;
           if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-            if (auto *LV = base->getType()->getAs<LValueType>())
-              selfTy = LValueType::get(selfTy, LV->getQualifiers());
+            if (auto *LV = base->getType()->getAs<LValueType>()) {
+              assert(LV->isImplicit() && "accessing member of explicit qual?");
+              selfTy = LValueType::getImplicit(selfTy);
+            }
         }
         base = coerceObjectArgumentToType(
                  base, 

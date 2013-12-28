@@ -1820,11 +1820,8 @@ public:
 
 /// \brief Adjust lvalue types within the type of a reference to a declaration.
 ///
-/// For an lvalue type, this routine adds the 'implicit' and 'nonheap' bits to
-/// the lvalue.
+/// For an lvalue type, this routine adds the 'implicit' bit to the lvalue.
 ///
-/// For the function type of an assignment operator, makes the first argument
-/// an implicit inout(settable).
 Type adjustLValueForReference(Type type, bool isAssignment);
 
 /// \brief Compute the shuffle required to map from a given tuple type to

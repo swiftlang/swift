@@ -1067,10 +1067,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::TupleIndex: {
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
+      assert(lvalueTy->isImplicit() && "Cannot access tuple element of @inout");
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
       refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
-      refType = LValueType::get(refType, lvalueTy->getQualifiers());
+      refType = LValueType::getImplicit(refType);
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       // FIXME: Do we have to strip several levels here? Possible.

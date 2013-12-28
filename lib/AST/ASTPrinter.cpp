@@ -1567,7 +1567,7 @@ public:
   void visitLValueType(LValueType *T) {
     Printer << "@inout ";
 
-    switch(T->getQualifiers()) {
+    switch (T->getQualifiers()) {
     case LValueType::Qual::InOut: break;
     case LValueType::Qual::Implicit: Printer << "(implicit)"; break;
     }
