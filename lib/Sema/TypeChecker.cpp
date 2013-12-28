@@ -703,6 +703,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                      TC.implicitlyDefinedFunctions.begin(),
                      TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
+
+    // Type-check any referenced nominal types.
+    while (!TC.ValidatedTypes.empty()) {
+      auto nominal = TC.ValidatedTypes.back();
+      TC.ValidatedTypes.pop_back();
+      TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
+    }
+      
   } while (currentFunctionIdx < DefinedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size());
 

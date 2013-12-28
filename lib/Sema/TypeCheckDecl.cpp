@@ -1260,6 +1260,9 @@ public:
     if (!IsSecondPass) {
       TC.validateDecl(ED);
 
+      if (!TC.ValidatedTypes.empty() && ED == TC.ValidatedTypes.back())
+        TC.ValidatedTypes.pop_back();
+
       {
         // Check for circular inheritance of the raw type.
         SmallVector<EnumDecl *, 8> path;
@@ -1398,8 +1401,11 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       TC.validateDecl(SD);
+      if (!TC.ValidatedTypes.empty() && SD == TC.ValidatedTypes.back())
+        TC.ValidatedTypes.pop_back();
+    }
 
     // Visit each of the members.
     for (Decl *Member : SD->getMembers()) {
@@ -1447,6 +1453,9 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       TC.validateDecl(CD);
+
+      if (!TC.ValidatedTypes.empty() && CD == TC.ValidatedTypes.back())
+        TC.ValidatedTypes.pop_back();
 
       {
         // Check for circular inheritance.
@@ -2251,12 +2260,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                     (superclassDecl && superclassDecl->isObjC()));
     }
 
-    // FIXME: Don't validate members so eagerly.
-    if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
-      for (Decl *member : nominal->getMembers())
-        if (auto VD = dyn_cast<ValueDecl>(member))
-          validateDecl(VD, true);
-    }
+    ValidatedTypes.push_back(nominal);
     break;
   }
 

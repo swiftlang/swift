@@ -185,6 +185,10 @@ public:
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
+  /// The list of nominal type declarations that have been validated
+  /// during type checking.
+  llvm::SmallVector<NominalTypeDecl *, 4> ValidatedTypes;
+
 private:
   Type IntLiteralType;
   Type FloatLiteralType;
