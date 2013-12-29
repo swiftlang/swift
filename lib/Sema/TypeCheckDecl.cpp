@@ -1556,6 +1556,11 @@ public:
         badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns(),
                                          resolver);
 
+    // Checking the function parameter patterns might (recursively)
+    // end up setting the type.
+    if (FD->hasType())
+      return;
+
     if (badType) {
       FD->setType(ErrorType::get(TC.Context));
       FD->setInvalid();
@@ -1733,7 +1738,7 @@ public:
     if (MutatingAttr) {
       if (!FD->getDeclContext()->isTypeContext() ||
           FD->getDeclContext()->getDeclaredTypeInContext()
-          ->hasReferenceSemantics())
+            ->hasReferenceSemantics())
         TC.diagnose(FD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
       else
         FD->setMutating(MutatingAttr.getValue());
