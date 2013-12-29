@@ -131,9 +131,6 @@ else:
 
 @@transparent
 extension ${Self} : RandomAccessIndex {
-  func __equal__(rhs: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
-  }
   func __less__(rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
   }
