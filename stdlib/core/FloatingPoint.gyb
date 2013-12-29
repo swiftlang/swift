@@ -314,11 +314,14 @@ func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
 }
 
 @@transparent
-extension ${Self} : Comparable {
-  func __less__(rhs: ${Self}) -> Bool {
-    return Bool(Builtin.fcmp_olt_FPIEEE${bits}(value, rhs.value))
-  }
+func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
+  return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
 }
+
+@@transparent
+extension ${Self} : Comparable {
+}
+
 extension ${Self} : Hashable {
   func hashValue() -> Int {
 @   if bits > intBits:
