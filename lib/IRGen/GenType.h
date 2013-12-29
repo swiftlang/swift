@@ -30,6 +30,7 @@ namespace swift {
   class CanType;
   class ClassDecl;
   class AnyFunctionType;
+  class InOutType;
   class LValueType;
   class MetatypeType;
   class ModuleType;
@@ -83,7 +84,7 @@ private:
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
-  const TypeInfo *convertLValueType(LValueType *T);
+  const TypeInfo *convertInOutType(InOutType *T);
   const TypeInfo *convertMetatypeType(MetatypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);

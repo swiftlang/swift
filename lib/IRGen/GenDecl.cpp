@@ -1193,7 +1193,7 @@ llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
 static CanType addOwnerArgument(DeclContext *DC, CanType resultType) {
   Type argType = DC->getDeclaredTypeInContext();
   if (!argType->hasReferenceSemantics())
-    argType = LValueType::getImplicit(argType);
+    argType = LValueType::get(argType);
   if (auto params = DC->getGenericParamsOfContext())
     return PolymorphicFunctionType::get(argType, resultType, params)
              ->getCanonicalType();

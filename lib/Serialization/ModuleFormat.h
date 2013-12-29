@@ -363,8 +363,12 @@ namespace decls_block {
 
   using LValueTypeLayout = BCRecordLayout<
     LVALUE_TYPE,
-    TypeIDField, // object type
-    BCFixed<1>   // implicit?
+    TypeIDField // object type
+  >;
+
+  using InOutTypeLayout = BCRecordLayout<
+    INOUT_TYPE,
+    TypeIDField // object type
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<

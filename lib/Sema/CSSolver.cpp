@@ -223,8 +223,9 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   }
 
   if (auto lvalue = type->getAs<LValueType>())
-    if (lvalue->isImplicit())
-      result.push_back(lvalue->getObjectType());
+    result.push_back(lvalue->getObjectType());
+  if (auto iot = type->getAs<InOutType>())
+    result.push_back(iot->getObjectType());
 
   // FIXME: lots of other cases to consider!
   return result;
@@ -822,7 +823,7 @@ static bool tryTypeVariableBindings(
           typeVar->getImpl().canBindToLValue() &&
           !type->is<LValueType>()) {
         // Try lvalue qualification in addition to rvalue qualification.
-        auto subtype = LValueType::getImplicit(type);
+        auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()))
           newBindings.push_back({subtype, binding.Kind, Nothing});
       }

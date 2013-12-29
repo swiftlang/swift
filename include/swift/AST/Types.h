@@ -2252,36 +2252,17 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// carries an l-value, the carried l-value types are converted
 /// to their object type.
 class LValueType : public TypeBase {
-public:
-  enum class Qual {
-    /// An InOut lvalue is an expression written with '&', or an argument
-    /// qualified with @inout.
-    InOut = 0,
-
-    /// An implicit lvalue is a normal lvalue used for anything else
-    /// assignable.
-    Implicit = 1
-  };
-
-private:
   Type ObjectTy;
-  Qual Quals; // TODO: put this bit in TypeBase
 
-  LValueType(Type objectTy, Qual quals, const ASTContext *canonicalContext,
+  LValueType(Type objectTy, const ASTContext *canonicalContext,
              bool hasTypeVariable)
     : TypeBase(TypeKind::LValue, canonicalContext, hasTypeVariable),
-      ObjectTy(objectTy), Quals(quals) {}
+      ObjectTy(objectTy) {}
 
 public:
-  static LValueType *get(Type type, Qual quals);
-  static LValueType *getInOut(Type type) { return get(type, Qual::InOut); }
-  static LValueType *getImplicit(Type type) { return get(type, Qual::Implicit);}
+  static LValueType *get(Type type);
 
-  bool isImplicit() const { return Quals == Qual::Implicit; }
-  bool isInOut() const { return Quals == Qual::InOut; }
-  
   Type getObjectType() const { return ObjectTy; }
-  Qual getQualifiers() const { return Quals; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
@@ -2290,10 +2271,41 @@ public:
 };
 BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
-  static CanLValueType get(CanType type, LValueType::Qual quals) {
-    return CanLValueType(LValueType::get(type, quals));
+  static CanLValueType get(CanType type) {
+    return CanLValueType(LValueType::get(type));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
+  
+/// InOutType - An @inout qualified type is an argument to a function passed
+/// with an explicit "Address of" operator.  It is read in and then written back
+/// to after the callee function is done.  This also models the receiver of
+/// @mutable methods on value types.
+///
+class InOutType : public TypeBase {
+  Type ObjectTy;
+  
+  InOutType(Type objectTy, const ASTContext *canonicalContext,
+            bool hasTypeVariable)
+  : TypeBase(TypeKind::InOut, canonicalContext, hasTypeVariable),
+    ObjectTy(objectTy) {}
+  
+public:
+  static InOutType *get(Type type);
+  
+  Type getObjectType() const { return ObjectTy; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::InOut;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(InOutType, Type)
+PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
+static CanInOutType get(CanType type) {
+  return CanInOutType(InOutType::get(type));
+}
+END_CAN_TYPE_WRAPPER(InOutType, Type)
+
 
 /// SubstitutableType - A reference to a type that can be substituted, i.e.,
 /// an archetype or a generic parameter.
@@ -2801,10 +2813,12 @@ inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
 }
 
 inline Type TypeBase::getRValueType() {
-  if (!is<LValueType>())
-    return this;
-
-  return castTo<LValueType>()->getObjectType();
+  // FIXME: Stop stripping IOT!
+  if (auto iot = getAs<InOutType>())
+    return iot->getObjectType();
+  if (auto lv = getAs<LValueType>())
+    return lv->getObjectType();
+  return this;
 }
 
 inline bool TypeBase::mayHaveSuperclass() {

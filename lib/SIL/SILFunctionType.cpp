@@ -137,7 +137,7 @@ namespace {
       auto &substTL =
         M.Types.getTypeLowering(AbstractionPattern(origType), substType);
       ParameterConvention convention;
-      if (isa<LValueType>(origType)) {
+      if (isa<InOutType>(origType)) {
         convention = ParameterConvention::Indirect_Inout;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
@@ -244,8 +244,8 @@ namespace {
       addInput(type, ParameterConvention::Indirect_In);
     }
 
-    void visitLValueType(CanLValueType type) {
-      // L-value types aren't valid targets for substitution.
+    void visitInOutType(CanInOutType type) {
+      // @inout types aren't valid targets for substitution.
       addInput(type.getObjectType(), ParameterConvention::Indirect_Inout);
     }
 
@@ -1275,7 +1275,7 @@ namespace {
     /// apply the substitution on the AST level and then lower that.
     CanType visitType(CanType origType) {
       assert(!isa<AnyFunctionType>(origType));
-      assert(!isa<LValueType>(origType));
+      assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
 
       assert(TheSILModule.Types.getLoweredType(origType).getSwiftRValueType()
                == origType);

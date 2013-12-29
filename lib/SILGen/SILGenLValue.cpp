@@ -200,7 +200,8 @@ SILGenFunction::Writeback::Writeback(SILLocation loc,
 /// Evaluate an Expr, which might be an rvalue or an lvalue, and return it
 /// wrapped in an rvalue.
 RValue SILGenFunction::emitLValueOrRValueAsRValue(Expr *E) {
-  if (E->getType()->is<LValueType>())
+  if (E->getType()->is<LValueType>() ||
+      E->getType()->is<InOutType>())
     return emitLValueAsRValue(E);
   return emitRValue(E);
 }
@@ -612,7 +613,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
                                  getSubstFormalRValueType(e));
       }
       
-      if (!isa<LValueType>(baseTy)) {
+      if (!isa<LValueType>(baseTy) && !isa<InOutType>(baseTy)) {
         assert(baseTy.hasReferenceSemantics());
         lv.add<RefElementComponent>(var, varStorageType, typeData);
       } else {
@@ -634,7 +635,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
 
-  assert((e->getBase()->getType()->is<LValueType>() ||
+  assert((e->getBase()->getType()->is<InOutType>() ||
           e->getBase()->getType()->hasReferenceSemantics()) &&
          "Base of lvalue subscript expr is not an lvalue!");
   

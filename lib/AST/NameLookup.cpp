@@ -764,10 +764,13 @@ bool DeclContext::lookupQualified(Type type,
   }
 
   // Look through lvalue types.
-  if (auto lvalueTy = type->getAs<LValueType>()) {
+  if (auto lvalueTy = type->getAs<LValueType>())
     return lookupQualified(lvalueTy->getObjectType(), name, options,
                            typeResolver, decls);
-  }
+  // Look through @inout types.
+  if (auto inoutTy = type->getAs<InOutType>())
+    return lookupQualified(inoutTy->getObjectType(), name, options,
+                           typeResolver, decls);
 
   // Look through metatypes.
   if (auto metaTy = type->getAs<MetatypeType>()) {

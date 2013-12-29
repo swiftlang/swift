@@ -483,7 +483,7 @@ struct InitializationForPattern
     CanType varType = vd->getType()->getCanonicalType();
 
     // If this is an @inout parameter, set up the writeback variable.
-    if (isa<LValueType>(varType))
+    if (isa<InOutType>(varType))
       return InitializationPtr(new InOutInitialization(vd));
 
     // If this is a 'let' initialization for a non-address-only type, set up a
@@ -592,7 +592,7 @@ struct ArgumentInitVisitor :
       I->bindAddress(arg, gen, loc);
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
-      if (!ty->is<LValueType>())
+      if (!ty->is<LValueType>() && !ty->is<InOutType>())
         gen.Cleanups.pushCleanup<DestroyAddr>(arg);
       break;
 
@@ -774,6 +774,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::LocalFunction: {
     // Local functions are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
+           !capture->getType()->is<InOutType>() &&
            "capturing inout by value?!");
     const TypeLowering &ti = gen.getTypeLowering(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
@@ -2032,8 +2033,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // not. Handle this special case in the witness type before applying the
   // abstraction change.
   auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;
-  if (!isa<LValueType>(witnessOrigTy.getInput())
-      && isa<LValueType>(requirementTy.getInput())) {
+  if ((!isa<LValueType>(witnessOrigTy.getInput()) &&
+       !isa<InOutType>(witnessOrigTy.getInput())) &&
+      (isa<LValueType>(requirementTy.getInput()) ||
+       isa<InOutType>(requirementTy.getInput()))) {
     inOutSelf = HasInOutSelfAbstractionDifference;
   }
       

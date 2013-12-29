@@ -76,7 +76,7 @@ bool TypeBase::isMaterializable() {
   }
 
   // l-values are never materializable.
-  if (is<LValueType>())
+  if (is<LValueType>() || is<InOutType>())
     return false;
 
   // Everything else is materializable.
@@ -108,6 +108,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::Module:
   case TypeKind::Array:
   case TypeKind::LValue:
+  case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
@@ -243,6 +244,8 @@ bool TypeBase::isUnspecializedGeneric() {
 
   case TypeKind::LValue:
     return cast<LValueType>(this)->getObjectType()->isUnspecializedGeneric();
+  case TypeKind::InOut:
+    return cast<InOutType>(this)->getObjectType()->isUnspecializedGeneric();
 
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(this);
@@ -293,7 +296,7 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 }
 
 static bool isLegalSILType(CanType type) {
-  if (isa<LValueType>(type)) return false;
+  if (isa<LValueType>(type) || isa<InOutType>(type)) return false;
   if (isa<AnyFunctionType>(type)) return false;
   if (auto meta = dyn_cast<MetatypeType>(type))
     return meta->hasThin();
@@ -653,9 +656,12 @@ CanType TypeBase::getCanonicalType() {
   }
   case TypeKind::LValue: {
     LValueType *lvalue = cast<LValueType>(this);
-    Type objectType = lvalue->getObjectType();
-    objectType = objectType->getCanonicalType();
-    Result = LValueType::get(objectType, lvalue->getQualifiers());
+    Result = LValueType::get(lvalue->getObjectType()->getCanonicalType());
+    break;
+  }
+  case TypeKind::InOut: {
+    InOutType *inout = cast<InOutType>(this);
+    Result = InOutType::get(inout->getObjectType()->getCanonicalType());
     break;
   }
   case TypeKind::PolymorphicFunction: {
@@ -773,6 +779,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::SILFunction:
   case TypeKind::Array:
   case TypeKind::LValue:
+  case TypeKind::InOut:
   case TypeKind::ProtocolComposition:
   case TypeKind::Metatype:
   case TypeKind::BoundGenericClass:
@@ -998,6 +1005,11 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::LValue: {
     auto lMe = cast<LValueType>(me);
     auto lThem = cast<LValueType>(them);
+    return lMe->getObjectType()->isSpelledLike(lThem->getObjectType());
+  }
+  case TypeKind::InOut: {
+    auto lMe = cast<InOutType>(me);
+    auto lThem = cast<InOutType>(them);
     return lMe->getObjectType()->isSpelledLike(lThem->getObjectType());
   }
   case TypeKind::ProtocolComposition: {
@@ -1958,13 +1970,19 @@ case TypeKind::Id:
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
     auto objectTy = lvalue->getObjectType().transform(fn);
-    if (!objectTy)
-      return Type();
+    if (!objectTy) return Type();
 
-    if (objectTy.getPointer() == lvalue->getObjectType().getPointer())
-      return *this;
+    return objectTy.getPointer() == lvalue->getObjectType().getPointer() ?
+      *this : LValueType::get(objectTy);
+  }
 
-    return LValueType::get(objectTy, lvalue->getQualifiers());
+  case TypeKind::InOut: {
+    auto inout = cast<InOutType>(base);
+    auto objectTy = inout->getObjectType().transform(fn);
+    if (!objectTy) return Type();
+    
+    return objectTy.getPointer() == inout->getObjectType().getPointer() ?
+      *this : InOutType::get(objectTy);
   }
 
   case TypeKind::ProtocolComposition: {
@@ -2141,6 +2159,8 @@ case TypeKind::Id:
 
     case TypeKind::LValue:
       return cast<LValueType>(base)->getObjectType().findIf(pred);
+    case TypeKind::InOut:
+      return cast<InOutType>(base)->getObjectType().findIf(pred);
 
     case TypeKind::ProtocolComposition: {
       auto pc = cast<ProtocolCompositionType>(base);

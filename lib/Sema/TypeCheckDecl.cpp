@@ -1750,9 +1750,9 @@ public:
       auto SelfDecl = FD->getImplicitSelfDecl();
       SelfDecl->setType(SelfTy);
       // 'self' is let for reference types (i.e., classes) or when 'self' is
-      // lowered to the type itself.  It is mutable when lowered to an lvalue.
+      // lowered to the type itself.  It is mutable when lowered to @inout.
       SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                       (!SelfTy->is<LValueType>() &&
+                       (!SelfTy->is<InOutType>() &&
                         !SelfTy->is<MetatypeType>()));
 
       TypedPattern *selfPattern =
@@ -2005,7 +2005,7 @@ public:
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
     SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     (!SelfTy->is<LValueType>() &&
+                     (!SelfTy->is<InOutType>() &&
                       !SelfTy->is<MetatypeType>()));
 
     Optional<ArchetypeBuilder> builder;
@@ -2140,7 +2140,7 @@ public:
     auto SelfDecl = DD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
     SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     (!SelfTy->is<LValueType>() &&
+                     (!SelfTy->is<InOutType>() &&
                       !SelfTy->is<MetatypeType>()));
 
     // Destructors are always @objc, because their Objective-C entry point is
@@ -2916,7 +2916,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       if (ParamTT)
         ParamType = ParamTT->getElementType(0);
 
-      if (!ParamType->is<LValueType>()) {
+      if (!ParamType->is<InOutType>()) {
         TC.diagnose(Attrs.getLoc(AK_assignment),
                     diag::assignment_without_inout);
         D->getMutableAttrs().clearAttribute(AK_assignment);

@@ -3301,6 +3301,9 @@ namespace {
     void visitLValueType(CanLValueType type) {
       llvm_unreachable("cannot store l-value type directly");
     }
+    void visitInOutType(CanInOutType type) {
+      llvm_unreachable("cannot store @inout type directly");
+    }
 
     // Bind archetypes from the parent of nominal types.
     void visitNominalType(CanNominalType type) {

@@ -161,7 +161,11 @@ private:
                                     ASTContext &ctx) {
     if (auto lv = dyn_cast<LValueType>(origParamType)) {
       selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
-      return CanLValueType::get(selfType, lv->getQualifiers());
+      return CanLValueType::get(selfType);
+    }
+    if (auto lv = dyn_cast<InOutType>(origParamType)) {
+      selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
+      return CanInOutType::get(selfType);
     }
 
     if (auto tuple = dyn_cast<TupleType>(origParamType)) {
@@ -1383,8 +1387,8 @@ namespace {
       auto loweredSubstArgType =
         SGF.getLoweredType(substArgType).getSwiftRValueType();
 
-      // L-values are mostly straightforward.
-      if (isa<LValueType>(substArgType)) {
+      // @inout's are mostly straightforward.
+      if (isa<InOutType>(substArgType)) {
         assert(param.isIndirectInOut());
         emitInOut(std::move(arg), loweredSubstArgType, param.getType(),
                   origParamType, substArgType);

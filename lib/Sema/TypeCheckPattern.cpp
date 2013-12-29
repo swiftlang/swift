@@ -647,7 +647,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     NamedPattern *NP = cast<NamedPattern>(P);
     NP->getDecl()->overwriteType(type);
 
-    if (type->is<LValueType>())
+    if (type->is<InOutType>())
       NP->getDecl()->setLet(false);
 
     P->setType(type);

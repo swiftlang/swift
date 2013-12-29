@@ -118,7 +118,8 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
-    llvm::DenseMap<std::pair<Type, unsigned>, LValueType*> LValueTypes;
+    llvm::DenseMap<Type, LValueType*> LValueTypes;
+    llvm::DenseMap<Type, InOutType*> InOutTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
@@ -461,8 +462,8 @@ ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver) const {
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
-  // Input must be [inout] Optional<T>.
-  auto inputInOut = dyn_cast<LValueType>(input);
+  // Input must be @inout Optional<T>.
+  auto inputInOut = dyn_cast<InOutType>(input);
   if (!inputInOut || !isOptionalType(*this, inputInOut.getObjectType(), param))
     return nullptr;
 
@@ -1564,23 +1565,41 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
                 /*HasTypeVariable=*/false) { }
 
-LValueType *LValueType::get(Type objectTy, Qual quals) {
+LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
          "can not have ErrorType wrapped inside LValueType");
+//  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
+//         "can not have @inout or @lvalue wrapped inside an @lvalue");
 
   bool hasTypeVariable = objectTy->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
   auto &C = objectTy->getASTContext();
-  
-  auto key = std::make_pair(objectTy,
-                            unsigned(quals == LValueType::Qual::Implicit));
-  auto &entry = C.Impl.getArena(arena).LValueTypes[key];
+  auto &entry = C.Impl.getArena(arena).LValueTypes[objectTy];
   if (entry)
     return entry;
 
   const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
-  return entry = new (C, arena) LValueType(objectTy, quals, canonicalContext,
+  return entry = new (C, arena) LValueType(objectTy, canonicalContext,
+                                           hasTypeVariable);
+}
+
+InOutType *InOutType::get(Type objectTy) {
+  assert(!objectTy->is<ErrorType>() &&
+         "can not have ErrorType wrapped inside InOutType");
+//  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
+//         "can not have @inout or @lvalue wrapped inside an @inout");
+  
+  bool hasTypeVariable = objectTy->hasTypeVariable();
+  auto arena = getArena(hasTypeVariable);
+  
+  auto &C = objectTy->getASTContext();
+  auto &entry = C.Impl.getArena(arena).InOutTypes[objectTy];
+  if (entry)
+    return entry;
+  
+  const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
+  return entry = new (C, arena) InOutType(objectTy, canonicalContext,
                                            hasTypeVariable);
 }
 

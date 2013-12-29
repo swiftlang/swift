@@ -342,11 +342,16 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   CanType canType = type->getCanonicalType();
 
   // Strip l-value-ness.
-  if (isa<LValueType>(canType)) {
-    return type->castTo<LValueType>()->getObjectType();
+  if (auto LV = dyn_cast<LValueType>(canType))
+    return LV->getObjectType();
+
+  // FIXME!! wrong!! strip @inout
+  // This should subsume ripping @inout off.
+  if (auto IO = dyn_cast<InOutType>(canType))
+    return IO->getObjectType();
 
   // Turn @weak T into Optional<T>.
-  } else if (isa<WeakStorageType>(canType)) {
+  if (isa<WeakStorageType>(canType)) {
     // On the one hand, we should probably use a better location than
     // the declaration's.  On the other hand, all these diagnostics
     // are "broken library" errors, so it should really never matter.
@@ -363,7 +368,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
 
     return optTy;
 
-  // Ignore [unowned] qualification.
+  // Ignore @unowned qualification.
   } else if (isa<UnownedStorageType>(canType)) {
     return type->castTo<UnownedStorageType>()->getReferentType();
 
@@ -389,10 +394,11 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType) {
   if (!VD->isSettable())
     return false;
   
-  // If the base type is a struct or enum, and is not lvalue qualified, the
+  // If the base type is a struct or enum, and is not @inout qualified, the
   // result of an access is always an rvalue.
   return !baseType || baseType->hasReferenceSemantics() ||
-         baseType->is<LValueType>() || VD->isStatic();
+         baseType->is<InOutType>() || baseType->is<LValueType>() ||
+         VD->isStatic();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
@@ -408,7 +414,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // returned as an rvalue (and the access must be a load).
   if (auto *VD = dyn_cast<VarDecl>(value))
     if (doesVarDeclMemberProduceLValue(VD, baseType))
-      return LValueType::getImplicit(getTypeOfRValue(value, wantInterfaceType));
+      return LValueType::get(getTypeOfRValue(value, wantInterfaceType));
   
   if (wantInterfaceType)
     return value->getInterfaceType();

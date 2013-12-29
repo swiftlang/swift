@@ -331,8 +331,6 @@ public:
     TypesNotConstructible,
     /// \brief Function types mismatch.
     FunctionTypesMismatch,
-    /// \brief Lvalue type qualifiers mismatch.
-    LValueQualifiers,
     /// \brief The first type doesn't conform to a protocol in the second
     /// type.
     DoesNotConformToProtocol,
@@ -407,7 +405,6 @@ public:
     case FunctionTypesMismatch:
     case FunctionAutoclosureMismatch:
     case FunctionNoReturnMismatch:
-    case LValueQualifiers:
     case TupleNameMismatch:
     case TupleNamePositionMismatch:
     case TupleSizeMismatch:
@@ -1823,9 +1820,9 @@ public:
   void dump(raw_ostream &out);
 };
 
-/// \brief Adjust lvalue types within the type of a reference to a declaration.
+/// \brief Adjust @inout types within the type of a reference to a declaration.
 ///
-Type adjustLValueForReference(Type type);
+Type adjustInOutForReference(Type type);
 
 /// \brief Compute the shuffle required to map from a given tuple type to
 /// another tuple type.

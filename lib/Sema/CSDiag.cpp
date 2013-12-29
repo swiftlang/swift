@@ -67,11 +67,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString() << " is not an dynamic lookup value";
     break;
 
-  case LValueQualifiers:
-    out << "lvalue qualifier mismatch between " << getFirstType().getString()
-        << " and " << getSecondType().getString();
-    break;
-
   case TupleNameMismatch:
   case TupleNamePositionMismatch:
   case TupleSizeMismatch:
@@ -591,12 +586,10 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::IsForbiddenLValue:
-    if (auto lvalueTy = failure.getSecondType()->getAs<LValueType>()) {
-      if (!lvalueTy->isImplicit()) {
-        tc.diagnose(loc, diag::reference_non_inout, lvalueTy->getObjectType())
-          .highlight(range1).highlight(range2);
-        return true;
-      }
+    if (auto lvalueTy = failure.getSecondType()->getAs<InOutType>()) {
+      tc.diagnose(loc, diag::reference_non_inout, lvalueTy->getObjectType())
+        .highlight(range1).highlight(range2);
+      return true;
     }
     // FIXME: diagnose other cases
     return false;

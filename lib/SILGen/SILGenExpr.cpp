@@ -196,6 +196,7 @@ namespace {
     using super::visit;
     RValue visit(Expr *E) {
       assert(!E->getType()->is<LValueType>() &&
+             !E->getType()->is<InOutType>() &&
              "RValueEmitter shouldn't be called on lvalues");
       return visit(E, SGFContext());
     }

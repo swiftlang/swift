@@ -509,7 +509,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
 /// <type> ::= 'Qq' index context    # archetype+context (DWARF only)
 ///
-/// <type> ::= R <type>              # lvalue
+/// <type> ::= R <type>              # inout
 /// <type> ::= T <tuple-element>* _  # tuple
 /// <type> ::= U <generic-parameter>+ _ <type>
 /// <type> ::= V <decl>              # struct (substitutable)
@@ -581,10 +581,11 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     Buffer << 'M';
     return mangleType(cast<MetatypeType>(type).getInstanceType(),
                       ExplosionKind::Minimal, 0);
-
   case TypeKind::LValue:
+    assert(0 && "@lvalue types should not occur in function interfaces");
+  case TypeKind::InOut:
     Buffer << 'R';
-    return mangleType(cast<LValueType>(type).getObjectType(),
+    return mangleType(cast<InOutType>(type).getObjectType(),
                       ExplosionKind::Minimal, 0);
 
   case TypeKind::UnownedStorage:

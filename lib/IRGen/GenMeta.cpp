@@ -550,6 +550,10 @@ namespace {
       IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
+    llvm::Value *visitInOutType(CanInOutType type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for @inout type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {

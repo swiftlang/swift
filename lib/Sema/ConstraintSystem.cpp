@@ -651,7 +651,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                                  /*wantInterfaceType=*/true);
 
   // Adjust the type of the reference.
-  valueType = adjustLValueForReference(
+  valueType = adjustInOutForReference(
                 openType(valueType,
                          value->getPotentialGenericDeclContext(),
                          /*skipProtocolSelfConstraint=*/false,
@@ -890,7 +890,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // lvalue.
       if (!selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>())
-        selfTy = LValueType::getInOut(selfTy);
+        selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);
     }
@@ -919,7 +919,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (isDynamicResult || subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy);
     else if (subscript->isSettable())
-      elementTy = LValueType::getImplicit(elementTy);
+      elementTy = LValueType::get(elementTy);
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {
@@ -1061,11 +1061,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::TupleIndex: {
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
-      assert(lvalueTy->isImplicit() && "Cannot access tuple element of @inout");
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
       refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
-      refType = LValueType::getImplicit(refType);
+      refType = LValueType::get(refType);
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       // FIXME: Do we have to strip several levels here? Possible.

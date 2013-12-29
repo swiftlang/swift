@@ -1793,8 +1793,15 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[LValueTypeLayout::Code];
     LValueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(lValueTy->getObjectType()),
-                                 lValueTy->isImplicit());
+                                 addTypeRef(lValueTy->getObjectType()));
+    break;
+  }
+  case TypeKind::InOut: {
+    auto iotTy = cast<InOutType>(ty.getPointer());
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[InOutTypeLayout::Code];
+    InOutTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addTypeRef(iotTy->getObjectType()));
     break;
   }
 
@@ -1857,6 +1864,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetatypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
+    registerDeclTypeAbbr<InOutTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
     registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
     registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();

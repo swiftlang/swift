@@ -2260,14 +2260,14 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::LVALUE_TYPE: {
     TypeID objectTypeID;
-    bool isImplicit;
-    decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID,
-                                              isImplicit);
-    LValueType::Qual quals = LValueType::Qual::InOut;
-    if (isImplicit)
-      quals = LValueType::Qual::Implicit;
-
-    typeOrOffset = LValueType::get(getType(objectTypeID), quals);
+    decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID);
+    typeOrOffset = LValueType::get(getType(objectTypeID));
+    break;
+  }
+  case decls_block::INOUT_TYPE: {
+    TypeID objectTypeID;
+    decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID);
+    typeOrOffset = InOutType::get(getType(objectTypeID));
     break;
   }
 

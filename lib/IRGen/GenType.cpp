@@ -803,7 +803,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-
+  case TypeKind::LValue: assert(0 && "@lvalue type made it to irgen");
   case TypeKind::Metatype:
     return convertMetatypeType(cast<MetatypeType>(ty));
   case TypeKind::Module:
@@ -833,8 +833,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
     return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
-  case TypeKind::LValue:
-    return convertLValueType(cast<LValueType>(ty));
+  case TypeKind::InOut:
+    return convertInOutType(cast<InOutType>(ty));
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
@@ -860,15 +860,12 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   llvm_unreachable("bad type kind");
 }
 
-/// Convert an l-value type.  For non-heap l-values, this is always
-/// just a bare pointer.  For heap l-values, this is a pair of a bare
-/// pointer with an object reference.
-const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
+/// Convert an @inout type.  This is always just a bare pointer.
+const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
   auto referenceType =
     IGM.getStoragePointerTypeForUnlowered(CanType(T->getObjectType()));
   
-  // If it's not a heap l-value, just use the reference type as a
-  // primitive pointer.
+  // Just use the reference type as a primitive pointer.
   return createPrimitive(referenceType, IGM.getPointerSize(),
                          IGM.getPointerAlignment());
 }

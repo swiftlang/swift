@@ -517,21 +517,11 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(AddressOfExpr *E) {
-      bool resultIsInOut, srcIsInOut;
-      Type resultObj = checkLValue(E->getType(), resultIsInOut,
-                                   "result of AddressOfExpr");
-
-      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcIsInOut,
-                                "source of AddressOfExpr");
-
-      checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
-
-      if (!resultIsInOut || srcIsInOut) {
-        Out << "mismatched qualifiers";
-        E->print(Out);
-        Out << "\n";
-        abort();
-      }
+      Type srcObj = checkLValue(E->getSubExpr()->getType(),
+                                "result of AddressOfExpr");
+      auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
+      
+      checkSameType(DestTy, srcObj, "object types for AddressOfExpr");
       verifyCheckedBase(E);
     }
 
@@ -652,7 +642,6 @@ struct ASTNodeBase {};
       Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
       checkSameType(obj, E->getSubExpr()->getType(),
                     "result and operand of MaterializeExpr");
-      assert(E->getType()->getAs<LValueType>()->isImplicit());
       verifyCheckedBase(E);
     }
 
@@ -708,8 +697,7 @@ struct ASTNodeBase {};
               InputExprTy->is<MetatypeType>())
             InputExprObjectTy = InputExprTy;
           else
-            InputExprObjectTy = checkLValue(InputExprTy,
-                                            "object argument");
+            InputExprObjectTy = checkLValue(InputExprTy, "object argument");
           Type FunctionInputObjectTy = checkLValue(FT->getInput(),
                                                    "'self' parameter");
           
@@ -1460,7 +1448,7 @@ struct ASTNodeBase {};
 
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
-    bool lookThroughLValue(Type &type, LValueType::Qual &qs) {
+    bool lookThroughLValue(Type &type, bool &isInOut) {
       if (LValueType *lv = type->getAs<LValueType>()) {
         Type objectType = lv->getObjectType();
         if (objectType->is<LValueType>()) {
@@ -1468,7 +1456,18 @@ struct ASTNodeBase {};
           type.print(Out);
           Out << "\n";
         }
-        qs = lv->getQualifiers();
+        isInOut = false;
+        type = objectType;
+        return true;
+      }
+      if (InOutType *io = type->getAs<InOutType>()) {
+        Type objectType = io->getObjectType();
+        if (objectType->is<InOutType>()) {
+          Out << "type is an @inout of @inout type: ";
+          type.print(Out);
+          Out << "\n";
+        }
+        isInOut = true;
         type = objectType;
         return true;
       }
@@ -1480,7 +1479,7 @@ struct ASTNodeBase {};
     /// Returns true if they are both l-values.
     bool checkSameLValueness(Type &T0, Type &T1,
                              const char *what) {
-      LValueType::Qual Q0, Q1;
+      bool Q0, Q1;
       bool isLValue0 = lookThroughLValue(T0, Q0);
       bool isLValue1 = lookThroughLValue(T1, Q1);
       
@@ -1498,21 +1497,15 @@ struct ASTNodeBase {};
       return isLValue0;
     }
 
-    Type checkLValue(Type T, bool &isInOut, const char *what) {
+    Type checkLValue(Type T, const char *what) {
       LValueType *LV = T->getAs<LValueType>();
-      if (LV) {
-        isInOut = LV->isInOut();
+      if (LV)
         return LV->getObjectType();
-      }
 
       Out << "type is not an l-value in " << what << ": ";
       T.print(Out);
       Out << "\n";
       abort();
-    }
-    Type checkLValue(Type T, const char *what) {
-      bool isInOut;
-      return checkLValue(T, isInOut, what);
     }
 
     // Verification utilities.

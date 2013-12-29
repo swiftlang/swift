@@ -183,6 +183,9 @@ namespace {
     RetTy visitLValueType(CanLValueType type) {
       llvm_unreachable("shouldn't get an l-value type here");
     }
+    RetTy visitInOutType(CanInOutType type) {
+      llvm_unreachable("shouldn't get an @inout type here");
+    }
 
     RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
       llvm_unreachable("shouldn't get a generic type parameter type here");
@@ -858,7 +861,7 @@ TypeConverter::~TypeConverter() {
     // Destroy only the unique entries.
     CanType srcType = CanType(ti.first.OrigType);
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
-    if (srcType == mappedType || isa<LValueType>(srcType))
+    if (srcType == mappedType || isa<InOutType>(srcType))
       ti.second->~TypeLowering();
   }
 }
@@ -870,7 +873,7 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
 #ifndef NDEBUG
 /// Is this type a lowered type?
 static bool isLoweredType(CanType type) {
-  if (isa<LValueType>(type))
+  if (isa<LValueType>(type) || isa<InOutType>(type))
     return false;
   if (isa<AnyFunctionType>(type))
     return false;
@@ -908,8 +911,12 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     if (auto substLV = dyn_cast<LValueType>(substEltType)) {
       SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
                                           substLV.getObjectType());
-      loweredSubstEltType =CanType(LValueType::get(silType.getSwiftRValueType(),
-                                                   substLV->getQualifiers()));
+      loweredSubstEltType = CanLValueType::get(silType.getSwiftRValueType());
+    } else if (auto substLV = dyn_cast<InOutType>(substEltType)) {
+      SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
+                                          substLV.getObjectType());
+      loweredSubstEltType = CanInOutType::get(silType.getSwiftRValueType());
+
     } else {
       // If the original type was an archetype, use that archetype as
       // the original type of the element --- the actual archetype
@@ -1016,11 +1023,11 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   assert(uncurryLevel == 0);
 
-  // L-value types are a special case for lowering, because they get
+  // @inout types are a special case for lowering, because they get
   // completely removed and represented as 'address' SILTypes.
-  if (auto substLValueType = dyn_cast<LValueType>(substType)) {
+  if (auto substInOutType = dyn_cast<InOutType>(substType)) {
     // Derive SILType for LValueType from the object type.
-    CanType substObjectType = substLValueType.getObjectType();
+    CanType substObjectType = substInOutType.getObjectType();
     AbstractionPattern origObjectType = origType.getLValueObjectType();
 
     SILType loweredType = getLoweredType(origObjectType, substObjectType,
@@ -1135,7 +1142,7 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
 CanType TypeConverter::getMethodSelfType(CanType selfType) const {
   if (selfType->hasReferenceSemantics())
     return selfType;
-  return CanType(LValueType::getInOut(selfType));
+  return CanInOutType::get(selfType);
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
@@ -1257,7 +1264,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::Box: {
       // Capture the owning ObjectPointer and the address of the value.
       inputFields.push_back(Context.TheObjectPointerType);
-      auto lvType = CanLValueType::get(captureType, LValueType::Qual::InOut);
+      auto lvType = CanInOutType::get(captureType);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }

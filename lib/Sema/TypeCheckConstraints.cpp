@@ -84,11 +84,10 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-Type constraints::adjustLValueForReference(Type type) {
+Type constraints::adjustInOutForReference(Type type) {
   // References to @inout arguments should become normal implicit lvalues.
-  if (auto lv = type->getAs<LValueType>())
-    if (lv->isInOut())
-      return LValueType::getImplicit(lv->getObjectType());
+  if (auto lv = type->getAs<InOutType>())
+    return LValueType::get(lv->getObjectType());
 
   return type;
 }
@@ -673,26 +672,21 @@ bool TypeChecker::typeCheckExpression(
       diagnoseExpr(*this, expr, listener);
       return true;
     }
+  } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
+    // We explicitly took a reference to the result, but didn't use it.
+    // Complain and emit a Fix-It to zap the '&'.
+    auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
+    diagnose(addressOf->getLoc(), diag::reference_non_inout,
+             ioTy->getObjectType())
+      .highlight(addressOf->getSubExpr()->getSourceRange())
+      .fixItRemove(SourceRange(addressOf->getLoc()));
+
+    // Strip the address-of expression.
+    result = addressOf->getSubExpr();
   } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
-    if (lvalueType->isInOut()) {
-      // We explicitly took a reference to the result, but didn't use it.
-      // Complain and emit a Fix-It to zap the '&'.
-      auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
-      diagnose(addressOf->getLoc(), diag::reference_non_inout,
-               lvalueType->getObjectType())
-        .highlight(addressOf->getSubExpr()->getSourceRange())
-        .fixItRemove(SourceRange(addressOf->getLoc()));
-
-      // Strip the address-of expression.
-      result = addressOf->getSubExpr();
-      lvalueType = result->getType()->getAs<LValueType>();
-    } 
-
-    if (lvalueType && !discardedExpr) {
-      // We referenced an lvalue. Load it.
-      assert(lvalueType->isImplicit() && "Explicit lvalue diagnosed above");
+    // We referenced an lvalue. Load it.
+    if (!discardedExpr)
       result = new (Context) LoadExpr(result, lvalueType->getObjectType());
-    }
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -924,7 +918,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
                       TVO_CanBindToLValue);
-    auto refTv = LValueType::getImplicit(objectTv);
+    auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;
   } else {

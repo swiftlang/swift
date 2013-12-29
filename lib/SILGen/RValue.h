@@ -257,7 +257,9 @@ public:
   explicit operator bool() const & { return !isUsed(); }
   
   /// True if this represents an lvalue.
-  bool isLValue() const & { return isa<LValueType>(type); }
+  bool isLValue() const & {
+    return isa<LValueType>(type) || isa<InOutType>(type);
+  }
   
   /// Add an element to the rvalue. The rvalue must not yet be complete.
   void addElement(RValue &&element) &;

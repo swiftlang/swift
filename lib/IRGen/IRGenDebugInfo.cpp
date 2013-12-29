@@ -1241,11 +1241,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                        DW_LANG_Swift);
   }
 
-  case TypeKind::LValue: {
-    // This is a [inout] type.
-    // FIXME: handle LValueTy->getQualifiers();
-    auto LValueTy = BaseTy->castTo<LValueType>();
-    auto DT = getOrCreateDesugaredType(LValueTy->getObjectType(), DbgTy, Scope);
+  case TypeKind::InOut: {
+    // This is a @inout type.
+    auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
+    auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy, Scope);
     return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
   }
 

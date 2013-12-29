@@ -264,6 +264,13 @@ namespace {
                                           origTy.getObjectType(),
                                           substTy.getObjectType());
     }
+    // inout go by the object type;  note that we ask the ordinary
+    // question, not the argument question.
+    bool visitInOutType(CanInOutType origTy, CanInOutType substTy) {
+      return differsByAbstractionInMemory(IGM,
+                                          origTy.getObjectType(),
+                                          substTy.getObjectType());
+    }
 
     bool visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       // Metatypes can differ by abstraction if the substitution
@@ -347,6 +354,7 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitSILFunctionType(CanSILFunctionType type) { return false; }
 
   bool visitLValueType(CanLValueType type) { return false; }
+  bool visitInOutType(CanInOutType type) { return false; }
   bool visitProtocolCompositionType(CanProtocolCompositionType type) {
     return false;
   }
@@ -564,6 +572,27 @@ namespace {
       Out.add(origValue);
     }
 
+    void visitInOutType(CanInOutType origTy, CanInOutType substTy) {
+      CanType origObjectTy = origTy.getObjectType();
+      CanType substObjectTy = substTy.getObjectType();
+      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
+        IGF.unimplemented(SourceLoc(), "remapping @inout values");
+      
+      llvm::Value *substMV = In.claimNext();
+      if (origObjectTy == substObjectTy)
+        return Out.add(substMV);
+      
+      // A bitcast will be sufficient.
+      auto &origObjectTI = IGF.IGM.getTypeInfoForUnlowered(origObjectTy);
+      auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
+      
+      auto substValue = substMV;
+      auto origValue =
+      IGF.Builder.CreateBitCast(substValue, origPtrTy,
+                                substValue->getName() + ".reinterpret");
+      Out.add(origValue);
+    }
+
     void visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
       CanType origInstanceTy = origTy.getInstanceType();
       CanType substInstanceTy = substTy.getInstanceType();
@@ -721,6 +750,25 @@ namespace {
       auto substValue =
         IGF.Builder.CreateBitCast(origMV, substPtrTy,
                                   origMV->getName() + ".reinterpret");
+      Out.add(substValue);
+    }
+    void visitInOutType(CanInOutType origTy, CanInOutType substTy) {
+      CanType origObjectTy = origTy.getObjectType();
+      CanType substObjectTy = substTy.getObjectType();
+      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
+        IGF.unimplemented(SourceLoc(), "remapping @inout");
+      
+      llvm::Value *origMV = In.claimNext();
+      if (origObjectTy == substObjectTy)
+        return Out.add(origMV);
+      
+      // A bitcast will be sufficient.
+      auto &substObjectTI = IGF.IGM.getTypeInfoForUnlowered(substObjectTy);
+      auto substPtrTy = substObjectTI.getStorageType()->getPointerTo();
+      
+      auto substValue =
+      IGF.Builder.CreateBitCast(origMV, substPtrTy,
+                                origMV->getName() + ".reinterpret");
       Out.add(substValue);
     }
 

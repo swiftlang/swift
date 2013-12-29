@@ -243,7 +243,7 @@ namespace {
         if (!superTy)
           return nullptr;
         
-        return LValueType::getImplicit(superTy);
+        return LValueType::get(superTy);
       }
       
       return E->getType();
@@ -755,8 +755,8 @@ namespace {
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                       /*options=*/0);
-      auto bound = LValueType::getImplicit(tv);
-      auto result = LValueType::getInOut(tv);
+      auto bound = LValueType::get(tv);
+      auto result = InOutType::get(tv);
 
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,

@@ -747,61 +747,45 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           ConstraintLocator::InstanceType));
     }
 
-    case TypeKind::Function: {
-      auto func1 = cast<FunctionType>(desugar1);
-      auto func2 = cast<FunctionType>(desugar2);
-      return matchFunctionTypes(func1, func2, kind, flags, locator);
-    }
+    case TypeKind::Function:
+      return matchFunctionTypes(cast<FunctionType>(desugar1),
+                                cast<FunctionType>(desugar2),
+                                kind, flags, locator);
 
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
-    case TypeKind::Array: {
-      auto array1 = cast<ArrayType>(desugar1);
-      auto array2 = cast<ArrayType>(desugar2);
-      return matchTypes(array1->getBaseType(), array2->getBaseType(),
+    case TypeKind::Array:
+      return matchTypes(cast<ArrayType>(desugar1)->getBaseType(),
+                        cast<ArrayType>(desugar2)->getBaseType(),
                         TypeMatchKind::SameType, subFlags,
                         locator.withPathElement(
                           ConstraintLocator::ArrayElementType));
-    }
 
     case TypeKind::ProtocolComposition:
       // Existential types handled below.
       break;
 
-    case TypeKind::LValue: {
-      auto lvalue1 = cast<LValueType>(desugar1);
-      auto lvalue2 = cast<LValueType>(desugar2);
-      // An argument to an operator must convert from an implicit LValue to an
-      // @inout lvalue.
-      if (kind == TypeMatchKind::OperatorConversion && lvalue2->isInOut()) {
-        if (!lvalue1->isImplicit()) {
-          // Record this failure.
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(locator),
-                          Failure::LValueQualifiers, type1, type2);
-          }
-          
-          return SolutionKind::Error;
-        }
-      } else {
-        if (lvalue1->isInOut() != lvalue2->isInOut()) {
-          // Record this failure.
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(locator),
-                          Failure::LValueQualifiers, type1, type2);
-          }
-          
-          return SolutionKind::Error;
-        }
-      }
-
-      return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
+    case TypeKind::LValue:
+      return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
+                        cast<LValueType>(desugar2)->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
                         locator.withPathElement(
                           ConstraintLocator::ArrayElementType));
-    }
+    
+    case TypeKind::InOut:
+      // If the RHS is an @inout type, the LHS must be an @lvalue type.
+      if (kind >= TypeMatchKind::OperatorConversion) {
+        if (shouldRecordFailures())
+          recordFailure(getConstraintLocator(locator),
+                        Failure::IsForbiddenLValue, type1, type2);
+        return SolutionKind::Error;
+      }
+      return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
+                        cast<InOutType>(desugar2)->getObjectType(),
+                        TypeMatchKind::SameType, subFlags,
+                  locator.withPathElement(ConstraintLocator::ArrayElementType));
 
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
@@ -880,23 +864,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (concrete && kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
-    if (auto lvalue1 = type1->getAs<LValueType>()) {
-      if (lvalue1->isImplicit()) {
-        potentialConversions.push_back(
-          ConversionRestrictionKind::LValueToRValue);
-      }
-    }
+    if (type1->is<LValueType>())
+      potentialConversions.push_back(
+        ConversionRestrictionKind::LValueToRValue);
 
     // An expression can be converted to an auto-closure function type, creating
     // an implicit closure.
     if (auto function2 = type2->getAs<FunctionType>()) {
-      if (function2->isAutoClosure()) {
+      if (function2->isAutoClosure())
         return matchTypes(type1, function2->getResult(), kind, subFlags,
                           locator.withPathElement(ConstraintLocator::Load));
-      }
     }
   }
 
+  if (concrete && kind >= TypeMatchKind::OperatorConversion) {
+    // If the RHS is an @inout type, the LHS must be an @lvalue type.
+    if (auto *iot = type2->getAs<InOutType>()) {
+      return matchTypes(type1, LValueType::get(iot->getObjectType()),
+                        kind, subFlags,
+                        locator.withPathElement(
+                                ConstraintLocator::ArrayElementType));
+    }
+  }
+  
   // For a subtyping relation involving two existential types or subtyping of
   // a class existential type, or a conversion from any type to an
   // existential type, check whether the first type conforms to each of the
@@ -1110,6 +1100,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::Array:
   case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
+  case TypeKind::InOut:
   case TypeKind::Protocol:
   case TypeKind::Module:
     // If we are supposed to record failures, do so.
@@ -1617,10 +1608,8 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
     return SolutionKind::Unsolved;
 
   // Look through implicit lvalue types.
-  if (auto lvalueTy = baseTy->getAs<LValueType>()) {
-    if (lvalueTy->isImplicit())
-      baseTy = lvalueTy->getObjectType();
-  }
+  if (auto lvalueTy = baseTy->getAs<LValueType>())
+    baseTy = lvalueTy->getObjectType();
 
   if (auto protoTy = baseTy->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(
