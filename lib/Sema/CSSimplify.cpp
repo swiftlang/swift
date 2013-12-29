@@ -110,7 +110,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     return SolutionKind::Solved;
   }
 
-  assert(kind == TypeMatchKind::Conversion);
+  assert(kind >= TypeMatchKind::Conversion);
 
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
@@ -147,8 +147,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     // Match up the types.
     const auto &elt1 = tuple1->getFields()[idx1];
     const auto &elt2 = tuple2->getFields()[idx2];
-    switch (matchTypes(elt1.getType(), elt2.getType(),
-                       TypeMatchKind::Conversion, subFlags,
+    switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
                        locator.withPathElement(
                          LocatorPathElt::getTupleElement(idx1)))) {
     case SolutionKind::Error:
@@ -167,8 +166,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     auto eltType2 = elt2.getVarargBaseTy();
 
     for (unsigned idx1 : variadicArguments) {
-      switch (matchTypes(tuple1->getElementType(idx1),
-                         eltType2, TypeMatchKind::Conversion, subFlags,
+      switch (matchTypes(tuple1->getElementType(idx1), eltType2, kind, subFlags,
                          locator.withPathElement(
                            LocatorPathElt::getTupleElement(idx1)))) {
       case SolutionKind::Error:
@@ -212,8 +210,8 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator) {
-  // An [auto_closure] function type can be a subtype of a
-  // non-[auto_closure] function type.
+  // An @auto_closure function type can be a subtype of a
+  // non-@auto_closure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
     if (func2->isAutoClosure() || kind < TypeMatchKind::TrivialSubtype) {
       // Record this failure.
@@ -226,7 +224,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  // A [noreturn] function type can be a subtype of a non-[noreturn] function
+  // A @noreturn function type can be a subtype of a non-@noreturn function
   // type.
   if (func1->isNoReturn() != func2->isNoReturn()) {
     if (func2->isNoReturn() || kind < TypeMatchKind::SameType) {
@@ -254,6 +252,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     break;
 
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::OperatorConversion:
     subKind = TypeMatchKind::Subtype;
     break;
   }
@@ -302,6 +301,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
     return Failure::TypesNotSubtypes;
 
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::OperatorConversion:
     return Failure::TypesNotConvertible;
   }
 
@@ -439,6 +439,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
+      
+  case TypeMatchKind::OperatorConversion:
+    return ConstraintKind::OperatorConversion;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -467,6 +470,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                   Type otherType, ConstraintLocatorBuilder locator) {
   assert(kind != ConstraintKind::Construction &&
          kind != ConstraintKind::Conversion &&
+         kind != ConstraintKind::OperatorConversion &&
          "Construction/conversion constraints create potential cycles");
 
   // If this isn't a type that can have user-defined conversions, there's
@@ -637,6 +641,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
+    case TypeMatchKind::OperatorConversion:
       if (flags & TMF_GenerateConstraints) {
         // Add a new constraint between these types. We consider the current
         // type-matching problem to the "solved" by this addition, because
@@ -651,8 +656,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
       if (typeVar1 && typeVar2)
-        return typeVar1 == typeVar2? SolutionKind::Solved
-                                   : SolutionKind::Unsolved;
+        return typeVar1 == typeVar2 ? SolutionKind::Solved
+                                    : SolutionKind::Unsolved;
         
       break;
     }
@@ -768,16 +773,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::LValue: {
       auto lvalue1 = cast<LValueType>(desugar1);
       auto lvalue2 = cast<LValueType>(desugar2);
-      if (lvalue1->getQualifiers() != lvalue2->getQualifiers() &&
-          !(kind >= TypeMatchKind::TrivialSubtype &&
-            lvalue1->isInOut() && lvalue2->isImplicit())) {
-        // Record this failure.
-        if (shouldRecordFailures()) {
-          recordFailure(getConstraintLocator(locator),
-                        Failure::LValueQualifiers, type1, type2);
+      // An argument to an operator must convert from an implicit LValue to an
+      // @inout lvalue.
+      if (kind == TypeMatchKind::OperatorConversion && lvalue2->isInOut()) {
+        if (!lvalue1->isImplicit()) {
+          // Record this failure.
+          if (shouldRecordFailures()) {
+            recordFailure(getConstraintLocator(locator),
+                          Failure::LValueQualifiers, type1, type2);
+          }
+          
+          return SolutionKind::Error;
         }
-
-        return SolutionKind::Error;
+      } else {
+        if (lvalue1->isInOut() != lvalue2->isInOut()) {
+          // Record this failure.
+          if (shouldRecordFailures()) {
+            recordFailure(getConstraintLocator(locator),
+                          Failure::LValueQualifiers, type1, type2);
+          }
+          
+          return SolutionKind::Error;
+        }
       }
 
       return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
@@ -1638,9 +1655,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   // If right-hand side is a type variable, the constraint is unsolved.
-  if (typeVar2) {
+  if (typeVar2)
     return SolutionKind::Unsolved;
-  }
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
@@ -1651,7 +1667,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
   parts.pop_back();
   ConstraintLocatorBuilder outerLocator = getConstraintLocator(anchor, parts);
-
+  
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();
   if (desugar2->getKind() == TypeKind::Function) {
@@ -1660,9 +1676,17 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     assert(func1->getResult()->is<TypeVariableType>() &&
            "the output of funct1 is a free variable by construction");
 
+    // If this application is part of an operator, then we allow an implicit
+    // lvalue to be compatible with @inout arguments.  This is used by
+    // assignment operators.
+    TypeMatchKind ArgConv = TypeMatchKind::Conversion;
+    if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||
+        isa<BinaryExpr>(anchor))
+      ArgConv = TypeMatchKind::OperatorConversion;
+    
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
-                   TypeMatchKind::Conversion, flags,
+                   ArgConv, flags,
                    outerLocator.withPathElement(
                      ConstraintLocator::ApplyArgument))
           == SolutionKind::Error)
@@ -1716,6 +1740,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+  case ConstraintKind::OperatorConversion:
+    return TypeMatchKind::OperatorConversion;
 
   case ConstraintKind::ApplicableFunction:
     llvm_unreachable("ApplicableFunction constraints don't involve "
@@ -1756,7 +1782,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Equal:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
-  case ConstraintKind::Conversion: {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::OperatorConversion: {
     // For relational constraints, match up the types.
     auto matchKind = getTypeMatchKind(constraint.getKind());
 
@@ -1842,7 +1869,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         break;
           
       case ConversionRestrictionKind::User:
-        assert(constraint.getKind() == ConstraintKind::Conversion);
+        assert(constraint.getKind() >= ConstraintKind::Conversion);
         result = tryUserConversion(*this, constraint.getFirstType(),
                                    ConstraintKind::Subtype,
                                    constraint.getSecondType(),
@@ -1858,7 +1885,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
       case SolutionKind::Solved:
         assert(solverState && "Can't record restriction without solver state");
-        if (constraint.getKind() == ConstraintKind::Conversion) {
+        if (constraint.getKind() >= ConstraintKind::Conversion) {
           solverState->constraintRestrictions.push_back(
               std::make_tuple(constraint.getFirstType(),
                               constraint.getSecondType(), *restriction));
@@ -1874,15 +1901,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                       TMF_None, constraint.getLocator());
   }
 
-  case ConstraintKind::ApplicableFunction: {
+  case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(constraint);
-  }
 
-  case ConstraintKind::BindOverload: {
+  case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice());
     return SolutionKind::Solved;
-  }
 
   case ConstraintKind::Construction:
     return simplifyConstructionConstraint(constraint.getSecondType(),

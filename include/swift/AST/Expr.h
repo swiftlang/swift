@@ -1785,8 +1785,9 @@ class AddressOfExpr : public Expr {
   SourceLoc OperLoc;
 
 public:
-  AddressOfExpr(SourceLoc operLoc, Expr *subExpr, Type type)
-    : Expr(ExprKind::AddressOf, /*Implicit=*/false, type),
+  AddressOfExpr(SourceLoc operLoc, Expr *subExpr, Type type,
+                bool isImplicit = false)
+    : Expr(ExprKind::AddressOf, isImplicit, type),
       SubExpr(subExpr), OperLoc(operLoc) {}
 
   SourceRange getSourceRange() const {

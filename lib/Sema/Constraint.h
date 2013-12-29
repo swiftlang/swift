@@ -60,6 +60,8 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
+  /// \brief The first type is convertible to the second type, including @inout.
+  OperatorConversion,
   /// \brief The first type can be converted to the second type or can be
   /// used as an argument to a constructor for the second (non-reference)
   /// type.
@@ -287,6 +289,7 @@ public:
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::OperatorConversion:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::CheckedCast:

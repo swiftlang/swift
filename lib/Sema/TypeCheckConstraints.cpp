@@ -85,34 +85,9 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 }
 
 Type constraints::adjustLValueForReference(Type type, bool isAssignment) {
+  // References to @inout arguments should become normal implicit lvalues.
   if (auto lv = type->getAs<LValueType>())
     return LValueType::getImplicit(lv->getObjectType());
-
-  // For an assignment operator, the first parameter is an implicit inout.
-  if (isAssignment) {
-    if (auto funcTy = type->getAs<FunctionType>()) {
-      Type inputTy;
-      if (auto inputTupleTy = funcTy->getInput()->getAs<TupleType>()) {
-        if (inputTupleTy->getFields().size() > 0) {
-          auto &firstParam = inputTupleTy->getFields()[0];
-          auto firstParamTy
-            = adjustLValueForReference(firstParam.getType(), false);
-          SmallVector<TupleTypeElt, 2> elements;
-          elements.push_back(firstParam.getWithType(firstParamTy));
-          elements.append(inputTupleTy->getFields().begin() + 1,
-                          inputTupleTy->getFields().end());
-          inputTy = TupleType::get(elements, type->getASTContext());
-        } else {
-          inputTy = funcTy->getInput();
-        }
-      } else {
-        inputTy = adjustLValueForReference(funcTy->getInput(), false);
-      }
-
-      return FunctionType::get(inputTy, funcTy->getResult(),
-                               funcTy->getExtInfo());
-    }
-  }
 
   return type;
 }

@@ -750,10 +750,10 @@ namespace {
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
       // The address-of operator produces an explicit lvalue
-      // [inout(settable)] T from a (potentially implicit) settable lvalue S.
+      // @inout T from an implicit lvalue @inout (implicit) T.
       // We model this with the constraint
       //
-      //     S < [inout(implicit, settable)] T
+      //     S < @inout(implicit) T
       //
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),

@@ -671,7 +671,7 @@ static Type computeSelfType(AbstractFunctionDecl *func,
   }
   
   // Otherwise, 'self' is passed inout.
-  return LValueType::getImplicit(selfTy);
+  return LValueType::getInOut(selfTy);
 }
 
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {

@@ -891,7 +891,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // lvalue.
       if (!selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>())
-        selfTy = LValueType::getImplicit(selfTy);
+        selfTy = LValueType::getInOut(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);
     }

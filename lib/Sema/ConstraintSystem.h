@@ -548,7 +548,12 @@ enum class TypeMatchKind : char {
   Subtype,
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
-  Conversion
+  Conversion,
+  /// \brief Requires the first type to be convertible to the second type,
+  /// which includes exact matches, both forms of subtyping, and inserting
+  /// address-of to convert implicit lvalues to @inout arguments.  This is
+  /// used by assignment operators.
+  OperatorConversion
 };
 
 /// \brief The result of comparing two constraint systems that are a solutions

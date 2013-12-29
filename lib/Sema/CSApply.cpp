@@ -196,8 +196,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
     if (auto *SelfLV = selfTy->getAs<LValueType>()) {
-      assert(SelfLV->isImplicit() && "self should always be implicit");
-      return LValueType::getImplicit(baseTy->getRValueType());
+      assert(SelfLV->isInOut() && "self should always be @inout");
+      return LValueType::getInOut(baseTy->getRValueType());
     }
 
     // Otherwise, return the rvalue type.
@@ -208,18 +208,18 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   // FIXME: Remove this when materialization is dead.
   if (auto *VD = dyn_cast<VarDecl>(member))
     if (VD->isComputed() && !baseTy->hasReferenceSemantics())
-      return LValueType::getImplicit(baseTy->getRValueType());
+      return LValueType::getInOut(baseTy->getRValueType());
   
   // The base of subscripts are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
-    return LValueType::getImplicit(baseTy->getRValueType());
+    return LValueType::getInOut(baseTy->getRValueType());
   
   // Accesses to non-function members in value types are done through an lvalue
   // with whatever access permissions the base has.  We just set the implicit
   // bit.
   if (baseTy->is<LValueType>())
-    return LValueType::getImplicit(baseTy->getRValueType());
+    return LValueType::getInOut(baseTy->getRValueType());
   
   // Accesses to members in values of reference type (classes, metatypes) are
   // always done through a the reference to self.  Accesses to value types with
@@ -422,10 +422,8 @@ namespace {
           // use it as the lvalue qualified type.
           selfTy = containerTy;
           if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-            if (auto *LV = base->getType()->getAs<LValueType>()) {
-              assert(LV->isImplicit() && "accessing member of explicit qual?");
-              selfTy = LValueType::getImplicit(selfTy);
-            }
+            if (base->getType()->is<LValueType>())
+              selfTy = LValueType::getInOut(selfTy);
         }
         base = coerceObjectArgumentToType(
                  base, 
@@ -738,9 +736,9 @@ namespace {
       if (subscript->isSettable())
         resultTy = LValueType::getImplicit(resultTy);
       
-      // Subscripts on a struct always take them as lvalues (for now!)
+      // Subscripts on a struct always take them as @inout lvalues (for now!)
       if (!containerTy->hasReferenceSemantics())
-        containerTy = LValueType::getImplicit(containerTy);
+        containerTy = LValueType::getInOut(containerTy);
 
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
@@ -832,7 +830,7 @@ namespace {
         auto resultFnTy = resultTy->castTo<FunctionType>();
         auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
         if (!selfTy->hasReferenceSemantics())
-          selfTy = LValueType::getImplicit(selfTy);
+          selfTy = LValueType::getInOut(selfTy);
 
         resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
                                      resultFnTy->getExtInfo());
@@ -2755,8 +2753,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                    fromLValue->getQualifiers());
       superRef->setType(fromLValue);
     }
-
-    if (toType->is<LValueType>()) {
+    
+    if (auto *toLV = toType->getAs<LValueType>()) {
+      if (toLV->isInOut()) {
+        // In an @assignment operator like "++i", the operand is converted from
+        // an implicit lvalue to an @inout argument.
+        assert(toLV->getObjectType()->isEqual(fromLValue->getObjectType()));
+        expr = new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
+                                              toType, /*isImplicit*/true);
+        return expr;
+      }
+      
+      
       // Update the qualifiers on the lvalue.
       expr = new (tc.Context) RequalifyExpr(expr,
                           LValueType::getImplicit(fromLValue->getObjectType()));
@@ -2940,7 +2948,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
 
   // Form the lvalue type we will be producing.
   auto &tc = cs.getTypeChecker();
-  Type destType = LValueType::getImplicit(containerType);
+  Type destType = LValueType::getInOut(containerType);
 
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();
@@ -2949,10 +2957,13 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
 
   // If the source is an lvalue...
   if (auto fromLValue = fromType->getAs<LValueType>()) {
-    // If the object types are the same, just requalify it.
-    if (fromLValue->getObjectType()->isEqual(containerType))
-      return new (tc.Context) RequalifyExpr(expr, destType,
-                                            /*forObject*/ true);
+    // If the object types are the same, use AddressOfExpr to convert it to an
+    // explicit @inout argument for the receiver.
+    if (fromLValue->getObjectType()->isEqual(containerType)) {
+      assert(fromLValue->isImplicit());
+      return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
+                                            destType, /*isImplicit*/true);
+    }
 
     // If the object types are different, coerce to the container type.
     expr = coerceToType(expr, containerType, locator);
