@@ -52,6 +52,7 @@ namespace swift {
   class FuncDecl;
   class BraceStmt;
   class DeclAttributes;
+  class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class Module;
@@ -650,6 +651,11 @@ class GenericParamList {
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
 
+  void getAsGenericSignatureElements(ASTContext &C,
+                         llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
+                         SmallVectorImpl<GenericTypeParamType*> &genericParams,
+                         SmallVectorImpl<Requirement> &requirements) const;
+  
 public:
   /// create - Create a new generic parameter list within the given AST context.
   ///
@@ -805,6 +811,16 @@ public:
       ++depth;
     return depth;
   }
+  
+  /// Get the generic parameter list as a GenericSignature in which the generic
+  /// parameters have been canonicalized.
+  ///
+  /// \param archetypeMap   This DenseMap is populated with a mapping of
+  ///                       context primary archetypes to dependent generic
+  ///                       types.
+  GenericSignature *getAsCanonicalGenericSignature(
+                           llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
+                           ASTContext &C) const;
   
   void print(raw_ostream &OS);
   void dump();

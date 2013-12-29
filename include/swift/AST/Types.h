@@ -46,6 +46,7 @@ namespace swift {
   class GenericTypeParamType;
   class GenericParam;
   class GenericParamList;
+  class GenericSignature;
   class Identifier;
   class SILModule;
   class SILType;
@@ -1919,14 +1920,25 @@ public:
   typedef AnyFunctionType::ExtInfo ExtInfo;
 
 private:
-  /// TODO: Use the representation from GenericFunctionType.
+  /// TODO: Retire in favor of GenericSig.
   GenericParamList *GenericParams;
+  
+  GenericSignature *GenericSig;
 
   /// TODO: Permit an arbitrary number of results.
+  /// TODO: Retire in favor of InterfaceResult.
   const SILResultInfo Result;
+  SILResultInfo InterfaceResult;
 
+  /// TODO: Retire in favor of InterfaceParameters.
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
+    unsigned n = SILFunctionTypeBits.NumParameters;
+    return MutableArrayRef<SILParameterInfo>(ptr, n);
+  }
+  MutableArrayRef<SILParameterInfo> getMutableInterfaceParameters() {
+    auto ptr
+      = reinterpret_cast<SILParameterInfo*>(getMutableParameters().end());
     unsigned n = SILFunctionTypeBits.NumParameters;
     return MutableArrayRef<SILParameterInfo>(ptr, n);
   }
@@ -1934,16 +1946,7 @@ private:
   SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params, SILResultInfo result,
-                  const ASTContext &ctx)
-    : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
-      GenericParams(genericParams), Result(result) {
-    SILFunctionTypeBits.ExtInfo = ext.Bits;
-    SILFunctionTypeBits.NumParameters = params.size();
-    assert(!isIndirectParameter(calleeConvention));
-    SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
-    memcpy(getMutableParameters().data(), params.data(),
-           params.size() * sizeof(SILParameterInfo));
-  }
+                  const ASTContext &ctx);
 
   static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
@@ -1965,11 +1968,20 @@ public:
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
   }
 
+  // TODO: Retire in favor of getInterfaceResult.
   SILResultInfo getResult() const {
     return Result;
   }
+  SILResultInfo getInterfaceResult() const {
+    return InterfaceResult;
+  }
+  
+  // TODO: Retire in favor of getInterfaceParameters.
   ArrayRef<SILParameterInfo> getParameters() const {
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
+  }
+  ArrayRef<SILParameterInfo> getInterfaceParameters() const {
+    return const_cast<SILFunctionType*>(this)->getMutableInterfaceParameters();
   }
 
   bool hasIndirectResult() const {
@@ -2001,7 +2013,9 @@ public:
   }
 
   bool isPolymorphic() const { return GenericParams != nullptr; }
+  /// TODO: Remove in favor of getGenericSignature().
   GenericParamList *getGenericParams() const { return GenericParams; }
+  GenericSignature *getGenericSignature() const { return GenericSig; }
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
@@ -2432,6 +2446,11 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Archetype;
   }
+  
+  /// Convert an archetype to a dependent generic parameter type using the
+  /// given mapping of primary archetypes to generic parameter types.
+  Type getAsDependentType(
+                    const llvm::DenseMap<ArchetypeType *, Type> &archetypeMap);
   
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,

@@ -1407,6 +1407,74 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   result.profile(id);
 }
 
+SILFunctionType::SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
+                                 ParameterConvention calleeConvention,
+                                 ArrayRef<SILParameterInfo> params,
+                                 SILResultInfo result,
+                                 const ASTContext &ctx)
+  : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
+    GenericParams(genericParams),
+    // TODO: GenericSig should be given as a constructor parameter.
+    Result(result) {
+  SILFunctionTypeBits.ExtInfo = ext.Bits;
+  SILFunctionTypeBits.NumParameters = params.size();
+  assert(!isIndirectParameter(calleeConvention));
+  SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
+  memcpy(getMutableParameters().data(), params.data(),
+         params.size() * sizeof(SILParameterInfo));
+  
+  // Derive interface types for the result and parameters.
+  if (GenericParams) {
+    llvm::DenseMap<ArchetypeType *, Type> archetypeMap;
+    // TODO: GenericSig and the interface types should be the constructor
+    // parameters.
+    GenericSig = GenericParams->getAsCanonicalGenericSignature(archetypeMap,
+                                                               getASTContext());
+    
+    /* FIXME: We place the wrong generic parameter list on some SILFunctionTypes
+       causing things to explode when we try to map out the archetypes.
+       Disable until those problems are fixed.
+     
+    auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
+      if (!t) return t;
+      if (auto arch = t->getAs<ArchetypeType>()) {
+        return arch->getAsDependentType(archetypeMap);
+      }
+      return t;
+    };
+    
+    for (unsigned i = 0; i < params.size(); ++i) {
+      auto &interfaceParam = getMutableInterfaceParameters()[i];
+      const auto &param = getParameters()[i];
+      
+      auto interfaceParamTy = param.getType()
+        .transform(getArchetypesAsDependentTypes)
+        ->getCanonicalType();
+      interfaceParam = SILParameterInfo(interfaceParamTy,
+                                        param.getConvention());
+    }
+    
+    auto interfaceResultTy = Result.getType()
+      .transform(getArchetypesAsDependentTypes)
+      ->getCanonicalType();
+    InterfaceResult = SILResultInfo(interfaceResultTy,
+                                    Result.getConvention());
+     */
+    InterfaceResult = Result;
+    memcpy(getMutableInterfaceParameters().data(),
+           getMutableParameters().data(),
+           params.size() * sizeof(SILParameterInfo));
+  } else {
+    // If not generic, the interface types are equivalent.
+    GenericSig = nullptr;
+    InterfaceResult = Result;
+    memcpy(getMutableInterfaceParameters().data(),
+           getMutableParameters().data(),
+           params.size() * sizeof(SILParameterInfo));
+  }
+}
+
+
 CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
                                         ExtInfo ext, ParameterConvention callee,
                                         ArrayRef<SILParameterInfo> params,
@@ -1424,8 +1492,9 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
   // All SILFunctionTypes are canonical.
 
   // Allocate storage for the object.
+  // FIXME: 2*params.size() so we can stash interface types.
   size_t bytes = sizeof(SILFunctionType)
-               + sizeof(SILParameterInfo) * params.size();
+               + sizeof(SILParameterInfo) * 2 * params.size();
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   auto fnType =

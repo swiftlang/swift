@@ -1715,6 +1715,9 @@ case TypeKind::Id:
     if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
       return *this;
 
+    if (meta->hasThin())
+      return MetatypeType::get(instanceTy, meta->isThin(),
+                               Ptr->getASTContext());
     return MetatypeType::get(instanceTy, Ptr->getASTContext());
   }
 
