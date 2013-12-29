@@ -165,6 +165,7 @@ private:
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
+  std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
 
   SmallVector<Decl *, 1> ImportDecls;
   bool ComputedImportDecls = false;

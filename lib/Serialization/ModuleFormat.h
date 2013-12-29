@@ -918,7 +918,8 @@ namespace index_block {
     TOP_LEVEL_DECLS,
     OPERATORS,
     EXTENSIONS,
-    CLASS_MEMBERS
+    CLASS_MEMBERS,
+    OPERATOR_METHODS
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
@@ -927,7 +928,7 @@ namespace index_block {
   >;
 
   using DeclListLayout = BCGenericRecordLayout<
-    BCFixed<3>,  // record ID
+    BCFixed<4>,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;

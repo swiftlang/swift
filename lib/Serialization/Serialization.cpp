@@ -257,6 +257,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, OPERATORS);
   BLOCK_RECORD(index_block, EXTENSIONS);
   BLOCK_RECORD(index_block, CLASS_MEMBERS);
+  BLOCK_RECORD(index_block, OPERATOR_METHODS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -2008,6 +2009,25 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
+/// Add operator methods to the given declaration type.
+static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members, 
+                                   Serializer::DeclTable &operatorMethodDecls) {
+  for (auto member : members) {
+    // Add operator methods.
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      if (!func->getName().empty() && func->getName().isOperator())
+        operatorMethodDecls[func->getName()]
+          .push_back({0, S.addDeclRef(func)});
+      continue;
+    }
+
+    // Recurse into nested types.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(member)) {
+      addOperatorMethodDecls(S, nominal->getMembers(), operatorMethodDecls);
+    }
+  }
+}
+
 void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
   assert(!this->M && "already serializing a module");
   this->M = getModule(DC);
@@ -2015,7 +2035,7 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
 
   writeSILFunctions(SILMod);
 
-  DeclTable topLevelDecls, extensionDecls, operatorDecls;
+  DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
   for (auto nextFile : files) {
     // FIXME: Switch to a visitor interface?
@@ -2031,12 +2051,19 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
         topLevelDecls[VD->getName()]
           .push_back({ getKindForTable(D), addDeclRef(D) });
 
+        // Add operator methods from nominal types.
+        if (auto nominal = dyn_cast<NominalTypeDecl>(VD)) {
+          addOperatorMethodDecls(*this, nominal->getMembers(), 
+                                 operatorMethodDecls);
+        }
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
         const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
         extensionDecls[extendedNominal->getName()]
           .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
 
+        // Add operator methods from extensions.
+        addOperatorMethodDecls(*this, ED->getMembers(), operatorMethodDecls);
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
@@ -2048,7 +2075,7 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
   writeAllIdentifiers();
 
   {
-    BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);
+    BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 4);
 
     index_block::OffsetsLayout Offsets(Out);
     writeOffsets(Offsets, DeclOffsets);
@@ -2060,6 +2087,7 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
+    writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
 
     {
       BCBlockRAII subBlock(Out, KNOWN_PROTOCOL_BLOCK_ID, 3);

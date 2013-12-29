@@ -252,6 +252,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::CLASS_MEMBERS:
         ClassMembersByName = readDeclTable(scratch, blobData);
         break;
+      case index_block::OPERATOR_METHODS:
+        OperatorMethodDecls = readDeclTable(scratch, blobData);
+        break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
         break;
@@ -530,16 +533,26 @@ void ModuleFile::lookupValue(Identifier name,
                              SmallVectorImpl<ValueDecl*> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
-  if (!TopLevelDecls)
-    return;
+  if (TopLevelDecls) {
+    // Find top-level declarations with the given name.
+    auto iter = TopLevelDecls->find(name);
+    if (iter != TopLevelDecls->end()) {
+      for (auto item : *iter) {
+        auto VD = cast<ValueDecl>(getDecl(item.second));
+        results.push_back(VD);
+      }
+    }
+  }
 
-  auto iter = TopLevelDecls->find(name);
-  if (iter == TopLevelDecls->end())
-    return;
-
-  for (auto item : *iter) {
-    auto VD = cast<ValueDecl>(getDecl(item.second));
-    results.push_back(VD);
+  // If the name is an operator name, also look for operator methods.
+  if (name.isOperator() && OperatorMethodDecls) {
+    auto iter = OperatorMethodDecls->find(name);
+    if (iter != OperatorMethodDecls->end()) {
+      for (auto item : *iter) {
+        auto VD = cast<ValueDecl>(getDecl(item.second));
+        results.push_back(VD);
+      }
+    }
   }
 }
 
