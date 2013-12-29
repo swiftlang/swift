@@ -2755,22 +2755,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     if (auto *toLV = toType->getAs<LValueType>()) {
-      if (toLV->isInOut()) {
-        // In an @assignment operator like "++i", the operand is converted from
-        // an implicit lvalue to an @inout argument.
-        assert(toLV->getObjectType()->isEqual(fromLValue->getObjectType()));
-        expr = new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
-                                              toType, /*isImplicit*/true);
-        return expr;
-      }
-      
-      
-      // Update the qualifiers on the lvalue.
-      expr = new (tc.Context) RequalifyExpr(expr,
-                          LValueType::getImplicit(fromLValue->getObjectType()));
-
-      // Coerce the result.
-      return coerceToType(expr, toType, locator);
+      assert(toLV->isInOut());
+      // In an @assignment operator like "++i", the operand is converted from
+      // an implicit lvalue to an @inout argument.
+      assert(toLV->getObjectType()->isEqual(fromLValue->getObjectType()));
+      expr = new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
+                                            toType, /*isImplicit*/true);
+      return expr;
     }
 
     if (fromLValue->isImplicit()) {

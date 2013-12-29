@@ -609,24 +609,6 @@ struct ASTNodeBase {};
       }
     }
 
-    void verifyChecked(RequalifyExpr *E) {
-      bool dstIsInOut, srcIsInOut;
-      Type dstObj = checkLValue(E->getType(), dstIsInOut,
-                                "result of RequalifyExpr");
-      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcIsInOut,
-                                "input to RequalifyExpr");
-      checkSameType(dstObj, srcObj,
-                    "objects of result and operand of RequalifyExpr");
-      // Requalify can only set the implicit bit.
-      if (!srcIsInOut || dstIsInOut) {
-        Out << "bad qualifier sets for RequalifyExpr:\n";
-        E->print(Out);
-        Out << "\n";
-        abort();
-      }
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(MetatypeConversionExpr *E) {
       auto destTy = checkMetatypeType(E->getType(),
                                       "result of MetatypeConversionExpr");

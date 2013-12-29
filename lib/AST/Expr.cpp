@@ -375,19 +375,6 @@ SourceRange UnresolvedPatternExpr::getSourceRange() const {
   return subPattern->getSourceRange();
 }
 
-RequalifyExpr::RequalifyExpr(Expr *subExpr, Type type, bool isForObject)
-  : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type),
-    IsForObject(isForObject) {
-
-  assert(subExpr->getType()->is<LValueType>() && type->is<LValueType>() &&
-         "RequalifyExpr can only convert from lvalue to lvalue");
-
-  assert(subExpr->getType()->castTo<LValueType>()->isInOut() &&
-         type->castTo<LValueType>()->isImplicit() &&
-         "RequalifyExpr is stripping lvalue qualifiers!");
-}
-
-
 
 unsigned ScalarToTupleExpr::getScalarField() const {
   unsigned result = std::find(Elements.begin(), Elements.end(), Element())

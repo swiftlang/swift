@@ -1587,27 +1587,6 @@ public:
     return E->getKind() == ExprKind::Materialize;
   }
 };
-
-/// RequalifyExpr - Change the qualification on an l-value.  The new
-/// type always has the same object type as the old type with strictly
-/// "more" (i.e. a supertyped set of) qualifiers.
-class RequalifyExpr : public ImplicitConversionExpr {
-  bool IsForObject;
-public:
-  RequalifyExpr(Expr *subExpr, Type type, bool isForObject = false);
-  
-  /// Is this requalification for the object operand?
-  ///
-  /// Qualification adjustments for the object operand are permitted
-  /// to remove non-settability.  This is neither sound nor a good
-  /// idea, but it's necessary until we have the capacity to control
-  /// mutation.
-  bool isForObjectOperand() const { return IsForObject; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Requalify;
-  }
-};
   
 /// FunctionConversionExpr - Convert a function to another function type,
 /// which might involve renaming the parameters or handling substitutions

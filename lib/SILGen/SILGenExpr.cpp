@@ -229,7 +229,6 @@ namespace {
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
-    RValue visitRequalifyExpr(RequalifyExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
@@ -771,12 +770,6 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                     archetype.forward(SGF),
                                     SGF.getLoweredLoadableType(E->getType()));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));
-}
-
-RValue RValueEmitter::visitRequalifyExpr(RequalifyExpr *E, SGFContext C) {
-  assert(E->getType()->is<LValueType>() && "non-lvalue requalify");
-  // Ignore lvalue qualifiers.
-  return visit(E->getSubExpr());
 }
 
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,

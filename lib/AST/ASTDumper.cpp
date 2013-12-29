@@ -1218,11 +1218,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitRequalifyExpr(RequalifyExpr *E) {
-    printCommon(E, "requalify_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
     printCommon(E, "metatype_conversion_expr") << '\n';
     printRec(E->getSubExpr());

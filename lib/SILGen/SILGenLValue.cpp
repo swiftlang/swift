@@ -110,7 +110,6 @@ public:
   // Expressions that wrap lvalues
   
   LValue visitAddressOfExpr(AddressOfExpr *e);
-  LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
 
@@ -664,12 +663,6 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
-  return visitRec(e->getSubExpr());
-}
-
-LValue SILGenLValue::visitRequalifyExpr(RequalifyExpr *e) {
-  assert(e->getType()->is<LValueType>() &&
-         "non-lvalue requalify in lvalue expression");
   return visitRec(e->getSubExpr());
 }
 
