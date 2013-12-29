@@ -345,7 +345,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (isa<LValueType>(canType)) {
     return type->castTo<LValueType>()->getObjectType();
 
-  // Turn [weak] T into Optional<T>.
+  // Turn @weak T into Optional<T>.
   } else if (isa<WeakStorageType>(canType)) {
     // On the one hand, we should probably use a better location than
     // the declaration's.  On the other hand, all these diagnostics

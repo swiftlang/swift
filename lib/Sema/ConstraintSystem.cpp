@@ -655,8 +655,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                 openType(valueType,
                          value->getPotentialGenericDeclContext(),
                          /*skipProtocolSelfConstraint=*/false,
-                         opener),
-                value->getAttrs().isAssignment());
+                         opener));
   return { valueType, valueType };
 }
 
@@ -986,9 +985,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
 
 /// \brief Retrieve the fully-materialized form of the given type.
 static Type getMateralizedType(Type type, ASTContext &context) {
-  if (auto lvalue = type->getAs<LValueType>()) {
+  if (auto lvalue = type->getAs<LValueType>())
     return lvalue->getObjectType();
-  }
 
   if (auto tuple = type->getAs<TupleType>()) {
     bool anyChanged = false;
@@ -1020,7 +1018,7 @@ static Type getMateralizedType(Type type, ASTContext &context) {
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice){
-  // Determie the type to which we'll bind the overload set's type.
+  // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
   switch (choice.getKind()) {
@@ -1052,10 +1050,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // getTypeOfMemberReference(); their result types are optional.
       if (!isa<SubscriptDecl>(choice.getDecl()))
         refType = OptionalType::get(refType->getRValueType());
-    } else {
-      // Otherwise, adjust the lvalue type for this reference.
-      bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
-      refType = adjustLValueForReference(refType, isAssignment);
     }
 
     break;

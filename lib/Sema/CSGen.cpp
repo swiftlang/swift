@@ -243,10 +243,7 @@ namespace {
         if (!superTy)
           return nullptr;
         
-        superTy = LValueType::getImplicit(superTy);
-        
-        return adjustLValueForReference(superTy,
-                                      E->getSelf()->getAttrs().isAssignment());
+        return LValueType::getImplicit(superTy);
       }
       
       return E->getType();

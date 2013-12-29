@@ -1825,9 +1825,7 @@ public:
 
 /// \brief Adjust lvalue types within the type of a reference to a declaration.
 ///
-/// For an lvalue type, this routine adds the 'implicit' bit to the lvalue.
-///
-Type adjustLValueForReference(Type type, bool isAssignment);
+Type adjustLValueForReference(Type type);
 
 /// \brief Compute the shuffle required to map from a given tuple type to
 /// another tuple type.

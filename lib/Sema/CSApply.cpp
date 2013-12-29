@@ -1153,7 +1153,7 @@ namespace {
 
       Type type = cs.TC.getUnopenedTypeOfReference(decl, Type(),
                                                    /*wantInterfaceType=*/true);
-      return adjustLValueForReference(type, decl->getAttrs().isAssignment());
+      return adjustLValueForReference(type);
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {

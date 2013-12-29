@@ -84,10 +84,11 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-Type constraints::adjustLValueForReference(Type type, bool isAssignment) {
+Type constraints::adjustLValueForReference(Type type) {
   // References to @inout arguments should become normal implicit lvalues.
   if (auto lv = type->getAs<LValueType>())
-    return LValueType::getImplicit(lv->getObjectType());
+    if (lv->isInOut())
+      return LValueType::getImplicit(lv->getObjectType());
 
   return type;
 }
