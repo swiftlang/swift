@@ -652,6 +652,7 @@ struct ASTNodeBase {};
       Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
       checkSameType(obj, E->getSubExpr()->getType(),
                     "result and operand of MaterializeExpr");
+      assert(E->getType()->getAs<LValueType>()->isImplicit());
       verifyCheckedBase(E);
     }
 

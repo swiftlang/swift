@@ -2934,6 +2934,9 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   if (!toType->is<LValueType>())
     return coerceToType(expr, toType, locator);
 
+  assert(toType->castTo<LValueType>()->isInOut() &&
+         "Object argument is an implicit lvalue?");
+  
   // Map down to the underlying object type.
   Type containerType = toType->getRValueType();
 
@@ -2946,24 +2949,19 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   if (fromType->isEqual(destType))
     return expr;
 
-  // If the source is an lvalue...
-  if (auto fromLValue = fromType->getAs<LValueType>()) {
-    // If the object types are the same, use AddressOfExpr to convert it to an
-    // explicit @inout argument for the receiver.
-    if (fromLValue->getObjectType()->isEqual(containerType)) {
-      assert(fromLValue->isImplicit());
-      return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
-                                            destType, /*isImplicit*/true);
-    }
-
+  if (!fromType->is<LValueType>()) {
     // If the object types are different, coerce to the container type.
     expr = coerceToType(expr, containerType, locator);
 
-    // Fall through to materialize.
+    // If the source is not an lvalue, materialize it.
+    expr = new (tc.Context) MaterializeExpr(expr,
+                                  LValueType::getImplicit(containerType));
   }
-
-  // If the source is not an lvalue, materialize it.
-  return new (tc.Context) MaterializeExpr(expr, destType);
+  
+  // Use AddressOfExpr to convert it to an explicit @inout argument for the
+  // receiver.
+  return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
+                                        destType, /*isImplicit*/true);
 }
 
 Expr *ExprRewriter::convertLiteral(Expr *literal,
