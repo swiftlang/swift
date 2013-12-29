@@ -24,7 +24,7 @@ using namespace swift;
 
 static llvm::cl::opt<unsigned>
 InlineCostThreshold("sil-inline-threshold", llvm::cl::Hidden,
-                    llvm::cl::init(255));
+                    llvm::cl::init(50));
 
 STATISTIC(NumApply, "Total number of ApplyInst.");
 STATISTIC(NumApplyInlined, "Number of ApplyInst inlined");
