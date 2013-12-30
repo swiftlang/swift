@@ -1,0 +1,251 @@
+// RUN: %sil-opt %s -sroa -verify | FileCheck %s
+
+import swift
+import Builtin
+
+class C1 {
+  var data : Builtin.Int64
+}
+
+class C2 {
+  var data : Builtin.FPIEEE32
+}
+
+class C3 {
+  var data : Builtin.FPIEEE64
+}
+
+struct S2 {
+  var cls1 : C1
+  var cls2 : C2
+  var trivial : Builtin.FPIEEE32
+}
+
+struct S {
+  var trivial : Builtin.Int64
+  var cls : C3
+  var inner_struct : S2
+}
+
+enum E {
+  case NoElement()
+  case TrivialElement(Builtin.Int64)
+  case ReferenceElement(C1)
+  case StructNonTrivialElt(S)
+  case TupleNonTrivialElt((Builtin.Int64, S, C3))
+}
+
+//////////////////
+// Destroy Addr //
+//////////////////
+
+// CHECK-LABEL: sil @expand_destroy_addr_trivial
+// CHECK: bb0
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @expand_destroy_addr_trivial : $@thin (@inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  destroy_addr %0 : $*Builtin.Int64
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_addr_aggstructnontrivial
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_addr_aggstructnontrivial : $@thin (@inout S) -> () {
+bb0(%0 : $*S):
+  destroy_addr %0 : $*S
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_addr_aggtuplenontrivial
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_addr_aggtuplenontrivial : $@thin (@inout (S, S2, C1)) -> () {
+bb0(%0 : $*(S, S2, C1)):
+  destroy_addr %0 : $*(S, S2, C1)
+  %1 = tuple()
+  return %1 : $()
+}
+
+// Do not do anything.
+/*
+sil @expand_destroy_addr_addressonly : $@thin<T> (@inout T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %1 = tuple()
+  return %1 : $()
+}
+*/
+
+// CHECK-LABEL: sil @expand_destroy_addr_reference
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_addr_reference : $@thin (@inout C1) -> () {
+bb0(%0 : $*C1):
+  destroy_addr %0 : $*C1
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_addr_enum
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_addr_enum : $@thin (@inout E) -> () {
+bb0(%0 : $*E):
+  destroy_addr %0 : $*E
+  %1 = tuple()
+  return %1 : $()
+}
+
+///////////////
+// Copy Addr //
+///////////////
+
+// CHECK-LABEL: sil @expand_copy_addr_takeinit
+// CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_takeinit : $@thin (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr [take] %0 to [initialization] %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @expand_copy_addr_init
+// CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
+// CHECK-NEXT: [[COPYVAL:%[0-9]+]] = copy_value [[LOAD1]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_init : $@thin (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr %0 to [initialization] %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @expand_copy_addr_take
+// CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
+// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*S
+// CHECK-NEXT: destroy_value [[LOAD2]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_take : $@thin (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr [take] %0 to %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Test expansions for various types (these will become more
+// interesting when I introduce the actual chopping work).
+
+// CHECK-LABEL: sil @expand_copy_addr_trivial
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_trivial : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  copy_addr %0 to %1 : $*Builtin.Int64
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @expand_copy_addr_aggstructnontrivial
+// CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
+// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*S
+// CHECK-NEXT: [[COPYVAL:%[0-9]+]] = copy_value [[LOAD1]]
+// CHECK-NEXT: destroy_value [[LOAD2]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_aggstructnontrivial : $@thin (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr %0 to %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @expand_copy_addr_aggtuplenontrivial
+// CHECK: bb0([[IN1:%[0-9]+]] : $*(S, S2, C1), [[IN2:%[0-9]+]] : $*(S, S2, C1)):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*(S, S2, C1)
+// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*(S, S2, C1)
+// CHECK-NEXT: [[COPYVAL:%[0-9]+]] = copy_value [[LOAD1]]
+// CHECK-NEXT: destroy_value [[LOAD2]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_aggtuplenontrivial : $@thin (@inout (S, S2, C1), @inout (S, S2, C1)) -> () {
+bb0(%0 : $*(S, S2, C1), %1 : $*(S, S2, C1)):
+  copy_addr %0 to %1 : $*(S, S2, C1)
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Do not do anything.
+/*
+sil @expand_copy_addr_addressonly : $@thin<T> (@inout T) -> () {
+bb0(%0 : $*T):
+  copy_addr %0 : $*T
+  %1 = tuple()
+  return %1 : $()
+}
+*/
+
+// Just turn into a load + strong_release.
+// CHECK-LABEL: sil @expand_copy_addr_reference
+// CHECK: bb0([[IN1:%[0-9]+]] : $*C1, [[IN2:%[0-9]+]] : $*C1):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*C1
+// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*C1
+// CHECK-NEXT: strong_retain [[LOAD1]]
+// CHECK-NEXT: strong_release [[LOAD2]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_reference : $@thin (@inout C1, @inout C1) -> () {
+bb0(%0 : $*C1, %1 : $*C1):
+  copy_addr %0 to %1 : $*C1
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @expand_copy_addr_enum
+// CHECK: bb0([[IN1:%[0-9]+]] : $*E, [[IN2:%[0-9]+]] : $*E):
+// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*E
+// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*E
+// CHECK-NEXT: [[COPYVAL:%[0-9]+]] = copy_value [[LOAD1]]
+// CHECK-NEXT: destroy_value [[LOAD2]]
+// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_copy_addr_enum : $@thin (@inout E, @inout E) -> () {
+bb0(%0 : $*E, %1 : $*E):
+  copy_addr %0 to %1 : $*E
+  %2 = tuple()
+  return %2 : $()
+}
+
