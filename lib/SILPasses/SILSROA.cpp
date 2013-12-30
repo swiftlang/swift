@@ -1,4 +1,4 @@
-//===--- SROA.cpp - Scalar Replacement of Aggregates ----------------------===//
+//===--- SILSROA.cpp - Scalar Replacement of Aggregates -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
