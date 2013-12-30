@@ -664,6 +664,10 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
                                  cast<ParenPattern>(pattern)->getSubPattern(),
                                  nextArgIndex,
                                  dc);
+  case PatternKind::Var:
+    return checkDefaultArguments(tc, cast<VarPattern>(pattern)->getSubPattern(),
+                                 nextArgIndex,
+                                 dc);
   case PatternKind::Typed:
   case PatternKind::Named:
   case PatternKind::Any:
@@ -737,9 +741,11 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
              SourceLoc(), /*Implicit=*/true);
 
   case PatternKind::Paren:
-    return createPatternMemberRefExpr(
-             tc, selfDecl,
-             cast<ParenPattern>(pattern)->getSubPattern());
+    return createPatternMemberRefExpr(tc, selfDecl,
+                                  cast<ParenPattern>(pattern)->getSubPattern());
+  case PatternKind::Var:
+    return createPatternMemberRefExpr(tc, selfDecl,
+                                    cast<VarPattern>(pattern)->getSubPattern());
 
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(pattern);
@@ -763,9 +769,7 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
   }
 
   case PatternKind::Typed:
-    return createPatternMemberRefExpr(
-             tc,
-             selfDecl,
+    return createPatternMemberRefExpr(tc, selfDecl,
              cast<TypedPattern>(pattern)->getSubPattern());
       
 #define PATTERN(Id, Parent)

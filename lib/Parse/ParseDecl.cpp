@@ -1418,6 +1418,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   assert(Tok.getKind() == tok::kw_let || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
 
+  
   struct AllBindings {
     Parser &P;
 
@@ -1443,7 +1444,14 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   ParserStatus Status;
 
   do {
-    ParserResult<Pattern> pattern = parsePattern(isLet);
+    ParserResult<Pattern> pattern;
+
+    { // In our recursive parse, remember that we're in a var/let pattern.
+      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+      pattern = parsePattern(isLet);
+    }
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (pattern.isNull())

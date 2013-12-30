@@ -1739,6 +1739,10 @@ static void addFunctionParametersToScope(const Pattern *Pat, DeclContext *DC,
                                  DC, P);
     return;
 
+  case PatternKind::Var:
+    addFunctionParametersToScope(cast<VarPattern>(Pat)->getSubPattern(), DC, P);
+    return;
+
   case PatternKind::Tuple:
     for (const TuplePatternElt &field : cast<TuplePattern>(Pat)->getFields())
       addFunctionParametersToScope(field.getPattern(), DC, P);

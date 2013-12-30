@@ -672,9 +672,6 @@ public:
 
   ParserResult<Pattern> parsePattern(bool isLet);
 
-  /// \brief Determine whether this token can start a pattern.
-  bool isStartOfPattern(Token tok);
-  
   /// \brief Determine whether this token can start a binding name, whether an
   /// identifier or the special discard-value binding '_'.
   bool isStartOfBindingName(Token tok);
@@ -695,6 +692,7 @@ public:
                                           bool isLet);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
   ParserResult<Pattern> parsePatternIdentifier(bool isLet);
+  ParserResult<Pattern> parsePatternVarOrLet();
   
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
   

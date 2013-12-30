@@ -2383,6 +2383,9 @@ namespace {
     void visitParenPattern(ParenPattern *P) {
       visit(P->getSubPattern());
     }
+    void visitVarPattern(VarPattern *P) {
+      visit(P->getSubPattern());
+    }
     
     void visitTypedPattern(TypedPattern *P) {
       // FIXME: work around a bug in visiting the "self" argument of methods

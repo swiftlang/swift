@@ -485,7 +485,13 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
+///   pattern ::= 'var' pattern
+///   pattern ::= 'let' pattern
 ParserResult<Pattern> Parser::parsePattern(bool isLet) {
+  // If this is a let or var pattern parse it.
+  if (Tok.is(tok::kw_let) || Tok.is(tok::kw_var))
+    return parsePatternVarOrLet();
+  
   // First, parse the pattern atom.
   ParserResult<Pattern> Result = parsePatternAtom(isLet);
 
@@ -510,9 +516,23 @@ ParserResult<Pattern> Parser::parsePattern(bool isLet) {
   return Result;
 }
 
-/// \brief Determine whether this token can start a pattern.
-bool Parser::isStartOfPattern(Token tok) {
-  return tok.is(tok::kw__) || tok.is(tok::identifier) || tok.is(tok::l_paren);
+ParserResult<Pattern> Parser::parsePatternVarOrLet() {
+  assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects let or var");
+  bool isLet = Tok.is(tok::kw_let);
+  SourceLoc varLoc = consumeToken();
+
+  // 'var' and 'let' patterns shouldn't nest.
+  if (InVarOrLetPattern)
+    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+
+  // In our recursive parse, remember that we're in a var/let pattern.
+  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+  ParserResult<Pattern> subPattern = parsePattern(isLet);
+  if (subPattern.isNull())
+    return nullptr;
+  return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
 }
 
 /// \brief Determine whether this token can start a binding name, whether an

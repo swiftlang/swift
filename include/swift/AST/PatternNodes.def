@@ -33,13 +33,11 @@ PATTERN(Tuple, Pattern)
 PATTERN(Named, Pattern)
 PATTERN(Any, Pattern)
 PATTERN(Typed, Pattern)
+PATTERN(Var, Pattern)
 REFUTABLE_PATTERN(Isa, Pattern)
 REFUTABLE_PATTERN(NominalType, Pattern)
 REFUTABLE_PATTERN(EnumElement, Pattern)
 REFUTABLE_PATTERN(Expr, Pattern)
-// FIXME: Not really refutable, but should only appear in refutable pattern
-// productions.
-REFUTABLE_PATTERN(Var, Pattern)
 
 #undef PATTERN
 #undef REFUTABLE_PATTERN

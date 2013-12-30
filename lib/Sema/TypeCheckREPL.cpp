@@ -505,6 +505,9 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
   void visitAnyPattern(AnyPattern *P) {
     ResultString += "_";
   }
+  void visitVarPattern(VarPattern *P) {
+    visit(P->getSubPattern());
+  }
 
   void visitTypedPattern(TypedPattern *P) {
     // We prefer to print the type separately.

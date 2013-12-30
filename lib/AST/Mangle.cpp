@@ -204,6 +204,9 @@ namespace {
     VarDecl *visitParenPattern(ParenPattern *P) {
       return visit(P->getSubPattern());
     }
+    VarDecl *visitVarPattern(VarPattern *P) {
+      return visit(P->getSubPattern());
+    }
     VarDecl *visitTypedPattern(TypedPattern *P) {
       return visit(P->getSubPattern());
     }

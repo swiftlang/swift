@@ -1566,6 +1566,9 @@ namespace {
         // Parentheses don't affect the type.
         return simplifyPatternTypes(
                  cast<ParenPattern>(pattern)->getSubPattern());
+      case PatternKind::Var:
+        // 'var' or 'let' doesn't affect the type.
+        return simplifyPatternTypes(cast<VarPattern>(pattern)->getSubPattern());
 
       case PatternKind::Any:
       case PatternKind::Typed:

@@ -443,11 +443,14 @@ struct InitializationForPattern
   InitializationForPattern(SILGenFunction &Gen, ArgumentOrVar_t ArgumentOrVar)
     : Gen(Gen), ArgumentOrVar(ArgumentOrVar) {}
   
-  // Paren & Typed patterns are noops, just look through them.
+  // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
     return visit(P->getSubPattern());
   }
   InitializationPtr visitTypedPattern(TypedPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  InitializationPtr visitVarPattern(VarPattern *P) {
     return visit(P->getSubPattern());
   }
   
@@ -628,11 +631,14 @@ struct ArgumentInitVisitor :
     return arg;
   }
     
-  // Paren & Typed patterns are no-ops. Just look through them.
+  // Paren, Typed, and Var patterns are no-ops. Just look through them.
   SILValue visitParenPattern(ParenPattern *P, Initialization *I) {
     return visit(P->getSubPattern(), I);
   }
   SILValue visitTypedPattern(TypedPattern *P, Initialization *I) {
+    return visit(P->getSubPattern(), I);
+  }
+  SILValue visitVarPattern(VarPattern *P, Initialization *I) {
     return visit(P->getSubPattern(), I);
   }
 
@@ -1742,6 +1748,9 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     return visit(P->getSubPattern());
   }
   void visitTypedPattern(TypedPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  void visitVarPattern(VarPattern *P) {
     return visit(P->getSubPattern());
   }
   void visitTuplePattern(TuplePattern *P) {

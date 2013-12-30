@@ -501,8 +501,13 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
-  case PatternKind::Paren: {
-    Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
+  case PatternKind::Paren:
+  case PatternKind::Var: {
+    Pattern *SP;
+    if (auto *PP = dyn_cast<ParenPattern>(P))
+      SP = PP->getSubPattern();
+    else
+      SP = cast<VarPattern>(P)->getSubPattern();
     if (typeCheckPattern(SP, dc, allowUnknownTypes, false, resolver)) {
       P->setType(ErrorType::get(Context));
       return true;
