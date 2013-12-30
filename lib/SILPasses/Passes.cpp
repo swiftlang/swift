@@ -56,14 +56,19 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 }
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
+  // Start with specialization because it does not depend on any other passes.
+  // Try to inline the specialized functions.
+  performSILSpecialization(&Module);
   performSILPerformanceInlining(&Module);
+
+  // Transition to SSA form.
+  performSILSROA(&Module);
   performSILMem2Reg(&Module);
+
+  // Perform scalar optimizations.
   performSILCSE(&Module);
   performSILCombine(&Module);
   performSimplifyCFG(&Module);
-  performSILSpecialization(&Module);
   performSILPerformanceInlining(&Module);
-  performSILSROA(&Module);
-  performSILMem2Reg(&Module);
   performSILCombine(&Module);
 }
