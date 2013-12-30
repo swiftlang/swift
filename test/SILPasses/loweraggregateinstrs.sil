@@ -1,5 +1,7 @@
 // RUN: %sil-opt %s -lower-aggregate-instrs -verify | FileCheck %s
 
+sil_stage canonical
+
 import swift
 import Builtin
 
@@ -247,5 +249,102 @@ bb0(%0 : $*E, %1 : $*E):
   copy_addr %0 to %1 : $*E
   %2 = tuple()
   return %2 : $()
+}
+
+////////////////
+// Copy Value //
+////////////////
+
+// Test expansions for various types (these will become more
+// interesting when I introduce the actual chopping work).
+
+// CHECK-LABEL: sil @expand_destroy_value_trivial
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_value_trivial : $@thin (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  destroy_value %0 : $Builtin.Int64
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_value_aggstructnontrivial
+// CHECK: bb0([[IN:%[0-9]+]] : $S):
+// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #cls
+// CHECK-NEXT: strong_release [[cls]] : $C3
+// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #inner_struct
+// CHECK-NEXT: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[innerstructcls1]] : $C1
+// CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[innerstructcls2]]
+sil @expand_destroy_value_aggstructnontrivial : $@thin (S) -> () {
+bb0(%0 : $S):
+  destroy_value %0 : $S
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_value_aggtuplenontrivial
+// CHECK: bb0([[IN:%[0-9]+]] : $(S, S2, C1, E)):
+// CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 0
+// CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #cls
+// CHECK-NEXT: strong_release [[ELT0cls]] : $C3
+// CHECK-NEXT: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #inner_struct
+// CHECK-NEXT: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[ELT0innerstructcls1]] : $C1
+// CHECK-NEXT: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[ELT0innerstructcls2]]
+// CHECK-NEXT: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 1
+// CHECK-NEXT: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[ELT1cls1]] : $C1
+// CHECK-NEXT: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[ELT1cls2]] : $C2
+// CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 2
+// CHECK-NEXT: strong_release [[ELT2]]
+// CHECK-NEXT: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 3
+// CHECK-NEXT: destroy_value [[ELT3]] : $E
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @expand_destroy_value_aggtuplenontrivial : $@thin ((S, S2, C1, E)) -> () {
+bb0(%0 : $(S, S2, C1, E)):
+  destroy_value %0 : $(S, S2, C1, E)
+  %1 = tuple()
+  return %1 : $()
+}
+
+// Do not do anything.
+/*
+sil @expand_destroy_value_addressonly : $@thin<T> (T) -> () {
+bb0(%0 : $T):
+  destroy_value %0 : $T
+  %1 = tuple()
+  return %1 : $()
+}
+*/
+
+// Just turn into a load + strong_release.
+// CHECK-LABEL: sil @expand_destroy_value_reference
+// CHECK: bb0([[IN:%[0-9]+]] : $C1):
+// CHECK-NEXT: strong_release [[IN]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @expand_destroy_value_reference : $@thin (C1) -> () {
+bb0(%0 : $C1):
+  destroy_value %0 : $C1
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @expand_destroy_value_enum
+// CHECK: bb0([[IN1:%[0-9]+]] : $E):
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @expand_destroy_value_enum : $@thin (E) -> () {
+bb0(%0 : $E):
+  destroy_value %0 : $E
+  %1 = tuple()
+  return %1 : $()
 }
 

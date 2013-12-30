@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-sroa"
+#define DEBUG_TYPE "sil-lower-aggregate-instrs"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/SILInstruction.h"
@@ -155,6 +155,29 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   return true;
 }
 
+static bool expandDestroyValue(DestroyValueInst *DV) {
+  SILModule &Module = DV->getModule();
+  SILBuilder Builder(DV);
+
+  // Strength reduce destroy_addr inst into release/store if
+  // we have a non-address only type.
+  SILValue Value = DV->getOperand();
+
+  // If we have an address only type, do nothing.
+  SILType Type = Value.getType();
+  if (Type.isAddressOnly(Module))
+    return false;
+
+  auto &TL = Module.getTypeLowering(Type);
+  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
+                             TypeLowering::LoweringStyle::DeepNoEnum);
+
+  DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
+
+  ++NumExpand;
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -178,6 +201,13 @@ static void processFunction(SILFunction &Fn) {
         if (expandDestroyAddr(DA)) {
           ++II;
           DA->eraseFromParent();
+          continue;
+        }
+
+      if (auto *DV = dyn_cast<DestroyValueInst>(Inst))
+        if (expandDestroyValue(DV)) {
+          ++II;
+          DV->eraseFromParent();
           continue;
         }
 
