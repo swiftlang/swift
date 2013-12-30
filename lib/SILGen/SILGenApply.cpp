@@ -711,6 +711,14 @@ public:
         return;
       }
     }
+
+    // If this is a direct reference to a vardecl, it must be a let constant
+    // (which doesn't need to be loaded).  Just emit its value directly.
+    if (auto *vd = dyn_cast<VarDecl>(e->getDecl())) {
+      assert(vd->isLet() && "Direct reference to vardecl that isn't a let?");
+      visitExpr(e);
+      return;
+    }
     
     // FIXME: Store context values for local funcs in a way that we can
     // apply them directly as an added "call site" here.
