@@ -228,16 +228,24 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
+  enum class LoweringStyle {
+    Shallow,
+    Deep,
+    DeepNoEnum
+  };
+
   /// Emit a lowered 'destroy_value' operation.
   ///
   /// This type must be loadable.
   virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                       SILValue value, bool deep) const = 0;
+                                       SILValue value,
+                                       LoweringStyle loweringStyle) const = 0;
 
   void emitLoweredDestroyChildValue(SILBuilder &B, SILLocation loc,
-                                    SILValue value, bool wasDeep) const {
-    if (wasDeep) {
-      return emitLoweredDestroyValue(B, loc, value, true);
+                                    SILValue value,
+                                    LoweringStyle loweringStyle) const {
+    if (loweringStyle != LoweringStyle::Shallow) {
+      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
     } else {
       return emitDestroyValue(B, loc, value);
     }
@@ -248,7 +256,7 @@ public:
   /// This type must be loadable.
   void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, false);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'destroy_value' operation.
@@ -256,7 +264,15 @@ public:
   /// This type must be loadable.
   void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, true);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
+  }
+
+  /// Emit a lowered 'destroy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredDestroyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
+                                         SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::DeepNoEnum);
   }
 
   /// Given a primitively loaded value of this type (which must be

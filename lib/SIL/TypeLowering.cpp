@@ -362,7 +362,8 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value, bool deep) const override {
+                                 SILValue value,
+                                 LoweringStyle loweringStyle) const override {
       // Trivial
     }
 
@@ -487,10 +488,23 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue aggValue, bool deep) const override {
-      forEachNonTrivialChild(B, loc, aggValue,
-                             deep ? &TypeLowering::emitLoweredDestroyValueDeep
-                                  : &TypeLowering::emitDestroyValue);
+                                 SILValue aggValue,
+                                 LoweringStyle loweringStyle) const override {
+      SimpleOperationTy Fn;
+
+      switch(loweringStyle) {
+      case LoweringStyle::Shallow:
+        Fn = &TypeLowering::emitDestroyValue;
+        break;
+      case LoweringStyle::Deep:
+        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
+        break;
+      case LoweringStyle::DeepNoEnum:
+        Fn = &TypeLowering::emitLoweredDestroyValueDeepNoEnum;
+        break;
+      }
+
+      forEachNonTrivialChild(B, loc, aggValue, Fn);
     }
   };
 
@@ -570,11 +584,11 @@ namespace {
     using SimpleOperationTy = 
       void(*)(SILBuilder &B, SILLocation loc, SILValue value,
               const TypeLowering &valueLowering, SILBasicBlock *dest,
-              bool deep);
+              LoweringStyle style);
 
     /// Emit a value semantics operation for each nontrivial case of the enum.
     void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
-                             SimpleOperationTy operation, bool deep) const {
+                             SimpleOperationTy operation, LoweringStyle style) const {
       SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
@@ -598,7 +612,7 @@ namespace {
         SILBasicBlock *bb = nonTrivialBBs[i].second;
         const TypeLowering &lowering = getNonTrivialElements()[i].getLowering();
         B.emitBlock(bb);
-        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB, deep);
+        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB, style);
       }
       
       B.emitBlock(doneBB);
@@ -634,13 +648,20 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value, bool deep) const override {
-      ifNonTrivialElement(B, loc, value,
-        [](SILBuilder &B, SILLocation loc, SILValue child,
-           const TypeLowering &childLowering, SILBasicBlock *dest, bool deep) {
-          childLowering.emitLoweredDestroyChildValue(B, loc, child, deep);
-          B.createBranch(loc, dest);
-      }, deep);
+                                 SILValue value,
+                                 LoweringStyle style) const override {
+      assert(style != LoweringStyle::Shallow &&
+             "This method should never be called when performing a shallow "
+             "destroy value.");
+      if (style == LoweringStyle::DeepNoEnum)
+        B.createDestroyValue(loc, value);
+      else
+        ifNonTrivialElement(B, loc, value,
+          [](SILBuilder &B, SILLocation loc, SILValue child,
+             const TypeLowering &childLowering, SILBasicBlock *dest, LoweringStyle style) {
+             childLowering.emitLoweredDestroyChildValue(B, loc, child, style);
+             B.createBranch(loc, dest);
+          }, style);
     }
   };
 
@@ -650,7 +671,8 @@ namespace {
       : NonTrivialLoadableTypeLowering(type) {}
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value, bool deep) const override {
+                                 SILValue value,
+                                 LoweringStyle style) const override {
       emitDestroyValue(B, loc, value);
     }
   };
@@ -736,7 +758,8 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value, bool deep) const override {
+                                 SILValue value,
+                                 LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
   };
