@@ -684,11 +684,11 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let))
-    return parseMatchingPatternVar();
+    return parseMatchingPatternVarOrLet();
 
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is))
-    return parseMatchingPatternIsa();
+    return parseMatchingPatternIs();
 
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
@@ -702,26 +702,27 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   return makeParserResult(new (Context) ExprPattern(subExpr.get()));
 }
 
-ParserResult<Pattern> Parser::parseMatchingPatternVar() {
+ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
+  assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects let or var");
   bool isLet = Tok.is(tok::kw_let);
+  SourceLoc varLoc = consumeToken();
 
   // 'var' and 'let' patterns shouldn't nest.
   if (InVarOrLetPattern)
-    diagnose(Tok, diag::var_pattern_in_var, unsigned(isLet));
+    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-  assert(Tok.is(tok::kw_let) || Tok.is(tok::kw_var));
-  SourceLoc varLoc = consumeToken();
   ParserResult<Pattern> subPattern = parseMatchingPattern();
   if (subPattern.isNull())
     return nullptr;
   return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
 }
 
-ParserResult<Pattern> Parser::parseMatchingPatternIsa() {
+// matching-pattern ::= 'is' type
+ParserResult<Pattern> Parser::parseMatchingPatternIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   ParserResult<TypeRepr> castType = parseType();
   if (castType.isNull() || castType.hasCodeCompletion())

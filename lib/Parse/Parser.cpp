@@ -408,7 +408,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::identifier:
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
-    consumeToken();
+    consumeToken(tok::identifier);
     return false;
   default:
     diagnose(Tok, D);
@@ -432,7 +432,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
   if (Tok.is(tok::exclaim_postfix)) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
-    consumeToken();
+    consumeToken(tok::exclaim_postfix);
     return false;
   }
 

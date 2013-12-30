@@ -706,8 +706,8 @@ public:
   // with matching pattern parsing when it matures.
   
   ParserResult<Pattern> parseMatchingPattern();
-  ParserResult<Pattern> parseMatchingPatternVar();
-  ParserResult<Pattern> parseMatchingPatternIsa();
+  ParserResult<Pattern> parseMatchingPatternVarOrLet();
+  ParserResult<Pattern> parseMatchingPatternIs();
   
   /// \brief Determine whether this token can only start a matching pattern
   /// production and not an expression.
