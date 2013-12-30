@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-STATISTIC(NumExpand, "Number of instructions expanded.");
+STATISTIC(NumExpand, "Number of instructions expanded");
 
 //===----------------------------------------------------------------------===//
 //                      Higher Level Operation Expansion
