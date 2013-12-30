@@ -566,7 +566,11 @@ SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
 }
 
 bool tryToRemoveFunction(SILFunction *F) {
-  if (F->getLinkage() != SILLinkage::Internal || F->getRefCount())
+  // Remove internal functions that are not referenced by anything.
+  // TODO: top_level_code is currently marked as internal so we explicitly check
+  // for functions with this name and keep them around.
+  if (F->getLinkage() != SILLinkage::Internal || F->getRefCount() ||
+      F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return false;
 
   DEBUG(llvm::dbgs() << "SC: Erasing:" << F->getName() << "\n");
