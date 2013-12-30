@@ -1501,10 +1501,10 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through and promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
-    Fn.verify();
+    DEBUG(Fn.verify());
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     lowerRawSILOperations(Fn);
-    Fn.verify();
+    DEBUG(Fn.verify());
   }
 }
