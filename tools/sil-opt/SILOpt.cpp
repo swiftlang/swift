@@ -43,7 +43,7 @@ enum class PassKind {
   SILSpecialization,
   SimplifyCFG,
   PerformanceInlining,
-  SROA,
+  LowerAggregateInstrs,
 };
 
 static llvm::cl::opt<std::string>
@@ -105,8 +105,8 @@ Passes(llvm::cl::desc("Passes:"),
                                    "inline",
                                    "Inline functions which are determined to be"
                                    " less than a pre-set cost."),
-                        clEnumValN(PassKind::SROA,
-                                   "sroa",
+                        clEnumValN(PassKind::LowerAggregateInstrs,
+                                   "lower-aggregate-instrs",
                                    "Perform SIL scalar replacement of "
                                    "aggregates"),
                         clEnumValEnd));
@@ -225,8 +225,8 @@ int main(int argc, char **argv) {
     case PassKind::PerformanceInlining:
       performSILPerformanceInlining(CI.getSILModule());
       break;
-    case PassKind::SROA:
-      performSILSROA(CI.getSILModule());
+    case PassKind::LowerAggregateInstrs:
+      performSILLowerAggregateInstrs(CI.getSILModule());
       break;
     }
 

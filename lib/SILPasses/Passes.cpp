@@ -62,7 +62,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   performSILPerformanceInlining(&Module);
 
   // Transition to SSA form.
-  performSILSROA(&Module);
+  performSILLowerAggregateInstrs(&Module);
   performSILMem2Reg(&Module);
 
   // Perform scalar optimizations.

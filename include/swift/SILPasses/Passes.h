@@ -94,8 +94,8 @@ namespace swift {
   /// \brief Perform SIL Inlining for Performance.
   void performSILPerformanceInlining(SILModule *M);
 
-  /// \brief Perform scalar replacement of aggregates.
-  void performSILSROA(SILModule *M);
+  /// \brief Replace aggregate instructions with scalar instructions.
+  void performSILLowerAggregateInstrs(SILModule *M);
 
 } // end namespace swift
 

@@ -1,4 +1,4 @@
-//===--- SILSROA.cpp - Scalar Replacement of Aggregates -------------------===//
+//===- SILLowerAggregateInstrs.cpp - Aggregate insts to Scalar insts  -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Simplify aggregate types into scalar types.
+// Simplify aggregate instructions into scalar instructions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -186,9 +186,9 @@ static void processFunction(SILFunction &Fn) {
   }
 }
 
-void swift::performSILSROA(SILModule *M) {
+void swift::performSILLowerAggregateInstrs(SILModule *M) {
 
-  DEBUG(llvm::dbgs() << "*** SIL SROA ***\n");
+  DEBUG(llvm::dbgs() << "*** SIL LowerAggregateInstrs ***\n");
 
   // For each function Fn in M...
   for (auto &Fn : *M) {
@@ -199,7 +199,7 @@ void swift::performSILSROA(SILModule *M) {
 
     DEBUG(llvm::dbgs() << "***** Visiting " << Fn.getName() << " *****\n");
 
-    // Otherwise perform SROA.
+    // Otherwise perform LowerAggregateInstrs.
     processFunction(Fn);
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -sroa -verify | FileCheck %s
+// RUN: %sil-opt %s -lower-aggregate-instrs -verify | FileCheck %s
 
 import swift
 import Builtin
