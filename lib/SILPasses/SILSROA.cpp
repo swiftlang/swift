@@ -199,8 +199,7 @@ void swift::performSILSROA(SILModule *M) {
 
     DEBUG(llvm::dbgs() << "***** Visiting " << Fn.getName() << " *****\n");
 
-    // Otherwise perform SROA and then verify it.
+    // Otherwise perform SROA.
     processFunction(Fn);
-    Fn.verify();
   }
 }
