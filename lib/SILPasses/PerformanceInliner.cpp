@@ -26,12 +26,12 @@ static llvm::cl::opt<unsigned>
 InlineCostThreshold("sil-inline-threshold", llvm::cl::Hidden,
                     llvm::cl::init(50));
 
-STATISTIC(NumApply, "Total number of ApplyInst.");
+STATISTIC(NumApply, "Total number of ApplyInst");
 STATISTIC(NumApplyInlined, "Number of ApplyInst inlined");
 STATISTIC(NumApplyNotValidForInlining,
-          "Number of ApplyInst that are not valid for inlining.");
+          "Number of ApplyInst that are not valid for inlining");
 STATISTIC(NumTimesHitCostLimit,
-          "Number of times the cost limit was hit when inlining.");
+          "Number of times the cost limit was hit when inlining");
 STATISTIC(CostIncrease, "Total increased cost in all functions from inlining");
 
 //===----------------------------------------------------------------------===//
