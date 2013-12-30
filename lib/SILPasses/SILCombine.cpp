@@ -565,15 +565,12 @@ SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
   return nullptr;
 }
 
-bool tryToRemoveFunction(SILModule *M, SILFunction *F) {
-  if (F->getLinkage() != SILLinkage::Internal)
-    return false;
-
-  if (F->getRefCount())
+bool tryToRemoveFunction(SILFunction *F) {
+  if (F->getLinkage() != SILLinkage::Internal || F->getRefCount())
     return false;
 
   DEBUG(llvm::dbgs() << "SC: Erasing:" << F->getName() << "\n");
-  M->getFunctionList().erase(F);
+  F->getModule().getFunctionList().erase(F);
   NumDeadFunc++;
   return true;
 }
@@ -583,7 +580,7 @@ void deleteDeadFunctions(SILModule *M) {
   // Erase trivially dead functions that may not be a part of the call graph.
   for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
     SILFunction *F = FI++;
-    tryToRemoveFunction(M, F);
+    tryToRemoveFunction(F);
   }
 
   std::vector<SILFunction*> Order;
@@ -593,7 +590,7 @@ void deleteDeadFunctions(SILModule *M) {
   // Scan the call graph top-down (caller first) because eliminating functions
   // can generate more opportunities.
   for (int i = Order.size() - 1; i >= 0; i--)
-    tryToRemoveFunction(M, Order[i]);
+    tryToRemoveFunction(Order[i]);
  }
 
 //===----------------------------------------------------------------------===//
