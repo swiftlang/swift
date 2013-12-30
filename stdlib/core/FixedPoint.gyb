@@ -164,7 +164,12 @@ extension ${Self} : RandomAccessIndex {
 
 @ if signed:
 extension ${Self} : SignedNumber {
-  static func negate(rhs: ${Self}) -> (${Self}, Bool) { return ${Self}.sub(0, rhs) }
+  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
+    return ${Self}.sub(0, rhs)
+  }
+  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
+    return rhs.isNegative() ? ${Self}.negate(rhs) : (rhs, false)
+  }
   func isNegative() -> Bool { return self < 0 }
 }
 @ end

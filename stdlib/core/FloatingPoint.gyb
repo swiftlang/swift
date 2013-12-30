@@ -339,6 +339,9 @@ extension ${Self} : SignedNumber {
   static func negate(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.fneg_FPIEEE${bits}(rhs.value)), false)
   }
+  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
+    return (${Self}(Builtin.int_fabs_FPIEEE${bits}(rhs.value)), false)
+  }
   func isNegative() -> Bool { return self < 0 }
 }
 
