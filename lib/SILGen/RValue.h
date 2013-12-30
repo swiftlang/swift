@@ -258,7 +258,7 @@ public:
   
   /// True if this represents an lvalue.
   bool isLValue() const & {
-    return isa<LValueType>(type) || isa<InOutType>(type);
+    return isa<InOutType>(type);
   }
   
   /// Add an element to the rvalue. The rvalue must not yet be complete.
