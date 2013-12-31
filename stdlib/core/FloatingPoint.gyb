@@ -336,12 +336,15 @@ extension ${Self} : Hashable {
 }
 
 extension ${Self} : SignedNumber {
+  @@transparent
   static func negate(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.fneg_FPIEEE${bits}(rhs.value)), false)
   }
+  @@transparent
   static func abs(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.int_fabs_FPIEEE${bits}(rhs.value)), false)
   }
+  @@transparent
   func isNegative() -> Bool { return self < 0 }
 }
 
