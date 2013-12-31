@@ -297,7 +297,10 @@ Pattern *ModuleFile::maybeReadPattern() {
     Pattern *subPattern = maybeReadPattern();
     assert(subPattern);
 
-    return new (getContext()) VarPattern(SourceLoc(), subPattern, isImplicit);
+    auto result = new (getContext()) VarPattern(SourceLoc(), subPattern,
+                                                isImplicit);
+    result->setType(subPattern->getType());
+    return result;
   }
 
   default:
