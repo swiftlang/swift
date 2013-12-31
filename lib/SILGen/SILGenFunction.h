@@ -352,10 +352,7 @@ public:
   /// \brief Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
   /// \brief Emits code for a ClosureExpr.
-  void emitClosure(ClosureExpr *ce);
-  /// \brief Generates code for an AutoClosureExpr.  This is akin to visiting
-  /// the body as if wrapped in a ReturnStmt.
-  void emitClosure(AutoClosureExpr *ce);
+  void emitClosure(AbstractClosureExpr *ce);
   /// emitDestructor - Generates code for a class destroying destructor. This
   /// emits the body code from the DestructorDecl (if any),
   /// implicitly releases the elements of the class, and calls the base

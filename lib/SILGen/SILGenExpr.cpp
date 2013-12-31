@@ -258,8 +258,7 @@ namespace {
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
-    RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
-    RValue visitAutoClosureExpr(AutoClosureExpr *E, SGFContext C);
+    RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
@@ -577,7 +576,6 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   if (Reference.isLValue())
     Reference = SGF.emitLoad(E, Reference.getUnmanagedValue(),
                              SGF.getTypeLowering(E->getType()), C, IsNotTake);
-  
   return RValue(SGF, E, Reference);
 }
 
@@ -718,13 +716,13 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
 }
 
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
-  assert(!v.isLValue() && "materializing an lvalue?!");
   // Address-only values are already materialized.
   if (v.getType().isAddress()) {
     assert(v.getType().isAddressOnly(SGM.M) && "can't materialize an l-value");
     return Materialize{v.getValue(), v.getCleanup()};
   }
 
+  assert(!v.isLValue() && "materializing a non-address-only lvalue?!");
   auto &lowering = getTypeLowering(v.getType().getSwiftType());
   
   // We don't use getBufferForExprResult here because the result of a
@@ -1826,21 +1824,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                       expectedType);
 }
 
-RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
+RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
+                                               SGFContext C) {
   // Generate the closure function.
   SGF.SGM.emitClosure(e);
 
-  // Generate the closure value (if any) for the closure expr's function
-  // reference.
-  return RValue(SGF, e, SGF.emitClosureValue(e, SILDeclRef(e),
-                                          SGF.getForwardingSubstitutions(), e));
-}
-
-RValue RValueEmitter::visitAutoClosureExpr(AutoClosureExpr *e,
-                                           SGFContext C) {
-  // Generate the closure body.
-  SGF.SGM.emitClosure(e);
-  
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   return RValue(SGF, e, SGF.emitClosureValue(e, SILDeclRef(e),
@@ -1855,21 +1843,19 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitEpilog(fd);
 }
 
-void SILGenFunction::emitClosure(ClosureExpr *ce) {
-  emitProlog(ce, ce->getParams(), ce->getResultType());
-  prepareEpilog(ce->getResultType(), CleanupLocation(ce));
-  visit(ce->getBody());
-  emitEpilog(ce);
-}
-
-void SILGenFunction::emitClosure(AutoClosureExpr *ce) {
-  Type resultTy = ce->getType()->castTo<FunctionType>()->getResult();
-  emitProlog(ce, ce->getParamPatterns(), resultTy);
-  prepareEpilog(resultTy, CleanupLocation(ce));
-
-  // Closure expressions implicitly return the result of their body expression.
-  emitReturnExpr(ImplicitReturnLocation(ce), ce->getSingleExpressionBody());
-  emitEpilog(ce);
+void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
+  emitProlog(ace, ace->getParams(), ace->getResultType());
+  prepareEpilog(ace->getResultType(), CleanupLocation(ace));
+  if (auto *ce = dyn_cast<ClosureExpr>(ace))
+    visit(ce->getBody());
+  else {
+    auto *autoclosure = cast<AutoClosureExpr>(ace);
+    // Closure expressions implicitly return the result of their body
+    // expression.
+    emitReturnExpr(ImplicitReturnLocation(ace),
+                   autoclosure->getSingleExpressionBody());
+  }
+  emitEpilog(ace);
 }
 
 std::pair<Optional<SILValue>, SILLocation>
@@ -2591,10 +2577,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
-  
-  // Emit the constructor body.
+
+   // Emit the constructor body.
   visit(ctor->getBody());
-  
+
   // Return 'self' in the epilog.
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(ctor);

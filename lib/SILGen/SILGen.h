@@ -151,10 +151,7 @@ public:
   
   /// \brief Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
-  void emitClosure(ClosureExpr *ce);
-  /// \brief Generates code for the given AutoClosureExpr and adds the
-  /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  void emitClosure(AutoClosureExpr *ce);
+  void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
