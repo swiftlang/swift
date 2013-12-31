@@ -165,7 +165,7 @@ static bool expandDestroyValue(DestroyValueInst *DV) {
 
   // If we have an address only type, do nothing.
   SILType Type = Value.getType();
-  assert(!Type.isAddressOnly(Module) &&
+  assert(Type.isLoadable(Module) &&
          "destroy_value should never be called on a non-loadable type.");
 
   auto &TL = Module.getTypeLowering(Type);
