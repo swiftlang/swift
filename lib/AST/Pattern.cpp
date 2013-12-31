@@ -119,8 +119,9 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
     return;
 
   case PatternKind::Paren:
-    return cast<ParenPattern>(this)->getSubPattern()
-             ->collectVariables(variables);
+  case PatternKind::Typed:
+  case PatternKind::Var:
+    return getSemanticsProvidingPattern()->collectVariables(variables);
 
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(this);
@@ -130,7 +131,6 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
     return;
   }
 
-  case PatternKind::Typed:
     return cast<TypedPattern>(this)->getSubPattern()
              ->collectVariables(variables);
       
@@ -155,9 +155,6 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   
   case PatternKind::Expr:
     return;
-      
-  case PatternKind::Var:
-    return cast<VarPattern>(this)->getSubPattern()->collectVariables(variables);
   }
 }
 
@@ -248,7 +245,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
       sub = oof->getSubPattern()->clone(context, Implicit);
-    result = new(context) EnumElementPattern(oof->getParentType(),
+    result = new (context) EnumElementPattern(oof->getParentType(),
                                               oof->getLoc(),
                                               oof->getNameLoc(),
                                               oof->getName(),
@@ -292,10 +289,14 @@ void *Pattern::operator new(size_t numBytes, ASTContext &C) {
 /// the type.
 Identifier Pattern::getBoundName() const {
   const Pattern *P = this;
-  if (const TypedPattern *TP = dyn_cast<TypedPattern>(P))
+  
+  if (auto *VP = dyn_cast<VarPattern>(P))
+    P = VP->getSubPattern();
+  
+  if (auto *TP = dyn_cast<TypedPattern>(P))
     P = TP->getSubPattern();
 
-  if (const NamedPattern *NP = dyn_cast<NamedPattern>(P))
+  if (auto *NP = dyn_cast<NamedPattern>(P))
     return NP->getBoundName();
   return Identifier();
 }

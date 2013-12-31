@@ -487,11 +487,12 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
         checkPattern(field.getPattern(), Reason);
       return;
     case PatternKind::Paren:
-      return checkPattern(cast<ParenPattern>(Pat)->getSubPattern(), Reason);
     case PatternKind::Typed:
-      return checkPattern(cast<TypedPattern>(Pat)->getSubPattern(), Reason);
+    case PatternKind::Var:
+      return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
     case PatternKind::Named:
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
+
     case PatternKind::NominalType: {
       for (auto &elt : cast<NominalTypePattern>(Pat)->getElements())
         checkPattern(elt.getSubPattern(), Reason);
@@ -503,8 +504,6 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
         checkPattern(OP->getSubPattern(), Reason);
       return;
     }
-    case PatternKind::Var:
-      return checkPattern(cast<VarPattern>(Pat)->getSubPattern(), Reason);
     // Handle non-vars.
     case PatternKind::Isa:
     case PatternKind::Expr:

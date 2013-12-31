@@ -563,13 +563,11 @@ namespace {
       return;
 
       // Handle vars.
-    case PatternKind::Named: {
+    case PatternKind::Named:
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
-      f(var);
+      f(cast<NamedPattern>(pattern)->getDecl());
       return;
-    }
 
       // Handle non-vars.
     case PatternKind::Any:

@@ -1019,39 +1019,40 @@ Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
-  if (P->hasSubPattern()) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
+  if (!P->hasSubPattern())
+    return P;
+
+  if (Pattern *newSub = doIt(P->getSubPattern())) {
+    P->setSubPattern(newSub);
+    return P;
   }
-  return P;
+  return nullptr;
 }
 
 Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   // If the pattern has been type-checked, walk the match expression, which
   // includes the explicit subexpression.
   if (P->getMatchExpr()) {
-    if (Expr *newMatch = doIt(P->getMatchExpr()))
+    if (Expr *newMatch = doIt(P->getMatchExpr())) {
       P->setMatchExpr(newMatch);
-    else
-      return nullptr;
-    return P;
+      return P;
+    }
+    return nullptr;
   }
 
-  if (Expr *newSub = doIt(P->getSubExpr()))
+  if (Expr *newSub = doIt(P->getSubExpr())) {
     P->setSubExpr(newSub);
-  else
-    return nullptr;
-  return P;
+    return P;
+  }
+  return nullptr;
 }
 
 Pattern *Traversal::visitVarPattern(VarPattern *P) {
-  if (Pattern *newSub = doIt(P->getSubPattern()))
+  if (Pattern *newSub = doIt(P->getSubPattern())) {
     P->setSubPattern(newSub);
-  else
-    return nullptr;
-  return P;
+    return P;
+  }
+  return nullptr;
 }
 
 #pragma mark Type representation traversal
