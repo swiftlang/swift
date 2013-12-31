@@ -550,15 +550,13 @@ namespace {
         forEachBoundVar(field.getPattern(), f);
       return;
     case PatternKind::Paren:
-      return forEachBoundVar(cast<ParenPattern>(pattern)->getSubPattern(), f);
     case PatternKind::Typed:
-      return forEachBoundVar(cast<TypedPattern>(pattern)->getSubPattern(), f);
+    case PatternKind::Var:
+      return forEachBoundVar(pattern->getSemanticsProvidingPattern(), f);
     case PatternKind::NominalType:
       for (auto &elt : cast<NominalTypePattern>(pattern)->getMutableElements())
         forEachBoundVar(elt.getSubPattern(), f);
       return;
-    case PatternKind::Var:
-      return forEachBoundVar(cast<VarPattern>(pattern)->getSubPattern(), f);
     case PatternKind::EnumElement:
       if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
         forEachBoundVar(subpattern, f);
@@ -712,9 +710,10 @@ static void revertDependentPattern(Pattern *pattern) {
   }
 
   case PatternKind::Paren:
-    // Recurse into parentheses.
+    // Recurse into parentheses patterns.
     revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern());
     break;
+      
   case PatternKind::Var:
     // Recurse into var patterns.
     revertDependentPattern(cast<VarPattern>(pattern)->getSubPattern());
@@ -1064,9 +1063,9 @@ public:
         visitBoundVars(field.getPattern());
       return;
     case PatternKind::Paren:
-      return visitBoundVars(cast<ParenPattern>(P)->getSubPattern());
     case PatternKind::Typed:
-      return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
+    case PatternKind::Var:
+      return visitBoundVars(P->getSemanticsProvidingPattern());
     case PatternKind::NominalType:
       for (auto &elt : cast<NominalTypePattern>(P)->getMutableElements())
         visitBoundVars(elt.getSubPattern());
@@ -1077,8 +1076,6 @@ public:
         visitBoundVars(OP->getSubPattern());
       return;
     }
-    case PatternKind::Var:
-      return visitBoundVars(cast<VarPattern>(P)->getSubPattern());
 
     // Handle vars.
     case PatternKind::Named: {
