@@ -62,9 +62,15 @@ bb0(%0 : $*Builtin.Int64):
 }
 
 // CHECK-LABEL: sil @expand_destroy_addr_aggstructnontrivial
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: destroy_value
+// CHECK: bb0([[INPTR:%[0-9]+]] : $*S):
+// CHECK-NEXT: [[IN:%[0-9]+]] = load [[INPTR]] : $*S
+// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #cls
+// CHECK-NEXT: strong_release [[cls]] : $C3
+// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #inner_struct
+// CHECK-NEXT: [[innerstruct_cls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[innerstruct_cls1]] : $C1
+// CHECK-NEXT: [[innerstruct_cls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[innerstruct_cls2]] : $C2
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @expand_destroy_addr_aggstructnontrivial : $@thin (@inout S) -> () {
@@ -75,10 +81,24 @@ bb0(%0 : $*S):
 }
 
 // CHECK-LABEL: sil @expand_destroy_addr_aggtuplenontrivial
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: destroy_value
-// CHECK-NEXT: tuple
+// CHECK: bb0([[INPTR:%[0-9]+]] : $*(S, S2, C1)):
+// CHECK-NEXT: [[IN:%[0-9]+]] = load [[INPTR]] : $*(S, S2, C1)
+// CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 0
+// CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #cls
+// CHECK-NEXT: strong_release [[ELT0cls]] : $C3
+// CHECK-NEXT: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #inner_struct
+// CHECK-NEXT: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[ELT0innerstructcls1]] : $C1
+// CHECK-NEXT: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[ELT0innerstructcls2]]
+// CHECK-NEXT: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 1
+// CHECK-NEXT: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #cls1
+// CHECK-NEXT: strong_release [[ELT1cls1]] : $C1
+// CHECK-NEXT: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #cls2
+// CHECK-NEXT: strong_release [[ELT1cls2]] : $C2
+// CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 2
+// CHECK-NEXT: strong_release [[ELT2]]
+// CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 sil @expand_destroy_addr_aggtuplenontrivial : $@thin (@inout (S, S2, C1)) -> () {
 bb0(%0 : $*(S, S2, C1)):

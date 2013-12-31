@@ -145,10 +145,9 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   if (!Type.isTrivial(Module)) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr);
-    if (Type.hasReferenceSemantics())
-      Builder.createStrongRelease(DA->getLoc(), LI);
-    else
-      Builder.createDestroyValue(DA->getLoc(), LI);
+    auto &TL = Module.getTypeLowering(Type);
+    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
+                               TypeLowering::LoweringStyle::DeepNoEnum);
   }
 
   ++NumExpand;
