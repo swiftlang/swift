@@ -1905,6 +1905,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TuplePatternLayout>();
     registerDeclTypeAbbr<TuplePatternEltLayout>();
     registerDeclTypeAbbr<NamedPatternLayout>();
+    registerDeclTypeAbbr<VarPatternLayout>();
     registerDeclTypeAbbr<AnyPatternLayout>();
     registerDeclTypeAbbr<TypedPatternLayout>();
 

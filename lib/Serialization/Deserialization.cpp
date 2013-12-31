@@ -287,10 +287,19 @@ Pattern *ModuleFile::maybeReadPattern() {
 
     TypeLoc typeInfo = TypeLoc::withoutLoc(getType(typeID));
     auto result = new (getContext()) TypedPattern(subPattern, typeInfo,
-                                                        isImplicit);
+                                                  isImplicit);
     result->setType(typeInfo.getType());
     return result;
   }
+  case decls_block::VAR_PATTERN: {
+    bool isImplicit;
+    VarPatternLayout::readRecord(scratch, isImplicit);
+    Pattern *subPattern = maybeReadPattern();
+    assert(subPattern);
+
+    return new (getContext()) VarPattern(SourceLoc(), subPattern, isImplicit);
+  }
+
   default:
     return nullptr;
   }

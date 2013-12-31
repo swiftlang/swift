@@ -615,7 +615,6 @@ class VarPattern : public Pattern {
 public:
   VarPattern(SourceLoc loc, Pattern *sub, Optional<bool> implicit = {})
     : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
-    assert(loc.isValid() == !sub->isImplicit());
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
