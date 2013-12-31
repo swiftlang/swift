@@ -135,7 +135,7 @@ struct ${Self} : ReplPrintable {
 @ if bits in allIntBits:
 // Not transparent because the compiler crashes in that case.
 //@@transparent
-extension ${Self} : IEEEFloatingPointNumber {
+extension ${Self} : FloatingPointNumber {
   typealias _BitsType = UInt${bits}
 
   static func _fromBitPattern(bits: _BitsType) -> ${Self} {
@@ -247,8 +247,8 @@ extension ${Self} : IEEEFloatingPointNumber {
 }
 
 // Not @transparent because the function is too complex.
-extension ${Self} /* : IEEEFloatingPointNumber */ {
-  var floatingPointClass: IEEEFloatingPointClass {
+extension ${Self} /* : FloatingPointNumber */ {
+  var floatingPointClass: FloatingPointClassification {
   get:
     var biasedExponent = __getBiasedExponent()
     if biasedExponent == ${getInfinityExponent(bits)} {
