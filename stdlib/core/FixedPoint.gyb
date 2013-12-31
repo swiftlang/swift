@@ -214,10 +214,6 @@ extension ${Self} {
   }
 }
 
-// Unary plus
-@@transparent @@prefix
-func +(rhs: ${Self}) -> ${Self} { return rhs }
-
 // Operations with masking and non-masking versions
 @ for op,method in ('+','add'), ('*','mul'), ('-','sub'):
 @@transparent
