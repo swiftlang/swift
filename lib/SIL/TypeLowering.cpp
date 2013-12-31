@@ -367,6 +367,13 @@ namespace {
       // Trivial
     }
 
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      // Trivial
+      return value;
+    }
+
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       // Trivial
@@ -405,58 +412,78 @@ namespace {
   template <class Impl, class IndexType>
   class LoadableAggTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
-    /// A non-trivial child of this aggregate type.
-    class NonTrivialChild {
+    /// A child of this aggregate type.
+    class Child {
       /// The index of this child, used to project it out.
       IndexType Index;
 
       /// The aggregate's type lowering.
       const TypeLowering *Lowering;
     public:
-      NonTrivialChild(IndexType index, const TypeLowering &lowering)
+      Child(IndexType index, const TypeLowering &lowering)
         : Index(index), Lowering(&lowering) {}
       const TypeLowering &getLowering() const { return *Lowering; }
       IndexType getIndex() const { return Index; }
+      bool isTrivial() const { return Lowering->isTrivial(); }
     };
 
   private:
     const Impl &asImpl() const { return static_cast<const Impl&>(*this); }
     Impl &asImpl() { return static_cast<Impl&>(*this); }
 
-    /// The number of non-trivial children of this aggregate.
-    /// The data follows the instance data.
-    unsigned NumNonTrivial;
+    /// The number of children of this aggregate. The data follows the instance
+    /// data.
+    unsigned NumChildren;
 
   protected:
-    LoadableAggTypeLowering(SILType type, ArrayRef<NonTrivialChild> nonTrivial)
+    LoadableAggTypeLowering(SILType type, ArrayRef<Child> children)
         : NonTrivialLoadableTypeLowering(type),
-          NumNonTrivial(nonTrivial.size()) {
-      memcpy(reinterpret_cast<NonTrivialChild*>(&asImpl()+1),
-             nonTrivial.data(),
-             NumNonTrivial * sizeof(NonTrivialChild));
+          NumChildren(children.size()) {
+      memcpy(reinterpret_cast<Child*>(&asImpl()+1),
+             children.data(),
+             NumChildren * sizeof(Child));
     }
 
   public:
     static const Impl *create(TypeConverter &TC, CanType type,
-                              ArrayRef<NonTrivialChild> nonTrivial) {
+                              ArrayRef<Child> children) {
       size_t bufferSize =
-        sizeof(Impl) + sizeof(NonTrivialChild) * nonTrivial.size();
+        sizeof(Impl) + sizeof(Child) * children.size();
       void *buffer = operator new(bufferSize, TC);
       auto silType = SILType::getPrimitiveObjectType(type);
-      return ::new(buffer) Impl(silType, nonTrivial);
+      return ::new(buffer) Impl(silType, children);
     }
 
-    ArrayRef<NonTrivialChild> getNonTrivialChildren() const {
-      auto buffer = reinterpret_cast<const NonTrivialChild*>(&asImpl() + 1);
-      return ArrayRef<NonTrivialChild>(buffer, NumNonTrivial);
+    ArrayRef<Child> getChildren() const {
+      auto buffer = reinterpret_cast<const Child*>(&asImpl() + 1);
+      return ArrayRef<Child>(buffer, NumChildren);
+    }
+
+    template <class T>
+    void forEachChild(SILBuilder &B, SILLocation loc,
+                      SILValue aggValue,
+                      const T &operation) const {
+      for (auto &child : getChildren()) {
+        auto &childLowering = child.getLowering();
+        // Skip trivial children.
+        if (childLowering.isTrivial())
+          continue;
+        auto childIndex = child.getIndex();
+        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
+                                                   childIndex, childLowering);
+        operation(B, loc, childIndex, childValue, childLowering);
+      }
     }
 
     template <class T>
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
-      for (auto &child : getNonTrivialChildren()) {
+      for (auto &child : getChildren()) {
         auto &childLowering = child.getLowering();
+        // Skip trivial children.
+        if (childLowering.isTrivial())
+          continue;
         auto childIndex = child.getIndex();
         auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
                                                    childIndex, childLowering);
@@ -480,6 +507,35 @@ namespace {
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue aggValue) const override {
       return B.createCopyValue(loc, aggValue);
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue aggValue,
+                                  LoweringStyle style) const override {
+      // Types with non-trivial copy semantics will need to override this.
+      bool hasDifference = false;
+      SmallVector<SILValue, 4> copiedChildren;
+
+      for (auto &child : getChildren()) {
+        auto &childLowering = child.getLowering();
+        SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
+                                                         child.getIndex(),
+                                                         childLowering);
+        if (!childLowering.isTrivial()) {
+          SILValue copiedChildValue =
+            childLowering.emitLoweredCopyChildValue(B, loc, childValue, style);
+          hasDifference |= (copiedChildValue != childValue);
+          childValue = copiedChildValue;
+        }
+
+        copiedChildren.push_back(childValue);
+      }
+
+      if (hasDifference) {
+        return asImpl().Impl::rebuildAggregate(B, loc, copiedChildren);
+      } else {
+        return aggValue;
+      }
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
@@ -513,8 +569,8 @@ namespace {
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
     LoadableTupleTypeLowering(SILType type,
-                              ArrayRef<NonTrivialChild> nonTrivial)
-      : LoadableAggTypeLowering(type, nonTrivial) {}
+                              ArrayRef<Child> children)
+      : LoadableAggTypeLowering(type, children) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue, unsigned index,
@@ -534,8 +590,8 @@ namespace {
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
     LoadableStructTypeLowering(SILType type,
-                               ArrayRef<NonTrivialChild> nonTrivial)
-      : LoadableAggTypeLowering(type, nonTrivial) {}
+                               ArrayRef<Child> children)
+      : LoadableAggTypeLowering(type, children) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue structValue, VarDecl *field,
@@ -580,15 +636,15 @@ namespace {
       memcpy(reinterpret_cast<NonTrivialElement*>(this+1), nonTrivial.data(),
              numNonTrivial * sizeof(NonTrivialElement));
     }
-    
-    using SimpleOperationTy = 
-      void(*)(SILBuilder &B, SILLocation loc, SILValue value,
-              const TypeLowering &valueLowering, SILBasicBlock *dest,
-              LoweringStyle style);
+
+    using SimpleOperationTy = void (*)(SILBuilder &B, SILLocation loc, SILValue value,
+                                       const TypeLowering &valueLowering,
+                                       SILBasicBlock *dest);
 
     /// Emit a value semantics operation for each nontrivial case of the enum.
+    template <typename T>
     void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
-                             SimpleOperationTy operation, LoweringStyle style) const {
+                             const T &operation) const {
       SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
@@ -612,7 +668,7 @@ namespace {
         SILBasicBlock *bb = nonTrivialBBs[i].second;
         const TypeLowering &lowering = getNonTrivialElements()[i].getLowering();
         B.emitBlock(bb);
-        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB, style);
+        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB);
       }
       
       B.emitBlock(doneBB);
@@ -642,6 +698,25 @@ namespace {
       return B.createCopyValue(loc, value);
     }
 
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      if (style == LoweringStyle::Shallow ||
+          style == LoweringStyle::DeepNoEnum) {
+        return B.createCopyValue(loc, value);
+      } else {
+        ifNonTrivialElement(B, loc, value,
+          [&](SILBuilder &B, SILLocation loc, SILValue child,
+              const TypeLowering &childLowering, SILBasicBlock *dest) {
+            SILValue copiedChild =
+              childLowering.emitLoweredCopyChildValue(B, loc, child, style);
+            B.createBranch(loc, dest, copiedChild);
+          });
+        return new (B.getFunction().getModule())
+          SILArgument(value.getType(), B.getInsertionBB());
+      }
+    }
+    
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.createDestroyValue(loc, value);
@@ -657,11 +732,11 @@ namespace {
         B.createDestroyValue(loc, value);
       else
         ifNonTrivialElement(B, loc, value,
-          [](SILBuilder &B, SILLocation loc, SILValue child,
-             const TypeLowering &childLowering, SILBasicBlock *dest, LoweringStyle style) {
+          [&](SILBuilder &B, SILLocation loc, SILValue child,
+             const TypeLowering &childLowering, SILBasicBlock *dest) {
              childLowering.emitLoweredDestroyChildValue(B, loc, child, style);
              B.createBranch(loc, dest);
-          }, style);
+          });
     }
   };
 
@@ -669,6 +744,12 @@ namespace {
   public:
     LeafLoadableTypeLowering(SILType type)
       : NonTrivialLoadableTypeLowering(type) {}
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      return emitCopyValue(B, loc, value);
+    }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
@@ -752,6 +833,12 @@ namespace {
       llvm_unreachable("type is not loadable!");
     }
 
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
@@ -794,34 +881,35 @@ namespace {
     }
 
     const TypeLowering *visitTupleType(CanTupleType tupleType) {
-      typedef LoadableTupleTypeLowering::NonTrivialChild NonTrivialChild;
-      SmallVector<NonTrivialChild, 8> nonTrivialElts;
+      typedef LoadableTupleTypeLowering::Child Child;
+      SmallVector<Child, 8> childElts;
+      bool hasOnlyTrivialChildren = true;
 
       unsigned i = 0;
       for (auto eltType : tupleType.getElementTypes()) {
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(tupleType);
-        if (!lowering.isTrivial()) {
-          nonTrivialElts.push_back(NonTrivialChild(i, lowering));
-        }
+        hasOnlyTrivialChildren &= lowering.isTrivial();
+        childElts.push_back(Child(i, lowering));
         ++i;
       }
 
-      if (nonTrivialElts.empty())
+      if (hasOnlyTrivialChildren)
         return handleTrivial(tupleType);
-      return LoadableTupleTypeLowering::create(TC, tupleType, nonTrivialElts);
+      return LoadableTupleTypeLowering::create(TC, tupleType, childElts);
     }
 
     const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
-      typedef LoadableStructTypeLowering::NonTrivialChild NonTrivialChild;
-      SmallVector<NonTrivialChild, 8> nonTrivialFields;
+      typedef LoadableStructTypeLowering::Child Child;
+      SmallVector<Child, 8> childFields;
 
       // For consistency, if it's anywhere resilient, we need to treat the type
       // as resilient in SIL.
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
+      bool hasOnlyTrivialChildren = true;
       for (auto field : D->getStoredProperties()) {
         auto origFieldType = AbstractionPattern(field->getType());
         auto substFieldType =
@@ -829,15 +917,14 @@ namespace {
         auto &lowering = TC.getTypeLowering(origFieldType, substFieldType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(structType);
-        if (!lowering.isTrivial()) {
-          nonTrivialFields.push_back(NonTrivialChild(field, lowering));
-        }
+        hasOnlyTrivialChildren &= lowering.isTrivial();
+        childFields.push_back(Child(field, lowering));
       }
 
-      if (nonTrivialFields.empty())
+      if (hasOnlyTrivialChildren)
         return handleTrivial(structType);
       return LoadableStructTypeLowering::create(TC, structType,
-                                                nonTrivialFields);
+                                                childFields);
     }
         
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {

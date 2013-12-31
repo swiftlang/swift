@@ -276,16 +276,6 @@ public:
   }
 
   /// Given a primitively loaded value of this type (which must be
-  /// loadable), +1 it.
-  ///
-  /// This should be used for duplicating a value from place to place
-  /// with exactly the same semantics.  For example, it performs an
-  /// unowned_retain on a value of [unknown] type.  It is therefore
-  /// not necessarily the right thing to do on a semantic load.
-  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value) const = 0;
-
-  /// Given a primitively loaded value of this type (which must be
   /// loadable), -1 it.
   ///
   /// This should be used when dropping a value which has been copied
@@ -295,6 +285,57 @@ public:
   /// a semantic load.
   virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
+
+  /// Emit a lowered 'copy_value' operation.
+  ///
+  /// This type must be loadable.
+  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                        SILValue value,
+                                        LoweringStyle style) const = 0;
+
+  /// Emit a lowered 'copy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
+                                   SILValue value) const {
+    emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
+  }
+
+  /// Emit a lowered 'copy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+                                SILValue value) const {
+    emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
+  }
+
+  /// Emit a lowered 'copy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredCopyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
+                                      SILValue value) const {
+    emitLoweredCopyValue(B, loc, value, LoweringStyle::DeepNoEnum);
+  }
+
+  /// Given a primitively loaded value of this type (which must be
+  /// loadable), +1 it.
+  ///
+  /// This should be used for duplicating a value from place to place
+  /// with exactly the same semantics.  For example, it performs an
+  /// unowned_retain on a value of [unknown] type.  It is therefore
+  /// not necessarily the right thing to do on a semantic load.
+  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value) const = 0;
+
+  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
+                                     SILValue value,
+                                     LoweringStyle style) const {    
+    if (style != LoweringStyle::Shallow) {
+      return emitLoweredCopyValue(B, loc, value, style);
+    } else {
+      return emitCopyValue(B, loc, value);
+    }
+  }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc);
