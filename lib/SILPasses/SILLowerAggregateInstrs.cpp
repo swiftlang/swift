@@ -86,8 +86,10 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   // If our object type is not trivial, we may need to release the old value and
   // retain the new one.
 
+  auto &TL = M.getTypeLowering(SrcType);
+
   // If we have a non-trivial type...
-  if (!SrcType.isTrivial(M)) {
+  if (!TL.isTrivial()) {
 
     // If we are not initializing:
     // %old = load %1 : $*T
@@ -103,10 +105,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   copy_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      if (SrcType.hasReferenceSemantics())
-        Builder.createStrongRetain(CA->getLoc(), New);
-      else
-        Builder.createCopyValue(CA->getLoc(), New);
+      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
+                              TypeLowering::LoweringStyle::DeepNoEnum);
     }
 
     // If we are not initializing:
@@ -114,10 +114,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // destroy_value %new : $*T
     if (Old) {
-      if (SrcType.hasReferenceSemantics())
-        Builder.createStrongRelease(CA->getLoc(), Old);
-      else
-        Builder.createDestroyValue(CA->getLoc(), Old);
+      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
+                                 TypeLowering::LoweringStyle::DeepNoEnum);
     }
   }
 
