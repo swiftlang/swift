@@ -460,22 +460,6 @@ namespace {
     }
 
     template <class T>
-    void forEachChild(SILBuilder &B, SILLocation loc,
-                      SILValue aggValue,
-                      const T &operation) const {
-      for (auto &child : getChildren()) {
-        auto &childLowering = child.getLowering();
-        // Skip trivial children.
-        if (childLowering.isTrivial())
-          continue;
-        auto childIndex = child.getIndex();
-        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                   childIndex, childLowering);
-        operation(B, loc, childIndex, childValue, childLowering);
-      }
-    }
-
-    template <class T>
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
