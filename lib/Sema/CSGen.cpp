@@ -38,6 +38,9 @@ static Identifier findPatternName(Pattern *pattern) {
   case PatternKind::Typed:
     return findPatternName(cast<TypedPattern>(pattern)->getSubPattern());
 
+  case PatternKind::Var:
+    return findPatternName(cast<VarPattern>(pattern)->getSubPattern());
+
   // TODO
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
@@ -633,6 +636,10 @@ namespace {
       case PatternKind::Paren:
         // Parentheses don't affect the type.
         return getTypeForPattern(cast<ParenPattern>(pattern)->getSubPattern(),
+                                 forFunctionParam, locator);
+      case PatternKind::Var:
+        // Var doesn't affect the type.
+        return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
                                  forFunctionParam, locator);
 
       case PatternKind::Any:

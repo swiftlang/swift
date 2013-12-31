@@ -715,6 +715,10 @@ static void revertDependentPattern(Pattern *pattern) {
     // Recurse into parentheses.
     revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern());
     break;
+  case PatternKind::Var:
+    // Recurse into var patterns.
+    revertDependentPattern(cast<VarPattern>(pattern)->getSubPattern());
+    break;
 
   case PatternKind::Tuple: {
     // Recurse into tuple elements.
