@@ -178,6 +178,31 @@ static bool expandDestroyValue(DestroyValueInst *DV) {
   return true;
 }
 
+static bool expandCopyValue(CopyValueInst *CV) {
+  SILModule &Module = CV->getModule();
+  SILBuilder Builder(CV);
+
+  // Strength reduce destroy_addr inst into release/store if
+  // we have a non-address only type.
+  SILValue Value = CV->getOperand();
+
+  // If we have an address only type, do nothing.
+  SILType Type = Value.getType();
+  assert(Type.isLoadable(Module) && "Copy Value can only be called on loadable "
+         "types.");
+
+  auto &TL = Module.getTypeLowering(Type);
+  SILValue Result =
+    TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
+                            TypeLowering::LoweringStyle::DeepNoEnum);
+  SILValue(CV, 0).replaceAllUsesWith(Result);
+
+  DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
+
+  ++NumExpand;
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -201,6 +226,13 @@ static void processFunction(SILFunction &Fn) {
         if (expandDestroyAddr(DA)) {
           ++II;
           DA->eraseFromParent();
+          continue;
+        }
+
+      if (auto *CV = dyn_cast<CopyValueInst>(Inst))
+        if (expandCopyValue(CV)) {
+          ++II;
+          CV->eraseFromParent();
           continue;
         }
 
