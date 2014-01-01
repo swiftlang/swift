@@ -449,7 +449,10 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
 /// Determine whether we should attempt a user-defined conversion.
 static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
-
+  // Strip the l-value qualifier if present.
+  if (!type->is<InOutType>())
+    type = type->getRValueType();
+  
   // If this isn't a type that can have user-defined conversions, there's
   // nothing to do.
   if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
@@ -472,10 +475,12 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
          kind != ConstraintKind::Conversion &&
          kind != ConstraintKind::OperatorConversion &&
          "Construction/conversion constraints create potential cycles");
-
+  
   // If this isn't a type that can have user-defined conversions, there's
   // nothing to do.
-  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
+  Type rvType = type->getRValueType();
+  if (!rvType->getNominalOrBoundGenericNominal() &&
+      !rvType->is<ArchetypeType>())
     return ConstraintSystem::SolutionKind::Unsolved;
 
   // If there are no user-defined conversions, there's nothing to do.
