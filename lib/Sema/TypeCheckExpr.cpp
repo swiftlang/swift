@@ -341,15 +341,14 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   // use this as the source of the result.
   CanType canType = type->getCanonicalType();
 
-  // Strip l-value-ness.
+  // Uses of @inout argument values are lvalues.
+  if (auto iot = dyn_cast<InOutType>(canType))
+    return iot->getObjectType();
+  
+  // Uses of values with lvalue type produce their rvalue.
   if (auto LV = dyn_cast<LValueType>(canType))
     return LV->getObjectType();
-
-  // FIXME!! wrong!! strip @inout
-  // This should subsume ripping @inout off.
-  if (auto IO = dyn_cast<InOutType>(canType))
-    return IO->getObjectType();
-
+  
   // Turn @weak T into Optional<T>.
   if (isa<WeakStorageType>(canType)) {
     // On the one hand, we should probably use a better location than
@@ -397,8 +396,7 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType) {
   // If the base type is a struct or enum, and is not @inout qualified, the
   // result of an access is always an rvalue.
   return !baseType || baseType->hasReferenceSemantics() ||
-         baseType->is<InOutType>() || baseType->is<LValueType>() ||
-         VD->isStatic();
+         baseType->is<LValueType>() || VD->isStatic();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,

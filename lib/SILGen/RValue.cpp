@@ -65,7 +65,7 @@ public:
         SILValue member = gen.B.createTupleElementAddr(l, v, i,
                                                      fieldTy.getAddressType());
         assert(fieldTI.getSemanticType() == fieldTy);
-        if (fieldTI.isLoadable() && !isa<LValueType>(fieldCanTy))
+        if (fieldTI.isLoadable() && !isa<InOutType>(fieldCanTy))
           member = gen.B.createLoad(l, member);
         visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member, fieldTI), l);
       }

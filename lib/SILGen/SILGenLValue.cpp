@@ -27,13 +27,11 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 #include "ASTVisitor.h"
-
 using namespace swift;
 using namespace Lowering;
 
 static CanType getSubstFormalRValueType(Expr *expr) {
-  auto lv = cast<LValueType>(expr->getType()->getCanonicalType());
-  return lv.getObjectType();
+  return expr->getType()->getRValueType()->getCanonicalType();
 }
 
 static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
@@ -613,7 +611,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
                                  getSubstFormalRValueType(e));
       }
       
-      if (!isa<LValueType>(baseTy) && !isa<InOutType>(baseTy)) {
+      if (!isa<LValueType>(baseTy)) {
         assert(baseTy.hasReferenceSemantics());
         lv.add<RefElementComponent>(var, varStorageType, typeData);
       } else {

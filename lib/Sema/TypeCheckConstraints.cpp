@@ -1174,28 +1174,34 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  // If we already have an rvalue, we're done.
-  auto lvalueTy = expr->getType()->getAs<LValueType>();
-  if (!lvalueTy)
-    return expr;
-
-  // Can't load from an explicit lvalue.
-  if (auto addrOf = dyn_cast<AddressOfExpr>(expr->getSemanticsProvidingExpr())){
-    diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-             lvalueTy->getObjectType())
-      .fixItRemove(SourceRange(expr->getLoc()));
-    return coerceToRValue(addrOf->getSubExpr());
+  // Can't load from an @inout value.
+  if (auto *iot = expr->getType()->getAs<InOutType>()) {
+    // Emit a fixit if we can find the & expression that turned this into an
+    // @inout.
+    if (auto addrOf =
+        dyn_cast<AddressOfExpr>(expr->getSemanticsProvidingExpr())) {
+      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
+               iot->getObjectType())
+      .fixItRemove(SourceRange(addrOf->getLoc()));
+      return coerceToRValue(addrOf->getSubExpr());
+    } else {
+      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
+               iot->getObjectType());
+      return expr;
+    }
   }
 
-  // Load the lvalue.
-  return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
+  // If we already have an rvalue, we're done, otherwise emit a load.
+  if (auto lvalueTy = expr->getType()->getAs<LValueType>())
+    return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
+
+  return expr;
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   // Load lvalues.
-  if (auto lvalue = expr->getType()->getAs<LValueType>()) {
+  if (auto lvalue = expr->getType()->getAs<LValueType>())
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
-  }
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<ParenExpr>(expr)) {

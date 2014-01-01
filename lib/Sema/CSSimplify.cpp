@@ -450,8 +450,7 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 /// Determine whether we should attempt a user-defined conversion.
 static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
   // Strip the l-value qualifier if present.
-  if (!type->is<InOutType>())
-    type = type->getRValueType();
+  type = type->getRValueType();
   
   // If this isn't a type that can have user-defined conversions, there's
   // nothing to do.
@@ -1607,8 +1606,7 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
     return SolutionKind::Unsolved;
 
   // Look through implicit lvalue types.
-  if (auto lvalueTy = baseTy->getAs<LValueType>())
-    baseTy = lvalueTy->getObjectType();
+  baseTy = baseTy->getRValueType();
 
   if (auto protoTy = baseTy->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(

@@ -417,11 +417,10 @@ namespace {
           selfTy = baseTy;
         else {
           // If the base is already an lvalue with the right base type, we can
-          // use it as the lvalue qualified type.
+          // pass it as an @inout qualified type.
           selfTy = containerTy;
           if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-            if (base->getType()->is<LValueType>() ||
-                base->getType()->is<InOutType>())
+            if (base->getType()->is<LValueType>())
               selfTy = InOutType::get(selfTy);
         }
         base = coerceObjectArgumentToType(
@@ -1978,8 +1977,7 @@ namespace {
     /// Whether this type is DynamicLookup or an implicit lvalue thereof.
     bool isDynamicLookupType(Type type) {
       // Look through lvalues.
-      if (auto lvalue = type->getAs<LValueType>())
-        type = lvalue->getObjectType();
+      type = type->getRValueType();
 
       // Check whether we have a protocol type.
       auto protoTy = type->getAs<ProtocolType>();
@@ -2736,8 +2734,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Coercions from an lvalue: requalify and load. We perform these coercions
-  // first because they are often the first step in a multi-step coercion.
+  // Coercions from an lvalue: load or perform implicit address-of. We perform
+  // these coercions first because they are often the first step in a multi-step
+  // coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     // Coercion of a SuperRefExpr. Refine the type of the 'super' reference
     // so we don't insert a DerivedToBase conversion later.
@@ -2763,8 +2762,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto toTuple = toType->getAs<TupleType>()) {
       int scalarIdx = toTuple->getFieldForScalarInit();
       if (scalarIdx >= 0 &&
-          (toTuple->getElementType(scalarIdx)->is<LValueType>() ||
-           toTuple->getElementType(scalarIdx)->is<InOutType>()))
+          toTuple->getElementType(scalarIdx)->is<InOutType>())
         performLoad = false;
     }
 

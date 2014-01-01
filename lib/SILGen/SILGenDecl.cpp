@@ -595,7 +595,7 @@ struct ArgumentInitVisitor :
       I->bindAddress(arg, gen, loc);
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
-      if (!ty->is<LValueType>() && !ty->is<InOutType>())
+      if (!ty->is<InOutType>())
         gen.Cleanups.pushCleanup<DestroyAddr>(arg);
       break;
 
@@ -2042,10 +2042,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // not. Handle this special case in the witness type before applying the
   // abstraction change.
   auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;
-  if ((!isa<LValueType>(witnessOrigTy.getInput()) &&
-       !isa<InOutType>(witnessOrigTy.getInput())) &&
-      (isa<LValueType>(requirementTy.getInput()) ||
-       isa<InOutType>(requirementTy.getInput()))) {
+  if (!isa<InOutType>(witnessOrigTy.getInput()) &&
+      isa<InOutType>(requirementTy.getInput())) {
     inOutSelf = HasInOutSelfAbstractionDifference;
   }
       

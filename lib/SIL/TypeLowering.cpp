@@ -1313,8 +1313,10 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (ValueDecl *capture : captures) {
-    // FIXME: should this be the type-of-rvalue?
-    auto captureType = capture->getType()->getRValueType()->getCanonicalType();
+    // A capture of a 'var' or '@inout' variable is done with the underlying
+    // object type.
+    auto captureType =
+      capture->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::None:
