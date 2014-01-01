@@ -1160,6 +1160,9 @@ NOTE(protocol_witness_static_conflict,sema_tcd,none,
 NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
+NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
+     "candidate is marked @mutating but protocol does not allow it", ())
+
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,sema_tcd,none,

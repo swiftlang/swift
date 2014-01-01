@@ -201,7 +201,10 @@ namespace {
     PrefixNonPrefixConflict,
 
     /// \brief The witness did not match due to postfix/non-postfix differences.
-    PostfixNonPostfixConflict
+    PostfixNonPostfixConflict,
+    
+    /// \brief The witness did not match because of @mutating conflicts.
+    MutatingConflict
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -236,6 +239,7 @@ namespace {
       case MatchKind::StaticNonStaticConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
+      case MatchKind::MutatingConflict:
         return false;
       }
     }
@@ -253,6 +257,7 @@ namespace {
       case MatchKind::StaticNonStaticConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
+      case MatchKind::MutatingConflict:
         return false;
       }
     }
@@ -431,6 +436,13 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
+    // If the requirement is for a @mutating member, then the witness must also
+    // be @mutating (unless it is defined on a type with reference semantics
+    // (e.g. a class).  It is fine for the witness to be non-mutating if the
+    // protocol is declared mutating.
+    if (funcWitness->isMutating() && !funcReq->isMutating())
+      return RequirementMatch(witness, MatchKind::MutatingConflict);
+    
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else {
@@ -742,6 +754,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
                 true, match.Witness->getAttrs().isPrefix() ? 1 : 0);
     break;
+  case MatchKind::MutatingConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
+    break;
   }
 }
 
@@ -833,8 +849,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     Conformance->addDefaultDefinition(assocType);
 }
 
-ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
-                       ValueDecl *requirement) {
+ResolveWitnessResult
+ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
   auto metaType = MetatypeType::get(Adoptee, TC.Context);
@@ -844,8 +860,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaLookup(
   if (requirement->getName().isOperator()) {
     // Operator lookup is always global.
     UnqualifiedLookup lookup(requirement->getName(),
-                             DC->getModuleScopeContext(),
-                             &TC);
+                             DC->getModuleScopeContext(), &TC);
 
     if (lookup.isSuccess()) {
       for (auto candidate : lookup.Results) {
