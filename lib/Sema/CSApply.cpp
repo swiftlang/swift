@@ -3060,13 +3060,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   apply->setFn(fn);
 
   // Check whether the argument is 'super'.
-  bool isSuper = false;
-  {
-    Expr *arg = apply->getArg()->getSemanticsProvidingExpr();
-    while (auto ice = dyn_cast<ImplicitConversionExpr>(arg))
-      arg = ice->getSubExpr()->getSemanticsProvidingExpr();
-    isSuper = isa<SuperRefExpr>(arg);
-  }
+  bool isSuper =
+    isa<SuperRefExpr>(apply->getArg()->getSemanticsProvidingExpr());
   
   // For function application, convert the argument to the input type of
   // the function.

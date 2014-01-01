@@ -142,33 +142,13 @@ static void destroyRValue(SILGenFunction &SGF, CleanupLocation loc,
   }
 }
 
-static VarDecl *isLoadPropagatedValue(Expr *SubExpr, SILGenFunction &SGF) {
-    // Look through parens.
-  while (auto *PE = dyn_cast<ParenExpr>(SubExpr))
-    SubExpr = PE->getSubExpr();
-  
-  // If this is a load of a local constant decl, just produce the value.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
-    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      // FIXME: This should be a bit on vardecl, not presence in VarLocs.
-      auto It = SGF.VarLocs.find(VD);
-      if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return VD;
-    }
-  }
-  
-  return nullptr;
-}
-
-
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
-  if (auto load = dyn_cast<LoadExpr>(E))
-    if (!isLoadPropagatedValue(load->getSubExpr(), *this)) {
-      auto lv = emitLValue(load->getSubExpr());
-      emitCopyLValueInto(E, lv, I);
-      return;
-    }
+  if (auto load = dyn_cast<LoadExpr>(E)) {
+    auto lv = emitLValue(load->getSubExpr());
+    emitCopyLValueInto(E, lv, I);
+    return;
+  }
   
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
@@ -631,18 +611,6 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
-  // If we can and must fold this, do so.
-  if (VarDecl *VD = isLoadPropagatedValue(E->getSubExpr(), SGF)) {
-    auto Entry = SGF.VarLocs[VD];
-    assert(Entry.isConstant() && "Not a load propagated vardecl");
-    SILValue V = Entry.getConstant();
-
-    auto &TL = SGF.getTypeLowering(VD->getType());
-    // The value must be copied for the duration of the expression.
-    V = TL.emitCopyValue(SGF.B, E, V);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(V, TL));
-  }
-
   LValue lv = SGF.emitLValue(E->getSubExpr());
   auto result = SGF.emitLoadOfLValue(E, lv, C);
   return (result ? RValue(SGF, E, result) : RValue());
@@ -3231,8 +3199,7 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   // if possible.
   if (auto *LE = dyn_cast<LoadExpr>(E->getSrc())) {
     if (!isa<TupleExpr>(E->getDest())
-        && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType()) &&
-        !isLoadPropagatedValue(LE->getSubExpr(), SGF)) {
+        && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType())) {
       auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr());
       SGF.emitAssignLValueToLValue(E, SrcLV,
                                    SGF.emitLValue(E->getDest()));
