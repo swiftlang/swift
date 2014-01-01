@@ -1193,7 +1193,7 @@ llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
 static CanType addOwnerArgument(DeclContext *DC, CanType resultType) {
   Type argType = DC->getDeclaredTypeInContext();
   if (!argType->hasReferenceSemantics())
-    argType = LValueType::get(argType);
+    argType = InOutType::get(argType);
   if (auto params = DC->getGenericParamsOfContext())
     return PolymorphicFunctionType::get(argType, resultType, params)
              ->getCanonicalType();
@@ -1247,7 +1247,7 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   // (this clause is skipped for a non-subscript getter).
   unsigned uncurryLevel = 0;
   CanType formalType = CanType(FunctionType::get(TupleType::getEmpty(Context),
-                                              getObjectType(value)));
+                                                 getObjectType(value)));
   addIndexArgument(value, formalType, uncurryLevel);
   AbstractCC cc = addOwnerArgument(value, formalType, uncurryLevel);
 

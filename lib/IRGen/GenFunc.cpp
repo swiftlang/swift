@@ -2217,7 +2217,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     hasSingleSwiftRefcountedContext = Maybe;
   
   // Collect the type infos for the context types.
-  // FIXME: Keep LValueTypes out of this.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   for (SILType argType : argTypes) {
     auto &ti = IGF.getTypeInfoForLowered(argType.getSwiftType());

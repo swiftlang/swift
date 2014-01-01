@@ -547,8 +547,7 @@ namespace {
     }
 
     llvm::Value *visitLValueType(CanLValueType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("should have been lowered by SILGen");
     }
     llvm::Value *visitInOutType(CanInOutType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for @inout type");

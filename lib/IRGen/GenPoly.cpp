@@ -260,11 +260,10 @@ namespace {
     // L-values go by the object type;  note that we ask the ordinary
     // question, not the argument question.
     bool visitLValueType(CanLValueType origTy, CanLValueType substTy) {
-      return differsByAbstractionInMemory(IGM,
-                                          origTy.getObjectType(),
-                                          substTy.getObjectType());
+      llvm_unreachable("should have been lowered by SILGen");
     }
-    // inout go by the object type;  note that we ask the ordinary
+        
+    // @inout go by the object type;  note that we ask the ordinary
     // question, not the argument question.
     bool visitInOutType(CanInOutType origTy, CanInOutType substTy) {
       return differsByAbstractionInMemory(IGM,
@@ -552,24 +551,7 @@ namespace {
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
-      CanType origObjectTy = origTy.getObjectType();
-      CanType substObjectTy = substTy.getObjectType();
-      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
-        IGF.unimplemented(SourceLoc(), "remapping l-values");
-
-      llvm::Value *substMV = In.claimNext();
-      if (origObjectTy == substObjectTy)
-        return Out.add(substMV);
-
-      // A bitcast will be sufficient.
-      auto &origObjectTI = IGF.IGM.getTypeInfoForUnlowered(origObjectTy);
-      auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
-
-      auto substValue = substMV;
-      auto origValue =
-        IGF.Builder.CreateBitCast(substValue, origPtrTy,
-                                  substValue->getName() + ".reinterpret");
-      Out.add(origValue);
+      llvm_unreachable("should have been lowered by SILGen");
     }
 
     void visitInOutType(CanInOutType origTy, CanInOutType substTy) {
@@ -734,23 +716,7 @@ namespace {
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
-      CanType origObjectTy = origTy.getObjectType();
-      CanType substObjectTy = substTy.getObjectType();
-      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
-        IGF.unimplemented(SourceLoc(), "remapping l-values");
-
-      llvm::Value *origMV = In.claimNext();
-      if (origObjectTy == substObjectTy)
-        return Out.add(origMV);
-
-      // A bitcast will be sufficient.
-      auto &substObjectTI = IGF.IGM.getTypeInfoForUnlowered(substObjectTy);
-      auto substPtrTy = substObjectTI.getStorageType()->getPointerTo();
-
-      auto substValue =
-        IGF.Builder.CreateBitCast(origMV, substPtrTy,
-                                  origMV->getName() + ".reinterpret");
-      Out.add(substValue);
+      llvm_unreachable("should have been lowered by SILGen");
     }
     void visitInOutType(CanInOutType origTy, CanInOutType substTy) {
       CanType origObjectTy = origTy.getObjectType();

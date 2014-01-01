@@ -31,7 +31,6 @@ namespace swift {
   class ClassDecl;
   class AnyFunctionType;
   class InOutType;
-  class LValueType;
   class MetatypeType;
   class ModuleType;
   class NominalTypeDecl;
