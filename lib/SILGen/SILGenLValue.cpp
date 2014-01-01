@@ -96,7 +96,6 @@ public:
   // Nodes that form the root of lvalue paths
 
   LValue visitDeclRefExpr(DeclRefExpr *e);
-  LValue visitSuperRefExpr(SuperRefExpr *e);
   LValue visitMaterializeExpr(MaterializeExpr *e);
 
   // Nodes that make up components of lvalue paths
@@ -548,11 +547,6 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   return emitLValueForDecl(*this, e, e->getDecl(), getSubstFormalRValueType(e));
-}
-
-LValue SILGenLValue::visitSuperRefExpr(SuperRefExpr *e) {
-  return emitLValueForDecl(*this, e, e->getSelf(),
-                           e->getSelf()->getType()->getCanonicalType());
 }
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {

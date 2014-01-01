@@ -837,15 +837,13 @@ static bool isSuperInitUse(UpcastInst *Inst) {
     // (call_expr type='SomeClass'
     //   (dot_syntax_call_expr type='() -> SomeClass' super
     //     (other_constructor_ref_expr implicit decl=SomeClass.init)
-    //     (load_expr implicit type='SomeClass'
-    //       (super_ref_expr type='@inout (implicit)SomeClass')))
+    //     (super_ref_expr type='SomeClass'))
     //   (...some argument...)
     LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
     if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
       continue;
 
-    auto *Arg = dyn_cast<LoadExpr>(LocExpr->getArg());
-    if (Arg && isa<SuperRefExpr>(Arg->getSubExpr()))
+    if (isa<SuperRefExpr>(LocExpr->getArg()))
       return true;
   }
 

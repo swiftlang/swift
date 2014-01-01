@@ -925,10 +925,6 @@ struct ASTNodeBase {};
     }
     
     void verifyChecked(SuperRefExpr *expr) {
-      if (!expr->getType()->is<LValueType>()) {
-        Out << "Type of SuperRefExpr should be an LValueType";
-        abort();
-      }
       verifyCheckedBase(expr);
     }
 

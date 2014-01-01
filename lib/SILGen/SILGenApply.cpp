@@ -877,10 +877,6 @@ public:
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
     ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen, arg);
-    if (super.isLValue()) {
-      auto superValue = gen.B.createLoad(arg, super.getValue());
-      super = gen.emitManagedRetain(arg, superValue);
-    }
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -904,19 +900,16 @@ public:
     } else
       llvm_unreachable("invalid super callee");
 
-    // Upcast 'self' parameter to the super type.
-    CanType superFormalType = arg->getType()->getRValueType()->getCanonicalType();
-    SILType superTy = gen.getLoweredLoadableType(superFormalType);
-    SILValue superUpcast = gen.B.createUpcast(arg, super.getValue(), superTy);
-    
-    setSelfParam(RValue(gen, apply, superFormalType,
-                        ManagedValue(superUpcast, super.getCleanup())),
-                 apply);
+    CanType superFormalType = arg->getType()->getCanonicalType();
+    setSelfParam(RValue(gen, apply, superFormalType, super), apply);
     
     SILValue superMethod;
     if (constant.isForeign) {
+      SILValue Input = super.getValue();
+      if (auto *UI = dyn_cast<UpcastInst>(Input))
+        Input = UI->getOperand();
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(gen, super.getValue(), constant,
+      setCallee(Callee::forSuperMethod(gen, Input, constant,
                                        getSubstFnType(), fn));
     } else {
       // Native Swift super calls are direct.

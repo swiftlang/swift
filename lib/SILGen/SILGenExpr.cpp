@@ -157,15 +157,6 @@ static VarDecl *isLoadPropagatedValue(Expr *SubExpr, SILGenFunction &SGF) {
     }
   }
   
-  // If this is a use of super that is a constant, just produce the value.
-  if (auto *SRE = dyn_cast<SuperRefExpr>(SubExpr)) {
-    if (auto *VD = dyn_cast<VarDecl>(SRE->getSelf())) {
-      // FIXME: This should be a bit on vardecl, not presence in VarLocs.
-      auto It = SGF.VarLocs.find(VD);
-      if (It != SGF.VarLocs.end() && It->second.isConstant())
-        return VD;
-    }
-  }
   return nullptr;
 }
 
@@ -578,8 +569,22 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  return RValue(SGF, E,
-                SGF.emitReferenceToDecl(E, E->getSelf(), E->getType(), 0));
+  auto Self = SGF.emitReferenceToDecl(E, E->getSelf(),
+                                      E->getSelf()->getType(), 0);
+  
+  // In some constructors, 'self' is mutable (since super.init can replace
+  // self).  A super reference is an rvalue though, so perform a load.
+  if (Self.isLValue())
+    Self = SGF.emitLoad(E, Self.getUnmanagedValue(),
+                          SGF.getTypeLowering(E->getSelf()->getType()),
+                          C, IsNotTake);
+
+  // Perform an upcast to convert self to the indicated super type.
+  auto Result = SGF.B.createUpcast(E, Self.getValue(),
+                                   SGF.getLoweredType(E->getType()));
+
+  return RValue(SGF, E, ManagedValue(Result, Self.getCleanup()));
+
 }
 
 RValue RValueEmitter::visitOtherConstructorDeclRefExpr(

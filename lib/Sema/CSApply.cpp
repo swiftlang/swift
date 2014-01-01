@@ -2661,6 +2661,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
         fromType = expr->getType();
       }
+      
+      // Coercion of a SuperRefExpr.  Refine the type of the 'super' reference
+      // instead of inserting a derived-to-base conversion.
+      if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
+        assert(tc.isSubtypeOf(fromType, toType, dc) &&
+               "coercing super expr to non-supertype?!");
+        superRef->setType(toType);
+        return expr;
+      }
 
       // Coercion from subclass to superclass.
       return new (tc.Context) DerivedToBaseExpr(expr, toType);
@@ -2737,16 +2746,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // these coercions first because they are often the first step in a multi-step
   // coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
-    // Coercion of a SuperRefExpr. Refine the type of the 'super' reference
-    // so we don't insert a DerivedToBase conversion later.
-    if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
-      assert(tc.isSubtypeOf(fromLValue->getObjectType(),
-                            toType->getRValueType(), dc)
-             && "coercing super expr to non-supertype?!");
-      fromLValue = LValueType::get(toType->getRValueType());
-      superRef->setType(fromLValue);
-    }
-    
     if (auto *toIO = toType->getAs<InOutType>()) {
       // In an @assignment operator like "++i", the operand is converted from
       // an implicit lvalue to an @inout argument.
@@ -2812,6 +2811,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
          fromSuperClass;
          fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
       if (fromSuperClass->isEqual(toType)) {
+        
         // Coercion from archetype to its (concrete) superclass.
         if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
           expr = new (tc.Context) ArchetypeToSuperExpr(
@@ -2819,13 +2819,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                     fromArchetype->getSuperclass());
 
           // If we succeeded, use the coerced result.
-          if (expr->getType()->isEqual(toType)) {
+          if (expr->getType()->isEqual(toType))
             return expr;
-          }
-
-          fromType = expr->getType();
         }
 
+        // Coercion of a SuperRefExpr.  Refine the type of the 'super' reference
+        // instead of inserting a derived-to-base conversion.
+        if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
+          assert(tc.isSubtypeOf(fromType, toType, dc) &&
+                 "coercing super expr to non-supertype?!");
+          superRef->setType(toType);
+          return expr;
+        }
+        
         // Coercion from subclass to superclass.
         expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
         return expr;

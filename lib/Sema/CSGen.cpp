@@ -240,13 +240,9 @@ namespace {
     Type visitSuperRefExpr(SuperRefExpr *E) {
       if (!E->getType()) {
         // Resolve the super type of 'self'.
-        Type superTy = getSuperType(E->getSelf(), E->getLoc(),
-                                    diag::super_not_in_class_method,
-                                    diag::super_with_no_base_class);
-        if (!superTy)
-          return nullptr;
-        
-        return LValueType::get(superTy);
+        return getSuperType(E->getSelf(), E->getLoc(),
+                            diag::super_not_in_class_method,
+                            diag::super_with_no_base_class);
       }
       
       return E->getType();
