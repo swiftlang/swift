@@ -58,10 +58,8 @@ public:
   }
 
   AbstractionPattern getLValueObjectType() const {
-    if (auto lv = dyn_cast<LValueType>(OrigType))
-      return AbstractionPattern(lv.getObjectType());
-    if (auto io = dyn_cast<InOutType>(OrigType))
-      return AbstractionPattern(io.getObjectType());
+    if (auto iot = dyn_cast<InOutType>(OrigType))
+      return AbstractionPattern(iot->getObjectType());
     assert(isOpaque());
     return AbstractionPattern(OrigType);
   }
