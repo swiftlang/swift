@@ -1149,9 +1149,8 @@ namespace {
         return MetatypeType::get(type, cs.getASTContext());
       }
 
-      Type type = cs.TC.getUnopenedTypeOfReference(decl, Type(),
-                                                   /*wantInterfaceType=*/true);
-      return adjustInOutForReference(type);
+      return cs.TC.getUnopenedTypeOfReference(decl, Type(),
+                                              /*wantInterfaceType=*/true);
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {

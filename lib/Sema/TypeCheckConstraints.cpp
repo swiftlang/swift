@@ -84,14 +84,6 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-Type constraints::adjustInOutForReference(Type type) {
-  // References to @inout arguments should become normal implicit lvalues.
-  if (auto lv = type->getAs<InOutType>())
-    return LValueType::get(lv->getObjectType());
-
-  return type;
-}
-
 bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                                       SmallVectorImpl<int> &sources,
                                       SmallVectorImpl<unsigned> &variadicArgs,

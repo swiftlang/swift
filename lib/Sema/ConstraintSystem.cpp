@@ -651,11 +651,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                                  /*wantInterfaceType=*/true);
 
   // Adjust the type of the reference.
-  valueType = adjustInOutForReference(
-                openType(valueType,
-                         value->getPotentialGenericDeclContext(),
-                         /*skipProtocolSelfConstraint=*/false,
-                         opener));
+  valueType = openType(valueType,
+                       value->getPotentialGenericDeclContext(),
+                       /*skipProtocolSelfConstraint=*/false,
+                       opener);
   return { valueType, valueType };
 }
 

@@ -1820,10 +1820,6 @@ public:
   void dump(raw_ostream &out);
 };
 
-/// \brief Adjust @inout types within the type of a reference to a declaration.
-///
-Type adjustInOutForReference(Type type);
-
 /// \brief Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
