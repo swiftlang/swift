@@ -345,6 +345,10 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
+  /// getLValueOrInOutObjectType - For an @lvalue or @inout type, retrieves the
+  /// underlying object type. Otherwise, returns the type itself.
+  Type getLValueOrInOutObjectType();
+
   /// Retrieves the rvalue instance type, looking through single-element
   /// tuples, lvalue types, and metatypes.
   Type getRValueInstanceType();
@@ -2814,6 +2818,16 @@ inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
 
 inline Type TypeBase::getRValueType() {
   // FIXME: Stop stripping IOT!
+  if (auto iot = getAs<InOutType>())
+    return iot->getObjectType();
+  if (auto lv = getAs<LValueType>())
+    return lv->getObjectType();
+  return this;
+}
+  
+/// getLValueOrInOutObjectType - For an @lvalue or @inout type, retrieves the
+/// underlying object type. Otherwise, returns the type itself.
+inline Type TypeBase::getLValueOrInOutObjectType() {
   if (auto iot = getAs<InOutType>())
     return iot->getObjectType();
   if (auto lv = getAs<LValueType>())

@@ -8,7 +8,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----------------------------------------------------------------------===//
+//===----- -----------------------------------------------------------------===//
 //
 // This file implements application of a solution to a constraint
 // system to a particular expression, resulting in a
@@ -217,7 +217,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   // with whatever access permissions the base has.  We just set the implicit
   // bit.
   if (baseTy->is<InOutType>())
-    return InOutType::get(baseTy->getRValueType());
+    return LValueType::get(baseTy->getRValueType());
   
   // Accesses to members in values of reference type (classes, metatypes) are
   // always done through a the reference to self.  Accesses to value types with
@@ -2920,39 +2920,36 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 Expr *
 ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
                                          ConstraintLocatorBuilder locator) {
-  
-  assert(!toType->is<LValueType>() &&
-         "Object argument should not be an @lvalue type");
-
-  // If we're coercing to an rvalue type, just do it.
-  if (!toType->is<InOutType>())
-    return coerceToType(expr, toType, locator);
-  
-  // Map down to the underlying object type.
-  Type containerType = toType->getRValueType();
-
-  // Form the lvalue type we will be producing.
-  auto &tc = cs.getTypeChecker();
-  Type destType = InOutType::get(containerType);
-
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();
-  if (fromType->isEqual(destType))
+  if (fromType->isEqual(toType))
     return expr;
 
+  auto &ctx = cs.getTypeChecker().Context;
+
+  // If we're coercing to an rvalue type, just do it.
+  if (!toType->is<InOutType>() && !toType->is<LValueType>())
+    return coerceToType(expr, toType, locator);
+
+  // If we have an rvalue that we are coercing, wrap it up in a materialize
+  // first.
   if (!fromType->is<LValueType>()) {
     // If the object types are different, coerce to the container type.
-    expr = coerceToType(expr, containerType, locator);
+    expr = coerceToType(expr, toType->getLValueOrInOutObjectType(), locator);
 
     // If the source is not an lvalue, materialize it.
-    expr = new (tc.Context) MaterializeExpr(expr,
-                                            LValueType::get(containerType));
+    expr = new (ctx) MaterializeExpr(expr, LValueType::get(expr->getType()));
   }
+  
+  // Member data accesses can be performed with lvalues, they don't require
+  // or want an @inout type.
+  if (expr->getType()->isEqual(toType))
+    return expr;
   
   // Use AddressOfExpr to convert it to an explicit @inout argument for the
   // receiver.
-  return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
-                                        destType, /*isImplicit*/true);
+  return new (ctx) AddressOfExpr(expr->getStartLoc(), expr,
+                                 toType, /*isImplicit*/true);
 }
 
 Expr *ExprRewriter::convertLiteral(Expr *literal,
