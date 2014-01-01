@@ -478,16 +478,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   
   // If this isn't a type that can have user-defined conversions, there's
   // nothing to do.
-  Type rvType = type->getRValueType();
-  if (!rvType->getNominalOrBoundGenericNominal() &&
-      !rvType->is<ArchetypeType>())
-    return ConstraintSystem::SolutionKind::Unsolved;
-
-  // If there are no user-defined conversions, there's nothing to do.
-  // FIXME: lame name!
-  auto &ctx = cs.getASTContext();
-  auto name = ctx.getIdentifier("__conversion");
-  if (!cs.lookupMember(type, name))
+  if (!shouldTryUserConversion(cs, type))
     return ConstraintSystem::SolutionKind::Unsolved;
 
   auto memberLocator = cs.getConstraintLocator(
@@ -501,6 +492,9 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                     cs.getConstraintLocator(memberLocator,
                                             ConstraintLocator::FunctionResult),
                     /*options=*/0);
+
+  auto &ctx = cs.getASTContext();
+  auto name = ctx.getIdentifier("__conversion");
 
   // The conversion function will have function type TI -> TO, for fresh
   // type variables TI and TO.
