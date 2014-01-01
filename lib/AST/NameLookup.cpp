@@ -758,24 +758,16 @@ bool DeclContext::lookupQualified(Type type,
                                   unsigned options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
-  if (type->is<ErrorType>()) {
+  if (type->is<ErrorType>())
     return false;
-  }
 
-  // Look through lvalue types.
-  if (auto lvalueTy = type->getAs<LValueType>())
-    return lookupQualified(lvalueTy->getObjectType(), name, options,
-                           typeResolver, decls);
-  // Look through @inout types.
-  if (auto inoutTy = type->getAs<InOutType>())
-    return lookupQualified(inoutTy->getObjectType(), name, options,
-                           typeResolver, decls);
+  
+  // Look through lvalue and @inout types.
+  type = type->getLValueOrInOutObjectType();
 
   // Look through metatypes.
-  if (auto metaTy = type->getAs<MetatypeType>()) {
-    return lookupQualified(metaTy->getInstanceType(), name, options,
-                           typeResolver, decls);
-  }
+  if (auto metaTy = type->getAs<MetatypeType>())
+    type = metaTy->getInstanceType();
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {

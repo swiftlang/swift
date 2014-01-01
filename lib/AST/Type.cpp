@@ -656,16 +656,12 @@ CanType TypeBase::getCanonicalType() {
     Result = WeakStorageType::get(referentType, referentType->getASTContext());
     break;
   }
-  case TypeKind::LValue: {
-    LValueType *lvalue = cast<LValueType>(this);
-    Result = LValueType::get(lvalue->getObjectType()->getCanonicalType());
+  case TypeKind::LValue:
+    Result = LValueType::get(getRValueType()->getCanonicalType());
     break;
-  }
-  case TypeKind::InOut: {
-    InOutType *inout = cast<InOutType>(this);
-    Result = InOutType::get(inout->getObjectType()->getCanonicalType());
+  case TypeKind::InOut:
+    Result = InOutType::get(getInOutObjectType()->getCanonicalType());
     break;
-  }
   case TypeKind::PolymorphicFunction: {
     PolymorphicFunctionType *FT = cast<PolymorphicFunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
