@@ -11,6 +11,29 @@
     SIGNED_MIN_FOR_TYPE &/ -1 == -1 // i.e. Int8: -0x80 / -1 == -0x80
     SIGNED_MIN_FOR_TYPE &% -1 == 0
 
+* Protocol conformance checking for @mutating methods is now implemented: an
+  @mutating struct method only fulfills a protocol requirement if the protocol
+  method was itself marked @mutating:
+
+    protocol P {
+      func nonmutating()
+      @mutating
+      func mutating()
+    }
+    
+    struct S : P {
+      // Error, @mutating method cannot implement non-@mutating requirement.
+      @mutating
+      func nonmutating() {}
+      
+      // Ok, mutating allowed, but not required.
+      func mutating() {}
+    }
+    
+  As before, class methods never need to be marked @mutating (and indeed, they
+  aren't allowed to be marked as such).
+
+
 2013-12-25
 ----------
 
