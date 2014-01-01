@@ -1,3 +1,16 @@
+2014-01-01
+----------
+
+* Happy New Year
+
+* Division and remainder arithmetic now trap on overflow. Like with the other
+  operators, one can use the "masking" alternatives to get non-trapping
+  behavior. The behavior of the non-trapping masking operators is defined:
+    x &/ 0 == 0
+    x &% 0 == 0
+    SIGNED_MIN_FOR_TYPE &/ -1 == -1 // i.e. Int8: -0x80 / -1 == -0x80
+    SIGNED_MIN_FOR_TYPE &% -1 == 0
+
 2013-12-25
 ----------
 

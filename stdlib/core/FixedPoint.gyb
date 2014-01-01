@@ -131,38 +131,81 @@ else:
 
 @@transparent
 extension ${Self} : RandomAccessIndex {
+  @@transparent
   func succ() -> ${Self} {
     return self + 1
   }
+  @@transparent
   func pred() -> ${Self} {
     return self - 1
   }
   typealias DistanceType = ${Self}
+  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
     var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
+  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
+  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
+  @@transparent
+  static func div(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+    if rhs == 0 {
+      return (0, true)
+    }
+@ if signed:
+    if lhs == ${Self}.min && rhs == -1 {
+      return (lhs, true)
+    }
+@ end
+    var tmp = Builtin.${sign}div_Int${bits}(lhs.value, rhs.value)
+    return (${Self}(tmp), false)
+  }
+  @@transparent
+  static func rem(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+    if rhs == 0 {
+      return (0, true)
+    }
+@ if signed:
+    if lhs == ${Self}.min && rhs == -1 {
+      return (0, true)
+    }
+@ end
+    var tmp = Builtin.${sign}rem_Int${bits}(lhs.value, rhs.value)
+    return (${Self}(tmp), false)
+  }
 
+  @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     return sub(lhs, rhs, true)
   }
+  @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     return add(lhs, rhs, true)
   }
+  @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return mul(lhs, rhs, true)
+  }
+  @@transparent
+  static func div(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+    return div(lhs, rhs, true)
+  }
+  @@transparent
+  static func rem(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+    return rem(lhs, rhs, true)
   }
 }
 
 @ if signed:
+@@transparent
 extension ${Self} : SignedNumber {
   @@transparent
   static func negate(rhs: ${Self}) -> (${Self}, Bool) {
@@ -251,7 +294,6 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
 @ end
 
 @ for op, name in (
-@  ('/',sign+'div'), ('%',sign+'rem'),
 @  ('<<','shl'), ('>>','ashr' if signed else 'lshr'),
 @  ('&','and'), ('^','xor'), ('|','or')):
 @@transparent
@@ -267,7 +309,7 @@ extension ${Self} : BitwiseOperations {
 }
 
 // Compound assignments
-@ for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
+@ for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
 @@transparent @@assignment
 func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
