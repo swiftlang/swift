@@ -154,7 +154,7 @@ public:
   }
 
   /// Returns the Swift type equivalent to this SIL type. If the SIL type is
-  /// an address type, returns an LValueType.
+  /// an address type, returns an InOutType.
   CanType getSwiftType() const {
     CanType rvalueTy = getSwiftRValueType();
     if (isAddress())

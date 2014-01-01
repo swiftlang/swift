@@ -159,10 +159,7 @@ private:
   /// in place of the underlying archetype.
   static CanType buildSubstSelfType(CanType origParamType, CanType selfType,
                                     ASTContext &ctx) {
-    if (auto lv = dyn_cast<LValueType>(origParamType)) {
-      selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
-      return CanLValueType::get(selfType);
-    }
+    assert(!isa<LValueType>(origParamType) && "Self can't be @lvalue");
     if (auto lv = dyn_cast<InOutType>(origParamType)) {
       selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
       return CanInOutType::get(selfType);

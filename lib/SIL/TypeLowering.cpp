@@ -1001,12 +1001,11 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     auto origEltType = origType.getTupleElementType(i);
     auto substEltType = substType.getElementType(i);
 
+    assert(!isa<LValueType>(substEltType) &&
+           "lvalue types cannot exist in function signatures");
+
     CanType loweredSubstEltType;
-    if (auto substLV = dyn_cast<LValueType>(substEltType)) {
-      SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
-                                          substLV.getObjectType());
-      loweredSubstEltType = CanLValueType::get(silType.getSwiftRValueType());
-    } else if (auto substLV = dyn_cast<InOutType>(substEltType)) {
+    if (auto substLV = dyn_cast<InOutType>(substEltType)) {
       SILType silType = tc.getLoweredType(origType.getLValueObjectType(),
                                           substLV.getObjectType());
       loweredSubstEltType = CanInOutType::get(silType.getSwiftRValueType());
@@ -1120,7 +1119,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // @inout types are a special case for lowering, because they get
   // completely removed and represented as 'address' SILTypes.
   if (auto substInOutType = dyn_cast<InOutType>(substType)) {
-    // Derive SILType for LValueType from the object type.
+    // Derive SILType for InOutType from the object type.
     CanType substObjectType = substInOutType.getObjectType();
     AbstractionPattern origObjectType = origType.getLValueObjectType();
 
