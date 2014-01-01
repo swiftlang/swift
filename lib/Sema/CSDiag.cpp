@@ -586,8 +586,8 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::IsForbiddenLValue:
-    if (auto lvalueTy = failure.getSecondType()->getAs<InOutType>()) {
-      tc.diagnose(loc, diag::reference_non_inout, lvalueTy->getObjectType())
+    if (auto iotTy = failure.getSecondType()->getAs<InOutType>()) {
+      tc.diagnose(loc, diag::reference_non_inout, iotTy->getObjectType())
         .highlight(range1).highlight(range2);
       return true;
     }

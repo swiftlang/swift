@@ -300,7 +300,7 @@ ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ArchetypeSubscript, /*Implicit=*/false,
          D? D->getElementType() : Type()),
     D(D), Base(Base), Index(Index) {
-  assert(Base->getType()->getRValueType()->is<ArchetypeType>() &&
+  assert(Base->getType()->getInOutObjectType()->is<ArchetypeType>() &&
          "use SubscriptExpr for non-archetype type subscript");
 }
 

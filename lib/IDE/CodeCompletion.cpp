@@ -985,9 +985,9 @@ public:
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() == Ctx.SelfIdentifier) {
-      // Strip [inout] from 'self'.  It is useful to show [inout] for function
+      // Strip @inout from 'self'.  It is useful to show @inout for function
       // parameters.  But for 'self' it is just noise.
-      VarType = VarType->getRValueType();
+      VarType = VarType->getInOutObjectType();
     }
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have

@@ -28,7 +28,6 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
-
 using namespace swift;
 
 bool TypeLoc::isError() const {
@@ -443,16 +442,19 @@ Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
 /// Retrieve the object type for a 'self' parameter, digging into one-element
 /// tuples, lvalue types, and metatypes.
 Type TypeBase::getRValueInstanceType() {
-  auto type = getRValueType();
+  Type type = this;
+  
+  // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 &&
-        !tupleTy->getFields()[0].isVararg())
-      type = tupleTy->getElementType(0)->getRValueType();
+    if (tupleTy->getNumElements() == 1 && !tupleTy->getFields()[0].isVararg())
+      type = tupleTy->getElementType(0);
   }
+  
   if (auto metaTy = type->getAs<MetatypeType>())
-    type = metaTy->getInstanceType();
+    return metaTy->getInstanceType();
 
-  return type;
+  // For @mutable value type methods, we need to dig through @inout types.
+  return type->getInOutObjectType();
 }
 
 /// \brief Collect the protocols in the existential type T into the given

@@ -341,9 +341,13 @@ public:
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
-  /// getRValueType - For an lvalue type, retrieves the underlying object type.
+  /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
+
+  /// getInOutObjectType - For an @inout type, retrieves the underlying object
+  /// type.  Otherwise, returns the type itself.
+  Type getInOutObjectType();
 
   /// getLValueOrInOutObjectType - For an @lvalue or @inout type, retrieves the
   /// underlying object type. Otherwise, returns the type itself.
@@ -2816,10 +2820,15 @@ inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   return false;
 }
 
-inline Type TypeBase::getRValueType() {
-  // FIXME: Stop stripping IOT!
+/// getInOutObjectType - For an @inout type, retrieves the underlying object
+/// type.  Otherwise, returns the type itself.
+inline Type TypeBase::getInOutObjectType() {
   if (auto iot = getAs<InOutType>())
     return iot->getObjectType();
+  return this;
+}
+
+inline Type TypeBase::getRValueType() {
   if (auto lv = getAs<LValueType>())
     return lv->getObjectType();
   return this;

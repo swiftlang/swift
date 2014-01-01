@@ -1347,7 +1347,7 @@ struct ASTNodeBase {};
           }
           InTy = TupleTy->getFields()[0].getType();
         }
-        InTy = InTy->getRValueType();
+        InTy = InTy->getInOutObjectType();
 
         Decl *ExpectedSelfDecl;
         Decl *ActualSelfDecl;

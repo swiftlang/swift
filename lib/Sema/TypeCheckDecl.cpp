@@ -2000,7 +2000,7 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
-    Type ResultTy = SelfTy->getRValueType();
+    Type ResultTy = SelfTy->getInOutObjectType();
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
     SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||

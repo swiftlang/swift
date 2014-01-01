@@ -411,7 +411,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   SILFunction *f = preEmitFunction(constant, decl, decl);
   PrettyStackTraceSILFunction X("silgen emitConstructor", f);
 
-  if (decl->getImplicitSelfDecl()->getType()->getRValueType()
+  if (decl->getImplicitSelfDecl()->getType()->getInOutObjectType()
         ->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
     // initialization.

@@ -8,7 +8,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----- -----------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // This file implements application of a solution to a constraint
 // system to a particular expression, resulting in a
@@ -191,33 +191,33 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 /// Adjust the given type to become the self type when referring to
 /// the given member.
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
+  auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an @inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
     if (selfTy->is<InOutType>())
-      return InOutType::get(baseTy->getRValueType());
+      return InOutType::get(baseObjectTy);
 
     // Otherwise, return the rvalue type.
-    return baseTy->getRValueType();
+    return baseObjectTy;
   }
 
   // Computed vardecls are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (auto *VD = dyn_cast<VarDecl>(member))
     if (VD->isComputed() && !baseTy->hasReferenceSemantics())
-      return InOutType::get(baseTy->getRValueType());
+      return InOutType::get(baseObjectTy);
   
   // The base of subscripts are always lvalues (for now).
   // FIXME: Remove this when materialization is dead.
   if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
-    return InOutType::get(baseTy->getRValueType());
+    return InOutType::get(baseObjectTy);
   
-  // Accesses to non-function members in value types are done through an lvalue
-  // with whatever access permissions the base has.  We just set the implicit
-  // bit.
+  // Accesses to non-function members in value types are done through an @lvalue
+  // type.
   if (baseTy->is<InOutType>())
-    return LValueType::get(baseTy->getRValueType());
+    return LValueType::get(baseObjectTy);
   
   // Accesses to members in values of reference type (classes, metatypes) are
   // always done through a the reference to self.  Accesses to value types with
