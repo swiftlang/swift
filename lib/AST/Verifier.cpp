@@ -1204,7 +1204,7 @@ struct ASTNodeBase {};
             // Skip the next same-type constraint.
             continue;
 
-          case RequirementKind::ValueWitnessMarker:
+          case RequirementKind::WitnessMarker:
             done = true;
             break;
           }
@@ -1265,7 +1265,7 @@ struct ASTNodeBase {};
           }
 
           if (requirements.front().getKind()
-                == RequirementKind::ValueWitnessMarker) {
+                == RequirementKind::WitnessMarker) {
             auto type = ArchetypeBuilder::mapTypeIntoContext(
                           dc,
                           requirements.front().getFirstType());

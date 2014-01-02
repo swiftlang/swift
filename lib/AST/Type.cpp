@@ -2138,7 +2138,7 @@ case TypeKind::Id:
             return true;
           break;
 
-        case RequirementKind::ValueWitnessMarker:
+        case RequirementKind::WitnessMarker:
           break;
         }
       }

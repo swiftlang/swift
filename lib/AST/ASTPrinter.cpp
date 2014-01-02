@@ -345,7 +345,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
     bool IsFirst = true;
     for (auto &Req : Requirements) {
       if (Req.isInvalid() ||
-          Req.getKind() == RequirementKind::ValueWitnessMarker)
+          Req.getKind() == RequirementKind::WitnessMarker)
         continue;
 
       if (IsFirst) {
@@ -366,7 +366,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
         Printer << " == ";
         printTypeLoc(Req.getSecondTypeLoc());
         break;
-      case RequirementKind::ValueWitnessMarker:
+      case RequirementKind::WitnessMarker:
         llvm_unreachable("Handled above");
       }
     }
@@ -1458,7 +1458,7 @@ public:
     // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : T->getRequirements()) {
-      if (req.getKind() == RequirementKind::ValueWitnessMarker)
+      if (req.getKind() == RequirementKind::WitnessMarker)
         continue;
 
       if (isFirstReq) {
@@ -1478,7 +1478,7 @@ public:
         Printer << " == ";
         break;
 
-      case RequirementKind::ValueWitnessMarker:
+      case RequirementKind::WitnessMarker:
         llvm_unreachable("Handled above");
       }
       visit(req.getSecondType());

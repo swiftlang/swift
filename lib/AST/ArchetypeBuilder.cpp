@@ -537,7 +537,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);
   }
 
-  case RequirementKind::ValueWitnessMarker:
+  case RequirementKind::WitnessMarker:
     llvm_unreachable("Value witness marker in requirement");
   }
 
@@ -580,7 +580,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
     return;
   }
 
-  case RequirementKind::ValueWitnessMarker:
+  case RequirementKind::WitnessMarker:
     return;
   }
 

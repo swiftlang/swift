@@ -319,7 +319,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       llvm_unreachable("value witness markers in syntactic requirement?");
     }
     
@@ -407,7 +407,7 @@ addRequirements(
   using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
 
   // Add a value witness marker.
-  requirements.push_back(Requirement(RequirementKind::ValueWitnessMarker,
+  requirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                      type, Type()));
 
   // Add superclass requirement, if needed.

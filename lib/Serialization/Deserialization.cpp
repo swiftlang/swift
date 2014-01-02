@@ -709,7 +709,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
         break;
       }
 
-      case ValueWitnessMarker: {
+      case WitnessMarker: {
         // Shouldn't happen where we have requirement representations.
         error();
         break;
@@ -794,11 +794,11 @@ void ModuleFile::readGenericRequirements(
                                            first, second));
         break;
       }
-      case GenericRequirementKind::ValueWitnessMarker: {
+      case GenericRequirementKind::WitnessMarker: {
         assert(rawTypeIDs.size() == 1);
         auto first = getType(rawTypeIDs[0]);
 
-        requirements.push_back(Requirement(RequirementKind::ValueWitnessMarker,
+        requirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                            first, Type()));
         break;
       }

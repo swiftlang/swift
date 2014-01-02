@@ -247,7 +247,7 @@ addRequirementForRepr(SmallVectorImpl<Requirement> &requirements,
      */
     return;
   }
-  case RequirementKind::ValueWitnessMarker:
+  case RequirementKind::WitnessMarker:
     llvm_unreachable("should not exist after typechecking (?)");
   }
 }

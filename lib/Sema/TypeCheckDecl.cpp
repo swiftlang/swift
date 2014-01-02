@@ -823,7 +823,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
       
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       llvm_unreachable("value witness markers in syntactic requirement?");
     }
     
@@ -863,7 +863,7 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
       revertDependentTypeLoc(req.getSecondTypeLoc());
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       llvm_unreachable("value witness markers in syntactic requirement?");
     }
   }
@@ -922,7 +922,7 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
       }
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       llvm_unreachable("value witness markers in syntactic requirement?");
     }
   }

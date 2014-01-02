@@ -125,7 +125,7 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType,
-  ValueWitnessMarker
+  WitnessMarker
 };
 using GenericRequirementKindField = BCFixed<2>;
 

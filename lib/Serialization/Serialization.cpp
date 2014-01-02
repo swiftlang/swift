@@ -492,7 +492,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   switch (kind) {
   CASE(Conformance)
   CASE(SameType)
-  CASE(ValueWitnessMarker)
+  CASE(WitnessMarker)
   }
 #undef CASE
 }
@@ -515,7 +515,7 @@ void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
         addTypeRef(req.getSecondType()));
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       GenericRequirementLayout::emitRecord(
         Out, ScratchRecord, reqAbbrCode,
         getRawStableRequirementKind(req.getKind()),
@@ -564,7 +564,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
                                       addTypeRef(next.getFirstType()),
                                       addTypeRef(next.getSecondType()));
       break;
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       llvm_unreachable("Can't show up in requirement representations");
       break;
     }

@@ -718,7 +718,7 @@ void ConstraintSystem::openGeneric(
       break;
     }
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       break;
   }
   }

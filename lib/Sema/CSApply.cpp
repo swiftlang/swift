@@ -103,7 +103,7 @@ Type Solution::computeSubstitutions(
       // Same-type requirements aren't recorded in substitutions.
       break;
 
-    case RequirementKind::ValueWitnessMarker:
+    case RequirementKind::WitnessMarker:
       // Flush the current conformances.
       if (!substitutions.empty()) {
         substitutions.back().Conformance

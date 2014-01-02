@@ -31,12 +31,12 @@ enum class RequirementKind : unsigned int {
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,
-  /// A marker that indicates where the value witness for the given (first)
+  /// A marker that indicates where the witness for the given (first)
   /// type should be located.
   ///
   /// FIXME: This is a crutch used to help us eliminate various walks over
   /// "all archetypes".
-  ValueWitnessMarker
+  WitnessMarker
 };
 
 /// \brief A single requirement placed on the type parameters (or associated

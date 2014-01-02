@@ -180,7 +180,7 @@ getBuiltinGenericFunction(Identifier Id,
                                   ->castTo<GenericTypeParamType>());
   }
 
-  Requirement Marker(RequirementKind::ValueWitnessMarker,
+  Requirement Marker(RequirementKind::WitnessMarker,
                      GenericParamTypes[0], Type());
   Type InterfaceType = GenericFunctionType::get(GenericParamTypes, Marker,
                                                 ArgParamType, ResType,

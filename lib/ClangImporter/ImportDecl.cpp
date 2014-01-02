@@ -2679,7 +2679,7 @@ namespace {
       auto genericParam = selfDecl->getDeclaredType()
                             ->castTo<GenericTypeParamType>();
       Requirement genericRequirements[2] = {
-        Requirement(RequirementKind::ValueWitnessMarker, genericParam, Type()),
+        Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
         Requirement(RequirementKind::Conformance, genericParam,
                     result->getDeclaredType())
       };
