@@ -432,38 +432,10 @@ isa(%6 : $Builtin.Int1):
   %9 = return %6 : $Builtin.Int1
 }
 
+sil @_TF7literal8literalsFT_T_ : $@thin () -> ()
+
 sil @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.metatype) -> Float64
 sil @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> String
-
-// CHECK-LABEL: @_TF7literal8literalsFT_T_ : $@thin () -> ()
-sil @_TF7literal8literalsFT_T_ : $@thin () -> () {
-bb0:
-  %0 = tuple ()
-  %1 = alloc_stack $Float64
-  %2 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.metatype) -> Float64
-  %3 = metatype $@thin Float64.metatype
-  // CHECK: float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
-  %4 = float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
-  %5 = apply %2(%4, %3) : $@thin (Builtin.FPIEEE64, @thin Float64.metatype) -> Float64
-  %6 = store %5 to %1#1 : $*Float64
-  %7 = alloc_stack $String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> String
-  %9 = metatype $@thin String.metatype
-  // CHECK: string_literal "foo"
-  %10 = string_literal "foo"
-  // CHECK-NOT: "bar""
-  %11 = string_literal "bar"
-  %15 = apply %8(%11#0, %11#1, %11#2, %9) : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> String
-  %16 = store %15 to %7#1 : $*String
-  %17 = load %7#1 : $*String
-  %18 = struct_extract %17 : $String, #str_value  // CHECK: struct_extract
-  %19 = struct_extract %18 : $StringByteData, #owner // CHECK: struct_extract
-  %20 = strong_release %19 : $Builtin.ObjectPointer
-  %21 = dealloc_stack %7#0 : $*@local_storage String
-  %22 = dealloc_stack %1#0 : $*@local_storage Float64
-  %23 = tuple ()
-  %24 = return %23 : $()
-}
 
 // CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
 sil @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Int64) -> Builtin.RawPointer {
@@ -605,73 +577,10 @@ bb3(%4 : $Int64):
 class Bas : NSObject {
   var strRealProp : String
 }
+sil @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString 
+sil @test_super_method : $@cc(method) @thin (Bas) -> Bas
 
-// Generated from
-// class Bas : NSObject {
-//   var strRealProp : String
-//   init() {
-//     super.init()
-//   }
-// }
-// CHECK-LABEL: sil deserialized @test_autorelease_return
-sil @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString {
-bb0(%0 : $Bas):
-  strong_retain %0 : $Bas
-  %2 = ref_element_addr %0 : $Bas, #strRealProp
-  %3 = load %2 : $*String
-  strong_release %0 : $Bas
-  %5 = struct_extract %3 : $String, #str_value
-  %6 = struct_extract %5 : $StringByteData, #owner
-  strong_retain %6 : $Builtin.ObjectPointer
-  %8 = function_ref @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
-  %9 = alloc_stack $String
-  store %3 to %9#1 : $*String
-  %11 = apply %8(%9#1) : $@thin (@inout String) -> @owned NSString
-  dealloc_stack %9#0 : $*@local_storage String
-  %13 = struct_extract %3 : $String, #str_value
-  %14 = struct_extract %13 : $StringByteData, #owner
-  strong_release %14 : $Builtin.ObjectPointer
-  // CHECK: autorelease_return %{{.*}} : $NSString
-  autorelease_return %11 : $NSString
-}
 sil @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
-
-// CHECK-LABEL: sil deserialized @test_super_method
-sil @test_super_method : $@cc(method) @thin (Bas) -> Bas {
-bb0(%0 : $Bas):
-  %1 = tuple ()
-  %2 = alloc_box $Bas
-  store %0 to %2#1 : $*Bas
-  %4 = function_ref @_TFSSCfMSSFT_SS : $@thin (@thin String.metatype) -> String
-  %5 = metatype $@thin String.metatype
-  %6 = apply %4(%5) : $@thin (@thin String.metatype) -> String
-  %7 = load %2#1 : $*Bas
-  strong_retain %7 : $Bas
-  %9 = ref_element_addr %7 : $Bas, #strRealProp
-  %10 = load %9 : $*String
-  store %6 to %9 : $*String
-  %12 = struct_extract %10 : $String, #str_value
-  %13 = struct_extract %12 : $StringByteData, #owner
-  strong_release %13 : $Builtin.ObjectPointer
-  strong_release %7 : $Bas
-  %16 = load %2#1 : $*Bas
-  strong_retain %16 : $Bas
-  %18 = upcast %16 : $Bas to $NSObject
-  // CHECK: super_method [volatile] %{{.*}} : $Bas, #NSObject.init!initializer.1.foreign :
-  %19 = super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.foreign : $@cc(objc_method) @thin (@owned NSObject) -> @owned NSObject
-  %20 = apply %19(%18) : $@cc(objc_method) @thin (@owned NSObject) -> @owned NSObject
-  // CHECK: strong_retain_autoreleased %{{.*}} : $NSObject
-  strong_retain_autoreleased %20 : $NSObject
-  %22 = unconditional_checked_cast downcast %20 : $NSObject to $Bas
-  %23 = load %2#1 : $*Bas
-  store %22 to %2#1 : $*Bas
-  strong_release %23 : $Bas
-  strong_release %16 : $Bas
-  %27 = load %2#1 : $*Bas
-  strong_retain %27 : $Bas
-  strong_release %2#0 : $Builtin.ObjectPointer
-  return %27 : $Bas
-}
 sil @_TFSSCfMSSFT_SS : $@thin (@thin String.metatype) -> String
 
 // CHECK-LABEL: sil deserialized @test_builtin_func_ref
