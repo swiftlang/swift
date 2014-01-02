@@ -1236,10 +1236,10 @@ void LifetimeChecker::getPredsLiveOut1(SILBasicBlock *BB,
 }
 
 AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
-  LiveOutBlockState &BBState = getBlockInfo(BB);
-  switch (BBState.LOState) {
+  LiveOutBlockState *BBState = &getBlockInfo(BB);
+  switch (BBState->LOState) {
   case LiveOutBlockState::IsKnown:
-    return BBState.getAvailabilitySet();
+    return BBState->getAvailabilitySet();
   case LiveOutBlockState::IsComputingLiveOut:
     // Speculate that it will be live out in cyclic cases.
     return AvailabilitySet(TheMemory.NumElements);
@@ -1250,15 +1250,19 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   
   // Set the block's state to reflect that we're currently processing it.  This
   // is required to handle cycles properly.
-  BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
+  BBState->LOState = LiveOutBlockState::IsComputingLiveOut;
 
   auto Result = AvailabilitySet(TheMemory.NumElements);
   getPredsLiveOutN(BB, Result);
 
+  // Computing predecessor live-out information may invalidate BBState.
+  // Refresh it.
+  BBState = &getBlockInfo(BB);
+  
   // Anything that our initial pass knew as a definition is still a definition
   // live out of this block.  Something known to be not-defined in a predecessor
   // does not drop it to "partial".
-  auto &LocalAV = BBState.getAvailabilitySet();
+  auto &LocalAV = BBState->getAvailabilitySet();
   for (unsigned i = 0, e = TheMemory.NumElements; i != e; ++i) {
     auto EV = LocalAV.getConditional(i);
     if (EV.hasValue() && EV.getValue() == DIKind::Yes)
@@ -1266,7 +1270,7 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   }
 
   // Finally, cache and return our result.
-  getBlockInfo(BB).setBlockAvailability(Result);
+  BBState->setBlockAvailability(Result);
   return Result;
 }
 
