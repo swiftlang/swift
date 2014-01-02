@@ -569,9 +569,6 @@ public:
                                                  ArrayRef<ValueDecl*> captures,
                                                  DeclContext *parentContext);
   
-  /// Returns the type of the "self" parameter to methods of a type.
-  CanType getMethodSelfType(CanType selfType) const;
-  
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(Type t, AbstractCC cc);

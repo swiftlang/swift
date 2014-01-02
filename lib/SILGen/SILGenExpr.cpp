@@ -533,8 +533,8 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
          "RValueEmitter shouldn't be called on lvalues");
 
   // Emit the reference to the decl.
-  ManagedValue Reference =
-    SGF.emitReferenceToDecl(E, E->getDeclRef(), E->getType(), 0);
+  ManagedValue Reference = SGF.emitReferenceToDecl(E, E->getDeclRef(),
+                                                   E->getType(), 0);
   
   // If it comes back as an LValue-style RValue, emit a load to get a real
   // RValue.
@@ -548,8 +548,7 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  auto Self = SGF.emitReferenceToDecl(E, E->getSelf(),
-                                      E->getSelf()->getType(), 0);
+  auto Self = SGF.emitReferenceToDecl(E, E->getSelf());
   
   // In some constructors, 'self' is mutable (since super.init can replace
   // self).  A super reference is an rvalue though, so perform a load.

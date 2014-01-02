@@ -1231,13 +1231,6 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   return *theInfo;
 }
 
-/// Get the type of the 'self' parameter for methods of a type.
-CanType TypeConverter::getMethodSelfType(CanType selfType) const {
-  if (selfType->hasReferenceSemantics())
-    return selfType;
-  return CanInOutType::get(selfType);
-}
-
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
