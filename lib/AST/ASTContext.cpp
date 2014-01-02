@@ -61,8 +61,14 @@ struct ASTContext::Implementation {
   NominalTypeDecl *SliceDecl = nullptr;
 
   /// The declaration of swift.Optional<T>.
-  NominalTypeDecl *OptionalDecl = nullptr;
+  EnumDecl *OptionalDecl = nullptr;
 
+  /// The declaration of swift.Optional<T>.Some.
+  EnumElementDecl *OptionalSomeDecl = nullptr;
+  
+  /// The declaration of swift.Optional<T>.None.
+  EnumElementDecl *OptionalNoneDecl = nullptr;
+  
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecl = nullptr;
 
@@ -322,11 +328,34 @@ NominalTypeDecl *ASTContext::getSliceDecl() const {
   return Impl.SliceDecl;
 }
 
-NominalTypeDecl *ASTContext::getOptionalDecl() const {
+EnumDecl *ASTContext::getOptionalDecl() const {
   if (!Impl.OptionalDecl)
-    Impl.OptionalDecl = findSyntaxSugarImpl(*this, "Optional");
+    Impl.OptionalDecl
+      = dyn_cast_or_null<EnumDecl>(findSyntaxSugarImpl(*this, "Optional"));
 
   return Impl.OptionalDecl;
+}
+
+static EnumElementDecl *findEnumElement(EnumDecl *e, StringRef name) {
+  if (!e) return nullptr;
+  auto ident = e->getASTContext().getIdentifier(name);
+  for (auto elt : e->getAllElements()) {
+    if (elt->getName() == ident)
+      return elt;
+  }
+  return nullptr;
+}
+
+EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
+  if (!Impl.OptionalSomeDecl)
+    Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), "Some");
+  return Impl.OptionalSomeDecl;
+}
+
+EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
+  if (!Impl.OptionalNoneDecl)
+    Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), "None");
+  return Impl.OptionalNoneDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
@@ -547,7 +576,10 @@ ASTContext::getInjectNothingIntoOptionalDecl(LazyResolver *resolver) const {
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
-  return getDoesOptionalHaveValueDecl(resolver) &&
+  return getOptionalDecl() &&
+         getOptionalSomeDecl() &&
+         getOptionalNoneDecl() &&
+         getDoesOptionalHaveValueDecl(resolver) &&
          getGetOptionalValueDecl(resolver) &&
          getInjectValueIntoOptionalDecl(resolver) &&
          getInjectNothingIntoOptionalDecl(resolver);

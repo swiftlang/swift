@@ -326,7 +326,13 @@ public:
   NominalTypeDecl *getSliceDecl() const;
 
   /// Retrieve the declaration of swift.Optional<T>.
-  NominalTypeDecl *getOptionalDecl() const;
+  EnumDecl *getOptionalDecl() const;
+  
+  /// Retrieve the declaration of swift.Optional<T>.Some.
+  EnumElementDecl *getOptionalSomeDecl() const;
+  
+  /// Retrieve the declaration of swift.Optional<T>.None.
+  EnumElementDecl *getOptionalNoneDecl() const;
 
   /// Retrieve the declaration of swift._doesOptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver) const;
