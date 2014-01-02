@@ -604,8 +604,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // be explicitly initialized by a copy_addr or some other use of the
     // projected address).
     if (isa<EnumDataAddrInst>(User)) {
-      assert(!InStructSubElement && !InEnumSubElement &&
-             "enum_data_addr shouldn't apply to subelements");
+      assert(!InStructSubElement &&
+             "enum_data_addr shouldn't apply to struct subelements");
       // Keep track of the fact that we're inside of an enum.  This informs our
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
@@ -617,8 +617,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // init_existential is modeled as an initialization store, where the uses
     // are treated as subelement accesses.
     if (isa<InitExistentialInst>(User)) {
-      assert(!InStructSubElement && !InEnumSubElement &&
-             "init_existential should not apply to subelements");
+      assert(!InStructSubElement &&
+             "init_existential should not apply to struct subelements");
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
                                  BaseEltNo, 1));
 
