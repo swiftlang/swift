@@ -63,6 +63,9 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
   
+  /// The context archetypes of the function.
+  GenericParamList *ContextGenericParams;
+
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;
@@ -168,6 +171,32 @@ public:
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
+    
+  /// Retrieve the generic parameter list containing the contextual archetypes
+  /// of the function.
+  ///
+  /// FIXME: We should remove this in favor of lazy archetype instantiation
+  /// using the 'getArchetype' and 'mapTypeIntoContext' interfaces.
+  GenericParamList *getContextGenericParams() const {
+    return ContextGenericParams;
+  }
+  void setContextGenericParams(GenericParamList *params) {
+    ContextGenericParams = params;
+  }
+    
+  /// Map the given type, which is based on an interface SILFunctionType and may
+  /// therefore be dependent, to a type based on the context archetypes of this
+  /// SILFunction.
+  Type mapTypeIntoContext(Type type) const;
+    
+  /// Map the given type, which is based on an interface SILFunctionType and may
+  /// therefore be dependent, to a type based on the context archetypes of this
+  /// SILFunction.
+  SILType mapTypeIntoContext(SILType type) const {
+    return SILType::getPrimitiveType(
+             mapTypeIntoContext(type.getSwiftRValueType())->getCanonicalType(),
+             type.getCategory());
+  }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

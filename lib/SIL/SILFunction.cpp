@@ -12,6 +12,8 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+// FIXME: For mapTypeInContext
+#include "swift/AST/ArchetypeBuilder.h"
 
 using namespace swift;
 
@@ -26,6 +28,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
   : ModuleAndLinkage(&Module, Linkage),
     Name(Name),
     LoweredType(LoweredType),
+    // FIXME: Context params should be independent of the function type.
+    ContextGenericParams(LoweredType->getGenericParams()),
     Location(Loc),
     DeclCtx(DC),
     DebugScope(DebugScope),
@@ -64,4 +68,12 @@ void SILFunction::setDeclContext(Expr *E) {
 
 ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
+}
+
+Type SILFunction::mapTypeIntoContext(Type type) const {
+  if (!type->isDependentType())
+    return type;
+  
+  return ArchetypeBuilder::mapTypeIntoContext(getContextGenericParams(),
+                                              type);
 }
