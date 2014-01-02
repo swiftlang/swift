@@ -378,7 +378,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
@@ -474,7 +474,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
     ->castTo<AnyFunctionType>()
     ->getResult();
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
                                       C.SelfIdentifier,
                                       Type(),
