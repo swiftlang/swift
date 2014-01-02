@@ -526,7 +526,7 @@ public:
   void visitAllocStackInst(AllocStackInst *AVI) {
     OS << "alloc_stack " << AVI->getElementType();
     if (VarDecl *vd = AVI->getDecl())
-      OS << "  // var " << vd->getName();
+      OS << "  // " << (vd->isLet() ? "let " : "var ") << vd->getName();
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
@@ -536,7 +536,7 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box " << ABI->getElementType();
     if (VarDecl *vd = ABI->getDecl())
-      OS << "  // var " << vd->getName();
+      OS << "  // " << (vd->isLet() ? "let " : "var ") << vd->getName();
   }
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
