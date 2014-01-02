@@ -2338,11 +2338,49 @@ namespace {
         addProtocols(inherited, protocols, known);
     }
 
-    // Import the given Objective-C protocol list and return a context-allocated
-    // ArrayRef that can be passed to the declaration.
-    MutableArrayRef<ProtocolDecl *>
-    importObjCProtocols(Decl *decl,
-                        const clang::ObjCProtocolList &clangProtocols) {
+    /// Finish the given protocol conformance (for an imported type)
+    /// by filling in any missing witnesses.
+    void finishProtocolConformance(NormalProtocolConformance *conformance) {
+      auto proto = conformance->getProtocol();
+
+      // Make sure this protocol was completely imported.
+      // FIXME: This wouldn't be needed if member imports were lazy
+      // like they should be.
+      SmallVector<Decl *, 4> members;
+      if (auto clangProto = dyn_cast_or_null<clang::ObjCProtocolDecl>(
+                              proto->getClangDecl())) {
+        if (auto def = clangProto->getDefinition())
+          importObjCMembers(def, proto, members);
+      }
+
+      // Create witnesses for requirements not already met.
+      for (auto req : members) {
+        auto valueReq = dyn_cast<ValueDecl>(req);
+        if (!valueReq)
+          continue;
+
+        if (!conformance->hasWitness(valueReq)) {
+          if (auto func = dyn_cast<AbstractFunctionDecl>(valueReq)){
+            // For an optional requirement, record an empty witness:
+            // we'll end up querying this at runtime.
+            if (func->getAttrs().isOptional()) {
+              conformance->setWitness(valueReq, ConcreteDeclRef());
+              continue;
+            }
+          }
+
+          conformance->setWitness(valueReq, valueReq);
+        }
+      }
+
+      conformance->setState(ProtocolConformanceState::Complete);
+    }
+
+    // Import the given Objective-C protocol list, along with any
+    // implicitly-provided protocols, and attach them to the given
+    // declaration.
+    void importObjCProtocols(Decl *decl,
+                             const clang::ObjCProtocolList &clangProtocols) {
       SmallVector<ProtocolDecl *, 4> protocols;
       llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
@@ -2357,8 +2395,46 @@ namespace {
         }
       }
 
-      // FIXME: We should be synthesizing protocol conformances as well.
-      return Impl.SwiftContext.AllocateCopy(protocols);
+      // Copy the list of protocols.
+      MutableArrayRef<ProtocolDecl *> allProtocols 
+        = Impl.SwiftContext.AllocateCopy(protocols);
+
+      // Set the protocols.
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        nominal->setProtocols(allProtocols);
+      } else {
+        auto ext = cast<ExtensionDecl>(decl);
+        ext->setProtocols(allProtocols);
+      }
+
+      // Protocols don't require conformances.
+      if (isa<ProtocolDecl>(decl))
+        return;
+
+      // Synthesize trivial conformances for each of the protocols.
+      MutableArrayRef<ProtocolConformance *> allConformances
+        = Impl.SwiftContext.Allocate<ProtocolConformance *>(allProtocols.size());
+      auto dc = decl->getInnermostDeclContext();
+      auto &ctx = Impl.SwiftContext;
+      for (unsigned i = 0, n = allProtocols.size(); i != n; ++i) {
+        // FIXME: Build a superclass conformance if the superclass
+        // conforms.
+        auto conformance
+          = ctx.getConformance(dc->getDeclaredTypeOfContext(),
+                               allProtocols[i], SourceLoc(),
+                               dc->getModuleScopeContext(),
+                               ProtocolConformanceState::Incomplete);
+        finishProtocolConformance(conformance);
+        allConformances[i] = conformance;
+      }
+
+      // Set the conformances.
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        nominal->setConformances(allConformances);
+      } else {
+        auto ext = cast<ExtensionDecl>(decl);
+        ext->setConformances(allConformances);        
+      }
     }
 
     /// Import members of the given Objective-C container and add them to the
@@ -2432,15 +2508,8 @@ namespace {
                                        DeclContext *dc,
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members,
-                           SmallVectorImpl<ProtocolConformance *> &Conformances,
                                        ASTContext &Ctx) {
       for (auto proto : protocols) {
-        NormalProtocolConformance *conformance
-          = Ctx.getConformance(dc->getDeclaredTypeOfContext(),
-                               proto, SourceLoc(),
-                               dc->getModuleScopeContext(),
-                               ProtocolConformanceState::Incomplete);
-
         for (auto member : proto->getMembers()) {
           if (auto func = dyn_cast<FuncDecl>(member)) {
             if (auto objcMethod = dyn_cast_or_null<clang::ObjCMethodDecl>(
@@ -2449,8 +2518,6 @@ namespace {
                                    objcMethod->isInstanceMethod())) {
                 if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
                   members.push_back(imported);
-                  conformance->setWitness(cast<ValueDecl>(member),
-                                          cast<ValueDecl>(imported));
 
                   // Import any special methods based on this member.
                   if (auto special = importSpecialMethod(imported, dc)) {
@@ -2461,20 +2528,6 @@ namespace {
             }
           }
         }
-
-        // Introduce empty mappings for any requirements not handled by the
-        // above.
-        for (auto req : proto->getMembers()) {
-          auto valueReq = dyn_cast<ValueDecl>(req);
-          if (!valueReq)
-            continue;
-
-          if (!conformance->hasWitness(valueReq))
-            conformance->setWitness(valueReq, valueReq);
-        }
-
-        conformance->setState(ProtocolConformanceState::Complete);
-        Conformances.push_back(conformance);
       }
     }
 
@@ -2563,8 +2616,7 @@ namespace {
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl);
-      result->setProtocols(importObjCProtocols(result,
-                                               decl->getReferencedProtocols()));
+      importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
 
       // Import each of the members.
@@ -2574,16 +2626,14 @@ namespace {
       // Import mirrored declarations for protocols to which this category
       // or extension conforms.
       // FIXME: This is a short-term hack.
-      SmallVector<ProtocolConformance *, 4> Conformances;
       importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members, Conformances, Impl.SwiftContext);
+                                    members, Impl.SwiftContext);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
                          Impl.importSourceRange(clang::SourceRange(
                                                   decl->getLocation(),
                                                   decl->getLocEnd())));
-      result->setConformances(Impl.SwiftContext.AllocateCopy(Conformances));
 
       return result;
     }
@@ -2616,18 +2666,6 @@ namespace {
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-      result->setClangNode(decl);
-      result->setCircularityCheck(CircularityCheck::Checked);
-
-      // Import protocols this protocol conforms to.
-      result->setProtocols(importObjCProtocols(result,
-                                               decl->getReferencedProtocols()));
-      result->setCheckedInheritanceClause();
-
-      // Note that this is an Objective-C and class protocol.
-      result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
-      result->setIsObjC(true);
-
       // Create the archetype for the implicit 'Self'.
       auto selfId = Impl.SwiftContext.getIdentifier("Self");
       auto selfDecl = result->getSelf();
@@ -2646,6 +2684,17 @@ namespace {
                     result->getDeclaredType())
       };
       result->setGenericSignature(genericParam, genericRequirements);
+
+      result->setClangNode(decl);
+      result->setCircularityCheck(CircularityCheck::Checked);
+
+      // Import protocols this protocol conforms to.
+      importObjCProtocols(result, decl->getReferencedProtocols());
+      result->setCheckedInheritanceClause();
+
+      // Note that this is an Objective-C and class protocol.
+      result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
+      result->setIsObjC(true);
                          
       // Import each of the members.
       SmallVector<Decl *, 4> members;
@@ -2703,8 +2752,7 @@ namespace {
       }
 
       // Import protocols this class conforms to.
-      result->setProtocols(importObjCProtocols(result,
-                                               decl->getReferencedProtocols()));
+      importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C class.
@@ -2723,16 +2771,14 @@ namespace {
       // Import mirrored declarations for protocols to which this class
       // conforms.
       // FIXME: This is a short-term hack.
-      SmallVector<ProtocolConformance *, 4> Conformances;
       importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members, Conformances, Impl.SwiftContext);
+                                    members, Impl.SwiftContext);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
                          Impl.importSourceRange(clang::SourceRange(
                                                   decl->getLocation(),
                                                   decl->getLocEnd())));
-      result->setConformances(Impl.SwiftContext.AllocateCopy(Conformances));
 
       // Pass the class to the type checker to create an implicit destructor.
       Impl.SwiftContext.addedExternalDecl(result);

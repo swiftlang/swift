@@ -999,10 +999,69 @@ struct ASTNodeBase {};
         abort();
       }      
     }
+
+    /// Check the given explicit protocol conformance.
+    void verifyConformance(Decl *decl, ProtocolConformance *conformance) {
+      if (!conformance) {
+        // FIXME: Eventually, this should itself be a verification
+        // failure.
+        return;
+      }
+
+      switch (conformance->getState()) {
+      case ProtocolConformanceState::Complete:
+      case ProtocolConformanceState::Invalid:
+        // More checking below.
+        break;
+        
+      case ProtocolConformanceState::Incomplete:
+        dumpRef(decl);
+        Out << " has a known-incomplete conformance for protocol "
+            << conformance->getProtocol()->getName().str() << "\n";
+        abort();
+      }
+
+      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+      if (!normal)
+        return;
+
+      // Check that a normal protocol conformance is complete.
+      auto proto = conformance->getProtocol();
+      for (auto member : proto->getMembers()) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+          if (!normal->hasTypeWitness(assocType)) {
+            dumpRef(decl);
+            Out << " is missing type witness for "
+                << conformance->getProtocol()->getName().str() 
+                << "." << assocType->getName().str()
+                << "\n";
+            abort();
+          }
+          continue;
+        }
+
+        if (auto req = dyn_cast<ValueDecl>(member)) {
+          if (!normal->hasWitness(req)) {
+            dumpRef(decl);
+            Out << " is missing witness for "
+                << conformance->getProtocol()->getName().str() 
+                << "." << req->getName().str()
+                << "\n";
+            abort();
+          }
+          continue;
+        }
+      }
+    }
     
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(nominal, nominal->getProtocols());
+
+      // Make sure that the protocol conformances are complete.
+      for (auto conformance : nominal->getConformances()) {
+        verifyConformance(nominal, conformance);
+      }
 
       verifyCheckedBase(nominal);
     }
@@ -1010,6 +1069,11 @@ struct ASTNodeBase {};
     void verifyChecked(ExtensionDecl *ext) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(ext, ext->getProtocols());
+
+      // Make sure that the protocol conformances are complete.
+      for (auto conformance : ext->getConformances()) {
+        verifyConformance(ext, conformance);
+      }
 
       verifyCheckedBase(ext);
     }
