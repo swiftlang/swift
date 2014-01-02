@@ -1464,10 +1464,6 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
     GenericSig = GenericParams->getAsCanonicalGenericSignature(archetypeMap,
                                                                getASTContext());
     
-    /* FIXME: We place the wrong generic parameter list on some SILFunctionTypes
-       causing things to explode when we try to map out the archetypes.
-       Disable until those problems are fixed.
-     
     auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
       if (!t) return t;
       if (auto arch = t->getAs<ArchetypeType>()) {
@@ -1492,11 +1488,6 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
       ->getCanonicalType();
     InterfaceResult = SILResultInfo(interfaceResultTy,
                                     Result.getConvention());
-     */
-    InterfaceResult = Result;
-    memcpy(getMutableInterfaceParameters().data(),
-           getMutableParameters().data(),
-           params.size() * sizeof(SILParameterInfo));
   } else {
     // If not generic, the interface types are equivalent.
     GenericSig = nullptr;

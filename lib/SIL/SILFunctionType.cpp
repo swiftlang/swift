@@ -860,12 +860,28 @@ static CanType getBridgedResultType(TypeConverter &tc,
 
 /// Fast path for bridging types in a function type without uncurrying.
 static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
-                                                 CanAnyFunctionType t,
-                                              AnyFunctionType::ExtInfo extInfo) {
+                                            CanAnyFunctionType t,
+                                            AnyFunctionType::ExtInfo extInfo) {
+  // Pull the innermost generic parameter list in the type out.
+  Optional<GenericParamList *> genericParams;
+  {
+    CanAnyFunctionType innerTy = t;
+    while (innerTy) {
+      if (auto pft = dyn_cast<PolymorphicFunctionType>(innerTy)) {
+        assert(!genericParams
+           || pft->getGenericParams().getOuterParameters() == *genericParams);
+        genericParams = &pft->getGenericParams();
+      }
+      innerTy = dyn_cast<AnyFunctionType>(innerTy.getResult());
+    }
+  }
+  GenericParamList *innerGenericParams
+    = genericParams ? *genericParams : nullptr;
+  
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
-    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
+    if (genericParams) {
       return CanPolymorphicFunctionType::get(input, result,
-                                             &pft->getGenericParams(),
+                                             innerGenericParams,
                                              extInfo);
     } else {
       return CanFunctionType::get(input, result, extInfo);
@@ -877,7 +893,7 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod:
     // No bridging needed for native functions.
-    if (t->getExtInfo() == extInfo)
+    if (t->getExtInfo() == extInfo && !innerGenericParams)
       return t;
     return rebuild(t.getInput(), t.getResult());
 

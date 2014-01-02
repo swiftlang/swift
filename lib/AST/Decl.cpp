@@ -21,6 +21,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/Basic/Range.h"
 using namespace swift;
 
 // Only allow allocation of Decls using the allocator in ASTContext.
@@ -266,7 +267,9 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
   }
 
   // Collect our parameters.
-  for (auto param : getParams()) {
+  for (auto paramIndex : indices(getParams())) {
+    auto param = getParams()[paramIndex];
+    
     GenericTypeParamDecl *typeParam = param.getAsTypeParam();
     auto typeParamTy = typeParam->getDeclaredType()
       ->castTo<GenericTypeParamType>();
@@ -279,16 +282,27 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     }
     
     // Set up a mapping we can use to remap requirements to dependent types.
-    archetypeMap[typeParam->getArchetype()] = typeParamTy;
+    ArchetypeType *archetype;
+    // The 'Self' archetype doesn't show up in getAllArchetypes.
+    if (hasSelfArchetype()) {
+      if (paramIndex == 0)
+        archetype = typeParam->getArchetype();
+      else
+        archetype = getPrimaryArchetypes()[paramIndex - 1];
+    } else {
+      archetype = getPrimaryArchetypes()[paramIndex];
+    }
+      
+    archetypeMap[archetype] = typeParamTy;
 
     genericParams.push_back(typeParamTy);
     
     // Collect conformance requirements declared on the archetype.
-    if (auto super = typeParam->getArchetype()->getSuperclass()) {
+    if (auto super = archetype->getSuperclass()) {
       requirements.push_back(Requirement(RequirementKind::Conformance,
                                          typeParamTy, super));
     }
-    for (auto proto : typeParam->getArchetype()->getConformsTo()) {
+    for (auto proto : archetype->getConformsTo()) {
       requirements.push_back(Requirement(RequirementKind::Conformance,
                                        typeParamTy, proto->getDeclaredType()));
     }
