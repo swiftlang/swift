@@ -636,7 +636,6 @@ public:
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
                                RValueSource &&optionalSubscripts,
-                               CanType resultType,
                                SGFContext C);
   void emitSetAccessor(SILLocation loc,
                        SILDeclRef setter,

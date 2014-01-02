@@ -453,10 +453,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                         SGM.requiresObjCDispatch(var));
       
       return emitGetAccessor(loc, getter,
-                             ArrayRef<Substitution>(),
-                             RValueSource(),
-                             RValueSource(), ncRefType->getCanonicalType(),
-                             SGFContext());
+                             ArrayRef<Substitution>(), RValueSource(),
+                             RValueSource(), SGFContext());
     }
     
     // If this is a global variable, invoke its accessor function to get its
@@ -1253,9 +1251,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
     return RValue(SGF, E,
                   SGF.emitGetAccessor(E, getter,
                                       E->getMember().getSubstitutions(),
-                                      std::move(baseRV),
-                                      RValueSource(),
-                                      E->getType()->getCanonicalType(), C));
+                                      std::move(baseRV), RValueSource(), C));
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
@@ -1354,8 +1350,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
                 SGF.emitGetAccessor(E, getter,
                                     E->getDecl().getSubstitutions(),
                                     std::move(baseRV),
-                                    std::move(subscriptRV),
-                                    E->getType()->getCanonicalType(), C));
+                                    std::move(subscriptRV), C));
 }
 
 

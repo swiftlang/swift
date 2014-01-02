@@ -2275,7 +2275,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
                 ArrayRef<Substitution> substitutions,
                 RValueSource &&selfValue,
                 RValueSource &&subscripts,
-                CanType resultType,
                 SGFContext c) {
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue);

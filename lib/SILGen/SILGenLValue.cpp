@@ -406,8 +406,7 @@ namespace {
       
       return gen.emitGetAccessor(loc, getter, substitutions,
                                  std::move(args.base),
-                                 std::move(args.subscripts),
-                                 getSubstFormalType(), c);
+                                 std::move(args.subscripts), c);
     }
     
     std::unique_ptr<LogicalPathComponent>
