@@ -888,7 +888,8 @@ BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
 }
 
 /// \brief Retrieve the arena from which we should allocate storage for a type.
-static AllocationArena getArena(bool hasTypeVariable) {
+static AllocationArena getArena(RecursiveTypeProperties properties) {
+  bool hasTypeVariable = properties.hasTypeVariable();
   return hasTypeVariable? AllocationArena::ConstraintSolver
                         : AllocationArena::Permanent;;
 }
@@ -914,11 +915,11 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying) {
-  bool hasTypeVariable = underlying->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = underlying->getRecursiveProperties();
+  auto arena = getArena(properties);
   ParenType *&Result = C.Impl.getArena(arena).ParenTypes[underlying];
   if (Result == 0) {
-    Result = new (C, arena) ParenType(underlying, hasTypeVariable);
+    Result = new (C, arena) ParenType(underlying, properties);
   }
   return Result;
 }
@@ -941,15 +942,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType());
 
-  bool HasTypeVariable = false;
+  RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
-    if (Elt.getType() && Elt.getType()->hasTypeVariable()) {
-      HasTypeVariable = true;
-      break;
-    }
+    if (Elt.getType())
+      properties |= Elt.getType()->getRecursiveProperties();
   }
 
-  auto arena = getArena(HasTypeVariable);
+  auto arena = getArena(properties);
 
 
   void *InsertPos = 0;
@@ -976,7 +975,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
   TupleType *New = new (C, arena) TupleType(Fields, IsCanonical ? &C : 0,
-                                            HasTypeVariable);
+                                            properties);
   C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
@@ -993,15 +992,16 @@ UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
   llvm::FoldingSetNodeID ID;
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = 0;
-  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties;
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   if (auto unbound = C.Impl.getArena(arena).UnboundGenericTypes
                         .FindNodeOrInsertPos(ID, InsertPos))
     return unbound;
 
   auto result = new (C, arena) UnboundGenericType(TheDecl, Parent, C,
-                                                  hasTypeVariable);
+                                                  properties);
   C.Impl.getArena(arena).UnboundGenericTypes.InsertNode(result, InsertPos);
   return result;
 }
@@ -1009,16 +1009,14 @@ UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
 void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                NominalTypeDecl *TheDecl, Type Parent,
                                ArrayRef<Type> GenericArgs,
-                               bool &hasTypeVariable) {
+                               RecursiveTypeProperties &properties) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
-  if (Parent && Parent->hasTypeVariable())
-    hasTypeVariable = true;
+  if (Parent) properties |= Parent->getRecursiveProperties();
   ID.AddInteger(GenericArgs.size());
   for (Type Arg : GenericArgs) {
     ID.AddPointer(Arg.getPointer());
-    if (Arg->hasTypeVariable())
-      hasTypeVariable = true;
+    properties |= Arg->getRecursiveProperties();
   }
 }
 
@@ -1027,8 +1025,8 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    Type parent,
                                    ArrayRef<Type> genericArgs,
                                    const ASTContext *context,
-                                   bool hasTypeVariable)
-  : TypeBase(theKind, context, hasTypeVariable),
+                                   RecursiveTypeProperties properties)
+  : TypeBase(theKind, context, properties),
     TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
 {
 }
@@ -1038,10 +1036,10 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         ArrayRef<Type> GenericArgs) {  
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
-  bool HasTypeVariable = false;
-  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, HasTypeVariable);
+  RecursiveTypeProperties properties;
+  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
 
-  auto arena = getArena(HasTypeVariable);
+  auto arena = getArena(properties);
 
   void *InsertPos = 0;
   if (BoundGenericType *BGT =
@@ -1064,16 +1062,16 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
     newType = new (C, arena) BoundGenericClassType(theClass, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0,
-                                                   HasTypeVariable);
+                                                   properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
     newType = new (C, arena) BoundGenericStructType(theStruct, Parent, ArgsCopy,
                                                     IsCanonical ? &C : 0,
-                                                    HasTypeVariable);
+                                                    properties);
   } else {
     auto theEnum = cast<EnumDecl>(TheDecl);
     newType = new (C, arena) BoundGenericEnumType(theEnum, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0,
-                                                   HasTypeVariable);
+                                                   properties);
   }
   C.Impl.getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
 
@@ -1098,22 +1096,23 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
 }
 
 EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
-                     bool HasTypeVariable)
-  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, HasTypeVariable) { }
+                     RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) { }
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   EnumType::Profile(id, D, Parent);
 
-  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties;
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   void *insertPos = 0;
   if (auto enumTy
         = C.Impl.getArena(arena).EnumTypes.FindNodeOrInsertPos(id, insertPos))
     return enumTy;
 
-  auto enumTy = new (C, arena) EnumType(D, Parent, C, hasTypeVariable);
+  auto enumTy = new (C, arena) EnumType(D, Parent, C, properties);
   C.Impl.getArena(arena).EnumTypes.InsertNode(enumTy, insertPos);
   return enumTy;
 }
@@ -1124,22 +1123,23 @@ void EnumType::Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent) {
 }
 
 StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
-                       bool HasTypeVariable)
-  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, HasTypeVariable) { }
+                       RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) { }
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   StructType::Profile(id, D, Parent);
 
-  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties;
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   void *insertPos = 0;
   if (auto structTy
         = C.Impl.getArena(arena).StructTypes.FindNodeOrInsertPos(id, insertPos))
     return structTy;
 
-  auto structTy = new (C, arena) StructType(D, Parent, C, hasTypeVariable);
+  auto structTy = new (C, arena) StructType(D, Parent, C, properties);
   C.Impl.getArena(arena).StructTypes.InsertNode(structTy, insertPos);
   return structTy;
 }
@@ -1150,22 +1150,23 @@ void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent)
 }
 
 ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
-                     bool HasTypeVariable)
-  : NominalType(TypeKind::Class, &C, TheDecl, Parent, HasTypeVariable) { }
+                     RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Class, &C, TheDecl, Parent, properties) { }
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   ClassType::Profile(id, D, Parent);
 
-  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties;
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   void *insertPos = 0;
   if (auto classTy
         = C.Impl.getArena(arena).ClassTypes.FindNodeOrInsertPos(id, insertPos))
     return classTy;
 
-  auto classTy = new (C, arena) ClassType(D, Parent, C, hasTypeVariable);
+  auto classTy = new (C, arena) ClassType(D, Parent, C, properties);
   C.Impl.getArena(arena).ClassTypes.InsertNode(classTy, insertPos);
   return classTy;
 }
@@ -1211,22 +1212,26 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   auto &entry = C.Impl.getArena(arena).ReferenceStorageTypes[key];
   if (entry) return entry;
 
+  auto properties = T->getRecursiveProperties();
+
   switch (ownership) {
   case Ownership::Strong: llvm_unreachable("not possible");
   case Ownership::Unowned:
     return entry =
-      new (C, arena) UnownedStorageType(T, T->isCanonical() ? &C : 0);
+      new (C, arena) UnownedStorageType(T, T->isCanonical() ? &C : 0,
+                                        properties);
   case Ownership::Weak:
     return entry =
-      new (C, arena) WeakStorageType(T, T->isCanonical() ? &C : 0);
+      new (C, arena) WeakStorageType(T, T->isCanonical() ? &C : 0,
+                                     properties);
   }
   llvm_unreachable("bad ownership");
 }
 
 MetatypeType *MetatypeType::get(Type T, Optional<bool> IsThin,
                                 const ASTContext &C) {
-  bool hasTypeVariable = T->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = T->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   char thinKey;
   if (IsThin.hasValue())
@@ -1239,13 +1244,14 @@ MetatypeType *MetatypeType::get(Type T, Optional<bool> IsThin,
   if (Entry) return Entry;
 
   return Entry = new (C, arena) MetatypeType(T, T->isCanonical() ? &C : 0,
-                                             hasTypeVariable,
+                                             properties,
                                              IsThin);
 }
 
-MetatypeType::MetatypeType(Type T, const ASTContext *C, bool HasTypeVariable,
+MetatypeType::MetatypeType(Type T, const ASTContext *C,
+                           RecursiveTypeProperties properties,
                            Optional<bool> IsThin)
-  : TypeBase(TypeKind::Metatype, C, HasTypeVariable),
+  : TypeBase(TypeKind::Metatype, C, properties),
     InstanceType(T) {
   MetatypeTypeBits.HasThin = IsThin.hasValue();
   if (IsThin.hasValue())
@@ -1265,8 +1271,9 @@ ModuleType *ModuleType::get(Module *M) {
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
-  bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = Input->getRecursiveProperties() |
+                    Result->getRecursiveProperties();
+  auto arena = getArena(properties);
   char attrKey = Info.getFuncAttrKey();
 
   const ASTContext &C = Input->getASTContext();
@@ -1276,19 +1283,19 @@ FunctionType *FunctionType::get(Type Input, Type Result,
   if (Entry) return Entry;
 
   return Entry = new (C, arena) FunctionType(Input, Result,
-                                             hasTypeVariable,
+                                             properties,
                                              Info);
 }
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(Type input, Type output,
-                           bool hasTypeVariable,
+                           RecursiveTypeProperties properties,
                            const ExtInfo &Info)
 : AnyFunctionType(TypeKind::Function,
                   (input->isCanonical() && output->isCanonical()) ?
                   &input->getASTContext() : 0,
                   input, output,
-                  hasTypeVariable,
+                  properties,
                   Info)
 { }
 
@@ -1299,23 +1306,24 @@ PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
                                                       const ExtInfo &Info) {
   // FIXME: one day we should do canonicalization properly.
-  bool hasTypeVariable = input->hasTypeVariable() || output->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties
+    = input->getRecursiveProperties() | output->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   const ASTContext &C = input->getASTContext();
 
   return new (C, arena) PolymorphicFunctionType(input, output, params,
-                                                Info, C);
+                                                Info, C, properties);
 }
 
 PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
                                                  GenericParamList *params,
                                                  const ExtInfo &Info,
-                                                 const ASTContext &C)
+                                                 const ASTContext &C,
+                                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::PolymorphicFunction,
                     (input->isCanonical() && output->isCanonical()) ?&C : 0,
-                    input, output,
-                    /*HasTypeVariable=*/false,
+                    input, output, properties,
                     Info),
     Params(params)
 {
@@ -1390,7 +1398,8 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
 
   auto result = new (mem) GenericFunctionType(params, requirements, input,
                                               output, info,
-                                              isCanonical? &ctx : nullptr);
+                                              isCanonical? &ctx : nullptr,
+                                              RecursiveTypeProperties());
   ctx.Impl.GenericFunctionTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -1401,9 +1410,10 @@ GenericFunctionType::GenericFunctionType(
                        Type input,
                        Type result,
                        const ExtInfo &info,
-                       const ASTContext *ctx)
+                       const ASTContext *ctx,
+                       RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
-                    /*hasTypeVariable=*/false, info),
+                    properties, info),
     NumGenericParams(genericParams.size()),
     NumRequirements(requirements.size())
 {
@@ -1444,8 +1454,9 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
                                  ParameterConvention calleeConvention,
                                  ArrayRef<SILParameterInfo> params,
                                  SILResultInfo result,
-                                 const ASTContext &ctx)
-  : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
+                                 const ASTContext &ctx,
+                                 RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::SILFunction, &ctx, properties),
     GenericParams(genericParams),
     // TODO: GenericSig should be given as a constructor parameter.
     Result(result) {
@@ -1522,7 +1533,8 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   auto fnType =
-    new (mem) SILFunctionType(genericParams, ext, callee, params, result, ctx);
+    new (mem) SILFunctionType(genericParams, ext, callee, params, result, ctx,
+                              RecursiveTypeProperties());
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }
@@ -1532,8 +1544,8 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
 ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
   assert(Size != 0);
 
-  bool hasTypeVariable = BaseType->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  RecursiveTypeProperties properties = BaseType->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   const ASTContext &C = BaseType->getASTContext();
   
@@ -1541,38 +1553,39 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
     = C.Impl.getArena(arena).ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
-  return Entry = new (C, arena) ArrayType(BaseType, Size, hasTypeVariable);
+  return Entry = new (C, arena) ArrayType(BaseType, Size, properties);
 }
 
-ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
+ArrayType::ArrayType(Type base, uint64_t size,
+                     RecursiveTypeProperties properties)
   : TypeBase(TypeKind::Array, 
              base->isCanonical() ? &base->getASTContext() : 0,
-             hasTypeVariable),
+             properties),
     Base(base), Size(size) {}
 
 
 ArraySliceType *ArraySliceType::get(Type base) {
-  bool hasTypeVariable = base->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   const ASTContext &C = base->getASTContext();
 
   ArraySliceType *&entry = C.Impl.getArena(arena).ArraySliceTypes[base];
   if (entry) return entry;
 
-  return entry = new (C, arena) ArraySliceType(C, base, hasTypeVariable);
+  return entry = new (C, arena) ArraySliceType(C, base, properties);
 }
 
 OptionalType *OptionalType::get(Type base) {
-  bool hasTypeVariable = base->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   const ASTContext &C = base->getASTContext();
 
   OptionalType *&entry = C.Impl.getArena(arena).OptionalTypes[base];
   if (entry) return entry;
 
-  return entry = new (C, arena) OptionalType(C, base, hasTypeVariable);
+  return entry = new (C, arena) OptionalType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
@@ -1586,7 +1599,7 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
-                /*HasTypeVariable=*/false) { }
+                RecursiveTypeProperties()) { }
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
@@ -1594,8 +1607,8 @@ LValueType *LValueType::get(Type objectTy) {
 //  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
 //         "can not have @inout or @lvalue wrapped inside an @lvalue");
 
-  bool hasTypeVariable = objectTy->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = objectTy->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
   auto &entry = C.Impl.getArena(arena).LValueTypes[objectTy];
@@ -1604,7 +1617,7 @@ LValueType *LValueType::get(Type objectTy) {
 
   const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
   return entry = new (C, arena) LValueType(objectTy, canonicalContext,
-                                           hasTypeVariable);
+                                           properties);
 }
 
 InOutType *InOutType::get(Type objectTy) {
@@ -1613,8 +1626,8 @@ InOutType *InOutType::get(Type objectTy) {
 //  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
 //         "can not have @inout or @lvalue wrapped inside an @inout");
   
-  bool hasTypeVariable = objectTy->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = objectTy->getRecursiveProperties();
+  auto arena = getArena(properties);
   
   auto &C = objectTy->getASTContext();
   auto &entry = C.Impl.getArena(arena).InOutTypes[objectTy];
@@ -1623,28 +1636,28 @@ InOutType *InOutType::get(Type objectTy) {
   
   const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
   return entry = new (C, arena) InOutType(objectTy, canonicalContext,
-                                           hasTypeVariable);
+                                          properties);
 }
 
 /// Return a uniqued substituted type.
 SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
                                       const ASTContext &C) {
-  bool hasTypeVariable = Replacement->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = Replacement->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   SubstitutedType *&Known
     = C.Impl.getArena(arena).SubstitutedTypes[{Original, Replacement}];
   if (!Known) {
     Known = new (C, arena) SubstitutedType(Original, Replacement,
-                                           hasTypeVariable);
+                                           properties);
   }
   return Known;
 }
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name,
                                               const ASTContext &ctx) {
-  bool hasTypeVariable = base->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
   auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
@@ -1652,7 +1665,7 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name,
   if (!known) {
     const ASTContext *canonicalCtx = base->isCanonical() ? &ctx : nullptr;
     known = new (ctx, arena) DependentMemberType(base, name, canonicalCtx,
-                                                 hasTypeVariable);
+                                                 properties);
   }
   return known;
 }
@@ -1660,8 +1673,8 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name,
 DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType,
                                               const ASTContext &ctx) {
-  bool hasTypeVariable = base->hasTypeVariable();
-  auto arena = getArena(hasTypeVariable);
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
   auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
@@ -1669,7 +1682,7 @@ DependentMemberType *DependentMemberType::get(Type base,
   if (!known) {
     const ASTContext *canonicalCtx = base->isCanonical() ? &ctx : nullptr;
     known = new (ctx, arena) DependentMemberType(base, assocType, canonicalCtx,
-                                                 hasTypeVariable);
+                                                 properties);
   }
   return known;
 }

@@ -1196,6 +1196,12 @@ public:
                                               TAD->getType()));
       }
 
+      // We create TypeAliasTypes with invalid underlying types, so we
+      // need to propagate recursive properties now.
+      if (TAD->hasUnderlyingType())
+        TAD->getAliasType()->setRecursiveProperties(
+                         TAD->getUnderlyingType()->getRecursiveProperties());
+
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         TC.checkInheritanceClause(TAD);
     }

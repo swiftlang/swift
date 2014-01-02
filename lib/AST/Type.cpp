@@ -1122,8 +1122,8 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
-                     bool hasTypeVariable)
-  : TypeBase(TypeKind::Tuple, CanCtx, hasTypeVariable), Fields(fields) { }
+                     RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::Tuple, CanCtx, properties), Fields(fields) { }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.

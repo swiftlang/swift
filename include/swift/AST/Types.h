@@ -69,6 +69,55 @@ namespace swift {
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
+
+
+/// Various properties of types that are primarily defined recursively
+/// on structural types.
+class RecursiveTypeProperties {
+public:
+  enum { BitWidth = 1 };
+
+  /// A single property.
+  ///
+  /// Note that the property polarities should be chosen so that 0 is
+  /// the correct default value and bitwise-or correctly merges things.
+  enum Property : unsigned {
+    HasTypeVariable = 1
+  };
+
+private:
+  unsigned Bits : BitWidth;
+
+public:
+  RecursiveTypeProperties() : Bits(0) {}
+  RecursiveTypeProperties(Property prop) : Bits(prop) {}
+  explicit RecursiveTypeProperties(unsigned bits) : Bits(bits) {}
+
+  /// Return these properties as a bitfield.
+  unsigned getBits() const { return Bits; }
+
+  /// Does a type with these properties structurally contain a type
+  /// variable?
+  bool hasTypeVariable() const { return Bits & HasTypeVariable; }
+
+  /// Merge two sets of properties.
+  friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
+    return RecursiveTypeProperties(lhs | rhs);
+  }
+  friend RecursiveTypeProperties operator|(RecursiveTypeProperties lhs,
+                                           RecursiveTypeProperties rhs) {
+    return RecursiveTypeProperties(lhs.Bits | rhs.Bits);
+  }
+  RecursiveTypeProperties &operator|=(RecursiveTypeProperties other) {
+    Bits |= other.Bits;
+    return *this;
+  }
+
+  /// Test for a particular property in this set.
+  bool operator&(Property prop) const {
+    return Bits & prop;
+  }
+};
   
 
 /// TypeBase - Base class for all types in Swift.
@@ -88,11 +137,10 @@ class alignas(8) TypeBase {
   const TypeKind Kind;
 
   struct TypeBaseBitfields {
-    /// \brief Whether this type has a type variable somewhere in it.
-    unsigned HasTypeVariable : 1;
+    unsigned Properties : RecursiveTypeProperties::BitWidth;
   };
 
-  enum { NumTypeBaseBits = 1 };
+  enum { NumTypeBaseBits = RecursiveTypeProperties::BitWidth };
   static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
 
 protected:
@@ -110,9 +158,9 @@ protected:
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    unsigned ID : 31;
+    unsigned ID : 32 - NumTypeBaseBits;
   };
-  enum { NumTypeVariableTypeBits = NumTypeBaseBits + 31 };
+  enum { NumTypeVariableTypeBits = NumTypeBaseBits + (32 - NumTypeBaseBits) };
   static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
 
   struct SILFunctionTypeBitfields {
@@ -141,18 +189,17 @@ protected:
   };
 
 protected:
-  TypeBase(TypeKind kind, const ASTContext *CanTypeCtx, bool HasTypeVariable)
+  TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
+           RecursiveTypeProperties properties)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
-    
-    setHasTypeVariable(HasTypeVariable);
+    setRecursiveProperties(properties);
   }
 
-  /// \brief Mark this type as having a type variable.
-  void setHasTypeVariable(bool TV = true) {
-    TypeBaseBits.HasTypeVariable = TV;
+  void setRecursiveProperties(RecursiveTypeProperties properties) {
+    TypeBaseBits.Properties = properties.getBits();
   }
 
 public:
@@ -169,7 +216,7 @@ public:
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
   CanType getCanonicalType();
-  
+
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.
@@ -207,6 +254,12 @@ public:
     return cast<T>(getDesugaredType());
   }
 
+  /// getRecursiveProperties - Returns the properties defined on the
+  /// structure of this type.
+  RecursiveTypeProperties getRecursiveProperties() const {
+    return RecursiveTypeProperties(TypeBaseBits.Properties);
+  }
+
   /// isMaterializable - Is this type 'materializable' according to
   /// the rules of the language?  Basically, does it not contain any
   /// l-value types?
@@ -221,7 +274,9 @@ public:
   bool allowsOwnership();  
 
   /// \brief Determine whether this type involves a type variable.
-  bool hasTypeVariable() const;
+  bool hasTypeVariable() const {
+    return getRecursiveProperties().hasTypeVariable();
+  }
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -421,7 +476,7 @@ class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C) 
-    : TypeBase(TypeKind::Error, &C, /*HasTypeVariable=*/false) { }
+    : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties()) { }
 public:
   static Type get(const ASTContext &C);
 
@@ -436,7 +491,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 class BuiltinType : public TypeBase {
 protected:
   BuiltinType(TypeKind kind, const ASTContext &canTypeCtx)
-  : TypeBase(kind, &canTypeCtx, /*HasTypeVariable=*/false) {}
+  : TypeBase(kind, &canTypeCtx, RecursiveTypeProperties()) {}
 public:
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
@@ -707,12 +762,14 @@ class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) 
-    : TypeBase(TypeKind::NameAlias, nullptr, /*HasTypeVariable=*/false),
+    : TypeBase(TypeKind::NameAlias, nullptr, RecursiveTypeProperties()),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
 public:
   TypeAliasDecl *getDecl() const { return TheDecl; }
+
+  using TypeBase::setRecursiveProperties;
    
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -729,8 +786,8 @@ class ParenType : public TypeBase {
   Type UnderlyingType;
 
   friend class ASTContext;
-  ParenType(Type UnderlyingType, bool HasTypeVariable)
-    : TypeBase(TypeKind::Paren, nullptr, HasTypeVariable),
+  ParenType(Type UnderlyingType, RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::Paren, nullptr, properties),
       UnderlyingType(UnderlyingType) {}
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
@@ -893,7 +950,7 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
-            bool hasTypeVariable);
+            RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   CanType getElementType(unsigned fieldNo) const {
@@ -914,10 +971,10 @@ class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
 
 private:
   UnboundGenericType(NominalTypeDecl *TheDecl, Type Parent, const ASTContext &C,
-                     bool hasTypeVariable)
+                     RecursiveTypeProperties properties)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
-               hasTypeVariable),
+               properties),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
@@ -969,7 +1026,7 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
                    ArrayRef<Type> genericArgs, const ASTContext *context,
-                   bool hasTypeVariable);
+                   RecursiveTypeProperties properties);
 
 public:
   static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
@@ -1002,12 +1059,12 @@ public:
                                           LazyResolver *resolver);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    bool hasTypeVariable = false;
-    Profile(ID, TheDecl, Parent, GenericArgs, hasTypeVariable);
+    RecursiveTypeProperties properties;
+    Profile(ID, TheDecl, Parent, GenericArgs, properties);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs,
-                      bool &hasTypeVariable);
+                      RecursiveTypeProperties &properties);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1029,10 +1086,10 @@ class BoundGenericClassType : public BoundGenericType {
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
-                        bool hasTypeVariable)
+                        RecursiveTypeProperties properties)
     : BoundGenericType(TypeKind::BoundGenericClass,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, hasTypeVariable) {}
+                       genericArgs, context, properties) {}
   friend class BoundGenericType;
 
 public:
@@ -1059,11 +1116,11 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 class BoundGenericEnumType : public BoundGenericType {
 private:
   BoundGenericEnumType(EnumDecl *theDecl, Type parent,
-                        ArrayRef<Type> genericArgs, const ASTContext *context,
-                        bool hasTypeVariable)
+                       ArrayRef<Type> genericArgs, const ASTContext *context,
+                       RecursiveTypeProperties properties)
     : BoundGenericType(TypeKind::BoundGenericEnum,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, hasTypeVariable) {}
+                       genericArgs, context, properties) {}
   friend class BoundGenericType;
 
 public:
@@ -1091,10 +1148,10 @@ class BoundGenericStructType : public BoundGenericType {
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
-                         bool hasTypeVariable)
+                         RecursiveTypeProperties properties)
     : BoundGenericType(TypeKind::BoundGenericStruct, 
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, hasTypeVariable) {}
+                       genericArgs, context, properties) {}
   friend class BoundGenericType;
 
 public:
@@ -1129,9 +1186,9 @@ class NominalType : public TypeBase {
 
 protected:
   NominalType(TypeKind K, const ASTContext *C, NominalTypeDecl *TheDecl,
-              Type Parent, bool HasTypeVariable)
+              Type Parent, RecursiveTypeProperties properties)
     : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
-               HasTypeVariable),
+               properties),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
@@ -1184,7 +1241,7 @@ public:
 
 private:
   EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &Ctx,
-            bool HasTypeVariable);
+            RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
@@ -1212,7 +1269,7 @@ public:
   
 private:
   StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
-             bool HasTypeVariable);
+             RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
@@ -1240,7 +1297,7 @@ public:
   
 private:
   ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &Ctx,
-            bool HasTypeVariable);
+            RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 
@@ -1297,7 +1354,8 @@ public:
   }
   
 private:
-  MetatypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable,
+  MetatypeType(Type T, const ASTContext *Ctx,
+               RecursiveTypeProperties properties,
                Optional<bool> IsThin);
   friend class TypeDecl;
 };
@@ -1331,7 +1389,7 @@ public:
 private:
   ModuleType(Module *M, const ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
-               /*HasTypeVariable=*/false),
+               RecursiveTypeProperties()),
       TheModule(M) {
   }
 };
@@ -1473,10 +1531,9 @@ public:
 
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, bool HasTypeVariable,
+                  Type Input, Type Output, RecursiveTypeProperties properties,
                   const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, HasTypeVariable),
-  Input(Input), Output(Output) {
+  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
   }
 
@@ -1550,7 +1607,7 @@ public:
   
 private:
   FunctionType(Type Input, Type Result,
-               bool HasTypeVariable,
+               RecursiveTypeProperties properties,
                const ExtInfo &Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
@@ -1600,9 +1657,11 @@ public:
   }
   
 private:
-  PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
+  PolymorphicFunctionType(Type input, Type output,
+                          GenericParamList *params,
                           const ExtInfo &Info,
-                          const ASTContext &C);
+                          const ASTContext &C,
+                          RecursiveTypeProperties properties);
 };  
 BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
   static CanPolymorphicFunctionType get(CanType input, CanType result,
@@ -1647,7 +1706,8 @@ class GenericFunctionType : public AnyFunctionType,
                       Type input,
                       Type result,
                       const ExtInfo &info,
-                      const ASTContext *ctx);
+                      const ASTContext *ctx,
+                      RecursiveTypeProperties properties);
 public:
   /// Create a new generic function type.
   static GenericFunctionType *get(ArrayRef<GenericTypeParamType *> params,
@@ -1954,7 +2014,8 @@ private:
   SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params, SILResultInfo result,
-                  const ASTContext &ctx);
+                  const ASTContext &ctx,
+                  RecursiveTypeProperties properties);
 
   static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
@@ -2092,7 +2153,7 @@ public:
   }
   
 private:
-  ArrayType(Type Base, uint64_t Size, bool HasTypeVariable);
+  ArrayType(Type Base, uint64_t Size, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArrayType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
@@ -2109,8 +2170,8 @@ class SyntaxSugarType : public TypeBase {
 protected:
   // Syntax sugar types are never canonical.
   SyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
-                  bool hasTypeVariable)
-    : TypeBase(K, nullptr, hasTypeVariable), Base(base), ImplOrContext(&ctx) {}
+                  RecursiveTypeProperties properties)
+    : TypeBase(K, nullptr, properties), Base(base), ImplOrContext(&ctx) {}
 
 public:
   Type getBaseType() const {
@@ -2129,8 +2190,9 @@ public:
   
 /// The type T[], which is always sugar for a library type.
 class ArraySliceType : public SyntaxSugarType {
-  ArraySliceType(const ASTContext &ctx, Type base, bool hasTypeVariable)
-    : SyntaxSugarType(TypeKind::ArraySlice, ctx, base, hasTypeVariable) {}
+  ArraySliceType(const ASTContext &ctx, Type base,
+                 RecursiveTypeProperties properties)
+    : SyntaxSugarType(TypeKind::ArraySlice, ctx, base, properties) {}
 
 public:
   /// Return a uniqued array slice type with the specified base type.
@@ -2143,8 +2205,9 @@ public:
 
 /// The type T?, which is always sugar for a library type.
 class OptionalType : public SyntaxSugarType {
-  OptionalType(const ASTContext &ctx,Type base, bool hasTypeVariable)
-    : SyntaxSugarType(TypeKind::Optional, ctx, base, hasTypeVariable) {}
+  OptionalType(const ASTContext &ctx,Type base,
+               RecursiveTypeProperties properties)
+    : SyntaxSugarType(TypeKind::Optional, ctx, base, properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
@@ -2233,7 +2296,7 @@ private:
 
   ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               /*HasTypeVariable=*/false),
+               RecursiveTypeProperties()),
       Protocols(Protocols) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -2263,8 +2326,8 @@ class LValueType : public TypeBase {
   Type ObjectTy;
 
   LValueType(Type objectTy, const ASTContext *canonicalContext,
-             bool hasTypeVariable)
-    : TypeBase(TypeKind::LValue, canonicalContext, hasTypeVariable),
+             RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::LValue, canonicalContext, properties),
       ObjectTy(objectTy) {}
 
 public:
@@ -2293,8 +2356,8 @@ class InOutType : public TypeBase {
   Type ObjectTy;
   
   InOutType(Type objectTy, const ASTContext *canonicalContext,
-            bool hasTypeVariable)
-  : TypeBase(TypeKind::InOut, canonicalContext, hasTypeVariable),
+            RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::InOut, canonicalContext, properties),
     ObjectTy(objectTy) {}
   
 public:
@@ -2322,10 +2385,11 @@ class SubstitutableType : public TypeBase {
   Type Superclass;
 
 protected:
-  SubstitutableType(TypeKind K, const ASTContext *C, 
+  SubstitutableType(TypeKind K, const ASTContext *C,
+                    RecursiveTypeProperties properties,
                     ArrayRef<ProtocolDecl *> ConformsTo,
                     Type Superclass)
-    : TypeBase(K, C, /*HasTypeVariable=*/false),
+    : TypeBase(K, C, properties),
       ConformsTo(ConformsTo), Superclass(Superclass) { }
 
 public:
@@ -2477,7 +2541,9 @@ private:
                 AssocTypeOrProtocolType AssocTypeOrProto,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
-    : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
+    : SubstitutableType(TypeKind::Archetype, &Ctx,
+                        RecursiveTypeProperties(),
+                        ConformsTo, Superclass),
       Parent(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
@@ -2490,7 +2556,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 class AbstractTypeParamType : public SubstitutableType {
 protected:
   AbstractTypeParamType(TypeKind kind, const ASTContext *ctx)
-    : SubstitutableType(kind, ctx, { }, Type()) { }
+    : SubstitutableType(kind, ctx, RecursiveTypeProperties(),
+                        { }, Type()) { }
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -2602,8 +2669,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, AbstractTypeParamType)
 class SubstitutedType : public TypeBase {
   // SubstitutedTypes are never canonical.
   explicit SubstitutedType(Type Original, Type Replacement,
-                           bool HasTypeVariable)
-    : TypeBase(TypeKind::Substituted, nullptr, HasTypeVariable),
+                           RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::Substituted, nullptr, properties),
       Original(Original), Replacement(Replacement) {}
   
   Type Original;
@@ -2636,13 +2703,14 @@ class DependentMemberType : public TypeBase {
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> NameOrAssocType;
 
   DependentMemberType(Type base, Identifier name, const ASTContext *ctx,
-                      bool hasTypeVariable)
-    : TypeBase(TypeKind::DependentMember, ctx, hasTypeVariable),
+                      RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::DependentMember, ctx, properties),
       Base(base), NameOrAssocType(name) { }
 
   DependentMemberType(Type base, AssociatedTypeDecl *assocType,
-                      const ASTContext *ctx, bool hasTypeVariable)
-    : TypeBase(TypeKind::DependentMember, ctx, hasTypeVariable),
+                      const ASTContext *ctx,
+                      RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::DependentMember, ctx, properties),
       Base(base), NameOrAssocType(assocType) { }
 
 public:
@@ -2682,8 +2750,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 /// represent this as a distinct type in SIL and IR-generation.
 class ReferenceStorageType : public TypeBase {
 protected:
-  ReferenceStorageType(TypeKind kind, Type referent, const ASTContext *C)
-    : TypeBase(kind, C, false), Referent(referent) {}
+  ReferenceStorageType(TypeKind kind, Type referent, const ASTContext *C,
+                       RecursiveTypeProperties properties)
+    : TypeBase(kind, C, properties), Referent(referent) {}
 
 private:
   Type Referent;
@@ -2710,8 +2779,9 @@ END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 /// \brief The storage type of a variable with [unowned] ownership semantics.
 class UnownedStorageType : public ReferenceStorageType {
   friend class ReferenceStorageType;
-  UnownedStorageType(Type referent, const ASTContext *C)
-    : ReferenceStorageType(TypeKind::UnownedStorage, referent, C) {}
+  UnownedStorageType(Type referent, const ASTContext *C,
+                     RecursiveTypeProperties properties)
+    : ReferenceStorageType(TypeKind::UnownedStorage, referent, C, properties) {}
 
 public:
   static UnownedStorageType *get(Type referent, const ASTContext &C) {
@@ -2729,8 +2799,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
 /// \brief The storage type of a variable with [weak] ownership semantics.
 class WeakStorageType : public ReferenceStorageType {
   friend class ReferenceStorageType;
-  WeakStorageType(Type referent, const ASTContext *C)
-    : ReferenceStorageType(TypeKind::WeakStorage, referent, C) {}
+  WeakStorageType(Type referent, const ASTContext *C,
+                  RecursiveTypeProperties properties)
+    : ReferenceStorageType(TypeKind::WeakStorage, referent, C, properties) {}
 
 public:
   static WeakStorageType *get(Type referent, const ASTContext &C) {
@@ -2748,7 +2819,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
-    : TypeBase(TypeKind::TypeVariable, &C, true) {
+    : TypeBase(TypeKind::TypeVariable, &C,
+               RecursiveTypeProperties::HasTypeVariable) {
     TypeVariableTypeBits.ID = ID;
   }
 
@@ -2793,10 +2865,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
-
-inline bool TypeBase::hasTypeVariable() const {
-  return TypeBaseBits.HasTypeVariable;
-}
 
 inline bool TypeBase::isExistentialType() {
   CanType T = getCanonicalType();
