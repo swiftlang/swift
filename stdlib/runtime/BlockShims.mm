@@ -248,6 +248,11 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(OWNED(PSo13DynamicLookup_),
 /// NSString line enumerator
 /// (NSString, UnsafePointer<BOOL>) -> Void
 /// FIXME String to NSString conversion?
+MAKE_BLOCK_SHIM(
+  FUNC(
+    CAT2(OWNED(SS), DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+      VOID
+  ), void(NSString*, BOOL*))
 
 /// NSTask termination handler
 /// (NSTask) -> Void
