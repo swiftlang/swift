@@ -585,7 +585,7 @@ macro(add_swift_executable name)
   else()
     add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   endif()
-  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_RUNTIME_OUTPUT_INTDIR})
+  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   # Add Swift source files to the project.
   source_group("Swift Sources" FILES ${SWIFTEXE_EXTERNAL_SOURCES})
