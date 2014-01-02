@@ -5,30 +5,71 @@ cmake_minimum_required(VERSION 2.8)
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   project(Swift)
 
-  set(SWIFT_PATH_TO_LLVM_SOURCE "" CACHE PATH
-    "Path to LLVM source code. Not necessary if using an installed LLVM.")
-  set(SWIFT_PATH_TO_LLVM_BUILD "" CACHE PATH
-    "Path to the directory where LLVM was built or installed.")
-
-  if( SWIFT_PATH_TO_LLVM_SOURCE )
-    if( NOT EXISTS "${SWIFT_PATH_TO_LLVM_SOURCE}/cmake/config-ix.cmake" )
-      message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_SOURCE to the root directory of LLVM source code.")
+  # Rely on llvm-config.
+  set(CONFIG_OUTPUT)
+  find_program(LLVM_CONFIG "llvm-config")
+  if(LLVM_CONFIG)
+    message(STATUS "Found LLVM_CONFIG as ${LLVM_CONFIG}")
+    set(CONFIG_COMMAND ${LLVM_CONFIG}
+      "--assertion-mode"
+      "--bindir"
+      "--libdir"
+      "--includedir"
+      "--prefix"
+      "--src-root")
+    execute_process(
+      COMMAND ${CONFIG_COMMAND}
+      RESULT_VARIABLE HAD_ERROR
+      OUTPUT_VARIABLE CONFIG_OUTPUT
+    )
+    if(NOT HAD_ERROR)
+      string(REGEX REPLACE
+        "[ \t]*[\r\n]+[ \t]*" ";"
+        CONFIG_OUTPUT ${CONFIG_OUTPUT})
     else()
-      get_filename_component(LLVM_MAIN_SRC_DIR ${SWIFT_PATH_TO_LLVM_SOURCE}
-        ABSOLUTE)
-      list(APPEND CMAKE_MODULE_PATH "${LLVM_MAIN_SRC_DIR}/cmake/modules")
+      string(REPLACE ";" " " CONFIG_COMMAND_STR "${CONFIG_COMMAND}")
+      message(STATUS "${CONFIG_COMMAND_STR}")
+      message(FATAL_ERROR "llvm-config failed with status ${HAD_ERROR}")
     endif()
+  else()
+    message(FATAL_ERROR "llvm-config not found -- ${LLVM_CONFIG}")
   endif()
 
-  if (EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
-    set (PATH_TO_LLVM_CONFIG "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
-  elseif (EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
-    # Looking for bin/Debug/llvm-config is a complete hack. How can we get
-    # around this?
-    set (PATH_TO_LLVM_CONFIG "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
-  else()
-    message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_BUILD to a directory containing a LLVM build.")
+  list(GET CONFIG_OUTPUT 0 ENABLE_ASSERTIONS)
+  list(GET CONFIG_OUTPUT 1 TOOLS_BINARY_DIR)
+  list(GET CONFIG_OUTPUT 2 LIBRARY_DIR)
+  list(GET CONFIG_OUTPUT 3 INCLUDE_DIR)
+  list(GET CONFIG_OUTPUT 4 LLVM_OBJ_ROOT)
+  list(GET CONFIG_OUTPUT 5 MAIN_SRC_DIR)
+
+  if(NOT MSVC_IDE)
+    set(LLVM_ENABLE_ASSERTIONS ${ENABLE_ASSERTIONS}
+      CACHE BOOL "Enable assertions")
+    # Assertions should follow llvm-config's.
+    mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
   endif()
+
+  set(LLVM_TOOLS_BINARY_DIR ${TOOLS_BINARY_DIR} CACHE PATH "Path to llvm/bin")
+  set(LLVM_LIBRARY_DIR ${LIBRARY_DIR} CACHE PATH "Path to llvm/lib")
+  set(LLVM_MAIN_INCLUDE_DIR ${INCLUDE_DIR} CACHE PATH "Path to llvm/include")
+  set(LLVM_BINARY_DIR ${LLVM_OBJ_ROOT} CACHE PATH "Path to LLVM build tree")
+  set(LLVM_MAIN_SRC_DIR ${MAIN_SRC_DIR} CACHE PATH "Path to LLVM source tree")
+
+  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" ${LLVM_TOOLS_BINARY_DIR}
+    NO_DEFAULT_PATH)
+
+  set(LLVM_CMAKE_PATH "${LLVM_BINARY_DIR}/share/llvm/cmake")
+  set(LLVMCONFIG_FILE "${LLVM_CMAKE_PATH}/LLVMConfig.cmake")
+  if(EXISTS ${LLVMCONFIG_FILE})
+    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_PATH}")
+    include(${LLVMCONFIG_FILE})
+  else()
+    message(FATAL_ERROR "Not found: ${LLVMCONFIG_FILE}")
+  endif()
+
+  # Clang
+  set(SWIFT_PATH_TO_LLVM_SOURCE "${LLVM_MAIN_SRC_DIR}")
+  set(SWIFT_PATH_TO_LLVM_BUILD "${LLVM_BINARY_DIR}")
 
   set(SWIFT_PATH_TO_CLANG_SOURCE "${SWIFT_PATH_TO_LLVM_SOURCE}/tools/clang"
       CACHE PATH "Path to Clang source code.")
@@ -70,10 +111,9 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   endif()
 
   include(AddLLVM)
-  include(LLVMParseArguments)
   include(TableGen)
-  include("${SWIFT_PATH_TO_LLVM_BUILD}/share/llvm/cmake/LLVMConfig.cmake")
   include(HandleLLVMOptions)
+  include(LLVMParseArguments)
 
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
 
@@ -86,11 +126,8 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
                       "${LLVM_MAIN_INCLUDE_DIR}"
                       "${CLANG_BUILD_INCLUDE_DIR}"
                       "${CLANG_MAIN_INCLUDE_DIR}")
-  link_directories("${PATH_TO_LLVM_BUILD}/lib"
-                   "${PATH_TO_CLANG_BUILD}/lib")
-
-  exec_program("${PATH_TO_LLVM_CONFIG} --bindir" OUTPUT_VARIABLE LLVM_BINARY_DIR)
-  set(LLVM_TABLEGEN_EXE "${LLVM_BINARY_DIR}/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
+  link_directories("${LLVM_LIBRARY_DIR}"
+                   "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib")
 
   set(LIT_ARGS_DEFAULT "-sv")
   if (MSVC OR XCODE)
@@ -128,11 +165,14 @@ else()
   endif()
 endif()
 
-set(LLVM_RUNTIME_OUTPUT_INTDIR ${PATH_TO_LLVM_BUILD}/bin/${CMAKE_CFG_INTDIR})
-set(LLVM_LIBRARY_OUTPUT_INTDIR ${PATH_TO_LLVM_BUILD}/lib/${CMAKE_CFG_INTDIR})
+set(LLVM_RUNTIME_OUTPUT_INTDIR ${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/bin)
+set(LLVM_LIBRARY_OUTPUT_INTDIR ${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/lib)
 
 set(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+set(SWIFT_RUNTIME_OUTPUT_INTDIR ${SWIFT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
+set(SWIFT_LIBRARY_OUTPUT_INTDIR ${SWIFT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
@@ -392,7 +432,7 @@ endfunction()
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
 # should be placed. Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
-set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
+set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 
 # Set SWIFTLIB_SUBDIR to the subdirectory inside SWIFTLIB_DIR 
 # where Swift .swiftmodules and libraries should be placed.
@@ -447,6 +487,7 @@ macro(add_swift_library name)
   add_library( ${name} ${libkind}
     ${SWIFTLIB_SOURCES}
     ${SWIFTLIB_EXTERNAL_SOURCES})
+  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
@@ -544,6 +585,7 @@ macro(add_swift_executable name)
   else()
     add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   endif()
+  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_RUNTIME_OUTPUT_INTDIR})
 
   # Add Swift source files to the project.
   source_group("Swift Sources" FILES ${SWIFTEXE_EXTERNAL_SOURCES})
