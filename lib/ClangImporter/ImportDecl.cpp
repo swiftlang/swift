@@ -1527,6 +1527,15 @@ namespace {
 
       // FIXME: Related result type?
 
+      // Check whether we recursively imported this method
+      if (!forceClassMethod && dc == Impl.importDeclContextOf(decl)) {
+        // FIXME: Should also be able to do this for forced class
+        // methods.
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
+      }
+
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
@@ -1597,7 +1606,8 @@ namespace {
       // Check whether there's some special method to import.
       result->setClangNode(decl);
       if (!forceClassMethod) {
-        if (!Impl.ImportedDecls[decl->getCanonicalDecl()])
+        if (dc == Impl.importDeclContextOf(decl) &&
+            !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
         if (decl->getMethodFamily() != clang::OMF_init ||
