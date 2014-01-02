@@ -27,8 +27,8 @@ namespace Lowering {
 /// in SILGenPoly.cpp.
 ///
 /// An abstraction pattern is represented with an original,
-/// unsubstituted type.  The archetypes naturally fall at exactly
-/// the specified abstraction points.
+/// unsubstituted type.  The archetypes or generic parameters
+/// naturally fall at exactly the specified abstraction points.
 class AbstractionPattern {
   CanType OrigType;
 public:
@@ -41,8 +41,15 @@ public:
   bool isNull() const { return OrigType.isNull(); }
 
   bool isOpaque() const {
-    return isa<ArchetypeType>(OrigType) &&
-           !cast<ArchetypeType>(OrigType)->requiresClass();
+    if (auto arch = dyn_cast<ArchetypeType>(OrigType))
+      return !arch->requiresClass();
+    // FIXME: Check class constraint of dependent types in their originating
+    // context
+    if (isa<GenericTypeParamType>(OrigType))
+      return true;
+    if (isa<DependentMemberType>(OrigType))
+      return true;
+    return false;
   }
 
   bool matchesTuple(CanTupleType substType) {
