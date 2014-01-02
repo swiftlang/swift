@@ -490,12 +490,6 @@ LValue SILGenLValue::visitRec(Expr *e) {
                             gen.emitRValue(e).getUnmanagedSingleValue(gen, e));
     return lv;
   }
-  
-  if (e->getType()->is<InOutType>()) {
-    auto *aoe = cast<AddressOfExpr>(e->getSemanticsProvidingExpr());
-    return visitRec(aoe->getSubExpr());
-  }
-  
   return visit(e);
 }
 
@@ -645,7 +639,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
-  llvm_unreachable("address_of_expr returns an @inout, not an @lvalue");
+  return visitRec(e->getSubExpr());
 }
 
 /// Load an r-value out of the given address.
