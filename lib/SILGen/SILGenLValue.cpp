@@ -194,20 +194,6 @@ SILGenFunction::Writeback::Writeback(SILLocation loc,
 {
 }
 
-/// Evaluate an Expr, which might be an rvalue or an lvalue, and return it
-/// wrapped in an rvalue.
-RValue SILGenFunction::emitLValueOrRValueAsRValue(Expr *E) {
-  if (E->getType()->is<LValueType>() ||
-      E->getType()->is<InOutType>())
-    return emitLValueAsRValue(E);
-  return emitRValue(E);
-}
-
-RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
-  LValue lv = emitLValue(e);
-  return RValue(*this, e, emitAddressOfLValue(e, lv));
-}
-
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
@@ -506,6 +492,11 @@ LValue SILGenLValue::visitRec(Expr *e) {
     return lv;
   }
   
+  if (e->getType()->is<InOutType>()) {
+    auto *aoe = cast<AddressOfExpr>(e->getSemanticsProvidingExpr());
+    return visitRec(aoe->getSubExpr());
+  }
+  
   return visit(e);
 }
 
@@ -564,8 +555,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   return ::std::move(lv);
 }
 
-LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
-{
+LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
   gen.emitRValue(e->getLHS());
   return visitRec(e->getRHS());
 }
@@ -626,7 +616,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
-
+  
   assert((e->getBase()->getType()->is<InOutType>() ||
           e->getBase()->getType()->hasReferenceSemantics()) &&
          "Base of lvalue subscript expr is not an lvalue!");
@@ -656,7 +646,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
-  return visitRec(e->getSubExpr());
+  llvm_unreachable("address_of_expr returns an @inout, not an @lvalue");
 }
 
 /// Load an r-value out of the given address.

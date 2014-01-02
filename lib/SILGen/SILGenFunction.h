@@ -920,14 +920,6 @@ public:
   
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);
-  
-  /// Evaluate an Expr as an lvalue, and take the materialized address as an
-  /// rvalue.
-  RValue emitLValueAsRValue(Expr *E);
-
-  /// Evaluate an Expr, which might be an rvalue or an lvalue, and return it
-  /// wrapped in an rvalue.
-  RValue emitLValueOrRValueAsRValue(Expr *E);
 
   /// Build an identity substitution map for the given set of archetypes.
   ArrayRef<Substitution>

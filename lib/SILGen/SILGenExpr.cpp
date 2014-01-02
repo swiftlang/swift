@@ -174,7 +174,8 @@ namespace {
 
     // These always produce lvalues.
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C) {
-      abort();
+      LValue lv = SGF.emitLValue(E->getSubExpr());
+      return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }
     RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
       abort();
@@ -1144,10 +1145,8 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   }
     
   RValue result(type);
-  for (Expr *elt : E->getElements()) {
-    // FIXME: Remove this when tuple elements cannot be inout.
-    result.addElement(SGF.emitLValueOrRValueAsRValue(elt));
-  }
+  for (Expr *elt : E->getElements())
+    result.addElement(SGF.emitRValue(elt));
   return result;
 }
 
@@ -1240,18 +1239,11 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                ManagedValue::Unmanaged));
   }
   
-  // If this is a get-only computed property being accessed, call the getter,
-  // passing in self as an lvalue (for now!).
+  // If this is a get-only computed property being accessed, call the getter.
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
   if (FieldDecl->isComputed()) {
-    SILValue baseVal;
-    if (!E->getBase()->getType()->is<MetatypeType>() &&
-        !E->getBase()->getType()->hasReferenceSemantics()) {
-      baseVal = SGF.emitLValueAsRValue(E->getBase())
-        .getAsSingleValue(SGF,E).getValue();
-    } else {
-      baseVal = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
-    }
+    SILValue baseVal
+      = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
     RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
   
     SILDeclRef getter(FieldDecl, SILDeclRef::Kind::Getter,
@@ -1347,14 +1339,8 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   auto decl = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   // Emit the base.
-  SILValue baseVal;
-  if (!E->getBase()->getType()->is<MetatypeType>() &&
-      !E->getBase()->getType()->hasReferenceSemantics()) {
-    baseVal = SGF.emitLValueAsRValue(E->getBase())
-    .getAsSingleValue(SGF,E).getValue();
-  } else {
-    baseVal = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
-  }
+  SILValue baseVal =
+     SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
   RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
 
   // Emit the indices.
@@ -1557,7 +1543,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   }
 
   // Emit the scalar member.
-  RValue scalar = SGF.emitLValueOrRValueAsRValue(E->getSubExpr());
+  RValue scalar = SGF.emitRValue(E->getSubExpr());
 
   // Prepare a tuple rvalue to house the result.
   RValue result(E->getType()->getCanonicalType());
