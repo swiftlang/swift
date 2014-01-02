@@ -90,15 +90,9 @@ class alignas(8) TypeBase {
   struct TypeBaseBitfields {
     /// \brief Whether this type has a type variable somewhere in it.
     unsigned HasTypeVariable : 1;
-    /// \brief Whether the IsDependent bit of this type has been computed.
-    unsigned DidSetDependent : 1;
-    /// \brief Whether this type is dependent on a generic context.
-    ///
-    /// Only valid if DidSetDependent is set.
-    unsigned IsDependent : 1;
   };
 
-  enum { NumTypeBaseBits = 3 };
+  enum { NumTypeBaseBits = 1 };
   static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
 
 protected:
@@ -116,9 +110,9 @@ protected:
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    unsigned ID : 29;
+    unsigned ID : 31;
   };
-  enum { NumTypeVariableTypeBits = NumTypeBaseBits + 29 };
+  enum { NumTypeVariableTypeBits = NumTypeBaseBits + 31 };
   static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
 
   struct SILFunctionTypeBitfields {
@@ -154,8 +148,6 @@ protected:
       CanonicalType = CanTypeCtx;
     
     setHasTypeVariable(HasTypeVariable);
-    TypeBaseBits.DidSetDependent = false;
-    TypeBaseBits.IsDependent = false;
   }
 
   /// \brief Mark this type as having a type variable.
@@ -2570,11 +2562,7 @@ private:
                                 unsigned index,
                                 const ASTContext &ctx)
     : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx),
-      ParamOrDepthIndex(depth << 16 | index) {
-    // These are always dependent.
-    TypeBaseBits.DidSetDependent = true;
-    TypeBaseBits.IsDependent = true;
-  }
+      ParamOrDepthIndex(depth << 16 | index) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
 

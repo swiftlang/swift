@@ -1048,16 +1048,8 @@ bool TypeBase::isSpelledLike(Type other) {
 }
 
 bool TypeBase::isDependentType() {
-  // Did we already compute this?
-  if (TypeBaseBits.DidSetDependent)
-    return TypeBaseBits.IsDependent;
-
-  // Search recursively in the canonical type for a dependent element type.
-  // TODO: It would be cool to recursively cache the dependent bit in the
-  // visited child types as well.
   auto canon = getCanonicalType();
-  TypeBaseBits.DidSetDependent = true;
-  return TypeBaseBits.IsDependent = canon.findIf([](Type type) -> bool {
+  return canon.findIf([](Type type) -> bool {
     // The presence of a generic type parameter indicates a dependent type.
     return isa<GenericTypeParamType>(type.getPointer());
   });
@@ -2032,151 +2024,151 @@ bool Type::findIf(const std::function<bool(Type)> &pred) const {
   if (pred(*this))
     return true;
 
-  // Recur into children of this type.
+  // Recursive into children of this type.
   TypeBase *base = getPointer();
   switch (base->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
-  case TypeKind::TypeVariable:
-  case TypeKind::AssociatedType:
-  case TypeKind::GenericTypeParam:
-    return false;
+    case TypeKind::Error:
+    case TypeKind::TypeVariable:
+    case TypeKind::AssociatedType:
+    case TypeKind::GenericTypeParam:
+      return false;
 
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-    if (auto parentTy = cast<NominalType>(base)->getParent()) {
-      return parentTy.findIf(pred);
-    }
-
-    return false;
-
-  case TypeKind::WeakStorage:
-  case TypeKind::UnownedStorage:
-    return cast<ReferenceStorageType>(base)->getReferentType().findIf(pred);
-
-  case TypeKind::SILFunction: {
-    auto fnTy = cast<SILFunctionType>(base);
-    if (fnTy->getResult().getType().findIf(pred))
-      return true;
-    for (auto param : fnTy->getParameters())
-      if (param.getType().findIf(pred))
-        return true;
-    return false;
-  }
-
-  case TypeKind::UnboundGeneric: {
-    if (auto parentTy = cast<UnboundGenericType>(base)->getParent()) {
-      return parentTy.findIf(pred);
-    }
-
-    return false;
-  }
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct: {
-    auto bound = cast<BoundGenericType>(base);
-
-    // Check the parent.
-    if (auto parentTy = bound->getParent()) {
-      if (parentTy.findIf(pred))
-        return true;
-    }
-
-    for (auto arg : bound->getGenericArgs()) {
-      if (arg.findIf(pred))
-        return true;
-    }
-
-    return false;
-  }
-
-  case TypeKind::Metatype:
-    return cast<MetatypeType>(base)->getInstanceType().findIf(pred);
-
-  case TypeKind::NameAlias: {
-    auto dependentDecl = cast<NameAliasType>(base)->getDecl();
-    return dependentDecl->getUnderlyingType().findIf(pred);
-  }
-
-  case TypeKind::Paren:
-    return cast<ParenType>(base)->getUnderlyingType().findIf(pred);
-
-  case TypeKind::Tuple: {
-    auto tuple = cast<TupleType>(base);
-    for (const auto &elt : tuple->getFields()) {
-      if (elt.getType().findIf(pred))
-        return true;
-    }
-
-    return false;
-  }
-
-  case TypeKind::DependentMember:
-    return cast<DependentMemberType>(base)->getBase().findIf(pred);
-
-  case TypeKind::Substituted:
-    return cast<SubstitutedType>(base)->getReplacementType().findIf(pred);
-
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    auto function = cast<AnyFunctionType>(base);
-    // FIXME: Polymorphic function's generic parameters and requirements.
-    return function->getInput().findIf(pred) ||
-           function->getResult().findIf(pred);
-  }
-
-  case TypeKind::GenericFunction: {
-    auto function = cast<GenericFunctionType>(base);
-    for (auto param : function->getGenericParams())
-      if (Type(param).findIf(pred))
-        return true;
-    for (const auto &req : function->getRequirements()) {
-      if (req.getFirstType().findIf(pred))
-        return true;
-
-      switch (req.getKind()) {
-      case RequirementKind::SameType:
-      case RequirementKind::Conformance:
-        if (req.getSecondType().findIf(pred))
-          return true;
-        break;
-
-      case RequirementKind::WitnessMarker:
-        break;
+    case TypeKind::Enum:
+    case TypeKind::Struct:
+    case TypeKind::Class:
+      if (auto parentTy = cast<NominalType>(base)->getParent()) {
+        return parentTy.findIf(pred);
       }
-    }
-    return function->getInput().findIf(pred) ||
-           function->getResult().findIf(pred);
-  }
 
-  case TypeKind::Array:
-    return cast<ArrayType>(base)->getBaseType().findIf(pred);
+      return false;
 
-  case TypeKind::ArraySlice:
-    return cast<ArraySliceType>(base)->getBaseType().findIf(pred);
+    case TypeKind::WeakStorage:
+    case TypeKind::UnownedStorage:
+      return cast<ReferenceStorageType>(base)->getReferentType().findIf(pred);
 
-  case TypeKind::Optional:
-    return cast<OptionalType>(base)->getBaseType().findIf(pred);
-
-  case TypeKind::LValue:
-    return cast<LValueType>(base)->getObjectType().findIf(pred);
-  case TypeKind::InOut:
-    return cast<InOutType>(base)->getObjectType().findIf(pred);
-
-  case TypeKind::ProtocolComposition: {
-    auto pc = cast<ProtocolCompositionType>(base);
-    for (auto proto : pc->getProtocols()) {
-      if (proto.findIf(pred))
+    case TypeKind::SILFunction: {
+      auto fnTy = cast<SILFunctionType>(base);
+      if (fnTy->getResult().getType().findIf(pred))
         return true;
+      for (auto param : fnTy->getParameters())
+        if (param.getType().findIf(pred))
+          return true;
+      return false;
     }
 
-    return false;
-  }
+    case TypeKind::UnboundGeneric: {
+      if (auto parentTy = cast<UnboundGenericType>(base)->getParent()) {
+        return parentTy.findIf(pred);
+      }
+
+      return false;
+    }
+
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericEnum:
+    case TypeKind::BoundGenericStruct: {
+      auto bound = cast<BoundGenericType>(base);
+
+      // Check the parent.
+      if (auto parentTy = bound->getParent()) {
+        if (parentTy.findIf(pred))
+          return true;
+      }
+
+      for (auto arg : bound->getGenericArgs()) {
+        if (arg.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::Metatype:
+      return cast<MetatypeType>(base)->getInstanceType().findIf(pred);
+
+    case TypeKind::NameAlias: {
+      auto dependentDecl = cast<NameAliasType>(base)->getDecl();
+      return dependentDecl->getUnderlyingType().findIf(pred);
+    }
+
+    case TypeKind::Paren:
+      return cast<ParenType>(base)->getUnderlyingType().findIf(pred);
+
+    case TypeKind::Tuple: {
+      auto tuple = cast<TupleType>(base);
+      for (const auto &elt : tuple->getFields()) {
+        if (elt.getType().findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::DependentMember:
+      return cast<DependentMemberType>(base)->getBase().findIf(pred);
+
+    case TypeKind::Substituted:
+      return cast<SubstitutedType>(base)->getReplacementType().findIf(pred);
+
+    case TypeKind::Function:
+    case TypeKind::PolymorphicFunction: {
+      auto function = cast<AnyFunctionType>(base);
+      // FIXME: Polymorphic function's generic parameters and requirements.
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
+    case TypeKind::GenericFunction: {
+      auto function = cast<GenericFunctionType>(base);
+      for (auto param : function->getGenericParams())
+        if (Type(param).findIf(pred))
+          return true;
+      for (const auto &req : function->getRequirements()) {
+        if (req.getFirstType().findIf(pred))
+          return true;
+
+        switch (req.getKind()) {
+        case RequirementKind::SameType:
+        case RequirementKind::Conformance:
+          if (req.getSecondType().findIf(pred))
+            return true;
+          break;
+
+        case RequirementKind::WitnessMarker:
+          break;
+        }
+      }
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
+    case TypeKind::Array:
+      return cast<ArrayType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::ArraySlice:
+      return cast<ArraySliceType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::Optional:
+      return cast<OptionalType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::LValue:
+      return cast<LValueType>(base)->getObjectType().findIf(pred);
+    case TypeKind::InOut:
+      return cast<InOutType>(base)->getObjectType().findIf(pred);
+
+    case TypeKind::ProtocolComposition: {
+      auto pc = cast<ProtocolCompositionType>(base);
+      for (auto proto : pc->getProtocols()) {
+        if (proto.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
   }
   
   llvm_unreachable("Unhandled type in transformation");
