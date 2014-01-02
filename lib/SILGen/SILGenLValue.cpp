@@ -277,41 +277,21 @@ namespace {
     }
   };
 
-  class RefComponent : public PhysicalPathComponent {
+  class ValueComponent : public PhysicalPathComponent {
     SILValue Value;
   public:
-    RefComponent(ManagedValue value) :
+    ValueComponent(ManagedValue value) :
       PhysicalPathComponent(getValueTypeData(value.getValue())),
       Value(value.getValue()) {
-
-      assert(value.getType().hasReferenceSemantics() &&
-             "ref component must be of reference type");
     }
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
-      assert(!base && "ref component must be root of lvalue path");
+      assert(!base && "value component must be root of lvalue path");
       return Value;
     }
   };
-  
-  class MetatypeComponent : public PhysicalPathComponent {
-    SILValue value;
-  public:
-    MetatypeComponent(SILValue metatype) :
-      PhysicalPathComponent(getValueTypeData(metatype)), value(metatype) {
-      
-      assert(metatype.getType().is<MetatypeType>()
-             && "metatype component must be of metatype type");
-    }
-    
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                    SILValue base) const override {
-      assert(!base && "metatype component must be root of lvalue path");
-      return value;
-    }
-  };
-  
+
   class GetterSetterComponent : public LogicalPathComponent {
     SILDeclRef getter;
     SILDeclRef setter;
@@ -476,20 +456,14 @@ LValue SILGenFunction::emitLValue(Expr *e) {
 }
 
 LValue SILGenLValue::visitRec(Expr *e) {
-  // Reference type or metatype expressions can form the root of a logical
-  // lvalue.
-  if (e->getType()->hasReferenceSemantics()) {
+  // Non-lvalue types (references, values, metatypes, etc) form the root of a
+  // logical l-value.
+  if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
     LValue lv;
-    lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
+    lv.add<ValueComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
     return lv;
   }
-  
-  if (e->getType()->is<MetatypeType>()) {
-    LValue lv;
-    lv.add<MetatypeComponent>(
-                            gen.emitRValue(e).getUnmanagedSingleValue(gen, e));
-    return lv;
-  }
+
   return visit(e);
 }
 
