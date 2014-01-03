@@ -1439,14 +1439,13 @@ public:
     Printer << " -> ";
     T->getResult().print(Printer, Options);
   }
-
-  void visitGenericFunctionType(GenericFunctionType *T) {
-    printFunctionExtInfo(T->getExtInfo());
-
+  
+  void printGenericSignature(ArrayRef<GenericTypeParamType *> genericParams,
+                             ArrayRef<Requirement> requirements) {
     // Print the generic parameters.
     Printer << "<";
     bool isFirstParam = true;
-    for (auto param : T->getGenericParams()) {
+    for (auto param : genericParams) {
       if (isFirstParam)
         isFirstParam = false;
       else
@@ -1457,7 +1456,7 @@ public:
 
     // Print the requirements.
     bool isFirstReq = true;
-    for (const auto &req : T->getRequirements()) {
+    for (const auto &req : requirements) {
       if (req.getKind() == RequirementKind::WitnessMarker)
         continue;
 
@@ -1484,7 +1483,11 @@ public:
       visit(req.getSecondType());
     }
     Printer << ">";
+  }
 
+  void visitGenericFunctionType(GenericFunctionType *T) {
+    printFunctionExtInfo(T->getExtInfo());
+    printGenericSignature(T->getGenericParams(), T->getRequirements());
     Printer << " ";
     printWithParensIfNotSimple(T->getInput());
 
@@ -1513,13 +1516,13 @@ public:
   void visitSILFunctionType(SILFunctionType *T) {
     printFunctionExtInfo(T->getExtInfo());
     printCalleeConvention(T->getCalleeConvention());
-    if (auto generics = T->getGenericParams()) {
-      printGenericParams(generics);
+    if (auto sig = T->getGenericSignature()) {
+      printGenericSignature(sig->getGenericParams(), sig->getRequirements());
       Printer << " ";
     }
     Printer << "(";
     bool first = true;
-    for (auto param : T->getParameters()) {
+    for (auto param : T->getInterfaceParameters()) {
       if (first) {
         first = false;
       } else {
@@ -1529,7 +1532,7 @@ public:
     }
     Printer << ") -> ";
 
-    T->getResult().print(Printer, Options);
+    T->getInterfaceResult().print(Printer, Options);
   }
 
   void visitArrayType(ArrayType *T) {
