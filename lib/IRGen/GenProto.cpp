@@ -35,6 +35,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -4227,12 +4228,12 @@ llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
 }
 
 StringRef irgen::getObjCProtocolName(ProtocolDecl *proto) {
-  // FIXME: Trim the 'Proto' suffix added by the Clang importer.
-  StringRef name = proto->getName().str();
-  if (name.endswith("Proto") && proto->hasClangNode()) {
-    name = name.slice(0, name.size() - 5);
-  }
-  return name;
+  // For a Clang protocol, use the name on the Clang AST node directly.
+  if (auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(
+                          proto->getClangNode().getAsDecl()))
+    return clangProto->getName();
+
+  return proto->getName().str();
 }
 
 bool irgen::requiresProtocolWitnessTable(ProtocolDecl *protocol) {
