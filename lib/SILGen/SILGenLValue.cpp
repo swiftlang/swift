@@ -198,22 +198,6 @@ void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
 
 namespace {
-  class AddressComponent : public PhysicalPathComponent {
-    SILValue address;
-  public:
-    AddressComponent(SILValue address, LValueTypeData typeData)
-      : PhysicalPathComponent(typeData), address(address) {
-      assert(address.getType().isAddress() &&
-             "var component value must be an address");
-    }
-    
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                    SILValue base) const override {
-      assert(!base && "var component must be root of lvalue path");
-      return address;
-    }
-  };
-  
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
     SILType SubstFieldType;
@@ -279,17 +263,18 @@ namespace {
   class ValueComponent : public PhysicalPathComponent {
     SILValue Value;
   public:
-    ValueComponent(ManagedValue value) :
-      PhysicalPathComponent(getValueTypeData(value.getValue())),
+    ValueComponent(ManagedValue value, LValueTypeData typeData) :
+      PhysicalPathComponent(typeData),
       Value(value.getValue()) {
     }
-    
+
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
     }
   };
+
 
   class GetterSetterComponent : public LogicalPathComponent {
     SILDeclRef getter;
@@ -448,8 +433,10 @@ LValue SILGenLValue::visitRec(Expr *e) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
+    ManagedValue rv = gen.emitRValue(e).getAsSingleValue(gen, e);
+    auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
-    lv.add<ValueComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
+    lv.add<ValueComponent>(std::move(rv), typeData);
     return lv;
   }
 
@@ -464,9 +451,8 @@ LValue SILGenLValue::visitExpr(Expr *e) {
 static LValue emitLValueForDecl(SILGenLValue &sgl,
                                 SILLocation loc, ValueDecl *decl,
                                 CanType formalRValueType) {
-  auto typeData = getUnsubstitutedTypeData(sgl.gen, formalRValueType);
- 
   LValue lv;
+  auto typeData = getUnsubstitutedTypeData(sgl.gen, formalRValueType);
 
   // If it's a computed variable, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
@@ -485,10 +471,10 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   }
 
   // If it's a physical value, push its address.
-  SILValue address = sgl.gen.emitReferenceToDecl(loc, decl).getUnmanagedValue();
+  auto address = sgl.gen.emitReferenceToDecl(loc, decl);
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
-  lv.add<AddressComponent>(address, typeData);
+  lv.add<ValueComponent>(address, typeData);
   return ::std::move(lv);
 }
 
@@ -497,17 +483,18 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 }
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
-  LValue lv;
 
   LValueTypeData typeData = getUnsubstitutedTypeData(gen,
-                               e->getSubExpr()->getType()->getCanonicalType());
+                                e->getSubExpr()->getType()->getCanonicalType());
 
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
   ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen,
                                                               e->getSubExpr());
-  SILValue addr = gen.emitMaterialize(e, v).address;
-  lv.add<AddressComponent>(addr, typeData);
+  auto addrMat = gen.emitMaterialize(e, v);
+  LValue lv;
+  lv.add<ValueComponent>(ManagedValue(addrMat.address, addrMat.valueCleanup),
+                         typeData);
   return ::std::move(lv);
 }
 
