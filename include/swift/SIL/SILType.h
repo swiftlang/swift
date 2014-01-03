@@ -164,8 +164,11 @@ public:
   
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
-  SILType getFunctionResultType() const {
+  SILType getFunctionResultType() const SIL_FUNCTION_TYPE_DEPRECATED {
     return castTo<SILFunctionType>()->getSemanticResultSILType();
+  }
+  SILType getFunctionInterfaceResultType() const {
+    return castTo<SILFunctionType>()->getSemanticInterfaceResultSILType();
   }
   
   /// Returns the AbstractCC of a function type.
@@ -370,6 +373,10 @@ inline SILType SILFunctionType::getSILParameter(unsigned i) const {
   return getParameters()[i].getSILType();
 }
 
+inline SILType SILFunctionType::getSILInterfaceParameter(unsigned i) const {
+  return getInterfaceParameters()[i].getSILType();
+}
+
 inline SILType SILParameterInfo::getSILType() const {
   if (isIndirect()) {
     return SILType::getPrimitiveAddressType(getType());
@@ -387,6 +394,10 @@ inline SILType SILFunctionType::getSILResult() const {
   return getResult().getSILType();
 }
 
+inline SILType SILFunctionType::getSILInterfaceResult() const {
+  return getInterfaceResult().getSILType();
+}
+
 inline SILType SILResultInfo::getSILType() const {
   return SILType::getPrimitiveObjectType(getType());
 }
@@ -394,6 +405,11 @@ inline SILType SILResultInfo::getSILType() const {
 inline SILType SILFunctionType::getSemanticResultSILType() const {
   return (hasIndirectResult() ? getIndirectResult().getSILType()
                               : getResult().getSILType());
+}  
+
+inline SILType SILFunctionType::getSemanticInterfaceResultSILType() const {
+  return (hasIndirectResult() ? getIndirectInterfaceResult().getSILType()
+                              : getInterfaceResult().getSILType());
 }  
 
 /// The hash of a SILType is the hash of its opaque value.

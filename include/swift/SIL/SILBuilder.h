@@ -198,7 +198,9 @@ public:
                          bool Transparent = false) {
     auto FnTy = Fn.getType();
     return createApply(Loc, Fn, FnTy,
-                       FnTy.castTo<SILFunctionType>()->getResult().getSILType(),
+                       FnTy.castTo<SILFunctionType>()
+                         ->getInterfaceResult()
+                         .getSILType(),
                        ArrayRef<Substitution>(), Args, Transparent);
   }
 

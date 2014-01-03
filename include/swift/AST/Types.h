@@ -2014,6 +2014,20 @@ public:
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
+// Some macros to aid the SILFunctionType transition.
+#if 0
+# define SIL_FUNCTION_TYPE_DEPRECATED __attribute__((deprecated))
+# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wdeprecated\"")
+# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END \
+    _Pragma("clang diagnostic pop")
+#else
+# define SIL_FUNCTION_TYPE_DEPRECATED
+# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
+# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
+#endif
+  
 /// SILFunctionType - The detailed type of a function value, suitable
 /// for use by SIL.
 ///
@@ -2062,8 +2076,11 @@ public:
                                 ArrayRef<SILParameterInfo> params,
                                 SILResultInfo result, const ASTContext &ctx);
 
-  SILType getSILResult() const; // in SILType.h
-  SILType getSILParameter(unsigned i) const; // in SILType.h
+  // in SILType.h
+  SILType getSILResult() const SIL_FUNCTION_TYPE_DEPRECATED;
+  SILType getSILParameter(unsigned i) const SIL_FUNCTION_TYPE_DEPRECATED;
+  SILType getSILInterfaceResult() const;
+  SILType getSILInterfaceParameter(unsigned i) const;
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -2075,7 +2092,7 @@ public:
   }
 
   // TODO: Retire in favor of getInterfaceResult.
-  SILResultInfo getResult() const {
+  SILResultInfo getResult() const SIL_FUNCTION_TYPE_DEPRECATED {
     return Result;
   }
   SILResultInfo getInterfaceResult() const {
@@ -2083,7 +2100,8 @@ public:
   }
   
   // TODO: Retire in favor of getInterfaceParameters.
-  ArrayRef<SILParameterInfo> getParameters() const {
+  ArrayRef<SILParameterInfo> getParameters() const
+  SIL_FUNCTION_TYPE_DEPRECATED {
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
   ArrayRef<SILParameterInfo> getInterfaceParameters() const {
@@ -2091,36 +2109,64 @@ public:
   }
 
   bool hasIndirectResult() const {
-    return !getParameters().empty() && getParameters()[0].isIndirectResult();
+    return !getInterfaceParameters().empty()
+      && getInterfaceParameters()[0].isIndirectResult();
   }
-  SILParameterInfo getIndirectResult() const {
+  SILParameterInfo getIndirectResult() const SIL_FUNCTION_TYPE_DEPRECATED {
     assert(hasIndirectResult());
     return getParameters()[0];
+  }
+  SILParameterInfo getIndirectInterfaceResult() const {
+    assert(hasIndirectResult());
+    return getInterfaceParameters()[0];
   }
 
   /// Returns the SILType of the semantic result of this function: the
   /// indirect result type, if there is one, otherwise the direct result.
-  SILType getSemanticResultSILType() const; // in SILType.h
+  ///
+  /// In SILType.h.
+  SILType getSemanticResultSILType() const SIL_FUNCTION_TYPE_DEPRECATED;
+  SILType getSemanticInterfaceResultSILType() const;
 
   /// Get the parameters, ignoring any indirect-result parameter.
-  ArrayRef<SILParameterInfo> getParametersWithoutIndirectResult() const {
+  ArrayRef<SILParameterInfo> getParametersWithoutIndirectResult() const
+  SIL_FUNCTION_TYPE_DEPRECATED {
     auto params = getParameters();
     if (hasIndirectResult()) params = params.slice(1);
     return params;
   }
 
-  using ParameterSILTypeArrayRef
-    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
-  ParameterSILTypeArrayRef getParameterSILTypes() const {
-    return ParameterSILTypeArrayRef(getParameters());
-  }
-  ParameterSILTypeArrayRef getParameterSILTypesWithoutIndirectResult() const {
-    return ParameterSILTypeArrayRef(getParametersWithoutIndirectResult());
+  ArrayRef<SILParameterInfo>
+  getInterfaceParametersWithoutIndirectResult() const  {
+    auto params = getInterfaceParameters();
+    if (hasIndirectResult()) params = params.slice(1);
+      return params;
   }
 
-  bool isPolymorphic() const { return GenericParams != nullptr; }
+  using ParameterSILTypeArrayRef
+    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
+  ParameterSILTypeArrayRef getParameterSILTypes() const
+  SIL_FUNCTION_TYPE_DEPRECATED {
+    return ParameterSILTypeArrayRef(getParameters());
+  }
+  ParameterSILTypeArrayRef getInterfaceParameterSILTypes() const {
+    return ParameterSILTypeArrayRef(getInterfaceParameters());
+  }
+  
+  ParameterSILTypeArrayRef getParameterSILTypesWithoutIndirectResult() const
+  SIL_FUNCTION_TYPE_DEPRECATED {
+    return ParameterSILTypeArrayRef(getParametersWithoutIndirectResult());
+  }
+  ParameterSILTypeArrayRef
+  getInterfaceParameterSILTypesWithoutIndirectResult() const {
+    return ParameterSILTypeArrayRef(getInterfaceParametersWithoutIndirectResult());
+  }
+
+  bool isPolymorphic() const { return GenericSig != nullptr; }
   /// TODO: Remove in favor of getGenericSignature().
-  GenericParamList *getGenericParams() const { return GenericParams; }
+  GenericParamList *getGenericParams() const SIL_FUNCTION_TYPE_DEPRECATED {
+    return GenericParams;
+  }
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
@@ -2151,8 +2197,11 @@ public:
                                       ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
+    // FIXME: Should profile by the generic signature and interface types.
+    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     Profile(ID, getGenericParams(), getExtInfo(), getCalleeConvention(),
             getParameters(), getResult());
+    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericParamList *genericParams,
