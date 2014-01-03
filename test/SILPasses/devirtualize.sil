@@ -1,0 +1,40 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import swift
+
+class Bar {
+  init()
+  func foo()
+}
+
+var x: Bar
+
+
+//CHECK: function_with_cm
+//CHECK: function_ref @_TFC4main3Bar3foofS0_FT_T_
+//CHECK-NEXT: apply
+//CHECK-NOT: class_method
+//CHECK: return
+sil @function_with_cm : $@thin () -> () {
+bb0:
+  %0 = global_addr #x : $*Bar                     // users: %2, %3
+  %1 = alloc_ref $Bar                             // user: %2
+  store %1 to %0 : $*Bar                          // id: %2
+  %3 = load %0 : $*Bar                            // users: %6, %5, %4
+  strong_retain %1 : $Bar                         // id: %4
+  %5 = class_method %1 : $Bar, #Bar.foo!1 : $@cc(method) @thin (@owned Bar) -> () // user: %6
+  %6 = apply %5(%1) : $@cc(method) @thin (@owned Bar) -> ()
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+}
+
+
+

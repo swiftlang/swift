@@ -36,6 +36,8 @@ STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
+STATISTIC(NumFuncDevirt, "Number of functions devirtualized");
+
 
 //===----------------------------------------------------------------------===//
 //                             SILCombineWorklist
@@ -526,6 +528,25 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   return nullptr;
 }
 
+/// \brief Scan the use-def chain and skip cast instructions that don't change
+/// the value of the class. Stop on classes that define a class type.
+SILInstruction *findMetaType(SILValue S) {
+  SILInstruction *Inst = dyn_cast<SILInstruction>(S);
+  if (!Inst)
+    return nullptr;
+
+  switch (Inst->getKind()) {
+    case ValueKind::AllocRefInst:
+    case ValueKind::MetatypeInst:
+      return Inst;
+    case ValueKind::UpcastInst:
+    case ValueKind::UnconditionalCheckedCastInst:
+      return findMetaType(Inst->getOperand(0));
+    default:
+      return nullptr;
+  }
+}
+
 SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
   // Optimize a class_method and alloc_ref pair into a direct function
   // reference:
@@ -533,33 +554,55 @@ SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
   // %XX = alloc_ref $Foo
   // %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
   //
+  //  or
+  //
+  //  %XX = metatype $...
+  //  %YY = class_method %XX : ...
+  //
   //  into
   //
   //  %YY = function_ref @...
-  
-  AllocRefInst *ARI = dyn_cast<AllocRefInst>(CMI->getOperand());
-  if (!ARI)
+
+  // Look for an instruction that defines a class type.
+  SILInstruction *Meta = findMetaType(CMI->getOperand());
+  if (!Meta)
     return nullptr;
 
-  // Find the type of the class that AllocRefInst is allocating.
-  SILType T = ARI->getType();
-  ClassType *CT = dyn_cast<ClassType>(T.getSwiftRValueType());
-  if (!CT)
-    return nullptr;
+  ClassDecl *Class = nullptr;
 
-  ClassDecl *Class = CT->getDecl();
+  // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
+  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(Meta)) {
+    Class = ARI->getType().getClassOrBoundGenericClass();
+  } else if (MetatypeInst *MTI = dyn_cast<MetatypeInst>(Meta)) {
+    CanType MetaTy = MTI->getType().getSwiftRValueType();
+    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
+    Class = T->getClassOrBoundGenericClass();
+  } else {
+    return nullptr;
+  }
+
+  // Walk up the class hierarchy and scan all members.
+  // TODO: There has to be a faster way of doing this scan.
   SILDeclRef Member = CMI->getMember();
+  while (Class) {
+    // Search all of the vtables in the module.
+    for (auto &Vtbl : CMI->getModule().getVTableList()) {
+      if (Vtbl.getClass() != Class)
+        continue;
 
-  // Search all of the vtables in the module.
-  for (auto &VTbl : CMI->getModule().getVTableList()) {
-    if (VTbl.getClass() != Class)
-      continue;
+      // Find the requested method.
+      if (SILFunction *F = Vtbl.getImplementation(CMI->getModule(), Member)) {
+        // Create a direct reference to the method.
+         NumFuncDevirt++;
+        return new (Module) FunctionRefInst(CMI->getLoc(), F);
+      }
+    }
 
-    // Find the requested method.
-    SILFunction *F = VTbl.getImplementation(CMI->getModule(), Member);
-    assert(F && "Can't find the requested method");
-    // Create a direct reference to the method.
-    return new (Module) FunctionRefInst(CMI->getLoc(), F);
+    // We could not find the member in our class. Moving to our superclass.
+    if (Type T = Class->getSuperclass())
+      Class = T->getClassOrBoundGenericClass();
+    else
+      break;
   }
 
   return nullptr;
