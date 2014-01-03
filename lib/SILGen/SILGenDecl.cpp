@@ -2015,14 +2015,39 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
                          conformance->getType())
       ->getCanonicalType());
-  // If the conformance is generic, its generic parameters apply to
-  // the witness.
+  
   GenericParamList *conformanceParams = conformance->getGenericParams();
+  
+  // If the requirement is generic, reparent its generic parameter list to
+  // the generic parameters of the conformance.
+  CanType methodTy = witnessSubstTy.getResult();
+  if (auto pft = dyn_cast<PolymorphicFunctionType>(methodTy)) {
+    auto &reqtParams = pft->getGenericParams();
+    auto methodParams
+      = GenericParamList::create(getASTContext(),
+                                 SourceLoc(),
+                                 reqtParams.getParams(),
+                                 SourceLoc(),
+                                 reqtParams.getRequirements(),
+                                 SourceLoc());
+    methodParams->setOuterParameters(conformanceParams);
+    methodParams->setAllArchetypes(reqtParams.getAllArchetypes());
+    methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
+                                               methodParams,
+                                               pft->getExtInfo());
+  }
+  
+  // If the conformance is generic, its generic parameters apply to
+  // the witness as its outer generic param list.
   if (conformanceParams) {
     witnessSubstTy = CanPolymorphicFunctionType::get(witnessSubstTy.getInput(),
-                                                   witnessSubstTy.getResult(),
+                                                   methodTy,
                                                    conformanceParams,
                                                    witnessSubstTy->getExtInfo());
+  } else {
+    witnessSubstTy = CanFunctionType::get(witnessSubstTy.getInput(),
+                                          methodTy,
+                                          witnessSubstTy->getExtInfo());
   }
   
   // If the witness is a free function, consider the self argument
