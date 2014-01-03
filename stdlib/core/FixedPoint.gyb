@@ -20,6 +20,7 @@ def hexify(n):
 
 
 # Bit counts for all int types
+#allBits = [8, 16, 32, 64, 'Word']
 allBits = [8, 16, 32, 64]
 
 # Number of bits in the biggest int type
@@ -42,33 +43,41 @@ def allInts():
         for signed in False, True:
             yield bits,signed
 
+def baseIntName(bits):
+    return 'Word' if bits == 'Word' else ('Int' + str(bits))
+
 def intName(bits, signed):
-    return ('' if signed else 'U') + 'Int' + str(bits)
+    return ('' if signed else 'U') + baseIntName(bits)
+
+def otherIntName(bits, signed):
+    return ('U' if signed else '') + baseIntName(bits)
 }@
 
 @ for (bits, signed) in allInts():
 @   sign = 's' if signed else 'u'
 @   Self = intName(bits, signed)
-@   ArrayBound = 'ArrayBound, ' if bits > 8 and bits < 128 else ''
+@   OtherSelf = otherIntName(bits, signed)
+@   LLVMName = 'Word' if bits == 'Word' else baseIntName(bits)
+@   ArrayBound = 'ArrayBound, ' if bits <= 64 or bits == 'Word' else ''
 
 struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
                 ${ArrayBound}ReplPrintable {
-  var value: Builtin.Int${bits}
+  var value: Builtin.${LLVMName}
 
   @@transparent
   init() {
     var maxWidthZero: Int${str(maxBits)} = 0
-    value = ${'maxWidthZero.value' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(maxWidthZero.value)' % (maxBits, bits) )}
+    value = ${'maxWidthZero.value' if bits == maxBits else ('Builtin.trunc_Int%d_%s(maxWidthZero.value)' % (maxBits, LLVMName) )}
   }
 
   @@transparent
-  init(v: Builtin.Int${bits}) {
+  init(v: Builtin.${LLVMName}) {
     value = v
   }
 
   @@transparent
   static func _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
-    return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_Int${bits}(val).0)
+    return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${LLVMName}(val).0)
   }
 
   @@transparent
@@ -77,7 +86,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   }
 @ if ArrayBound:
   @@transparent
-  func _getBuiltinArrayBoundValue() -> Builtin.Int${bits} {
+  func _getBuiltinArrayBoundValue() -> Builtin.${LLVMName} {
     return value
   }
 
@@ -94,38 +103,37 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
       else (('String' if bits > 64 else 'Int64' if signed else 'UInt64') + '(self)')})
   }
 
-@ max = maskBits((bits - 1) if signed else bits)
-  @@transparent 
+@ if bits != 'Word':
+@   max = maskBits((bits - 1) if signed else bits)
+  @@transparent
   static var max: ${Self} { return ${max} }
   @@transparent
   static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
+@ else:
+  @@transparent
+  static var max: ${Self} { return ${'~(1 << (sizeof(Int) * 8 - 1))' if signed else '~0'} }
+  @@transparent
+  static var min: ${Self} { return ${'-(1 << (sizeof(Int) * 8 - 1))' if signed else '0'} }
+@ end
 }
 
 extension ${Self} : Hashable {
   func hashValue() -> Int {
-@{
-if bits == intBits and signed == True:
-    hashValue = 'self'
-elif bits <= intBits:
-    hashValue = 'Int(self)'
-else:
-    # count of ints needed to represent this type
-    ints = (bits + intBits - 1) / intBits
+@ if Self == 'Int' or Self == 'Int64':  # hack! remove when Int == Word
+    return self
+@ elif bits != 'Word' and bits <= 32:
+    return Int(self)
+@ else:
+    if sizeof(self) <= sizeof(Int) {
+      return Int(self)
+    }
+    var result: Int = 0
 
-    # accumulate the high word
-    i = ints - 1
-    hashValue = 'Int(self >> %s)' % (i * intBits)
-
-    # accumulate middle words; these require shift + mask
-    while i > 1:
-        i = i-1
-        hashValue += ' ^ Int((self >> %d) & %s)' % (
-                      intBits * i, maskBits(intBits))
-
-    # accumulate the low word; requires only a mask
-    hashValue += ' ^ Int(self & %s)' % maskBits(intBits)
-}@
-    return ${hashValue}
+    for var i = 0; i < (sizeof(self) * 8); i += sizeof(Int) * 8 {
+      result ^= Int(self >> ${Self}(i)) & ~0
+    }
+    return result
+@ end
   }
 }
 
@@ -142,17 +150,17 @@ extension ${Self} : RandomAccessIndex {
   typealias DistanceType = ${Self}
   @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
-    var tmp = Builtin.${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    var tmp = Builtin.${sign}sub_with_overflow_${LLVMName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
   static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    var tmp = Builtin.${sign}add_with_overflow_${LLVMName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
   static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value, reportOverflow.value)
+    var tmp = Builtin.${sign}mul_with_overflow_${LLVMName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
@@ -165,7 +173,7 @@ extension ${Self} : RandomAccessIndex {
       return (lhs, true)
     }
 @ end
-    var tmp = Builtin.${sign}div_Int${bits}(lhs.value, rhs.value)
+    var tmp = Builtin.${sign}div_${LLVMName}(lhs.value, rhs.value)
     return (${Self}(tmp), false)
   }
   @@transparent
@@ -178,7 +186,7 @@ extension ${Self} : RandomAccessIndex {
       return (0, true)
     }
 @ end
-    var tmp = Builtin.${sign}rem_Int${bits}(lhs.value, rhs.value)
+    var tmp = Builtin.${sign}rem_${LLVMName}(lhs.value, rhs.value)
     return (${Self}(tmp), false)
   }
 
@@ -225,16 +233,17 @@ extension ${Self} : SignedNumber {
 extension ${Self} {
 @ for (srcBits, srcSigned) in allInts():
 @    That = intName(srcBits, srcSigned)
+@    ThatLLVMName = 'Word' if srcBits == 'Word' else baseIntName(srcBits)
 @    srcSign = 's' if srcSigned else 'u'
 @    if Self != That:
   init(v: ${That}) {
 @      if bits == srcBits:
-    var tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${bits}(v.value)
+    var tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_${LLVMName}(v.value)
     Builtin.condfail(tmp.1)
     value = tmp.0
 @      end
 @      if srcBits > bits:
-    var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(v.value)
+    var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_${ThatLLVMName}_${LLVMName}(v.value)
     Builtin.condfail(tmp.1)
     value = tmp.0
 @      end
@@ -242,18 +251,18 @@ extension ${Self} {
 @         if srcSigned and not signed:
     var tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(v.value)
     Builtin.condfail(tmp.1)
-    value = Builtin.zext_Int${srcBits}_Int${bits}(tmp.0)
+    value = Builtin.zext_Int${srcBits}_${LLVMName}(tmp.0)
 @         else:
     value = Builtin.${
     ('sext' if srcSigned else 'zext')
-    }_Int${srcBits}_Int${bits}(v.value)
+    }_Int${srcBits}_${LLVMName}(v.value)
 @         end
 @      end
   }
 @    end
 @ end
-  func as${'Unsigned' if signed else 'Signed'}() -> ${'U' if signed else ''}Int${bits} {
-    return ${'U' if signed else ''}Int${bits}(value)
+  func as${'Unsigned' if signed else 'Signed'}() -> ${OtherSelf} {
+    return ${OtherSelf}(value)
   }
 }
 
@@ -274,13 +283,8 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 @@transparent @@prefix
 func ~(rhs: ${Self}) -> ${Self} {
-@ if maxBits == bits:
-  var mask : UInt64 = ${'%s' % maskBits(bits)}
-  var maskValue = mask.value
-@ else:
-  var maskValue = ${'Builtin.trunc_Int%d_Int%d(%s.value)' % (maxBits, bits, maskBits(bits))}
-@ end
-  return ${Self}(Builtin.xor_Int${bits}(rhs.value, maskValue))
+  let mask = ${Self}.sub(0, 1).0
+  return ${Self}(Builtin.xor_${LLVMName}(rhs.value, mask.value))
 }
 
 @ for op, name in (
@@ -289,7 +293,7 @@ func ~(rhs: ${Self}) -> ${Self} {
 @  ('>',sign+'gt'), ('>=',sign+'ge')):
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_${name}_Int${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_${name}_${LLVMName}(lhs.value, rhs.value))
 }
 @ end
 
@@ -298,7 +302,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
 @  ('&','and'), ('^','xor'), ('|','or')):
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.${name}_Int${bits}(lhs.value, rhs.value))
+  return ${Self}(Builtin.${name}_${LLVMName}(lhs.value, rhs.value))
 }
 @ end
 
