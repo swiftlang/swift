@@ -106,6 +106,7 @@ public:
     SelfTypeRef,
     Setter,
     Structure,
+    Suffix,
     TupleElement,
     TupleElementName,
     TupleElementType,

@@ -18,6 +18,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 #include <tuple>
@@ -96,6 +97,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(SelfTypeRef)
   CASE(Setter)
   CASE(Structure)
+  CASE(Suffix)
   CASE(TupleElement)
   CASE(TupleElementName)
   CASE(TupleElementType)
@@ -242,18 +244,20 @@ public:
       return failure();
     if (Mangled.slice(2) != "_T")
       return failure();
-    if (Mangled.hasAtLeast(4)) {
-      if (Mangled.slice(4) == "_TTo") {
-        Mangled.advanceOffset(4);
-        appendNode(Node::Kind::ObjCAttribute);
-        if (!demangleGlobal())
-          return false;
-        return true;
-      }
+    if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
+      Mangled.advanceOffset(4);
+      appendNode(Node::Kind::ObjCAttribute);
+    } else {
+      Mangled.advanceOffset(2);
     }
-    Mangled.advanceOffset(2);
     if (!demangleGlobal())
       return false;
+
+    // Add a suffix node if there's anything left unmangled
+    if (!Mangled.isEmpty()) {
+      appendNode(Node::Kind::Suffix, Mangled.getString());
+    }
+
     return true;
   }
 
@@ -1611,7 +1615,7 @@ std::string Demangler::MangledNameSource::slice(size_t size) {
   return Mangled.substr(0, size);
 }
 
-std::string Demangler::MangledNameSource::getString() { return Mangled.data(); }
+std::string Demangler::MangledNameSource::getString() { return Mangled; }
 
 size_t Demangler::MangledNameSource::getOffset() { return Offset; }
 
@@ -1904,6 +1908,9 @@ private:
       return;
     case swift::Demangle::Node::Kind::Global:
       toStringChildren(pointer);
+      return;
+    case swift::Demangle::Node::Kind::Suffix:
+      Printer << " with unmangled suffix " << QuotedString(pointer->getText());
       return;
     case swift::Demangle::Node::Kind::Initializer:
       toStringEntity(false, true, "initializer");
