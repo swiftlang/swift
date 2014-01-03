@@ -2249,7 +2249,13 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                     ManagedValue base) {
-  // Pase the base address at +1, consuming the +1 coming in.
+  // @inout bases get passed by their address.
+  if (base.getType().isAddress())
+    return RValueSource(loc, RValue(*this, loc,
+                                    base.getType().getSwiftType(),
+                                    base));
+
+  // Other bases get passed +1.  Consume the base's +1.
   base = ManagedValue::forUnmanaged(base.forward(*this));
   
   return RValueSource(loc, RValue(*this, loc,
