@@ -143,9 +143,6 @@ public:
   virtual std::unique_ptr<LogicalPathComponent>
   clone(SILGenFunction &gen, SILLocation l) const = 0;
   
-  /// True if the property is settable.
-  virtual bool isSettable() const = 0;
-  
   /// Set the property.
   virtual void set(SILGenFunction &gen, SILLocation loc,
                    RValueSource &&rvalue, SILValue base) const = 0;

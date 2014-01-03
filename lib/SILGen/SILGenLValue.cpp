@@ -115,8 +115,7 @@ Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                   SILValue base) const {
   ManagedValue value = get(gen, loc, base, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
-  if (isSettable())
-    gen.pushWritebackIfInScope(loc, *this, base, temp);
+  gen.pushWritebackIfInScope(loc, *this, base, temp);
   return temp;
 }
 
@@ -341,11 +340,9 @@ namespace {
         getter(SILDeclRef(decl, SILDeclRef::Kind::Getter,
                           SILDeclRef::ConstructAtNaturalUncurryLevel,
                           gen.SGM.requiresObjCDispatch(decl))),
-        setter(decl->isSettable()
-                 ? SILDeclRef(decl, SILDeclRef::Kind::Setter,
-                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                              gen.SGM.requiresObjCDispatch(decl))
-                 : SILDeclRef()),
+        setter(SILDeclRef(decl, SILDeclRef::Kind::Setter,
+                          SILDeclRef::ConstructAtNaturalUncurryLevel,
+                          gen.SGM.requiresObjCDispatch(decl))),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptIndexExpr(subscriptIndexExpr)
     {
@@ -361,10 +358,6 @@ namespace {
         subscriptIndexExpr(copied.subscriptIndexExpr),
         origSubscripts(copied.origSubscripts.copy(gen, loc))
     {
-    }
-    
-    bool isSettable() const override {
-      return !setter.isNull();
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
@@ -408,10 +401,6 @@ namespace {
       : LogicalPathComponent(getUnsubstitutedTypeData(gen, substType)),
         origType(origType), substType(substType)
     {}
-    
-    bool isSettable() const override {
-      return true;
-    }
     
     void set(SILGenFunction &gen, SILLocation loc,
              RValueSource &&rvalue, SILValue base) const override {
