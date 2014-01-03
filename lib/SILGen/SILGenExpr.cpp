@@ -1239,9 +1239,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   // If this is a get-only computed property being accessed, call the getter.
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
   if (FieldDecl->isComputed()) {
-    SILValue baseVal
-      = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
-    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
+    ManagedValue base
+      = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
+    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base);
   
     SILDeclRef getter(FieldDecl, SILDeclRef::Kind::Getter,
                       SILDeclRef::ConstructAtNaturalUncurryLevel,
@@ -1334,9 +1334,9 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   auto decl = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   // Emit the base.
-  SILValue baseVal =
-     SGF.emitRValue(E->getBase()).getAsSingleValue(SGF,E).getValue();
-  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, baseVal);
+  ManagedValue base =
+     SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
+  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base);
 
   // Emit the indices.
   RValueSource subscriptRV = RValueSource(E, SGF.emitRValue(E->getIndex()));

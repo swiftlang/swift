@@ -112,21 +112,15 @@ public:
 
 Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                   SILLocation loc,
-                                                  SILValue base) const {
+                                                  ManagedValue base) const {
   ManagedValue value = get(gen, loc, base, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
-  gen.pushWritebackIfInScope(loc, *this, base, temp);
+  
+  if (gen.InWritebackScope)
+    gen.WritebackStack.emplace_back(loc, clone(gen, loc), base.getValue(),
+                                    temp);
+  
   return temp;
-}
-
-void
-SILGenFunction::pushWritebackIfInScope(SILLocation loc,
-                                       const LogicalPathComponent &component,
-                                       SILValue base,
-                                       Materialize temp) {
-  if (InWritebackScope) {
-    WritebackStack.emplace_back(loc, component.clone(*this, loc), base, temp);
-  }
 }
 
 WritebackScope::WritebackScope(SILGenFunction &gen)
@@ -163,7 +157,7 @@ WritebackScope::~WritebackScope() {
     auto formalTy = i->component->getSubstFormalType();
     i->component->set(*gen, i->loc,
                       RValueSource(i->loc, RValue(*gen, i->loc, formalTy, mv)),
-                      i->base);
+                      ManagedValue::forUnmanaged(i->base));
   }
   
   gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
@@ -207,14 +201,16 @@ namespace {
       : PhysicalPathComponent(typeData),
         Field(field), SubstFieldType(substFieldType) {}
     
-    SILValue offset(SILGenFunction &gen, SILLocation loc, SILValue base)
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base)
       const override
     {
       assert(base.getType().isObject() &&
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      return gen.B.createRefElementAddr(loc, base, Field, SubstFieldType);
+      auto Res = gen.B.createRefElementAddr(loc, base.getValue(), Field,
+                                            SubstFieldType);
+      return ManagedValue::forUnmanaged(Res);
     }
   };
   
@@ -224,17 +220,13 @@ namespace {
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
       : PhysicalPathComponent(typeData), ElementIndex(elementIndex) {}
     
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                    SILValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
       assert(base && "invalid value for element base");
-      SILType baseType = base.getType();
-      (void)baseType;
-      assert(baseType.isAddress() &&
-             "base for element component must be an address");
-      assert(!baseType.hasReferenceSemantics() &&
-             "can't get element from address of ref type");
-      return gen.B.createTupleElementAddr(loc, base, ElementIndex,
-                                          getTypeOfRValue().getAddressType());
+      auto Res = gen.B.createTupleElementAddr(loc, base.getUnmanagedValue(),
+                                              ElementIndex,
+                                              getTypeOfRValue().getAddressType());
+      return ManagedValue::forUnmanaged(Res);
     }
   };
   
@@ -247,29 +239,25 @@ namespace {
       : PhysicalPathComponent(typeData),
         Field(field), SubstFieldType(substFieldType) {}
     
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                    SILValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
       assert(base && "invalid value for element base");
-      SILType baseType = base.getType();
-      (void)baseType;
-      assert(baseType.isAddress() &&
-             "base for element component must be an address");
-      assert(!baseType.hasReferenceSemantics() &&
-             "can't get element from address of ref type");
-      return gen.B.createStructElementAddr(loc, base, Field, SubstFieldType);
+      auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
+                                               Field, SubstFieldType);
+      return ManagedValue::forUnmanaged(Res);
     }
   };
 
   class ValueComponent : public PhysicalPathComponent {
-    SILValue Value;
+    ManagedValue Value;
   public:
     ValueComponent(ManagedValue value, LValueTypeData typeData) :
       PhysicalPathComponent(typeData),
-      Value(value.getValue()) {
+      Value(value) {
     }
 
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                    SILValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
     }
@@ -292,7 +280,7 @@ namespace {
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
     prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                        SILValue base) const
+                        ManagedValue base) const
     {
       AccessorArgs result;
       if (base)
@@ -346,7 +334,7 @@ namespace {
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValueSource &&rvalue, SILValue base) const override
+             RValueSource &&rvalue, ManagedValue base) const override
     {
       assert(!setter.isNull() && "not settable!");      
       auto args = prepareAccessorArgs(gen, loc, base);
@@ -358,7 +346,7 @@ namespace {
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     SILValue base, SGFContext c) const override
+                     ManagedValue base, SGFContext c) const override
     {
       auto args = prepareAccessorArgs(gen, loc, base);
       
@@ -388,18 +376,18 @@ namespace {
     {}
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValueSource &&rvalue, SILValue base) const override {
+             RValueSource &&rvalue, ManagedValue base) const override {
       // Map the value to the original abstraction level.
       ManagedValue mv = std::move(rvalue).getAsSingleValue(gen);
       mv = gen.emitSubstToOrigValue(loc, mv, origType, substType);
       // Store to the base.
-      mv.assignInto(gen, loc, base);
+      mv.assignInto(gen, loc, base.getValue());
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     SILValue base, SGFContext c) const override {
+                     ManagedValue base, SGFContext c) const override {
       // Load the original value.
-      ManagedValue baseVal = gen.emitLoad(loc, base,
+      ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
                                           gen.getTypeLowering(base.getType()),
                                           SGFContext(),
                                           IsNotTake);
@@ -470,7 +458,8 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
     }
   }
 
-  // If it's a physical value, push its address.
+  // If it's a physical value (e.g. a local variable in memory), push its
+  // address.
   auto address = sgl.gen.emitReferenceToDecl(loc, decl);
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
@@ -1011,27 +1000,24 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
 /// Produce a physical address that corresponds to the given l-value
 /// component.
-static SILValue drillIntoComponent(SILGenFunction &SGF,
-                                   SILLocation loc,
-                                   const PathComponent &component,
-                                   SILValue base) {
+static ManagedValue drillIntoComponent(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       const PathComponent &component,
+                                       ManagedValue base) {
   assert(!base ||
          base.getType().isAddress() ||
          base.getType().is<MetatypeType>() ||
          base.getType().hasReferenceSemantics());
 
-  SILValue addr;
+  ManagedValue addr;
   if (component.isPhysical()) {
     addr = component.asPhysical().offset(SGF, loc, base);
   } else {
     auto &lcomponent = component.asLogical();
     Materialize temporary = lcomponent.getMaterialized(SGF, loc, base);
-    addr = temporary.address;
+    addr = ManagedValue::forUnmanaged(temporary.address);
   }
 
-  assert(addr.getType().isAddress() ||
-         addr.getType().is<MetatypeType>() ||
-         addr.getType().hasReferenceSemantics());
   return addr;
 }
 
@@ -1040,7 +1026,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
 static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
                                                  SILLocation loc,
                                                  const LValue &lv,
-                                                 SILValue &addr) {
+                                                 ManagedValue &addr) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
@@ -1059,14 +1045,14 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   // No need to write back to a loaded lvalue.
   DisableWritebackScope scope(*this);
 
-  SILValue addr;
+  ManagedValue addr;
   auto &component = drillToLastComponent(*this, loc, src, addr);
 
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
     addr = component.asPhysical().offset(*this, loc, addr);
-    return emitLoad(loc, addr, getTypeLowering(src.getTypeOfRValue()),
-                    C, IsNotTake);
+    return emitLoad(loc, addr.getValue(),
+                    getTypeLowering(src.getTypeOfRValue()), C, IsNotTake);
   }
 
   // If the last component is logical, just emit a get.
@@ -1075,15 +1061,12 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  const LValue &src) {
-  SILValue addr;
-  
-  assert(src.begin() != src.end() && "lvalue must have at least one component");
-  for (auto &component : src) {
-    addr = drillIntoComponent(*this, loc, component, addr);
-  }
+  ManagedValue addr;
+  auto &component = drillToLastComponent(*this, loc, src, addr);
+  addr = drillIntoComponent(*this, loc, component, addr);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
-  return ManagedValue(addr, ManagedValue::LValue);
+  return addr;
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
@@ -1093,16 +1076,15 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
-  SILValue destAddr;
+  ManagedValue destAddr;
   auto &component = drillToLastComponent(*this, loc, dest, destAddr);
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    SILValue finalDestAddr
-      = component.asPhysical().offset(*this, loc, destAddr);
+    auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr);
     
     std::move(src).getAsSingleValue(*this)
-      .assignInto(*this, loc, finalDestAddr);
+      .assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     component.asLogical().set(*this, loc, std::move(src), destAddr);
   }

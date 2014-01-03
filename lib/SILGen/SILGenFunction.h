@@ -179,11 +179,6 @@ public:
   /// The stack of pending writebacks.
   std::vector<Writeback> WritebackStack;
   bool InWritebackScope = false;
-  
-  void pushWritebackIfInScope(SILLocation loc,
-                              const LogicalPathComponent &component,
-                              SILValue base,
-                              Materialize temp);
 
   /// VarLoc - representation of an emitted local variable.  Local variables can
   /// either have a singular constant value that is always returned (in which
@@ -629,7 +624,7 @@ public:
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   
-  RValueSource prepareAccessorBaseArg(SILLocation loc, SILValue base);
+  RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base);
   
   ManagedValue emitGetAccessor(SILLocation loc,
                                SILDeclRef getter,

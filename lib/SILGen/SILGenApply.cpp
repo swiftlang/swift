@@ -2248,17 +2248,18 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 }
 
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
-                                                    SILValue base) {
-  if (!base.getType().isAddress()) {
-    base = B.emitCopyValueOperation(loc, base);
+                                                    ManagedValue base) {
+  // @inout bases get passed by their address.
+  if (base.getType().isAddress())
     return RValueSource(loc, RValue(*this, loc,
                                     base.getType().getSwiftType(),
-                                    emitManagedRValueWithCleanup(base)));
-  }
+                                    base));
 
+  // Other bases get passed +1.
+  SILValue baseVal = B.emitCopyValueOperation(loc, base.getValue());
   return RValueSource(loc, RValue(*this, loc,
-                                  base.getType().getSwiftType(),
-                                  ManagedValue(base, ManagedValue::LValue)));
+                                  baseVal.getType().getSwiftType(),
+                                  emitManagedRValueWithCleanup(baseVal)));
 }
 
 

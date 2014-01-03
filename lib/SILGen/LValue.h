@@ -114,9 +114,9 @@ protected:
     : PathComponent(typeData, true) {}
 
 public:
-  virtual SILValue offset(SILGenFunction &gen,
-                          SILLocation loc,
-                          SILValue base) const = 0;
+  virtual ManagedValue offset(SILGenFunction &gen,
+                              SILLocation loc,
+                              ManagedValue base) const = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -145,16 +145,16 @@ public:
   
   /// Set the property.
   virtual void set(SILGenFunction &gen, SILLocation loc,
-                   RValueSource &&rvalue, SILValue base) const = 0;
+                   RValueSource &&rvalue, ManagedValue base) const = 0;
 
   /// Get the property.
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                           SILValue base, SGFContext c) const = 0;
+                           ManagedValue base, SGFContext c) const = 0;
   
   /// Get the property, materialize a temporary lvalue for it, and if
   /// we're in a writeback scope, register a writeback.
   Materialize getMaterialized(SILGenFunction &gen, SILLocation loc,
-                              SILValue base) const;
+                              ManagedValue base) const;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
