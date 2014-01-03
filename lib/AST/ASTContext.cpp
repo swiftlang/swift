@@ -1380,7 +1380,7 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
       }
     }
   }
-  if (isCanonical ) {
+  if (isCanonical) {
     for (const auto &req : requirements) {
       if (!req.getFirstType()->isCanonical() ||
           (req.getSecondType() && !req.getSecondType()->isCanonical())) {
@@ -1396,10 +1396,16 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
                + sizeof(Requirement) * requirements.size();
   void *mem = ctx.Allocate(bytes, alignof(GenericFunctionType));
 
+  // For now, generic function types cannot be dependent (in fact,
+  // they erase dependence) or contain type variables.
+  RecursiveTypeProperties properties;
+  static_assert(RecursiveTypeProperties::BitWidth == 2,
+                "revisit this if you add new recursive type properties");
+
   auto result = new (mem) GenericFunctionType(params, requirements, input,
                                               output, info,
                                               isCanonical? &ctx : nullptr,
-                                              RecursiveTypeProperties());
+                                              properties);
   ctx.Impl.GenericFunctionTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -1532,9 +1538,15 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
                + sizeof(SILParameterInfo) * 2 * params.size();
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
+  // Right now, SIL function types cannot be dependent or contain type
+  // variables.
+  RecursiveTypeProperties properties;
+  static_assert(RecursiveTypeProperties::BitWidth == 2,
+                "revisit this if you add new recursive type properties");
+
   auto fnType =
-    new (mem) SILFunctionType(genericParams, ext, callee, params, result, ctx,
-                              RecursiveTypeProperties());
+    new (mem) SILFunctionType(genericParams, ext, callee,
+                              params, result, ctx, properties);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }

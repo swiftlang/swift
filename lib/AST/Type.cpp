@@ -1047,14 +1047,6 @@ bool TypeBase::isSpelledLike(Type other) {
   llvm_unreachable("Unknown type kind");
 }
 
-bool TypeBase::isDependentType() {
-  auto canon = getCanonicalType();
-  return canon.findIf([](Type type) -> bool {
-    // The presence of a generic type parameter indicates a dependent type.
-    return isa<GenericTypeParamType>(type.getPointer());
-  });
-}
-
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
   Type superclassTy;
   Type specializedTy;
@@ -1120,10 +1112,6 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   } while ((ty = ty->getSuperclass(nullptr)));
   return false;
 }
-
-TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
-                     RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::Tuple, CanCtx, properties), Fields(fields) { }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.

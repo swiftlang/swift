@@ -75,14 +75,18 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 1 };
+  enum { BitWidth = 2 };
 
   /// A single property.
   ///
   /// Note that the property polarities should be chosen so that 0 is
   /// the correct default value and bitwise-or correctly merges things.
   enum Property : unsigned {
-    HasTypeVariable = 1
+    /// This type expression contains a TypeVariableType.
+    HasTypeVariable = 0x01,
+
+    /// This type expression contains a GenericTypeParamType.
+    IsDependent     = 0x02,
   };
 
 private:
@@ -99,6 +103,11 @@ public:
   /// Does a type with these properties structurally contain a type
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
+
+  /// Is a type with these properties dependent, in the sense of being
+  /// expressed in terms of a generic type parameter or a dependent
+  /// member thereof?
+  bool isDependent() const { return Bits & IsDependent; }
 
   /// Merge two sets of properties.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -293,7 +302,9 @@ public:
   /// the Swift definition of "dependent" is fairly shallow: we either have
   /// a generic parameter or a member of that generic parameter. Types such
   /// as X<T>, where T is a generic parameter, are not considered "dependent".
-  bool isDependentType();
+  bool isDependentType() {
+    return getRecursiveProperties().isDependent();
+  }
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -950,7 +961,9 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
-            RecursiveTypeProperties properties);
+            RecursiveTypeProperties properties)
+     : TypeBase(TypeKind::Tuple, CanCtx, properties), Fields(fields) {
+  }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   CanType getElementType(unsigned fieldNo) const {
@@ -2555,9 +2568,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 /// \sa AbstractTypeParamDecl
 class AbstractTypeParamType : public SubstitutableType {
 protected:
-  AbstractTypeParamType(TypeKind kind, const ASTContext *ctx)
-    : SubstitutableType(kind, ctx, RecursiveTypeProperties(),
-                        { }, Type()) { }
+  AbstractTypeParamType(TypeKind kind, const ASTContext *ctx,
+                        RecursiveTypeProperties properties)
+    : SubstitutableType(kind, ctx, properties, { }, Type()) { }
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -2622,13 +2635,15 @@ private:
   friend class GenericTypeParamDecl;
 
   explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr),
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr,
+                            RecursiveTypeProperties::IsDependent),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(unsigned depth,
                                 unsigned index,
                                 const ASTContext &ctx)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx),
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx,
+                            RecursiveTypeProperties::IsDependent),
       ParamOrDepthIndex(depth << 16 | index) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
@@ -2657,8 +2672,11 @@ public:
 private:
   friend class AssociatedTypeDecl;
 
+  // These aren't classified as dependent for some reason.
+
   AssociatedTypeType(AssociatedTypeDecl *assocType)
-    : AbstractTypeParamType(TypeKind::AssociatedType, nullptr),
+    : AbstractTypeParamType(TypeKind::AssociatedType, nullptr,
+                            RecursiveTypeProperties()),
       AssocType(assocType) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, AbstractTypeParamType)
