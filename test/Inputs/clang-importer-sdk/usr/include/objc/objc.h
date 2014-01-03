@@ -31,20 +31,20 @@ typedef long NSInteger;
 @property int overriddenProp;
 @end
 
-@protocol B
+@protocol BProto
 - (int)method:(int)arg withFloat:(float)f;
 - (int)otherMethod:(int)arg withFloat:(float)f;
 @end
 
-@protocol Cat1
+@protocol Cat1Proto
 - cat1Method;
 @end
 
-@interface B : A <B>
+@interface B : A <BProto>
 - (int)method:(int)arg withFloat:(float)f;
 + (int)classMethod:(int)arg withInt:(int)i;
-- (id<B>)getAsProto;
-- (id<B, Cat1>)getAsProtoWithCat;
+- (id<BProto>)getAsProto;
+- (id<BProto, Cat1Proto>)getAsProtoWithCat;
 - performAdd:(int)x withValue:(int)y withValue:(int)z withValue2:(int)w;
 @property (readonly) int readCounter;
 
@@ -66,7 +66,7 @@ typedef long NSInteger;
 
 @end
 
-@interface A(Cat1) <Cat1>
+@interface A(Cat1) <Cat1Proto>
 - method:(int)i onCat1:(double)d;
 - cat1Method;
 @end

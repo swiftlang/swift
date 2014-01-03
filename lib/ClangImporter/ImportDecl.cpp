@@ -2647,8 +2647,18 @@ namespace {
         return nullptr;
       }
 
-      // Append "Proto" to protocol names.
-      auto name = Impl.importName(decl->getDeclName(), "Proto");
+      // Form the protocol name, using the renaming table when necessary.
+      Identifier name;
+      if (false) { }
+#define RENAMED_PROTOCOL(ObjCName, SwiftName)                  \
+      else if (decl->getName().equals(#ObjCName)) {            \
+        name = Impl.SwiftContext.getIdentifier(#SwiftName);    \
+      }
+#include "RenamedProtocols.def"
+      else {
+        name = Impl.importName(decl->getDeclName());
+      }
+
       if (name.empty())
         return nullptr;
 

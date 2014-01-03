@@ -450,19 +450,21 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   auto &pp = Impl.Instance->getPreprocessor();
   auto &sema = Impl.Instance->getSema();
 
-  // If the name ends with 'Proto', strip off the 'Proto' and look for an
-  // Objective-C protocol.
-  // FIXME: Revisit this notion. We could append 'Proto' only when there is both
-  // a class and a protocol with the same name, as with NSObject. However,
-  // doing so requires our input modules to be "sane", in the sense that
-  // one cannot introduce a class X in one module and a protocol X in a another
-  // module that does *not* depend on 
+  // If the given name matches one of a special set of renamed
+  // protocol names, perform protocol lookup. For example, the
+  // NSObject protocol is named NSObjectProto so that it does not
+  // conflict with the NSObject class.
+  // FIXME: It would be better to put protocols into a submodule, so
+  // that normal name lookup would prefer the class (NSObject) but
+  // protocols would be visible with, e.g., protocols.NSObject.
   auto lookupNameKind = clang::Sema::LookupOrdinaryName;
-  if (name.str().endswith("Proto")) {
-    name = Impl.SwiftContext.getIdentifier(
-             name.str().substr(0, name.str().size() - 5));
-    lookupNameKind = clang::Sema::LookupObjCProtocolName;
+  if (false) { }
+#define RENAMED_PROTOCOL(ObjCName, SwiftName)             \
+  else if (name.str().equals(#SwiftName)) {               \
+    name = Impl.SwiftContext.getIdentifier(#ObjCName);    \
+    lookupNameKind = clang::Sema::LookupObjCProtocolName; \
   }
+#include "RenamedProtocols.def"
 
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
   auto clangName = Impl.importName(name);
@@ -484,6 +486,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    lookupNameKind);
   bool FoundType = false;
+  bool FoundAny = false;
   if (sema.LookupName(lookupResult, /*Scope=*/0)) {
     // FIXME: Filter based on access path? C++ access control?
     for (auto decl : lookupResult) {
@@ -497,6 +500,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
 
           consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
           FoundType = FoundType || isa<TypeDecl>(valueDecl);
+          FoundAny = true;
         }
     }
   }
@@ -505,14 +509,29 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
     // Look up a tag name if we did not find a type with this name already.
     // We don't want to introduce multiple types with same name.
     lookupResult.clear(clang::Sema::LookupTagName);
-    if (!sema.LookupName(lookupResult, /*Scope=*/0))
-      return;
+    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto decl : lookupResult) {
+        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
+          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
+            consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
+            FoundAny = true;
+          }
+      }
+    }
+  }
 
-    // FIXME: Filter based on access path? C++ access control?
-    for (auto decl : lookupResult) {
-      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
-        if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
-          consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
+  if (lookupNameKind == clang::Sema::LookupOrdinaryName && !FoundAny) {
+    // Look up a protocol name if we did not find anything with this
+    // name already.
+    lookupResult.clear(clang::Sema::LookupObjCProtocolName);
+    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto decl : lookupResult) {
+        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
+          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
+            consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
+      }
     }
   }
 }
