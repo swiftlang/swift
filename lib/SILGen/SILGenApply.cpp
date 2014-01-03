@@ -2255,11 +2255,11 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                     base.getType().getSwiftType(),
                                     base));
 
-  // Other bases get passed +1.
-  SILValue baseVal = B.emitCopyValueOperation(loc, base.getValue());
+  // Other bases get passed +1.  Consume the base's +1.
+  base = ManagedValue::forUnmanaged(base.forward(*this));
+  
   return RValueSource(loc, RValue(*this, loc,
-                                  baseVal.getType().getSwiftType(),
-                                  emitManagedRValueWithCleanup(baseVal)));
+                                  base.getType().getSwiftType(), base));
 }
 
 

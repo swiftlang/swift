@@ -113,13 +113,25 @@ public:
 Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                   SILLocation loc,
                                                   ManagedValue base) const {
-  ManagedValue value = get(gen, loc, base, SGFContext());
+  // If the writeback is disabled, just emit a load into a temporary memory
+  // location.
+  if (!gen.InWritebackScope) {
+    ManagedValue value = get(gen, loc, base, SGFContext());
+    return gen.emitMaterialize(loc, value);
+  }
+
+  // Otherwise, we need to emit a get and set.  The get operation will consume
+  // the base's +1, so copy the base for the setter.
+  ManagedValue getterBase = base;
+  if (base && base.hasCleanup())
+    getterBase = base.copy(gen, loc);
+
+  ManagedValue value = get(gen, loc, getterBase, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
   
-  if (gen.InWritebackScope)
-    gen.WritebackStack.emplace_back(loc, clone(gen, loc), base.getValue(),
-                                    temp);
-  
+  gen.WritebackStack.emplace_back(loc, clone(gen, loc),
+                                  base ? base.forward(gen) : SILValue(),
+                                  temp);
   return temp;
 }
 
