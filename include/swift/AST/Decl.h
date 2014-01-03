@@ -656,6 +656,10 @@ class GenericParamList {
                          SmallVectorImpl<GenericTypeParamType*> &genericParams,
                          SmallVectorImpl<Requirement> &requirements) const;
   
+  // Don't copy.
+  GenericParamList(const GenericParamList &) = delete;
+  GenericParamList &operator=(const GenericParamList &) = delete;
+  
 public:
   /// create - Create a new generic parameter list within the given AST context.
   ///
