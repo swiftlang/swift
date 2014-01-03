@@ -329,8 +329,61 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
+void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
+  llvm::LLVMContext &ctx = Module.getContext();
+
+  switch (linkLib.getKind()) {
+  case LibraryKind::Library: {
+    // FIXME: Use target-independent linker option.
+    // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
+    llvm::SmallString<32> buf;
+    buf += "-l";
+    buf += linkLib.getName();
+    auto flag = llvm::MDString::get(ctx, buf);
+    AutolinkEntries.push_back(llvm::MDNode::get(ctx, flag));
+    break;
+  }
+  case LibraryKind::Framework:
+    llvm::Value *args[] = {
+      llvm::MDString::get(ctx, "-framework"),
+      llvm::MDString::get(ctx, linkLib.getName())
+    };
+    AutolinkEntries.push_back(llvm::MDNode::get(ctx, args));
+    break;
+  }
+}
+
+// FIXME: This should just be the implementation of
+// llvm::array_pod_sort_comparator. The only difference is that it uses
+// std::less instead of operator<.
+template <typename T>
+static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
+  std::less<T *> lt;
+  if (lt(*lhs, *rhs))
+    return -1;
+  if (lt(*rhs, *lhs))
+    return -1;
+  return 0;
+}
+
+void IRGenModule::emitAutolinkInfo() {
+  // FIXME: This constant should be vended by LLVM somewhere.
+  static const char * const LinkerOptionsFlagName = "Linker Options";
+
+  // Remove duplicates.
+  llvm::array_pod_sort(AutolinkEntries.begin(), AutolinkEntries.end(),
+                       pointerPODSortComparator);
+  auto newEnd = std::unique(AutolinkEntries.begin(), AutolinkEntries.end());
+  AutolinkEntries.erase(newEnd, AutolinkEntries.end());
+
+  llvm::LLVMContext &ctx = Module.getContext();
+  Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
+                       llvm::MDNode::get(ctx, AutolinkEntries));
+}
+
 void IRGenModule::finalize() {
   emitGlobalLists();
+  emitAutolinkInfo();
   if (DebugInfo)
     DebugInfo->finalize();
 }

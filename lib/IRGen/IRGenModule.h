@@ -61,6 +61,7 @@ namespace swift {
   class DestructorDecl;
   class ExtensionDecl;
   class FuncDecl;
+  class LinkLibrary;
   class SILFunction;
   class EnumElementDecl;
   class EnumDecl;
@@ -268,6 +269,12 @@ private:
   /// out.
   SmallVector<llvm::WeakVH, 4> LLVMUsed;
 
+  /// Metadata nodes for autolinking info.
+  ///
+  /// This is typed using llvm::Value instead of llvm::MDNode because it
+  /// needs to be used to produce another MDNode during finalization.
+  SmallVector<llvm::Value *, 32> AutolinkEntries;
+
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCClasses;
   /// List of Objective-C categories, bitcast to i8*.
@@ -289,8 +296,9 @@ private:
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
-  
+
   void emitGlobalLists();
+  void emitAutolinkInfo();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -324,6 +332,7 @@ public:
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
+  void addLinkLibrary(const LinkLibrary &linkLib);
   void finalize();
 
   void emitProtocolDecl(ProtocolDecl *D);

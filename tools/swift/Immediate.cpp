@@ -243,7 +243,10 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   };
   std::for_each(Options.LinkLibraries.begin(), Options.LinkLibraries.end(),
                 addLinkLibrary);
-  M->collectLinkLibraries(addLinkLibrary);
+  M->forAllVisibleModules(Module::AccessPathTy(),
+                          [&](Module::ImportedModule import) {
+    import.second->collectLinkLibraries(addLinkLibrary);
+  });
 
   // IRGen the modules this module depends on. This is only really necessary
   // for imported source, but that's a very convenient thing to do in -i mode.

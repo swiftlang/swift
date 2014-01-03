@@ -19,3 +19,12 @@ module ClangModuleUser {
 module ClangModuleWithAdapter {
   link "UnderlyingClangLibrary"
 }
+
+module IndirectFramework {
+  link framework "Indirect"
+}
+
+module IndirectFrameworkImporter {
+  header "IndirectFrameworkImporter.h"
+  export IndirectFramework
+}

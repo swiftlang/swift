@@ -67,44 +67,6 @@ static void addSwiftExpandPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCExpandPass());
 }
 
-static void emitModuleLinkOptions(llvm::Module &module, swift::Module *M,
-                                  ArrayRef<LinkLibrary> LinkLibraries) {
-  // FIXME: This constant should be vended by LLVM somewhere.
-  static const char * const LinkerOptionsFlagName = "Linker Options";
-  
-  SmallVector<llvm::Value *, 32> metadata;
-  llvm::LLVMContext &ctx = module.getContext();
-
-  auto addLinkLibrary = [&](LinkLibrary linkLib) {
-    switch (linkLib.getKind()) {
-    case LibraryKind::Library: {
-      // FIXME: Use target-independent linker option.
-      // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-      llvm::SmallString<32> buf;
-      buf += "-l";
-      buf += linkLib.getName();
-      auto flag = llvm::MDString::get(ctx, buf);
-      metadata.push_back(llvm::MDNode::get(ctx, flag));
-      break;
-    }
-    case LibraryKind::Framework:
-      llvm::Value *args[] = {
-        llvm::MDString::get(ctx, "-framework"),
-        llvm::MDString::get(ctx, linkLib.getName())
-      };
-      metadata.push_back(llvm::MDNode::get(ctx, args));
-      break;
-    }
-  };
-
-  M->collectLinkLibraries(addLinkLibrary);
-  std::for_each(LinkLibraries.begin(), LinkLibraries.end(), addLinkLibrary);
-  
-  module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                       llvm::MDNode::get(ctx, metadata));
-}
-
-
 static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 swift::Module *M, SILModule *SILMod,
                                 SourceFile *SF = nullptr,
@@ -183,6 +145,11 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
     }
   }
 
+  std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
+                [&](LinkLibrary linkLib) {
+    IGM.addLinkLibrary(linkLib);
+  });
+
   IGM.finalize();
 
   // Objective-C image information.
@@ -201,8 +168,6 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
   Module->addModuleFlag(llvm::Module::Override,
                         "Objective-C Garbage Collection", (uint32_t)0);
   // FIXME: Simulator flag.
-
-  emitModuleLinkOptions(*Module, M, Opts.LinkLibraries);
 
   DEBUG(llvm::dbgs() << "module before passes:\n";
         IGM.Module.dump());

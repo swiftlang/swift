@@ -251,6 +251,12 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
     emitGlobalDecl(SF.Decls[i]);
 
+  SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
+    import.second->collectLinkLibraries([this](LinkLibrary linkLib) {
+      this->addLinkLibrary(linkLib);
+    });
+  });
+
   // Library files have no entry point.
   if (!SF.isScriptMode()) {
     assert(!Module.getFunction(SWIFT_ENTRY_POINT_FUNCTION)
