@@ -75,7 +75,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 2 };
+  enum { BitWidth = 3 };
 
   /// A single property.
   ///
@@ -83,10 +83,14 @@ public:
   /// the correct default value and bitwise-or correctly merges things.
   enum Property : unsigned {
     /// This type expression contains a TypeVariableType.
-    HasTypeVariable = 0x01,
+    HasTypeVariable     = 0x01,
 
     /// This type expression contains a GenericTypeParamType.
-    IsDependent     = 0x02,
+    IsDependent         = 0x02,
+
+    /// This type expression contains an LValueType or InOutType,
+    /// other than as a function input.
+    IsNotMaterializable = 0x04,
   };
 
 private:
@@ -109,16 +113,34 @@ public:
   /// member thereof?
   bool isDependent() const { return Bits & IsDependent; }
 
-  /// Merge two sets of properties.
-  friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
+  /// Is a type with these properties materializable: that is, is it a
+  /// first-class value type?
+  bool isMaterializable() const { return !(Bits & IsNotMaterializable); }
+
+  /// Returns the set of properties present in either set.
+  friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
     return RecursiveTypeProperties(lhs | rhs);
   }
-  friend RecursiveTypeProperties operator|(RecursiveTypeProperties lhs,
+  friend RecursiveTypeProperties operator+(RecursiveTypeProperties lhs,
                                            RecursiveTypeProperties rhs) {
     return RecursiveTypeProperties(lhs.Bits | rhs.Bits);
   }
-  RecursiveTypeProperties &operator|=(RecursiveTypeProperties other) {
+
+  /// Add any properties in the right-hand set to this set.
+  RecursiveTypeProperties &operator+=(RecursiveTypeProperties other) {
     Bits |= other.Bits;
+    return *this;
+  }
+
+  /// Returns the set of properties present in the left-hand set but
+  /// missing in the right-hand set.
+  RecursiveTypeProperties operator-(RecursiveTypeProperties other) {
+    return RecursiveTypeProperties(Bits & ~other.Bits);
+  }
+
+  /// Remove any properties in the right-hand set from this set.
+  RecursiveTypeProperties &operator-=(RecursiveTypeProperties other) {
+    Bits &= ~other.Bits;
     return *this;
   }
 
@@ -272,7 +294,9 @@ public:
   /// isMaterializable - Is this type 'materializable' according to
   /// the rules of the language?  Basically, does it not contain any
   /// l-value types?
-  bool isMaterializable();
+  bool isMaterializable() const {
+    return getRecursiveProperties().isMaterializable();
+  }
 
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?

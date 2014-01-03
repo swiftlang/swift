@@ -62,26 +62,6 @@ bool TypeBase::isEqual(Type Other) {
   return getCanonicalType() == Other.getPointer()->getCanonicalType();
 }
 
-/// isMaterializable - Is this type 'materializable' according to the
-/// rules of the language?  Basically, does it not contain any l-value
-/// types?
-bool TypeBase::isMaterializable() {
-  // Tuples are materializable if all their elements are.
-  if (TupleType *tuple = getAs<TupleType>()) {
-    for (auto &field : tuple->getFields())
-      if (!field.getType()->isMaterializable())
-        return false;
-    return true;
-  }
-
-  // l-values are never materializable.
-  if (is<LValueType>() || is<InOutType>())
-    return false;
-
-  // Everything else is materializable.
-  return true;
-}
-
 /// hasReferenceSemantics - Does this type have reference semantics?
 bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();

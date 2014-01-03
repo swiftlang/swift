@@ -945,7 +945,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType())
-      properties |= Elt.getType()->getRecursiveProperties();
+      properties += Elt.getType()->getRecursiveProperties();
   }
 
   auto arena = getArena(properties);
@@ -993,7 +993,7 @@ UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = 0;
   RecursiveTypeProperties properties;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  if (Parent) properties += Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   if (auto unbound = C.Impl.getArena(arena).UnboundGenericTypes
@@ -1012,11 +1012,11 @@ void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                RecursiveTypeProperties &properties) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  if (Parent) properties += Parent->getRecursiveProperties();
   ID.AddInteger(GenericArgs.size());
   for (Type Arg : GenericArgs) {
     ID.AddPointer(Arg.getPointer());
-    properties |= Arg->getRecursiveProperties();
+    properties += Arg->getRecursiveProperties();
   }
 }
 
@@ -1104,7 +1104,7 @@ EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   EnumType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  if (Parent) properties += Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -1131,7 +1131,7 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   StructType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  if (Parent) properties += Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -1158,7 +1158,7 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   ClassType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  if (Parent) properties += Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -1271,8 +1271,9 @@ ModuleType *ModuleType::get(Module *M) {
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
-  auto properties = Input->getRecursiveProperties() |
-                    Result->getRecursiveProperties();
+  auto properties = Input->getRecursiveProperties()
+                    + Result->getRecursiveProperties()
+                    - RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
   char attrKey = Info.getFuncAttrKey();
 
@@ -1306,8 +1307,9 @@ PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
                                                       const ExtInfo &Info) {
   // FIXME: one day we should do canonicalization properly.
-  RecursiveTypeProperties properties
-    = input->getRecursiveProperties() | output->getRecursiveProperties();
+  auto properties = input->getRecursiveProperties()
+                    + output->getRecursiveProperties()
+                    - RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
 
   const ASTContext &C = input->getASTContext();
@@ -1397,9 +1399,10 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
   void *mem = ctx.Allocate(bytes, alignof(GenericFunctionType));
 
   // For now, generic function types cannot be dependent (in fact,
-  // they erase dependence) or contain type variables.
+  // they erase dependence) or contain type variables, and they're
+  // always materializable.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 2,
+  static_assert(RecursiveTypeProperties::BitWidth == 3,
                 "revisit this if you add new recursive type properties");
 
   auto result = new (mem) GenericFunctionType(params, requirements, input,
@@ -1539,9 +1542,9 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   // Right now, SIL function types cannot be dependent or contain type
-  // variables.
+  // variables, and they're always materializable.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 2,
+  static_assert(RecursiveTypeProperties::BitWidth == 3,
                 "revisit this if you add new recursive type properties");
 
   auto fnType =
@@ -1619,7 +1622,8 @@ LValueType *LValueType::get(Type objectTy) {
 //  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
 //         "can not have @inout or @lvalue wrapped inside an @lvalue");
 
-  auto properties = objectTy->getRecursiveProperties();
+  auto properties = objectTy->getRecursiveProperties()
+                    + RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
@@ -1638,7 +1642,8 @@ InOutType *InOutType::get(Type objectTy) {
 //  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
 //         "can not have @inout or @lvalue wrapped inside an @inout");
   
-  auto properties = objectTy->getRecursiveProperties();
+  auto properties = objectTy->getRecursiveProperties()
+                    + RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
   
   auto &C = objectTy->getASTContext();
