@@ -13,6 +13,7 @@
 #ifndef SIL_TypeLowering_h
 #define SIL_TypeLowering_h
 
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILType.h"
@@ -83,7 +84,7 @@ inline CanSILFunctionType getThickFunctionType(CanSILFunctionType t) {
                             DefaultThickCalleeConvention);
 }
 
-/// CaptureKind - Different ways in which a function can capture context.
+/// Different ways in which a function can capture context.
 enum class CaptureKind {
   /// No context arguments are necessary.
   None,
@@ -99,10 +100,17 @@ enum class CaptureKind {
   GetterSetter
 };
   
-/// getDeclCaptureKind - Return the CaptureKind to use when capturing a decl.
+/// Return the CaptureKind to use when capturing a decl.
 CaptureKind getDeclCaptureKind(ValueDecl *capture);
   
-/// TypeLowering - Extended type information used by SILGen.
+/// Flag used to place context-dependent TypeLowerings in their own arena which
+/// can be disposed when a generic context is exited.
+enum IsDependent_t : unsigned {
+  IsNotDependent = false,
+  IsDependent = true
+};
+  
+/// Extended type information used by SIL.
 class TypeLowering {
 public:
   enum IsTrivial_t : bool { IsNotTrivial, IsTrivial };
@@ -338,12 +346,14 @@ public:
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
-  void *operator new(size_t size, TypeConverter &tc);
+  void *operator new(size_t size, TypeConverter &tc,
+                     IsDependent_t dependent);
 
   // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
   // The latter is made challenging because the existence of the
   // virtual destructor requires an accessible 'operator delete'.
   void *operator new(size_t) = delete;
+
 protected:
   void operator delete(void*) {}
 };
@@ -379,7 +389,10 @@ struct SILConstantInfo {
 class TypeConverter {
   friend class TypeLowering;
 
-  llvm::BumpPtrAllocator TypeLoweringBPA;
+  llvm::BumpPtrAllocator IndependentBPA;
+  /// BumpPtrAllocator for types dependent on contextual generic parameters,
+  /// which is reset when the generic context is popped.
+  llvm::BumpPtrAllocator DependentBPA;
 
   enum : unsigned {
     /// There is a unique entry with this uncurry level in the
@@ -397,12 +410,16 @@ class TypeConverter {
     CanType SubstType;
 
     /// The uncurrying level of the type.
-    unsigned UncurryLevel;
+    unsigned UncurryLevel : 31;
+    
+    /// Whether the type carries dependencies on its generic context.
+    IsDependent_t Dependent : 1;
 
     friend bool operator==(const TypeKey &lhs, const TypeKey &rhs) {
       return lhs.OrigType == rhs.OrigType
           && lhs.SubstType == rhs.SubstType
-          && lhs.UncurryLevel == rhs.UncurryLevel;
+          && lhs.UncurryLevel == rhs.UncurryLevel
+          && lhs.Dependent == rhs.Dependent;
     }
     friend bool operator!=(const TypeKey &lhs, const TypeKey &rhs) {
       return !(lhs == rhs);
@@ -411,12 +428,27 @@ class TypeConverter {
   friend struct llvm::DenseMapInfo<TypeKey>;
   
   TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
-                     unsigned uncurryLevel) {
-    return { origTy.getAsType(), substTy, uncurryLevel };
+                     unsigned uncurryLevel, IsDependent_t dependent) {
+    return { origTy.getAsType(), substTy, uncurryLevel, dependent };
   }
   
-  llvm::DenseMap<TypeKey, const TypeLowering *> Types;
+  /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
+  /// exist.
+  const TypeLowering *find(TypeKey k);
+  /// Insert a mapping into the cache.
+  void insert(TypeKey k, const TypeLowering *tl);
+  
+  /// Mapping for types independent on contextual generic parameters, which is
+  /// cleared when the generic context is popped.
+  llvm::DenseMap<TypeKey, const TypeLowering *> IndependentTypes;
+  /// Mapping for types dependent on contextual generic parameters, which is
+  /// cleared when the generic context is popped.
+  llvm::DenseMap<TypeKey, const TypeLowering *> DependentTypes;
+  
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
+  
+  /// ArchetypeBuilder used for lowering types in generic function contexts.
+  Optional<ArchetypeBuilder> GenericArchetypes;
   
   CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
   
@@ -594,6 +626,25 @@ public:
   /// Retrieve the set of generic parameters considered for the given context.
   GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
 
+  /// Push a generic function context. See GenericContextScope for an RAII
+  /// interface to this function.
+  ///
+  /// Types containing generic parameter references must be lowered in a generic
+  /// context. There can be at most one level of generic context active at any
+  /// point in time.
+  void pushGenericContext(ArrayRef<GenericTypeParamType*> genericParams,
+                          ArrayRef<Requirement> requirements);
+  
+  /// Pop a generic function context. See GenericContextScope for an RAII
+  /// interface to this function. There must be an active generic context.
+  void popGenericContext();
+  
+  /// Return the archetype builder for the current generic context. Fails if no
+  /// generic context has been pushed.
+  ArchetypeBuilder &getArchetypes() {
+    return *GenericArchetypes;
+  }
+  
   /// Known types for bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
   CanType get##BridgedType##Type(); \
@@ -609,6 +660,25 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
     return TC.getTypeLowering(refType.getReferentType());
   return *this;
 }
+
+/// RAII interface to push a generic context.
+class GenericContextScope {
+  TypeConverter &TC;
+public:
+  GenericContextScope(TypeConverter &TC,
+                      ArrayRef<GenericTypeParamType*> genericParams,
+                      ArrayRef<Requirement> requirements) : TC(TC) {
+    TC.pushGenericContext(genericParams, requirements);
+  }
+  
+  ~GenericContextScope() {
+    TC.popGenericContext();
+  }
+  
+private:
+  GenericContextScope(const GenericContextScope&) = delete;
+  GenericContextScope &operator=(const GenericContextScope&) = delete;
+};
   
 } // namespace Lowering
 } // namespace swift
@@ -618,16 +688,17 @@ namespace llvm {
     typedef swift::Lowering::TypeConverter::TypeKey TypeKey;
     static TypeKey getEmptyKey() {
       return TypeKey{ DenseMapInfo<swift::CanType>::getEmptyKey(),
-                      swift::CanType(), 0 };
+                      swift::CanType(), 0, swift::Lowering::IsNotDependent };
     }
     static TypeKey getTombstoneKey() {
       return TypeKey{ DenseMapInfo<swift::CanType>::getTombstoneKey(),
-                      swift::CanType(), 0 };
+                      swift::CanType(), 0, swift::Lowering::IsNotDependent };
     }
     static unsigned getHashValue(TypeKey val) {
       return DenseMapInfo<swift::CanType>::getHashValue(val.OrigType)
            ^ DenseMapInfo<swift::CanType>::getHashValue(val.SubstType)
-           ^ val.UncurryLevel;
+           ^ val.UncurryLevel
+           ^ unsigned(val.Dependent);
     }
     static bool isEqual(TypeKey LHS, TypeKey RHS) {
       return LHS == RHS;
