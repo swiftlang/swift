@@ -466,7 +466,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
       }
 
       lv.add<GetterSetterComponent>(sgl.gen, var, substitutions, typeData);
-      return ::std::move(lv);
+      return std::move(lv);
     }
   }
 
@@ -475,7 +475,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
   lv.add<ValueComponent>(address, typeData);
-  return ::std::move(lv);
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
@@ -495,7 +495,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
   lv.add<ValueComponent>(ManagedValue(addrMat.address, addrMat.valueCleanup),
                          typeData);
-  return ::std::move(lv);
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
@@ -544,7 +544,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       } else {
         lv.add<StructElementComponent>(var, varStorageType, typeData);
       }
-      return ::std::move(lv);
+      return std::move(lv);
     }
   }
 
@@ -553,7 +553,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
                                 e->getMember().getDecl(),
                                 e->getMember().getSubstitutions(),
                                 typeData);
-  return ::std::move(lv);
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
@@ -570,7 +570,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
                                 e->getDecl().getSubstitutions(),
                                 e->getIndex(),
                                 typeData);
-  return ::std::move(lv);
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
@@ -585,7 +585,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   };
 
   lv.add<TupleElementComponent>(index, typeData);
-  return ::std::move(lv);
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
