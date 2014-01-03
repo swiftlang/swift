@@ -1993,7 +1993,8 @@ namespace {
       // If the subexpression is of DynamicLookup type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
       Expr *subExpr = expr->getSubExpr();
-      if (isDynamicLookupType(expr->getSubExpr()->getType())) {
+      if (isDynamicLookupType(expr->getSubExpr()->getType()) &&
+          !isDynamicLookupType(valueType)) {
         // Coerce the subexpression to an rvalue.
         subExpr = tc.coerceToRValue(subExpr);
         if (!subExpr) return nullptr;
