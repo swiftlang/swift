@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/QuotedString.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -974,7 +975,8 @@ public:
     printCommon(E, "character_literal_expr") << " value=" << E->getValue()<<')';
   }
   void visitStringLiteralExpr(StringLiteralExpr *E) {
-    printCommon(E, "string_literal_expr") << " value=" << E->getValue() << ')';
+    printCommon(E, "string_literal_expr")
+      << " value=" << QuotedString(E->getValue()) << ')';
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");

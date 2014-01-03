@@ -4,6 +4,7 @@ add_swift_library(swiftBasic
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   Punycode.cpp
+  QuotedString.cpp
   SourceLoc.cpp
   ThreadSafeRefCounted.cpp
   Version.cpp)
