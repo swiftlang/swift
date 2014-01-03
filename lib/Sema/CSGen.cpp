@@ -105,9 +105,9 @@ namespace {
       if (decl->isInvalid())
         return nullptr;
 
-      auto tv = CS.createTypeVariable(
-                  CS.getConstraintLocator(expr, ConstraintLocator::Member),
-                  TVO_CanBindToLValue);
+      auto memberLocator =
+        CS.getConstraintLocator(expr, ConstraintLocator::Member);
+      auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
       OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
@@ -132,14 +132,15 @@ namespace {
       auto outputTv = CS.createTypeVariable(resultLocator,
                                             TVO_CanBindToLValue);
 
+      auto subscriptMemberLocator
+        = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTv);
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("subscript"),
-                                  fnTy,
-                                  CS.getConstraintLocator(expr,
-                                    ConstraintLocator::SubscriptMember));
+                                  fnTy, subscriptMemberLocator);
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
