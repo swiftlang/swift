@@ -389,7 +389,7 @@ sil @floatliteral : $@thin () -> (Builtin.FPIEEE32) {
   return %4 : $(Builtin.FPIEEE32)
 }
 
-sil @string_use : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> ()
+sil @string_use : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype) -> ()
 
 
 // CHECK-LABEL: stringliteral
@@ -400,8 +400,8 @@ sil @stringliteral : $@thin () -> () {
   %0 = string_literal "First"
   %1 = string_literal "First"
   %2 = metatype $@thin String.metatype
-  %3 = function_ref @string_use : $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> ()
-  apply %3 (%0#0, %0#1, %0#2, %2, %1#0, %1#1, %1#2, %2): $@thin (Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Int64, Builtin.Int1, @thin String.metatype) -> ()
+  %3 = function_ref @string_use : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype) -> ()
+  apply %3 (%0#0, %0#1, %0#2, %2, %1#0, %1#1, %1#2, %2): $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype) -> ()
   %4 = tuple()
   return %4 : $()
 }
@@ -524,7 +524,7 @@ sil @metatype_test : $@thin () -> () {
 }
 
 struct StringData {
-  var size: Builtin.Int64
+  var size: Builtin.Word
 }
 
 // CHECK-LABEL: sil @sil_extract_of_string
@@ -532,9 +532,9 @@ struct StringData {
 // Make sure we only forward the first field of the string_literal
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
-sil @sil_extract_of_string : $@thin () -> Builtin.Int64 {
+sil @sil_extract_of_string : $@thin () -> Builtin.Word {
   %0 = string_literal ""
-  %1 = struct $StringData (%0#1 : $Builtin.Int64)
+  %1 = struct $StringData (%0#1 : $Builtin.Word)
   %2 = struct_extract %1 : $StringData, #size  
-  return %2 : $Builtin.Int64
+  return %2 : $Builtin.Word
 }

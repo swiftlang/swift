@@ -86,8 +86,8 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   }
 @ if ArrayBound:
   @@transparent
-  func _getBuiltinArrayBoundValue() -> Builtin.${LLVMName} {
-    return value
+  func _getBuiltinArrayBoundValue() -> Builtin.Word {
+    return Word(self).value
   }
 
   typealias ArrayBoundType = ${Self}

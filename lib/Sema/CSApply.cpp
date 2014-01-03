@@ -1022,12 +1022,9 @@ namespace {
           type = defaultType;
       }
       
-      // Note: We always use 64-bits here, even on 32-bit platforms to keep the
-      // AST consistent across different architectures.  LLVM optimizers will
-      // handily slice off the top bits for 32-bit targets.
       TupleTypeElt elements[3] = {
         TupleTypeElt(tc.Context.TheRawPointerType),
-        TupleTypeElt(BuiltinIntegerType::get(64, tc.Context)),
+        TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
       
@@ -2308,7 +2305,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     ArraySliceType *sliceType
       = cast<ArraySliceType>(
           toTuple->getFields().back().getType().getPointer());
-    Type boundType = BuiltinIntegerType::get(64, tc.Context);
+    Type boundType = BuiltinIntegerType::getWordType(tc.Context);
     injectionFn = tc.buildArrayInjectionFnRef(dc,
                                               sliceType, boundType,
                                               expr->getStartLoc());
@@ -2370,7 +2367,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     // Find the appropriate injection function.
     ArraySliceType *sliceType
       = cast<ArraySliceType>(lastField.getType().getPointer());
-    Type boundType = BuiltinIntegerType::get(64, tc.Context);
+    Type boundType = BuiltinIntegerType::getWordType(tc.Context);
     injectionFn = tc.buildArrayInjectionFnRef(dc,
                                               sliceType, boundType,
                                               expr->getStartLoc());

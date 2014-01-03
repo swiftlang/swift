@@ -982,15 +982,14 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   // If it's an integer literal expression, just convert the type directly.
   if (auto lit = dyn_cast<IntegerLiteralExpr>(
                    expr->getSemanticsProvidingExpr())) {
-    // FIXME: the choice of 64-bit is rather arbitrary.
-    expr->setType(BuiltinIntegerType::get(64, Context));
+    expr->setType(BuiltinIntegerType::getWordType(Context));
 
     // Constant array bounds must be non-zero.
     if (constantRequired) {
       uint64_t size = lit->getValue().getZExtValue();
       if (size == 0) {
         diagnose(lit->getLoc(), diag::new_array_bound_zero)
-        .highlight(lit->getSourceRange());
+          .highlight(lit->getSourceRange());
         return nullptr;
       }
     }

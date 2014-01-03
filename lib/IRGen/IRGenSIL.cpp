@@ -1761,7 +1761,8 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
   }
   {
     Explosion e(ExplosionKind::Maximal);
-    e.add(Builder.getInt64(i->getValue().size()));
+    e.add(Builder.getInt(APInt(IGM.getPointerSize().getValueInBits(),
+                               i->getValue().size())));
     setLoweredExplosion(SILValue(i, 1), e);
   }
   

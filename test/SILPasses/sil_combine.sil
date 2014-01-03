@@ -336,7 +336,7 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 }
 
 struct StringData {
-  var size: Builtin.Int64
+  var size: Builtin.Word
 }
 
 // CHECK-LABEL: sil @sil_extract_of_string
@@ -344,11 +344,11 @@ struct StringData {
 // Make sure we only forward the first field of the string_literal
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
-sil @sil_extract_of_string : $@thin () -> Builtin.Int64 {
+sil @sil_extract_of_string : $@thin () -> Builtin.Word {
   %0 = string_literal ""
-  %1 = struct $StringData (%0#1 : $Builtin.Int64)
+  %1 = struct $StringData (%0#1 : $Builtin.Word)
   %2 = struct_extract %1 : $StringData, #size  
-  return %2 : $Builtin.Int64
+  return %2 : $Builtin.Word
 }
 
 class C {}

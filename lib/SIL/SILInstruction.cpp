@@ -659,7 +659,7 @@ StringLiteralInst::create(SILLocation Loc, StringRef Text, SILFunction &F) {
   const ASTContext &Ctx = F.getModule().getASTContext();
   SILType ResTys[] = {
     SILType::getRawPointerType(Ctx),
-    SILType::getBuiltinIntegerType(64, Ctx),
+    SILType::getBuiltinWordType(Ctx),
     SILType::getBuiltinIntegerType(1, Ctx)
   };
 

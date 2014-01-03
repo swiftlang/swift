@@ -320,6 +320,8 @@ public:
   /// Get a builtin floating-point type as a SILType.
   static SILType getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
                                      const ASTContext &C);
+  /// Get the builtin word type as a SILType;
+  static SILType getBuiltinWordType(const ASTContext &C);
   
   //
   // Utilities for treating SILType as a pointer-like type.

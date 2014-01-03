@@ -738,26 +738,26 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   // If it's not present, just create a null value.
   gen.B.emitBlock(isNotPresentBB);
 
-  // %1 = integer_literal $Builtin.Int64, 0
-  auto Int64Ty = SILType::getBuiltinIntegerType(64, gen.getASTContext());
-  SILValue null = gen.B.createIntegerLiteral(loc, Int64Ty, 0);
+  // %1 = integer_literal $Builtin.Word, 0
+  auto WordTy = SILType::getBuiltinWordType(gen.getASTContext());
+  SILValue null = gen.B.createIntegerLiteral(loc, WordTy, 0);
 
-  // %2 = builtin_function_ref "inttoptr_Int64" : $@thin (Int64) -> RawPointer
+  // %2 = builtin_function_ref "inttoptr_Word" : $@thin (Word) -> RawPointer
   auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           /*thin*/ true,
                                           /*noreturn*/ false,
                                           /*autoclosure*/ false,
                                           /*block*/ false);
-  SILParameterInfo Param(Int64Ty.getSwiftRValueType(),
+  SILParameterInfo Param(WordTy.getSwiftRValueType(),
                          ParameterConvention::Direct_Unowned);
   SILResultInfo Result(gen.getASTContext().TheRawPointerType,
                        ResultConvention::Unowned);
   auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
                                         ParameterConvention::Direct_Owned,
                                         Param, Result, gen.getASTContext());
-  auto bfr = gen.B.createBuiltinFunctionRef(loc, "inttoptr_Int64",
+  auto bfr = gen.B.createBuiltinFunctionRef(loc, "inttoptr_Word",
                                     SILType::getPrimitiveObjectType(bfrFnType));
-  // %3 = apply %2(%1) : $@thin (Builtin.Int64) -> Builtin.RawPointer
+  // %3 = apply %2(%1) : $@thin (Builtin.Word) -> Builtin.RawPointer
   null = gen.B.createApply(loc, bfr, null);
 
   null = gen.B.createRawPointerToRef(loc, null, refType);

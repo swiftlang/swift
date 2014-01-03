@@ -1091,7 +1091,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 ArrayRef<ManagedValue> elements,
                                 Expr *VarargsInjectionFn) {
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
-                      SILType::getBuiltinIntegerType(64, gen.F.getASTContext()),
+                      SILType::getBuiltinWordType(gen.F.getASTContext()),
                       elements.size());
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
                                                   gen.getLoweredType(baseTy),
@@ -1106,7 +1106,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
     SILValue eltPtr = basePtr;
     if (i != 0) {
       SILValue index = gen.B.createIntegerLiteral(loc,
-                  SILType::getBuiltinIntegerType(64, gen.F.getASTContext()), i);
+                  SILType::getBuiltinWordType(gen.F.getASTContext()), i);
       eltPtr = gen.B.createIndexAddr(loc, basePtr, index);
     }
     ManagedValue v = elements[i];
