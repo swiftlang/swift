@@ -75,7 +75,7 @@ usage() {
     echo "  Available settings. Each setting corresponds to a variable,"
     echo "  obtained by upcasing its name, in this script.  A variable"
     echo "  with no default listed here will be unset in the script if"
-    echo "  not explicitly specified.  A setting passed in the 2nd form"
+    echo "  not explicitly specified.  A setting passed in the 3rd form"
     echo "  will set its corresponding variable to \"1\"."
     echo
 
