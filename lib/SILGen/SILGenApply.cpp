@@ -2259,11 +2259,16 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::
-emitGetAccessor(SILLocation loc, SILDeclRef get,
+emitGetAccessor(SILLocation loc, ValueDecl *decl,
                 ArrayRef<Substitution> substitutions,
                 RValueSource &&selfValue,
                 RValueSource &&subscripts,
                 SGFContext c) {
+ 
+  SILDeclRef get(decl, SILDeclRef::Kind::Getter,
+                 SILDeclRef::ConstructAtNaturalUncurryLevel,
+                 SGM.requiresObjCDispatch(decl));
+
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue);
   CanAnyFunctionType accessType = getter.getSubstFormalType();
@@ -2286,12 +2291,15 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   return emission.apply(c);
 }
 
-void SILGenFunction::emitSetAccessor(SILLocation loc,
-                                     SILDeclRef set,
+void SILGenFunction::emitSetAccessor(SILLocation loc, ValueDecl *decl,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
                                      RValueSource &&subscripts,
                                      RValueSource &&setValue) {
+  SILDeclRef set(decl, SILDeclRef::Kind::Setter,
+                 SILDeclRef::ConstructAtNaturalUncurryLevel,
+                 SGM.requiresObjCDispatch(decl));
+
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue);
   CanAnyFunctionType accessType = setter.getSubstFormalType();

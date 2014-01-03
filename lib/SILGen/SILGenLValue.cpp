@@ -277,8 +277,8 @@ namespace {
 
 
   class GetterSetterComponent : public LogicalPathComponent {
-    SILDeclRef getter;
-    SILDeclRef setter;
+    // The VarDecl or SubscriptDecl being get/set.
+    ValueDecl *decl;
     std::vector<Substitution> substitutions;
     Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
@@ -310,24 +310,12 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
+    GetterSetterComponent(ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
-                          LValueTypeData typeData)
-      : GetterSetterComponent(gen, decl, substitutions, nullptr, typeData)
-    {
-    }
-
-    GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
-                          ArrayRef<Substitution> substitutions,
-                          Expr *subscriptIndexExpr,
-                          LValueTypeData typeData)
+                          LValueTypeData typeData,
+                          Expr *subscriptIndexExpr = nullptr)
       : LogicalPathComponent(typeData),
-        getter(SILDeclRef(decl, SILDeclRef::Kind::Getter,
-                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                          gen.SGM.requiresObjCDispatch(decl))),
-        setter(SILDeclRef(decl, SILDeclRef::Kind::Setter,
-                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                          gen.SGM.requiresObjCDispatch(decl))),
+        decl(decl),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptIndexExpr(subscriptIndexExpr)
     {
@@ -337,8 +325,7 @@ namespace {
                           SILGenFunction &gen,
                           SILLocation loc)
       : LogicalPathComponent(copied.getTypeData()),
-        getter(copied.getter),
-        setter(copied.setter),
+        decl(copied.decl),
         substitutions(copied.substitutions),
         subscriptIndexExpr(copied.subscriptIndexExpr),
         origSubscripts(copied.origSubscripts.copy(gen, loc))
@@ -348,10 +335,9 @@ namespace {
     void set(SILGenFunction &gen, SILLocation loc,
              RValueSource &&rvalue, ManagedValue base) const override
     {
-      assert(!setter.isNull() && "not settable!");      
       auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitSetAccessor(loc, setter, substitutions,
+      return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
                                  std::move(rvalue));
@@ -362,7 +348,7 @@ namespace {
     {
       auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitGetAccessor(loc, getter, substitutions,
+      return gen.emitGetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts), c);
     }
@@ -465,7 +451,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
                           genericParams->getAllArchetypes());
       }
 
-      lv.add<GetterSetterComponent>(sgl.gen, var, substitutions, typeData);
+      lv.add<GetterSetterComponent>(var, substitutions, typeData);
       return std::move(lv);
     }
   }
@@ -550,8 +536,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   }
 
   // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(gen,
-                                e->getMember().getDecl(),
+  lv.add<GetterSetterComponent>(e->getMember().getDecl(),
                                 e->getMember().getSubstitutions(),
                                 typeData);
   return std::move(lv);
@@ -566,11 +551,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
          "Base of lvalue subscript expr is not an lvalue!");
   
   LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(gen, 
-                                e->getDecl().getDecl(),
+  lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
                                 e->getDecl().getSubstitutions(),
-                                e->getIndex(),
-                                typeData);
+                                typeData,
+                                e->getIndex());
   return std::move(lv);
 }
 

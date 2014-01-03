@@ -447,12 +447,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       assert(!var->isSettable() &&
              "computed lvalue decls are handled by lvalue machinery");
       // Global properties have no base or subscript.
-      
-      SILDeclRef getter(var, SILDeclRef::Kind::Getter,
-                        SILDeclRef::ConstructAtNaturalUncurryLevel,
-                        SGM.requiresObjCDispatch(var));
-      
-      return emitGetAccessor(loc, getter,
+      return emitGetAccessor(loc, var,
                              ArrayRef<Substitution>(), RValueSource(),
                              RValueSource(), SGFContext());
     }
@@ -1242,13 +1237,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
     ManagedValue base
       = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
     RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base);
-  
-    SILDeclRef getter(FieldDecl, SILDeclRef::Kind::Getter,
-                      SILDeclRef::ConstructAtNaturalUncurryLevel,
-                      SGF.SGM.requiresObjCDispatch(FieldDecl));
     
     return RValue(SGF, E,
-                  SGF.emitGetAccessor(E, getter,
+                  SGF.emitGetAccessor(E, FieldDecl,
                                       E->getMember().getSubstitutions(),
                                       std::move(baseRV), RValueSource(), C));
   }
@@ -1340,13 +1331,9 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
   // Emit the indices.
   RValueSource subscriptRV = RValueSource(E, SGF.emitRValue(E->getIndex()));
-  
-  SILDeclRef getter(decl, SILDeclRef::Kind::Getter,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    SGF.SGM.requiresObjCDispatch(decl));
     
   return RValue(SGF, E,
-                SGF.emitGetAccessor(E, getter,
+                SGF.emitGetAccessor(E, decl,
                                     E->getDecl().getSubstitutions(),
                                     std::move(baseRV),
                                     std::move(subscriptRV), C));
