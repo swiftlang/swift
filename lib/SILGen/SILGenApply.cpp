@@ -2249,15 +2249,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                     SILValue base) {
-  assert((base.getType().isAddress() ||
-          base.getType().is<MetatypeType>() ||
-          base.getType().hasReferenceSemantics()) &&
-         "base of getter/setter component must be invalid, lvalue, or "
-         "of reference type");
-  
-  if (base.getType().hasReferenceSemantics()) {
-    if (!isa<FunctionRefInst>(base))
-      B.createStrongRetain(loc, base);
+  if (!base.getType().isAddress()) {
+    base = B.emitCopyValueOperation(loc, base);
     return RValueSource(loc, RValue(*this, loc,
                                     base.getType().getSwiftType(),
                                     emitManagedRValueWithCleanup(base)));
