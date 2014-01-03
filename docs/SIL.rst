@@ -754,9 +754,9 @@ implements the method for that class::
     func bas()
   }
 
-  sil @A_foo : $((), A) -> ()
-  sil @A_bar : $((), A) -> ()
-  sil @A_bas : $((), A) -> ()
+  sil @A_foo : $@thin (@owned A) -> ()
+  sil @A_bar : $@thin (@owned A) -> ()
+  sil @A_bas : $@thin (@owned A) -> ()
 
   sil_vtable A {
     #A.foo!1: @A_foo
@@ -768,7 +768,7 @@ implements the method for that class::
     func bar()
   }
 
-  sil @B_bar : $((), B) -> ()
+  sil @B_bar : $@thin (@owned B) -> ()
 
   sil_vtable B {
     #A.foo!1: @A_foo
@@ -780,7 +780,7 @@ implements the method for that class::
     func bas()
   }
 
-  sil @C_bas : $((), C) -> ()
+  sil @C_bas : $@thin (@owned C) -> ()
 
   sil_vtable C {
     #A.foo!1: @A_foo
@@ -794,6 +794,73 @@ visible through that class (in the example above, ``B``'s vtable references
 ``A.bas``). The Swift AST maintains override relationships between declarations
 that can be used to look up overridden methods in the SIL vtable for a derived
 class (such as ``A.bas`` in ``C``'s vtable).
+
+Witness Tables
+~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-witness-table
+  sil-witness-table ::= 'sil_witness_table' normal-protocol-conformance
+                        '{' sil-witness-entry* '}'
+
+SIL encodes the information needed for dynamic dispatch of generic types into
+witness tables. This information is used to produce runtime dispatch tables when
+generating binary code. It can also be used by SIL optimizations to specialize
+generic functions. A witness table is emitted for every declared explicit
+conformance. Generic types share one generic witness table for all of their
+instances. Derived classes inherit the witness tables of their base class.
+
+::
+
+  protocol-conformance ::= normal-protocol-conformance
+  protocol-conformance ::= 'inherit' '(' protocol-conformance ')'
+  protocol-conformance ::= 'specialize' '<' substitution* '>'
+                           '(' protocol-conformance ')'
+  protocol-conformance ::= 'dependent'
+  normal-protocol-conformance ::= identifier ':' identifier 'module' identifier
+
+Witness tables are keyed by *protocol conformance*, which is a unique identifier
+for a concrete type's conformance to a protocol.
+
+- A *normal protocol conformance*
+  names a (potentially unbound generic) type, the protocol it conforms to, and
+  the module in which the type or extension declaration that provides the
+  conformance appears. These correspond 1:1 to protocol conformance declarations
+  in the source code.
+- If a derived class conforms to a protocol through inheritance from its base
+  class, this is represented by an *inherited protocol conformance*, which
+  simply references the protocol conformance for the base class.
+- If an instance of a generic type conforms to a protocol, it does so with a
+  *specialized conformance*, which provides the generic parameter bindings
+  to the normal conformance, which should be for a generic type.
+
+Witness tables are only directly associated with normal conformances.
+Inherited and specialized conformances indirectly reference the witness table of
+the underlying normal conformance.
+
+::
+
+  sil-witness-entry ::= 'base_protocol' identifier ':' protocol-conformance
+  sil-witness-entry ::= 'method' sil-decl-ref ':' sil-function-name
+  sil-witness-entry ::= 'associated_type' identifier
+  sil-witness-entry ::= 'associated_type_protocol'
+                        '(' identifier ':' identifier ')' ':' protocol-conformance
+
+Witness tables consist of the following entries:
+
+- *Base protocol entries* provide references to the protocol conformances that
+  satisfy the witnessed protocols' inherited protocols.
+- *Method entries* map a method requirement of the protocol to a SIL function
+  that implements that method for the witness type. One method entry must exist
+  for every required method of the witnessed protocol.
+- *Associated type entries* map an associated type requirement of the protocol
+  to the type that satisfies that requirement for the witness type. Note that
+  the witness type is a source-level Swift type and not a SIL type. One
+  associated type entry must exist for every required associated type of the
+  witnessed protocol.
+- *Associated type protocol entries* map a protocol requirement on an associated
+  type to the protocol conformance that satisfies that requirement for the
+  associated type.
 
 Dataflow Errors
 ---------------
@@ -1070,6 +1137,12 @@ passed last::
   }
 
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
+
+Witness Method Calling Convention @cc(witness_method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The witness method calling convention is used by protocol witness methods in
+`witness tables`_.
 
 C Calling Convention @cc(cdecl)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1856,16 +1929,20 @@ archetype_method
   sil-instruction ::= 'archetype_method' sil-method-attributes?
                         sil-type ',' sil-decl-ref ':' sil-type
 
-  %1 = archetype_method $T, #Proto.method!1 : $@thin U -> V
+  %1 = archetype_method $T, #Proto.method!1 \
+    : $@thin @cc(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
-  // constraints on T
-  // $U -> V must be the type of the referenced method with "Self == T"
-  // substitution applied
-  // %1 will be of type $@thin U -> V
+  //   constraints on T
+  // <Self: Proto> U -> V must be the type of the referenced method,
+  //   generic on Self
+  // %1 will be of type $@thin <Self: Proto> U -> V
 
 Looks up the implementation of a protocol method for a generic type variable
-constrained by that protocol.
+constrained by that protocol. The result will be generic on the ``Self``
+archetype of the original protocol and have the ``witness_method`` calling
+convention. If the referenced protocol is an ``@objc`` protocol, the
+resulting type has the ``objc`` calling convention.
 
 protocol_method
 ```````````````
@@ -1874,18 +1951,18 @@ protocol_method
   sil-instruction ::= 'protocol_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = protocol_method %0 : $P, #P.method!1 : $@thin U -> V
+  %1 = protocol_method %0 : $P, #P.method!1 : $@thick @cc(witness_method) U -> V
   // %0 must be of a protocol or protocol composition type $P,
   //   address of address-only protocol type $*P,
   //   or metatype of protocol type $P.metatype
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
   // If %0 is an address-only protocol address, then the "self" argument of
-  //   the method type $@thin U -> V must be $*@sil_self P, the Self archetype of P
+  //   the method type must be $*@sil_self P, the Self archetype of P
   // If %0 is a class protocol value, then the "self" argument of
-  //   the method type $@thin U -> V must be $@sil_self P, the Self archetype of P
+  //   the method type must be $@sil_self P, the Self archetype of P
   // If %0 is a protocol metatype, then the "self" argument of
-  //   the method type $@thin U -> V must be P.metatype
+  //   the method type must be P.metatype
 
 Looks up the implementation of a protocol method for the dynamic type of the
 value inside an existential container. The "self" operand of the result
