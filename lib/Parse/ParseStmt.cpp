@@ -261,7 +261,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (!TmpDecls.empty())
         PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
-    } else if (IsTopLevel && allowTopLevelCode()) {
+    } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
@@ -278,6 +278,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
       if (Status.isError())
         NeedParseErrorRecovery = true;
+      else if (!allowTopLevelCode()) {
+        diagnose(StartLoc,
+                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
+                                    : diag::illegal_top_level_expr);
+      }
       unwrapIfDiscardedClosure(*this, Result);
       if (!Result.isNull()) {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
