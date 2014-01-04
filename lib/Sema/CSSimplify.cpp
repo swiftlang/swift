@@ -802,8 +802,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // FIXME: Materialization
-
   if (concrete && kind >= TypeMatchKind::TrivialSubtype) {
     auto tuple1 = type1->getAs<TupleType>();
     auto tuple2 = type2->getAs<TupleType>();

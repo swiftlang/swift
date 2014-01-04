@@ -977,38 +977,6 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                               locator));
 }
 
-/// \brief Retrieve the fully-materialized form of the given type.
-static Type getMateralizedType(Type type, ASTContext &context) {
-  if (auto lvalue = type->getAs<LValueType>())
-    return lvalue->getObjectType();
-
-  if (auto tuple = type->getAs<TupleType>()) {
-    bool anyChanged = false;
-    SmallVector<TupleTypeElt, 4> elements;
-    for (unsigned i = 0, n = tuple->getFields().size(); i != n; ++i) {
-      auto elt = tuple->getFields()[i];
-      auto eltType = getMateralizedType(elt.getType(), context);
-      if (anyChanged) {
-        elements.push_back(elt.getWithType(eltType));
-        continue;
-      }
-
-      if (eltType.getPointer() != elt.getType().getPointer()) {
-        elements.append(tuple->getFields().begin(),
-                        tuple->getFields().begin() + i);
-        elements.push_back(elt.getWithType(eltType));
-        anyChanged = true;
-      }
-    }
-
-    if (anyChanged) {
-      return TupleType::get(elements, context);
-    }
-  }
-
-  return type;
-}
-
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice){
@@ -1053,7 +1021,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = choice.getBaseType();
     break;
 
-  case OverloadChoiceKind::TupleIndex: {
+  case OverloadChoiceKind::TupleIndex:
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
@@ -1061,13 +1029,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = LValueType::get(refType);
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
-      // FIXME: Do we have to strip several levels here? Possible.
       auto tuple = choice.getBaseType()->castTo<TupleType>();
-      refType =getMateralizedType(tuple->getElementType(choice.getTupleIndex()),
-                                  getASTContext());
+      refType = tuple->getElementType(choice.getTupleIndex());
     }
     break;
-  }
   }
 
   // Add the type binding constraint.

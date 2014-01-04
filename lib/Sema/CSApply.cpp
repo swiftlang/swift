@@ -1407,23 +1407,13 @@ namespace {
                                      selected.openedType,
                                      cs.getConstraintLocator(expr, { }));
 
-      case OverloadChoiceKind::TupleIndex: {
-        auto base = expr->getBase();
-        // If the base expression is not an lvalue, make everything inside it
-        // materializable.
-        if (!base->getType()->is<LValueType>()) {
-          base = cs.getTypeChecker().coerceToMaterializable(base);
-          if (!base)
-            return nullptr;
-        }
-
+      case OverloadChoiceKind::TupleIndex:
         return new (cs.getASTContext()) TupleElementExpr(
-                                          base,
+                                          expr->getBase(),
                                           expr->getDotLoc(),
                                           selected.choice.getTupleIndex(),
                                           expr->getNameLoc(),
                                           simplifyType(expr->getType()));
-      }
 
       case OverloadChoiceKind::BaseType: {
         // FIXME: Losing ".0" sugar here.
@@ -2784,17 +2774,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Coercions to an lvalue: materialize the value.
-  if (auto toLValue = toType->getAs<LValueType>()) {
-    // Convert the expression to the expected object type.
-    expr = coerceToType(expr, toLValue->getObjectType(), locator);
-    if (!expr)
-      return nullptr;
-
-    // Materialize.
-    return new (tc.Context) MaterializeExpr(expr, toType);
-  }
-
   // Coercion from a subclass to a superclass.
   if (fromType->mayHaveSuperclass() &&
       toType->getClassOrBoundGenericClass()) {
@@ -2833,8 +2812,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercions to function type.
   if (auto toFunc = toType->getAs<FunctionType>()) {
     // Coercion to an autoclosure type produces an implicit closure.
-    // FIXME: The type checker is more lenient, and allows [auto_closure]s to
-    // be subtypes of non-[auto_closures], which is bogus.
+    // FIXME: The type checker is more lenient, and allows @auto_closures to
+    // be subtypes of non-@auto_closures, which is bogus.
     if (toFunc->isAutoClosure()) {
       // Convert the value to the expected result type of the function.
       expr = coerceToType(expr, toFunc->getResult(),
