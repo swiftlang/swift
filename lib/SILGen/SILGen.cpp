@@ -45,6 +45,7 @@ SILGenFunction::~SILGenFunction() {
   // If the end of the function isn't terminated, we screwed up somewhere.
   assert(!B.hasValidInsertionPoint() &&
          "SILGenFunction did not terminate function?!");
+  freeWritebackStack();
 }
 
 //===--------------------------------------------------------------------===//

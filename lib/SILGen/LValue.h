@@ -28,7 +28,7 @@ namespace Lowering {
 class PhysicalPathComponent;
 class LogicalPathComponent;
 
-/// Information about the type of an l-value.
+  /// Information about the type of an l-value.
 struct LValueTypeData {
   AbstractionPattern OrigFormalType;
   CanType SubstFormalType;

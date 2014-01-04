@@ -30,6 +30,44 @@
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+
+/// A pending writeback.
+namespace swift {
+namespace Lowering {
+struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
+  SILLocation loc;
+  std::unique_ptr<LogicalPathComponent> component;
+  SILValue base;
+  Materialize temp;
+
+  ~LValueWriteback() {}
+  LValueWriteback(LValueWriteback&&) = default;
+  LValueWriteback &operator=(LValueWriteback&&) = default;
+
+  LValueWriteback() = default;
+  LValueWriteback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
+                  SILValue base, Materialize temp)
+    : loc(loc), component(std::move(comp)), base(base), temp(temp) {
+  }
+};
+}
+}
+
+std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
+  if (!WritebackStack)
+    WritebackStack = new std::vector<LValueWriteback>();
+
+  return *WritebackStack;
+}
+
+void SILGenFunction::freeWritebackStack() {
+  delete WritebackStack;
+}
+
+
+//===----------------------------------------------------------------------===//
+
 static CanType getSubstFormalRValueType(Expr *expr) {
   return expr->getType()->getRValueType()->getCanonicalType();
 }
@@ -129,15 +167,15 @@ Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   ManagedValue value = get(gen, loc, getterBase, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
   
-  gen.WritebackStack.emplace_back(loc, clone(gen, loc),
-                                  base ? base.forward(gen) : SILValue(),
-                                  temp);
+  gen.getWritebackStack().emplace_back(loc, clone(gen, loc),
+                                       base ? base.forward(gen) : SILValue(),
+                                       temp);
   return temp;
 }
 
 WritebackScope::WritebackScope(SILGenFunction &gen)
   : gen(&gen), wasInWritebackScope(gen.InWritebackScope),
-    savedDepth(gen.WritebackStack.size())
+    savedDepth(gen.getWritebackStack().size())
 {
   gen.InWritebackScope = true;
 }
@@ -162,8 +200,8 @@ WritebackScope::~WritebackScope() {
     return;
   
   gen->InWritebackScope = wasInWritebackScope;
-  auto i = gen->WritebackStack.end(),
-       deepest = gen->WritebackStack.begin() + savedDepth;
+  auto i = gen->getWritebackStack().end(),
+       deepest = gen->getWritebackStack().begin() + savedDepth;
   while (i-- > deepest) {
     ManagedValue mv = i->temp.claim(*gen, i->loc);
     auto formalTy = i->component->getSubstFormalType();
@@ -172,7 +210,7 @@ WritebackScope::~WritebackScope() {
                       ManagedValue::forUnmanaged(i->base));
   }
   
-  gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
+  gen->getWritebackStack().erase(deepest, gen->getWritebackStack().end());
 }
 
 WritebackScope::WritebackScope(WritebackScope &&o)
@@ -189,14 +227,6 @@ WritebackScope &WritebackScope::operator=(WritebackScope &&o) {
   savedDepth = o.savedDepth;
   o.gen = nullptr;
   return *this;
-}
-
-SILGenFunction::Writeback::~Writeback() {}
-SILGenFunction::Writeback::Writeback(SILLocation loc,
-                                   std::unique_ptr<LogicalPathComponent> &&comp,
-                                   SILValue base, Materialize temp)
-  : loc(loc), component(std::move(comp)), base(base), temp(temp)
-{
 }
 
 void PathComponent::_anchor() {}

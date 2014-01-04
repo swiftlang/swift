@@ -105,7 +105,8 @@ public:
 };
 
 class SwitchContext;
-  
+struct LValueWriteback;
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -158,27 +159,16 @@ public:
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
-  /// A pending writeback.
-  struct Writeback {
-    SILLocation loc;
-    std::unique_ptr<LogicalPathComponent> component;
-    SILValue base;
-    Materialize temp;
-    
-    // Instantiate the unique_ptr destructor in a scope where
-    // LogicalPathComponent is defined.
-    ~Writeback();
-    Writeback(Writeback&&) = default;
-    Writeback &operator=(Writeback&&) = default;
-    
-    Writeback() = default;
-    Writeback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
-              SILValue base, Materialize temp);
-  };
 
   /// The stack of pending writebacks.
-  std::vector<Writeback> WritebackStack;
+  std::vector<LValueWriteback> *WritebackStack = 0;
+  std::vector<LValueWriteback> &getWritebackStack();
+
   bool InWritebackScope = false;
+
+  /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
+  /// having to put the definition of LValueWriteback in this header.
+  void freeWritebackStack();
 
   /// VarLoc - representation of an emitted local variable.  Local variables can
   /// either have a singular constant value that is always returned (in which
