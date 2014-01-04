@@ -433,6 +433,12 @@ public:
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
 
+  TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
+                                       unsigned FieldNo) {
+    auto type = Operand.getType().getTupleElementType(FieldNo);
+    return createTupleExtract(Loc, Operand, FieldNo, type);
+  }
+
   TupleElementAddrInst *createTupleElementAddr(SILLocation Loc,
                                                SILValue Operand,
                                                unsigned FieldNo,
