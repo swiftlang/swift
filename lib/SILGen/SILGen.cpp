@@ -279,7 +279,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
 
   F->setDeclContext(VD);
 
-  mangleConstant(constant, F);
+  SmallVector<char, 128> buffer;
+  F->getMutableName() = constant.mangle(buffer);
   emittedFunctions[constant] = F;
 
   return F;
