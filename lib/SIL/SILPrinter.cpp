@@ -582,8 +582,16 @@ public:
     FLI->getValue().toString(decimal);
     OS << " // " << decimal;
   }
+  static StringRef getStringEncodingName(StringLiteralInst::Encoding kind) {
+    switch (kind) {
+    case StringLiteralInst::Encoding::UTF8: return "utf8 ";
+    case StringLiteralInst::Encoding::UTF16: return "utf16 ";
+    }
+    llvm_unreachable("bad string literal encoding");
+  }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal " << QuotedString(SLI->getValue());
+    OS << "string_literal " << getStringEncodingName(SLI->getEncoding())
+       << QuotedString(SLI->getValue());
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getIDAndType(LI->getOperand());

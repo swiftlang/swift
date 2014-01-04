@@ -248,7 +248,8 @@ private:
 
 //--- Globals ---------------------------------------------------------------
 public:
-  llvm::Constant *getAddrOfGlobalString(StringRef string);
+  llvm::Constant *getAddrOfGlobalString(StringRef utf8);
+  llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
   llvm::Constant *getAddrOfObjCProtocolRecord(ProtocolDecl *proto);
@@ -260,6 +261,7 @@ private:
   llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::StringMap<llvm::Constant*> GlobalStrings;
+  llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
 

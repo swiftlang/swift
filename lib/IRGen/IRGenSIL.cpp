@@ -1753,16 +1753,42 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
+static std::pair<llvm::Constant*, size_t>
+getAddrOfString(IRGenModule &IGM, StringRef string,
+                StringLiteralInst::Encoding encoding) {
+  switch (encoding) {
+  case swift::StringLiteralInst::Encoding::UTF8:
+    return { IGM.getAddrOfGlobalString(string), string.size() };
+
+  case swift::StringLiteralInst::Encoding::UTF16: {
+    // This is always a GEP of a GlobalVariable with a nul terminator.
+    auto addr = IGM.getAddrOfGlobalUTF16String(string);
+    auto gep = cast<llvm::ConstantExpr>(addr);
+    assert(gep->getOpcode() == llvm::Instruction::GetElementPtr);
+    auto var = cast<llvm::GlobalVariable>(gep->getOperand(0));
+    auto array = cast<llvm::ConstantDataArray>(var->getInitializer());
+    size_t length = array->getNumElements() - 1;
+
+    // Cast to Builtin.RawPointer.
+    addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
+    return { addr, length };
+  }
+
+  }
+  llvm_unreachable("bad string encoding");
+}
+
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
+  auto addrAndSize = getAddrOfString(IGM, i->getValue(), i->getEncoding());
   {
     Explosion e(ExplosionKind::Maximal);
-    e.add(IGM.getAddrOfGlobalString(i->getValue()));
+    e.add(addrAndSize.first);
     setLoweredExplosion(SILValue(i, 0), e);
   }
   {
     Explosion e(ExplosionKind::Maximal);
     e.add(Builder.getInt(APInt(IGM.getPointerSize().getValueInBits(),
-                               i->getValue().size())));
+                               addrAndSize.second)));
     setLoweredExplosion(SILValue(i, 1), e);
   }
   

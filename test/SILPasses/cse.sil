@@ -393,12 +393,12 @@ sil @string_use : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin 
 
 
 // CHECK-LABEL: stringliteral
-// CHECK: [[TARGET:%[0-9]+]] = string_literal "First"
+// CHECK: [[TARGET:%[0-9]+]] = string_literal utf8 "First"
 // CHECK-NOT: string_literal "First"
 // CHECK: apply {{%[0-9]+}}([[TARGET]]#0, [[TARGET]]#1, [[TARGET]]#2, {{%[0-9]+}}, [[TARGET]]#0, [[TARGET]]#1, [[TARGET]]#2, {{%[0-9]+}})
 sil @stringliteral : $@thin () -> () {
-  %0 = string_literal "First"
-  %1 = string_literal "First"
+  %0 = string_literal utf8 "First"
+  %1 = string_literal utf8 "First"
   %2 = metatype $@thin String.metatype
   %3 = function_ref @string_use : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype) -> ()
   apply %3 (%0#0, %0#1, %0#2, %2, %1#0, %1#1, %1#2, %2): $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.metatype) -> ()
@@ -533,8 +533,21 @@ struct StringData {
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
 sil @sil_extract_of_string : $@thin () -> Builtin.Word {
-  %0 = string_literal ""
+  %0 = string_literal utf8 ""
   %1 = struct $StringData (%0#1 : $Builtin.Word)
   %2 = struct_extract %1 : $StringData, #size  
   return %2 : $Builtin.Word
 }
+
+sil @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+
+sil @sil_string_different_encodings : $@thin () -> Builtin.Word {
+  %0 = string_literal utf8 "help"
+  %1 = string_literal utf16 "help"
+  %2 = function_ref @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  %3 = apply %2(%0#0, %1#0) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  return %3 : $Builtin.Word
+}
+// CHECK:      [[T0:%.*]] = function_ref @helper
+// CHECK-NEXT: apply [[T0]](%0#0, %1#0)
+

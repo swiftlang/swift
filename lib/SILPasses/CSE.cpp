@@ -128,6 +128,7 @@ namespace {
 
     hash_code visitStringLiteralInst(StringLiteralInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
+                                unsigned(X->getEncoding()),
                                 X->getValue());
     }
 

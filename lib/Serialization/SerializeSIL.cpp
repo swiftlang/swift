@@ -36,6 +36,14 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 
+static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
+  switch (encoding) {
+  case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
+  case StringLiteralInst::Encoding::UTF16: return SIL_UTF16;
+  }
+  llvm_unreachable("bad string encoding");
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -606,10 +614,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::StringLiteralInst: {
-    StringRef Str = cast<StringLiteralInst>(&SI)->getValue();
+    auto SLI = cast<StringLiteralInst>(&SI);
+    StringRef Str = SLI->getValue();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned encoding = toStableStringEncoding(SLI->getEncoding());
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    (unsigned)SI.getKind(), 0, 0, 0,
+                                    (unsigned)SI.getKind(), encoding, 0, 0,
                                     S.addIdentifierRef(Ctx.getIdentifier(Str)),
                                     0);
     break;

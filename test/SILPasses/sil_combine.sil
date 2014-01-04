@@ -345,7 +345,7 @@ struct StringData {
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
 sil @sil_extract_of_string : $@thin () -> Builtin.Word {
-  %0 = string_literal ""
+  %0 = string_literal utf8 ""
   %1 = struct $StringData (%0#1 : $Builtin.Word)
   %2 = struct_extract %1 : $StringData, #size  
   return %2 : $Builtin.Word

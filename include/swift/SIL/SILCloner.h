@@ -295,7 +295,8 @@ void
 SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
   doPostProcess(Inst,
                 Builder.createStringLiteral(getOpLocation(Inst->getLoc()),
-                                            Inst->getValue()));
+                                            Inst->getValue(),
+                                            Inst->getEncoding()));
 }
 
 template<typename ImplClass>

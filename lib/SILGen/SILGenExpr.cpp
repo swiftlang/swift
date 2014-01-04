@@ -585,7 +585,8 @@ RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
 
 RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
                                         SGFContext C) {
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str);
+  auto encoding = StringLiteralInst::Encoding::UTF8;
+  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, encoding);
   CanType ty = E->getType()->getCanonicalType();
   
   ManagedValue Elts[] = {

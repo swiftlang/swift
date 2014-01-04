@@ -258,8 +258,9 @@ public:
     return insert(FloatLiteralInst::create(Loc, Ty, Value, F));
   }
   
-  StringLiteralInst *createStringLiteral(SILLocation Loc, StringRef Text) {
-    return insert(StringLiteralInst::create(Loc, Text, F));
+  StringLiteralInst *createStringLiteral(SILLocation loc, StringRef text,
+                                         StringLiteralInst::Encoding encoding) {
+    return insert(StringLiteralInst::create(loc, text, encoding, F));
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {

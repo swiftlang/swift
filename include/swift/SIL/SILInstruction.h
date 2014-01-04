@@ -676,19 +676,30 @@ public:
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
 /// a StringLiteralExpr.
 class StringLiteralInst : public SILInstruction {
-  unsigned length;
+public:
+  enum class Encoding {
+    UTF8,
+    UTF16
+  };
+
+private:
+  unsigned Length;
+  Encoding TheEncoding;
   
-  StringLiteralInst(SILLocation Loc, StringRef Text, SILTypeList *Ty);
+  StringLiteralInst(SILLocation loc, StringRef text, Encoding encoding,
+                    SILTypeList *type);
   
 public:
-  static StringLiteralInst *create(StringLiteralExpr *E, SILFunction &F);
   static StringLiteralInst *create(SILLocation Loc, StringRef Text,
-                                   SILFunction &F);
+                                   Encoding encoding, SILFunction &F);
 
-  /// getValue - Return the string data for the literal.
+  /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {reinterpret_cast<char const *>(this + 1), length};
+    return {reinterpret_cast<char const *>(this + 1), Length};
   }
+
+  /// getEncoding - Return the desired encoding of the text.
+  Encoding getEncoding() const { return TheEncoding; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

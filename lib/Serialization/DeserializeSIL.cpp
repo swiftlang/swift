@@ -30,6 +30,15 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 
+static Optional<StringLiteralInst::Encoding>
+fromStableStringEncoding(unsigned value) {
+  switch (value) {
+  case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
+  case SIL_UTF16: return StringLiteralInst::Encoding::UTF16;
+  default: return Nothing;
+  }
+}
+
 /// Used to deserialize entries in the on-disk func hash table.
 class SILDeserializer::FuncTableInfo {
 public:
@@ -755,7 +764,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::StringLiteralInst: {
     Identifier StringVal = MF->getIdentifier(ValID);
-    ResultVal = Builder.createStringLiteral(Loc, StringVal.str());
+    auto encoding = fromStableStringEncoding(Attr);
+    if (!encoding) break;
+    ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
+                                            encoding.getValue());
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {

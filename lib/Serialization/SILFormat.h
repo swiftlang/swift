@@ -30,6 +30,11 @@ using SILInstOpCodeField = BCFixed<8>;
 using SILTypeCategoryField = BCFixed<2>;
 using SILValueResultField = BCFixed<8>;
 
+enum SILStringEncoding : uint8_t {
+  SIL_UTF8,
+  SIL_UTF16
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID

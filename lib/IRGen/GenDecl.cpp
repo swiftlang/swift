@@ -1544,6 +1544,46 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data) {
   return address;
 }
 
+/// Get or create a global UTF-16 string constant.
+///
+/// \returns an i16* with a null terminator; note that embedded nulls
+///   are okay
+llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
+  // Check whether this string already exists.
+  auto &entry = GlobalUTF16Strings[utf8];
+  if (entry) return entry;
+
+  // If not, first transcode it to UTF16.
+  SmallVector<UTF16, 128> buffer(utf8.size() + 1); // +1 for ending nulls.
+  const UTF8 *fromPtr = (const UTF8 *) utf8.data();
+  UTF16 *toPtr = &buffer[0];
+  (void) ConvertUTF8toUTF16(&fromPtr, fromPtr + utf8.size(),
+                            &toPtr, toPtr + utf8.size(),
+                            strictConversion);
+
+  // The length of the transcoded string in UTF-8 code points.
+  size_t utf16Length = toPtr - &buffer[0];
+
+  // Null-terminate the UTF-16 string.
+  *toPtr = 0;
+  ArrayRef<UTF16> utf16(&buffer[0], utf16Length + 1);
+
+  auto init = llvm::ConstantDataArray::get(LLVMContext, utf16);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
+  global->setUnnamedAddr(true);
+
+  // Drill down to make an i16*.
+  auto zero = llvm::ConstantInt::get(SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(global, indices);
+
+  // Cache and return.
+  entry = address;
+  return address;
+}
+
 /// Mangle the name of a type.
 StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
   LinkEntity::forTypeMangling(type).mangle(buffer);

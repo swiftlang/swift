@@ -1201,18 +1201,34 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::StringLiteralInst: {
+    if (P.Tok.getKind() != tok::identifier) {
+      P.diagnose(P.Tok, diag::sil_string_no_encoding);
+      return true;
+    }
+
+    StringLiteralInst::Encoding encoding;
+    if (P.Tok.getText() == "utf8") {
+      encoding = StringLiteralInst::Encoding::UTF8;
+    } else if (P.Tok.getText() == "utf16") {
+      encoding = StringLiteralInst::Encoding::UTF16;
+    } else {
+      P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
+      return true;
+    }
+    P.consumeToken(tok::identifier);
+
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
       return true;
     }
    
-    // We should remove '"' from token.
-    StringRef Str = P.Tok.getText();
-    if (Str.size() < 2 || Str[0] != '"' || Str[Str.size()-1] != '"') {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
-      return true;
-    }
-    ResultVal = B.createStringLiteral(InstLoc, Str.substr(1, Str.size()-2));
+    // Drop the double quotes.
+    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+
+    // Ask the lexer to interpret the entire string as a literal segment.
+    SmallVector<char, 128> stringBuffer;
+    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
+    ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     P.consumeToken(tok::string_literal);
     break;
   }
