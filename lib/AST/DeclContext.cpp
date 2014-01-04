@@ -156,7 +156,9 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
 
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractClosureExpr:
-    return nullptr;
+    // Closures and initializers can't themselves be generic, but they
+    // can occur in generic contexts.
+    return getParent()->getGenericParamsOfContext();
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);

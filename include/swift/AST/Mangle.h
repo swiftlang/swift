@@ -18,6 +18,8 @@
 #include "swift/AST/Decl.h"
 
 namespace swift {
+class AbstractClosureExpr;
+
 namespace Mangle {
   
 /// ExplosionKind - A policy for choosing what types should be
@@ -66,14 +68,44 @@ class Mangler {
   DeclContext *DeclCtx = nullptr;
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
-  
+
 public:
+  enum BindGenerics : unsigned {
+    /// We don't intend to mangle any sort of type within this context
+    /// and so do not require its generic parameters to be bound.
+    None,
+
+    /// We are going to mangle a method declared in this context
+    /// (which must be a type context) and do not need its generic
+    /// parameters, or the parameters from its enclosing types, to be
+    /// bound because we will bind them as part of processing the
+    /// method's formal signature.
+    Enclosing,
+
+    /// We intend to mangle a type which may be dependent on the
+    /// context and so require all generic parameters to be bound.
+    All
+  };
+  
+  class ContextStack {
+    Mangler &M;
+    unsigned OldDepth;
+    ContextStack(const ContextStack &) = delete;
+    ContextStack &operator=(const ContextStack &) = delete;
+  public:
+    ContextStack(Mangler &M) : M(M), OldDepth(M.ArchetypesDepth) {
+      M.ArchetypesDepth = 0;
+    }
+    ~ContextStack() { M.ArchetypesDepth = OldDepth; }
+  };
+
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.
   Mangler(raw_ostream &buffer, bool DWARFMangling = false)
     : Buffer(buffer), DWARFMangling(DWARFMangling) {}
-  void mangleContextOf(ValueDecl *decl);
-  void mangleContext(DeclContext *ctx);
+  void mangleContextOf(ValueDecl *decl, BindGenerics shouldBind);
+  void mangleContext(DeclContext *ctx, BindGenerics shouldBind);
+  void mangleModule(Module *module);
   void mangleDeclName(ValueDecl *decl);
   void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
                       unsigned uncurryingLevel);
@@ -87,7 +119,10 @@ public:
   void mangleAddressorEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(VarDecl *var);
-  void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
+  void mangleClosureEntity(AbstractClosureExpr *closure,
+                           ExplosionKind explosion, unsigned uncurryingLevel);
+  void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind,
+                         BindGenerics shouldBind);
   void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(ProtocolDecl *protocol);
@@ -95,6 +130,8 @@ public:
   void bindGenericParameters(const GenericParamList *genericParams,
                              bool mangleParameters);
   void addSubstitution(void *ptr);
+
+  void mangleDeclTypeForDebugger(ValueDecl *decl);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,

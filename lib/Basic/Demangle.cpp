@@ -53,6 +53,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(Directness)
   CASE(Enum)
   CASE(ErrorType)
+  CASE(ExplicitClosure)
   CASE(Failure)
   CASE(FieldOffset)
   CASE(Function)
@@ -66,6 +67,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(ImplConvention)
   CASE(ImplFunctionAttribute)
   CASE(ImplFunctionType)
+  CASE(ImplicitClosure)
   CASE(ImplParameter)
   CASE(ImplResult)
   CASE(InOut)
@@ -626,14 +628,14 @@ private:
     // decl-name ::= local-decl-name
     // local-decl-name ::= 'L' index identifier
     if (Mangled.nextIf('L')) {
-      Node::IndexType discriminator;
-      if (!demangleIndex(discriminator)) return nullptr;
+      NodePointer discriminator = demangleIndexAsNode();
+      if (!discriminator) return nullptr;
 
       NodePointer name = demangleIdentifier();
       if (!name) return nullptr;
 
       NodePointer localName = Node::create(Node::Kind::LocalDeclName);
-      localName->addChild(Node::create(Node::Kind::Number, discriminator));
+      localName->addChild(std::move(discriminator));
       localName->addChild(std::move(name));
       return localName;
     }
@@ -693,6 +695,14 @@ private:
       return true;
     }
     return false;
+  }
+
+  /// Demangle an <index> and package it as a node of some kind.
+  NodePointer demangleIndexAsNode(Node::Kind kind = Node::Kind::Number) {
+    Node::IndexType index;
+    if (!demangleIndex(index))
+      return nullptr;
+    return Node::create(kind, index);
   }
 
   NodePointer createSwiftType(Node::Kind typeKind, StringRef name) {
@@ -916,19 +926,29 @@ private:
     } else if (Mangled.nextIf('a')) {
       entityKind = Node::Kind::Addressor;
       name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('g')) {
       entityKind = Node::Kind::Getter;
       name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('s')) {
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('U')) {
+      entityKind = Node::Kind::ExplicitClosure;
+      name = demangleIndexAsNode();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('u')) {
+      entityKind = Node::Kind::ImplicitClosure;
+      name = demangleIndexAsNode();
+      if (!name) return nullptr;
     } else if (entityBasicKind == Node::Kind::Initializer) {
       // entity-name ::= 'A' index
       if (Mangled.nextIf('A')) {
         entityKind = Node::Kind::DefaultArgumentInitializer;
-        Node::IndexType index;
-        if (!demangleIndex(index)) return nullptr;
-        name = Node::create(Node::Kind::Number, index);
+        name = demangleIndexAsNode();
+        if (!name) return nullptr;
       // entity-name ::= 'i'
       } else if (Mangled.nextIf('i')) {
         entityKind = Node::Kind::Initializer;
@@ -939,6 +959,7 @@ private:
     } else {
       entityKind = entityBasicKind;
       name = demangleDeclName();
+      if (!name) return nullptr;
     }
 
     NodePointer entity = Node::create(entityKind);
@@ -1062,17 +1083,16 @@ private:
       return demangleArchetypeRef(depth + 1, index);
     }
     if (Mangled.nextIf('q')) {
-      Node::IndexType index;
-      if (!demangleIndex(index))
+      NodePointer index = demangleIndexAsNode();
+      if (!index)
         return nullptr;
-      NodePointer index_node = Node::create(Node::Kind::Number, index);
       NodePointer decl_ctx = Node::create(Node::Kind::DeclContext);
       NodePointer ctx = demangleContext();
       if (!ctx)
         return nullptr;
       decl_ctx->addChild(ctx);
       NodePointer qual_atype = Node::create(Node::Kind::QualifiedArchetype);
-      qual_atype->addChild(index_node);
+      qual_atype->addChild(index);
       qual_atype->addChild(decl_ctx);
       return qual_atype;
     }
@@ -1906,6 +1926,17 @@ private:
     case swift::Demangle::Node::Kind::Function:
       toStringEntity(true, true, "");
       return;
+    case swift::Demangle::Node::Kind::ExplicitClosure:
+    case swift::Demangle::Node::Kind::ImplicitClosure: {
+      auto index = pointer->getChild(1)->getIndex();
+      DemanglerPrinter name;
+      name << '(';
+      if (pointer->getKind() == Node::Kind::ImplicitClosure)
+        name << "implicit ";
+      name << "closure #" << (index + 1) << ")";
+      toStringEntity(false, false, name.str());
+      return;
+    }
     case swift::Demangle::Node::Kind::Global:
       toStringChildren(pointer);
       return;

@@ -679,15 +679,17 @@ Globals
   entity-kind ::= 'v'                    // variable (let/var)
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
-  entity-name ::= 'D'                    // deallocating destructor; untyped
-  entity-name ::= 'd'                    // non-deallocating destructor; untyped
+  entity-name ::= 'A' index              // default argument generator
+  entity-name ::= 'a' decl-name type     // addressor
   entity-name ::= 'C' type               // allocating constructor
   entity-name ::= 'c' type               // non-allocating constructor
+  entity-name ::= 'D'                    // deallocating destructor; untyped
+  entity-name ::= 'd'                    // non-deallocating destructor; untyped
   entity-name ::= 'g' decl-name type     // getter
-  entity-name ::= 's' decl-name type     // setter
-  entity-name ::= 'a' decl-name type     // addressor
-  entity-name ::= 'A' index              // default argument generator
   entity-name ::= 'i'                    // non-local variable initializer
+  entity-name ::= 's' decl-name type     // setter
+  entity-name ::= 'U' index type         // explicit anonymous closure expression
+  entity-name ::= 'u' index type         // implicit anonymous closure
   decl-name ::= identifier
   decl-name ::= local-decl-name
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
@@ -697,7 +699,7 @@ An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``
 (``[FIv]``).
 
-An ``entity-name`` starts with ``[AaCcDFgIisv]`` or a ``decl-name``.
+An ``entity-name`` starts with ``[AaCcDggis]`` or a ``decl-name``.
 A ``decl-name`` starts with a ``[L]`` or an ``identifier`` (``[0-9oX]``).
 
 A ``context`` starts with either an ``entity`` or a ``module``, which

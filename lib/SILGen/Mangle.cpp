@@ -66,11 +66,14 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
   case SILDeclRef::Kind::Func:
-    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
-      // FIXME: Generate a more descriptive name for closures.
-      buffer << "closure" << anonymousSymbolCounter++;
+    if (!c.hasDecl()) {
+      buffer << introducer;
+      mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
+                                  ExplosionKind::Minimal,
+                                  c.uncurryLevel);
       return;
     }
+
     // As a special case, functions can have external asm names.
     // Use the asm name only for the original non-thunked, non-curried entry
     // point.
@@ -100,10 +103,7 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
     }
 
     buffer << introducer;
-    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
-      
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal,
-                         c.uncurryLevel);
+    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, c.uncurryLevel);
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
@@ -135,24 +135,12 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
 
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
-    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
-      // FIXME: Generate a more descriptive name for getters.
-      buffer << "closure" << anonymousSymbolCounter++;
-      return;
-    }
-
     buffer << introducer;
     mangler.mangleGetterEntity(c.getDecl(), ExplosionKind::Minimal);
     return;
 
   //   entity ::= declaration 's'                 // setter
   case SILDeclRef::Kind::Setter:
-    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
-      // FIXME: Generate a more descriptive name for setters.
-      buffer << "closure" << anonymousSymbolCounter++;
-      return;
-    }
-
     buffer << introducer;
     mangler.mangleSetterEntity(c.getDecl(), ExplosionKind::Minimal);
     return;

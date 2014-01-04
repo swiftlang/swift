@@ -108,10 +108,10 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
-  //   global ::= 't' type                       // value witness
+  //   global ::= 't' type
   case Kind::DebuggerDeclTypeMangling:
     buffer << "_Tt";
-    mangler.mangleDeclType(getDecl(), ExplosionKind::Minimal, 0);
+    mangler.mangleDeclTypeForDebugger(getDecl());
     return;
 
   case Kind::DebuggerTypeMangling:
@@ -138,14 +138,16 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::SwiftMetaclassStub:
     buffer << "_TMm";
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
-                              ExplosionKind::Minimal);
+                              ExplosionKind::Minimal,
+                              Mangler::BindGenerics::None);
     return;
       
   //   global ::= 'Mn' type                       // nominal type descriptor
   case Kind::NominalTypeDescriptor:
     buffer << "_TMn";
     mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
-                              ExplosionKind::Minimal);
+                              ExplosionKind::Minimal,
+                              Mangler::BindGenerics::None);
     return;
 
   //   global ::= 'Mp' type                       // protocol descriptor
@@ -252,7 +254,8 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-      mangler.mangleNominalType(type, getExplosionKind());
+      mangler.mangleNominalType(type, getExplosionKind(),
+                                Mangler::BindGenerics::None);
     } else {
       mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     }
