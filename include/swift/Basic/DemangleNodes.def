@@ -1,0 +1,107 @@
+//===-- DemangleNodes.def - Demangling Tree Metaprogramming -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros useful for macro-metaprogramming with nodes in
+// the demangling tree.
+//
+//===----------------------------------------------------------------------===//
+
+/// NODE(ID)
+///   The node's enumerator value is Node::Kind::ID.
+
+NODE(Failure)
+NODE(Addressor)
+NODE(Allocator)
+NODE(ArchetypeAndProtocol)
+NODE(ArchetypeRef)
+NODE(ArgumentTuple)
+NODE(ArrayType)
+NODE(AssociatedTypeRef)
+NODE(BoundGenericClass)
+NODE(BoundGenericEnum)
+NODE(BoundGenericStructure)
+NODE(BridgeToBlockFunction)
+NODE(BuiltinTypeName)
+NODE(Class)
+NODE(Constructor)
+NODE(Deallocator)
+NODE(DeclContext)
+NODE(DefaultArgumentInitializer)
+NODE(DependentProtocolWitnessTableGenerator)
+NODE(DependentProtocolWitnessTableTemplate)
+NODE(Destructor)
+NODE(Directness)
+NODE(Enum)
+NODE(ErrorType)
+NODE(ExplicitClosure)
+NODE(FieldOffset)
+NODE(Function)
+NODE(FunctionType)
+NODE(Generics)
+NODE(GenericType)
+NODE(GenericTypeMetadataPattern)
+NODE(Getter)
+NODE(Global)
+NODE(Identifier)
+NODE(ImplConvention)
+NODE(ImplFunctionAttribute)
+NODE(ImplFunctionType)
+NODE(ImplicitClosure)
+NODE(ImplParameter)
+NODE(ImplResult)
+NODE(InOut)
+NODE(InfixOperator)
+NODE(Initializer)
+NODE(LazyProtocolWitnessTableAccessor)
+NODE(LazyProtocolWitnessTableTemplate)
+NODE(LocalDeclName)
+NODE(Metatype)
+NODE(Metaclass)
+NODE(Module)
+NODE(NominalTypeDescriptor)
+NODE(NonVariadicTuple)
+NODE(Number)
+NODE(ObjCAttribute)
+NODE(ObjCBlock)
+NODE(PostfixOperator)
+NODE(PrefixOperator)
+NODE(Protocol)
+NODE(ProtocolConformance)
+NODE(ProtocolList)
+NODE(ProtocolWitness)
+NODE(ProtocolWitnessTable)
+NODE(QualifiedArchetype)
+NODE(ReabstractionThunk)
+NODE(ReabstractionThunkHelper)
+NODE(ReturnType)
+NODE(SelfTypeRef)
+NODE(Setter)
+NODE(Structure)
+NODE(Suffix)
+NODE(TupleElement)
+NODE(TupleElementName)
+NODE(TupleElementType)
+NODE(Type)
+NODE(TypeAlias)
+NODE(TypeList)
+NODE(TypeMetadata)
+NODE(UncurriedFunctionType)
+NODE(Unknown)
+NODE(Unowned)
+NODE(ValueWitnessKind)
+NODE(ValueWitnessTable)
+NODE(Variable)
+NODE(VariadicTuple)
+NODE(Weak)
+NODE(WitnessTableOffset)
+
+#undef NODE
