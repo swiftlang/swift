@@ -185,9 +185,11 @@ public:
   /// underlying decls instead.
   llvm::DenseSet<const clang::Decl *> SuperfluousTypedefs;
 
+  using ClangDeclAndFlag = llvm::PointerIntPair<const clang::Decl *, 1, bool>;
+
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
+  llvm::DenseMap<std::pair<ClangDeclAndFlag, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
   /// \brief Mapping of already-imported macros.
@@ -381,7 +383,8 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
-  Decl *importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc);
+  Decl *importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc,
+                           bool forceClassMethod = false);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

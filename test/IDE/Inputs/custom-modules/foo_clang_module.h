@@ -15,7 +15,12 @@ int fooFunc3(int a, float b, double c, int *d);
 
 int redeclaredInMultipleModulesFunc1(int a);
 
-@interface FooClass {
+@protocol FooProtocol
+- (void)fooProtoFunc;
++ (void)fooProtoClassFunc;
+@end
+
+@interface FooClass <FooProtocol> {
   int fooIntIvar;
 }
 

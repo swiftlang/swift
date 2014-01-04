@@ -2503,28 +2503,46 @@ namespace {
     ///
     /// FIXME: This whole thing is a hack, because name lookup should really
     /// just find these members when it looks in the protocol. Unfortunately,
-    /// that's not something the name lookup code can handle right now.
+    /// that's not something the name lookup code can handle right now, and
+    /// it may still be necessary when the protocol's instance methods become
+    /// class methods on a root class (e.g. NSObject-the-protocol's instance
+    /// methods become class methods on NSObject).
     void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members,
                                        ASTContext &Ctx) {
+      Type swiftTy = dc->getDeclaredTypeInContext();
+      auto swiftClass = swiftTy->getClassOrBoundGenericClass();
+      bool isRoot = swiftClass && !swiftClass->getSuperclass();
+
       for (auto proto : protocols) {
         for (auto member : proto->getMembers()) {
-          if (auto func = dyn_cast<FuncDecl>(member)) {
-            if (auto objcMethod = dyn_cast_or_null<clang::ObjCMethodDecl>(
-                                    func->getClangDecl())) {
-              if (!decl->getMethod(objcMethod->getSelector(),
-                                   objcMethod->isInstanceMethod())) {
-                if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
-                  members.push_back(imported);
+          auto func = dyn_cast<FuncDecl>(member);
+          if (!func)
+            continue;
 
-                  // Import any special methods based on this member.
-                  if (auto special = importSpecialMethod(imported, dc)) {
-                    members.push_back(special);
-                  }
-                }
-              }
+          auto objcMethod =
+            dyn_cast_or_null<clang::ObjCMethodDecl>(func->getClangDecl());
+          if (!objcMethod)
+            continue;
+
+          clang::Selector sel = objcMethod->getSelector();
+          if (decl->getMethod(sel, objcMethod->isInstanceMethod()))
+            continue;
+
+          if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
+            members.push_back(imported);
+
+            // Import any special methods based on this member.
+            if (auto special = importSpecialMethod(imported, dc))
+              members.push_back(special);
+
+            if (isRoot && objcMethod->isInstanceMethod() &&
+                !decl->getClassMethod(sel, /*AllowHidden=*/true)) {
+              if (auto classImport = Impl.importMirroredDecl(objcMethod,
+                                                             dc, true))
+                members.push_back(classImport);
             }
           }
         }
@@ -3125,23 +3143,24 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
 Decl *
 ClangImporter::Implementation::
-importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
+importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc,
+                   bool forceClassMethod) {
   if (!decl)
     return nullptr;
 
-  auto known = ImportedProtocolDecls.find({decl->getCanonicalDecl(), dc});
+  auto canon = decl->getCanonicalDecl();
+  auto known = ImportedProtocolDecls.find({{canon, forceClassMethod}, dc });
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
   SwiftDeclConverter converter(*this);
-  auto result = converter.VisitObjCMethodDecl(decl, dc);
-  auto canon = decl->getCanonicalDecl();
+  auto result = converter.VisitObjCMethodDecl(decl, dc, forceClassMethod);
   if (result) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(decl);
   }
   if (result || !converter.hadForwardDeclaration())
-    ImportedProtocolDecls[{canon, dc}] = result;
+    ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;
   return result;
 }
 
