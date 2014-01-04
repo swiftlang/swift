@@ -1841,16 +1841,21 @@ string_literal
 ``````````````
 ::
 
-  sil-instruction ::= 'string_literal' string-literal
+  sil-instruction ::= 'string_literal' encoding string-literal
+  encoding ::= 'utf8'
+  encoding ::= 'utf16'
 
   %1 = string_literal "asdf"
-  // %1 has type $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1)
+  // %1#0 has type $Builtin.RawPointer
+  // %1#1 has type Builtin.Word
+  // %1#2 has tpye Builtin.Int1
 
-Creates a reference to a string in the global string table. The result has three
-values: a pointer to the data, a length, and a bit that indicates whether
-the string contains only ASCII characters.  In any case, the referenced string
-is null-terminated. The string literal value is specified using Swift's string
-literal syntax (though ``\()`` interpolations are not allowed).
+Creates a reference to a string in the global string table. The result
+has three values: a pointer to the data, a length, and a bit that
+indicates whether the string contains only ASCII characters.  In any
+case, the referenced string is null-terminated. The string literal
+value is specified using Swift's string literal syntax (though ``\()``
+interpolations are not allowed).
 
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
