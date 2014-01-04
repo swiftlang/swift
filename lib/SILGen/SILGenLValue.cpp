@@ -93,19 +93,6 @@ static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
   };
 }
 
-/// Return the LValueTypeData for a value whose type is its own
-/// lowering.
-static LValueTypeData getValueTypeData(SILValue value) {
-  assert(value.getType().isObject());
-  assert(value.getType().hasReferenceSemantics() ||
-         value.getType().is<MetatypeType>());
-  return {
-    AbstractionPattern(value.getType().getSwiftRValueType()),
-    value.getType().getSwiftRValueType(),
-    value.getType()
-  };
-}
-
 static LValueTypeData getMemberTypeData(SILGenFunction &gen,
                                         Type memberStorageType,
                                         Expr *lvalueExpr) {
@@ -231,6 +218,17 @@ void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
 
+/// Return the LValueTypeData for a value whose type is its own
+/// lowering.
+static LValueTypeData getValueTypeData(SILValue value) {
+  assert(value.getType().isObject());
+  return {
+    AbstractionPattern(value.getType().getSwiftRValueType()),
+    value.getType().getSwiftRValueType(),
+    value.getType()
+  };
+}
+
 namespace {
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
@@ -303,7 +301,6 @@ namespace {
     }
   };
 
-
   class GetterSetterComponent : public LogicalPathComponent {
     // The VarDecl or SubscriptDecl being get/set.
     ValueDecl *decl;
@@ -320,11 +317,11 @@ namespace {
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
     prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const
+                        ManagedValue base, AbstractFunctionDecl *funcDecl) const
     {
       AccessorArgs result;
       if (base)
-        result.base = gen.prepareAccessorBaseArg(loc, base);
+        result.base = gen.prepareAccessorBaseArg(loc, base, funcDecl);
       
       if (subscriptIndexExpr) {
         if (!origSubscripts)
@@ -361,9 +358,15 @@ namespace {
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValueSource &&rvalue, ManagedValue base) const override
-    {
-      auto args = prepareAccessorArgs(gen, loc, base);
+             RValueSource &&rvalue, ManagedValue base) const override {
+      // Pass in just the setter.
+      AbstractFunctionDecl *setter;
+      if (auto *VD = dyn_cast<VarDecl>(decl))
+        setter = VD->getSetter();
+      else
+        setter = cast<SubscriptDecl>(decl)->getSetter();
+      
+      auto args = prepareAccessorArgs(gen, loc, base, setter);
       
       return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
@@ -372,9 +375,14 @@ namespace {
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) const override
-    {
-      auto args = prepareAccessorArgs(gen, loc, base);
+                     ManagedValue base, SGFContext c) const override {
+      AbstractFunctionDecl *getter;
+      if (auto *VD = dyn_cast<VarDecl>(decl))
+        getter = VD->getGetter();
+      else
+        getter = cast<SubscriptDecl>(decl)->getGetter();
+
+      auto args = prepareAccessorArgs(gen, loc, base, getter);
       
       return gen.emitGetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
@@ -450,7 +458,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
     ManagedValue rv = gen.emitRValue(e).getAsSingleValue(gen, e);
     auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
-    lv.add<ValueComponent>(std::move(rv), typeData);
+    lv.add<ValueComponent>(rv, typeData);
     return lv;
   }
 
@@ -508,7 +516,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
                                                               e->getSubExpr());
   auto addrMat = gen.emitMaterialize(e, v);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue(addrMat.address, addrMat.valueCleanup),
+  lv.add<ValueComponent>(ManagedValue(addrMat.address, ManagedValue::LValue),
                          typeData);
   return std::move(lv);
 }
@@ -573,10 +581,6 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
-  
-  assert((e->getBase()->getType()->is<InOutType>() ||
-          e->getBase()->getType()->hasReferenceSemantics()) &&
-         "Base of lvalue subscript expr is not an lvalue!");
   
   LValue lv = visitRec(e->getBase());
   lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
@@ -1028,11 +1032,6 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        SILLocation loc,
                                        const PathComponent &component,
                                        ManagedValue base) {
-  assert(!base ||
-         base.getType().isAddress() ||
-         base.getType().is<MetatypeType>() ||
-         base.getType().hasReferenceSemantics());
-
   ManagedValue addr;
   if (component.isPhysical()) {
     addr = component.asPhysical().offset(SGF, loc, base);

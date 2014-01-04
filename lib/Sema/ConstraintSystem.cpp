@@ -885,8 +885,6 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value)) {
       // If self is a struct, properly qualify it based on our base
       // qualification.  If we have an lvalue coming in, we expect an @inout.
-      // TODO: Not for @non-mutable methods, they don't require self to be an
-      // lvalue.
       if (!selfTy->hasReferenceSemantics() && baseTy->is<LValueType>())
         selfTy = InOutType::get(selfTy);
 
@@ -915,9 +913,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
     if (isDynamicResult || subscript->getAttrs().isOptional())
-      elementTy = OptionalType::get(elementTy);
-    else if (subscript->isSettable())
-      elementTy = LValueType::get(elementTy);
+      elementTy = OptionalType::get(elementTy->getRValueType());
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {

@@ -1384,9 +1384,10 @@ namespace {
       auto loweredSubstArgType =
         SGF.getLoweredType(substArgType).getSwiftRValueType();
 
-      // @inout's are mostly straightforward.
-      if (isa<InOutType>(substArgType)) {
-        assert(param.isIndirectInOut());
+      // If the caller takes the argument indirectly, the argument has an
+      // @inout type.
+      if (param.isIndirectInOut()) {
+        assert(isa<InOutType>(substArgType));
         emitInOut(std::move(arg), loweredSubstArgType, param.getType(),
                   origParamType, substArgType);
         return;
@@ -2248,18 +2249,30 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 }
 
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
-                                                    ManagedValue base) {
-  // @inout bases get passed by their address.
-  if (base.getType().isAddress())
-    return RValueSource(loc, RValue(*this, loc,
-                                    base.getType().getSwiftType(),
-                                    base));
+                                                    ManagedValue base,
+                                                    AbstractFunctionDecl *decl){
+
+  if (base.isLValue()) {
+    // @inout bases get passed by their address.
+    if (decl->getImplicitSelfDecl()->getType()->is<InOutType>())
+      return RValueSource(loc, RValue(*this, loc,
+                                      base.getType().getSwiftType(),
+                                      base));
+    // When calling an accessor, the base may be provided as an @inout value, even
+    // though we only need an rvalue.  In this case, load the value out of the
+    // address.
+    // TODO: this causes us to materialize stuff (at the SIL level) that will
+    // just be loaded - unnecessarily dumping stuff in memory.
+    base = emitLoad(loc, base.getValue(),
+                    getTypeLowering(base.getType().getObjectType()),
+                    SGFContext(), IsNotTake);
+  }
 
   // Other bases get passed +1.  Consume the base's +1.
   base = ManagedValue::forUnmanaged(base.forward(*this));
   
   return RValueSource(loc, RValue(*this, loc,
-                                  base.getType().getSwiftType(), base));
+                                  base.getSwiftType(), base));
 }
 
 

@@ -657,15 +657,8 @@ static Type computeSelfType(AbstractFunctionDecl *func,
     return selfTy;
 
   if (auto *FD = dyn_cast<FuncDecl>(func)) {
-    if (FD->isStatic())
+    if (FD->isStatic() || !FD->isMutating())
       return selfTy;
-    
-    if (!FD->isMutating() &&
-        // For now, always make 'self' be lvalue qualified for
-        // property/subscript getters and setters.
-        !FD->isGetterOrSetter())
-      return selfTy;
-    
   } else if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
     return selfTy;
   }

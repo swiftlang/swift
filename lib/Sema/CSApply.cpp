@@ -203,15 +203,16 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
     return baseObjectTy;
   }
 
-  // Computed vardecls are always lvalues (for now).
-  // FIXME: Remove this when materialization is dead.
+  // If the base of the access is mutable, then we may be invoking a getter or
+  // setter and the base needs to be mutable.
   if (auto *VD = dyn_cast<VarDecl>(member))
-    if (VD->isComputed() && !baseTy->hasReferenceSemantics())
+    if (VD->isComputed() && baseTy->is<InOutType>())
       return InOutType::get(baseObjectTy);
   
-  // The base of subscripts are always lvalues (for now).
-  // FIXME: Remove this when materialization is dead.
-  if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics())
+  // If the base of the subscript is mutable, then we may be invoking a mutable
+  // getter or setter.
+  if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics() &&
+      baseTy->is<InOutType>())
     return InOutType::get(baseObjectTy);
   
   // Accesses to non-function members in value types are done through an @lvalue
@@ -677,9 +678,6 @@ namespace {
       if (!index)
         return nullptr;
 
-      // Determine the result type of the subscript expression.
-      resultTy = resultTy->getRValueType();
-
       // Form the subscript expression.
 
       // Handle dynamic lookup.
@@ -728,15 +726,6 @@ namespace {
         subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }
-
-      // If the subscript expression is non-settable, then this produces an
-      // rvalue, otherwise it produces an lvalue.
-      if (subscript->isSettable())
-        resultTy = LValueType::get(resultTy);
-      
-      // Subscripts on a struct always take them as @inout lvalues (for now!)
-      if (!containerTy->hasReferenceSemantics())
-        containerTy = InOutType::get(containerTy);
 
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
@@ -787,11 +776,15 @@ namespace {
         return subscriptExpr;
       }
 
+      Type selfTy = containerTy;
+      if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
+        if (base->getType()->is<LValueType>())
+          selfTy = InOutType::get(selfTy);
+
+      selfTy = adjustSelfTypeForMember(selfTy, subscript);
+
       // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, 
-                                        adjustSelfTypeForMember(containerTy,
-                                                                subscript),
-                                        locator);
+      base = coerceObjectArgumentToType(base, selfTy, locator);
       if (!base)
         return nullptr;
 

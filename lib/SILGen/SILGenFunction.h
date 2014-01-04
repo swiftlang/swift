@@ -614,7 +614,8 @@ public:
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   
-  RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base);
+  RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
+                                      AbstractFunctionDecl *decl);
   
   ManagedValue emitGetAccessor(SILLocation loc, ValueDecl *decl,
                                ArrayRef<Substitution> substitutions,

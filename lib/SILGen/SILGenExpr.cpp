@@ -1236,12 +1236,13 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   if (FieldDecl->isComputed()) {
     ManagedValue base
       = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
-    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base);
-    
-    return RValue(SGF, E,
-                  SGF.emitGetAccessor(E, FieldDecl,
-                                      E->getMember().getSubstitutions(),
-                                      std::move(baseRV), RValueSource(), C));
+    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base,
+                                                     FieldDecl->getGetter());
+    ManagedValue MV =
+      SGF.emitGetAccessor(E, FieldDecl,
+                          E->getMember().getSubstitutions(),
+                          std::move(baseRV), RValueSource(), C);
+    return MV ? RValue(SGF, E, MV) : RValue();
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
@@ -1327,16 +1328,15 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Emit the base.
   ManagedValue base =
      SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
-  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base);
+  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, decl->getGetter());
 
   // Emit the indices.
   RValueSource subscriptRV = RValueSource(E, SGF.emitRValue(E->getIndex()));
-    
-  return RValue(SGF, E,
-                SGF.emitGetAccessor(E, decl,
-                                    E->getDecl().getSubstitutions(),
-                                    std::move(baseRV),
-                                    std::move(subscriptRV), C));
+
+  ManagedValue MV =
+    SGF.emitGetAccessor(E, decl, E->getDecl().getSubstitutions(),
+                        std::move(baseRV), std::move(subscriptRV), C);
+  return MV ? RValue(SGF, E, MV) : RValue();
 }
 
 

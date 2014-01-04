@@ -392,11 +392,37 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType) {
   // Get-only VarDecls always produce rvalues.
   if (!VD->isSettable())
     return false;
-  
-  // If the base type is a struct or enum, and is not @inout qualified, the
-  // result of an access is always an rvalue.
-  return !baseType || baseType->hasReferenceSemantics() ||
-         baseType->is<LValueType>() || VD->isStatic();
+
+  // If there is no base, or if the base isn't being used, it is settable.
+  if (!baseType || VD->isStatic())
+    return true;
+
+  // If the base is a reference type, or if the base is mutable, then a
+  // reference produces an lvalue.
+  if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
+    return true;
+
+  // If the base is an rvalue, then we only produce an lvalue if the vardecl
+  // is a computed property, whose setter is @!mutating.
+  return VD->isComputed() && !VD->getSetter()->isMutating();
+}
+
+/// doesSubscriptDeclProduceLValue - Return true if a reference to the specified
+/// SubscriptDecl should produce an lvalue.
+static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType) {
+  assert(baseType && "Subscript without a base expression?");
+  // Get-only SubscriptDecls always produce rvalues.
+  if (!SD->isSettable())
+    return false;
+
+  // If the base is a reference type, or if the base is mutable, then a
+  // reference produces an lvalue.
+  if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
+    return true;
+
+  // If the base is an rvalue, then we only produce an lvalue if both the getter
+  // and setter are non-mutating.
+  return !SD->getGetter()->isMutating() && !SD->getSetter()->isMutating();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
@@ -413,11 +439,23 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   if (auto *VD = dyn_cast<VarDecl>(value))
     if (doesVarDeclMemberProduceLValue(VD, baseType))
       return LValueType::get(getTypeOfRValue(value, wantInterfaceType));
-  
-  if (wantInterfaceType)
-    return value->getInterfaceType();
 
-  return value->getType();
+
+  Type requestedType =
+    wantInterfaceType ? value->getInterfaceType() : value->getType();
+
+  // Check to see if the subscript-decl produces an lvalue.
+  if (auto *SD = dyn_cast<SubscriptDecl>(value))
+    if (doesSubscriptDeclProduceLValue(SD, baseType)) {
+      // Subscript decls have function type.  For the purposes of later type
+      // checker consumption, model this as returning an lvalue.
+      auto *RFT = requestedType->castTo<FunctionType>();
+      return FunctionType::get(RFT->getInput(),
+                               LValueType::get(RFT->getResult()),
+                               RFT->getExtInfo());
+    }
+
+  return requestedType;
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc,
