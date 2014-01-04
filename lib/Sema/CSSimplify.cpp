@@ -1511,12 +1511,26 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
-    // Verify that @mutating methods on value types are only applied to settable
-    // values.
+    // If we have an rvalue base of struct or enum type, make sure that the
+    // result isn't @mutating (only valid on lvalues).
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
-        isa<FuncDecl>(result) && cast<FuncDecl>(result)->isMutating() &&
-        result->isInstanceMember() && !baseTy->is<LValueType>())
-      continue;
+        !baseTy->is<LValueType>() && result->isInstanceMember()) {
+      if (auto *FD = dyn_cast<FuncDecl>(result))
+        if (FD->isMutating())
+          continue;
+      
+      // Subscripts are ok on rvalues so long as the getter is @!mutating.
+      if (auto *SD = dyn_cast<SubscriptDecl>(result))
+        if (SD->getGetter()->isMutating())
+          continue;
+      
+      // Computed properties are ok on rvalues so long as the getter is
+      // non-mutating.
+      if (auto *VD = dyn_cast<VarDecl>(result))
+        if (auto *GD = VD->getGetter())
+          if (GD->isMutating())
+            continue;
+    }
 
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
