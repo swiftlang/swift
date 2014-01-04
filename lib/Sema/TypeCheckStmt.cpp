@@ -785,8 +785,8 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = new (Context) UnresolvedConstructorExpr(superRef,
                                                     SourceLoc(),
-                                                    SourceLoc(),
-                                                    /*Implicit=*/true);
+                                                         SourceLoc(),
+                                                         /*Implicit=*/true);
   Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
                                        /*hasTrailingClosure=*/false,
                                        /*Implicit=*/true);
