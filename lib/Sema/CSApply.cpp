@@ -1375,14 +1375,14 @@ namespace {
           else
             goto not_value_type_member;
         } else if (auto amRef = dyn_cast<ArchetypeMemberRefExpr>(member)) {
-          if (!amRef->getBase()->getType()->is<LValueType>() &&
-              !amRef->getBase()->getType()->is<InOutType>())
+          if (amRef->getBase()->getType()->is<MetatypeType>() ||
+              amRef->getBase()->getType()->hasReferenceSemantics())
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(amRef->getDecl());
           kind = ValueTypeMemberApplication::Archetype;
         } else if (auto pmRef = dyn_cast<ExistentialMemberRefExpr>(member)) {
-          if (!pmRef->getBase()->getType()->is<LValueType>() &&
-              !pmRef->getBase()->getType()->is<InOutType>())
+          if (pmRef->getBase()->getType()->is<MetatypeType>() ||
+              pmRef->getBase()->getType()->hasReferenceSemantics())
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(pmRef->getDecl());
           kind = ValueTypeMemberApplication::Protocol;
