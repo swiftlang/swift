@@ -575,21 +575,33 @@ replaceDynApplyWithStaticApply(ApplyInst *AI,
                            ArrayRef<Substitution>(), Args, false, *F);
 }
 
-/// \brief Scan the uses of the protocol object and return an
-/// InitExistentialInst instruction if there is only one initialization and the
-/// object is not captured by any instruction that may initialize it.
-static InitExistentialInst *
+/// \brief Scan the uses of the protocol object and return the initialization
+/// instruction, which can be copy_addr or init_existential.
+/// There needs to be only one initialization instruction and the
+/// object must not be captured by any instruction that may re-initialize it.
+static SILInstruction *
 findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
-  InitExistentialInst *Init = 0;
+  SILInstruction *Init = 0;
   for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
        UI != E; UI++) {
     switch (UI.getUser()->getKind()) {
+      case ValueKind::CopyAddrInst: {
+        // If we are reading the content of the protocol (to initialize
+        // something else) then its okay.
+        if (cast<CopyAddrInst>(UI.getUser())->getSrc() == ProtocolObject)
+          continue;
+
+        // fallthrough: ...
+      }
       case ValueKind::InitExistentialInst: {
         // Make sure there is a single initialization:
-        if (Init)
+        if (Init) {
+          DEBUG(llvm::dbgs() << " *** Multiple Protocol initializers: " <<
+                *UI.getUser() << " and " << *Init);
           return nullptr;
+        }
         // This is the first initialization.
-        Init = cast<InitExistentialInst>(UI.getUser());
+        Init = UI.getUser();
         continue;
       }
       case ValueKind::ProjectExistentialInst:
@@ -600,7 +612,6 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
       case ValueKind::StrongReleaseInst:
       case ValueKind::DestroyAddrInst:
       case ValueKind::DestroyValueInst:
-      case ValueKind::CopyAddrInst:
         continue;
 
       default: {
@@ -648,8 +659,16 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         *ProtocolObject.getDef());
 
   // Find a single initialization point, and make sure the protocol is not
-  // captured.
-  InitExistentialInst *Init = findSingleInitNoCaptureProtocol(ProtocolObject);
+  // captured. We also handle the case where the initializer is the copy_addr
+  // instruction by looking at the source object.
+  SILInstruction *InitInst = findSingleInitNoCaptureProtocol(ProtocolObject);
+  if (CopyAddrInst *CAI = dyn_cast_or_null<CopyAddrInst>(InitInst)) {
+    if (!CAI->isInitializationOfDest() || !CAI->isTakeOfSrc())
+      return nullptr;
+    InitInst = findSingleInitNoCaptureProtocol(CAI->getSrc());
+  }
+
+  InitExistentialInst *Init = dyn_cast_or_null<InitExistentialInst>(InitInst);
   if (!Init)
     return nullptr;
 
@@ -671,6 +690,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
           !ConcreteTy.getPointer()->isEqual(Witness.getConformance()->getType()))
         continue;
 
+      DEBUG(llvm::dbgs() << " *** Found witness table for : " << *Init);
+
       // Okay, we found the right witness table. Now look for the method.
       for (auto &Entry : Witness.getEntries()) {
         // Look at method entries only.
@@ -690,6 +711,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       }
     }
   }
+  DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *PMI);
 
   return nullptr;
 }
