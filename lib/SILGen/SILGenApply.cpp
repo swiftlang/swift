@@ -784,8 +784,8 @@ public:
     auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
 
     if (e->getDecl()->isInstanceMember()) {
-      // Attach the existential cleanup to the projection so that it gets consumed
-      // (or not) when the call is applied to it (or isn't).
+      // Attach the existential cleanup to the projection so that it gets
+      // consumed (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
       SILType protoSelfTy
         = gen.getLoweredType(proto->getSelf()->getArchetype());

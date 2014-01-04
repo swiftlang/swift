@@ -437,9 +437,11 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
+      // If this is a non-address-only 'let' value, return it as a value.
       if (It->second.isConstant())
         return emitManagedRetain(loc, It->second.getConstant());
 
+      // Otherwise, it is a reference to a mutable var, return it as an lvalue.
       return ManagedValue::forLValue(It->second.getAddress());
     }
 
@@ -533,9 +535,11 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   
   // If it comes back as an LValue-style RValue, emit a load to get a real
   // RValue.
-  if (Reference.isLValue())
+  if (Reference.isLValue()) {
     Reference = SGF.emitLoad(E, Reference.getUnmanagedValue(),
                              SGF.getTypeLowering(E->getType()), C, IsNotTake);
+    if (!Reference) return RValue();
+  }
   return RValue(SGF, E, Reference);
 }
 
@@ -550,7 +554,7 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   if (Self.isLValue())
     Self = SGF.emitLoad(E, Self.getUnmanagedValue(),
                           SGF.getTypeLowering(E->getSelf()->getType()),
-                          C, IsNotTake);
+                          SGFContext(), IsNotTake);
 
   // Perform an upcast to convert self to the indicated super type.
   auto Result = SGF.B.createUpcast(E, Self.getValue(),
@@ -2848,7 +2852,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
   
-  SILValue selfAddr = SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
+  SILValue selfAddr =
+    SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
   newSelf.assignInto(SGF, E, selfAddr);
   
   return SGF.emitEmptyTupleRValue(E);
