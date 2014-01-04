@@ -38,7 +38,6 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 STATISTIC(NumFuncDevirt, "Number of functions devirtualized");
 
-
 //===----------------------------------------------------------------------===//
 //                             SILCombineWorklist
 //===----------------------------------------------------------------------===//
@@ -256,6 +255,7 @@ public:
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitClassMethodInst(ClassMethodInst *CMI);
+  SILInstruction *visitApplyInst(ApplyInst *AI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -545,6 +545,153 @@ SILInstruction *findMetaType(SILValue S) {
     default:
       return nullptr;
   }
+}
+
+/// \brief Replaces a virtual ApplyInst instruction with a new ApplyInst
+/// instruction that does not use a project_existencial \p PEI and calls \p F
+/// directly. See visitApplyInst.
+static SILInstruction *
+replaceDynApplyWithStaticApply(ApplyInst *AI,
+                               SILFunction *F,
+                               InitExistentialInst *In,
+                               ProjectExistentialInst *PEI) {
+  // Creates a new FunctionRef Inst and inserts it to the basic block.
+  FunctionRefInst *FRI = new (AI->getModule()) FunctionRefInst(AI->getLoc(), F);
+  AI->getParent()->getInstList().insert(AI, FRI);
+  SmallVector<SILValue, 4> Args;
+
+  // Push all of the args and replace uses of PEI with the InitExistentional.
+  MutableArrayRef<Operand> OrigArgs = AI->getArgumentOperands();
+  for (unsigned i = 0; i < OrigArgs.size(); i++) {
+    SILValue A = OrigArgs[i].get();
+    Args.push_back(A.getDef() == PEI ? In : A);
+  }
+
+  // Create a new non-virtual ApplyInst.
+  SILType FnTy = FRI->getType();
+  return ApplyInst::create(AI->getLoc(), FRI, FnTy,
+                           FnTy.castTo<SILFunctionType>()
+                           ->getInterfaceResult().getSILType(),
+                           ArrayRef<Substitution>(), Args, false, *F);
+}
+
+/// \brief Scan the uses of the protocol object and return an
+/// InitExistentialInst instruction if there is only one initialization and the
+/// object is not captured by any instruction that may initialize it.
+static InitExistentialInst *
+findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
+  InitExistentialInst *Init = 0;
+  for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
+       UI != E; UI++) {
+    switch (UI.getUser()->getKind()) {
+      case ValueKind::InitExistentialInst: {
+        // Make sure there is a single initialization:
+        if (Init)
+          return nullptr;
+        // This is the first initialization.
+        Init = cast<InitExistentialInst>(UI.getUser());
+        continue;
+      }
+      case ValueKind::ProjectExistentialInst:
+      case ValueKind::ProtocolMethodInst:
+      case ValueKind::DeallocBoxInst:
+      case ValueKind::DeallocRefInst:
+      case ValueKind::DeallocStackInst:
+      case ValueKind::StrongReleaseInst:
+      case ValueKind::DestroyAddrInst:
+      case ValueKind::DestroyValueInst:
+      case ValueKind::CopyAddrInst:
+        continue;
+
+      default: {
+        DEBUG(llvm::dbgs() << " *** Protocol captured by: " << *UI.getUser());
+        return nullptr;
+      }
+    }
+  }
+  return Init;
+}
+
+SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  // Devirtualize protocol_method + project_existential + init_existential
+  // instructions.  For example:
+  //
+  // %0 = alloc_box $Pingable
+  // %1 = init_existential %0#1 : $*Pingable, $*Foo  <-- Foo is the static type!
+  // %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
+  // %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
+  // %8 = apply %5(ARGUMENTS ... , %4) :
+
+  // Find the protocol_method instruction.
+  ProtocolMethodInst *PMI = dyn_cast<ProtocolMethodInst>(AI->getCallee());
+  if (!PMI)
+    return nullptr;
+
+  // Find the last argument, which is the Self argument, which may be a
+  // project_existential instruction.
+  MutableArrayRef<Operand> Args = AI->getArgumentOperands();
+  if (Args.size() < 1)
+    return nullptr;
+
+  SILValue LastArg = Args[Args.size() - 1].get();
+  ProjectExistentialInst *PEI = dyn_cast<ProjectExistentialInst>(LastArg);
+  if (!PEI)
+    return nullptr;
+
+  // Make sure that the project_existential and protocol_method instructions
+  // use the same protocol.
+  SILValue ProtocolObject = PMI->getOperand();
+  if (PEI->getOperand().getDef() != ProtocolObject.getDef())
+    return nullptr;
+
+  DEBUG(llvm::dbgs() << " *** Protocol to devirtualize : " <<
+        *ProtocolObject.getDef());
+
+  // Find a single initialization point, and make sure the protocol is not
+  // captured.
+  InitExistentialInst *Init = findSingleInitNoCaptureProtocol(ProtocolObject);
+  if (!Init)
+    return nullptr;
+
+  // Strip the @InOut qualifier.
+  CanType ConcreteTy = Init->getConcreteType().getSwiftType();
+  if (InOutType *IOT = dyn_cast<InOutType>(ConcreteTy)) {
+    ConcreteTy = IOT->getObjectType()->getCanonicalType();
+  }
+
+  SILDeclRef Member = PMI->getMember();
+  // For each protocol that our type conforms to:
+  for (auto &Conf : Init->getConformances()) {
+    // Scan all of the witness tables in search of a matching method.
+    for (SILWitnessTable &Witness : AI->getModule().getWitnessTableList()) {
+      ProtocolDecl *WitnessProtocol = Witness.getConformance()->getProtocol();
+      // Is this the correct protocol?
+
+      if (WitnessProtocol != Conf->getProtocol() ||
+          !ConcreteTy.getPointer()->isEqual(Witness.getConformance()->getType()))
+        continue;
+
+      // Okay, we found the right witness table. Now look for the method.
+      for (auto &Entry : Witness.getEntries()) {
+        // Look at method entries only.
+        if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
+          continue;
+
+        SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+        // Check if this is the member we were looking for.
+        if (MethodEntry.Requirement != Member)
+          continue;
+
+        // We found the correct witness function. Devirtualize this Apply.
+        DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AI);
+        SILFunction *StaticRef = MethodEntry.Witness;
+        NumFuncDevirt++;
+        return replaceDynApplyWithStaticApply(AI, StaticRef, Init, PEI);
+      }
+    }
+  }
+
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
