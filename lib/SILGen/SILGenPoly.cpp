@@ -374,7 +374,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     return gen.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_Inout:
-    return ManagedValue(paramValue, ManagedValue::LValue);
+    return ManagedValue::forLValue(paramValue);
   case ParameterConvention::Indirect_In:
     return gen.emitManagedBufferWithCleanup(paramValue);
   case ParameterConvention::Indirect_Out:

@@ -250,7 +250,7 @@ namespace {
              "base for ref element component must be a reference type");
       auto Res = gen.B.createRefElementAddr(loc, base.getValue(), Field,
                                             SubstFieldType);
-      return ManagedValue::forUnmanaged(Res);
+      return ManagedValue::forLValue(Res);
     }
   };
   
@@ -266,7 +266,7 @@ namespace {
       auto Res = gen.B.createTupleElementAddr(loc, base.getUnmanagedValue(),
                                               ElementIndex,
                                               getTypeOfRValue().getAddressType());
-      return ManagedValue::forUnmanaged(Res);
+      return ManagedValue::forLValue(Res);
     }
   };
   
@@ -284,7 +284,7 @@ namespace {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
-      return ManagedValue::forUnmanaged(Res);
+      return ManagedValue::forLValue(Res);
     }
   };
 
@@ -1039,7 +1039,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
   } else {
     auto &lcomponent = component.asLogical();
     Materialize temporary = lcomponent.getMaterialized(SGF, loc, base);
-    addr = ManagedValue::forUnmanaged(temporary.address);
+    addr = ManagedValue::forLValue(temporary.address);
   }
 
   return addr;

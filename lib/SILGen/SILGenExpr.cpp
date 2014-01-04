@@ -384,14 +384,14 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
     // FIXME: It'd be nice if the result of the accessor was natively an address.
     addr = gen.B.createPointerToAddress(loc, addr,
                           gen.getLoweredType(var->getType()).getAddressType());
-    return ManagedValue(addr, ManagedValue::LValue);
+    return ManagedValue::forLValue(addr);
   }
   
   // Global variables in main source files can be accessed directly.
   // FIXME: And all global variables when lazy initialization is disabled.
   SILValue addr = gen.B.createGlobalAddr(loc, var,
                           gen.getLoweredType(var->getType()).getAddressType());
-  return ManagedValue(addr, ManagedValue::LValue);
+  return ManagedValue::forLValue(addr);
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
@@ -440,7 +440,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       if (It->second.isConstant())
         return emitManagedRetain(loc, It->second.getConstant());
 
-      return ManagedValue(It->second.getAddress(), ManagedValue::LValue);
+      return ManagedValue::forLValue(It->second.getAddress());
     }
 
     if (var->isComputed()) {

@@ -289,7 +289,7 @@ public:
     SILValue arg = new (gen.SGM.M)
       SILArgument(gen.getLoweredType(t), parent, loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = isa<InOutType>(t)
-      ? ManagedValue(arg, ManagedValue::LValue)
+      ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
     return RValue(gen, loc, t, mv);
   }

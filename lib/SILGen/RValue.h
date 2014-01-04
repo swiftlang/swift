@@ -63,6 +63,9 @@ public:
   static ManagedValue forUnmanaged(SILValue value) {
     return ManagedValue(value, Unmanaged);
   }
+  static ManagedValue forLValue(SILValue value) {
+    return ManagedValue(value, LValue);
+  }
 
   SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
