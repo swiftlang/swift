@@ -1190,6 +1190,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
+  // If the type is already materializable, then we're already done.
+  if (expr->getType()->isMaterializable())
+    return expr;
+  
   // Load lvalues.
   if (auto lvalue = expr->getType()->getAs<LValueType>())
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
