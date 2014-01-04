@@ -1486,8 +1486,10 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 //------------------------------------------------------------------------------
 
 ERROR(invalid_objc_decl,sema_tcd,none,
-      "only classes, methods, properties, and subscript declarations "
-      "can be declared 'objc'", ())
+      "only classes, protocols, methods, properties, and subscript "
+      "declarations can be declared 'objc'", ())
+ERROR(objc_class_not_top_level,sema_tcd,none,
+      "only classes at file scope can be declared 'objc'", ())
 ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
       "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(objc_invalid_on_static_var,sema_tcd,none,

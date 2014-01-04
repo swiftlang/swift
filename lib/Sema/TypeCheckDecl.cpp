@@ -2725,7 +2725,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // constructors, and subscripts can be ObjC.
     Optional<Diag<>> error;
     if (isa<ClassDecl>(D)) {
-      /* ok */
+      if (!D->getDeclContext()->isModuleScopeContext())
+        error = diag::objc_class_not_top_level;
     } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
       if (isOperator || cast<FuncDecl>(D)->getGetterOrSetterDecl())
         error = diag::invalid_objc_decl;
