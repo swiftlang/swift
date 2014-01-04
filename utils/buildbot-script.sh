@@ -165,6 +165,17 @@ SOURCEKIT_PACKAGE_PATH=/Users/sourcekit-dev
 
 # Set this to the address to which release announcements should be sent.
 
+# WORKSPACE and BUILD_DIR must be absolute paths
+case "${WORKSPACE}" in
+  /*) ;;
+   *) echo "workspace must be an absolute path (was '${WORKSPACE}')" ; exit 1 ;;
+esac
+case "${BUILD_DIR}" in
+  /*) ;;
+  "") ;;
+   *) echo "build-dir must be an absolute path (was '${BUILD_DIR}')" ; exit 1 ;;
+esac
+
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
 test -d "$WORKSPACE"
