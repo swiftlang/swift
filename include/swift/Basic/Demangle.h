@@ -85,7 +85,6 @@ public:
     LazyProtocolWitnessTableAccessor,
     LazyProtocolWitnessTableTemplate,
     LocalDeclName,
-    LocalEntity,
     Metatype,
     Metaclass,
     Module,

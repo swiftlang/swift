@@ -252,7 +252,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     }
 
     buffer << "_T";
-    if (isLocalLinkage()) buffer << 'L';
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
       mangler.mangleNominalType(type, getExplosionKind(),
                                 Mangler::BindGenerics::None);

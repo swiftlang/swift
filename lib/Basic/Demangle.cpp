@@ -76,7 +76,6 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
   CASE(LazyProtocolWitnessTableAccessor)
   CASE(LazyProtocolWitnessTableTemplate)
   CASE(LocalDeclName)
-  CASE(LocalEntity)
   CASE(Metatype)
   CASE(Metaclass)
   CASE(Module)
@@ -592,8 +591,6 @@ private:
       }
       return failure();
     }
-    if (Mangled.nextIf('L'))
-      appendNode(Node::Kind::LocalEntity);
     if (!demangleEntity(getRootNode()))
       return failure();
     return true;
@@ -1918,9 +1915,6 @@ private:
       return;
     case swift::Demangle::Node::Kind::Directness:
       Printer << pointer->getText() << " ";
-      return;
-    case swift::Demangle::Node::Kind::LocalEntity:
-      Printer << "local ";
       return;
     case swift::Demangle::Node::Kind::Variable:
     case swift::Demangle::Node::Kind::Function:
