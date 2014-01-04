@@ -16,6 +16,7 @@ add_swift_library(swiftSIL
   SILWitnessTable.cpp
   TypeLowering.cpp
   Verifier.cpp
+  SILType.cpp
   DEPENDS swiftAST)
 
 # Clang dependencies.

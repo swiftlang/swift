@@ -248,13 +248,6 @@ void SILDeclRef::dump() const {
   llvm::errs() << '\n';
 }
 
-std::string SILType::getAsString() const {
-  std::string Result;
-  llvm::raw_string_ostream OS(Result);
-  print(OS);
-  return OS.str();
-}
-
 static void print(raw_ostream &OS, SILValueCategory category) {
   switch (category) {
   case SILValueCategory::Object: return;
