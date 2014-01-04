@@ -38,7 +38,7 @@ namespace Lowering {
 struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   SILLocation loc;
   std::unique_ptr<LogicalPathComponent> component;
-  SILValue base;
+  ManagedValue base;
   Materialize temp;
 
   ~LValueWriteback() {}
@@ -47,7 +47,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
 
   LValueWriteback() = default;
   LValueWriteback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
-                  SILValue base, Materialize temp)
+                  ManagedValue base, Materialize temp)
     : loc(loc), component(std::move(comp)), base(base), temp(temp) {
   }
 };
@@ -167,9 +167,7 @@ Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   ManagedValue value = get(gen, loc, getterBase, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
   
-  gen.getWritebackStack().emplace_back(loc, clone(gen, loc),
-                                       base ? base.forward(gen) : SILValue(),
-                                       temp);
+  gen.getWritebackStack().emplace_back(loc, clone(gen, loc), base, temp);
   return temp;
 }
 
@@ -207,7 +205,7 @@ WritebackScope::~WritebackScope() {
     auto formalTy = i->component->getSubstFormalType();
     i->component->set(*gen, i->loc,
                       RValueSource(i->loc, RValue(*gen, i->loc, formalTy, mv)),
-                      ManagedValue::forUnmanaged(i->base));
+                      i->base);
   }
   
   gen->getWritebackStack().erase(deepest, gen->getWritebackStack().end());
