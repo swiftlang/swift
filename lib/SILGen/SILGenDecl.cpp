@@ -861,13 +861,14 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                               DestructorDecl *DD) {
   // Emit the implicit 'self' argument.
-  VarDecl *selfDecl = DD ? DD->getImplicitSelfDecl() : nullptr;
-  assert((!selfDecl || selfDecl->getType()->hasReferenceSemantics()) &&
+  VarDecl *selfDecl = DD->getImplicitSelfDecl();
+  assert(selfDecl);
+  assert(selfDecl->getType()->hasReferenceSemantics() &&
          "destructor's implicit this is a value type?!");
 
   SILType selfType = getLoweredLoadableType(CD->getDeclaredTypeInContext());
-  assert((!selfDecl || getLoweredLoadableType(selfDecl->getType()) == selfType)
-         && "decl type doesn't match destructor's implicit this type");
+  assert(getLoweredLoadableType(selfDecl->getType()) == selfType &&
+         "decl type doesn't match destructor's implicit this type");
   
   SILValue selfValue = new (SGM.M) SILArgument(selfType, F.begin(), selfDecl);
   VarLocs[selfDecl] = VarLoc::getConstant(selfValue);
