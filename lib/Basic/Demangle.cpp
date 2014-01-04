@@ -1587,28 +1587,28 @@ private:
 public:
   NodePrinter(DemangleOptions options) : Options(options) {}
   
-  std::string print(Node *root) {
-    toString(root);
+  std::string printRoot(Node *root) {
+    print(root);
     return Printer.str();
   }
 
 private:  
-  void toStringChildren(Node::iterator begin,
-                        Node::iterator end,
-                        const char *sep = nullptr) {
+  void printChildren(Node::iterator begin,
+                     Node::iterator end,
+                     const char *sep = nullptr) {
     for (; begin != end;) {
-      toString(begin->getPtr());
+      print(begin->getPtr());
       ++begin;
       if (sep && begin != end)
         Printer << sep;
     }
   }
   
-  void toStringChildren(Node *pointer, const char *sep = nullptr) {
+  void printChildren(Node *pointer, const char *sep = nullptr) {
     if (!pointer)
       return;
     Node::iterator begin = pointer->begin(), end = pointer->end();
-    toStringChildren(begin, end, sep);
+    printChildren(begin, end, sep);
   }
   
   Node *getFirstChildOfKind(Node *pointer, Node::Kind kind) {
@@ -1629,23 +1629,23 @@ private:
     Node *child = type->getChild(0);
     Node::Kind child_kind = child->getKind();
     switch (child_kind) {
-      case Node::Kind::UncurriedFunctionType:
-      case Node::Kind::FunctionType:
-        return false;
-      case Node::Kind::GenericType:
-        return typeNeedsColonForDecl(getFirstChildOfKind(type, Node::Kind::UncurriedFunctionType));
-      default:
-        return true;
+    case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::FunctionType:
+      return false;
+    case Node::Kind::GenericType:
+      return typeNeedsColonForDecl(getFirstChildOfKind(type, Node::Kind::UncurriedFunctionType));
+    default:
+      return true;
     }
   }
   
-  void toStringBoundGenericNoSugar(Node *pointer) {
+  void printBoundGenericNoSugar(Node *pointer) {
     if (pointer->getNumChildren() < 2)
       return;
     Node *typelist = pointer->getChild(1);
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     Printer << "<";
-    toStringChildren(typelist, ", ");
+    printChildren(typelist, ", ");
     Printer << ">";
   }
 
@@ -1705,11 +1705,11 @@ private:
     
   }
   
-  void toStringBoundGeneric(Node *pointer) {
+  void printBoundGeneric(Node *pointer) {
     if (pointer->getNumChildren() < 2)
       return;
     if (pointer->getNumChildren() != 2) {
-      toStringBoundGenericNoSugar(pointer);
+      printBoundGenericNoSugar(pointer);
       return;
     }
 
@@ -1717,7 +1717,7 @@ private:
         pointer->getKind() == Node::Kind::BoundGenericClass)
     {
       // no sugar here
-      toStringBoundGenericNoSugar(pointer);
+      printBoundGenericNoSugar(pointer);
       return;
     }
 
@@ -1726,7 +1726,7 @@ private:
     switch (sugarType)
     {
       case SugarType::None:
-        toStringBoundGenericNoSugar(pointer);
+        printBoundGenericNoSugar(pointer);
         break;
       case SugarType::Optional: {
         Node *type = pointer->getChild(1)->getChild(0);
@@ -1735,7 +1735,7 @@ private:
           needs_parens = true;
         if (needs_parens)
           Printer << "(";
-        toString(type);
+        print(type);
         if (needs_parens)
           Printer << ")";
         Printer << "?";
@@ -1748,7 +1748,7 @@ private:
           needs_parens = true;
         if (needs_parens)
           Printer << "(";
-        toString(type);
+        print(type);
         if (needs_parens)
           Printer << ")";
         Printer << "[]";
@@ -1757,7 +1757,7 @@ private:
     }
   }
 
-  void toStringImplFunctionType(Node *fn) {
+  void printImplFunctionType(Node *fn) {
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
@@ -1775,14 +1775,14 @@ private:
       if (child->getKind() == Node::Kind::ImplParameter) {
         if (curState == Inputs) Printer << ", ";
         transitionTo(Inputs);
-        toString(child.getPtr());
+        print(child.getPtr());
       } else if (child->getKind() == Node::Kind::ImplResult) {
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
-        toString(child.getPtr());
+        print(child.getPtr());
       } else {
         assert(curState == Attrs);
-        toString(child.getPtr());
+        print(child.getPtr());
         Printer << ' ';
       }
     }
@@ -1790,30 +1790,27 @@ private:
     Printer << ')';
   }
 
-  void toStringContext(Node *context) {
+  void printContext(Node *context) {
     // TODO: parenthesize local contexts?
-    toString(context, /*asContext*/ true);
+    print(context, /*asContext*/ true);
     Printer << '.';
   }
 
-  void toString(Node *pointer,
-                bool asContext = false,
-                bool suppressType = false);
+  void print(Node *pointer, bool asContext = false, bool suppressType = false);
 };
 } // end anonymous namespace
 
-void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
+void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   // Common code for handling entities.
-  auto toStringEntity = [&](bool hasName, bool hasType,
-                            StringRef extraName) {
-    toStringContext(pointer->getChild(0));
+  auto printEntity = [&](bool hasName, bool hasType, StringRef extraName) {
+    printContext(pointer->getChild(0));
 
     bool printType = (hasType && !suppressType);
     bool useParens = (printType && asContext);
 
     if (useParens) Printer << '(';
 
-    if (hasName) toString(pointer->getChild(1));
+    if (hasName) print(pointer->getChild(1));
     Printer << extraName;
 
     if (printType) {
@@ -1822,7 +1819,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
         Printer << " : ";
       else
         Printer << " ";
-      toString(type);
+      print(type);
     }
 
     if (useParens) Printer << ')';      
@@ -1837,7 +1834,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::Variable:
   case Node::Kind::Function:
-    toStringEntity(true, true, "");
+    printEntity(true, true, "");
     return;
   case Node::Kind::ExplicitClosure:
   case Node::Kind::ImplicitClosure: {
@@ -1847,41 +1844,41 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     if (pointer->getKind() == Node::Kind::ImplicitClosure)
       name << "implicit ";
     name << "closure #" << (index + 1) << ")";
-    toStringEntity(false, false, name.str());
+    printEntity(false, false, name.str());
     return;
   }
   case Node::Kind::Global:
-    toStringChildren(pointer);
+    printChildren(pointer);
     return;
   case Node::Kind::Suffix:
     Printer << " with unmangled suffix " << QuotedString(pointer->getText());
     return;
   case Node::Kind::Initializer:
-    toStringEntity(false, true, "initializer");
+    printEntity(false, true, "initializer");
     return;
   case Node::Kind::DefaultArgumentInitializer: {
     auto index = pointer->getChild(1);
     DemanglerPrinter strPrinter;
     strPrinter << "(default argument " << index->getIndex() << ")";
-    toStringEntity(false, false, strPrinter.str());
+    printEntity(false, false, strPrinter.str());
     return;
   }
   case Node::Kind::DeclContext:
-    toString(pointer->getChild(0), asContext);
+    print(pointer->getChild(0), asContext);
     return;
   case Node::Kind::Type:
-    toString(pointer->getChild(0), asContext);
+    print(pointer->getChild(0), asContext);
     return;
   case Node::Kind::Class:
   case Node::Kind::Structure:
   case Node::Kind::Enum:
   case Node::Kind::Protocol:
   case Node::Kind::TypeAlias:
-    toStringEntity(true, false, "");
+    printEntity(true, false, "");
     return;
   case Node::Kind::LocalDeclName:
     Printer << '(';
-    toString(pointer->getChild(1));
+    print(pointer->getChild(1));
     Printer << " #" << (pointer->getChild(0)->getIndex() + 1) << ')';
     return;
   case Node::Kind::Module:
@@ -1889,16 +1886,16 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     Printer << pointer->getText();
     return;
   case Node::Kind::FunctionType:
-    toStringChildren(pointer);
+    printChildren(pointer);
     return;
   case Node::Kind::UncurriedFunctionType: {
     Node *metatype = pointer->getChild(0);
     Printer << "(";
-    toString(metatype);
+    print(metatype);
     Printer << ")";
     Node *real_func = pointer->getChild(1);
     real_func = real_func->getChild(0);
-    toStringChildren(real_func);
+    printChildren(real_func);
     return;
   }
   case Node::Kind::ArgumentTuple: {
@@ -1917,7 +1914,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     }
     if (need_parens)
       Printer << "(";
-    toStringChildren(pointer);
+    printChildren(pointer);
     if (need_parens)
       Printer << ")";
     return;
@@ -1925,7 +1922,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::NonVariadicTuple:
   case Node::Kind::VariadicTuple: {
     Printer << "(";
-    toStringChildren(pointer, ", ");
+    printChildren(pointer, ", ");
     if (pointer->getKind() == Node::Kind::VariadicTuple)
       Printer << "...";
     Printer << ")";
@@ -1934,12 +1931,12 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::TupleElement:
     if (pointer->getNumChildren() == 1) {
       Node *type = pointer->getChild(0);
-      toString(type);
+      print(type);
     } else if (pointer->getNumChildren() == 2) {
       Node *id = pointer->getChild(0);
       Node *type = pointer->getChild(1);
-      toString(id);
-      toString(type);
+      print(id);
+      print(type);
     }
     return;
   case Node::Kind::TupleElementName:
@@ -1953,20 +1950,20 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
       Printer << " -> " << pointer->getText();
     else {
       Printer << " -> ";
-      toStringChildren(pointer);
+      printChildren(pointer);
     }
     return;
   case Node::Kind::Weak:
     Printer << "@weak ";
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     return;
   case Node::Kind::Unowned:
     Printer << "@unowned ";
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     return;
   case Node::Kind::InOut:
     Printer << "@inout ";
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
@@ -1980,9 +1977,9 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::ArrayType: {
     Node *type = pointer->getChild(0);
     Node *size = pointer->getChild(1);
-    toString(type);
+    print(type);
     Printer << "[";
-    toString(size);
+    print(size);
     Printer << "]";
     return;
   }
@@ -1997,39 +1994,39 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::DependentProtocolWitnessTableGenerator:
     Printer << "dependent protocol witness table generator for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::DependentProtocolWitnessTableTemplate:
     Printer << "dependent protocol witness table template for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::LazyProtocolWitnessTableAccessor:
     Printer << "lazy protocol witness table accessor for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::LazyProtocolWitnessTableTemplate:
     Printer << "lazy protocol witness table template for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::ProtocolWitnessTable:
     Printer << "protocol witness table for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::ProtocolWitness: {
     Printer << "protocol witness for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   }
   case Node::Kind::FieldOffset: {
     Printer << "field offset for ";
     auto entity = pointer->getFirstChild();
-    toString(entity, /*asContext*/ false,
+    print(entity, /*asContext*/ false,
              /*suppressType*/ !Options.DisplayTypeOfIVarFieldOffset);
     return;
   }
   case Node::Kind::BridgeToBlockFunction:
     Printer << "bridge-to-block function for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
@@ -2039,59 +2036,59 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     auto generics = getFirstChildOfKind(pointer, Node::Kind::Generics);
     assert(pointer->getNumChildren() == 2 + unsigned(generics != nullptr));
     if (generics) {
-      toString(generics);
+      print(generics);
       Printer << " ";
     }
     Printer << "from ";
-    toString(pointer->getChild(pointer->getNumChildren() - 2));
+    print(pointer->getChild(pointer->getNumChildren() - 2));
     Printer << " to ";
-    toString(pointer->getChild(pointer->getNumChildren() - 1));
+    print(pointer->getChild(pointer->getNumChildren() - 1));
     return;
   }
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::TypeMetadata:
     Printer << "type metadata for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::ValueWitnessKind:
     Printer << pointer->getText() << " value witness for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::ValueWitnessTable:
     Printer << "value witness table for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::WitnessTableOffset:
     Printer << "witness table offset for ";
-    toString(pointer->getFirstChild());
+    print(pointer->getFirstChild());
     return;
   case Node::Kind::BoundGenericClass:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
-    toStringBoundGeneric(pointer);
+    printBoundGeneric(pointer);
     return;
   case Node::Kind::ObjCBlock: {
     Printer << "@objc_block ";
     Node *tuple = pointer->getChild(0);
     Node *rettype = pointer->getChild(1);
-    toString(tuple);
-    toString(rettype);
+    print(tuple);
+    print(rettype);
     return;
   }
   case Node::Kind::Metatype: {
     Node *type = pointer->getChild(0);
-    toString(type);
+    print(type);
     Printer << ".metatype";
     return;
   }
@@ -2099,11 +2096,11 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     Printer << pointer->getText();
     return;
   case Node::Kind::AssociatedTypeRef:
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     Printer << '.' << pointer->getChild(1)->getText();
     return;
   case Node::Kind::SelfTypeRef:
-    toString(pointer->getChild(0));
+    print(pointer->getChild(0));
     Printer << ".Self";
     return;
   case Node::Kind::ProtocolList: {
@@ -2113,7 +2110,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     bool needs_proto_marker = (type_list->getNumChildren() != 1);
     if (needs_proto_marker)
       Printer << "protocol<";
-    toStringChildren(type_list, ", ");
+    printChildren(type_list, ", ");
     if (needs_proto_marker)
       Printer << ">";
     return;
@@ -2122,7 +2119,7 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     if (pointer->getNumChildren() == 0)
       return;
     Printer << "<";
-    toStringChildren(pointer, ", ");
+    printChildren(pointer, ", ");
     Printer << ">";
     return;
   }
@@ -2132,58 +2129,58 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     Node *number = pointer->getChild(0);
     Node *decl_ctx = pointer->getChild(1);
     Printer << "(archetype " << number->getIndex() << " of ";
-    toString(decl_ctx);
+    print(decl_ctx);
     Printer << ")";
     return;
   }
   case Node::Kind::GenericType: {
     Node *atype_list = pointer->getChild(0);
     Node *fct_type = pointer->getChild(1)->getChild(0);
-    toString(atype_list);
-    toString(fct_type);
+    print(atype_list);
+    print(fct_type);
     return;
   }
   case Node::Kind::Addressor:
-    toStringEntity(true, true, ".addressor");
+    printEntity(true, true, ".addressor");
     return;
   case Node::Kind::Getter:
-    toStringEntity(true, true, ".getter");
+    printEntity(true, true, ".getter");
     return;
   case Node::Kind::Setter:
-    toStringEntity(true, true, ".setter");
+    printEntity(true, true, ".setter");
     return;
   case Node::Kind::Allocator:
-    toStringEntity(false, true, "__allocating_init");
+    printEntity(false, true, "__allocating_init");
     return;
   case Node::Kind::Constructor:
-    toStringEntity(false, true, "init");
+    printEntity(false, true, "init");
     return;
   case Node::Kind::Destructor:
-    toStringEntity(false, false, "destructor");
+    printEntity(false, false, "destructor");
     return;
   case Node::Kind::Deallocator:
-    toStringEntity(false, false, "__deallocating_destructor");
+    printEntity(false, false, "__deallocating_destructor");
     return;
   case Node::Kind::ProtocolConformance: {
     Node *child0 = pointer->getChild(0);
     Node *child1 = pointer->getChild(1);
     Node *child2 = pointer->getChild(2);
-    toString(child0);
+    print(child0);
     Printer << " : ";
-    toString(child1);
+    print(child1);
     Printer << " in ";
-    toString(child2);
+    print(child2);
     return;
   }
   case Node::Kind::TypeList:
-    toStringChildren(pointer);
+    printChildren(pointer);
     return;
   case Node::Kind::ArchetypeAndProtocol: {
     Node *child0 = pointer->getChild(0);
     Node *child1 = pointer->getChild(1);
-    toString(child0);
+    print(child0);
     Printer << " : ";
-    toString(child1);
+    print(child1);
     return;
   }
   case Node::Kind::ImplConvention:
@@ -2194,10 +2191,10 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
-    toStringChildren(pointer, " ");
+    printChildren(pointer, " ");
     return;
   case Node::Kind::ImplFunctionType:
-    toStringImplFunctionType(pointer);
+    printImplFunctionType(pointer);
     return;
   case Node::Kind::Unknown:
     return;
@@ -2208,14 +2205,15 @@ void NodePrinter::toString(Node *pointer, bool asContext, bool suppressType) {
   llvm_unreachable("bad node kind!");
 }
 
-std::string swift::Demangle::nodeToString(NodePointer root,
-                                          const DemangleOptions& options) {
+std::string Demangle::nodeToString(NodePointer root,
+                                   const DemangleOptions &options) {
   if (!root)
     return "";
-  return NodePrinter(options).print(root.getPtr());
+  return NodePrinter(options).printRoot(root.getPtr());
 }
 
-std::string swift::Demangle::demangleSymbolAsString(llvm::StringRef mangled, const DemangleOptions& options) {
+std::string Demangle::demangleSymbolAsString(llvm::StringRef mangled,
+                                             const DemangleOptions &options) {
   std::string demangling = nodeToString(demangleSymbolAsNode(mangled, options), options);
   if (demangling.empty())
     return mangled.str();
