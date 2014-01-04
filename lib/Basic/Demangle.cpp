@@ -159,7 +159,7 @@ public:
   NameSource(StringRef text) : Text(text) {}
 
   /// Return whether there are at least len characters remaining.
-  bool hasAtLeast(size_t len) { return (len >= Text.size()); }
+  bool hasAtLeast(size_t len) { return (len <= Text.size()); }
 
   bool isEmpty() { return Text.empty(); }
   explicit operator bool() { return !isEmpty(); }
