@@ -162,6 +162,9 @@ struct SILDeclRef {
     return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
   }
 
+  /// Produce a mangled form of this constant.
+  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer) const;
+
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;
@@ -224,7 +227,7 @@ struct SILDeclRef {
     return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried,
                       foreign, defaultArgIndex);
   }
-  
+
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift (or vice versa).
   bool isForeignThunk() const;
