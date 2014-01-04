@@ -896,7 +896,7 @@ public:
 ///
 /// \code
 /// class C {
-///   subscript @objc (i : Int) -> String {
+///   @objc subscript (i : Int) -> String {
 ///   get: 
 ///     ... 
 ///   }
