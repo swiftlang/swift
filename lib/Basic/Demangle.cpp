@@ -151,10 +151,72 @@ static std::string archetypeName(Node::IndexType i) {
 }
 
 namespace {
+
+/// A convenient class for parsing characters out of a string.
+class NameSource {
+  StringRef Text;
+public:
+  NameSource(StringRef text) : Text(text) {}
+
+  /// Return whether there are at least len characters remaining.
+  bool hasAtLeast(size_t len) { return (len >= Text.size()); }
+
+  bool isEmpty() { return Text.empty(); }
+  explicit operator bool() { return !isEmpty(); }
+
+  /// Return the next character without claiming it.  Asserts that
+  /// there is at least one remaining character.
+  char peek() { return Text.front(); }
+
+  /// Claim and return the next character.  Asserts that there is at
+  /// least one remaining character.
+  char next() {
+    char c = peek();
+    advanceOffset(1);
+    return c;
+  }
+
+  /// Claim the next character if it exists and equals the given
+  /// character.
+  bool nextIf(char c) {
+    if (isEmpty() || peek() != c) return false;
+    advanceOffset(1);
+    return true;
+  }
+
+  /// Return the next len characters without claiming them.  Asserts
+  /// that there are at least so many characters.
+  StringRef slice(size_t len) { return Text.substr(0, len); }
+
+  /// Claim the next len characters.
+  void advanceOffset(size_t len) {
+    Text = Text.substr(len);
+  }
+
+  /// Claim and return all the rest of the characters.
+  StringRef getString() {
+    auto result = Text;
+    advanceOffset(Text.size());
+    return result;
+  }
+};
+
+/// The main class for parsing a demangling tree out of a mangled string.
 class Demangler {
+  SmallVector<NodePointer, 10> Substitutions;
+  SmallVector<unsigned, 4> ArchetypeCounts;
+  unsigned ArchetypeCount = 0;
+  NameSource Mangled;
+  NodePointer RootNode;
 public:  
   Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
+  /// Attempt to demangle the source string.  The root node will
+  /// always be a Global.  Extra characters at the end will be
+  /// tolerated (and included as a Suffix node as a child of the
+  /// Global).
+  ///
+  /// \return true if the mangling succeeded
   bool demangle() {
     if (!Mangled.hasAtLeast(2))
       return failure();
@@ -169,7 +231,7 @@ public:
     if (!demangleGlobal())
       return false;
 
-    // Add a suffix node if there's anything left unmangled
+    // Add a suffix node if there's anything left unmangled.
     if (!Mangled.isEmpty()) {
       appendNode(Node::Kind::Suffix, Mangled.getString());
     }
@@ -1470,107 +1532,8 @@ private:
     node->addChild(type);
     return node;
   }
-
-  class MangledNameSource {
-  public:
-    
-    typedef void* Snapshot;
-    
-    MangledNameSource(StringRef mangled);
-
-    char peek();
-
-    bool nextIf(char c);
-
-    char next();
-
-    bool isEmpty();
-
-    explicit operator bool();
-
-    std::string slice(size_t size);
-
-    std::string getString();
-
-    size_t getOffset();
-
-    size_t getSize();
-
-    bool hasAtLeast(size_t n);
-
-    void advanceOffset(size_t by);
-
-    Snapshot getSnapshot();
-    
-    void resetToSnapshot(Snapshot snap);
-    
-  private:
-    StringRef Mangled;
-    size_t Offset;
-  };
-
-  SmallVector<NodePointer, 10> Substitutions;
-  SmallVector<unsigned, 4> ArchetypeCounts;
-  unsigned ArchetypeCount = 0;
-  MangledNameSource Mangled;
-  NodePointer RootNode;
 };
 } // end anonymous namespace
-
-Demangler::MangledNameSource::MangledNameSource(StringRef Mangled)
-    : Mangled(Mangled), Offset(0) {}
-
-char Demangler::MangledNameSource::peek() { return Mangled.front(); }
-
-bool Demangler::MangledNameSource::nextIf(char c) {
-  if (isEmpty())
-    return false;
-  char real_c = peek();
-  if (real_c == c) {
-    advanceOffset(1);
-    return true;
-  }
-  return false;
-}
-
-char Demangler::MangledNameSource::next() {
-  char c = peek();
-  advanceOffset(1);
-  return c;
-}
-
-bool Demangler::MangledNameSource::isEmpty() { return Mangled.empty(); }
-
-Demangler::MangledNameSource::operator bool() { return isEmpty() == false; }
-
-std::string Demangler::MangledNameSource::slice(size_t size) {
-  return Mangled.substr(0, size);
-}
-
-std::string Demangler::MangledNameSource::getString() { return Mangled; }
-
-size_t Demangler::MangledNameSource::getOffset() { return Offset; }
-
-size_t Demangler::MangledNameSource::getSize() { return Mangled.size(); }
-
-bool Demangler::MangledNameSource::hasAtLeast(size_t n) {
-  if (n > getSize())
-    return false;
-  return true;
-}
-
-void Demangler::MangledNameSource::advanceOffset(size_t by) {
-  Offset += by;
-  Mangled = Mangled.substr(by);
-}
-
-Demangler::MangledNameSource::Snapshot Demangler::MangledNameSource::getSnapshot() {
-  return (void*)Offset;
-}
-
-void Demangler::MangledNameSource::resetToSnapshot(Snapshot snap) {
-  Offset = reinterpret_cast<size_t>(snap);
-}
 
 NodePointer swift::Demangle::demangleSymbolAsNode(llvm::StringRef mangled, const DemangleOptions& options) {
   Demangler demangler(mangled);
