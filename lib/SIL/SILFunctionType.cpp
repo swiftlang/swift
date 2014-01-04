@@ -1244,12 +1244,18 @@ namespace {
 
     /// Functions need to preserve their abstraction structure.
     CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
-                                            bool dropGenerics = false) {
-      SILResultInfo substResult = subst(origType->getResult());
+                                            bool dropGenerics = false,
+                                            bool interfaceTypes = false)
+    {
+      auto result = interfaceTypes ? origType->getInterfaceResult()
+                                   : origType->getResult();
+      SILResultInfo substResult = subst(result);
 
       SmallVector<SILParameterInfo, 8> substParams;
       substParams.reserve(origType->getParameters().size());
-      for (auto &origParam : origType->getParameters()) {
+      auto params = interfaceTypes ? origType->getInterfaceParameters()
+                                   : origType->getParameters();
+      for (auto &origParam : params) {
         substParams.push_back(subst(origParam));
       }
 
@@ -1345,3 +1351,17 @@ CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,
                                           /*dropGenerics*/ true);
 }
 
+/// Apply a substitution to this polymorphic SILFunctionType so that
+/// it has the form of the normal SILFunctionType for the substituted
+/// type, except using the original conventions.
+CanSILFunctionType
+SILFunctionType::substInterfaceGenericArgs(SILModule &silModule,
+                                           Module *astModule,
+                                           ArrayRef<Substitution> subs) {
+  assert(isPolymorphic());
+  TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
+  SILTypeSubstituter substituter(silModule, astModule, map);
+  return substituter.visitSILFunctionType(CanSILFunctionType(this),
+                                          /*dropGenerics*/ true,
+                                          /*interfaceTypes*/ true);
+}

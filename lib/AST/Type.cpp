@@ -1363,16 +1363,61 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
   return FunctionType::get(input, result, getExtInfo());
 }
 
+TypeSubstitutionMap
+GenericSignature::getSubstitutionMap(
+                                ArrayRef<GenericTypeParamType *> genericParams,
+                                ArrayRef<Substitution> args) {
+  TypeSubstitutionMap subs;
+  
+  // An empty parameter list gives an empty map.
+  if (genericParams.empty()) {
+    assert(args.empty() && "substitutions but no generic params?!");
+    return subs;
+  }
+  
+  assert(!args.empty() && "no substitutions?!");
+  ASTContext &C = args[0].Archetype->getASTContext();
+  llvm::DenseMap<ArchetypeType*, CanType> archetypeMap;
+  
+  // The substitution vector should be ordered so that substitutions for
+  // primary archetypes at each depth are followed by the associated archetypes
+  // for that depth. We should thus be able to convert primary archetypes to
+  // generic parameters in order, then convert associated types to dependent
+  // member types of archetypes we've already seen.
+  unsigned genericParam = 0;
+  for (auto &arg : args) {
+    CanType fromType;
+    if (auto parent = arg.Archetype->getParent()) {
+      // If it's an associated type, substitute a dependent member type.
+      assert(archetypeMap.count(parent));
+      fromType = DependentMemberType::get(archetypeMap.find(parent)->second,
+                                          arg.Archetype->getAssocType(), C)
+        ->getCanonicalType();
+    } else {
+      // If no parent, it's a primary archetype. Substitute the next generic
+      // parameter.
+      auto param = genericParams[genericParam++];
+      fromType = CanType(param);
+      // FIXME: DependentMemberTypes are not SubstitutableTypes.
+      subs[param] = arg.Replacement;
+    }
+    
+    archetypeMap[arg.Archetype] = fromType;
+  }
+  
+  assert(genericParam == genericParams.size()
+         && "did not substitute all generic params!");
+  
+  return subs;
+}
+
 FunctionType *
-GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args)
-const {
+GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   auto params = getGenericParams();
   assert(args.size() == params.size());
   
-  TypeSubstitutionMap subs;
-  for (size_t i = 0, e = args.size(); i != e; ++i) {
-    subs.insert(std::make_pair(params[i], args[i].Replacement));
-  }
+  TypeSubstitutionMap subs
+    = GenericSignature::getSubstitutionMap(getGenericParams(), args);
 
   Type input = getInput().subst(M, subs, true, nullptr);
   Type result = getResult().subst(M, subs, true, nullptr);
@@ -2141,3 +2186,4 @@ case TypeKind::Id:
   
   llvm_unreachable("Unhandled type in transformation");
 }
+

@@ -1774,7 +1774,7 @@ public:
   /// function type and return the resulting non-generic type.
   ///
   /// The order of Substitutions must match the order of generic parameters.
-  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs) const;
+  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements(), getInput(), getResult(),
@@ -2192,9 +2192,15 @@ public:
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
-                                      ArrayRef<Type> subs);
+                                      ArrayRef<Type> subs)
+    SIL_FUNCTION_TYPE_DEPRECATED;
   CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
-                                      ArrayRef<Substitution> subs);
+                                      ArrayRef<Substitution> subs)
+    SIL_FUNCTION_TYPE_DEPRECATED;
+
+  CanSILFunctionType substInterfaceGenericArgs(SILModule &silModule,
+                                               Module *astModule,
+                                               ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     // FIXME: Should profile by the generic signature and interface types.

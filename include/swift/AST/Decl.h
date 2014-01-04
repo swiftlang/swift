@@ -1666,6 +1666,23 @@ public:
     assert(Mem);
     return Mem;
   }
+  
+  /// Build a substitution map from a vector of Substitutions that correspond to
+  /// the generic parameters in this generic signature. The order of primary
+  /// archetypes in the substitution vector must match the order of generic
+  /// parameters in getGenericParams().
+  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const {
+    return getSubstitutionMap(getGenericParams(), args);
+  }
+  
+  /// Build a substitution map from a vector of Substitutions that correspond to
+  /// the generic parameters in the given generic parameter vector. The order of
+  /// primary archetypes in the substitution vector must match the order of
+  /// generic parameters in genericParams.
+  static TypeSubstitutionMap
+  getSubstitutionMap(ArrayRef<GenericTypeParamType *> genericParams,
+                     ArrayRef<Substitution> args);
+                                         
 };
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
