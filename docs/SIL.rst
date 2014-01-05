@@ -1423,6 +1423,7 @@ by the definitive initialization pass.
 mark_uninitialized
 ``````````````````
 ::
+
   sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
   mu_kind ::= 'globalvar'
   mu_kind ::= 'rootself'
