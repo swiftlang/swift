@@ -256,7 +256,6 @@ public:
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitClassMethodInst(ClassMethodInst *CMI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
-  SILInstruction *visitPartialApplyInst(PartialApplyInst *PAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -775,11 +774,6 @@ SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
       break;
   }
 
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (PAI->
   return nullptr;
 }
 
