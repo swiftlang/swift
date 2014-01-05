@@ -502,7 +502,7 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
     if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module)) {
       // We need to use eraseInstFromFunction + RAUW here since a copy value can
-      // never be trivially dead since it touches reference counts.      
+      // never be trivially dead since it touches reference counts.
       replaceInstUsesWith(*CI, EI, 0);
       return eraseInstFromFunction(*CI);
     }
