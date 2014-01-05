@@ -340,9 +340,9 @@ public:
     S->setContainer(Container);
 
     // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *EnumerableProto
+    ProtocolDecl *SequenceProto
       = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
-    if (!EnumerableProto) {
+    if (!SequenceProto) {
       return nullptr;
     }
 
@@ -361,17 +361,17 @@ public:
       Type ContainerType = Container->getType()->getRValueType();
 
       ProtocolConformance *Conformance = nullptr;
-      if (!TC.conformsToProtocol(ContainerType, EnumerableProto, DC,
+      if (!TC.conformsToProtocol(ContainerType, SequenceProto, DC,
                                  &Conformance, Container->getLoc()))
         return nullptr;
 
-      GeneratorTy = TC.getWitnessType(ContainerType, EnumerableProto,
+      GeneratorTy = TC.getWitnessType(ContainerType, SequenceProto,
                                       Conformance,
                                       TC.Context.getIdentifier("GeneratorType"),
                                       diag::sequence_protocol_broken);
       
       Expr *GetGenerator
-        = TC.callWitness(Container, DC, EnumerableProto, Conformance,
+        = TC.callWitness(Container, DC, SequenceProto, Conformance,
                          TC.Context.getIdentifier("enumerate"),
                          {}, diag::sequence_protocol_broken);
       if (!GetGenerator) return nullptr;
