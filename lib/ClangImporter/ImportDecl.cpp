@@ -112,9 +112,19 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 
   // If the C type does not have the expected size, don't import it as a stdlib
   // type.
-  if (Bitwidth != 0 &&
-      Bitwidth != ClangCtx.getTypeSize(ClangType))
-    return std::make_pair(Type(), "");
+  unsigned ClangTypeSize = ClangCtx.getTypeSize(ClangType);
+  switch (Bitwidth) {
+  case 0: // do not check
+    break;
+  case 6432: // "word" sized
+    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+      return std::make_pair(Type(), "");
+    break;
+  default:
+    if (Bitwidth != ClangTypeSize)
+      return std::make_pair(Type(), "");
+    break;
+  }
 
   // Chceck other expected properties of the C type.
   switch(CTypeKind) {
