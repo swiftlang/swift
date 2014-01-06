@@ -797,7 +797,15 @@ public:
     RootSelf,
 
     /// DerivedSelf designates "self" in a derived (non-root) class.
-    DerivedSelf
+    DerivedSelf,
+
+    /// DelegatingRootSelf designates "self" on a struct, enum, or root class
+    /// in a delegating constructor (one that calls self.init).
+    DelegatingRootSelf,
+
+    /// DelegatingDerivedSelf designates "self" on a derived class which
+    /// delegates to another constructor.
+    DelegatingDerivedSelf,
   };
 private:
   Kind ThisKind;
@@ -808,6 +816,17 @@ public:
   }
 
   Kind getKind() const { return ThisKind; }
+
+  bool isGlobalVar() const { return ThisKind == GlobalVar; }
+  bool isRoot() const {
+    return ThisKind == RootSelf || ThisKind == DelegatingRootSelf;
+  }
+  bool isDerivedClass() const {
+    return ThisKind == DerivedSelf || ThisKind == DelegatingDerivedSelf;
+  }
+  bool isDelegatingInit() const {
+    return ThisKind == DelegatingRootSelf || ThisKind == DelegatingDerivedSelf;
+  }
 };
 
 /// MarkFunctionEscape - Represents the escape point of set of variables due to

@@ -610,6 +610,12 @@ public:
     case MarkUninitializedInst::GlobalVar: OS << "[globalvar] "; break;
     case MarkUninitializedInst::RootSelf:  OS << "[rootself] "; break;
     case MarkUninitializedInst::DerivedSelf:  OS << "[derivedself] "; break;
+    case MarkUninitializedInst::DelegatingRootSelf:
+      OS << "[delegatingrootself] ";
+      break;
+    case MarkUninitializedInst::DelegatingDerivedSelf:
+      OS << "[delegatingderivedself] ";
+      break;
     }
     
     OS << getIDAndType(MU->getOperand());

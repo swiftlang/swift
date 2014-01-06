@@ -90,8 +90,7 @@ public:
 
   bool isEnumSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->getKind() == MarkUninitializedInst::RootSelf &&
-          isa<EnumDecl>(getType()->getAnyNominal()))
+      if (MUI->isRoot() && isa<EnumDecl>(getType()->getAnyNominal()))
         return true;
     return false;
   }
@@ -100,8 +99,7 @@ public:
   /// a derived class init method.
   bool isDerivedClassSelf() const {
     return IsSelfOfInitializer &&
-           cast<MarkUninitializedInst>(MemoryInst)->getKind() ==
-             MarkUninitializedInst::DerivedSelf;
+           cast<MarkUninitializedInst>(MemoryInst)->isDerivedClass();
   }
 
   /// emitElementAddress - Given an element number (in the flattened sense)
