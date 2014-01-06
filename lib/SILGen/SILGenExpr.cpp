@@ -2840,7 +2840,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(SGF,
                                                               E->getSubExpr());
   if (!newSelf.getType().getSwiftRValueType()
-        ->isEqual(E->getSelf()->getType())) {
+        ->isEqual(E->getSelf()->getType()->getInOutObjectType())) {
     assert(newSelf.getType().isObject() &&
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");

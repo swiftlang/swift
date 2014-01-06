@@ -723,6 +723,8 @@ ERROR(super_initializer_not_in_initializer,expr_parsing,none,
       "'super.init' cannot be called outside of an initializer", ())
 ERROR(super_initializer_must_be_called,expr_parsing,none,
       "'super.init' cannot be referenced without arguments", ())
+ERROR(init_ref_must_be_called,expr_parsing,none,
+      "initializer cannot be referenced without arguments", ())
 
 // New expressions
 ERROR(array_new_missing_first_bound,expr_parsing,none,

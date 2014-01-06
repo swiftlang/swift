@@ -902,10 +902,6 @@ namespace {
     }
     
     Type visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
-      // The subexpression must be a supertype of 'self' type.
-      CS.addConstraint(ConstraintKind::Subtype,
-                       expr->getSelf()->getType(),
-                       expr->getSubExpr()->getType());
       // The result is void.
       return TupleType::getEmpty(CS.getASTContext());
     }

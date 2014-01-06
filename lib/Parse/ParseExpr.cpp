@@ -829,13 +829,45 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
         // expr-init ::= expr-postfix '.' 'init'.
         if (Tok.is(tok::kw_init)) {
-          Result = makeParserResult(
-                     new (Context) UnresolvedConstructorExpr(
-                                     Result.get(),
-                                     TokLoc,
-                                     Tok.getLoc(),
-                                     /*Implicit=*/false));
-          consumeToken(tok::kw_init);
+          // Form the reference to the constructor.
+          Expr *initRef = new (Context) UnresolvedConstructorExpr(
+                                          Result.get(),
+                                          TokLoc,
+                                          Tok.getLoc(),
+                                          /*Implicit=*/false);
+          SourceLoc initLoc = consumeToken(tok::kw_init);
+
+          // FIXME: This is really a semantic restriction for 'self.init'
+          // masquerading as a parser restriction.
+          if (Tok.isFollowingLParen()) {
+            // Parse initializer arguments.
+            ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
+            if (arg.hasCodeCompletion())
+              return makeParserCodeCompletionResult<Expr>();
+            // FIXME: Unfortunate recovery here.
+            if (arg.isNull())
+              return nullptr;
+
+            initRef = new (Context) CallExpr(initRef, arg.get(),
+                                             /*Implicit=*/false);
+
+            // Dig out the 'self' declaration we're using so we can rebind it.
+            // FIXME: Should be in the type checker, not here.
+            if (auto func = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
+              if (auto selfDecl = func->getImplicitSelfDecl()) {
+                initRef = new (Context) RebindSelfInConstructorExpr(initRef,
+                                                                    selfDecl);
+              }
+            }
+
+          } else {
+            // It's invalid to refer to an uncalled initializer.
+            diagnose(initLoc, diag::init_ref_must_be_called);
+            initRef->setType(ErrorType::get(Context));
+          }
+
+
+          Result = makeParserResult(initRef);
           continue;
         }
 
