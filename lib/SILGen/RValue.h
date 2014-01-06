@@ -93,14 +93,14 @@ public:
     auto &lowering = gen.getTypeLowering(getType());
     assert(!lowering.isTrivial() && "trivial value has cleanup?");
 
-    if (lowering.isAddressOnly()) {
-      SILValue buf = gen.emitTemporaryAllocation(l, getType());
-      gen.B.createCopyAddr(l, getValue(), buf,
-                           IsNotTake, IsInitialization);
-      return gen.emitManagedRValueWithCleanup(buf, lowering);
+    if (!lowering.isAddressOnly()) {
+      auto result = lowering.emitCopyValue(gen.B, l, getValue());
+      return gen.emitManagedRValueWithCleanup(result, lowering);
     }
-    auto result = lowering.emitCopyValue(gen.B, l, getValue());
-    return gen.emitManagedRValueWithCleanup(result, lowering);
+    
+    SILValue buf = gen.emitTemporaryAllocation(l, getType());
+    gen.B.createCopyAddr(l, getValue(), buf, IsNotTake, IsInitialization);
+    return gen.emitManagedRValueWithCleanup(buf, lowering);
   }
   
   /// Store a copy of this value with independent ownership into the given
@@ -114,6 +114,24 @@ public:
     }
     auto result = lowering.emitCopyValue(gen.B, L, getValue());
     gen.B.createStore(L, result, dest);
+  }
+  
+  /// This is the same operation as 'copy', but works on +0 values that don't
+  /// have cleanups.  It returns a +1 value with one.
+  ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
+    auto &lowering = gen.getTypeLowering(getType());
+ 
+    if (lowering.isTrivial())
+      return *this;
+    
+    SILValue result;
+    if (!lowering.isAddressOnly()) {
+      result = lowering.emitCopyValue(gen.B, loc, getValue());
+    } else {
+      result = gen.emitTemporaryAllocation(loc, getType());
+      gen.B.createCopyAddr(loc, getValue(), result, IsNotTake,IsInitialization);
+    }
+    return gen.emitManagedRValueWithCleanup(result, lowering);
   }
   
   bool hasCleanup() const { return cleanup.isValid(); }
