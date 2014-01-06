@@ -1431,7 +1431,7 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "Sequence protocol definition is broken", ())
 ERROR(generator_protocol_broken,sema_tcs,none,
-      "Generator protocol definition is broken", ())
+      "Stream protocol definition is broken", ())
 
 ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())

@@ -369,7 +369,7 @@ public:
 void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'generator' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups, CleanupLocation(S));
-  visitPatternBindingDecl(S->getGenerator());
+  visitPatternBindingDecl(S->getStream());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -379,7 +379,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // This will be initialized on every entry into the loop header and consumed
   // by the loop body. On loop exit, the terminating value will be in the
   // buffer.
-  auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
+  auto optTy = S->getStreamNext()->getType()->getCanonicalType();
   auto valTy = CanType(optTy->getOptionalObjectType(getASTContext()));
   auto &optTL = getTypeLowering(optTy);
   SILValue nextBuf = emitTemporaryAllocation(S, optTL.getLoweredType());
@@ -399,9 +399,9 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   {
-    Scope InnerForScope(Cleanups, CleanupLocation(S->getGeneratorNext()));
+    Scope InnerForScope(Cleanups, CleanupLocation(S->getStreamNext()));
     InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
-    emitExprInto(S->getGeneratorNext(), nextInit.get());
+    emitExprInto(S->getStreamNext(), nextInit.get());
     nextInit->finishInitialization(*this);
   }
   

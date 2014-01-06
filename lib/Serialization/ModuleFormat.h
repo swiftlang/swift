@@ -962,7 +962,7 @@ namespace index_block {
     
     DynamicLookup,
     RawRepresentable,
-    Generator,
+    Stream,
     RawOptionSet,
   };
 
