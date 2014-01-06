@@ -1779,9 +1779,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     if (hasName) print(pointer->getChild(1));
     Printer << extraName;
 
-    if (printType &&
-        // FIXME: Hack for rdar://15753317
-        pointer->getNumChildren() > 1 + unsigned(hasName)) {
+    if (printType) {
       Node *type = pointer->getChild(1 + unsigned(hasName));
       if (typeNeedsColonForDecl(type))
         Printer << " : ";
@@ -1822,7 +1820,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     Printer << " with unmangled suffix " << QuotedString(pointer->getText());
     return;
   case Node::Kind::Initializer:
-    printEntity(false, true, "initializer");
+    printEntity(false, false, "(variable initialization expression)");
     return;
   case Node::Kind::DefaultArgumentInitializer: {
     auto index = pointer->getChild(1);
