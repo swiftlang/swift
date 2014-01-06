@@ -2509,19 +2509,26 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // If there's no body, this is the implicit constructor.
   assert(ctor->getBody() && "Class constructor without a body?");
 
+  // True if this constructor delegates to a peer constructor with self.init().
+  bool isDelegating = ctor->getDelegatingOrChainedInitKind() ==
+    ConstructorDecl::BodyInitKind::Delegating;
+
   // FIXME: The (potentially partially initialized) value here would need to be
   // cleaned up on a constructor failure unwinding.
 
   // Set up the 'self' argument.  If this class has a superclass, we set up
   // self as a box.  This allows "self reassignment" to happen in super init
   // method chains, which is important for interoperating with Objective-C
-  // classes.
+  // classes.  We also use a box for delegating constructors, since the
+  // delegated-to initializer may also replace self.
+  //
   // TODO: If we could require Objective-C classes to have an attribute to get
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
-    ->getNominalOrBoundGenericNominal();
-  bool NeedsBoxForSelf = cast<ClassDecl>(nominalDecl)->hasSuperclass();
+  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
+  auto selfClassDecl =
+    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+  bool NeedsBoxForSelf = isDelegating || selfClassDecl->hasSuperclass();
 
   if (NeedsBoxForSelf)
     emitLocalVariable(selfDecl);
@@ -2535,9 +2542,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
   // on ivars.
-  auto MUKind = cast<ClassDecl>(nominalDecl)->hasSuperclass()
-          ? MarkUninitializedInst::DerivedSelf :
-            MarkUninitializedInst::RootSelf;
+  auto MUKind = MarkUninitializedInst::
+    getConstructorSelfKind(selfClassDecl->hasSuperclass(), isDelegating);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
 
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");

@@ -817,6 +817,14 @@ public:
 
   Kind getKind() const { return ThisKind; }
 
+
+  static Kind getConstructorSelfKind(bool isDerivedClass, bool isDelegating) {
+    if (isDerivedClass)
+      return isDelegating ? DelegatingDerivedSelf : DerivedSelf;
+    return isDelegating ? DelegatingRootSelf : RootSelf;
+  }
+
+
   bool isGlobalVar() const { return ThisKind == GlobalVar; }
   bool isRoot() const {
     return ThisKind == RootSelf || ThisKind == DelegatingRootSelf;
