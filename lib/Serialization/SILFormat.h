@@ -81,7 +81,8 @@ namespace sil_block {
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
-    SIL_GLOBALVAR
+    SIL_GLOBALVAR,
+    SIL_INST_CAST // It has a cast kind instead of an attribute.
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -139,6 +140,19 @@ namespace sil_block {
     SIL_ONE_TYPE_ONE_OPERAND,
     SILInstOpCodeField,
     BCFixed<2>,          // Optional attributes
+    TypeIDField,
+    SILTypeCategoryField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField
+  >;
+
+  // SIL Cast instructions with a cast kind, one type and one typed valueref.
+  using SILInstCastLayout = BCRecordLayout<
+    SIL_INST_CAST,
+    SILInstOpCodeField,
+    BCFixed<4>,          // Cast kind
     TypeIDField,
     SILTypeCategoryField,
     TypeIDField,

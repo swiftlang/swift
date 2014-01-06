@@ -796,8 +796,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+    SILInstCastLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstCastLayout::Code],
         (unsigned)SI.getKind(), (unsigned)CI->getCastKind(),
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
@@ -1191,6 +1191,8 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
     registerSILAbbr<VTableLayout>();
     registerSILAbbr<VTableEntryLayout>();
     registerSILAbbr<GlobalVarLayout>();
+
+    registerSILAbbr<SILInstCastLayout>();
 
     // Register the abbreviation codes so these layouts can exist in both
     // decl blocks and sil blocks.

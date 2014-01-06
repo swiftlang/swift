@@ -470,6 +470,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                            TyID2, TyCategory2,
                                            ValID, ValResNum);
     break;
+  case SIL_INST_CAST:
+    SILInstCastLayout::readRecord(scratch, OpCode, Attr,
+                                  TyID, TyCategory,
+                                  TyID2, TyCategory2,
+                                  ValID, ValResNum);
+    break;
   case SIL_ONE_TYPE_VALUES:
     SILOneTypeValuesLayout::readRecord(scratch, OpCode, TyID, TyCategory,
                                        ListOfValues);
