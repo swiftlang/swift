@@ -131,6 +131,7 @@ public:
 
   unsigned getNumOperands() const { return getAllOperands().size(); }
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
+  void setOperand(unsigned Num, SILValue V) { getAllOperands()[Num].set(V); }
 
   MemoryBehavior getMemoryBehavior() const;
 
