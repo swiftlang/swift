@@ -2503,6 +2503,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-postfix  ::= <a href="#expr-new">expr-new</a>
     expr-postfix  ::= <a href="#expr-dot">expr-dot</a>
     expr-postfix  ::= <a href="#expr-metatype">expr-metatype</a>
+    expr-postfix  ::= <a href="#expr-init">expr-init</a>
     expr-postfix  ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix  ::= <a href="#expr-call">expr-call</a>
     expr-postfix  ::= <a href="#expr-optional">expr-optional</a>
@@ -3094,6 +3095,29 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>Otherwise, <a href="#namebind_value_lookup_dot">dot name lookup</a> is
   performed, and this expression is treated as function application.  This
   allows looking up members in modules, metatypes, etc.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-init">Initializer Expressions</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-init ::= <a href="#expr">expr-postfix</a> '.' 'init'
+  </pre>
+
+  <p>An initializer reference refers to a set of initializers of the
+  base expression. The base expression must be the <code>self</code>
+  parameter of an initializer, which is used to delegate the
+  initialization of the object to another initializer.</p>
+
+  <pre class="example">
+    class X {
+      init() {
+        self.init(5) // delegate to initializer below
+      }
+
+      init(value: Int) { /* ... */ }
+    }
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="expr-subscript">Subscript Expressions</h3>

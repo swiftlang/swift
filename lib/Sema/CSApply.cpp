@@ -1176,7 +1176,47 @@ namespace {
       auto choice = selected.choice;
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
-      // Build a call to the initializer for the constructor.
+      // The subexpression must be either 'self' or 'super'.
+      auto arg = expr->getSubExpr()->getSemanticsProvidingExpr();
+      if (!isa<SuperRefExpr>(arg)) {
+        auto &tc = cs.getTypeChecker();
+
+        // 'super' references have already been fully checked; handle the
+        // 'self' case below.
+        bool diagnoseBadInitRef = true;
+        if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
+          if (dre->getDecl()->getName().str().equals("self")) {
+            // We have a reference to 'self'.
+            diagnoseBadInitRef = false;
+
+            // Make sure the reference to 'self' occurs within an initializer.
+            if (!dyn_cast_or_null<ConstructorDecl>(
+                   cs.DC->getInnermostMethodContext())) {
+              tc.diagnose(expr->getDotLoc(),
+                          diag::init_delegation_outside_initializer);
+            }
+          }
+        }
+
+        // If we need to diagnose this as a bad reference to an initializer,
+        // do so now.
+        if (diagnoseBadInitRef) {
+          // Determine whether 'super' would have made sense as a base.
+          bool hasSuper = false;
+          if (auto func = cs.DC->getInnermostMethodContext()) {
+            if (auto nominalType
+                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
+              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
+                hasSuper = classDecl->hasSuperclass();
+              }
+            }
+          }
+
+          tc.diagnose(expr->getDotLoc(), diag::bad_init_ref_base, hasSuper);
+        }
+      }
+
+      // Build a partial application of the initializer.
       Expr *ctorRef = buildOtherConstructorRef(selected.openedFullType,
                                                ctor, expr->getConstructorLoc(),
                                                expr->isImplicit());

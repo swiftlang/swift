@@ -233,6 +233,38 @@ DeclContext *DeclContext::getLocalContext() {
   return getParent()->getLocalContext();
 }
 
+AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
+  DeclContext *result = this;
+  while (true) {
+    switch (result->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::Initializer:
+      // Look through closures, initial values.
+      result = result->getParent();
+      continue;
+
+    case DeclContextKind::AbstractFunctionDecl: {
+      // If this function is a method, we found our result.
+      auto func = dyn_cast<AbstractFunctionDecl>(result);
+      if (func->getDeclContext()->isTypeContext())
+        return func;
+
+      // This function isn't a method; look through it.
+      result = func->getDeclContext();
+      continue;
+    }
+
+    case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::Module:
+    case DeclContextKind::NominalTypeDecl:
+    case DeclContextKind::TopLevelCodeDecl:
+      // Not in a method context.
+      return nullptr;
+    }
+  }
+}
+
 Module *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())

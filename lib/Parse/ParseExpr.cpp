@@ -648,6 +648,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 ///     expr-primary
 ///     expr-dot
 ///     expr-metatype
+///     expr-init
 ///     expr-subscript
 ///     expr-call
 ///     expr-force-value
@@ -813,6 +814,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                  peekToken().isFollowingLBrace();
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
+      // Non-identifier cases.
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         // If we have '.<keyword><code_complete>', try to recover by creating
         // an identifier with the same spelling as the keyword.
@@ -824,6 +826,19 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                               /*Implicit=*/false));
           consumeToken();
         }
+
+        // expr-init ::= expr-postfix '.' 'init'.
+        if (Tok.is(tok::kw_init)) {
+          Result = makeParserResult(
+                     new (Context) UnresolvedConstructorExpr(
+                                     Result.get(),
+                                     TokLoc,
+                                     Tok.getLoc(),
+                                     /*Implicit=*/false));
+          consumeToken(tok::kw_init);
+          continue;
+        }
+
         if (Tok.is(tok::code_complete)) {
           if (CodeCompletion && Result.isNonNull())
             CodeCompletion->completeDotExpr(Result.get());

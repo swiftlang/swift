@@ -25,6 +25,7 @@
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
+  class AbstractFunctionDecl;
   class ASTContext;
   class ASTWalker;
   class DeclContext;
@@ -201,6 +202,18 @@ public:
   DeclContext *getLocalContext();
   const DeclContext *getLocalContext() const {
     return const_cast<DeclContext*>(this)->getLocalContext();
+  }
+
+  /// Returns the innermost method context.
+  ///
+  /// This routine looks through closure, initializer, and local function
+  /// contexts to find the innermost method (including constructors and
+  /// destructors).
+  ///
+  /// \returns the innermost method, or null if there is no such method.
+  AbstractFunctionDecl *getInnermostMethodContext();
+  const AbstractFunctionDecl *getInnermostMethodContext() const {
+    return const_cast<DeclContext*>(this)->getInnermostMethodContext();
   }
 
   /// Returns the semantic parent of this context.  A context has a

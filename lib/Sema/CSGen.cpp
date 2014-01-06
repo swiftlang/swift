@@ -254,15 +254,16 @@ namespace {
       
       // Open a member constraint for constructors on the subexpr type.
       auto baseTy = expr->getSubExpr()->getType()->getRValueType();
-      auto argsTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
-                                          TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+      auto argsTy = CS.createTypeVariable(
+                      CS.getConstraintLocator(expr, { }),
+                      TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
       auto methodTy = FunctionType::get(argsTy, baseTy);
       CS.addValueMemberConstraint(baseTy, C.getIdentifier("init"),
         methodTy,
         CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
       
       // The result of the expression is the partial application of the
-      // constructor to 'self'.
+      // constructor to the subexpression.
       return methodTy;
     }
     

@@ -1320,6 +1320,12 @@ ERROR(super_not_in_class_method,sema_tce,none,
 ERROR(super_with_no_base_class,sema_tce,none,
       "'super' members cannot be referenced in a root class", ())
 
+ERROR(bad_init_ref_base,sema_tce, none,
+      "'init' can only refer to the initializers of "
+      "'self'%select{| or 'super'}0", (bool))
+ERROR(init_delegation_outside_initializer,sema_tce,none,
+      "initializer delegation can only occur within an initiailizer", ())
+
 // Operators
 ERROR(unknown_binop,sema_tce,none,
        "operator is not a known binary operator", ())
