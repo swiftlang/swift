@@ -20,7 +20,7 @@
 //  - C_TYPE_KIND is the expected kind of the C type (see MappedCTypeKind
 //    enum).
 //  - C_TYPE_BITWIDTH is the expected size of the C type; a zero value
-//    means "don't check"; 6432 means "word sized".
+//    means "don't check".
 //  - SWIFT_MODULE_NAME is the name of the swift library module.
 //  - SWIFT_TYPE_NAME is the name of the corresponding stdlib type.
 //  - LANGUAGES specifies the set of languages for which this mapping
@@ -64,20 +64,20 @@ MAP_STDLIB_TYPE("int16_t", SignedInt, 16, "Int16", All, false)
 MAP_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false)
 MAP_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false)
 
-MAP_STDLIB_TYPE("ssize_t", SignedInt, 6432, "Int", All, false)
-MAP_STDLIB_TYPE("size_t", UnsignedInt, 6432, "UInt", All, false)
+MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false)
+MAP_STDLIB_TYPE("size_t", UnsignedWord, 0, "UInt", All, false)
 
 // C types.
-MAP_STDLIB_TYPE("long", SignedInt, 6432, "Int", All, false)
-MAP_STDLIB_TYPE("unsigned long", UnsignedInt, 6432, "UInt", All, false)
+MAP_STDLIB_TYPE("long", SignedWord, 0, "Int", All, false)
+MAP_STDLIB_TYPE("unsigned long", UnsignedWord, 0, "UInt", All, false)
 
 // Objective-C types.
 MAP_TYPE("BOOL",  ObjCBool,  8, "ObjectiveC", "ObjCBool",  ObjC1, false, false)
 MAP_TYPE("SEL",   ObjCSel,   0, "ObjectiveC", "Selector",  ObjC1, false, false)
 MAP_TYPE("id",    ObjCId,    0, "swift",      "AnyObject", ObjC1, false, false)
 MAP_TYPE("Class", ObjCClass, 0, "swift",      "AnyClass",  ObjC1, false, false)
-MAP_STDLIB_TYPE("NSUInteger", UnsignedInt, 6432, "Int", ObjC1, false)
-MAP_STDLIB_TYPE("NSInteger",  SignedInt,   6432, "Int", ObjC1, false)
+MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", ObjC1, false)
+MAP_STDLIB_TYPE("NSInteger",  SignedWord,   0, "Int", ObjC1, false)
 
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE

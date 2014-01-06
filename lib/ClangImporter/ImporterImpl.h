@@ -93,6 +93,8 @@ enum class ImportTypeKind {
 enum class MappedCTypeKind {
   UnsignedInt,
   SignedInt,
+  UnsignedWord,
+  SignedWord,
   FloatIEEEsingle,
   FloatIEEEdouble,
   FloatX87DoubleExtended,

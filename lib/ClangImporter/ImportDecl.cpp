@@ -113,18 +113,8 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   // If the C type does not have the expected size, don't import it as a stdlib
   // type.
   unsigned ClangTypeSize = ClangCtx.getTypeSize(ClangType);
-  switch (Bitwidth) {
-  case 0: // do not check
-    break;
-  case 6432: // "word" sized
-    if (ClangTypeSize != 64 && ClangTypeSize != 32)
-      return std::make_pair(Type(), "");
-    break;
-  default:
-    if (Bitwidth != ClangTypeSize)
-      return std::make_pair(Type(), "");
-    break;
-  }
+  if (Bitwidth != 0 && Bitwidth != ClangTypeSize)
+    return std::make_pair(Type(), "");
 
   // Chceck other expected properties of the C type.
   switch(CTypeKind) {
@@ -134,6 +124,20 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::SignedInt:
+    if (!ClangType->isSignedIntegerType())
+      return std::make_pair(Type(), "");
+    break;
+
+  case MappedCTypeKind::UnsignedWord:
+    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+      return std::make_pair(Type(), "");
+    if (!ClangType->isUnsignedIntegerType())
+      return std::make_pair(Type(), "");
+    break;
+
+  case MappedCTypeKind::SignedWord:
+    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+      return std::make_pair(Type(), "");
     if (!ClangType->isSignedIntegerType())
       return std::make_pair(Type(), "");
     break;
