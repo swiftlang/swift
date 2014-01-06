@@ -807,24 +807,6 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   return 0;
 }
 
-/// Find out if the statement has references to initializers.
-static bool hasReferencesToInitializers(Stmt *S) {
-  struct FindReferenceToInitializer : ASTWalker {
-    bool FoundInitializerRef = false;
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-      assert(!FoundInitializerRef &&
-             "Continuing to walk after finding initializer.");
-      if (isa<OtherConstructorDeclRefExpr>(E)) {
-        FoundInitializerRef = true;
-        return { false, nullptr };
-      }
-      return { true, E };
-    }
-  } finder;
-  S->walk(finder);
-  return finder.FoundInitializerRef;
-}
-
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
@@ -874,7 +856,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   // initializer if none has been added by the user.
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
   if (!ctor->isImplicit() && ClassD && ClassD->getSuperclass() &&
-      !hasReferencesToInitializers(body)) {
+      !ctor->hasDelegatingOrChainedInit()) {
     // Find a definite initializer in the superclass.
     if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
       // Store the super.init expression within the constructor declaration

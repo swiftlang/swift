@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1808,6 +1809,25 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
   assert(!t->is<PolymorphicFunctionType>()
          && "polymorphic function type is invalid interface type");
   InitializerInterfaceType = t;
+}
+
+bool ConstructorDecl::hasDelegatingOrChainedInit() const {
+  assert(hasBody() && "Constructor does not have a definition");
+  struct FindReferenceToInitializer : ASTWalker {
+    bool FoundInitializerRef = false;
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+      assert(!FoundInitializerRef &&
+             "Continuing to walk after finding initializer.");
+      if (isa<OtherConstructorDeclRefExpr>(E)) {
+        FoundInitializerRef = true;
+        return { false, nullptr };
+      }
+
+      return { true, E };
+    }
+  } finder;
+  getBody()->walk(finder);
+  return finder.FoundInitializerRef;
 }
 
 SourceRange DestructorDecl::getSourceRange() const {

@@ -3016,6 +3016,11 @@ public:
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
+  /// Determine whether the body of this constructor contains any delegating
+  /// or superclass initializations (\c self.init or \c super.init,
+  /// respectively) within its body.
+  bool hasDelegatingOrChainedInit() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
