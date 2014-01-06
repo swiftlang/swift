@@ -765,7 +765,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::StringLiteralInst: {
     Identifier StringVal = MF->getIdentifier(ValID);
     auto encoding = fromStableStringEncoding(Attr);
-    if (!encoding) break;
+    if (!encoding) return true;
     ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
                                             encoding.getValue());
     break;
