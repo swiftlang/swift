@@ -1776,7 +1776,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     if (hasName) print(pointer->getChild(1));
     Printer << extraName;
 
-    if (printType) {
+    if (printType &&
+        // FIXME: Hack for rdar://15753317
+        pointer->getNumChildren() > 1 + unsigned(hasName)) {
       Node *type = pointer->getChild(1 + unsigned(hasName));
       if (typeNeedsColonForDecl(type))
         Printer << " : ";
