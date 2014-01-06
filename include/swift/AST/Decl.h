@@ -3016,10 +3016,26 @@ public:
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
+  /// Specifies the kind of initialization call performed within the body
+  /// of the constructor, e.g., self.init or super.init.
+  enum class BodyInitKind {
+    /// There are no calls to self.init or super.init.
+    None,
+    /// There is a call to self.init, which delegates to another (peer)
+    /// initializer.
+    Delegating,
+    /// There is a call to super.init, which chains to a superclass initializer.
+    Chained,
+    /// There are no calls to self.init or super.init explicitly in the body of
+    /// the constructor, but a 'super.init' call will be implicitly added
+    /// by semantic analysis.
+    ImplicitChained
+  };
+
   /// Determine whether the body of this constructor contains any delegating
   /// or superclass initializations (\c self.init or \c super.init,
   /// respectively) within its body.
-  bool hasDelegatingOrChainedInit() const;
+  BodyInitKind getDelegatingOrChainedInitKind() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

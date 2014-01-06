@@ -1811,23 +1811,43 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
   InitializerInterfaceType = t;
 }
 
-bool ConstructorDecl::hasDelegatingOrChainedInit() const {
+ConstructorDecl::BodyInitKind
+ConstructorDecl::getDelegatingOrChainedInitKind() const {
   assert(hasBody() && "Constructor does not have a definition");
   struct FindReferenceToInitializer : ASTWalker {
-    bool FoundInitializerRef = false;
+    BodyInitKind Kind = BodyInitKind::None;
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-      assert(!FoundInitializerRef &&
-             "Continuing to walk after finding initializer.");
-      if (isa<OtherConstructorDeclRefExpr>(E)) {
-        FoundInitializerRef = true;
-        return { false, nullptr };
+      if (auto apply = dyn_cast<ApplyExpr>(E)) {
+        if (isa<OtherConstructorDeclRefExpr>(
+              apply->getFn()->getSemanticsProvidingExpr())) {
+          if (isa<SuperRefExpr>(apply->getArg()->getSemanticsProvidingExpr()))
+            Kind = BodyInitKind::Chained;
+          else
+            Kind = BodyInitKind::Delegating;
+          return { false, nullptr };
+        }
       }
+
+      // Don't walk into closures.
+      if (isa<ClosureExpr>(E))
+        return { false, E };
 
       return { true, E };
     }
   } finder;
   getBody()->walk(finder);
-  return finder.FoundInitializerRef;
+
+  // If we didn't find any delegating or chained initializers, check whether
+  // we have a class with a superclass: it gets an implicit chained initializer.
+  if (finder.Kind == BodyInitKind::None) {
+    if (auto classDecl = getDeclContext()->getDeclaredTypeInContext()
+                           ->getClassOrBoundGenericClass()) {
+      if (classDecl->getSuperclass())
+        return BodyInitKind::ImplicitChained;
+    }
+  }
+
+  return finder.Kind;
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
