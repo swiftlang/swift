@@ -641,7 +641,7 @@ SILValue SILGenFunction::getBufferForExprResult(
     case Initialization::Kind::LetValue:
       // Emit into the buffer that 'let's produce for address-only values if
       // we have it.
-      if (ty.isAddressOnly(SGM.M))
+      if (I->hasAddress())
         return I->getAddress();
       break;
     case Initialization::Kind::Translating:
@@ -676,8 +676,14 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
     case Initialization::Kind::Ignored:
     case Initialization::Kind::Translating:
     case Initialization::Kind::Tuple:
-    case Initialization::Kind::LetValue:
       break;
+    case Initialization::Kind::LetValue:
+      if (I->hasAddress()) {
+        I->finishInitialization(*this);
+        return ManagedValue();
+      }
+      break;
+
     case Initialization::Kind::SingleBuffer:
       I->finishInitialization(*this);
       return ManagedValue();
