@@ -50,8 +50,8 @@ public:
     /// This Initialization is for an @inout or address-only argument binding,
     /// which is initialized using bindAddress().
     AddressBinding,
-    /// This Initialization is to bind a 'let' declaration with non-address-only
-    /// type into varlocs directly.
+    /// This Initialization is to bind a 'let' declaration into VarLocs
+    /// directly.
     LetValue,
     /// This Initialization is for a single buffer with a physical address,
     /// which can be accessed with getAddress() and stored to.
