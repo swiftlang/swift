@@ -20,5 +20,6 @@ add_swift_library(swiftSILPasses
   SimplifyCFG.cpp
   PerformanceInliner.cpp
   SILLowerAggregateInstrs.cpp
+  SILSROA.cpp
   DEPENDS swiftSILPassesUtils)
 

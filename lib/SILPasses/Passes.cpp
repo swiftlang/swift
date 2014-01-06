@@ -63,6 +63,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Transition to SSA form.
   performSILLowerAggregateInstrs(&Module);
+  performSILSROA(&Module);
   performSILMem2Reg(&Module);
 
   // Perform scalar optimizations.
