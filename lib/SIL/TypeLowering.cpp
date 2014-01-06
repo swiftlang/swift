@@ -844,7 +844,7 @@ namespace {
     IsDependent_t Dependent;
   public:
     LowerType(TypeConverter &TC, IsDependent_t Dependent)
-      : TypeClassifierBase(TC.M), TC(TC) {}
+      : TypeClassifierBase(TC.M), TC(TC), Dependent(Dependent) {}
 
     const TypeLowering *handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
@@ -1000,7 +1000,7 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc,
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
-  auto &Types = k.Dependent ? DependentTypes : IndependentTypes;
+  auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
   auto found = Types.find(k);
   if (found == Types.end())
     return nullptr;
@@ -1011,7 +1011,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
 }
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
-  auto &Types = k.Dependent ? DependentTypes : IndependentTypes;
+  auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
   Types[k] = tl;
 }
 
@@ -1095,14 +1095,9 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType,
                                unsigned uncurryLevel) {
   CanType substType = origSubstType->getCanonicalType();
-  auto key = getTypeKey(origType, substType, uncurryLevel,
-                  substType->isDependentType() ? IsDependent : IsNotDependent);
-  // Generic function types don't appear positionally, so dependent types
-  // should never be substituted.
-  assert(!key.Dependent || substType == origType.getAsType()
-         && "dependent type substituted?!");
+  auto key = getTypeKey(origType, substType, uncurryLevel);
   
-  assert(!key.Dependent || GenericArchetypes.hasValue()
+  assert(!key.isDependent() || GenericArchetypes.hasValue()
          && "dependent type outside of generic context?!");
   
   if (auto existing = find(key))
@@ -1131,7 +1126,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     auto thinnedTy = CanMetatypeType::get(substMeta.getInstanceType(),
                                           isThin, substMeta->getASTContext());
     auto loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
-    auto *theInfo = new (*this, key.Dependent) TrivialTypeLowering(loweredTy);
+    auto *theInfo
+      = new (*this, key.isDependent()) TrivialTypeLowering(loweredTy);
     insert(key, theInfo);
     return *theInfo;
   }
@@ -1157,8 +1153,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       origLoweredType =
         AbstractionPattern(getLoweredASTFunctionType(origFnType, uncurryLevel));
     }
-    TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0,
-                                    key.Dependent);
+    TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0);
 
     // If the uncurrying/unbridging process changed the type, re-check
     // the cache and add a cache entry for the curried type.
@@ -1184,7 +1179,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     SILType loweredType = getLoweredType(origObjectType, substObjectType,
                                          uncurryLevel).getAddressType();
 
-    auto *theInfo = new (*this, key.Dependent) TrivialTypeLowering(loweredType);
+    auto *theInfo = new (*this, key.isDependent()) TrivialTypeLowering(loweredType);
     insert(key, theInfo);
     return *theInfo;
   }
@@ -1196,8 +1191,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     // If that changed anything, check for a lowering at the lowered
     // type.
     if (loweredType != substType) {
-      TypeKey loweredKey = getTypeKey(origType, loweredType, 0,
-                                      key.Dependent);
+      TypeKey loweredKey = getTypeKey(origType, loweredType, 0);
       auto &lowering = getTypeLoweringForLoweredType(loweredKey);
       insert(key, &lowering);
       return lowering;
@@ -1214,8 +1208,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
 const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
   auto loweredType = type.getSwiftRValueType();
-  auto key = getTypeKey(AbstractionPattern(loweredType), loweredType, 0,
-    type.getSwiftRValueType()->isDependentType()? IsDependent : IsNotDependent);
+  auto key = getTypeKey(AbstractionPattern(loweredType), loweredType, 0);
 
   return getTypeLoweringForLoweredType(key);
 }
@@ -1264,8 +1257,7 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
 
   // Do a cached lookup under yet another key, just so later lookups
   // using the SILType will find the same TypeLowering object.
-  auto loweredKey = getTypeKey(AbstractionPattern(key.OrigType), silFnType, 0,
-                               key.Dependent);
+  auto loweredKey = getTypeKey(AbstractionPattern(key.OrigType), silFnType, 0);
   auto &lowering = getTypeLoweringForLoweredType(loweredKey);
   insert(key, &lowering);
   return lowering;
@@ -1282,7 +1274,7 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   insert(key, nullptr);
 #endif
 
-  auto *theInfo = LowerType(*this, key.Dependent).visit(key.SubstType);
+  auto *theInfo = LowerType(*this, key.isDependent()).visit(key.SubstType);
   insert(key, theInfo);
   return *theInfo;
 }

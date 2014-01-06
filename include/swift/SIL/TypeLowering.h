@@ -410,16 +410,20 @@ class TypeConverter {
     CanType SubstType;
 
     /// The uncurrying level of the type.
-    unsigned UncurryLevel : 31;
+    unsigned UncurryLevel;
     
-    /// Whether the type carries dependencies on its generic context.
-    IsDependent_t Dependent : 1;
-
+    IsDependent_t isDependent() const {
+      if (SubstType->isDependentType())
+        return IsDependent;
+      if (OrigType->isDependentType())
+        return IsDependent;
+      return IsNotDependent;
+    }
+    
     friend bool operator==(const TypeKey &lhs, const TypeKey &rhs) {
       return lhs.OrigType == rhs.OrigType
           && lhs.SubstType == rhs.SubstType
-          && lhs.UncurryLevel == rhs.UncurryLevel
-          && lhs.Dependent == rhs.Dependent;
+          && lhs.UncurryLevel == rhs.UncurryLevel;
     }
     friend bool operator!=(const TypeKey &lhs, const TypeKey &rhs) {
       return !(lhs == rhs);
@@ -428,8 +432,8 @@ class TypeConverter {
   friend struct llvm::DenseMapInfo<TypeKey>;
   
   TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
-                     unsigned uncurryLevel, IsDependent_t dependent) {
-    return { origTy.getAsType(), substTy, uncurryLevel, dependent };
+                     unsigned uncurryLevel) {
+    return {origTy.getAsType(), substTy, uncurryLevel};
   }
   
   /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
@@ -687,18 +691,17 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::Lowering::TypeConverter::TypeKey> {
     typedef swift::Lowering::TypeConverter::TypeKey TypeKey;
     static TypeKey getEmptyKey() {
-      return TypeKey{ DenseMapInfo<swift::CanType>::getEmptyKey(),
-                      swift::CanType(), 0, swift::Lowering::IsNotDependent };
+      return {DenseMapInfo<swift::CanType>::getEmptyKey(),
+              swift::CanType(), 0};
     }
     static TypeKey getTombstoneKey() {
-      return TypeKey{ DenseMapInfo<swift::CanType>::getTombstoneKey(),
-                      swift::CanType(), 0, swift::Lowering::IsNotDependent };
+      return {DenseMapInfo<swift::CanType>::getTombstoneKey(),
+              swift::CanType(), 0};
     }
     static unsigned getHashValue(TypeKey val) {
       return DenseMapInfo<swift::CanType>::getHashValue(val.OrigType)
            ^ DenseMapInfo<swift::CanType>::getHashValue(val.SubstType)
-           ^ val.UncurryLevel
-           ^ unsigned(val.Dependent);
+           ^ val.UncurryLevel;
     }
     static bool isEqual(TypeKey LHS, TypeKey RHS) {
       return LHS == RHS;
