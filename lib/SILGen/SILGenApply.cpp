@@ -608,16 +608,35 @@ public:
     visit(e);
   }
 
-  CanFunctionType getSubstFnType() {
+  /// Get the type of the function for substitution purposes.
+  ///
+  /// \param otherCtorRefUsesAllocating If true, the OtherConstructorDeclRef
+  CanFunctionType getSubstFnType(bool otherCtorRefUsesAllocating = false) {
     // TODO: optimize this if there are no specializes in play
-    auto getSiteType = [](ApplyExpr *site) {
+    auto getSiteType = [&](ApplyExpr *site, bool otherCtorRefUsesAllocating) {
+      if (otherCtorRefUsesAllocating) {
+        // We have a reference to an initializing constructor, but we will
+        // actually be using the allocating constructor. Update the type
+        // appropriately.
+        // FIXME: Re-derive the type from the declaration + substitutions?
+        auto ctorRef = cast<OtherConstructorDeclRefExpr>(
+                         site->getFn()->getSemanticsProvidingExpr());
+        auto fnType = ctorRef->getType()->castTo<FunctionType>();
+        auto selfTy = MetatypeType::get(
+                        fnType->getInput()->getInOutObjectType(),
+                        gen.getASTContext());
+        return CanFunctionType::get(selfTy->getCanonicalType(),
+                                    fnType->getResult()->getCanonicalType(),
+                                    fnType->getExtInfo());
+      }
+
       return cast<FunctionType>(site->getFn()->getType()->getCanonicalType());
     };
 
     CanFunctionType fnType;
 
-    auto addSite = [&](ApplyExpr *site) {
-      auto siteType = getSiteType(site);
+    auto addSite = [&](ApplyExpr *site, bool otherCtorRefUsesAllocating) {
+      auto siteType = getSiteType(site, otherCtorRefUsesAllocating);
 
       // If this is the first call site, use its formal type directly.
       if (!fnType) {
@@ -630,10 +649,10 @@ public:
     };
 
     for (auto callSite : callSites) {
-      addSite(callSite);
+      addSite(callSite, false);
     }
     if (auto selfApply = dyn_cast_or_null<ApplyExpr>(SelfApplyExpr)) {
-      addSite(selfApply);
+      addSite(selfApply, otherCtorRefUsesAllocating);
     }
 
     assert(fnType && "found no call sites?");
@@ -668,6 +687,8 @@ public:
   void visitApplyExpr(ApplyExpr *e) {
     if (e->isSuper()) {
       applySuper(e);
+    } else if (applyInitDelegation(e)) {
+      // Already done */
     } else {
       callSites.push_back(e);
       visit(e->getFn());
@@ -919,7 +940,57 @@ public:
     if (!substitutions.empty())
       callee->setSubstitutions(gen, fn, substitutions, callDepth-1);
   }
-  
+
+  /// Try to emit the given application as
+  bool applyInitDelegation(ApplyExpr *expr) {
+    // Dig out the constructor we're delegating to.
+    Expr *fn = expr->getFn();
+    auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(
+                     fn->getSemanticsProvidingExpr());
+    if (!ctorRef)
+      return false;
+
+    // Determine whether we'll need to use an allocating constructor (vs. the
+    // initializing constructor).
+    auto nominal = ctorRef->getDecl()->getDeclContext()
+                     ->getDeclaredTypeOfContext()->getAnyNominal();
+    bool useAllocatingCtor = isa<StructDecl>(nominal) || isa<EnumDecl>(nominal);
+
+    // Load the 'self' argument.
+    Expr *arg = expr->getArg();
+    ManagedValue self = gen.emitRValue(arg).getAsSingleValue(gen, arg);
+
+    // If we're using the allocating constructor, we need to pass along the
+    // metatype.
+    if (useAllocatingCtor) {
+      auto cleanup = self.getCleanup();
+
+      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.forward(gen));
+      self = ManagedValue(selfMeta, cleanup);
+    }
+
+    CanType selfFormalType = arg->getType()->getCanonicalType();
+    setSelfParam(RValue(gen, expr, selfFormalType, self), expr);
+
+    // Determine the callee. For structs and enums, this is the allocating
+    // constructor (because there is no initializing constructor). For classes,
+    // this is the initializing constructor. Dispatch is always direct.
+    setCallee(Callee::forDirect(gen,
+                                SILDeclRef(ctorRef->getDecl(),
+                                           useAllocatingCtor
+                                             ? SILDeclRef::Kind::Allocator
+                                             : SILDeclRef::Kind::Initializer),
+                                getSubstFnType(useAllocatingCtor), fn));
+
+    // Set up the substitutions, if we have any.
+    if (ctorRef->getDeclRef().isSpecialized())
+      callee->setSubstitutions(gen, fn,
+                               ctorRef->getDeclRef().getSubstitutions(),
+                               callDepth-1);
+
+    return true;
+  }
+
   Callee getCallee() {
     assert(callee && "did not find callee?!");
     return *std::move(callee);
