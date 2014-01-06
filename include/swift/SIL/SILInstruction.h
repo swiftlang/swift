@@ -927,6 +927,10 @@ public:
   
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
+
+  void setSrc(SILValue V) { Operands[Src].set(V); }
+  void setDest(SILValue V) { Operands[Dest].set(V); }
+
   IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
   IsInitialization_t isInitializationOfDest() const {
     return IsInitialization_t(IsInitializationOfDest);
