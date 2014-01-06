@@ -279,12 +279,12 @@ of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same result
 regardless of system state.  Strings *do* provide a suitable
 foundation on which to build locale-aware interfaces.\ [#locales]_ 
 
-Strings are **Indexable**
--------------------------
+Strings are **Containers**
+--------------------------
 
 .. sidebar:: String Indices
 
-          ``String`` implements the ``Indexable`` protocol, but
+          ``String`` implements the ``Container`` protocol, but
           **cannot be indexed by integers**.  Instead,
           ``String.IndexType`` is a library type conforming to the
           ``BidirectionalIndex`` protocol.
@@ -784,7 +784,7 @@ Indexing
 
     :Note: Swift may need additional interfaces to support
            ``index...`` and ``...index`` notations.  This part of the
-           ``Indexable`` protocol design isn't worked out yet.
+           ``Container`` protocol design isn't worked out yet.
 
 Comparison
 ~~~~~~~~~~~~
@@ -932,7 +932,7 @@ Searching
 .. sidebar:: Naming
 
    The Swift function is just an algorithm that comes from conformance
-   to the ``Indexable`` protocol, which explains why it doesn't have a
+   to the ``Container`` protocol, which explains why it doesn't have a
    ``String``\ -specific name.
 
 :Swift:
