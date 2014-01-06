@@ -770,9 +770,8 @@ void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     // ignored. We use an array of null pointers for conformances to satisfy
     // the requirement in writeConformances: the first and second arguments
     // have the same size.
-    SmallVector<ProtocolConformance *, 4> conformances;
-    for (unsigned i = 0, e = sub.Archetype->getConformsTo().size(); i < e; i++)
-      conformances.push_back(nullptr); 
+    SmallVector<ProtocolConformance *, 4> conformances(
+      sub.Archetype->getConformsTo().size(), nullptr);
     writeConformances(sub.Archetype->getConformsTo(), conformances, nullptr,
                       abbrCodes);
   }
