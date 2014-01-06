@@ -767,7 +767,7 @@ public:
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->print(OS, Indent + 2); }
-  void printRec(Pattern *P) { P->print(OS); }
+  void printRec(Pattern *P) {  PrintPattern(OS, Indent+2).visit(P); }
 
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
@@ -933,9 +933,7 @@ public:
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Stmt *S) { S->print(OS, Indent + 2); }
-  void printRec(Pattern *P) {
-    PrintPattern(OS, Indent+2).visit(P);
-  }
+  void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
   void printRec(TypeRepr *T);
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
