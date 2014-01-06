@@ -974,13 +974,27 @@ public:
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
-    // this is the initializing constructor. Dispatch is always direct.
-    setCallee(Callee::forDirect(gen,
-                                SILDeclRef(ctorRef->getDecl(),
-                                           useAllocatingCtor
-                                             ? SILDeclRef::Kind::Allocator
-                                             : SILDeclRef::Kind::Initializer),
-                                getSubstFnType(useAllocatingCtor), fn));
+    // this is the initializing constructor.
+    if (isa<ClassDecl>(nominal) && ctorRef->getDecl()->hasClangNode()) {
+      // If the constructor doesn't have a Swift entry point, we can't call it
+      // directly. Use the foreign entry point.
+      setCallee(Callee::forClassMethod(
+                  gen,
+                  self.getValue(),
+                  SILDeclRef(ctorRef->getDecl(),
+                             SILDeclRef::Kind::Initializer,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
+                             /*isForeign=*/true),
+                  getSubstFnType(), fn));
+    } else {
+      // Directly call the peer constructor.
+      setCallee(Callee::forDirect(gen,
+                                  SILDeclRef(ctorRef->getDecl(),
+                                             useAllocatingCtor
+                                               ? SILDeclRef::Kind::Allocator
+                                               : SILDeclRef::Kind::Initializer),
+                                  getSubstFnType(useAllocatingCtor), fn));
+    }
 
     // Set up the substitutions, if we have any.
     if (ctorRef->getDeclRef().isSpecialized())
