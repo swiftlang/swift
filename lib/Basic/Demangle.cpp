@@ -18,6 +18,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/QuotedString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -1535,7 +1536,9 @@ private:
 };
 } // end anonymous namespace
 
-NodePointer swift::Demangle::demangleSymbolAsNode(llvm::StringRef mangled, const DemangleOptions& options) {
+NodePointer Demangle::demangleSymbolAsNode(llvm::StringRef mangled,
+                                           const DemangleOptions &options) {
+  PrettyStackTraceStringAction prettyStackTrace("demangling string", mangled);
   Demangler demangler(mangled);
   demangler.demangle();
   return demangler.getDemangled();
@@ -2179,7 +2182,11 @@ std::string Demangle::nodeToString(NodePointer root,
 
 std::string Demangle::demangleSymbolAsString(llvm::StringRef mangled,
                                              const DemangleOptions &options) {
-  std::string demangling = nodeToString(demangleSymbolAsNode(mangled, options), options);
+  auto root = demangleSymbolAsNode(mangled, options);
+  if (!root) return mangled.str();
+
+  PrettyStackTraceStringAction trace("printing the demangling of", mangled);
+  std::string demangling = nodeToString(std::move(root), options);
   if (demangling.empty())
     return mangled.str();
   return demangling;

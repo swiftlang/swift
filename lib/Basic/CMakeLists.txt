@@ -3,6 +3,7 @@ add_swift_library(swiftBasic
   Demangle.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
+  PrettyStackTrace.cpp
   Punycode.cpp
   QuotedString.cpp
   SourceLoc.cpp
