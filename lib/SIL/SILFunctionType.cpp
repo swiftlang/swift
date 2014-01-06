@@ -1361,6 +1361,11 @@ SILFunctionType::substInterfaceGenericArgs(SILModule &silModule,
   assert(isPolymorphic());
   TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
   SILTypeSubstituter substituter(silModule, astModule, map);
+  
+  GenericContextScope scope(silModule.Types,
+                            getGenericSignature()->getGenericParams(),
+                            getGenericSignature()->getRequirements());
+  
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true,
                                           /*interfaceTypes*/ true);
