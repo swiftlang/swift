@@ -898,9 +898,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (Expr *Container = S->getContainer()) {
-    if ((Container = doIt(Container)))
-      S->setContainer(Container);
+  if (Expr *Sequence = S->getSequence()) {
+    if ((Sequence = doIt(Sequence)))
+      S->setSequence(Sequence);
     else
       return nullptr;
   }

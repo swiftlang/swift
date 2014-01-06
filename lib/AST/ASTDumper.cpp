@@ -851,7 +851,7 @@ public:
     OS.indent(Indent) << "(for_each_stmt\n";
     printRec(S->getPattern());
     OS << '\n';
-    printRec(S->getContainer());
+    printRec(S->getSequence());
     OS << '\n';
     printRec(S->getBody());
     OS << ')';

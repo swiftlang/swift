@@ -311,7 +311,7 @@ class ForEachStmt : public Stmt {
   SourceLoc ForLoc;
   SourceLoc InLoc;
   Pattern *Pat;
-  Expr *Container;
+  Expr *Sequence;
   BraceStmt *Body;
   
   /// The generator variable along with its initializer.
@@ -322,11 +322,11 @@ class ForEachStmt : public Stmt {
 
 public:
   ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
-              Expr *Container, BraceStmt *Body,
+              Expr *Sequence, BraceStmt *Body,
               Optional<bool> implicit = {})
     : Stmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc)),
       ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
-      Container(Container), Body(Body) { }
+      Sequence(Sequence), Body(Body) { }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
@@ -339,12 +339,12 @@ public:
   Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *p) { Pat = p; }
   
-  /// getContainer - Retrieve the container whose elements will be visited
+  /// getSequence - Retrieve the Sequence whose elements will be visited
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getContainer() const { return Container; }
-  void setContainer(Expr *C) { Container = C; }
+  Expr *getSequence() const { return Sequence; }
+  void setSequence(Expr *S) { Sequence = S; }
   
   /// Retrieve the pattern binding that contains the (implicit) generator
   /// variable and its initialization from the container.

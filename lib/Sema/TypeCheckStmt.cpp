@@ -334,10 +334,10 @@ public:
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // Type-check the container and convert it to an rvalue.
-    Expr *Container = S->getContainer();
-    if (TC.typeCheckExpression(Container, DC, Type(), /*discardedExpr=*/false))
+    Expr *Sequence = S->getSequence();
+    if (TC.typeCheckExpression(Sequence, DC, Type(), /*discardedExpr=*/false))
       return nullptr;
-    S->setContainer(Container);
+    S->setSequence(Sequence);
 
     // Retrieve the 'Sequence' protocol.
     ProtocolDecl *SequenceProto
@@ -358,20 +358,20 @@ public:
     Type StreamTy;
     VarDecl *Stream;
     {
-      Type ContainerType = Container->getType()->getRValueType();
+      Type SequenceType = Sequence->getType()->getRValueType();
 
       ProtocolConformance *Conformance = nullptr;
-      if (!TC.conformsToProtocol(ContainerType, SequenceProto, DC,
-                                 &Conformance, Container->getLoc()))
+      if (!TC.conformsToProtocol(SequenceType, SequenceProto, DC,
+                                 &Conformance, Sequence->getLoc()))
         return nullptr;
 
-      StreamTy = TC.getWitnessType(ContainerType, SequenceProto,
+      StreamTy = TC.getWitnessType(SequenceType, SequenceProto,
                                       Conformance,
                                       TC.Context.getIdentifier("StreamType"),
                                       diag::sequence_protocol_broken);
       
       Expr *GetStream
-        = TC.callWitness(Container, DC, SequenceProto, Conformance,
+        = TC.callWitness(Sequence, DC, SequenceProto, Conformance,
                          TC.Context.getIdentifier("generate"),
                          {}, diag::sequence_protocol_broken);
       if (!GetStream) return nullptr;
@@ -405,7 +405,7 @@ public:
     // conformsToProtocol().
     ProtocolConformance *GenConformance = nullptr;
     if (!TC.conformsToProtocol(StreamTy, StreamProto, DC, &GenConformance,
-                               Container->getLoc()))
+                               Sequence->getLoc()))
       return nullptr;
     
     Type ElementTy = TC.getWitnessType(StreamTy, StreamProto,
