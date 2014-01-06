@@ -1316,9 +1316,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
   witness cannot be determined in any other way.</p>
 
   <pre class="example">
-    protocol Enumerable {
-      typename EnumeratorType : Enumerator
-      func getElements() -> EnumeratorType
+    protocol Sequence {
+      typename StreamType : Stream
+      func generate() -> StreamType
     }
   </pre>
 
