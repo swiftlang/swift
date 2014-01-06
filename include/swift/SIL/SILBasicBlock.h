@@ -75,12 +75,19 @@ public:
 
   typedef InstListType::iterator iterator;
   typedef InstListType::const_iterator const_iterator;
+  typedef InstListType::reverse_iterator reverse_iterator;
+  typedef InstListType::const_reverse_iterator const_reverse_iterator;
 
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }
   const_iterator begin() const { return InstList.begin(); }
   const_iterator end() const { return InstList.end(); }
+  reverse_iterator rbegin() { return InstList.rbegin(); }
+  reverse_iterator rend() { return InstList.rend(); }
+  const_reverse_iterator rbegin() const { return InstList.rbegin(); }
+  const_reverse_iterator rend() const { return InstList.rend(); }
+
 
   TermInst *getTerminator() {
     assert(!InstList.empty() && "Can't get successors for malformed block");
