@@ -42,6 +42,15 @@ namespace {
       return false;
     }
 
+    /// Dependent types have non-trivial representation in case they
+    /// instantiate to a class metatype.
+    bool visitGenericTypeParamType(CanGenericTypeParamType type) {
+      return false;
+    }
+    bool visitDependentMemberType(CanDependentMemberType type) {
+      return false;
+    }
+    
     /// Archetype metatypes have non-trivial representation in case
     /// they instantiate to a class metatype.
     bool visitArchetypeType(CanArchetypeType type) {
