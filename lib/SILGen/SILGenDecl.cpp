@@ -310,13 +310,14 @@ class LetValueInitialization : public Initialization {
   bool DidFinish = false;
 
 public:
-  LetValueInitialization(VarDecl *vd, SILGenFunction &gen)
-  : Initialization(Initialization::Kind::LetValue), vd(vd) {
+  LetValueInitialization(VarDecl *vd, bool isArgument, SILGenFunction &gen)
+    : Initialization(Initialization::Kind::LetValue), vd(vd) {
 
-    // If this is an address-only let declaration, create a buffer to bind the
-    // expression value assigned into this slot.
+    // If this is an address-only let declaration for a real let declaration
+    // (not a function argument), create a buffer to bind the expression value
+    // assigned into this slot.
     auto &lowering = gen.getTypeLowering(vd->getType());
-    if (lowering.isAddressOnly()) {
+    if (lowering.isAddressOnly() && !isArgument) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
       gen.enterDormantTemporaryCleanup(address, lowering);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(address);
@@ -349,20 +350,20 @@ public:
     gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
   }
 
-  void bindArgument(SILValue value, SILLocation loc, SILGenFunction &gen) {
+  void bindArgument(SILValue value, SILGenFunction &gen) {
     if (!value.getType().isAddress())
       bindValue(value, gen);
     else {
-      // FIXME: replace the buffer.
-      gen.emitSemanticStore(loc, value, address,
-                            gen.getTypeLowering(vd->getType()),
-                            IsInitialization);
+      assert(!gen.VarLocs.count(vd) &&
+             "Already bound a location to this argument");
+      gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
     }
   }
 
   void finishInitialization(SILGenFunction &gen) override {
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
+    assert(gen.VarLocs.count(vd) && "Didn't bind a value to this let!");
     gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
     DidFinish = true;
   }
@@ -520,8 +521,10 @@ struct InitializationForPattern
 
     // If this is a 'let' initialization for a non-address-only type, set up a
     // let binding, which stores the initialization value into VarLocs directly.
-    if (vd->isLet())
-      return InitializationPtr(new LetValueInitialization(vd, Gen));
+    if (vd->isLet()) {
+      bool isArgument = ArgumentOrVar == Argument;
+      return InitializationPtr(new LetValueInitialization(vd, isArgument, Gen));
+    }
     
     // Otherwise, we have a normal local-variable initialization.
     auto varInit = Gen.emitLocalVariableWithCleanup(vd);
@@ -641,7 +644,7 @@ struct ArgumentInitVisitor :
     case Initialization::Kind::LetValue: {
       // If this is a 'let' value being used as a constant, lower it as the
       // value itself.
-      ((LetValueInitialization*)I)->bindArgument(arg, loc, gen);
+      ((LetValueInitialization*)I)->bindArgument(arg, gen);
       break;
     }
 
