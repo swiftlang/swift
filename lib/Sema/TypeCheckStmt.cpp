@@ -372,7 +372,7 @@ public:
       
       Expr *GetStream
         = TC.callWitness(Container, DC, SequenceProto, Conformance,
-                         TC.Context.getIdentifier("enumerate"),
+                         TC.Context.getIdentifier("generate"),
                          {}, diag::sequence_protocol_broken);
       if (!GetStream) return nullptr;
       
