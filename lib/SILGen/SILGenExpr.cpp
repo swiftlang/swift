@@ -106,15 +106,16 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v.getType());
-  if (lowering.isTrivial()) {
+  if (lowering.isTrivial())
     return ManagedValue(v, ManagedValue::Unmanaged);
-  } else if (lowering.isAddressOnly()) {
+  
+  if (lowering.isAddressOnly()) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(v);
     return ManagedValue(v, getTopCleanup());
-  } else {
-    Cleanups.pushCleanup<CleanupRValue>(lowering, v);
-    return ManagedValue(v, getTopCleanup());
   }
+  
+  Cleanups.pushCleanup<CleanupRValue>(lowering, v);
+  return ManagedValue(v, getTopCleanup());
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
@@ -437,12 +438,17 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
-      // If this is a non-address-only 'let' value, return it as a value.
-      if (It->second.isConstant())
-        return emitManagedRetain(loc, It->second.getConstant());
+      // If this is a mutable lvalue, return it as an LValue.
+      if (It->second.isAddress())
+        return ManagedValue::forLValue(It->second.getAddress());
 
-      // Otherwise, it is a reference to a mutable var, return it as an lvalue.
-      return ManagedValue::forLValue(It->second.getAddress());
+      // If this is an address-only 'let', return its address as an lvalue.
+      if (It->second.getConstant().getType().isAddress())
+        return ManagedValue::forLValue(It->second.getConstant());
+
+      // Otherwise, emit it as a +1 value.
+      return ManagedValue::forUnmanaged(It->second.getConstant())
+               .copyUnmanaged(*this, loc);
     }
 
     if (var->isComputed()) {
@@ -633,6 +639,11 @@ SILValue SILGenFunction::getBufferForExprResult(
     case Initialization::Kind::AddressBinding:
       llvm_unreachable("can't emit into address binding");
     case Initialization::Kind::LetValue:
+      // Emit into the buffer that 'let's produce for address-only values if
+      // we have it.
+      if (ty.isAddressOnly(SGM.M))
+        return I->getAddress();
+      break;
     case Initialization::Kind::Translating:
     case Initialization::Kind::Ignored:
       break;
@@ -1695,25 +1706,49 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::None:
       break;
 
-    case CaptureKind::Constant:
-      if (!getTypeLowering(capture->getType()).isAddressOnly()) {
-        // LValues captured by value.
-        auto Entry = VarLocs[cast<VarDecl>(capture)];
-        ManagedValue v;
-        if (!Entry.isConstant()) {
-          SILValue addr = Entry.getAddress();
-          B.createStrongRetain(loc, Entry.box);
-          auto &TL = getTypeLowering(capture->getType());
-          v = emitLoad(loc, addr, TL, SGFContext(), IsNotTake);
-        }
-        SILValue Val = B.createCopyValue(loc, Entry.getConstant());
+    case CaptureKind::Constant: {
+      // let declarations.
+      auto Entry = VarLocs[cast<VarDecl>(capture)];
+      assert(Entry.isConstant() && cast<VarDecl>(capture)->isLet() &&
+             "only let decls captured by constant");
+      SILValue Val = Entry.getConstant();
+
+#if 0
+      // FIXME: This should work for both paths.  partial_apply hasn't been
+      // taught how to work with @in address only values yet.
+      auto MV = ManagedValue::forUnmanaged(Entry.getConstant())
+      .copyUnmanaged(*this, loc);
+      MV.forward(*this);
+      MV = ManagedValue::forUnmanaged(MV.getValue());
+
+      // Use an RValue to explode Val if it is a tuple.
+      RValue RV(*this, loc, capture->getType()->getCanonicalType(), MV);
+      std::move(RV).forwardAll(*this, capturedArgs);
+      break;
+#endif
+
+      // Non-address-only constants are passed at +1.
+      if (!Val.getType().isAddress()) {
+        Val = B.createCopyValue(loc, Val);
+        
         // Use an RValue to explode Val if it is a tuple.
         RValue RV(*this, loc, capture->getType()->getCanonicalType(),
                   ManagedValue(Val, ManagedValue::Unmanaged));
         std::move(RV).forwardAll(*this, capturedArgs);
         break;
       }
-      SWIFT_FALLTHROUGH;
+
+      // Address only values are passed by box.  This isn't great, in that a
+      // variable captured by multiple closures will be boxed for each one, 
+      AllocBoxInst *allocBox = B.createAllocBox(loc,
+                                                Val.getType().getObjectType());
+      auto boxAddress = SILValue(allocBox, 1);
+      B.createCopyAddr(loc, Val, boxAddress, IsNotTake, IsInitialization);
+      capturedArgs.push_back(SILValue(allocBox, 0));
+      capturedArgs.push_back(boxAddress);
+
+      break;
+    }
 
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
@@ -2135,9 +2170,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
-  SILValue selfLV;
+  SILValue selfLV, selfBox;
   {
     auto &SelfVarLoc = VarLocs[selfDecl];
+    selfBox = SelfVarLoc.box;
     selfLV = B.createMarkUninitializedRootSelf(selfDecl,
                                                SelfVarLoc.getAddress());
     SelfVarLoc = VarLoc::getAddress(selfLV, SelfVarLoc.box);
@@ -2167,13 +2203,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(ctor);
 
+  assert(selfBox && "self should be a mutable box");
+  
   // If 'self' is address-only, copy 'self' into the indirect return slot.
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
-    SILValue selfBox = VarLocs[selfDecl].box;
-    assert(selfBox &&
-           "address-only non-heap this should have been allocated in-place");
+    assert(selfBox == VarLocs[selfDecl].box);
     // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(cleanupLoc, selfLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
@@ -2183,16 +2219,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
 
   // Otherwise, load and return the final 'self' value.
+  assert(selfBox == VarLocs[selfDecl].box);
   SILValue selfValue = B.createLoad(cleanupLoc, selfLV);
-  SILValue selfBox = VarLocs[selfDecl].box;
-  assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
   selfValue = lowering.emitCopyValue(B, cleanupLoc, selfValue);
 
   // Release the box.
   B.emitStrongRelease(cleanupLoc, selfBox);
-
   B.createReturn(returnLoc, selfValue);
 }
 

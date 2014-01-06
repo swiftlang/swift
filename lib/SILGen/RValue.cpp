@@ -22,6 +22,7 @@
 #include "RValue.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Fallthrough.h"
 #include <deque>
 
 using namespace swift;
@@ -225,7 +226,20 @@ public:
       I->translateValue(gen, loc, result);
       I->finishInitialization(gen);
       return;
-        
+
+    case Initialization::Kind::LetValue:
+      // If this is a non-address-only let, just bind the value.
+      if (!I->hasAddress()) {
+        // Disable the rvalue expression cleanup, since the let value
+        // initialization has a cleanup that lives for the entire scope of the
+        // let declaration.
+        I->bindValue(result.forward(gen), gen);
+        I->finishInitialization(gen);
+        return;
+      }
+      // Otherwise, handle it the same as the singlebuffer case.
+      SWIFT_FALLTHROUGH;
+
     case Initialization::Kind::SingleBuffer:
       // If we didn't evaluate into the initialization buffer, do so now.
       if (result.getValue() != I->getAddress()) {
@@ -236,14 +250,6 @@ public:
         result.forwardCleanup(gen);
       }
       
-      I->finishInitialization(gen);
-      return;
-
-    case Initialization::Kind::LetValue:
-      // Disable the rvalue expression cleanup, since the let value
-      // initialization has a cleanup that lives for the entire scope of the let
-      // declaration.
-      I->bindValue(result.forward(gen), gen);
       I->finishInitialization(gen);
       return;
     }

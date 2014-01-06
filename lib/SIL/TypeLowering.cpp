@@ -1401,7 +1401,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     }
     case CaptureKind::Constant:
       if (!getTypeLowering(captureType).isAddressOnly()) {
-        // Capture the value directly unless they are address-only.
+        // Capture the value directly, unless it is address only.
         inputFields.push_back(TupleTypeElt(captureType));
         break;
       }
