@@ -35,7 +35,7 @@ public:
 private:
   /// A backreference to the containing SILFunction.
   SILFunction * const Parent;
-  
+
   /// PrevList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
   /// automatically managed by the SILSuccessor class.
@@ -46,7 +46,7 @@ private:
 
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
-  
+
   friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(0) {}
   void operator=(const SILBasicBlock &) = delete;
@@ -88,12 +88,11 @@ public:
   const_reverse_iterator rbegin() const { return InstList.rbegin(); }
   const_reverse_iterator rend() const { return InstList.rend(); }
 
-
   TermInst *getTerminator() {
     assert(!InstList.empty() && "Can't get successors for malformed block");
     return cast<TermInst>(&InstList.back());
   }
-  
+
   const TermInst *getTerminator() const {
     return const_cast<SILBasicBlock*>(this)->getTerminator();
   }
@@ -125,7 +124,7 @@ public:
   bbarg_iterator bbarg_end() { return BBArgList.end(); }
   const_bbarg_iterator bbarg_begin() const { return BBArgList.begin(); }
   const_bbarg_iterator bbarg_end() const { return BBArgList.end(); }
-  
+
   ArrayRef<SILArgument*> getBBArgs() const { return BBArgList; }
 
   unsigned getNumBBArg() const { return BBArgList.size(); }
@@ -226,7 +225,7 @@ public:
   SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
   static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
   static void deleteNode(SILBasicBlock *V) { V->~SILBasicBlock(); }
-  
+
 private:
   void createNode(const SILBasicBlock &);
 };
