@@ -1112,11 +1112,10 @@ void Mangler::mangleDefaultArgumentEntity(DeclContext *func, unsigned index) {
 }
 
 void Mangler::mangleInitializerEntity(VarDecl *var) {
+  // The initializer is its own entity whose context is the variable.
   Buffer << 'I';
-  mangleContext(var->getDeclContext(), BindGenerics::All);
+  mangleEntity(var, ExplosionKind::Minimal, /*uncurry*/ 0);
   Buffer << 'i';
-  mangleDeclName(var);
-  mangleDeclType(var, ExplosionKind::Minimal, /*uncurry*/ 0);
 }
 
 void Mangler::mangleEntity(ValueDecl *decl, ExplosionKind explosion,
