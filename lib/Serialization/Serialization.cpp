@@ -765,7 +765,15 @@ void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
       addTypeRef(sub.Archetype),
       addTypeRef(sub.Replacement),
       sub.Archetype->getConformsTo().size());
-    writeConformances(sub.Archetype->getConformsTo(), sub.Conformance, nullptr,
+    // For archetypes the conformance information is context dependent,
+    // the conformance array is either empty or full of nulls and can be
+    // ignored. We use an array of null pointers for conformances to satisfy
+    // the requirement in writeConformances: the first and second arguments
+    // have the same size.
+    SmallVector<ProtocolConformance *, 4> conformances;
+    for (unsigned i = 0, e = sub.Archetype->getConformsTo().size(); i < e; i++)
+      conformances.push_back(nullptr); 
+    writeConformances(sub.Archetype->getConformsTo(), conformances, nullptr,
                       abbrCodes);
   }
 }
