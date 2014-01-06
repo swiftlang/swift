@@ -124,12 +124,7 @@ public:
   }
 
   StringRef getName() const { return Name; }
-  void setName(StringRef N) {
-    Name = N;
-  }
   
-  std::string &getMutableName() { return Name; }
-
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
   

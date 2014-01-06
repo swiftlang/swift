@@ -270,17 +270,15 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
 
-  auto *F = new (M) SILFunction(M, linkage, "", constantType, Nothing,
-                                IsNotBare, IsTrans);
+  SmallVector<char, 128> buffer;
+  auto *F = new (M) SILFunction(M, linkage, constant.mangle(buffer),
+                                constantType, Nothing, IsNotBare, IsTrans);
   
   ValueDecl *VD = nullptr;
   if (constant.hasDecl())
     VD = constant.getDecl();
 
   F->setDeclContext(VD);
-
-  SmallVector<char, 128> buffer;
-  F->getMutableName() = constant.mangle(buffer);
   emittedFunctions[constant] = F;
 
   return F;

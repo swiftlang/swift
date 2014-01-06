@@ -2100,26 +2100,27 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               AbstractionPattern(requirementTy),
                                               witnessSubstTy,
                                               requirement.uncurryLevel);
+
+  // Mangle the name of the witness thunk.
+  llvm::SmallString<128> nameBuffer;
+  {
+    llvm::raw_svector_ostream nameStream(nameBuffer);
+    nameStream << "_TTW";
+    Mangler mangler(nameStream);
+    mangler.mangleProtocolConformance(conformance);
+    assert(isa<FuncDecl>(requirement.getDecl())
+           && "need to handle mangling of non-Func SILDeclRefs here");
+    mangler.mangleEntity(requirement.getDecl(), ExplosionKind::Minimal,
+                         requirement.uncurryLevel);
+  }
   
-  auto *f = new (M) SILFunction(M, SILLinkage::Internal, "",
+  auto *f = new (M) SILFunction(M, SILLinkage::Internal, nameBuffer,
                                 witnessSILType.castTo<SILFunctionType>(),
                                 SILLocation(witness.getDecl()),
                                 IsNotBare,
                                 IsNotTransparent);
   
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(witness.getDecl())));
-  
-  // Mangle the name of the witness thunk.
-  llvm::raw_string_ostream buffer(f->getMutableName());
-  buffer << "_TTW";
-  Mangler mangler(buffer);
-  
-  mangler.mangleProtocolConformance(conformance);
-  assert(isa<FuncDecl>(requirement.getDecl())
-         && "need to handle mangling of non-Func SILDeclRefs here");
-  mangler.mangleEntity(requirement.getDecl(), ExplosionKind::Minimal,
-                       requirement.uncurryLevel);
-  buffer.flush();
   
   // Create the witness.
   SILGenFunction(*this, *f)
