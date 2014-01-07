@@ -27,6 +27,9 @@
   the protocol will be suffixed with "Proto", as in "NSObject" (the
   class) and "NSObjectProto" (the protocol).
 
+* String literals are now emitted as UTF-16 for string types that
+  support them (such as Swift's String).
+
 2014-01-01
 ----------
 
