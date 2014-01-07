@@ -2004,6 +2004,10 @@ public:
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
 
+    // Reject @mutating and @!mutating attributes.
+    if (CD->getAttrs().getMutating())
+      TC.diagnose(CD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
+
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
     Type ResultTy = SelfTy->getInOutObjectType();
