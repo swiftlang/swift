@@ -19,13 +19,20 @@ TOOLNAME = swift2objc
 # LINK_COMPONENTS before including Makefile.rules
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-LINK_COMPONENTS := option bitreader
+LINK_COMPONENTS :=  $(TARGETS_TO_BUILD) bitreader mc asmparser option
 USEDLIBS = swiftDriver.a swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a \
-           swiftAST.a swiftBasic.a swiftClangImporter.a
+           swiftSIL.a swiftAST.a swiftBasic.a swiftClangImporter.a
 
 LLVMLibsOptions :=     \
-  -lclangAST	       \
-  -lclangLex	       \
+  -lclangDriver        \
+  -lclangFrontend      \
+  -lclangSerialization \
+  -lclangParse         \
+  -lclangSema          \
+  -lclangAnalysis      \
+  -lclangEdit          \
+  -lclangLex           \
+  -lclangAST           \
   -lclangBasic         \
   $(LLVMLibsOptions)
 
