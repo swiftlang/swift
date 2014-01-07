@@ -1487,6 +1487,10 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
     auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
       if (!t) return t;
       if (auto arch = t->getAs<ArchetypeType>()) {
+        // As a kludge, we allow Self archetypes of protocol_methods to be
+        // unapplied.
+        if (arch->getSelfProtocol() && !archetypeMap.count(arch))
+          return arch;
         return arch->getAsDependentType(archetypeMap);
       }
       return t;

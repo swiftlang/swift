@@ -118,8 +118,7 @@ namespace {
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
   auto outerFTy = F.getLoweredFunctionType();
   if (outerFTy->isPolymorphic()) {
-    return buildForwardingSubstitutions(
-                            outerFTy->getGenericParams()->getAllArchetypes());
+    return buildForwardingSubstitutions(outerFTy->getGenericParams());
   }
   return {};
 }
@@ -2053,7 +2052,15 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                  SourceLoc(),
                                  reqtParams.getRequirements(),
                                  SourceLoc());
-    methodParams->setOuterParameters(conformanceParams);
+    
+    // Preserve the depth of generic arguments by adding an empty outer generic
+    // param list if the conformance is concrete.
+    GenericParamList *outerParams = conformanceParams;
+    if (!outerParams)
+      outerParams = GenericParamList::create(getASTContext(),
+                                             SourceLoc(), {}, SourceLoc());
+      
+    methodParams->setOuterParameters(outerParams);
     methodParams->setAllArchetypes(reqtParams.getAllArchetypes());
     methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
                                                methodParams,

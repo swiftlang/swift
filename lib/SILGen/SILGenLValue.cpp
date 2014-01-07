@@ -483,8 +483,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
       if (auto genericParams
             = sgl.gen.SGM.Types.getEffectiveGenericParamsForContext(
                 decl->getDeclContext())) {
-        substitutions = sgl.gen.buildForwardingSubstitutions(
-                          genericParams->getAllArchetypes());
+        substitutions = sgl.gen.buildForwardingSubstitutions(genericParams);
       }
 
       lv.add<GetterSetterComponent>(var, substitutions, typeData);

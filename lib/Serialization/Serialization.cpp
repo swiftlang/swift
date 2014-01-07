@@ -1716,9 +1716,6 @@ void Serializer::writeType(Type ty) {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
     auto genericParams = fnTy->getGenericParams();
-    const Decl *genericContext =
-      (genericParams ? getGenericContext(genericParams) : nullptr);
-    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID(0);
 
     auto callingConvention = fnTy->getAbstractCC();
     auto result = fnTy->getResult();
@@ -1739,13 +1736,16 @@ void Serializer::writeType(Type ty) {
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(result.getType()),
                                       stableResultConvention,
-                                      dID,
+                                      // FIXME: Always serialize a new
+                                      // GenericParamList for now.
+                                      // Interface types will kill this soon.
+                                      DeclID(0),
                                       stableCalleeConvention,
                                       getRawStableCC(callingConvention),
                                       fnTy->isThin(),
                                       fnTy->isNoReturn(),
                                       paramTypes);
-    if (genericParams && !genericContext)
+    if (genericParams)
       writeGenericParams(genericParams);
     break;
   }

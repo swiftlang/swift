@@ -1178,9 +1178,11 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     
     auto origMeta = dyn_cast<MetatypeType>(origType.getAsType());
     if (!origMeta) {
-      // If the metatype matches an archetype T, it cannot be thin.
-      assert(isa<ArchetypeType>(origType.getAsType()) &&
-         "metatype matches in position that isn't an archetype or metatype?!");
+      // If the metatype matches a dependent type, it cannot be thin.
+      assert((isa<SubstitutableType>(origType.getAsType())
+              || isa<DependentMemberType>(origType.getAsType()))
+         && "metatype matches in position that isn't a dependent type "
+            "or metatype?!");
       isThin = false;
     } else {
       // Otherwise, we're thin if the metatype is thinnable both substituted and

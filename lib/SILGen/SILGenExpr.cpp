@@ -1164,65 +1164,13 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
-/// Retrieve the outer substitutions
-static ArrayRef<Substitution> 
-getOuterSubstitutions(Type type, Module *module,
-                      SmallVectorImpl<Substitution> &allSubstitutions) {
-  if (!type)
-    return { };
-
-  // For a (non-generic) nominal type, just get the outer substitutions.
-  if (auto nominal = type->getAs<NominalType>())
-    return getOuterSubstitutions(nominal->getParent(), module, 
-                                 allSubstitutions);
-
-  // If we don't have a bound generic type, there are no substitutions.
-  auto bound = type->getAs<BoundGenericType>();
-  if (!bound)
-    return { };
-
-  // Retrieve the parent's substitutions.
-  auto outer = getOuterSubstitutions(bound->getParent(), 
-                                     module, allSubstitutions);
-
-  // If the parent had no substitutions, just use our substitutions.
-  auto subs = bound->getSubstitutions(module, nullptr);
-  if (outer.empty())
-    return subs;
-
-  // If the parent had substitutions, add our own substitutions to it.
-  if (allSubstitutions.empty())
-    allSubstitutions.append(outer.begin(), outer.end());
-  allSubstitutions.append(subs.begin(), subs.end());
-  return allSubstitutions;
-}
-
 std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
-                                     ArrayRef<Substitution> innerSubs) {
+                                     ArrayRef<Substitution> subs) {
   SILValue methodValue = B.createFunctionRef(loc,
                                              SGM.getFunction(methodConstant));
-
-  /// Collect substitutions from a generic 'self' type, so we can
-  /// specialize the method with its forwarding substitutions.
-  SmallVector<Substitution, 4> allSubsVec;
-  auto subs = getOuterSubstitutions(selfValue.getType().getSwiftType(),
-                                    F.getDeclContext()->getParentModule(),
-                                    allSubsVec);
-
-  // Add the inner substitutions, if we have any.
-  if (!innerSubs.empty()) {
-    if (subs.empty())
-      subs = innerSubs;
-    else {
-      if (allSubsVec.empty())
-        allSubsVec.append(subs.begin(), subs.end());
-      allSubsVec.append(innerSubs.begin(), innerSubs.end());
-      subs = F.getASTContext().AllocateCopy(allSubsVec);
-    }
-  }
 
   SILType methodTy = methodValue.getType();
   
@@ -2020,9 +1968,10 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     ManagedValue dtorValue;
     SILType dtorTy;
     ArrayRef<Substitution> subs;
+    if (auto bgt = superclassTy->getAs<BoundGenericType>())
+      subs = bgt->getSubstitutions(SGM.M.getSwiftModule(), nullptr);
     std::tie(dtorValue, dtorTy, subs)
-      = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant,
-                             /*innerSubstitutions*/ {});
+      = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
     selfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), dtorTy,
                               objectPtrTy,
                               subs, baseSelf);
@@ -2393,18 +2342,19 @@ namespace {
 } // end anonymous namespace
 
 ArrayRef<Substitution>
-SILGenFunction::buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params) {
-  if (params.empty())
+SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
+  if (!params)
     return {};
   
   ASTContext &C = F.getASTContext();
   
-  size_t paramCount = params.size();
-  MutableArrayRef<Substitution> results = C.Allocate<Substitution>(paramCount);
+  SmallVector<Substitution, 4> subs;
   
-  for (size_t i = 0; i < paramCount; ++i) {
-    // FIXME: better way to do this?
-    ArchetypeType *archetype = params[i];
+  // TODO: IRGen wants substitutions for secondary archetypes.
+  //for (auto &param : params->getNestedGenericParams()) {
+  //  ArchetypeType *archetype = param.getAsTypeParam()->getArchetype();
+  
+  for (auto archetype : params->getAllNestedArchetypes()) {
     // "Check conformance" on each declared protocol to build a
     // conformance map.
     SmallVector<ProtocolConformance*, 2> conformances;
@@ -2416,11 +2366,11 @@ SILGenFunction::buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params) {
     
     // Build an identity mapping with the derived conformances.
     auto replacement = SubstitutedType::get(archetype, archetype, C);
-    results[i] = {archetype, replacement,
-                  C.AllocateCopy(conformances)};
+    subs.push_back({archetype, replacement,
+                    C.AllocateCopy(conformances)});
   }
   
-  return results;
+  return C.AllocateCopy(subs);
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
@@ -2489,10 +2439,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
   } else {
     // Otherwise, directly call the constructor.
-    ArrayRef<ArchetypeType *> archetypes;
-    if (auto genericParams = ctor->getGenericParams())
-      archetypes = genericParams->getAllArchetypes();
-    auto forwardingSubs = buildForwardingSubstitutions(archetypes);
+    auto forwardingSubs
+      = buildForwardingSubstitutions(ctor->getGenericParamsOfContext());
     std::tie(initVal, initTy, subs)
       = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
   }
@@ -2721,7 +2669,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   {
     auto toFnTy = toFn.getType().castTo<SILFunctionType>();
     if (toFnTy->isPolymorphic()) {
-      subs = buildForwardingSubstitutions(toFnTy->getGenericParams()->getAllArchetypes());
+      subs = buildForwardingSubstitutions(toFnTy->getGenericParams());
       toTy = getLoweredLoadableType(toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
     }
   }

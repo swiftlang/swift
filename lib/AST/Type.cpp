@@ -1305,14 +1305,15 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
 
 FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
                                                         ArrayRef<Type> args) {
-  auto params = getGenericParameters();
-  assert(args.size() <= params.size());
-
   TypeSubstitutionMap subs;
-  for (size_t i = 0, e = args.size(); i != e; ++i) {
-    subs.insert(std::make_pair(params[i].getAsTypeParam()->getArchetype(),
-                               args[i]));
+  unsigned i = 0;
+  for (auto &param : getGenericParams().getNestedGenericParams()) {
+    subs.insert(std::make_pair(param.getAsTypeParam()->getArchetype(),
+                               args[i++]));
   }
+  assert(i == args.size()
+         && "got more arguments than generic parameters");
+  
   Type input = getInput().subst(module, subs, true, nullptr);
   Type result = getResult().subst(module, subs, true, nullptr);
   return FunctionType::get(input, result, getExtInfo());
@@ -1322,20 +1323,25 @@ static void getReplacementTypes(GenericParamList &genericParams,
                                 ArrayRef<Substitution> subs,
                                 SmallVectorImpl<Type> &replacements) {
   (void) genericParams;
-
+  
 #ifndef NDEBUG
-  // FIXME: The AST sets up substitutions for secondary archetypes that are
-  // strictly unnecessary.
-  auto archetypes = genericParams.getAllArchetypes();
-  assert(subs.size() == archetypes.size() &&
-         "substitutions don't match archetypes");
-  auto ai = archetypes.begin();
+  // Ensure the substitution vector matches the generic parameter order.
+  auto params = genericParams.getNestedGenericParams();
+  auto pi = params.begin();
 #endif
   
   for (auto &sub : subs) {
-    assert(*ai++ == sub.Archetype && "substitution doesn't match archetype");
+    // FIXME: Only substitute primary archetypes.
+    if (!sub.Archetype->isPrimary())
+      continue;
+    
+    assert((pi++)->getAsTypeParam()->getArchetype() == sub.Archetype
+           && "substitution doesn't match archetype");
     replacements.push_back(sub.Replacement);
-  }  
+  }
+  
+  assert(pi == params.end()
+         && "did not substitute all archetypes?!");
 }
 
 FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
@@ -1343,9 +1349,7 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   SmallVector<Type, 4> replacements;
   getReplacementTypes(getGenericParams(), subs, replacements);
   
-  // FIXME: Only substitute the primary archetypes.
-  return substGenericArgs(module,
-      llvm::makeArrayRef(replacements).slice(0, getGenericParameters().size()));
+  return substGenericArgs(module, replacements);
 }
 
 FunctionType *

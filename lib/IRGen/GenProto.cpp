@@ -2931,10 +2931,10 @@ namespace {
     
     SourceKind getSourceKind() const { return TheSourceKind; }
 
-    ArrayRef<ArchetypeType *> getAllArchetypes() const {
+    Range<NestedArchetypeIterator> getAllArchetypes() const {
       if (auto gp = FnType->getGenericParams())
-        return gp->getAllArchetypes();
-      return {};
+        return gp->getAllNestedArchetypes();
+      return NestedArchetypeIterator::emptyRange();
     }
     
   private:

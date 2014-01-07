@@ -904,9 +904,9 @@ public:
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);
 
-  /// Build an identity substitution map for the given set of archetypes.
+  /// Build an identity substitution map for the given generic parameter list.
   ArrayRef<Substitution>
-  buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params);
+  buildForwardingSubstitutions(GenericParamList *params);
   
   /// Return forwarding substitutions for the archetypes in the current
   /// function.

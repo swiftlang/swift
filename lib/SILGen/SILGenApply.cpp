@@ -266,6 +266,34 @@ private:
         cast<PolymorphicFunctionType>(OrigFormalType)
           ->substGenericArgs(SGM.SwiftModule, archetype)
             ->getCanonicalType());
+    
+    // If the requirement is generic, sever its connection to the substituted
+    // outer parameter list.
+    if (auto polyMethod = dyn_cast<PolymorphicFunctionType>(
+                                          partialSubstFormalType.getResult())) {
+      auto origParams = &polyMethod->getGenericParams();
+      
+      auto emptyOuterParams
+        = GenericParamList::create(polyMethod->getASTContext(),
+                                   SourceLoc(),
+                                   {}, SourceLoc());
+      
+      auto params = GenericParamList::create(polyMethod->getASTContext(),
+                                             SourceLoc(),
+                                             origParams->getParams(),
+                                             SourceLoc(),
+                                             origParams->getRequirements(),
+                                             SourceLoc());
+      params->setAllArchetypes(origParams->getAllArchetypes());
+      params->setOuterParameters(emptyOuterParams);
+      
+      polyMethod = CanPolymorphicFunctionType::get(polyMethod.getInput(),
+                                                   polyMethod.getResult(),
+                                                   params,
+                                                   polyMethod->getExtInfo());
+      partialSubstFormalType
+        = CanFunctionType::get(partialSubstFormalType.getInput(), polyMethod);
+    }
 
     auto partialSubstUncurriedType =
       SGM.Types.getConstantFunctionType(constant, partialSubstFormalType,
