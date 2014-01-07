@@ -19,11 +19,16 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILPasses/Passes.h"
+#define DEBUG_TYPE "sil-optimizer"
 
+#include "swift/SILPasses/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
+
+STATISTIC(NumOptzIter, "Number of optimizer iterations");
 
 using namespace swift;
 
@@ -56,20 +61,30 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 }
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
-  // Start with specialization because it does not depend on any other passes.
-  // Try to inline the specialized functions.
-  performSILSpecialization(&Module);
-  performSILPerformanceInlining(&Module);
 
-  // Transition to SSA form.
-  performSILLowerAggregateInstrs(&Module);
-  performSILSROA(&Module);
-  performSILMem2Reg(&Module);
+  // Continue to optimize the code until we can't specialize any more.
+  bool Changed = true;
+  while (Changed) {
+    // Specialize generic functions.
+    Changed = performSILSpecialization(&Module);
+    // Inline the specialized functions.
+    performSILPerformanceInlining(&Module);
+    // Cleanup after inlining.
+    performSILCombine(&Module);
 
-  // Perform scalar optimizations.
-  performSILCSE(&Module);
-  performSILCombine(&Module);
-  performSimplifyCFG(&Module);
-  performSILPerformanceInlining(&Module);
-  performSILCombine(&Module);
+    // Transition to SSA form.
+    performSILLowerAggregateInstrs(&Module);
+    performSILSROA(&Module);
+    performSILMem2Reg(&Module);
+
+    // Perform scalar optimizations.
+    performSILCSE(&Module);
+    performSILCombine(&Module);
+    performSimplifyCFG(&Module);
+
+    // Stats
+    NumOptzIter++;
+  }
+
+
 }
