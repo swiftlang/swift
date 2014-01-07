@@ -27,6 +27,7 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -648,7 +649,10 @@ public:
     return SeparatorLoc;
   }
 };
-
+  
+template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
+class NestedGenericParamListIterator;
+  
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
@@ -799,6 +803,23 @@ public:
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
     AllArchetypes = AA;
   }
+
+  using NestedArchetypeIterator
+    = NestedGenericParamListIterator<ArchetypeType*,
+                                     &GenericParamList::getAllArchetypes>;
+  using NestedGenericParamIterator
+    = NestedGenericParamListIterator<GenericParam,
+                                     &GenericParamList::getParams>;
+  
+  /// \brief Retrieves a list containing all archetypes from this generic
+  /// parameter clause and all outer generic parameter clauses in outer-to-
+  /// inner order.
+  Range<NestedArchetypeIterator> getAllNestedArchetypes() const;
+  
+  /// \brief Retrieves a list containing all generic parameter records from
+  /// this generic parameter clause and all outer generic parameter clauses in
+  /// outer-to-inner order.
+  Range<NestedGenericParamIterator> getNestedGenericParams() const;
   
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
@@ -845,6 +866,81 @@ public:
   void print(raw_ostream &OS);
   void dump();
 };
+  
+/// An iterator template for lazily walking a nested generic parameter list.
+template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
+class NestedGenericParamListIterator {
+  SmallVector<const GenericParamList*, 2> stack;
+  ArrayRef<T> elements;
+
+  void refreshElements() {
+    while (elements.empty()) {
+      stack.pop_back();
+      if (stack.empty()) break;
+      elements = (stack.back()->*accessor)();
+    }
+  }
+public:
+  // Create a 'begin' iterator for a generic param list.
+  NestedGenericParamListIterator(const GenericParamList *params) {
+    // Walk up to the outermost list to create a stack of lists to walk.
+    while (params) {
+      stack.push_back(params);
+      params = params->getOuterParameters();
+    }
+    elements = (stack.back()->*accessor)();
+    refreshElements();
+  }
+  
+  // Create an 'end' iterator.
+  NestedGenericParamListIterator() {}
+  
+  // Iterator dereference.
+  const T &operator*() const {
+    return elements[0];
+  }
+  const T *operator->() const {
+    return &elements[0];
+  }
+  
+  // Iterator advancement.
+  NestedGenericParamListIterator &operator++() {
+    elements = elements.slice(1);
+    refreshElements();
+    return *this;
+  }
+  NestedGenericParamListIterator operator++(int) {
+    auto copy = *this;
+    ++(*this);
+    return copy;
+  }
+  
+  // Ghetto comparison. Only true if end() == end().
+  bool operator==(const NestedGenericParamListIterator &o) const {
+    return stack.empty() && o.stack.empty();
+  }
+  bool operator!=(const NestedGenericParamListIterator &o) const {
+    return !stack.empty() || !o.stack.empty();
+  }
+  
+  // An empty range of nested archetypes.
+  static Range<NestedGenericParamListIterator> emptyRange() {
+    return {{}, {}};
+  }
+};
+  
+using NestedArchetypeIterator = GenericParamList::NestedArchetypeIterator;
+using NestedGenericParamIterator = GenericParamList::NestedGenericParamIterator;
+
+inline Range<NestedArchetypeIterator>
+GenericParamList::getAllNestedArchetypes() const {
+  return {NestedArchetypeIterator(this), NestedArchetypeIterator()};
+}
+  
+inline Range<NestedGenericParamIterator>
+GenericParamList::getNestedGenericParams() const {
+  return {NestedGenericParamIterator(this), NestedGenericParamIterator()};
+}
 
 /// Describes what kind of name is being imported.
 ///
