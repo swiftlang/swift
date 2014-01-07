@@ -365,6 +365,7 @@ namespace {
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
                               bool IsSuperInitComplete);
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
+    void handleSelfInitUse(const DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
@@ -499,7 +500,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // TODO: The QoI could be improved in many different ways here.  For example,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
-  if (!TheMemory.IsSelfOfInitializer)
+  if (!TheMemory.isAnyInitSelf())
     diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here);
 }
 
@@ -519,8 +520,9 @@ void LifetimeChecker::doIt() {
     switch (Use.Kind) {
     case DIUseKind::Initialization:
       // We assume that SILGen knows what it is doing when it produces
-      // initializations of variables, because it only produces them when it knows
-      // they are correct, and this is a super common case for "var x = y" cases.
+      // initializations of variables, because it only produces them when it
+      // knows they are correct, and this is a super common case for "var x = y"
+      // cases.
       continue;
         
     case DIUseKind::Assign:
@@ -562,7 +564,9 @@ void LifetimeChecker::doIt() {
         Diag<StringRef> DiagMessage;
 
         // This is a use of an uninitialized value.  Emit a diagnostic.
-        if (isa<MarkFunctionEscapeInst>(Inst))
+        if (TheMemory.isDelegatingInit())
+          DiagMessage = diag::self_use_before_init_in_delegatinginit;
+        else if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
         else if (isa<AddressToPointerInst>(Inst))
           DiagMessage = diag::variable_addrtaken_before_initialized;
@@ -574,6 +578,9 @@ void LifetimeChecker::doIt() {
       break;
     case DIUseKind::SuperInit:
       handleSuperInitUse(Use);
+      break;
+    case DIUseKind::SelfInit:
+      handleSelfInitUse(Use);
       break;
     }
   }
@@ -689,7 +696,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
     if (isa<ReturnInst>(Inst)) {
       diagnose(Module, Inst->getLoc(),
-               diag::superinit_not_called_before_return);
+               diag::superselfinit_not_called_before_return,
+               (unsigned)TheMemory.isDelegatingInit());
       return;
     }
 
@@ -708,13 +716,14 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     }
 
     // Otherwise, this is a general use of self.
-    diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    diagnose(Module, Inst->getLoc(), diag::self_before_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
     return;
   }
 
   // Check to see if we're returning self in a class initializer before all the
   // ivars are set up.
-  if (isa<ReturnInst>(Inst) && TheMemory.IsSelfOfInitializer) {
+  if (isa<ReturnInst>(Inst) && TheMemory.isAnyInitSelf()) {
     diagnoseInitError(Use, diag::ivar_not_initialized_at_init_return);
     return;
   }
@@ -740,7 +749,7 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   case DIKind::Partial:
     // This is bad, only one super.init call is allowed.
     if (shouldEmitError(Inst))
-      diagnose(Module, Inst->getLoc(), diag::superinit_multiple_times);
+      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 0);
     return;
   }
 
@@ -750,6 +759,29 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
     if (Liveness.get(i) != DIKind::Yes)
       return diagnoseInitError(InstInfo,
                                diag::ivar_not_initialized_at_superinit);
+  }
+
+  // Otherwise everything is good!
+}
+
+/// handleSuperInitUse - When processing a 'self' argument on a class, this is
+/// a call to self.init.
+void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
+  ApplyInst *Inst = cast<ApplyInst>(InstInfo.Inst);
+
+  assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
+
+  // Determine the self.init state.  self.init() calls require that self.init
+  // has not already been called. If it has, reject the program.
+  switch (getLivenessAtInst(Inst, 0, 1).get(0)) {
+  case DIKind::No:  // This is good! Keep going.
+    break;
+  case DIKind::Yes:
+  case DIKind::Partial:
+    // This is bad, only one super.init call is allowed.
+    if (EmittedErrorLocs.empty() && shouldEmitError(Inst))
+      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 1);
+    return;
   }
 
   // Otherwise everything is good!

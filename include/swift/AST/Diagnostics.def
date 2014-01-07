@@ -1585,6 +1585,9 @@ ERROR(variable_inout_before_initialized,sil_analysis,none,
 ERROR(variable_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",
       (StringRef))
+ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
+      "use of '%0' in delegating initializer before self.init is called",
+      (StringRef))
 ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
       "address of variable '%0' taken before it is initialized",
       (StringRef))
@@ -1595,14 +1598,20 @@ ERROR(ivar_in_base_object_use_before_initialized,sil_analysis,none,
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "property '%0' not initialized at super.init call",
       (StringRef))
+ERROR(ivar_not_initialized_at_selfinit,sil_analysis,none,
+      "property '%0' not initialized at self.init call",
+      (StringRef))
 ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
       "property '%0' not initialized", (StringRef))
-ERROR(superinit_multiple_times,sil_analysis,none,
-      "super.init called multiple times in initializer", ())
-ERROR(superinit_not_called_before_return,sil_analysis,none,
-      "super.init isn't called before returning from initializer", ())
-ERROR(self_before_superinit,sil_analysis,none,
-      "'self' used before super.init call", ())
+ERROR(selfinit_multiple_times,sil_analysis,none,
+      "%select{super|self}0.init called multiple times in initializer",
+      (unsigned))
+ERROR(superselfinit_not_called_before_return,sil_analysis,none,
+      "%select{super|self}0.init isn't called before returning from "
+      "initializer", (unsigned))
+ERROR(self_before_superselfinit,sil_analysis,none,
+      "'self' used before %select{super|self}0.init call",
+     (unsigned))
 ERROR(return_from_init_without_initing_self,sil_analysis,none,
       "return from enum initializer method without storing to 'self'", ())
 

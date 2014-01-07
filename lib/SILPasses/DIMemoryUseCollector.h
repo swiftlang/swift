@@ -55,8 +55,8 @@ public:
   SILType MemorySILType;
   
   /// This is true if the memory being analyzed represents the 'self' value in
-  /// an initializer.
-  bool IsSelfOfInitializer;
+  /// an non-delegating initializer (one that does not call "self.init").
+  bool IsSelfOfNonDelegatingInitializer;
 
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
@@ -88,6 +88,13 @@ public:
     return NumElements - (unsigned)isDerivedClassSelf();
   }
 
+  /// isAnyInitSelf - Return true if this is 'self' in any kind of initializer.
+  bool isAnyInitSelf() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      return !MUI->isGlobalVar();
+    return false;
+  }
+  
   bool isEnumSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRoot() && isa<EnumDecl>(getType()->getAnyNominal()))
@@ -98,8 +105,15 @@ public:
   /// isDerivedClassSelf - Return true if this memory object is the 'self' of
   /// a derived class init method.
   bool isDerivedClassSelf() const {
-    return IsSelfOfInitializer &&
+    return IsSelfOfNonDelegatingInitializer &&
            cast<MarkUninitializedInst>(MemoryInst)->isDerivedClass();
+  }
+
+  /// isDelegatingInit - True if this is a delegating initializer, one that
+  /// calls 'self.init'.
+  bool isDelegatingInit() const {
+    return isa<MarkUninitializedInst>(MemoryInst) &&
+       cast<MarkUninitializedInst>(MemoryInst)->isDelegatingInit();
   }
 
   /// emitElementAddress - Given an element number (in the flattened sense)
@@ -147,7 +161,10 @@ enum DIUseKind {
 
   /// This instruction is a call to 'super.init' in a 'self' initializer of a
   /// derived class.
-  SuperInit
+  SuperInit,
+
+  /// This instruction is a call to 'self.init' in a delegating initializer.
+  SelfInit
 };
 
 /// This struct represents a single classified access to the memory object
