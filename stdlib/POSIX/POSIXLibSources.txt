@@ -1,8 +1,0 @@
-#
-# This file lists sources for the POSIX library.
-#
-Descriptor.swift
-File.swift
-Misc.swift
-Getopt.swift
-Environment.swift
