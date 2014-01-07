@@ -97,9 +97,6 @@ ASTContext &SILFunction::getASTContext() const {
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
-  if (!type->isDependentType())
-    return type;
-  
   return ArchetypeBuilder::mapTypeIntoContext(getContextGenericParams(),
                                               type);
 }

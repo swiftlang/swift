@@ -212,10 +212,6 @@ public:
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamType *GenericParam) const;
   
-  /// \brief Retrieve the archetype that corresponds to the given associated
-  /// type.
-  ArchetypeType *getArchetype(DependentMemberType *DepType);
-  
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.

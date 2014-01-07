@@ -151,6 +151,51 @@ enum class LoweredTypeKind {
 static LoweredTypeKind classifyType(CanType type, SILModule &M);
 
 namespace {
+  /// A type transformer that replaces dependent types with contextual types
+  /// from an ArchetypeBuilder.
+  static CanType substDependentTypes(TypeConverter &TC, CanType ty) {
+    auto &M = TC.getArchetypes().getModule();
+    // Resolve generic type parameters to archetypes.
+    if (auto genType = dyn_cast<GenericTypeParamType>(ty)) {
+      return CanType(TC.getArchetypes().getArchetype(genType));
+    }
+    
+    // Resolve dependent member types.
+    if (auto depType = dyn_cast<DependentMemberType>(ty)) {
+      // See if the type directly references an associated archetype.
+      auto potentialArchetype = TC.getArchetypes().resolveType(depType);
+      // If so, use it.
+      if (potentialArchetype) {
+        return CanType(potentialArchetype->getArchetype(nullptr, M));
+      }
+      
+      // If not, resolve the base type, then look up the associated type in
+      // a conformance.
+      CanType base(depType->getBase().transform([&](Type t) -> Type {
+        return substDependentTypes(TC, CanType(t));
+      }));
+      assert(!isa<ArchetypeType>(base)
+             && "archetype base should have been handled above by "
+                "ArchetypeBuilder");
+      
+      auto assocType = depType->getAssocType();
+      auto proto = assocType->getProtocol();
+      auto conformance = M.lookupConformance(base, proto, nullptr);
+      switch (conformance.getInt()) {
+      case ConformanceKind::DoesNotConform:
+      case ConformanceKind::UncheckedConforms:
+        llvm_unreachable("substituted base does not conform to protocol?!");
+          
+      case ConformanceKind::Conforms:
+        return conformance.getPointer()->getTypeWitness(assocType, nullptr)
+            .Replacement
+            ->getCanonicalType();
+      }
+    }
+    
+    return ty;
+  }
+  
   /// A CRTP helper class for doing things that depends on type
   /// classification.
   template <class Impl, class RetTy>
@@ -197,12 +242,20 @@ namespace {
       llvm_unreachable("shouldn't get an @inout type here");
     }
 
-    // Delegate abstract types to their context archetypes.
+    // Delegate dependent types to their context archetypes.
+
+    RetTy visitDependent(CanType type) {
+      CanType contextType(type.transform([&](Type t) -> Type {
+        return substDependentTypes(M.Types, CanType(t));
+      }));
+      return asImpl().visit(contextType);
+    }
+    
     RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
-      return asImpl().visit(CanType(M.Types.getArchetypes().getArchetype(type)));
+      return asImpl().visitDependent(type);
     }
     RetTy visitDependentMemberType(CanDependentMemberType type) {
-      return asImpl().visit(CanType(M.Types.getArchetypes().getArchetype(type)));
+      return asImpl().visitDependent(type);
     }
 
     RetTy visitUnownedStorageType(CanUnownedStorageType type) {
@@ -957,7 +1010,8 @@ namespace {
                                               enumType, nonTrivialElts);
     }
         
-    // For dependent types, lower based on the context archetype we created.
+    // For dependent types, lower based on the context archetype we created,
+    // but preserve the original type in the lowering.
     
     const TypeLowering *visitGenericTypeParamType(CanGenericTypeParamType type){
       assert(Dependent && "generic type param type not dependent?!");
@@ -975,7 +1029,11 @@ namespace {
       
       // The parameter is address-only unless our context requirements make it
       // class-constrained.
-      if (TC.getArchetypes().getArchetype(type)->requiresClass())
+      CanType contextType(type.transform([&](Type t) -> Type {
+        return substDependentTypes(TC, CanType(t));
+      }));
+      
+      if (contextType->hasReferenceSemantics())
         return handleReference(type);
       else
         return handleAddressOnly(type);

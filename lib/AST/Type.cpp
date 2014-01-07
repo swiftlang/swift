@@ -1456,7 +1456,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                                         substParent->getASTContext());
       }
 
-      auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
+      auto proto = assocType->getProtocol();
       // FIXME: Introduce substituted type node here?
       auto conformance = module->lookupConformance(substParent, proto,
                                                    resolver);

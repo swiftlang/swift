@@ -723,12 +723,6 @@ ArchetypeBuilder::getArchetype(GenericTypeParamType *GenericParam) const {
   return Pos->second;
 }
 
-ArchetypeType *
-ArchetypeBuilder::getArchetype(DependentMemberType *AssocType) {
-  // FIXME: root protocol?
-  return resolveType(AssocType)->getArchetype(nullptr, Mod);
-}
-
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   if (Impl->AllArchetypes.empty()) {
     // Collect the primary archetypes first.
@@ -758,7 +752,7 @@ ArchetypeBuilder::getSameTypeRequirements() const {
 
 void ArchetypeBuilder::dump() {
   llvm::errs() << "Archetypes to build:\n";
-  for (const auto& PA : Impl->PotentialArchetypes) {
+  for (const auto &PA : Impl->PotentialArchetypes) {
     PA.second.second->dump(llvm::errs(), 2);
   }
 }
@@ -790,6 +784,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(GenericParamList *genericParams,
       // Skip down to the generic parameter list that houses the corresponding
       // generic parameter.
       auto myGenericParams = genericParams;
+      assert(genericParamsDepth >= depth);
       unsigned skipLevels = genericParamsDepth - depth;
       while (skipLevels > 0) {
         myGenericParams = genericParams->getOuterParameters();
