@@ -884,7 +884,7 @@ public:
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
     require(CMI->getType() == TC.getConstantType(CMI->getMember()),
-            "result type of class_method must match type of method");
+            "result type of super_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
     require(methodType->isThin(),
@@ -904,7 +904,29 @@ public:
             "super_method operand should be a subtype of the "
             "lookup class type");
   }
-  
+
+  void checkPeerMethodInst(PeerMethodInst *CMI) {
+    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
+            "result type of peer_method must match type of method");
+    auto methodType = requireObjectType(SILFunctionType, CMI,
+                                        "result of peer_method");
+    require(methodType->isThin(),
+            "result method must be of a thin function type");
+    SILType operandType = CMI->getOperand().getType();
+    require(isClassOrClassMetatype(operandType.getSwiftType()),
+            "operand must be of a class type");
+    require(isClassOrClassMetatype(getMethodSelfType(methodType)),
+            "result must be a method of a class");
+
+    Type methodClass = CMI->getMember().getDecl()->getDeclContext()
+                         ->getDeclaredTypeInContext();
+
+    require(methodClass->getClassOrBoundGenericClass(),
+            "peer_method must look up a class method");
+    require(methodClass->isEqual(operandType.getSwiftType()),
+            "peer_method operand should be equal to lookup class type");
+  }
+
   void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
     SILType operandType = PEI->getOperand().getType();
     require(operandType.isAddress(),

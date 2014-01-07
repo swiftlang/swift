@@ -742,7 +742,8 @@ VTables
   sil-vtable-entry ::= sil-decl-ref ':' sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
-`super_method`_, and `dynamic_method`_ instructions. The potential destinations
+`super_method`_, `peer_method`_, and `dynamic_method`_
+instructions. The potential destinations
 for these dispatch operations are tracked in ``sil_vtable`` declarations for
 every class type. The declaration contains a mapping from every method of the
 class (including those inherited from its base class) to the SIL function that
@@ -1919,11 +1920,30 @@ super_method
   %1 = super_method %0 : $T, #Super.method!1.foreign : $@thin U -> V
   // %0 must be of a non-root class type or class metatype $T
   // #Super.method!1.foreign must be a reference to an ObjC method of T's
-  // superclass or ; of one of its ancestor classes, at uncurry level >= 1
+  // superclass or of one of its ancestor classes, at uncurry level >= 1
   // %1 will be of type $@thin U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
+dispatched, so this instruction is only valid for Objective-C methods.
+It is undefined behavior if the class value is null and the method is
+not an Objective-C method.
+
+peer_method
+````````````
+::
+
+  sil-instruction ::= 'peer_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+  
+  %1 = peer_method %0 : $T, #Peer.method!1.foreign : $@thin U -> V
+  // %0 must be of class type or class metatype $T
+  // #Peer.method!1.foreign must be a reference to an ObjC method of T's
+  // class or of one of its ancestor classes, at uncurry level >= 1
+  // %1 will be of type $@thin U -> V
+
+Looks up a method in the current class or class metatype instance.
+Note that for native Swift methods, peer method calls are statically
 dispatched, so this instruction is only valid for Objective-C methods.
 It is undefined behavior if the class value is null and the method is
 not an Objective-C method.

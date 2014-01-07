@@ -63,7 +63,9 @@ public:
       ClassMethod = VirtualMethod_First,
       /// A method call using super method dispatch.
       SuperMethod,
-    VirtualMethod_Last = SuperMethod,
+      /// A method call using peer method dispatch.
+      PeerMethod,
+    VirtualMethod_Last = PeerMethod,
   
     GenericMethod_First,
       /// A method call using archetype dispatch.
@@ -343,6 +345,11 @@ public:
                                SILLocation l) {
     return Callee(Kind::SuperMethod, gen, selfValue, name, substFormalType, l);
   }
+  static Callee forPeerMethod(SILGenFunction &gen, SILValue selfValue,
+                               SILDeclRef name, CanAnyFunctionType substFormalType,
+                               SILLocation l) {
+    return Callee(Kind::PeerMethod, gen, selfValue, name, substFormalType, l);
+  }
   static Callee forArchetype(SILGenFunction &gen, SILValue value,
                              SILDeclRef name, CanAnyFunctionType substFormalType,
                              SILLocation l) {
@@ -403,6 +410,7 @@ public:
 
     case Kind::ClassMethod:
     case Kind::SuperMethod:
+    case Kind::PeerMethod:
     case Kind::ArchetypeMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
@@ -474,6 +482,24 @@ public:
                                                    /*volatile*/
                                                      constant.isForeign);
       
+      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
+      break;
+    }
+    case Kind::PeerMethod: {
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+      assert(level >= 1
+             && "currying 'self' of peer method dispatch not yet supported");
+
+      auto constant = method.methodName.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(constant);
+      SILValue methodVal = gen.B.createPeerMethod(Loc,
+                                                   method.selfValue,
+                                                   constant,
+                                                   constantInfo.getSILType(),
+                                                   /*volatile*/
+                                                   constant.isForeign);
+
       mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
       break;
     }
@@ -574,6 +600,7 @@ public:
     case Kind::IndirectValue:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
+    case Kind::PeerMethod:
     case Kind::ArchetypeMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
@@ -1004,9 +1031,9 @@ public:
     // constructor (because there is no initializing constructor). For classes,
     // this is the initializing constructor.
     if (isa<ClassDecl>(nominal) && ctorRef->getDecl()->hasClangNode()) {
-      // If the constructor doesn't have a Swift entry point, we can't call it
-      // directly. Use the foreign entry point.
-      setCallee(Callee::forClassMethod(
+      // If the constructor doesn't have a Swift entry point, use peer
+      // method dispatch.
+      setCallee(Callee::forPeerMethod(
                   gen,
                   self.getValue(),
                   SILDeclRef(ctorRef->getDecl(),

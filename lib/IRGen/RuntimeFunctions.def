@@ -489,9 +489,13 @@ FUNCTION(ObjCMsgSend, objc_msgSend, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
 FUNCTION(ObjCMsgSendStret, objc_msgSend_stret, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
-FUNCTION(ObjCMsgSendSuper, objc_msgSendSuper2, C_CC,
+FUNCTION(ObjCMsgSendSuper, objc_msgSendSuper, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
-FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper2_stret, C_CC,
+FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuper2, objc_msgSendSuper2, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuperStret2, objc_msgSendSuper2_stret, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
 FUNCTION(ObjCSelRegisterName, sel_registerName, C_CC,
          RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone))

@@ -1034,6 +1034,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
+  case ValueKind::PeerMethodInst: {
+    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
+    // and an operand.
+    const PeerMethodInst *SMI = cast<PeerMethodInst>(&SI);
+    SILType Ty = SMI->getType();
+    SmallVector<ValueID, 9> ListOfValues;
+    handleMethodInst(SMI, SMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+                                       SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+                                       S.addTypeRef(Ty.getSwiftRValueType()),
+                                       (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
   case ValueKind::DynamicMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),

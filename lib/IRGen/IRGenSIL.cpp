@@ -87,17 +87,19 @@ public:
 class ObjCMethod {
   /// The SILDeclRef declaring the method.
   SILDeclRef method;
-  /// For a super call, the type to pass to msgSendSuper2 dispatch.
-  /// Null for non-super calls.
-  SILType superSearchType;
+  /// For a bounded call, the static type that provides the lower bound for
+  /// the search. Null for unbounded calls that will look for the method in
+  /// the dynamic type of the object.
+  llvm::PointerIntPair<SILType, 1, bool> searchTypeAndSuper;
 
 public:
-  ObjCMethod(SILDeclRef method, SILType superSearchType)
-    : method(method), superSearchType(superSearchType)
+  ObjCMethod(SILDeclRef method, SILType searchType, bool startAtSuper)
+    : method(method), searchTypeAndSuper(searchType, startAtSuper)
   {}
   
   SILDeclRef getMethod() const { return method; }
-  SILType getSuperSearchType() const { return superSearchType; }
+  SILType getSearchType() const { return searchTypeAndSuper.getPointer(); }
+  bool shouldStartAtSuper() const { return searchTypeAndSuper.getInt(); }
   
   /// FIXME: Thunk down to a Swift function value?
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
@@ -375,15 +377,35 @@ public:
            "function for non-function value?!");
     setLoweredValue(v, StaticFunction{f, cc, explosionLevel});
   }
-  
-  void setLoweredObjCMethod(SILValue v, SILDeclRef method,
-                            SILType superSearchType = SILType()) {
+
+  /// Create a new Objective-C method corresponding to the given SIL value.
+  void setLoweredObjCMethod(SILValue v, SILDeclRef method) {
     assert(v.getType().isObject() && "function for address value?!");
     assert(v.getType().is<SILFunctionType>() &&
            "function for non-function value?!");
-    setLoweredValue(v, ObjCMethod{method, superSearchType});
+    setLoweredValue(v, ObjCMethod{method, SILType(), false});
   }
-  
+
+  /// Create a new Objective-C method corresponding to the given SIL value that
+  /// starts its search from the given search type.
+  ///
+  /// Unlike \c setLoweredObjCMethod, which finds the method in the actual
+  /// runtime type of the object, this routine starts at the static type of the
+  /// object and searches up the the class hierarchy (toward superclasses).
+  ///
+  /// \param searchType The class from which the Objective-C runtime will start
+  /// its search for a method.
+  ///
+  /// \param startAtSuper Whether we want to start at the superclass of the
+  /// static type (vs. the static type itself).
+  void setLoweredObjCMethodBounded(SILValue v, SILDeclRef method,
+                                   SILType searchType, bool startAtSuper) {
+    assert(v.getType().isObject() && "function for address value?!");
+    assert(v.getType().is<SILFunctionType>() &&
+           "function for non-function value?!");
+    setLoweredValue(v, ObjCMethod{method, searchType, startAtSuper});
+  }
+
   void setLoweredMetatypeValue(SILValue v,
                                llvm::Value /*nullable*/ *swiftMetatype,
                                llvm::Value /*nullable*/ *objcMetatype) {
@@ -538,6 +560,7 @@ public:
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
+  void visitPeerMethodInst(PeerMethodInst *i);
   void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   void visitDynamicMethodInst(DynamicMethodInst *i);
@@ -1412,12 +1435,16 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       
   case LoweredValue::Kind::ObjCMethod: {
     auto &objcMethod = lv.getObjCMethod();
+    ObjCMessageKind kind = ObjCMessageKind::Normal;
+    if (objcMethod.getSearchType())
+      kind = objcMethod.shouldStartAtSuper()? ObjCMessageKind::Super
+                                            : ObjCMessageKind::Peer;
     return prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
                                      origCalleeType,
                                      substCalleeType,
                                      substitutions,
                                      ExplosionKind::Minimal,
-                                     bool(objcMethod.getSuperSearchType()));
+                                     kind);
   }
       
   case LoweredValue::Kind::Explosion: {
@@ -1572,7 +1599,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     addObjCMethodCallImplicitArguments(*this, llArgs,
                                  calleeLV.getObjCMethod().getMethod(),
                                  selfArg,
-                                 calleeLV.getObjCMethod().getSuperSearchType());
+                                 calleeLV.getObjCMethod().getSearchType());
   }
 
   // Turn the formal SIL parameters into IR-gen things.
@@ -2836,8 +2863,17 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   assert(i->getMember().isForeign && "super_method to non_objc callee");
-  setLoweredObjCMethod(SILValue(i, 0), i->getMember(),
-                       i->getOperand().getType());
+  setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
+                              i->getOperand().getType(),
+                              /*startAtSuper=*/true);
+}
+
+void IRGenSILFunction::visitPeerMethodInst(swift::PeerMethodInst *i) {
+  assert(i->getMember().isForeign && "peer_method to non_objc callee");
+  // FIXME: Mark as a peer method, so we use objc_msgSendSuper.
+  setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
+                              i->getOperand().getType(),
+                              /*startAtSuper=*/false);
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {

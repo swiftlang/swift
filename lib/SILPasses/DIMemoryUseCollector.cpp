@@ -979,7 +979,11 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // We ignore retains and releases of self.
         if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
           continue;
-        
+
+        // peer_method is a method lookup for delegation to a foreign
+        // constructor, which is ignored.
+        if (isa<PeerMethodInst>(User)) continue;
+
         // We only track two kinds of uses for delegating initializers:
         // calls to self.init, and "other", which we choose to model as escapes.
         // This intentionally ignores all stores, which (if they got emitted as
@@ -999,7 +1003,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     
     // destroyaddr on the box is load+release, which is ignored.
     if (isa<DestroyAddrInst>(User)) continue;
-    
+
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
     Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));

@@ -447,7 +447,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               CanSILFunctionType substFnType,
                                               ArrayRef<Substitution> subs,
                                               ExplosionKind maxExplosion,
-                                              bool isSuper) {
+                                              ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Func
           || method.kind == SILDeclRef::Kind::Getter
@@ -463,20 +463,40 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                       attrs);
   bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType,
                                                        explosionLevel);
-  if (isSuper)
+  if (kind != ObjCMessageKind::Normal)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
   llvm::Constant *messenger;
   if (indirectResult && IGF.IGM.TargetInfo.ObjCUseStret) {
-    messenger = isSuper
-      ? IGF.IGM.getObjCMsgSendSuperStretFn()
-      : IGF.IGM.getObjCMsgSendStretFn();
+    switch (kind) {
+    case ObjCMessageKind::Normal:
+      messenger = IGF.IGM.getObjCMsgSendStretFn();
+      break;
+
+    case ObjCMessageKind::Peer:
+      messenger = IGF.IGM.getObjCMsgSendSuperStretFn();
+      break;
+
+    case ObjCMessageKind::Super:
+      messenger = IGF.IGM.getObjCMsgSendSuperStret2Fn();
+      break;
+    }
   } else {
-    messenger = isSuper
-      ? IGF.IGM.getObjCMsgSendSuperFn()
-      : IGF.IGM.getObjCMsgSendFn();
+    switch (kind) {
+      case ObjCMessageKind::Normal:
+        messenger = IGF.IGM.getObjCMsgSendFn();
+        break;
+
+      case ObjCMessageKind::Peer:
+        messenger = IGF.IGM.getObjCMsgSendSuperFn();
+        break;
+
+      case ObjCMessageKind::Super:
+        messenger = IGF.IGM.getObjCMsgSendSuper2Fn();
+        break;
+    }
   }
 
   // Cast the messenger to the right type.
@@ -639,7 +659,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // Prepare the call to the underlying method.
   CallEmission emission
     = prepareObjCMethodRootCall(subIGF, method, origMethodType, origMethodType,
-       ArrayRef<Substitution>{}, ExplosionKind::Minimal, /*isSuper*/ false);
+                                ArrayRef<Substitution>{}, ExplosionKind::Minimal,
+                                ObjCMessageKind::Normal);
   
   Explosion args(params.getKind());
   addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());

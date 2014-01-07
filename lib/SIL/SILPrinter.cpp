@@ -841,6 +841,10 @@ public:
     printMethodInst(AMI, AMI->getOperand(), "super_method");
     OS << " : " << AMI->getType();
   }
+  void visitPeerMethodInst(PeerMethodInst *AMI) {
+    printMethodInst(AMI, AMI->getOperand(), "peer_method");
+    OS << " : " << AMI->getType();
+  }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     OS << "archetype_method ";
     if (AMI->isVolatile())

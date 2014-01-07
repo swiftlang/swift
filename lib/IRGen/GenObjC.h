@@ -39,13 +39,23 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
 
+  /// The kind of message to send through the Objective-C runtime.
+  enum class ObjCMessageKind {
+    /// A normally-dispatched call.
+    Normal,
+    /// A call to a superclass method.
+    Super,
+    /// A call to a peer method.
+    Peer
+  };
+
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
                                          SILDeclRef method,
                                          CanSILFunctionType origFnType,
                                          CanSILFunctionType substFnType,
                                          ArrayRef<Substitution> subs,
                                          ExplosionKind maxExplosion,
-                                         bool isSuper);
+                                         ObjCMessageKind kind);
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                           Explosion &emission,

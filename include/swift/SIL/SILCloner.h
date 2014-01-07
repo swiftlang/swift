@@ -692,6 +692,17 @@ SILCloner<ImplClass>::visitSuperMethodInst(SuperMethodInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitPeerMethodInst(PeerMethodInst *Inst) {
+  doPostProcess(Inst,
+                Builder.createPeerMethod(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand()),
+                                         Inst->getMember(),
+                                         getOpType(Inst->getType()),
+                                         Inst->isVolatile()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
   doPostProcess(Inst,
     Builder.createArchetypeMethod(getOpLocation(Inst->getLoc()),
