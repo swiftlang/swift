@@ -15,6 +15,16 @@
 
 using namespace swift;
 
+SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
+                                             StringRef name,
+                                             SILType loweredType,
+                                             bool isDefinition,
+                                             Optional<SILLocation> loc) {
+  return new (M) SILGlobalVariable(M, linkage, name, loweredType,
+                                   isDefinition, loc);
+}
+
+
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      StringRef Name, SILType LoweredType,
                                      bool IsDefinition,

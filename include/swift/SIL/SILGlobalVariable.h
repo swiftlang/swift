@@ -48,12 +48,17 @@ private:
   /// True if the storage for this global variable lies in this module. False
   /// if this is a reference to storage from a different module.
   bool IsDefinition;
+
+  SILGlobalVariable(SILModule &M, SILLinkage linkage,
+                    StringRef mangledName, SILType loweredType,
+                    bool ssDefinition,
+                    Optional<SILLocation> loc);
   
 public:
-  SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
-                    StringRef MangledName, SILType LoweredType,
-                    bool IsDefinition,
-                    Optional<SILLocation> Loc = Nothing);
+  static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
+                                   StringRef MangledName, SILType LoweredType,
+                                   bool IsDefinition,
+                                   Optional<SILLocation> Loc = Nothing);
 
   ~SILGlobalVariable();
 

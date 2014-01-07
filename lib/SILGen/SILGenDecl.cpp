@@ -1827,9 +1827,9 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
   
-  auto onceToken = new (M) SILGlobalVariable(M, SILLinkage::Internal,
-                                           onceTokenName,
-                                           onceSILTy, /*isDefinition*/ true);
+  auto onceToken = SILGlobalVariable::create(M, SILLinkage::Internal,
+                                             onceTokenName,
+                                             onceSILTy, /*isDefinition*/ true);
   
   // Emit the initialization code into a function.
   llvm::SmallString<20> onceFuncName;
@@ -2114,7 +2114,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                          requirement.uncurryLevel);
   }
   
-  auto *f = new (M) SILFunction(M, SILLinkage::Internal, nameBuffer,
+  auto *f = SILFunction::create(M, SILLinkage::Internal, nameBuffer,
                                 witnessSILType.castTo<SILFunctionType>(),
                                 SILLocation(witness.getDecl()),
                                 IsNotBare,

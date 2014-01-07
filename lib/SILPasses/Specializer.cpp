@@ -90,7 +90,7 @@ private:
 
     // Create a new empty function.
     SILFunction *NewF =
-        new (M) SILFunction(M, SILLinkage::Internal, NewName, FTy,
+        SILFunction::create(M, SILLinkage::Internal, NewName, FTy,
                             Orig->getLocation(), Orig->isBare(),
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());

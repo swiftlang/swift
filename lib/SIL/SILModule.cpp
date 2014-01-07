@@ -121,8 +121,8 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
     return fn;
   }
 
-  return new (*this) SILFunction(*this, linkage, name, type,
-                                 loc, isBareSILFunction, isTransparent);
+  return SILFunction::create(*this, linkage, name, type,
+                             loc, isBareSILFunction, isTransparent);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {

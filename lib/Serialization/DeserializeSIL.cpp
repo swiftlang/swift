@@ -273,9 +273,9 @@ static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
 
   // If we didn't find a function, create a new one.
   SourceLoc Loc;
-  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty.castTo<SILFunctionType>(),
-                                     SILFileLocation(Loc));
+  auto Fn = SILFunction::create(SILMod, SILLinkage::Internal,
+                                Name.str(), Ty.castTo<SILFunctionType>(),
+                                SILFileLocation(Loc));
   return Fn;
 }
 
@@ -1286,7 +1286,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
   }
 
   auto Ty = MF->getType(TyID);
-  SILGlobalVariable *v = new (SILMod) SILGlobalVariable(
+  SILGlobalVariable *v = SILGlobalVariable::create(
                            SILMod, (SILLinkage)Linkage,
                            Name.str(), getSILType(Ty, SILValueCategory::Object),
                            !IsExternal);

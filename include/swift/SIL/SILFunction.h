@@ -92,17 +92,24 @@ private:
   friend class SILWitnessTable;
   unsigned RefCount = 0;
 
+  SILFunction(SILModule &module, SILLinkage linkage,
+              StringRef mangledName, CanSILFunctionType loweredType,
+              Optional<SILLocation> loc,
+              IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans,
+              SILFunction *insertBefore,
+              SILDebugScope *debugScope,
+              DeclContext *DC);
+
 public:
-
-  SILFunction(SILModule &Module, SILLinkage Linkage,
-              StringRef MangledName, CanSILFunctionType LoweredType,
-              Optional<SILLocation> Loc = Nothing,
-              IsBare_t isBareSILFunction = IsNotBare,
-              IsTransparent_t isTrans = IsNotTransparent,
-              SILFunction *InsertBefore = nullptr,
-              SILDebugScope *DebugScope = nullptr,
-              DeclContext *DC = nullptr);
-
+  static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
+                             CanSILFunctionType loweredType,
+                             Optional<SILLocation> loc = Nothing,
+                             IsBare_t isBareSILFunction = IsNotBare,
+                             IsTransparent_t isTrans = IsNotTransparent,
+                             SILFunction *InsertBefore = nullptr,
+                             SILDebugScope *DebugScope = nullptr,
+                             DeclContext *DC = nullptr);
   ~SILFunction();
 
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }

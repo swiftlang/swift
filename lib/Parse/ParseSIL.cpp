@@ -260,8 +260,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     if (Fn->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
-                                    SILFileLocation(Loc));
+      Fn = SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+                               SILFileLocation(Loc));
     }
     
     assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
@@ -273,13 +273,13 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   // defined already.
   if (SILMod.lookup(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
-                                    SILFileLocation(Loc));
+    return SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+                               SILFileLocation(Loc));
   }
 
   // Otherwise, this definition is the first use of this name.
-  return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, Name.str(), Ty,
-                                  SILFileLocation(Loc));
+  return SILFunction::create(SILMod, SILLinkage::Internal, Name.str(), Ty,
+                             SILFileLocation(Loc));
 }
 
 
@@ -296,16 +296,16 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType());
-      FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
-                                       SILFileLocation(Loc));
+      FnRef = SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+                                  SILFileLocation(Loc));
     }
     return FnRef;
   }
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty, SILFileLocation(Loc));
+  auto Fn = SILFunction::create(SILMod, SILLinkage::Internal,
+                                Name.str(), Ty, SILFileLocation(Loc));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
   return Fn;
@@ -2530,9 +2530,9 @@ bool Parser::parseSILGlobal() {
   bool IsExternal = false;
   if (parseSILOptional(IsExternal, State, "external"))
     return true;
-  new (*SIL->M) SILGlobalVariable(*SIL->M, GlobalLinkage, GlobalName.str(),
-                                  GlobalType, !IsExternal,
-                                  SILFileLocation(NameLoc));
+  SILGlobalVariable::create(*SIL->M, GlobalLinkage, GlobalName.str(),
+                            GlobalType, !IsExternal,
+                            SILFileLocation(NameLoc));
   return false;
 }
 

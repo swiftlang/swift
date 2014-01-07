@@ -17,6 +17,20 @@
 
 using namespace swift;
 
+SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
+                                 StringRef name,
+                                 CanSILFunctionType loweredType,
+                                 Optional<SILLocation> loc,
+                                 IsBare_t isBareSILFunction,
+                                 IsTransparent_t isTrans,
+                                 SILFunction *insertBefore,
+                                 SILDebugScope *debugScope,
+                                 DeclContext *DC) {
+  return new (M) SILFunction(M, linkage, name, loweredType, loc,
+                             isBareSILFunction, isTrans, insertBefore,
+                             debugScope, DC);
+}
+
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, CanSILFunctionType LoweredType,
                          Optional<SILLocation> Loc,

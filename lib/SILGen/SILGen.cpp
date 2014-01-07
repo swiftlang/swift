@@ -217,7 +217,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                         TupleType::getEmpty(C),
                                         extInfo);
   auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
-  return new (M) SILFunction(M, SILLinkage::Internal,
+  return SILFunction::create(M, SILLinkage::Internal,
                              SWIFT_ENTRY_POINT_FUNCTION, loweredType, Loc);
 }
 
@@ -271,7 +271,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
                               IsTransparent : IsNotTransparent;
 
   SmallVector<char, 128> buffer;
-  auto *F = new (M) SILFunction(M, linkage, constant.mangle(buffer),
+  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, Nothing, IsNotBare, IsTrans);
   
   ValueDecl *VD = nullptr;
@@ -478,9 +478,9 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                     FunctionType::ExtInfo().withIsThin(true));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
   
-  auto *f = new (M)
-    SILFunction(M, SILLinkage::Internal, funcName,
-                initSILType, binding, IsNotBare, IsNotTransparent);
+  auto *f = 
+    SILFunction::create(M, SILLinkage::Internal, funcName,
+                        initSILType, binding, IsNotBare, IsNotTransparent);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding->getInit())));
   f->setLocation(binding);
   
