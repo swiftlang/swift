@@ -972,9 +972,19 @@ public:
   void visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
     printCommon(E, "character_literal_expr") << " value=" << E->getValue()<<')';
   }
+
+  void printStringEncoding(StringLiteralExpr::Encoding encoding) {
+    switch (encoding) {
+    case StringLiteralExpr::UTF8: OS << "utf8"; break;
+    case StringLiteralExpr::UTF16: OS << "utf16"; break;
+    }
+  }
+
   void visitStringLiteralExpr(StringLiteralExpr *E) {
     printCommon(E, "string_literal_expr")
-      << " value=" << QuotedString(E->getValue()) << ')';
+      << " encoding=";
+    printStringEncoding(E->getEncoding());
+    OS << " value=" << QuotedString(E->getValue()) << ')';
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
@@ -987,7 +997,11 @@ public:
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
     printCommon(E, "magic_identifier_literal_expr") << " kind=";
     switch (E->getKind()) {
-    case MagicIdentifierLiteralExpr::File:  OS << "__FILE__"; break;
+    case MagicIdentifierLiteralExpr::File:
+      OS << "__FILE__ encoding=";
+      printStringEncoding(E->getStringEncoding());
+      break;
+
     case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
     case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
     }

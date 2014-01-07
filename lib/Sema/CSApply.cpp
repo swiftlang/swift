@@ -999,14 +999,16 @@ namespace {
     }
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
+      auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
+      auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
+      assert(bool(stringLiteral) != bool(magicLiteral) &&
+             "literal must be either a string literal or a magic literal");
+
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::StringLiteralConvertible);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinStringLiteralConvertible);
-      
+
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
@@ -1015,15 +1017,43 @@ namespace {
           type = defaultType;
       }
       
-      TupleTypeElt elements[3] = {
+      TupleTypeElt elementsArray[3] = {
         TupleTypeElt(tc.Context.TheRawPointerType),
         TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
-      
-      auto CFSLID = tc.Context.getIdentifier("convertFromStringLiteral");
-      auto CFBSLID=tc.Context.getIdentifier("_convertFromBuiltinStringLiteral");
-      
+
+      Identifier CFSLID = tc.Context.getIdentifier("convertFromStringLiteral");
+
+
+      // If the type can handle UTF-16 string literals, prefer them.
+      Identifier CFBSLID;
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
+      ArrayRef<TupleTypeElt> elements;
+      if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
+        CFBSLID = tc.Context.getIdentifier(
+                    "_convertFromBuiltinUTF16StringLiteral");
+        elements = llvm::makeArrayRef(elementsArray).slice(0, 2);
+        if (stringLiteral)
+          stringLiteral->setEncoding(StringLiteralExpr::UTF16);
+        else
+          magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+      } else {
+        // Otherwise, fall back to UTF-8.
+        builtinProtocol
+          = tc.getProtocol(expr->getLoc(),
+                           KnownProtocolKind::BuiltinStringLiteralConvertible);
+        CFBSLID = tc.Context.getIdentifier("_convertFromBuiltinStringLiteral");
+        elements = elementsArray;
+        if (stringLiteral)
+          stringLiteral->setEncoding(StringLiteralExpr::UTF8);
+        else
+          magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
+      }
+
       return convertLiteral(expr,
                             type,
                             expr->getType(),
@@ -2132,7 +2162,7 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
                                  SourceLoc loc, AbstractFunctionDecl *owner,
                                  unsigned index) {
   auto defArg = owner->getDefaultArg(index);
-  MagicIdentifierLiteralExpr::KindTy magicKind;
+  MagicIdentifierLiteralExpr::Kind magicKind;
   switch (defArg.first) {
     case DefaultArgumentKind::None:
       llvm_unreachable("No default argument here?");

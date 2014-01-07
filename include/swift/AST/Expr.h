@@ -89,6 +89,25 @@ class alignas(8) Expr {
   enum { NumIntegerLiteralExprBits = NumLiteralExprBits + 1 };
   static_assert(NumIntegerLiteralExprBits <= 32, "fits in an unsigned");
 
+  class StringLiteralExprBitfields {
+    friend class StringLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned Encoding : 1;
+  };
+  enum { NumStringLiteralExprBits = NumLiteralExprBits + 1 };
+  static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
+
+  class MagicIdentifierLiteralExprBitfields {
+    friend class MagicIdentifierLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned Kind : 2;
+    unsigned StringEncoding : 1;
+  };
+  enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 1 };
+  static_assert(NumMagicIdentifierLiteralExprBits <= 32, "fits in an unsigned");
+
   class AbstractClosureExprBitfields {
     friend class AbstractClosureExpr;
     unsigned : NumExprBits;
@@ -117,6 +136,8 @@ protected:
     ExprBitfields ExprBits;
     LiteralExprBitfields LiteralExprBits;
     IntegerLiteralExprBitfields IntegerLiteralExprBits;
+    StringLiteralExprBitfields StringLiteralExprBits;
+    MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
   };
@@ -334,13 +355,32 @@ class StringLiteralExpr : public LiteralExpr {
   SourceRange Range;
   
 public:
+  /// The encoding that should be used for the string literal.
+  enum Encoding : unsigned {
+    UTF8,
+    UTF16
+  };
+
   StringLiteralExpr(StringRef Val, SourceRange Range)
     : LiteralExpr(ExprKind::StringLiteral, /*Implicit=*/false),
-      Val(Val), Range(Range) {}
+      Val(Val), Range(Range)
+  {
+    StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
+  }
   
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Range; }
-  
+
+  /// Determine the encoding that should be used for this string literal.
+  Encoding getEncoding() const {
+    return static_cast<Encoding>(StringLiteralExprBits.Encoding);
+  }
+
+  /// Set the encoding that should be used for this string literal.
+  void setEncoding(Encoding encoding) {
+    StringLiteralExprBits.Encoding = static_cast<unsigned>(encoding);
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::StringLiteral;
   }
@@ -383,24 +423,47 @@ public:
 /// out to a literal at SILGen time.
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
-  enum KindTy {
+  enum Kind : unsigned {
     File, Line, Column
   };
 private:
-  KindTy Kind;
   SourceLoc Loc;
   
 public:
-  MagicIdentifierLiteralExpr(KindTy Kind, SourceLoc Loc, bool Implicit)
-    : LiteralExpr(ExprKind::MagicIdentifierLiteral, Implicit), Kind(Kind), Loc(Loc) {}
+  MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit)
+    : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc)
+  {
+    MagicIdentifierLiteralExprBits.Kind = static_cast<unsigned>(kind);
+    MagicIdentifierLiteralExprBits.StringEncoding
+      = static_cast<unsigned>(StringLiteralExpr::UTF8);
+  }
   
-  KindTy getKind() const { return Kind; }
-  bool isFile() const { return Kind == File; }
-  bool isLine() const { return Kind == Line; }
-  bool isColumn() const { return Kind == Column; }
+  Kind getKind() const {
+    return static_cast<Kind>(MagicIdentifierLiteralExprBits.Kind);
+  }
+
+  bool isFile() const { return getKind() == File; }
+  bool isLine() const { return getKind() == Line; }
+  bool isColumn() const { return getKind() == Column; }
   
   SourceRange getSourceRange() const { return Loc; }
-  
+
+  // For a magic identifier that produces a string literal, retrieve the
+  // encoding for that string literal.
+  StringLiteralExpr::Encoding getStringEncoding() const {
+    assert(isFile() && "Magic identifier literal has non-string encoding");
+    return static_cast<StringLiteralExpr::Encoding>(
+             MagicIdentifierLiteralExprBits.StringEncoding);
+  }
+
+  // For a magic identifier that produces a string literal, set the encoding
+  // for the string literal.
+  void setStringEncoding(StringLiteralExpr::Encoding encoding) {
+    assert(isFile() && "Magic identifier literal has non-string encoding");
+    MagicIdentifierLiteralExprBits.StringEncoding
+      = static_cast<unsigned>(encoding);
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MagicIdentifierLiteral;
   }

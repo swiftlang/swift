@@ -14,6 +14,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
@@ -195,7 +196,8 @@ namespace {
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
     RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
         
-    RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C);
+    RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C,
+                             StringLiteralExpr::Encoding encoding);
         
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
@@ -594,24 +596,46 @@ RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
 }
 
 RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
-                                        SGFContext C) {
-  auto encoding = StringLiteralInst::Encoding::UTF8;
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, encoding);
+                                        SGFContext C,
+                                        StringLiteralExpr::Encoding encoding) {
+  StringLiteralInst::Encoding instEncoding;
+  switch (encoding) {
+  case StringLiteralExpr::UTF8:
+    instEncoding = StringLiteralInst::Encoding::UTF8;
+    break;
+
+  case StringLiteralExpr::UTF16:
+    instEncoding = StringLiteralInst::Encoding::UTF16;
+    break;
+  }
+
+  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
   CanType ty = E->getType()->getCanonicalType();
   
-  ManagedValue Elts[] = {
+  ManagedValue EltsArray[] = {
     ManagedValue(SILValue(string, 0), ManagedValue::Unmanaged),
     ManagedValue(SILValue(string, 1), ManagedValue::Unmanaged),
     ManagedValue(SILValue(string, 2), ManagedValue::Unmanaged)
   };
-  
+
+  ArrayRef<ManagedValue> Elts;
+  switch (instEncoding) {
+  case StringLiteralInst::Encoding::UTF16:
+    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
+    break;
+
+  case StringLiteralInst::Encoding::UTF8:
+    Elts = EltsArray;
+    break;
+  }
+
   return RValue(Elts, ty);
 }
 
 
 RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
                                              SGFContext C) {
-  return emitStringLiteral(E, E->getValue(), C);
+  return emitStringLiteral(E, E->getValue(), C, E->getEncoding());
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -2818,7 +2842,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     StringRef Value =
       Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
 
-    return emitStringLiteral(E, Value, C);
+    return emitStringLiteral(E, Value, C, E->getStringEncoding());
   }
   case MagicIdentifierLiteralExpr::Line: {
     unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;

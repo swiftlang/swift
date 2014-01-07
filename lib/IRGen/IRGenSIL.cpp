@@ -1793,8 +1793,8 @@ getAddrOfString(IRGenModule &IGM, StringRef string,
     auto gep = cast<llvm::ConstantExpr>(addr);
     assert(gep->getOpcode() == llvm::Instruction::GetElementPtr);
     auto var = cast<llvm::GlobalVariable>(gep->getOperand(0));
-    auto array = cast<llvm::ConstantDataArray>(var->getInitializer());
-    size_t length = array->getNumElements() - 1;
+    size_t length = dyn_cast<llvm::ArrayType>(var->getInitializer()->getType())
+                     ->getNumElements() - 1;
 
     // Cast to Builtin.RawPointer.
     addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);

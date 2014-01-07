@@ -959,7 +959,8 @@ namespace index_block {
     BuiltinFloatLiteralConvertible,
     BuiltinIntegerLiteralConvertible,
     BuiltinStringLiteralConvertible,
-    
+    BuiltinUTF16StringLiteralConvertible,
+
     DynamicLookup,
     RawRepresentable,
     Stream,
