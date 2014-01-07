@@ -564,9 +564,27 @@ void LifetimeChecker::doIt() {
         Diag<StringRef> DiagMessage;
 
         // This is a use of an uninitialized value.  Emit a diagnostic.
-        if (TheMemory.isDelegatingInit())
+        if (TheMemory.isDelegatingInit()) {
           DiagMessage = diag::self_use_before_init_in_delegatinginit;
-        else if (isa<MarkFunctionEscapeInst>(Inst))
+          
+          // If this is a load with a single user that is a return, then this is
+          // a return before self.init.   Emit a specific diagnostic.
+          if (auto *LI = dyn_cast<LoadInst>(Inst))
+            if (LI->hasOneUse() &&
+                isa<ReturnInst>((*LI->use_begin())->getUser())) {
+              if (shouldEmitError(Inst))
+                diagnose(Module, Inst->getLoc(),
+                         diag::return_from_init_without_self_init);
+              break;
+            }
+          if (isa<ReturnInst>(Inst)) {
+            if (shouldEmitError(Inst))
+              diagnose(Module, Inst->getLoc(),
+                       diag::return_from_init_without_self_init);
+            break;
+          }
+          
+        } else if (isa<MarkFunctionEscapeInst>(Inst))
           DiagMessage = diag::global_variable_function_use_uninit;
         else if (isa<AddressToPointerInst>(Inst))
           DiagMessage = diag::variable_addrtaken_before_initialized;

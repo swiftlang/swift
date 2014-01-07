@@ -1614,6 +1614,8 @@ ERROR(self_before_superselfinit,sil_analysis,none,
      (unsigned))
 ERROR(return_from_init_without_initing_self,sil_analysis,none,
       "return from enum initializer method without storing to 'self'", ())
+ERROR(return_from_init_without_self_init,sil_analysis,none,
+      "self.init isn't called on all paths in delegating initializer", ())
 
 ERROR(global_variable_function_use_uninit,sil_analysis,none,
       "variable '%0' used by function definition before being initialized",
