@@ -2466,9 +2466,37 @@ the enum is injected with an `inject_enum_addr`_ instruction::
 Accessing the value of a loadable enum is inseparable from dispatching on its
 discriminator and is done with the `switch_enum`_ terminator::
 
+  enum Foo { case A(Int), B(String) }
+
+  sil @switch_foo : $(Foo) -> () {
+  entry(%foo : $Foo):
+    switch_enum %foo : $Foo, case #Foo.A: a_dest, case #Foo.B: b_dest
+    
+  a_dest(%a : $Int):
+    /* use %a */
+  
+  b_dest(%b : $String):
+    /* use %b */
+  }
+
 An address-only enum can be tested by branching on it using the
 `switch_enum_addr`_ terminator. Its value can then be taken by destructively
-projecting the enum value with `take_enum_data_addr`_.
+projecting the enum value with `take_enum_data_addr`_::
+
+  enum Foo<T> { case A(T), B(String) }
+
+  sil @switch_foo : $<T> (Foo<T>) -> () {
+  entry(%foo : $*Foo<T>):
+    switch_enum_addr %foo : $*Foo<T>, case #Foo.A: a_dest, case #Foo.B: b_dest
+    
+  a_dest:
+    %a = take_enum_data_addr %foo : $*Foo<T>, #Foo.A
+    /* use %a */
+  
+  b_dest:
+    %b = take_enum_data_addr %foo : $*Foo<T>, #Foo.B
+    /* use %b */
+  }
 
 enum
 ````
@@ -2533,9 +2561,9 @@ take_enum_data_addr
 ```````````````````
 ::
 
-  sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
+  sil-instruction ::= 'take_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = init_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = take_enum_data_addr %0 : $*U, #U.DataCase
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
