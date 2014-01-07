@@ -227,7 +227,8 @@ struct SILSpecializer {
   void collectApplyInst(SILFunction &F);
 
   /// The driver for the generic specialization pass.
-  void specialize() {
+  bool specialize() {
+    bool Changed = false;
     for (auto &F : *M)
       collectApplyInst(F);
 
@@ -239,8 +240,9 @@ struct SILSpecializer {
       SILFunction *F = Worklist.back();
       Worklist.pop_back();
       if (ApplyInstMap.count(F))
-        specializeApplyInstGroup(F, ApplyInstMap[F]);
+        Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
     }
+    return Changed;
   }
 };
 
@@ -388,6 +390,6 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   return Changed;
 }
 
-void swift::performSILSpecialization(SILModule *M) {
-  SILSpecializer(M).specialize();
+bool swift::performSILSpecialization(SILModule *M) {
+  return SILSpecializer(M).specialize();
 }

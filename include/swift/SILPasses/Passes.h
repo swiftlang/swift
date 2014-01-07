@@ -64,7 +64,7 @@ namespace swift {
 
   /// \brief Specialize generic functions by cloning them and replacing the
   /// abstract type with the concrete type.
-  void performSILSpecialization(SILModule *M);
+  bool performSILSpecialization(SILModule *M);
 
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
