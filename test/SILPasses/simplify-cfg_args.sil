@@ -1,0 +1,66 @@
+// RUN: %sil-opt %s -simplify-cfg | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import swift
+
+sil_global internal @globalinit_token11 : $Builtin.Word
+
+sil_global internal @globalinit_token120 : $Builtin.Word
+
+sil @globalinit_func11 :  $@thin () -> () 
+
+//CHECK: sil @a_method_to_simplify 
+sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.ObjectPointer, Builtin.Int64, @thin StringByteData.metatype) -> @owned StringByteData {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.ObjectPointer, %2 : $Builtin.Int64, %3 : $@thin StringByteData.metatype):
+  %4 = struct $UnsafePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
+  strong_retain %1 : $Builtin.ObjectPointer       // id: %5
+  strong_retain %1 : $Builtin.ObjectPointer       // id: %6
+  strong_release %1 : $Builtin.ObjectPointer      // id: %7
+  %8 = integer_literal $Builtin.Int1, 0           // user: %23
+  %9 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> () // users: %27, %14
+  %10 = sil_global_addr @globalinit_token11 : $*Builtin.Word // user: %11
+  %11 = address_to_pointer %10 : $*Builtin.Word to $Builtin.RawPointer // user: %14
+  %12 = function_ref @globalinit_func11 : $@thin () -> () // users: %26, %13
+  %13 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %14
+  %14 = apply %9(%11, %13) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %15 = alloc_stack $Int64                        // users: %38, %40, %41
+  %16 = struct_element_addr %15#1 : $*Int64, #value // users: %28, %17
+  %17 = load %16 : $*Builtin.Int64                // user: %20
+  %18 = integer_literal $Builtin.Int64, -1        // user: %20
+  %19 = builtin_function_ref "xor_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %20
+  %20 = apply %19(%17, %18) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %22
+  %21 = builtin_function_ref "and_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %22
+  %22 = apply %21(%2, %20) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %30, %23
+//CHECK-NOT: cond_br
+  cond_br %8, bb1, bb2(%22 : $Builtin.Int64)      // id: %23
+
+bb1:                                              // Preds: bb0
+  %24 = sil_global_addr @globalinit_token11 : $*Builtin.Word // user: %25
+  %25 = address_to_pointer %24 : $*Builtin.Word to $Builtin.RawPointer // user: %27
+  %26 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %27
+  %27 = apply %9(%25, %26) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %28 = load %16 : $*Builtin.Int64                // user: %30
+  %29 = builtin_function_ref "or_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %30
+// CHECK: builtin_function_ref "and_Int64"
+// CHECK-NEXT: [[VAR_21:%[0-9]+]] = apply
+  %30 = apply %29(%22, %28) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %31
+  br bb2(%30 : $Builtin.Int64)                    // id: %31
+
+bb2(%32 : $Builtin.Int64):                        // Preds: bb0 bb1
+//CHECK-NEXT: tuple ()
+  %33 = tuple ()                                  // user: %34
+  br bb3(%33 : $())                               // id: %34
+
+bb3(%35 : $()):                                   // Preds: bb2
+// CHECK-NEXT: struct $Int64 ([[VAR_21]] : $Builtin.Int64)
+  %36 = struct $Int64 (%32 : $Builtin.Int64)      // user: %37
+  %37 = struct $StringByteData (%4 : $UnsafePointer<UInt8>, %36 : $Int64, %1 : $Builtin.ObjectPointer) // user: %41
+  strong_retain %1 : $Builtin.ObjectPointer       // id: %38
+  strong_release %1 : $Builtin.ObjectPointer      // id: %39
+  strong_release %1 : $Builtin.ObjectPointer      // id: %40
+  dealloc_stack %15#0 : $*@local_storage Int64    // id: %41
+// CHECK: return
+  return %37 : $StringByteData                    // id: %41
+}
+

@@ -352,11 +352,12 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
     bool isFalse = !IL->getValue();
+    auto LiveArgs =  isFalse ? BI->getFalseArgs() : BI->getTrueArgs();
     auto *LiveBlock =  isFalse ? BI->getFalseBB() : BI->getTrueBB();
     auto *DeadBlock = !isFalse ? BI->getFalseBB() : BI->getTrueBB();
     auto *ThisBB = BI->getParent();
 
-    SILBuilder(BI).createBranch(BI->getLoc(), LiveBlock);
+    SILBuilder(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
     BI->eraseFromParent();
     if (IL->use_empty()) IL->eraseFromParent();
 
