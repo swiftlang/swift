@@ -2542,8 +2542,14 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
   // on ivars.
-  auto MUKind = MarkUninitializedInst::
-    getConstructorSelfKind(selfClassDecl->hasSuperclass(), isDelegating);
+  MarkUninitializedInst::Kind MUKind;
+  
+  if (isDelegating)
+    MUKind = MarkUninitializedInst::DelegatingSelf;
+  else if (selfClassDecl->hasSuperclass())
+    MUKind = MarkUninitializedInst::DerivedSelf;
+  else
+    MUKind = MarkUninitializedInst::RootSelf;
   selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
 
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");

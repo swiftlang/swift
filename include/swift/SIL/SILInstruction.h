@@ -799,13 +799,9 @@ public:
     /// DerivedSelf designates "self" in a derived (non-root) class.
     DerivedSelf,
 
-    /// DelegatingRootSelf designates "self" on a struct, enum, or root class
+    /// DelegatingSelf designates "self" on a struct, enum, or class
     /// in a delegating constructor (one that calls self.init).
-    DelegatingRootSelf,
-
-    /// DelegatingDerivedSelf designates "self" on a derived class which
-    /// delegates to another constructor.
-    DelegatingDerivedSelf,
+    DelegatingSelf,
   };
 private:
   Kind ThisKind;
@@ -817,23 +813,15 @@ public:
 
   Kind getKind() const { return ThisKind; }
 
-
-  static Kind getConstructorSelfKind(bool isDerivedClass, bool isDelegating) {
-    if (isDerivedClass)
-      return isDelegating ? DelegatingDerivedSelf : DerivedSelf;
-    return isDelegating ? DelegatingRootSelf : RootSelf;
-  }
-
-
   bool isGlobalVar() const { return ThisKind == GlobalVar; }
-  bool isRoot() const {
-    return ThisKind == RootSelf || ThisKind == DelegatingRootSelf;
+  bool isRootSelf() const {
+    return ThisKind == RootSelf;
   }
-  bool isDerivedClass() const {
-    return ThisKind == DerivedSelf || ThisKind == DelegatingDerivedSelf;
+  bool isDerivedClassSelf() const {
+    return ThisKind == DerivedSelf;
   }
-  bool isDelegatingInit() const {
-    return ThisKind == DelegatingRootSelf || ThisKind == DelegatingDerivedSelf;
+  bool isDelegatingSelf() const {
+    return ThisKind == DelegatingSelf;
   }
 };
 
