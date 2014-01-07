@@ -1,5 +1,8 @@
 2014-01-08
 
+* Strings have a new native UTF-16 representation that can be
+  converted back and forth to NSString at minimal cost.
+
 * Initializers can now delegate to other initializers within the same
   class by calling 'self.init'. For example:
 
