@@ -397,8 +397,10 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     auto &Use = Uses[ui];
     assert(Use.Inst && "No instruction identified?");
 
-    // Keep track of all the uses that aren't loads.
-    if (Use.Kind == DIUseKind::Load)
+    // Keep track of all the uses that aren't loads or escapes.  These are
+    // important uses that we'll visit, but we don't consider them definition
+    // points for liveness computation purposes.
+    if (Use.Kind == DIUseKind::Load || Use.Kind == DIUseKind::Escape)
       continue;
 
     NonLoadUses[Use.Inst] = ui;
