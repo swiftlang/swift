@@ -2045,23 +2045,13 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   CanType methodTy = witnessSubstTy.getResult();
   if (auto pft = dyn_cast<PolymorphicFunctionType>(methodTy)) {
     auto &reqtParams = pft->getGenericParams();
-    auto methodParams
-      = GenericParamList::create(getASTContext(),
-                                 SourceLoc(),
-                                 reqtParams.getParams(),
-                                 SourceLoc(),
-                                 reqtParams.getRequirements(),
-                                 SourceLoc());
-    
     // Preserve the depth of generic arguments by adding an empty outer generic
     // param list if the conformance is concrete.
     GenericParamList *outerParams = conformanceParams;
     if (!outerParams)
-      outerParams = GenericParamList::create(getASTContext(),
-                                             SourceLoc(), {}, SourceLoc());
-      
-    methodParams->setOuterParameters(outerParams);
-    methodParams->setAllArchetypes(reqtParams.getAllArchetypes());
+      outerParams = GenericParamList::getEmpty(getASTContext());
+    auto methodParams
+      = reqtParams.cloneWithOuterParameters(getASTContext(), outerParams);    
     methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
                                                methodParams,
                                                pft->getExtInfo());

@@ -713,6 +713,28 @@ public:
                                   MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
+  /// Create a new generic parameter list with the same parameters and
+  /// requirements as this one, but parented to a different outer parameter
+  /// list.
+  GenericParamList *cloneWithOuterParameters(const ASTContext &Context,
+                                             GenericParamList *Outer) {
+    auto clone = create(Context,
+                        SourceLoc(),
+                        getParams(),
+                        SourceLoc(),
+                        getRequirements(),
+                        SourceLoc());
+    clone->setAllArchetypes(getAllArchetypes());
+    clone->setOuterParameters(Outer);
+    return clone;
+  }
+  
+  /// Create an empty generic parameter list.
+  static GenericParamList *getEmpty(ASTContext &Context) {
+    // TODO: Could probably unique this in the AST context.
+    return create(Context, SourceLoc(), {}, SourceLoc(), {}, SourceLoc());
+  }
+  
   MutableArrayRef<GenericParam> getParams() {
     return MutableArrayRef<GenericParam>(
              reinterpret_cast<GenericParam *>(this + 1), NumParams);

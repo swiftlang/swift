@@ -245,6 +245,8 @@ private:
                                  SILDeclRef constant,
                                  SILConstantInfo &constantInfo,
                                  CanArchetypeType &archetype) const {
+    auto &C = SGM.getASTContext();
+    
     CanType selfType = getProtocolSelfType(SGM);
 
     // Find the archetype.
@@ -275,19 +277,8 @@ private:
                                           partialSubstFormalType.getResult())) {
       auto origParams = &polyMethod->getGenericParams();
       
-      auto emptyOuterParams
-        = GenericParamList::create(polyMethod->getASTContext(),
-                                   SourceLoc(),
-                                   {}, SourceLoc());
-      
-      auto params = GenericParamList::create(polyMethod->getASTContext(),
-                                             SourceLoc(),
-                                             origParams->getParams(),
-                                             SourceLoc(),
-                                             origParams->getRequirements(),
-                                             SourceLoc());
-      params->setAllArchetypes(origParams->getAllArchetypes());
-      params->setOuterParameters(emptyOuterParams);
+      auto emptyOuterParams = GenericParamList::getEmpty(C);
+      auto params = origParams->cloneWithOuterParameters(C, emptyOuterParams);
       
       polyMethod = CanPolymorphicFunctionType::get(polyMethod.getInput(),
                                                    polyMethod.getResult(),
