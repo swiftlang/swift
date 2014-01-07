@@ -1309,21 +1309,21 @@ public:
   }
 };
   
-/// EnumDataAddrInst - Projects the address of the data for a case inside the
-/// enum.
-class EnumDataAddrInst
-  : public UnaryInstructionBase<ValueKind::EnumDataAddrInst>
+/// Projects the address of the data for a case inside the enum in order to
+/// initialize the payload for that case.
+class InitEnumDataAddrInst
+  : public UnaryInstructionBase<ValueKind::InitEnumDataAddrInst>
 {
   EnumElementDecl *Element;
 public:
-  EnumDataAddrInst(SILLocation Loc, SILValue Operand,
+  InitEnumDataAddrInst(SILLocation Loc, SILValue Operand,
                     EnumElementDecl *Element, SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy),
       Element(Element) {}
   
   EnumElementDecl *getElement() const { return Element; }
 };
-  
+
 /// InjectEnumAddrInst - Tags an enum as containing a case. The data for
 /// that case, if any, must have been written into the enum first.
 class InjectEnumAddrInst

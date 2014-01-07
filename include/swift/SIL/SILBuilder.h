@@ -416,10 +416,10 @@ public:
     return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
   
-  EnumDataAddrInst *createEnumDataAddr(SILLocation Loc, SILValue Operand,
+  InitEnumDataAddrInst *createInitEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(
-              new (F.getModule()) EnumDataAddrInst(Loc, Operand, Element, Ty));
+              new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
   
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,

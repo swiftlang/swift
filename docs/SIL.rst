@@ -2438,7 +2438,7 @@ Enums
 These instructions construct values of enum type. Loadable enum values are
 created with the ``enum`` instruction. Address-only enums require two-step
 initialization. First, if the case requires data, that data is stored into
-the enum at the address projected by ``enum_data_addr``. This step is skipped
+the enum at the address projected by ``init_enum_data_addr``. This step is skipped
 for cases without data. Finally, the tag for
 the enum is injected with an ``inject_enum_addr`` instruction::
 
@@ -2450,7 +2450,7 @@ the enum is injected with an ``inject_enum_addr`` instruction::
   sil @init_with_data : $(AddressOnlyType) -> AddressOnlyEnum {
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
-    %2 = enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
+    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
     copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
     // Inject the tag.
     inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
@@ -2484,13 +2484,13 @@ enum
 Creates a loadable enum value in the given ``case``. If the ``case`` has a
 data type, the enum value will contain the operand value.
 
-enum_data_addr
-``````````````
+init_enum_data_addr
+```````````````````
 ::
 
-  sil-instruction ::= 'enum_data_addr' sil-operand ',' sil-decl-ref
+  sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = enum_data_addr %0 : $*U, #U.DataCase
+  %1 = init_enum_data_addr %0 : $*U, #U.DataCase
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -2498,9 +2498,9 @@ enum_data_addr
 Projects the address of the data for an enum ``case`` inside an enum. This
 does not modify the enum or check its value. It is intended to be used as
 part of the initialization sequence for an address-only enum. Storing to
-the ``enum_data_addr`` for a case followed by ``inject_enum_addr`` with that
+the ``init_enum_data_addr`` for a case followed by ``inject_enum_addr`` with that
 same case is guaranteed to result in a fully-initialized enum value of that
-case being stored. Loading from the ``enum_data_addr`` of an initialized
+case being stored. Loading from the ``init_enum_data_addr`` of an initialized
 enum value or injecting a mismatched case tag is undefined behavior.
 
 The address is invalidated as soon as the operand enum is fully initialized by
@@ -2520,7 +2520,7 @@ inject_enum_addr
 Initializes the enum value referenced by the given address by overlaying the
 tag for the given case. If the case has no data, this instruction is sufficient
 to initialize the enum value. If the case has data, the data must be stored
-into the enum at the ``enum_data_addr`` address for the case *before*
+into the enum at the ``init_enum_data_addr`` address for the case *before*
 ``inject_enum_addr`` is applied. It is undefined behavior if
 ``inject_enum_addr`` is applied for a case with data to an uninitialized enum,
 or if ``inject_enum_addr`` is applied for a case with data when data for a

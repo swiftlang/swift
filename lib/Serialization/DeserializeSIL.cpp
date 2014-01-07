@@ -1083,7 +1083,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                (SILValueCategory)TyCategory));
     break;
   }
-  case ValueKind::EnumDataAddrInst: {
+  case ValueKind::InitEnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
     auto OperandTy = MF->getType(TyID);
@@ -1091,7 +1091,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                Elt,
                                                nullptr,
                                                Elt->getArgumentType());
-    ResultVal = Builder.createEnumDataAddr(Loc,
+    ResultVal = Builder.createInitEnumDataAddr(Loc,
                     getLocalValue(ValID2, ValResNum2,
                                   getSILType(OperandTy,
                                              (SILValueCategory)TyCategory)),

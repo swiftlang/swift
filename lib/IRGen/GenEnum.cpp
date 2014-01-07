@@ -129,7 +129,7 @@ public:
   
   /// Project the address of the data for a case. Does not check or modify
   /// the referenced enum value.
-  /// Corresponds to the SIL 'enum_data_addr' instruction.
+  /// Corresponds to the SIL 'init_enum_data_addr' instruction.
   virtual Address projectDataForStore(IRGenFunction &IGF,
                                       EnumElementDecl *elt,
                                       Address enumAddr) const = 0;

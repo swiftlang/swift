@@ -546,7 +546,7 @@ public:
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
-  void visitEnumDataAddrInst(EnumDataAddrInst *i);
+  void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
@@ -2110,7 +2110,7 @@ void IRGenSILFunction::visitEnumInst(swift::EnumInst *i) {
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitEnumDataAddrInst(swift::EnumDataAddrInst *i) {
+void IRGenSILFunction::visitInitEnumDataAddrInst(swift::InitEnumDataAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
   Address dataAddr = emitProjectEnumAddressForStore(*this,
                                                      i->getOperand().getType(),

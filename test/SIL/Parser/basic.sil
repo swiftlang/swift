@@ -386,8 +386,8 @@ bb0(%0 : $*Gimel):
 
 sil @test_union_addr_data_case : $(@out Gimel, @in Q) -> () {
 bb0(%0 : $*Gimel, %1 : $*Q):
-  // CHECK: {{%.*}} = enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
-  %p = enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
+  // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
+  %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
   copy_addr [take] %1 to [initialization] %p : $*Q
   inject_enum_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
   %t = tuple ()

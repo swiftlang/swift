@@ -138,7 +138,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Enums
   INST(EnumInst, SILInstruction, None)
-  INST(EnumDataAddrInst, SILInstruction, None)
+  INST(InitEnumDataAddrInst, SILInstruction, None)
   INST(InjectEnumAddrInst, SILInstruction, MayWrite)
 
   // Protocol and Protocol Composition Types

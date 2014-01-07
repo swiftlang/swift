@@ -791,8 +791,8 @@ public:
     }
   }
   
-  void visitEnumDataAddrInst(EnumDataAddrInst *UDAI) {
-    OS << "enum_data_addr "
+  void visitInitEnumDataAddrInst(InitEnumDataAddrInst *UDAI) {
+    OS << "init_enum_data_addr "
        << getIDAndType(UDAI->getOperand()) << ", "
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }

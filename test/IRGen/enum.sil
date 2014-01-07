@@ -236,7 +236,7 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, @inout Singleton) -> () {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %a = enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
+  %a = init_enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
   store %t to %a : $*(Builtin.Int64, Builtin.Int64)
   inject_enum_addr %2 : $*Singleton, #Singleton.val!enumelt.1
   %v = tuple ()
@@ -538,7 +538,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK: }
 sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, @inout SinglePayloadNoXI2) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
-  %a = enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
+  %a = init_enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
   inject_enum_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   %v = tuple ()
@@ -820,7 +820,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK: }
 sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, @inout SinglePayloadSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
-  %a = enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
+  %a = init_enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int63
   inject_enum_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   %v = tuple ()
@@ -1324,7 +1324,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, @inout MultiPayloadNoSpareBits) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
-  %a = enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
+  %a = init_enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
   inject_enum_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   %v = tuple ()
@@ -1577,7 +1577,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
-  %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
+  %a = init_enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
   inject_enum_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   %v = tuple ()
@@ -1618,7 +1618,7 @@ entry(%0 : $Builtin.Int63):
 
 sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
-  %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
+  %a = init_enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   store %0 to %a : $*Builtin.Int63
   inject_enum_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   %v = tuple ()
@@ -1806,7 +1806,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
-  %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
+  %a = init_enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
   inject_enum_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   %v = tuple ()
@@ -1841,7 +1841,7 @@ entry(%0 : $Builtin.Int60):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
-  %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
+  %a = init_enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   store %0 to %a : $*Builtin.Int60
   inject_enum_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   %v = tuple ()

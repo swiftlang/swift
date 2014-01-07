@@ -844,7 +844,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RefElementAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
-  case ValueKind::EnumDataAddrInst:
+  case ValueKind::InitEnumDataAddrInst:
   case ValueKind::InjectEnumAddrInst: {
     // Has a typed valueref and a field decl. We use SILOneValueOneOperandLayout
     // where the field decl is streamed as a ValueID.
@@ -864,9 +864,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = cast<StructExtractInst>(&SI)->getOperand();
       tDecl = cast<StructExtractInst>(&SI)->getField();
       break;
-    case ValueKind::EnumDataAddrInst:
-      operand = cast<EnumDataAddrInst>(&SI)->getOperand();
-      tDecl = cast<EnumDataAddrInst>(&SI)->getElement();
+    case ValueKind::InitEnumDataAddrInst:
+      operand = cast<InitEnumDataAddrInst>(&SI)->getOperand();
+      tDecl = cast<InitEnumDataAddrInst>(&SI)->getElement();
       break;
     case ValueKind::InjectEnumAddrInst:
       operand = cast<InjectEnumAddrInst>(&SI)->getOperand();

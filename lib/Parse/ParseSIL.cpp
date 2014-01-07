@@ -897,7 +897,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
     .Case("enum", ValueKind::EnumInst)
-    .Case("enum_data_addr", ValueKind::EnumDataAddrInst)
+    .Case("init_enum_data_addr", ValueKind::InitEnumDataAddrInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
@@ -1668,7 +1668,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                               cast<EnumElementDecl>(Elt.getDecl()), Ty);
     break;
   }
-  case ValueKind::EnumDataAddrInst: {
+  case ValueKind::InitEnumDataAddrInst: {
     SILValue Operand;
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand) ||
@@ -1684,7 +1684,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                                nullptr,
                                                Elt->getArgumentType())
       ->getCanonicalType();
-    ResultVal = B.createEnumDataAddr(InstLoc, Operand, Elt,
+    ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt,
                                     SILType::getPrimitiveAddressType(ResultTy));
     break;
   }

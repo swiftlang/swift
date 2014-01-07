@@ -620,13 +620,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
 
-    // enum_data_addr is treated like a tuple_element_addr or other instruction
+    // init_enum_data_addr is treated like a tuple_element_addr or other instruction
     // that is looking into the memory object (i.e., the memory object needs to
     // be explicitly initialized by a copy_addr or some other use of the
     // projected address).
-    if (isa<EnumDataAddrInst>(User)) {
+    if (isa<InitEnumDataAddrInst>(User)) {
       assert(!InStructSubElement &&
-             "enum_data_addr shouldn't apply to struct subelements");
+             "init_enum_data_addr shouldn't apply to struct subelements");
       // Keep track of the fact that we're inside of an enum.  This informs our
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.

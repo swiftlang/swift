@@ -499,23 +499,23 @@ public:
     }
   }
 
-  void checkEnumDataAddrInst(EnumDataAddrInst *UI) {
+  void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
     EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
-    require(ud, "EnumDataAddrInst must take an enum operand");
+    require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
-            "EnumDataAddrInst case must be a case of the enum operand type");
+            "InitEnumDataAddrInst case must be a case of the enum operand type");
     require(UI->getElement()->hasArgumentType(),
-            "EnumDataAddrInst case must have a data type");
+            "InitEnumDataAddrInst case must have a data type");
     require(UI->getOperand().getType().isAddress(),
-            "EnumDataAddrInst must take an address operand");
+            "InitEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
-            "EnumDataAddrInst must produce an address");
+            "InitEnumDataAddrInst must produce an address");
     
     SILType caseTy =
       UI->getOperand().getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     require(caseTy == UI->getType(),
-            "EnumDataAddrInst result does not match type of enum case");
+            "InitEnumDataAddrInst result does not match type of enum case");
   }
   
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {

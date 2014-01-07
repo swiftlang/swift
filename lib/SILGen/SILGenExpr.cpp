@@ -2216,7 +2216,7 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
   
   // Store the data, if any.
   if (element->hasArgumentType()) {
-    SILValue resultData = gen.B.createEnumDataAddr(element, resultSlot,
+    SILValue resultData = gen.B.createInitEnumDataAddr(element, resultSlot,
       element, gen.getLoweredType(element->getArgumentType()).getAddressType());
     argValue.forwardInto(gen, element, resultData);
   }

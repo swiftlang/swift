@@ -566,9 +566,9 @@ SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {
   
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitEnumDataAddrInst(EnumDataAddrInst *Inst) {
+SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
   doPostProcess(Inst,
-    Builder.createEnumDataAddr(getOpLocation(Inst->getLoc()),
+    Builder.createInitEnumDataAddr(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOperand()),
                                 Inst->getElement(),
                                 getOpType(Inst->getType())));
