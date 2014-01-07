@@ -1,5 +1,25 @@
 2014-01-08
 
+* Initializers can now delegate to other initializers within the same
+  class by calling 'self.init'. For example:
+
+    class A { }
+
+    class B : A {
+      var title: String
+
+      init() {
+        // note: cannot access self before delegating
+        self.init(withTitle: "My Title")
+      }
+
+      init withTitle(title: String) {
+        self.title = title
+        super.init()
+      }
+    }
+
+
 * Objective-C protocols no longer have the "Proto" suffix unless there
   is a collision with a class name. For example, UITableViewDelegate is
   now imported as "UITableViewDelegate" rather than
