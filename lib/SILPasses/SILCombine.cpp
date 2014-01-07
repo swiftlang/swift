@@ -786,7 +786,7 @@ bool tryToRemoveFunction(SILFunction *F) {
     return false;
 
   DEBUG(llvm::dbgs() << "SC: Erasing:" << F->getName() << "\n");
-  F->getModule().getFunctionList().erase(F);
+  F->getModule().eraseFunction(F);
   NumDeadFunc++;
   return true;
 }

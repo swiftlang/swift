@@ -156,7 +156,13 @@ public:
   const Lowering::TypeLowering &getTypeLowering(SILType t) {
     return Types.getTypeLowering(t);
   }
-  
+
+  /// Erase a function from the module.
+  void eraseFunction(SILFunction *F) {
+    getFunctionList().erase(F);
+    FunctionTable.erase(F->getName());
+  }
+
   /// Construct a SIL module from an AST module.
   ///
   /// The module will be constructed in the Raw stage. The provided AST module
