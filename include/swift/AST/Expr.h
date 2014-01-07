@@ -105,7 +105,7 @@ class alignas(8) Expr {
     unsigned Kind : 2;
     unsigned StringEncoding : 1;
   };
-  enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 1 };
+  enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 3 };
   static_assert(NumMagicIdentifierLiteralExprBits <= 32, "fits in an unsigned");
 
   class AbstractClosureExprBitfields {
