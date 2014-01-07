@@ -159,7 +159,6 @@ static unsigned instructionInlineCost(SILInstruction &I) {
     case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
-    case ValueKind::StringLiteralInst:
       return 0;
     default:
       return 1;
