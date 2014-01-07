@@ -271,7 +271,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   
   // If we don't have a forward reference, make sure the function hasn't been
   // defined already.
-  if (SILMod.lookup(Name.str()) != nullptr) {
+  if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
     return SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
                                SILFileLocation(Loc));
@@ -291,7 +291,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                                                   SourceLoc Loc) {
   
   // Check to see if we have a function by this name already.
-  if (SILFunction *FnRef = SILMod.lookup(Name.str())) {
+  if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str())) {
     // If so, check for matching types.
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
@@ -2032,24 +2032,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     // Go through list of global variables in the SILModule.
-    SILGlobalVariable *Global = nullptr;
-    for (SILGlobalVariable &g : SILMod.getSILGlobals())
-      if (g.getName().equals(GlobalName.str())) {
-        if (g.getLoweredType().getAddressType() != Ty) {
-          P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
-                     g.getLoweredType().getSwiftRValueType());
-          return true;
-        }
-        Global = &g;
-        break;
-      }
-
-    if (!Global) {
+    SILGlobalVariable *global = SILMod.lookUpGlobalVariable(GlobalName.str());
+    if (!global) {
       P.diagnose(IdLoc, diag::sil_global_variable_not_found, GlobalName);
       return true;
     }
 
-    ResultVal = B.createSILGlobalAddr(InstLoc, Global);
+    if (global->getLoweredType().getAddressType() != Ty) {
+      P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
+                 global->getLoweredType().getSwiftRValueType());
+      return true;
+    }
+
+    ResultVal = B.createSILGlobalAddr(InstLoc, global);
     break;
   }
   case ValueKind::SwitchEnumInst:
@@ -2530,6 +2525,8 @@ bool Parser::parseSILGlobal() {
   bool IsExternal = false;
   if (parseSILOptional(IsExternal, State, "external"))
     return true;
+
+  // FIXME: check for existing global variable?
   SILGlobalVariable::create(*SIL->M, GlobalLinkage, GlobalName.str(),
                             GlobalType, !IsExternal,
                             SILFileLocation(NameLoc));
@@ -2585,7 +2582,7 @@ bool Parser::parseSILVTable() {
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                          diag::expected_sil_value_name))
         return true;
-      SILFunction *Func = SIL->M->lookup(FuncName.str());
+      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
       if (!Func) {
         diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
         return true;

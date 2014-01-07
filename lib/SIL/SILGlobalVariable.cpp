@@ -20,8 +20,20 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              SILType loweredType,
                                              bool isDefinition,
                                              Optional<SILLocation> loc) {
-  return new (M) SILGlobalVariable(M, linkage, name, loweredType,
-                                   isDefinition, loc);
+  // Get a StringMapEntry for the variable.  As a sop to error cases,
+  // allow the name to have an empty string.
+  llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
+  if (!name.empty()) {
+    entry = &M.GlobalVariableTable.GetOrCreateValue(name);
+    assert(!entry->getValue() && "global variable already exists");
+    name = entry->getKey();
+  }
+
+  auto var = new (M) SILGlobalVariable(M, linkage, name, loweredType,
+                                       isDefinition, loc);
+
+  if (entry) entry->setValue(var);
+  return var;
 }
 
 
@@ -37,4 +49,6 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   Module.silGlobals.push_back(this);
 }
 
-SILGlobalVariable::~SILGlobalVariable() {}
+SILGlobalVariable::~SILGlobalVariable() {
+  getModule().GlobalVariableTable.erase(Name);
+}

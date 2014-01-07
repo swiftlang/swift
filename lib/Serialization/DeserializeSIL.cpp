@@ -265,7 +265,7 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
 static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
                                         SILModule &SILMod) {
   // Check to see if we have a function by this name already.
-  if (SILFunction *FnRef = SILMod.lookup(Name.str()))
+  if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str()))
     // FIXME: check for matching types.
     return FnRef;
 

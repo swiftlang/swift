@@ -276,7 +276,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     ClonedName.clear();
     llvm::raw_string_ostream buffer(ClonedName);
     buffer << Orig->getName() << "_promote" << Counter++;
-  } while (M.lookup(ClonedName));
+  } while (M.lookUpFunction(ClonedName));
 
   SmallVector<SILParameterInfo, 4> ClonedArgTys;
 

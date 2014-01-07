@@ -111,8 +111,11 @@ private:
   /// FIXME: Remove this when SILGlobalVariable is ready.
   llvm::SetVector<VarDecl*> globals;
 
-  /// Lookup cache for SIL functions.
-  llvm::StringMap<SILFunction*> FunctionLookupCache;
+  /// Lookup table for SIL functions.
+  llvm::StringMap<SILFunction*> FunctionTable;
+
+  /// Lookup table for SIL global variables.
+  llvm::StringMap<SILGlobalVariable*> GlobalVariableTable;
   
   /// Lookup cache for SIL witness tables.
   llvm::DenseMap<const NormalProtocolConformance*,SILWitnessTable*>
@@ -254,7 +257,19 @@ public:
     return {silGlobals.begin(), silGlobals.end()};
   }
 
-  SILFunction *lookup(StringRef Name);
+  /// Look for a global variable by name.
+  ///
+  /// \return null if this module has no such global variable
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name) {
+    return GlobalVariableTable.lookup(name);
+  }
+
+  /// Look for a function by name.
+  ///
+  /// \return null if this module has no such function
+  SILFunction *lookUpFunction(StringRef name) {
+    return FunctionTable.lookup(name);
+  }
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.

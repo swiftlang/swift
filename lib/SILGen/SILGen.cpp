@@ -655,7 +655,7 @@ public:
     // If this is the script-mode file for the module, create a toplevel.
     if (sf->isScriptMode()) {
       assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
-      assert(!sgm.M.lookup(SWIFT_ENTRY_POINT_FUNCTION)
+      assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
              && "already emitted toplevel?!");
       
       RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();

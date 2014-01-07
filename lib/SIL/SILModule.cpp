@@ -50,23 +50,6 @@ SILModule::~SILModule() {
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
-SILFunction *SILModule::lookup(StringRef Name) {
-  // Did we already find this?
-  auto found = FunctionLookupCache.find(Name);
-  if (found != FunctionLookupCache.end()) {
-    return found->second;
-  }
-  
-  // If not, search through the function list, caching the entries we visit.
-  for (SILFunction &F : *this) {
-    FunctionLookupCache[F.getName()] = &F;
-    if (F.getName() == Name) {
-      return &F;
-    }
-  }
-  return nullptr;
-}
-
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   // Walk down to the base NormalProtocolConformance.
@@ -116,8 +99,9 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
   // TODO: use a 'shared' linkage.
   auto linkage = SILLinkage::Internal;
 
-  if (auto fn = lookup(name)) {
+  if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
+    assert(fn->getLinkage() == linkage);
     return fn;
   }
 

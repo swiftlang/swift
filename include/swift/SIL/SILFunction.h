@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILLinkage.h"
+#include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
 /// FIXME: Hardcoding this is lame.
@@ -49,9 +50,9 @@ private:
   /// the function's linkage.
   llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
   
-  /// The mangled name of the SIL function, which will be propagated to the
-  /// binary.
-  std::string Name;
+  /// The mangled name of the SIL function, which will be propagated
+  /// to the binary.  A pointer into the module's lookup table.
+  StringRef Name;
 
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;

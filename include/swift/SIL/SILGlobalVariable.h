@@ -43,8 +43,8 @@ private:
   llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
   
   /// The mangled name of the variable, which will be propagated to the
-  /// binary.
-  std::string Name;
+  /// binary.  A pointer into the module's lookup table.
+  StringRef Name;
 
   /// The lowered type of the variable.
   SILType LoweredType;

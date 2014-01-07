@@ -26,9 +26,21 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  SILFunction *insertBefore,
                                  SILDebugScope *debugScope,
                                  DeclContext *DC) {
-  return new (M) SILFunction(M, linkage, name, loweredType, loc,
-                             isBareSILFunction, isTrans, insertBefore,
-                             debugScope, DC);
+  // Get a StringMapEntry for the function.  As a sop to error cases,
+  // allow the name to have an empty string.
+  llvm::StringMapEntry<SILFunction*> *entry = nullptr;
+  if (!name.empty()) {
+    entry = &M.FunctionTable.GetOrCreateValue(name);
+    assert(!entry->getValue() && "function already exists");
+    name = entry->getKey();
+  }
+
+  auto fn = new (M) SILFunction(M, linkage, name, loweredType, loc,
+                                isBareSILFunction, isTrans, insertBefore,
+                                debugScope, DC);
+
+  if (entry) entry->setValue(fn);
+  return fn;
 }
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
@@ -58,7 +70,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 SILFunction::~SILFunction() {
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
-  getModule().FunctionLookupCache.erase(Name);
+  getModule().FunctionTable.erase(Name);
 }
 
 void SILFunction::setDeclContext(Decl *D) {
