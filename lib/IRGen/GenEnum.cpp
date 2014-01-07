@@ -144,13 +144,13 @@ public:
   /// projects the address of the data for a case. Does not check
   /// the referenced enum value.
   /// Performs the block argument binding for a SIL
-  /// 'destructive_switch_enum_addr' instruction.
+  /// 'switch_enum_addr' instruction.
   virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                                 EnumElementDecl *elt,
                                                 Address enumAddr) const = 0;
   
   /// Emit a branch on the case contained by an enum explosion.
-  /// Performs the branching for a SIL 'destructive_switch_enum_addr'
+  /// Performs the branching for a SIL 'switch_enum_addr'
   /// instruction.
   virtual void emitIndirectSwitch(IRGenFunction &IGF,
                                   Address enumAddr,

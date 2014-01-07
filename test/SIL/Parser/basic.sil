@@ -777,13 +777,15 @@ enum MaybeAddressOnlyPair {
 // CHECK-LABEL: sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
 sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
-  // CHECK: destructive_switch_enum_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
-  destructive_switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
 
 bb1:
   br bb3
 
-bb2(%q : $*Q):
+bb2:
+  // CHECK: take_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
+  %q = take_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
   br bb3
 
 bb3:

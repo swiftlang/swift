@@ -388,21 +388,25 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
       SILBasicBlock *caseBB = gen.createBasicBlock();
       
-      // Create a BB argument to receive the enum case data if it has any.
+      // Create a BB argument or 'take_enum_data_addr' instruction to receive
+      // the enum case data if it has any.
       SILValue eltValue;
       if (elt->hasArgumentType()) {
         auto argTy = v.getType().getEnumElementType(elt, gen.SGM.M);
         if (!argTy.getSwiftRValueType()->isVoid()) {
+          gen.B.setInsertionPoint(caseBB);
+
           auto &argLowering = gen.getTypeLowering(argTy);
-          if (addressOnlyEnum)
+          if (addressOnlyEnum) {
             argTy = argTy.getAddressType();
-          eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
-          // Load a loadable data value from an address-only enum.
-          if (addressOnlyEnum && argLowering.isLoadable()) {
-            gen.B.setInsertionPoint(caseBB);
-            eltValue = gen.B.createLoad(Loc, eltValue);
-            gen.B.setInsertionPoint(bb);
+            eltValue = gen.B.createTakeEnumDataAddr(Loc, v, elt, argTy);
+            // Load a loadable data value.
+            if (argLowering.isLoadable())
+              eltValue = gen.B.createLoad(Loc, eltValue);
+          } else {
+            eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
           }
+
           // Reabstract to the substituted type, if needed.
           auto substArgTy = v.getType().getSwiftRValueType()
             ->getTypeOfMember(gen.SGM.M.getSwiftModule(),
@@ -410,7 +414,6 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
             ->getCanonicalType();
           auto substTy = gen.getLoweredType(substArgTy);
           if (substTy != argTy) {
-            gen.B.setInsertionPoint(caseBB);
             FullExpr reabstractScope(gen.Cleanups,
                                      const_cast<Pattern*>(headPattern));
 
@@ -421,8 +424,9 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
               = gen.emitOrigToSubstValue(const_cast<Pattern*>(headPattern),
                                          origMV, origArgPattern, substArgTy);
             eltValue = substMV.forward(gen);
-            gen.B.setInsertionPoint(bb);
           }
+          
+          gen.B.setInsertionPoint(bb);
         }
       } else {
         // If the element pattern for a void enum element has a subpattern, it
@@ -444,8 +448,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     // Emit the switch instruction.
     if (addressOnlyEnum) {
-      gen.B.createDestructiveSwitchEnumAddr(stmt, v,
-                                             defaultBB, caseBBs);
+      gen.B.createSwitchEnumAddr(stmt, v,
+                                 defaultBB, caseBBs);
     } else {
       gen.B.createSwitchEnum(stmt, v, defaultBB, caseBBs);
     }

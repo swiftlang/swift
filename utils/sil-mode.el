@@ -73,7 +73,7 @@
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
-   `(,(regexp-opt '("init_enum_data_addr" "inject_enum_addr")
+   `(,(regexp-opt '("init_enum_data_addr" "take_enum_data_addr" "inject_enum_addr")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "upcast_existential" "deinit_existential"
@@ -97,7 +97,7 @@
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
                     "cond_br" "switch_int" "switch_enum"
-                    "destructive_switch_enum_addr" "dynamic_method_br"
+                    "switch_enum_addr" "dynamic_method_br"
                     "checked_cast_br")
                   'words) . font-lock-keyword-face)
    ;; SIL Value

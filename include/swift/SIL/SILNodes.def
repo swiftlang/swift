@@ -139,6 +139,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Enums
   INST(EnumInst, SILInstruction, None)
   INST(InitEnumDataAddrInst, SILInstruction, None)
+  INST(TakeEnumDataAddrInst, SILInstruction, MayWrite)
   INST(InjectEnumAddrInst, SILInstruction, MayWrite)
 
   // Protocol and Protocol Composition Types
@@ -183,7 +184,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(CondBranchInst, TermInst, None)
     TERMINATOR(SwitchIntInst, TermInst, None)
     TERMINATOR(SwitchEnumInst, TermInst, None)
-    TERMINATOR(DestructiveSwitchEnumAddrInst, TermInst, MayWrite)
+    TERMINATOR(SwitchEnumAddrInst, TermInst, None)
     TERMINATOR(DynamicMethodBranchInst, TermInst, None)
     TERMINATOR(CheckedCastBranchInst, TermInst, None)
     VALUE_RANGE(TermInst, UnreachableInst, CheckedCastBranchInst)

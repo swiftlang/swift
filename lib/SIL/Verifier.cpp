@@ -518,6 +518,25 @@ public:
             "InitEnumDataAddrInst result does not match type of enum case");
   }
   
+  void checkTakeEnumDataAddrInst(TakeEnumDataAddrInst *UI) {
+    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    require(ud, "TakeEnumDataAddrInst must take an enum operand");
+    require(UI->getElement()->getParentEnum() == ud,
+            "TakeEnumDataAddrInst case must be a case of the enum operand type");
+    require(UI->getElement()->hasArgumentType(),
+            "TakeEnumDataAddrInst case must have a data type");
+    require(UI->getOperand().getType().isAddress(),
+            "TakeEnumDataAddrInst must take an address operand");
+    require(UI->getType().isAddress(),
+            "TakeEnumDataAddrInst must produce an address");
+    
+    SILType caseTy =
+      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+                                                    F.getModule());
+    require(caseTy == UI->getType(),
+            "TakeEnumDataAddrInst result does not match type of enum case");
+  }
+  
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     require(IUAI->getOperand().getType().is<EnumType>()
               || IUAI->getOperand().getType().is<BoundGenericEnumType>(),
@@ -1405,13 +1424,13 @@ public:
               "switch_enum default destination must take no arguments");
   }
   
-  void checkDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *SOI){
+  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
     require(SOI->getOperand().getType().isAddress(),
-            "destructive_switch_enum_addr operand must be an object");
+            "switch_enum_addr operand must be an object");
     
     SILType uTy = SOI->getOperand().getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
-    require(uDecl, "destructive_switch_enum_addr operand must be an enum");
+    require(uDecl, "switch_enum_addr operand must be an enum");
     
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
@@ -1427,42 +1446,25 @@ public:
       std::tie(elt, dest) = SOI->getCase(i);
       
       require(elt->getDeclContext() == uDecl,
-              "destructive_switch_enum_addr dispatches on enum element that "
+              "switch_enum_addr dispatches on enum element that "
               "is not part of its type");
       require(unswitchedElts.count(elt),
-              "destructive_switch_enum_addr dispatches on same enum element "
+              "switch_enum_addr dispatches on same enum element "
               "more than once");
       unswitchedElts.erase(elt);
       
-      // The destination BB must take the argument payload, if any, as a BB
-      // argument.
-      if (elt->hasArgumentType()) {
-        require(dest->getBBArgs().size() == 1,
-                "destructive_switch_enum_addr destination for case w/ args "
-                "must take an argument");
-        
-        SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
-        SILType bbArgTy = dest->getBBArgs()[0]->getType();
-        require(eltArgTy == bbArgTy,
-                "destructive_switch_enum_addr destination bbarg must match "
-                "case arg type");
-        require(dest->getBBArgs()[0]->getType().isAddress(),
-                "destructive_switch_enum_addr destination bbarg type must "
-                "be an address");
-      } else {
-        require(dest->getBBArgs().size() == 0,
-                "destructive_switch_enum_addr destination for no-argument "
-                "case must take no arguments");
-      }
+      // The destination BB must not have BB arguments.
+      require(dest->getBBArgs().size() == 0,
+              "switch_enum_addr destination must take no BB args");
     }
     
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive destructive_switch_enum_addr must have a default "
+            "nonexhaustive switch_enum_addr must have a default "
             "destination");
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->bbarg_empty(),
-              "destructive_switch_enum_addr default destination must take "
+              "switch_enum_addr default destination must take "
               "no arguments");
   }
   

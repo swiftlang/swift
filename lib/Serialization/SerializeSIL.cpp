@@ -476,7 +476,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::SwitchEnumInst:
-  case ValueKind::DestructiveSwitchEnumAddrInst: {
+  case ValueKind::SwitchEnumAddrInst: {
     // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
@@ -845,6 +845,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::TakeEnumDataAddrInst:
   case ValueKind::InjectEnumAddrInst: {
     // Has a typed valueref and a field decl. We use SILOneValueOneOperandLayout
     // where the field decl is streamed as a ValueID.
@@ -867,6 +868,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::InitEnumDataAddrInst:
       operand = cast<InitEnumDataAddrInst>(&SI)->getOperand();
       tDecl = cast<InitEnumDataAddrInst>(&SI)->getElement();
+      break;
+    case ValueKind::TakeEnumDataAddrInst:
+      operand = cast<TakeEnumDataAddrInst>(&SI)->getOperand();
+      tDecl = cast<TakeEnumDataAddrInst>(&SI)->getElement();
       break;
     case ValueKind::InjectEnumAddrInst:
       operand = cast<InjectEnumAddrInst>(&SI)->getOperand();

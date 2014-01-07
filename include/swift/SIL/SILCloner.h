@@ -576,6 +576,16 @@ SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
   
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createTakeEnumDataAddr(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand()),
+                                Inst->getElement(),
+                                getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
   doPostProcess(Inst,
     Builder.createInjectEnumAddr(getOpLocation(Inst->getLoc()),
@@ -1000,8 +1010,8 @@ SILCloner<ImplClass>::visitSwitchEnumInst(SwitchEnumInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitDestructiveSwitchEnumAddrInst(
-                                        DestructiveSwitchEnumAddrInst *Inst) {
+SILCloner<ImplClass>::visitSwitchEnumAddrInst(
+                                        SwitchEnumAddrInst *Inst) {
   SILBasicBlock *DefaultBB = nullptr;
   if (Inst->hasDefault())
     DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
@@ -1010,7 +1020,7 @@ SILCloner<ImplClass>::visitDestructiveSwitchEnumAddrInst(
     CaseBBs.push_back(std::make_pair(Inst->getCase(i).first,
                                      getOpBasicBlock(Inst->getCase(i).second)));
   doPostProcess(Inst,
-    Builder.createDestructiveSwitchEnumAddr(getOpLocation(Inst->getLoc()),
+    Builder.createSwitchEnumAddr(getOpLocation(Inst->getLoc()),
                                              getOpValue(Inst->getOperand()),
                                              DefaultBB, CaseBBs));
 }

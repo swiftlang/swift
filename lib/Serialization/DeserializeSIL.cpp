@@ -1020,7 +1020,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::SwitchEnumInst:
-  case ValueKind::DestructiveSwitchEnumAddrInst: {
+  case ValueKind::SwitchEnumAddrInst: {
     // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
@@ -1041,7 +1041,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if ((ValueKind)OpCode == ValueKind::SwitchEnumInst)
       ResultVal = Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs);
     else
-      ResultVal = Builder.createDestructiveSwitchEnumAddr(Loc, Cond,
+      ResultVal = Builder.createSwitchEnumAddr(Loc, Cond,
                       DefaultBB, CaseBBs);
     break;
   }
@@ -1092,6 +1092,22 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                nullptr,
                                                Elt->getArgumentType());
     ResultVal = Builder.createInitEnumDataAddr(Loc,
+                    getLocalValue(ValID2, ValResNum2,
+                                  getSILType(OperandTy,
+                                             (SILValueCategory)TyCategory)),
+                    Elt,
+                    getSILType(ResultTy, SILValueCategory::Address));
+    break;
+  }
+  case ValueKind::TakeEnumDataAddrInst: {
+    // Use SILOneValueOneOperandLayout.
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
+    auto OperandTy = MF->getType(TyID);
+    auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
+                                               Elt,
+                                               nullptr,
+                                               Elt->getArgumentType());
+    ResultVal = Builder.createTakeEnumDataAddr(Loc,
                     getLocalValue(ValID2, ValResNum2,
                                   getSILType(OperandTy,
                                              (SILValueCategory)TyCategory)),

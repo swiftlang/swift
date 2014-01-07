@@ -956,12 +956,12 @@ SwitchEnumInst *SwitchEnumInst::create(SILLocation Loc, SILValue Operand,
     createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F);
 }
 
-DestructiveSwitchEnumAddrInst *
-DestructiveSwitchEnumAddrInst::create(SILLocation Loc, SILValue Operand,
+SwitchEnumAddrInst *
+SwitchEnumAddrInst::create(SILLocation Loc, SILValue Operand,
                SILBasicBlock *DefaultBB,
                ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
                SILFunction &F) {
-  return createSwitchEnum<DestructiveSwitchEnumAddrInst>
+  return createSwitchEnum<SwitchEnumAddrInst>
     (Loc, Operand, DefaultBB, CaseBBs, F);
 }
 

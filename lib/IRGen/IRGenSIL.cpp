@@ -547,6 +547,7 @@ public:
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
+  void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
@@ -616,7 +617,7 @@ public:
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
   void visitSwitchIntInst(SwitchIntInst *i);
   void visitSwitchEnumInst(SwitchEnumInst *i);
-  void visitDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *i);
+  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
 };
@@ -1970,8 +1971,7 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
 }
 
 void
-IRGenSILFunction::visitDestructiveSwitchEnumAddrInst(
-                                        DestructiveSwitchEnumAddrInst *inst) {
+IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
   Address value = getLoweredAddress(inst->getOperand());
   
   // Map the SIL dest bbs to their LLVM bbs.
@@ -1982,25 +1982,6 @@ IRGenSILFunction::visitDestructiveSwitchEnumAddrInst(
   // Emit the dispatch.
   emitSwitchAddressOnlyEnumDispatch(*this, inst->getOperand().getType(),
                                      value, dests, defaultDest);
-
-  // Bind arguments for cases that want them.
-  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
-    auto casePair = inst->getCase(i);
-    if (!casePair.second->bbarg_empty()) {
-      auto waypointBB = dests[i].second;
-      auto &destLBB = getLoweredBB(casePair.second);
-      
-      Builder.emitBlock(waypointBB);
-
-      Address data
-        = emitDestructiveProjectEnumAddressForLoad(*this,
-                                                  inst->getOperand().getType(),
-                                                  value, casePair.first);
-      unsigned phiIndex = 0;
-      addIncomingAddressToPHINodes(*this, destLBB, phiIndex, data);
-      Builder.CreateBr(destLBB.bb);
-    }
-  }
 }
 
 void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
@@ -2116,6 +2097,15 @@ void IRGenSILFunction::visitInitEnumDataAddrInst(swift::InitEnumDataAddrInst *i)
                                                      i->getOperand().getType(),
                                                      enumAddr,
                                                      i->getElement());
+  setLoweredAddress(SILValue(i, 0), dataAddr);
+}
+
+void IRGenSILFunction::visitTakeEnumDataAddrInst(swift::TakeEnumDataAddrInst *i) {
+  Address enumAddr = getLoweredAddress(i->getOperand());
+  Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                    i->getOperand().getType(),
+                                                    enumAddr,
+                                                    i->getElement());
   setLoweredAddress(SILValue(i, 0), dataAddr);
 }
 

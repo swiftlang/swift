@@ -419,9 +419,15 @@ public:
   InitEnumDataAddrInst *createInitEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(
-              new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
+          new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
-  
+
+  TakeEnumDataAddrInst *createTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                       EnumElementDecl *Element, SILType Ty) {
+    return insert(
+          new (F.getModule()) TakeEnumDataAddrInst(Loc, Operand, Element, Ty));
+  }
+
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,
                                              EnumElementDecl *Element) {
     return insert(new (F.getModule())
@@ -744,12 +750,12 @@ public:
                                                     CaseBBs, F));
   }
 
-  DestructiveSwitchEnumAddrInst *
-  createDestructiveSwitchEnumAddr(SILLocation Loc, SILValue Operand,
+  SwitchEnumAddrInst *
+  createSwitchEnumAddr(SILLocation Loc, SILValue Operand,
          SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs) {
     return insertTerminator(
-              DestructiveSwitchEnumAddrInst::create(Loc, Operand, DefaultBB,
+              SwitchEnumAddrInst::create(Loc, Operand, DefaultBB,
                                                      CaseBBs, F));
   }
 

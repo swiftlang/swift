@@ -2436,11 +2436,11 @@ Enums
 ~~~~~
 
 These instructions construct values of enum type. Loadable enum values are
-created with the ``enum`` instruction. Address-only enums require two-step
+created with the `enum`_ instruction. Address-only enums require two-step
 initialization. First, if the case requires data, that data is stored into
-the enum at the address projected by ``init_enum_data_addr``. This step is skipped
-for cases without data. Finally, the tag for
-the enum is injected with an ``inject_enum_addr`` instruction::
+the enum at the address projected by `init_enum_data_addr`_. This step is
+skipped for cases without data. Finally, the tag for
+the enum is injected with an `inject_enum_addr`_ instruction::
 
   enum AddressOnlyEnum {
     case HasData(AddressOnlyType)
@@ -2463,9 +2463,12 @@ the enum is injected with an ``inject_enum_addr`` instruction::
     return
   }
 
-Accessing the value of an enum is inseparable from dispatching on its
-discriminator, which is done with the ``switch_enum`` and
-``destructive_switch_enum_addr`` `terminators`_.
+Accessing the value of a loadable enum is inseparable from dispatching on its
+discriminator and is done with the `switch_enum`_ terminator::
+
+An address-only enum can be tested by branching on it using the
+`switch_enum_addr`_ terminator. Its value can then be taken by destructively
+projecting the enum value with `take_enum_data_addr`_.
 
 enum
 ````
@@ -2507,7 +2510,7 @@ The address is invalidated as soon as the operand enum is fully initialized by
 an ``inject_enum_addr``.
 
 inject_enum_addr
-`````````````````
+````````````````
 ::
 
   sil-instruction ::= 'inject_enum_addr' sil-operand ',' sil-decl-ref
@@ -2525,6 +2528,25 @@ into the enum at the ``init_enum_data_addr`` address for the case *before*
 ``inject_enum_addr`` is applied for a case with data to an uninitialized enum,
 or if ``inject_enum_addr`` is applied for a case with data when data for a
 mismatched case has been stored to the enum.
+
+take_enum_data_addr
+```````````````````
+::
+
+  sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
+
+  %1 = init_enum_data_addr %0 : $*U, #U.DataCase
+  // $U must be an enum type
+  // #U.DataCase must be a case of enum $U with data
+  // %1 will be of address type $*T for the data type of case U.DataCase
+
+Invalidates an enum value, and takes the address of the payload for the given
+enum ``case`` in-place in memory. The referenced enum value is no longer valid,
+but the payload value referenced by the result address is valid and must be
+destroyed. It is undefined behavior if the referenced enum does not contain a
+value of the given ``case``. The result shares memory with the original enum
+value; the enum memory cannot be reinitialized as an enum until the payload has
+also been invalidated.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3206,15 +3228,15 @@ to copying or destroying the ``switch_enum`` operand::
     // ...and this one
     destroy_value %b
 
-destructive_switch_enum_addr
-````````````````````````````
+switch_enum_addr
+````````````````
 ::
 
-  sil-terminator ::= 'destructive_switch_enum_addr' sil-operand
+  sil-terminator ::= 'switch_enum_addr' sil-operand
                        (',' sil-switch-enum-case)*
                        (',' sil-switch-default)?
 
-  destructive_switch_enum_addr %0 : $*U, case #U.Foo: label1, \
+  switch_enum_addr %0 : $*U, case #U.Foo: label1, \
                                           case #U.Bar: label2, \
                                           ...,                 \
                                           default labelN
@@ -3223,26 +3245,17 @@ destructive_switch_enum_addr
   // #U.Foo, #U.Bar, etc. must be cases of $U
   // `label1` through `labelN` must refer to block labels within the current
   //   function
-  // label1 must take a single argument of the address type of #U.Foo's data
-  // label2 must take a single argument of the address type of #U.Bar's data
-  // labelN must take no basic block arguments
+  // The destinations must take no basic block arguments
 
 Conditionally branches to one of several destination basic blocks based on
 the discriminator in the enum value referenced by the address operand.
-If a case is matched by the switch, the enum value is destructured in-place,
-invalidating the enum value, and the address of the data for the matched case
-is passed to the destination basic block as an argument. Destroying the
-data is guaranteed equivalent to destroying the original value.
-Destroying the original enum after it has been successfully matched by a case
-is undefined behavior.  In the default case, the enum is left unmodified.
 
 Unlike ``switch_int``, ``switch_enum`` requires coverage of the operand type:
 If the ``enum`` type is resilient, the ``default`` branch is required; if the
 ``enum`` type is fragile, the ``default`` branch is required unless a
 destination is assigned to every ``case`` of the ``enum``.
-
-The addresses passed into the destination blocks are invalidated if the
-``destructive_switch_enum_addr`` operand is reinitialized.
+Unlike ``switch_enum``, the payload value is not passed to the destination
+basic blocks; it must be projected out separately with `take_enum_data_addr`_.
 
 dynamic_method_br
 `````````````````

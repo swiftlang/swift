@@ -797,6 +797,12 @@ public:
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
+  void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *UDAI) {
+    OS << "take_enum_data_addr "
+       << getIDAndType(UDAI->getOperand()) << ", "
+       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+  }
+  
   void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     OS << "inject_enum_addr "
        << getIDAndType(IUAI->getOperand()) << ", "
@@ -991,8 +997,8 @@ public:
     OS << "switch_enum ";
     printSwitchEnumInst(SOI);
   }
-  void visitDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *SOI){
-    OS << "destructive_switch_enum_addr ";
+  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+    OS << "switch_enum_addr ";
     printSwitchEnumInst(SOI);
   }
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {

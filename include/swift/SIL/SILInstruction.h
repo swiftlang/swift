@@ -1340,6 +1340,21 @@ public:
   EnumElementDecl *getElement() const { return Element; }
 };
 
+/// Invalidate an enum value and take ownership of its payload data
+/// without moving it in memory.
+class TakeEnumDataAddrInst
+  : public UnaryInstructionBase<ValueKind::TakeEnumDataAddrInst>
+{
+  EnumElementDecl *Element;
+public:
+  TakeEnumDataAddrInst(SILLocation Loc, SILValue Operand,
+                       EnumElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy),
+      Element(Element) {}
+  
+  EnumElementDecl *getElement() const { return Element; }
+};
+
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst : public SILInstruction {
@@ -2223,7 +2238,7 @@ public:
 };
 
 /// Common implementation for the switch_enum and
-/// destructive_switch_enum_addr instructions.
+/// switch_enum_addr instructions.
 class SwitchEnumInstBase : public TermInst {
   FixedOperandList<1> Operands;
   unsigned NumCases : 31;
@@ -2327,29 +2342,27 @@ public:
   }
 };
 
-/// A switch on an address-only enum's discriminator. If a case is matched, the
-/// tag is invalidated and the address of the data for the case is passed as
-/// an argument to the destination block.
-class DestructiveSwitchEnumAddrInst : public SwitchEnumInstBase {
+/// A switch on an enum's discriminator in memory.
+class SwitchEnumAddrInst : public SwitchEnumInstBase {
 private:
   friend class SwitchEnumInstBase;
 
-  DestructiveSwitchEnumAddrInst(SILLocation Loc, SILValue Operand,
+  SwitchEnumAddrInst(SILLocation Loc, SILValue Operand,
               SILBasicBlock *DefaultBB,
               ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs)
-    : SwitchEnumInstBase(ValueKind::DestructiveSwitchEnumAddrInst,
+    : SwitchEnumInstBase(ValueKind::SwitchEnumAddrInst,
                           Loc, Operand, DefaultBB, CaseBBs)
     {}
   
 public:
-  static DestructiveSwitchEnumAddrInst *create(
+  static SwitchEnumAddrInst *create(
                SILLocation Loc, SILValue Operand,
                SILBasicBlock *DefaultBB,
                ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
                SILFunction &F);
   
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::DestructiveSwitchEnumAddrInst;
+    return V->getKind() == ValueKind::SwitchEnumAddrInst;
   }
 };
 
