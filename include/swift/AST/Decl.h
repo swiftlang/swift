@@ -518,8 +518,8 @@ class RequirementRepr {
   bool Invalid : 1;
   TypeLoc Types[2];
 
-  RequirementRepr(SourceLoc SeparatorLoc, RequirementKind Kind, TypeLoc FirstType,
-              TypeLoc SecondType)
+  RequirementRepr(SourceLoc SeparatorLoc, RequirementKind Kind,
+                  TypeLoc FirstType, TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       Types{FirstType, SecondType} { }
   
@@ -1018,8 +1018,8 @@ public:
 
   /// Returns the most appropriate import kind for the given list of decls.
   ///
-  /// If the list is non-homogenous, or if there is more than one decl that cannot
-  /// be overloaded, returns Nothing.
+  /// If the list is non-homogenous, or if there is more than one decl that
+  /// cannot be overloaded, returns Nothing.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
@@ -2385,7 +2385,9 @@ public:
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return VarDeclBits.IsDebuggerVar; }
-  void setDebuggerVar(bool IsDebuggerVar) { VarDeclBits.IsDebuggerVar = IsDebuggerVar; }
+  void setDebuggerVar(bool IsDebuggerVar) {
+    VarDeclBits.IsDebuggerVar = IsDebuggerVar;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
