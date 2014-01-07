@@ -1017,7 +1017,7 @@ caller allocates an uninitialized buffer and passes its address as the first
 argument to the callee. The callee must initialize this buffer before
 returning. This Swift function::
 
-  struct [API] A {}
+   @API struct A {}
 
   func bas(x:A, y:Int) -> A { return x }
 
@@ -1043,7 +1043,7 @@ Tuple arguments are destructured regardless of the
 address-only-ness of the tuple type. The destructured fields are passed
 individually according to the above convention. This Swift function::
 
-  struct [API] A {}
+  @API struct A {}
 
   func zim(x:Int, y:A, (z:Int, w:(A, Int)))
 
