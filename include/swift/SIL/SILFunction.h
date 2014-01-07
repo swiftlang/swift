@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILLinkage.h"
 
 /// The symbol name used for the program entry point function.
 /// FIXME: Hardcoding this is lame.
@@ -28,14 +29,6 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
-  
-/// Linkage attribute for a SIL function.
-enum class SILLinkage : unsigned char {
-  External,
-  Thunk,
-  Internal,
-  Deserialized // Deserialized from a module.
-};
   
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };

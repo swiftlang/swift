@@ -17,9 +17,17 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
-#include "swift/SIL/SILFunction.h"
+#include <string>
+#include "swift/SIL/SILLinkage.h"
+#include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILType.h"
+#include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/ilist.h"
 
 namespace swift {
+
+class ASTContext;
+class SILModule;
   
 /// A global variable that has been referenced in SIL.
 class SILGlobalVariable
@@ -131,11 +139,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILFunction
+// ilist_traits for SILGLobalVariable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-  
+
 template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
 public ilist_default_traits<::swift::SILGlobalVariable> {
