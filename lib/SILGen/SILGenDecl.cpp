@@ -2051,7 +2051,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     if (!outerParams)
       outerParams = GenericParamList::getEmpty(getASTContext());
     auto methodParams
-      = reqtParams.cloneWithOuterParameters(getASTContext(), outerParams);    
+      = reqtParams.cloneWithOuterParameters(getASTContext(), outerParams);
     methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
                                                methodParams,
                                                pft->getExtInfo());

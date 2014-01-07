@@ -1641,11 +1641,8 @@ void TypeConverter::pushGenericContext(
   
   // Prepare the ArchetypeBuilder with the generic signature.
   GenericArchetypes.emplace(*M.getSwiftModule(), M.getASTContext().Diags);
-  for (auto param : genericParams)
-    GenericArchetypes->addGenericParameter(param);
-  for (auto reqt : requirements)
-    GenericArchetypes->addRequirement(reqt);
-  
+  if (GenericArchetypes->addGenericSignature(genericParams, requirements))
+    llvm_unreachable("error adding generic signature to archetype builder?!");
   GenericArchetypes->assignArchetypes();
 }
 

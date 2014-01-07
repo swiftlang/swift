@@ -36,6 +36,7 @@ class AssociatedTypeDecl;
 class DeclContext;
 class DependentMemberType;
 class GenericParamList;
+class GenericSignature;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
 class Module;
@@ -148,6 +149,13 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req);
+  
+  /// \brief Add a generic signature's parameters and requirements.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool addGenericSignature(GenericSignature *sig);
+  bool addGenericSignature(ArrayRef<GenericTypeParamType*> params,
+                           ArrayRef<Requirement> reqts);
 
   /// \brief Add a new, implicit conformance requirement for one of the
   /// parameters.
