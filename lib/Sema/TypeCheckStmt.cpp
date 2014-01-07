@@ -856,20 +856,19 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   // initializer if none has been added by the user.
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
   if (!ctor->isImplicit()) {
-    switch (ctor->getDelegatingOrChainedInitKind()) {
-    case ConstructorDecl::BodyInitKind::Chained:
-    case ConstructorDecl::BodyInitKind::Delegating:
-    case ConstructorDecl::BodyInitKind::None:
-      break;
+    switch (ctor->getDelegatingOrChainedInitKind(&Diags)) {
+      case ConstructorDecl::BodyInitKind::Chained:
+      case ConstructorDecl::BodyInitKind::Delegating:
+      case ConstructorDecl::BodyInitKind::None:
+        break;
 
-    case ConstructorDecl::BodyInitKind::ImplicitChained:
-      // Find a default initializer in the superclass.
-      if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
-        // Store the super.init expression within the constructor declaration
-        // to be emitted during SILGen.
-        ctor->setSuperInitCall(SuperInitCall);
-      }
-      break;
+      case ConstructorDecl::BodyInitKind::ImplicitChained:
+        // Find a definite initializer in the superclass.
+        if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
+          // Store the super.init expression within the constructor declaration
+          // to be emitted during SILGen.
+          ctor->setSuperInitCall(SuperInitCall);
+        }
     }
   }
 

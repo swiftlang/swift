@@ -18,6 +18,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Diagnostics.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1812,19 +1814,56 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
 }
 
 ConstructorDecl::BodyInitKind
-ConstructorDecl::getDelegatingOrChainedInitKind() const {
+ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags) {
   assert(hasBody() && "Constructor does not have a definition");
+
+  // If we already computed the result, return it.
+  if (ConstructorDeclBits.ComputedBodyInitKind) {
+    return static_cast<BodyInitKind>(
+             ConstructorDeclBits.ComputedBodyInitKind - 1);
+  }
+
+
   struct FindReferenceToInitializer : ASTWalker {
     BodyInitKind Kind = BodyInitKind::None;
+    Expr *InitExpr = nullptr;
+    DiagnosticEngine *Diags;
+
+    FindReferenceToInitializer(DiagnosticEngine *diags) : Diags(diags) { }
+
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
       if (auto apply = dyn_cast<ApplyExpr>(E)) {
         if (isa<OtherConstructorDeclRefExpr>(
               apply->getFn()->getSemanticsProvidingExpr())) {
+          BodyInitKind myKind;
           if (isa<SuperRefExpr>(apply->getArg()->getSemanticsProvidingExpr()))
-            Kind = BodyInitKind::Chained;
+            myKind = BodyInitKind::Chained;
           else
-            Kind = BodyInitKind::Delegating;
-          return { false, nullptr };
+            myKind = BodyInitKind::Delegating;
+
+          if (Kind == BodyInitKind::None) {
+            Kind = myKind;
+
+            // If we're not emitting diagnostics, we're done.
+            if (!Diags) {
+              return { false, nullptr };
+            }
+
+            InitExpr = E;
+            return { true, E };
+          }
+
+          assert(Diags && "Failed to abort traversal early");
+
+          // If the kind changed, complain.
+          if (Kind != myKind) {
+            // The kind changed. Complain.
+            Diags->diagnose(E->getLoc(), diag::init_delegates_and_chains);
+            Diags->diagnose(InitExpr->getLoc(), diag::init_delegation_or_chain,
+                            Kind == BodyInitKind::Chained);
+          }
+
+          return { true, E };
         }
       }
 
@@ -1834,7 +1873,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind() const {
 
       return { true, E };
     }
-  } finder;
+  } finder(diags);
   getBody()->walk(finder);
 
   // If we didn't find any delegating or chained initializers, check whether
@@ -1843,10 +1882,13 @@ ConstructorDecl::getDelegatingOrChainedInitKind() const {
     if (auto classDecl = getDeclContext()->getDeclaredTypeInContext()
                            ->getClassOrBoundGenericClass()) {
       if (classDecl->getSuperclass())
-        return BodyInitKind::ImplicitChained;
+        finder.Kind = BodyInitKind::ImplicitChained;
     }
   }
 
+  // Cache the result.
+  ConstructorDeclBits.ComputedBodyInitKind
+    = static_cast<unsigned>(finder.Kind) + 1;
   return finder.Kind;
 }
 

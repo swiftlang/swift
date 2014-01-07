@@ -1327,6 +1327,11 @@ ERROR(bad_init_ref_base,sema_tce, none,
       "'self'%select{| or 'super'}0", (bool))
 ERROR(init_delegation_outside_initializer,sema_tce,none,
       "initializer delegation can only occur within an initiailizer", ())
+ERROR(init_delegates_and_chains,sema_tce,none,
+      "initializer cannot both delegate ('self.init') and chain to a "
+      "superclass initializer ('super.init')", ())
+NOTE(init_delegation_or_chain,sema_tce,none,
+      "previous %select{delegation|chaining}0 call is here", (bool))
 
 // Operators
 ERROR(unknown_binop,sema_tce,none,

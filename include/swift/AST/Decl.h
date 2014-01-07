@@ -45,6 +45,7 @@ namespace swift {
   class ASTContext;
   class ASTPrinter;
   class ASTWalker;
+  class DiagnosticEngine;
   class Type;
   class Expr;
   class LazyMemberLoader;
@@ -196,6 +197,20 @@ class alignas(8) Decl {
   enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
+  class ConstructorDeclBitfields {
+    friend class ConstructorDecl;
+    unsigned : NumAbstractFunctionDeclBits;
+
+    /// The body initialization kind (+1), or zero if not yet computed.
+    ///
+    /// This value is cached but is not serialized, because it is a property
+    /// of the definition of the constructor that is useful only to semantic
+    /// analysis and SIL generation.
+    unsigned ComputedBodyInitKind : 3;
+  };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 3 };
+  static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
+
   class TypeDeclBitfields {
     friend class TypeDecl;
     unsigned : NumValueDeclBits;
@@ -301,6 +316,7 @@ protected:
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
     FuncDeclBitfields FuncDeclBits;
+    ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
@@ -2973,6 +2989,7 @@ public:
                            ConstructorLoc, ImplicitSelfDecl, GenericParams),
       ArgParams(ArgParams), BodyParams(BodyParams) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
+    ConstructorDeclBits.ComputedBodyInitKind = 0;
   }
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
@@ -3035,7 +3052,11 @@ public:
   /// Determine whether the body of this constructor contains any delegating
   /// or superclass initializations (\c self.init or \c super.init,
   /// respectively) within its body.
-  BodyInitKind getDelegatingOrChainedInitKind() const;
+  ///
+  /// \param diags If non-null, this check will ensure that the constructor
+  /// body is consistent in its use of delegation vs. chaining and emit any
+  /// diagnostics through the given diagnostic engine.
+  BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags);
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

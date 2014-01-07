@@ -2510,7 +2510,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   assert(ctor->getBody() && "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
-  bool isDelegating = ctor->getDelegatingOrChainedInitKind() ==
+  bool isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
     ConstructorDecl::BodyInitKind::Delegating;
 
   // FIXME: The (potentially partially initialized) value here would need to be
