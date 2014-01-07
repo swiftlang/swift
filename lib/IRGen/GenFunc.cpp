@@ -863,24 +863,6 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
-///
-/// When dealing with non-trivial uncurryings, parameter clusters
-/// are added in reverse order.  For example:
-///   formal type:  (A, B) -> (C, D, E) -> F -> G
-///   curry 0:      (A, B) -> ((C, D, E) -> F -> G)
-///   curry 1:      (C, D, E, A, B) -> (F -> G)
-///   curry 2:      (F, C, D, E, A, B) -> G
-/// This is so that currying stubs can load their stored arguments
-/// into position without disturbing their formal arguments.
-/// This also interacts well with closures that save a single
-/// retainable pointer which becomes the only curried argument
-/// (and therefore the final argument) to a method call.
-///
-/// Generic arguments come last in a clause, also in order to make it
-/// easier to drop or ignore them.
-///
-/// This is all somewhat optimized for register-passing CCs; it
-/// probably makes extra work when the stack gets involved.
 void SignatureExpansion::expandParameters() {
   auto params = FnType->getParameters();
 
