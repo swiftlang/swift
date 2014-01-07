@@ -1541,11 +1541,30 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
                + sizeof(SILParameterInfo) * 2 * params.size();
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
-  // Right now, SIL function types cannot be dependent or contain type
+  // Right now, generic SIL function types cannot be dependent or contain type
   // variables, and they're always materializable.
+  // FIXME: If we ever have first-class polymorphic values, we'll need to
+  // revisit this.
   RecursiveTypeProperties properties;
   static_assert(RecursiveTypeProperties::BitWidth == 3,
                 "revisit this if you add new recursive type properties");
+  if (!genericParams) {
+    // Nongeneric SIL functions are dependent if they have dependent argument
+    // or return types. They still never contain type variables and are always
+    // materializable.
+    if (result.getType()->isDependentType()) {
+      properties += RecursiveTypeProperties::IsDependent;
+      goto did_set_dependent;
+    }
+    
+    for (auto &param : params) {
+      if (param.getType()->isDependentType()) {
+        properties += RecursiveTypeProperties::IsDependent;
+        goto did_set_dependent;
+      }
+    }
+  }
+did_set_dependent:
 
   auto fnType =
     new (mem) SILFunctionType(genericParams, ext, callee,
