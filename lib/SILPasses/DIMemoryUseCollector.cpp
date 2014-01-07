@@ -361,9 +361,12 @@ namespace {
         TheMemory.IsSelfOfNonDelegatingInitializer;
 
       // If this is a delegating initializer, collect uses specially.
-      if (TheMemory.isDelegatingInit())
-        collectDelegatingInitSelfUses();
-      else if (IsSelfOfNonDelegatingInitializer &&
+      if (TheMemory.isDelegatingInit()) {
+        if (TheMemory.getType()->hasReferenceSemantics())
+          collectDelegatingClassInitSelfUses();
+        else
+          collectDelegatingValueTypeInitSelfUses();
+      } else if (IsSelfOfNonDelegatingInitializer &&
                 TheMemory.getType()->getClassOrBoundGenericClass() != nullptr) {
         // If this is a class pointer, we need to look through
         // ref_element_addrs.
@@ -388,7 +391,8 @@ namespace {
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
     void collectClassSelfUses();
-    void collectDelegatingInitSelfUses();
+    void collectDelegatingClassInitSelfUses();
+    void collectDelegatingValueTypeInitSelfUses();
     void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                               llvm::SmallDenseMap<VarDecl*, unsigned> &EN);
 
@@ -932,17 +936,15 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
   }
 }
 
-
-/// collectDelegatingInitSelfUses - Collect uses of the self argument in a
+/// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
 /// delegating-constructor-for-a-class case.
-void ElementUseCollector::collectDelegatingInitSelfUses() {
+void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
-  // all.  Just treat all members of self (whether it is a reference or not)
-  // as uses of the single non-field-sensitive value.
-  InStructSubElement = true;
-  
+  // all.  Just treat all members of self as uses of the single
+  // non-field-sensitive value.
+  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
   auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-
+ 
   // Because self.init is allows to change self, SILGen is producing a box for
   // 'self'.  This means that we need to see through this box to find the uses
   // of 'self'.  We handle this by pattern matching: we allow only a single use
@@ -990,7 +992,7 @@ void ElementUseCollector::collectDelegatingInitSelfUses() {
         if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
           Kind = DIUseKind::SelfInit;
         
-        Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
+        Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
       }
       continue;
     }
@@ -1001,6 +1003,38 @@ void ElementUseCollector::collectDelegatingInitSelfUses() {
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
     Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
+  }
+}
+
+
+void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
+  // When we're analyzing a delegating constructor, we aren't field sensitive at
+  // all.  Just treat all members of self as uses of the single
+  // non-field-sensitive value.
+  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
+
+  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
+  
+  for (auto UI : MUI->getUses()) {
+    auto *User = UI->getUser();
+    
+    // We only track two kinds of uses for delegating initializers:
+    // calls to self.init, and "other", which we choose to model as escapes.
+    // This intentionally ignores all stores, which (if they got emitted as
+    // copyaddr or assigns) will eventually get rewritten as assignments
+    // (not initializations), which is the right thing to do.
+    DIUseKind Kind = DIUseKind::Escape;
+
+    // Stores *to* the allocation are writes.  If the value being stored is a
+    // call to self.init()... then we have a self.init call.
+    if (auto *AI = dyn_cast<AssignInst>(User))
+      if (auto *Call = dyn_cast<ApplyInst>(AI->getOperand(0)))
+        if (isSelfInitUse(Call))
+          Kind = DIUseKind::SelfInit;
+    
+    // We can safely handle anything else as an escape.  They should all happen
+    // after self.init is invoked.
+    Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
   }
 }
 

@@ -767,7 +767,7 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
 /// handleSuperInitUse - When processing a 'self' argument on a class, this is
 /// a call to self.init.
 void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
-  ApplyInst *Inst = cast<ApplyInst>(InstInfo.Inst);
+  auto *Inst = InstInfo.Inst;
 
   assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 

@@ -2162,6 +2162,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!ctor->getBody())
     return emitImplicitValueConstructor(*this, ctor);
 
+  // True if this constructor delegates to a peer constructor with self.init().
+  bool isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
+    ConstructorDecl::BodyInitKind::Delegating;
+
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto &lowering = getTypeLowering(selfDecl->getType()->getInOutObjectType());
@@ -2180,8 +2184,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   {
     auto &SelfVarLoc = VarLocs[selfDecl];
     selfBox = SelfVarLoc.box;
-    selfLV = B.createMarkUninitializedRootSelf(selfDecl,
-                                               SelfVarLoc.getAddress());
+    
+    auto MUKind = isDelegating ? MarkUninitializedInst::DelegatingSelf
+                               : MarkUninitializedInst::RootSelf;
+    selfLV = B.createMarkUninitialized(selfDecl,SelfVarLoc.getAddress(),MUKind);
     SelfVarLoc = VarLoc::getAddress(selfLV, SelfVarLoc.box);
   }
 
@@ -2215,7 +2221,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
-    assert(selfBox == VarLocs[selfDecl].box);
     // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(cleanupLoc, selfLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
@@ -2225,7 +2230,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
 
   // Otherwise, load and return the final 'self' value.
-  assert(selfBox == VarLocs[selfDecl].box);
   SILValue selfValue = B.createLoad(cleanupLoc, selfLV);
 
   // We have to do a retain because someone else may be using the box.
