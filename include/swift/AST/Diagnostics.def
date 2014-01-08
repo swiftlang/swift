@@ -174,7 +174,7 @@ ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
 ERROR(decl_not_static,decl_parsing,none,
-      "declaration can not be marked 'type'", ())
+      "declaration cannot be marked 'type'", ())
 ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
@@ -284,7 +284,7 @@ ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(subscript_without_get,decl_parsing,none,
       "subscripting must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
-     "subscript can not be marked 'type'", ())
+     "subscript cannot be marked 'type'", ())
 
 // initializer
 ERROR(initializer_decl_wrong_scope,decl_parsing,none,
@@ -698,7 +698,7 @@ ERROR(numeric_literal_numeric_member,expr_parsing,none,
 ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
       "anonymous closure argument not contained in a closure", ())
 ERROR(anon_closure_arg_in_closure_with_args,expr_parsing,none,
-      "anonymous closure arguments can not be used inside a closure that has "
+      "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
 ERROR(expected_closure_parameter_name,expr_parsing,none,
       "expected the name of a closure parameter", ())
@@ -1512,40 +1512,40 @@ ERROR(objc_class_not_top_level,sema_tcd,none,
 ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
       "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(objc_invalid_on_static_var,sema_tcd,none,
-      "type properties can not be declared '@objc'", ())
+      "type properties cannot be declared '@objc'", ())
 
 ERROR(objc_invalid_on_var,sema_objc,none,
-      "property can not be marked %select{@objc|@IBOutlet}0 because its type "
-      "can not be represented in Objective-C", (unsigned))
+      "property cannot be marked %select{@objc|@IBOutlet}0 because its type "
+      "cannot be represented in Objective-C", (unsigned))
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,sema_objc,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_empty_tuple,sema_objc,none,
-      "empty tuple type can not be represented in Objective-C", ())
+      "empty tuple type cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,sema_objc,none,
-      "tuples can not be represented in Objective-C", ())
+      "tuples cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_struct,sema_objc,none,
-      "Swift structs can not be represented in Objective-C", ())
+      "Swift structs cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_enum,sema_objc,none,
-      "Swift enums can not be represented in Objective-C", ())
+      "Swift enums cannot be represented in Objective-C", ())
 NOTE(not_objc_generic_type_param,sema_objc,none,
-     "generic type parameters can not be represented in Objective-C", ())
+     "generic type parameters cannot be represented in Objective-C", ())
 
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
-      "method can not be marked @objc because curried functions can not be "
+      "method cannot be marked @objc because curried functions cannot be "
       "represented in Objective-C", ())
 ERROR(objc_invalid_on_tuple_style,sema_objc,none,
-      "method can not be marked @objc because it is not using selector-style "
+      "method cannot be marked @objc because it is not using selector-style "
       "declaration syntax", ())
 ERROR(objc_invalid_on_func_param_type,sema_objc,none,
-      "method can not be marked @objc because the type of the parameter %0 "
-      "can not be represented in Objective-C", (unsigned))
+      "method cannot be marked @objc because the type of the parameter %0 "
+      "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
-      "method can not be marked @objc because the type of the parameter "
-      "can not be represented in Objective-C", ())
+      "method cannot be marked @objc because the type of the parameter "
+      "cannot be represented in Objective-C", ())
 ERROR(objc_invalid_on_func_result_type,sema_objc,none,
-      "method can not be marked @objc because its result type can not be "
+      "method cannot be marked @objc because its result type cannot be "
       "represented in Objective-C", ())
 
 
