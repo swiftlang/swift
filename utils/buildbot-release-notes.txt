@@ -5,11 +5,15 @@
   functions" and "type variables" which are functions and variables
   defined on a type (rather than on an instance of the type), e.g.,
 
-    struct X {
+    class X {
       type func factory() -> X { ... }
 
       type var version: Int
     }
+
+  The use of "static" was actively misleading, since type methods
+  on classes are dynamically dispatched (the same as Objective-C
+  "+" methods).
 
   Note that "type" is a context-sensitive keyword; it can still be
   used as an identifier.
