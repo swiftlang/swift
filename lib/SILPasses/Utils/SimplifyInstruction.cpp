@@ -113,7 +113,7 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // (pointer_to_address (address_to_pointer x)) -> x
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand().getDef()))
-    if (ATPI->getType(0) == PTAI->getOperand().getType())
+    if (ATPI->getType() == PTAI->getOperand().getType())
       return ATPI->getOperand();
 
   return SILValue();
