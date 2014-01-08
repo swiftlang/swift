@@ -1,34 +1,61 @@
-/// \brief An Container is a multi-pass collection.  FIXME: every
-/// Container should be enumerable (<rdar://problem/14016705>)
-protocol Container {
-  typealias Element
+protocol _Collection  {
   typealias IndexType : ForwardIndex
 
   func startIndex() -> IndexType
   func endIndex() -> IndexType
 
-  func __getitem__(i: IndexType) -> Element
+  // The declaration of Element and _subscript here is a trick used to
+  // break a cyclic conformance/deduction that Swift can't handle.  We
+  // need something other than a Collection.StreamType.Element that can
+  // be used as ContainedStream<T>'s Element.  Here we arrange for the
+  // Collection itself to have an Element type that's deducible from
+  // its __getitem__ function.  Ideally we'd like to constrain this
+  // Element to be the same as Collection.StreamType.Element (see
+  // below), but we have no way of expressing it today.
+  typealias _Element
+  func __getitem__(i: IndexType) -> _Element
+}
+
+protocol Collection : _Collection, Sequence {
+  func __getitem__(i: IndexType) -> StreamType.Element
+}
+
+/// \brief A stream type that could serve for a Collection given that
+/// it already had an IndexType.  Because of <rdar://problem/14396120>
+/// we've had to factor _Collection out of Collection to make it useful
+struct ContainedStream<C: _Collection> : Stream {
+  init(seq: C) {
+    self._elements = seq
+    self._position = seq.startIndex()
+  }
+  
+  func generate() -> ContainedStream {
+    return self
+  }
+  
+  @mutating
+  func next() -> C._Element? {
+    return _position == _elements.endIndex() 
+    ? .None : .Some(_elements.__getitem__(_position++))
+  }
+  var _elements: C
+  var _position: C.IndexType
 }
 
 func indices<
-    Seq : Container>(seq: Seq) -> Range<Seq.IndexType> {
+    Seq : Collection>(seq: Seq) -> Range<Seq.IndexType> {
   return Range(seq.startIndex(), seq.endIndex())
 }
 
-// FIXME: Ideally we'd be able to use a generic ContainerStream
-// like this one.  Instead, in generic contexts, we use
-// ForwardContainerStream et al, below. See
-// <rdar://problem/13997019> cluster of crashes.
-// 
-struct ContainerStream<
-  Seq: Container, Indices: Sequence
+struct IndexedStream<
+  Seq: Collection, Indices: Sequence
   where Seq.IndexType == Indices.StreamType.Element
   // FIXME: Commenting out "Stream," below causes all kinds of deserialization crashes
 > : Stream, Sequence, MultiPassStream {
   var seq : Seq
   var indices : Indices.StreamType
 
-  typealias Element = Seq.Element
+  typealias Element = Seq.StreamType.Element
 
   @mutating
   func next() -> Element? {
@@ -37,8 +64,7 @@ struct ContainerStream<
   }
 
   // Every Stream is also a single-pass Sequence
-  typealias StreamType = ContainerStream<Seq, Indices>
-
+  typealias StreamType = IndexedStream
   func generate() -> StreamType {
     return self
   }
@@ -49,68 +75,14 @@ struct ContainerStream<
   }
 }
 
-// FIXME: Replace with ContainerStream above in generic contexts
-// pending <rdar://problem/13997019> cluster of crashes.
-struct ForwardContainerStream<
-   Seq: Container> : Stream, Sequence {
-  typealias Element = Seq.Element
-  typealias IndexStream = RangeStream<Seq.IndexType>
-  var seq : Seq
-  var indices : IndexStream
 
-  init(seq: Seq) {
-    self.seq = seq
-    self.indices = IndexStream(seq.startIndex(), seq.endIndex())
-  }
-
-  @mutating
-  func next() -> Element? {
-    var result = indices.next()
-    return result ? seq.__getitem__(result!) : .None
-  }
-
-  // Every Stream is also a single-pass Sequence
-  typealias StreamType = ForwardContainerStream<Seq>
-  func generate() -> StreamType {
-    return self
-  }
-}
-
-// FIXME: Replace with ContainerStream above in generic contexts
-// pending <rdar://problem/13997019> cluster of crashes.
-struct ReverseContainerStream<
-   Seq: Container where Seq.IndexType: BidirectionalIndex
-> : Stream, Sequence {
-  typealias Element = Seq.Element
-  typealias IndexStream = ReverseRangeStream<Seq.IndexType>
-  var seq : Seq
-  var indices : IndexStream
-
-  init(seq: Seq) {
-    self.seq = seq
-    self.indices = IndexStream(seq.startIndex(), seq.endIndex())
-  }
-
-
-  @mutating
-  func next() -> Element? {
-    var result = indices.next()
-    return result ? seq.__getitem__(result!) : .None
-  }
-
-  // Every Stream is also a single-pass Sequence
-  typealias StreamType = ReverseContainerStream<Seq>
-  func generate() -> StreamType {
-    return self
-  }
-}
-
-/// \brief Adapt an Container into an Sequence
-struct ContainerSequence<Seq: Container> 
+/*
+/// \brief Adapt an Collection into an Sequence
+struct CollectionSequence<Seq: Collection> 
   : Sequence {
   var seq : Seq
 
-  typealias StreamType = ForwardContainerStream<Seq>
+  typealias StreamType = ForwardCollectionStream<Seq>
   func generate() -> StreamType {
     return StreamType(self.seq)
   }
@@ -120,13 +92,13 @@ struct ContainerSequence<Seq: Container>
   }
 }
 
-struct ReverseContainerSequence<
-  Seq: Container 
+struct ReverseCollection<
+  Seq: Collection 
   where Seq.IndexType: BidirectionalIndex
-> : Sequence {
+> : Collection {
   var seq : Seq
 
-  typealias StreamType = ReverseContainerStream<Seq>
+  typealias StreamType = CollectionStream<Seq>
   func generate() -> StreamType {
     return StreamType(self.seq)
   }
@@ -136,33 +108,71 @@ struct ReverseContainerSequence<
   }
 }
 
-
 func elements<
-  Seq: Container>(seq: Seq) -> ContainerSequence<Seq> {
-  return ContainerSequence(seq)
-}
-
-// FIXME: Several of these overloads can go away when
-// rdar://problem/14016705 is addressed.
-func reverse<
-  Seq: Container where Seq.IndexType: BidirectionalIndex
->(seq: Seq) -> ReverseContainerSequence<Seq> {
-  return ReverseContainerSequence(seq)
+  Seq: Collection>(seq: Seq) -> CollectionSequence<Seq> {
+  return CollectionSequence(seq)
 }
 
 func reverse<
-  Seq: Container where Seq.IndexType: BidirectionalIndex
->(e: ContainerSequence<Seq>) -> ReverseContainerSequence<Seq> {
-  return ReverseContainerSequence(e.seq)
+  Seq: Collection where Seq.IndexType: BidirectionalIndex
+>(seq: Seq) -> ReverseCollectionSequence<Seq> {
+  return ReverseCollectionSequence(seq)
 }
 
 func reverse<
-  Seq: Container where Seq.IndexType: BidirectionalIndex
->(e: ReverseContainerSequence<Seq>) -> ContainerSequence<Seq> {
-  return ContainerSequence(e.seq)
+  Seq: Collection where Seq.IndexType: BidirectionalIndex
+>(e: CollectionSequence<Seq>) -> ReverseCollectionSequence<Seq> {
+  return ReverseCollectionSequence(e.seq)
 }
 
-protocol Sliceable: Container {
+func reverse<
+  Seq: Collection where Seq.IndexType: BidirectionalIndex
+>(e: ReverseCollectionSequence<Seq>) -> CollectionSequence<Seq> {
+  return CollectionSequence(e.seq)
+}
+*/
+/// \brief A wrapper for a BidirectionalIndex that reverses its
+/// direction of traversal
+struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
+  var _base: I
+  
+  func succ() -> ReverseIndex {
+    return ReverseIndex(_base.pred())
+  }
+  
+  func pred() -> ReverseIndex {
+    return ReverseIndex(_base.succ())
+  }
+}
+
+func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
+  return lhs._base == rhs._base
+}
+
+struct Reverse<T: Collection where T.IndexType: BidirectionalIndex> : Collection {
+  typealias IndexType = ReverseIndex<T.IndexType>
+  typealias StreamType = ContainedStream<Reverse>
+  
+  func generate() -> ContainedStream<Reverse> {
+    return ContainedStream(self)
+  }
+  
+  func startIndex() -> IndexType {
+    return ReverseIndex(_base.endIndex())
+  }
+  
+  func endIndex() -> IndexType {
+    return ReverseIndex(_base.startIndex())
+  }
+
+  func __getitem__(i: IndexType) -> T.StreamType.Element {
+    return _base.__getitem__(i._base.pred())
+  }
+  
+  var _base: T
+}
+
+protocol Sliceable: Collection {
   func __slice__(start: IndexType, finish: IndexType) -> Self
 }
 
@@ -214,9 +224,9 @@ func -- <T: BidirectionalIndex> (x: @inout T) -> T {
 
 protocol RandomAccessIndex : BidirectionalIndex, NumericOperations {
   typealias DistanceType
-  static func sub(lhs: Self, rhs: Self) -> (DistanceType, Bool)
-  static func sub(lhs: Self, rhs: DistanceType) -> (Self, Bool)
-  static func add(lhs: Self, rhs: DistanceType) -> (Self, Bool)
+  type func sub(lhs: Self, rhs: Self) -> (DistanceType, Bool)
+  type func sub(lhs: Self, rhs: DistanceType) -> (Self, Bool)
+  type func add(lhs: Self, rhs: DistanceType) -> (Self, Bool)
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
   // implementations in protocols)
   func <(lhs: Self, rhs: Self) -> Bool /* {
