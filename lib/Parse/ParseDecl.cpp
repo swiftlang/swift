@@ -663,7 +663,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   if (Status.isSuccess() && Tok.is(tok::semi))
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
 
-  // If we parsed 'static' but didn't handle it above, complain about it.
+  // If we parsed 'type' but didn't handle it above, complain about it.
   if (Status.isSuccess() && UnhandledStatic) {
     diagnose(Entries.back()->getLoc(), diag::decl_not_static)
       .fixItRemove(SourceRange(StaticLoc));
@@ -1417,8 +1417,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
 ///
 /// \verbatim
 ///   decl-var:
-///      'let' attribute-list pattern initializer (',' pattern initializer )*
-///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
+///      'type'? 'let' attribute-list pattern initializer (',' pattern initializer )*
+///      'type'? 'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
@@ -1691,7 +1691,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \verbatim
 ///   decl-func:
-///     'static'? 'func' attribute-list any-identifier generic-params?
+///     'type'? 'func' attribute-list any-identifier generic-params?
 ///               func-signature stmt-brace?
 /// \endverbatim
 ///
@@ -1701,7 +1701,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
                       DeclAttributes &Attributes) {
   bool HasContainerType = Flags & PD_HasContainerType;
 
-  // Reject 'static' functions at global scope.
+  // Reject 'type' functions at global scope.
   if (StaticLoc.isValid() && !HasContainerType) {
     diagnose(Tok, diag::static_func_decl_global_scope)
       .fixItRemoveChars(StaticLoc, Tok.getLoc());
