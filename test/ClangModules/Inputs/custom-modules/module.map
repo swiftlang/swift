@@ -28,3 +28,15 @@ module IndirectFrameworkImporter {
   header "IndirectFrameworkImporter.h"
   export IndirectFramework
 }
+
+module HasSubmodule {
+  link framework "HasSubmodule"
+  module Submodule {
+    header "Submodule.h"
+  }
+}
+
+module UsesSubmodule {
+  header "UsesSubmodule.h"
+  export *
+}

@@ -248,6 +248,16 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     import.second->collectLinkLibraries(addLinkLibrary);
   });
 
+  // Hack to handle thunks eagerly synthesized by the Clang importer.
+  swift::Module *prev = nullptr;
+  for (auto external : CI.getASTContext().ExternalDefinitions) {
+    swift::Module *next = external->getModuleContext();
+    if (next == prev)
+      continue;
+    next->collectLinkLibraries(addLinkLibrary);
+    prev = next;
+  }
+
   // IRGen the modules this module depends on. This is only really necessary
   // for imported source, but that's a very convenient thing to do in -i mode.
   // FIXME: Crawling all loaded modules is a hack.

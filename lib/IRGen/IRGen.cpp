@@ -150,6 +150,18 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
     IGM.addLinkLibrary(linkLib);
   });
 
+  // Hack to handle thunks eagerly synthesized by the Clang importer.
+  swift::Module *prev = nullptr;
+  for (auto external : M->Ctx.ExternalDefinitions) {
+    swift::Module *next = external->getModuleContext();
+    if (next == prev)
+      continue;
+    next->collectLinkLibraries([&](LinkLibrary linkLib) {
+      IGM.addLinkLibrary(linkLib);
+    });
+    prev = next;
+  }
+
   IGM.finalize();
 
   // Objective-C image information.
