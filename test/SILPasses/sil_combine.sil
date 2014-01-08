@@ -415,3 +415,16 @@ bb0(%0 : $@thin U.metatype, %1 : $C):
   return %6 : $(U, U, U)
 }
 
+// (ref_to_raw_pointer (ref_to_object_pointer x))
+//    -> (ref_to_raw_pointer x)
+// CHECK-LABEL: sil @ref_to_raw_pointer_ref_to_object_pointer_composition : $@thin (C) -> Builtin.RawPointer
+// CHECK: bb0([[IN:%[0-9]+]] : $C):
+// CHECK-NEXT: ref_to_object_pointer
+// CHECK-NEXT: [[OUT:%[0-9]+]] = ref_to_raw_pointer [[IN]]
+// CHECK-NEXT: return [[OUT]]
+sil @ref_to_raw_pointer_ref_to_object_pointer_composition : $@thin (C) -> Builtin.RawPointer {
+bb0(%0 : $C):
+  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
+  %2 = ref_to_raw_pointer %1 : $Builtin.ObjectPointer to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}

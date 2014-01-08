@@ -29,6 +29,7 @@ namespace {
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
+    SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   };
 } // end anonymous namespace
 
@@ -114,6 +115,17 @@ SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand().getDef()))
     if (ATPI->getType(0) == PTAI->getOperand().getType())
       return ATPI->getOperand();
+
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
+  // (ref_to_raw_pointer (ref_to_object_pointer x))
+  //    -> (ref_to_raw_pointer x)
+  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*RRPI->getOperand())) {
+    RRPI->setOperand(ROPI->getOperand());
+    return SILValue();
+  }
 
   return SILValue();
 }
