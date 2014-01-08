@@ -41,6 +41,16 @@
 using namespace swift;
 using namespace irgen;
 
+llvm::DenseMap<TypeBase*, TypeCacheEntry> &
+TypeConverter::Types_t::getCacheFor(TypeBase *t) {
+  return t->isDependentType() ? DependentCache : IndependentCache;
+}
+
+const TypeInfo *&
+TypeConverter::getFirstTypeFor(TypeBase *t) {
+  return t->isDependentType() ? FirstDependentType : FirstIndependentType;
+}
+
 bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
 }
@@ -505,16 +515,21 @@ static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
 TypeConverter::TypeConverter(IRGenModule &IGM)
-  : IGM(IGM), FirstType(invalidTypeInfo()),
+  : IGM(IGM),
+    FirstIndependentType(invalidTypeInfo()),
+    FirstDependentType(invalidTypeInfo()),
     FirstProtocol(invalidProtocolInfo()) {}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
-  for (const TypeInfo *I = FirstType; I != invalidTypeInfo(); ) {
+  for (const TypeInfo *I = FirstIndependentType; I != invalidTypeInfo(); ) {
     const TypeInfo *Cur = I;
     I = Cur->NextConverted;
     delete Cur;
   }
+  
+  assert(FirstDependentType == invalidTypeInfo()
+         && "generic context not popped?!");
 
   for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
     const ProtocolInfo *Cur = I;
@@ -523,12 +538,40 @@ TypeConverter::~TypeConverter() {
   }
 }
 
+void TypeConverter::pushGenericContext(GenericSignature *signature) {
+  assert(!Archetypes && "already have generic context?!");
+  
+  // If the generic signature is empty, this is a no-op.
+  if (!signature)
+    return;
+  
+  Archetypes.emplace(*IGM.SILMod->getSwiftModule(), IGM.Context.Diags);
+  if (Archetypes->addGenericSignature(signature))
+    llvm_unreachable("error adding generic signature to archetype builder?!");
+  Archetypes->assignArchetypes();
+}
+
+void TypeConverter::popGenericContext() {
+  if (!Archetypes.hasValue())
+    return;
+  
+  // Delete converted TypeInfos for dependent types.
+  for (const TypeInfo *I = FirstDependentType; I != invalidTypeInfo(); ) {
+    const TypeInfo *Cur = I;
+    I = Cur->NextConverted;
+    delete Cur;
+  }
+  FirstDependentType = invalidTypeInfo();
+  Types.DependentCache.clear();
+  Archetypes.reset();
+}
+
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
-  assert(!Types.Cache.count(key) && "entry already exists for type!");
-  Types.Cache.insert(std::make_pair(key, type));
+  assert(!Types.getCacheFor(key).count(key) && "entry already exists for type!");
+  Types.getCacheFor(key).insert(std::make_pair(key, type));
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -540,8 +583,8 @@ const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   WitnessTablePtrTI = createPrimitive(IGM.WitnessTablePtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getPointerAlignment());
-  WitnessTablePtrTI->NextConverted = FirstType;
-  FirstType = WitnessTablePtrTI;
+  WitnessTablePtrTI->NextConverted = FirstIndependentType;
+  FirstIndependentType = WitnessTablePtrTI;
   return *WitnessTablePtrTI;
 }
 
@@ -554,8 +597,8 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   TypeMetadataPtrTI = createPrimitive(IGM.TypeMetadataPtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getPointerAlignment());
-  TypeMetadataPtrTI->NextConverted = FirstType;
-  FirstType = TypeMetadataPtrTI;
+  TypeMetadataPtrTI->NextConverted = FirstIndependentType;
+  FirstIndependentType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
 }
 
@@ -682,8 +725,9 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
-  auto it = Types.Cache.find(canonicalTy.getPointer());
-  if (it != Types.Cache.end())
+  auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
+  auto it = Cache.find(canonicalTy.getPointer());
+  if (it != Cache.end())
     return it->second;
 
   // Convert the type.
@@ -695,13 +739,14 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // because we won't know how to clear it later.
   if (!convertedTI) return convertedEntry;
 
-  auto &entry = Types.Cache[canonicalTy.getPointer()];
+  auto &entry = Cache[canonicalTy.getPointer()];
   assert(entry == TypeCacheEntry() ||
          (entry.is<llvm::Type*>() &&
           entry.get<llvm::Type*>() == convertedTI->getStorageType()));
   entry = convertedTI;
 
   // If the type info hasn't been added to the list of types, do so.
+  auto &FirstType = getFirstTypeFor(canonicalTy.getPointer());
   if (!convertedTI->NextConverted) {
     convertedTI->NextConverted = FirstType;
     FirstType = convertedTI;
@@ -945,8 +990,9 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->is<UnboundGenericType>());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto entry = Types.Cache.find(key);
-  if (entry != Types.Cache.end())
+  auto &Cache = Types.getCacheFor(key);
+  auto entry = Cache.find(key);
+  if (entry != Cache.end())
     return entry->second;
 
   switch (decl->getKind()) {
@@ -961,22 +1007,22 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
 
   case DeclKind::Class: {
     auto result = convertClassType(cast<ClassDecl>(decl));
-    assert(!Types.Cache.count(key));
-    Types.Cache.insert(std::make_pair(key, result));
+    assert(!Cache.count(key));
+    Cache.insert(std::make_pair(key, result));
     return result;
   }
 
   case DeclKind::Enum: {
     auto type = CanType(decl->getDeclaredTypeInContext());
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
-    overwriteForwardDecl(Types.Cache, key, result);
+    overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
     auto type = CanType(decl->getDeclaredTypeInContext());
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
-    overwriteForwardDecl(Types.Cache, key, result);
+    overwriteForwardDecl(Cache, key, result);
     return result;
   }
   }

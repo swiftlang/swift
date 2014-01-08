@@ -19,12 +19,14 @@
 #define SWIFT_IRGEN_GENTYPE_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/AST/ArchetypeBuilder.h"
 
 namespace llvm {
   class Constant;
 }
 
 namespace swift {
+  class ArchetypeBuilder;
   class ArchetypeType;
   class ArrayType;
   class CanType;
@@ -65,7 +67,11 @@ public:
   IRGenModule &IGM;
 private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
-  const TypeInfo *FirstType;
+  const TypeInfo *FirstIndependentType;
+  const TypeInfo *FirstDependentType;
+  
+  const TypeInfo *&getFirstTypeFor(TypeBase *key);
+  
   const ProtocolInfo *FirstProtocol;
   const TypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
@@ -110,15 +116,44 @@ public:
   const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
 
+  /// Enter a generic context for lowering the parameters of a generic function
+  /// type.
+  void pushGenericContext(GenericSignature *signature);
+  
+  /// Exit a generic context.
+  void popGenericContext();
+  
 private:
   class Types_t {
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> Cache;
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
+    friend void TypeConverter::popGenericContext();
+    
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
   };
   Types_t Types;
+  Optional<ArchetypeBuilder> Archetypes;
+};
+  
+/// An RAII interface for entering a generic context for type conversion in
+/// a scope.
+class GenericContextScope {
+  TypeConverter &TC;
+public:
+  GenericContextScope(TypeConverter &TC,
+                      GenericSignature *sig)
+    : TC(TC)
+  {
+    TC.pushGenericContext(sig);
+  }
+  
+  ~GenericContextScope() {
+    TC.popGenericContext();
+  }
 };
   
 } // end namespace irgen
