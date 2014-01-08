@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
+class ASTPrinter;
 
 /// The associativity of a binary operator.
 enum class Associativity {
@@ -290,6 +291,9 @@ public:
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
   }
+
+  void print(llvm::raw_ostream &OS) const;
+  void print(ASTPrinter &Printer) const;
 };
   
 } // end namespace swift

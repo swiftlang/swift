@@ -16,6 +16,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -31,4 +32,52 @@ DeclAttributes &Decl::getMutableAttrs() {
     AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(),
                       AttrsAndIsObjC.getInt()};
   return *const_cast<DeclAttributes*>(&getAttrs());
+}
+
+void DeclAttributes::print(llvm::raw_ostream &OS) const {
+  StreamPrinter P(OS);
+  print(P);
+}
+
+void DeclAttributes::print(ASTPrinter &Printer) const {
+    if (empty())
+    return;
+
+  if (isAssignment())
+    Printer << "@assignment ";
+  if (isConversion())
+    Printer << "@conversion ";
+  if (isTransparent())
+    Printer << "@transparent ";
+  if (isInfix())
+    Printer << "@infix ";
+  switch (getResilienceKind()) {
+  case Resilience::Default: break;
+  case Resilience::Fragile: Printer << "@fragile "; break;
+  case Resilience::InherentlyFragile: Printer << "@born_fragile "; break;
+  case Resilience::Resilient: Printer << "@resilient "; break;
+  }
+  if (isNoReturn())
+    Printer << "@noreturn ";
+  if (!AsmName.empty())
+    Printer << "@asmname=\"" << AsmName << "\" ";
+  if (isPostfix())
+    Printer << "@postfix ";
+  if (isObjC())
+    Printer << "@objc ";
+  if (isIBOutlet())
+    Printer << "@IBOutlet ";
+  if (isIBAction())
+    Printer << "@IBAction ";
+  if (isClassProtocol())
+    Printer << "@class_protocol ";
+  if (isExported())
+    Printer << "@exported ";
+  if (isOptional())
+    Printer << "@optional ";
+  Optional<bool> MutatingAttr = getMutating();
+  if (MutatingAttr && MutatingAttr.getValue())
+    Printer << "@mutating ";
+  if (MutatingAttr && !MutatingAttr.getValue())
+    Printer << "@!mutating ";
 }

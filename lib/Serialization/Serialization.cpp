@@ -966,7 +966,13 @@ static void checkAllowedAttributes(const Decl *D) {
   DeclAttributes attrs = D->getAttrs();
   for (AttrKind AK : { KINDS... })
     attrs.clearAttribute(AK);
-  assert(attrs.empty());
+
+  if (!attrs.empty()) {
+    llvm::errs() << "Serialization: unhandled attributes ";
+    attrs.print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm_unreachable("TODO: handle the above attributes");
+  }
 #endif
 }
 

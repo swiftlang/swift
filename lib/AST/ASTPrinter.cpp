@@ -180,41 +180,7 @@ private:
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
-  if (Attrs.empty())
-    return;
-
-  if (Attrs.isAssignment())
-    Printer << "@assignment ";
-  if (Attrs.isConversion())
-    Printer << "@conversion ";
-  if (Attrs.isTransparent())
-    Printer << "@transparent ";
-  if (Attrs.isInfix())
-    Printer << "@infix ";
-  switch (Attrs.getResilienceKind()) {
-  case Resilience::Default: break;
-  case Resilience::Fragile: Printer << "@fragile "; break;
-  case Resilience::InherentlyFragile: Printer << "@born_fragile "; break;
-  case Resilience::Resilient: Printer << "@resilient "; break;
-  }
-  if (Attrs.isNoReturn())
-    Printer << "@noreturn ";
-  if (!Attrs.AsmName.empty())
-    Printer << "@asmname=\"" << Attrs.AsmName << "\" ";
-  if (Attrs.isPostfix())
-    Printer << "@postfix ";
-  if (Attrs.isObjC())
-    Printer << "@objc ";
-  if (Attrs.isIBOutlet())
-    Printer << "@IBOutlet ";
-  if (Attrs.isIBAction())
-    Printer << "@IBAction ";
-  if (Attrs.isClassProtocol())
-    Printer << "@class_protocol ";
-  if (Attrs.isExported())
-    Printer << "@exported ";
-  if (Attrs.isOptional())
-    Printer << "@optional ";
+  Attrs.print(Printer);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,
