@@ -493,12 +493,12 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///
 ///   expr-super:
 ///     expr-super-member
-///     expr-super-constructor
+///     expr-super-init
 ///     expr-super-subscript
 ///   expr-super-member:
 ///     'super' '.' identifier
-///   expr-super-constructor:
-///     'super' '.' 'constructor' 
+///   expr-super-init:
+///     'super' '.' 'init' 
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper() {
@@ -514,7 +514,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
   if (Tok.is(tok::period)) {
-    // 'super.' must be followed by a member or constructor ref.
+    // 'super.' must be followed by a member or initializer ref.
 
     SourceLoc dotLoc = consumeToken(tok::period);
     
@@ -522,7 +522,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       // super.init
       SourceLoc ctorLoc = consumeToken();
       
-      // Check that we're actually in a constructor.
+      // Check that we're actually in an initializer
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
         if (!isa<ConstructorDecl>(AFD)) {
           diagnose(ctorLoc, diag::super_initializer_not_in_initializer);
@@ -537,7 +537,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
                                                              dotLoc, ctorLoc,
                                                              /*Implicit=*/false);
       if (Tok.isFollowingLParen()) {
-        // Parse Swift-style constructor arguments.
+        // Parse Swift-style initializer arguments.
         ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
         if (arg.hasCodeCompletion())
           return makeParserCodeCompletionResult<Expr>();
@@ -547,13 +547,13 @@ ParserResult<Expr> Parser::parseExprSuper() {
         
         result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
       } else {
-        // It's invalid to refer to an uncalled constructor.
+        // It's invalid to refer to an uncalled initializer.
         diagnose(ctorLoc, diag::super_initializer_must_be_called);
         result->setType(ErrorType::get(Context));
         return makeParserErrorResult(result);
       }
 
-      // The result of the called constructor is used to rebind 'self'.
+      // The result of the called initializer is used to rebind 'self'.
       return makeParserResult(
           new (Context) RebindSelfInConstructorExpr(result, selfDecl));
     } else if (Tok.is(tok::code_complete)) {
