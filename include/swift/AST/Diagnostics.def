@@ -174,7 +174,7 @@ ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
 ERROR(decl_not_static,decl_parsing,none,
-      "declaration can not be 'static'", ())
+      "declaration can not be denoted 'type'", ())
 
 // Var Name
 ERROR(unimplemented_static_var,decl_parsing,none,
@@ -234,7 +234,7 @@ ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
 ERROR(func_decl_without_paren,decl_parsing,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,decl_parsing,none,
-      "'static' functions may only be declared on a type", ())
+      "type functions may only be declared on a type", ())
 ERROR(func_selector_without_paren,decl_parsing,PointsToFirstBadToken,
       "expected '(' after identifier in argument list of selector-style function declaration", ())
 ERROR(func_selector_with_not_one_argument,decl_parsing,none,
@@ -282,7 +282,7 @@ ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(subscript_without_get,decl_parsing,none,
       "subscripting must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
-     "subscript can not be 'static'", ())
+     "subscript can not be denoted 'type'", ())
 
 // initializer
 ERROR(initializer_decl_wrong_scope,decl_parsing,none,
@@ -1161,8 +1161,8 @@ NOTE(protocol_witness_kind_conflict,sema_tcd,none,
 NOTE(protocol_witness_type_conflict,sema_tcd,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_static_conflict,sema_tcd,none,
-     "candidate is %select{|not }0'static'"
-     "%select{, but requirement is not| as required}0", (bool))
+     "candidate operates on %select{a type|an instance}0, not "
+     "%select{an instance|a type}0 as required", (bool))
 NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
