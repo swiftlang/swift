@@ -3411,13 +3411,11 @@ namespace {
     
     // The enum has the worst alignment of its payloads. The size includes the
     // added tag bits.
-    auto sizeWithTag = Size((CommonSpareBits.size() + 7U)/8U)
-      .roundUpToAlignment(worstAlignment)
-      .getValue();
+    auto sizeWithTag = (CommonSpareBits.size() + 7U)/8U;
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), {},
-                            worstAlignment, isPOD);
+                                worstAlignment, isPOD);
   }
 }
 

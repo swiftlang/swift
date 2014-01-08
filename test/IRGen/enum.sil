@@ -71,6 +71,8 @@ import Builtin
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ [8 x i8] }>
 
+// CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8], [1 x i8] }>
+
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
 // CHECK: %O4enum20DynamicSinglePayload = type <{}>
@@ -142,6 +144,12 @@ import Builtin
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* null
+
+// CHECK: @_TWVO4enum18MultiPayloadNested = constant [16 x i8*] [
+// CHECK:   i8* inttoptr (i64 10 to i8*),
+// CHECK:   i8* inttoptr (i64 7 to i8*),
+// CHECK:   i8* inttoptr (i64 16 to i8*)
+// CHECK: ]
 
 enum Empty {}
 
@@ -1963,6 +1971,36 @@ end:
   return undef : $()
 }
 
+// <rdar://problem/15759464>
+enum MultiPayloadInner {
+  case A(Builtin.Int64)
+  case B(Builtin.Int64)
+}
+
+enum MultiPayloadNested {
+  case A(MultiPayloadInner)
+  case B(MultiPayloadInner)
+}
+
+// CHECK-LABEL: define void @multi_payload_nested_switch
+// CHECK:  [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum18MultiPayloadNested* %0, i32 0, i32 1
+// CHECK:  [[TAG_BIT_ADDR:%.*]] = bitcast [1 x i8]* [[TAG_ADDR]] to i1*
+// CHECK:  [[TAG_BIT:%.*]] = load i1* [[TAG_BIT_ADDR]], align 1
+// CHECK:  switch i1 [[TAG_BIT]]
+sil @multi_payload_nested_switch : $(@in MultiPayloadNested) -> () {
+entry(%c : $*MultiPayloadNested):
+  switch_enum_addr %c : $*MultiPayloadNested, case #MultiPayloadNested.A!enumelt.1: a_dest, case #MultiPayloadNested.B!enumelt.1: b_dest
+
+a_dest:
+  br end
+
+b_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
 // -- test for a switch_enum bug for multi-payload, no-empty-case enums
 //    uncovered by Chris
 enum OnlyPayloads {
@@ -2002,7 +2040,8 @@ typealias AllConcreteTestEnums = (
   SinglePayloadNestedNested,
   MultiPayloadNoSpareBits,
   MultiPayloadOneSpareBit,
-  MultiPayloadTwoSpareBits)
+  MultiPayloadTwoSpareBits,
+  MultiPayloadNested)
 
 var x : AllConcreteTestEnums
 
