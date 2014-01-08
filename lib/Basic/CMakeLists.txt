@@ -7,8 +7,15 @@ add_swift_library(swiftBasic
   Punycode.cpp
   QuotedString.cpp
   SourceLoc.cpp
+  TaskQueue.cpp
   ThreadSafeRefCounted.cpp
-  Version.cpp)
+  Version.cpp
+
+  # Platform-specific TaskQueue implementations
+  Unix/TaskQueue.inc
+
+  # Platform-agnostic fallback TaskQueue implementation
+  Default/TaskQueue.inc)
 
 set(SWIFT_VERSION "1.0")
 message(STATUS "Swift version: ${SWIFT_VERSION}")
