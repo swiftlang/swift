@@ -142,8 +142,8 @@ void swift::performInOutDeshadowing(SILModule *M) {
     // them.
     SILFunctionType *FTI = Fn.getLoweredFunctionType();
     
-    for (unsigned arg = 0, e = FTI->getParameters().size(); arg != e; ++arg) {
-      if (!FTI->getParameters()[arg].isIndirectInOut()) continue;
+    for (unsigned arg = 0, e = FTI->getInterfaceParameters().size(); arg != e; ++arg) {
+      if (!FTI->getInterfaceParameters()[arg].isIndirectInOut()) continue;
 
       DEBUG(llvm::errs() << "  " << Fn.getName() << ": argument #"
                          << arg << "\n");

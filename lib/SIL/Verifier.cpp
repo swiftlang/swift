@@ -305,6 +305,9 @@ public:
             AI->getSubstCalleeType()->getAbstractCC(),
             "calling convention difference between types");
     
+    require(!AI->getSubstCalleeType()->isPolymorphic(),
+            "substituted callee type should not be generic");
+    
     require(substTy == AI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
     
@@ -328,6 +331,10 @@ public:
 
     auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
                                         PAI->getCallee().getType());
+
+    require(!PAI->getSubstCalleeType()->isPolymorphic(),
+            "substituted callee type should not be generic");
+    
     require(substTy == PAI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
 

@@ -34,7 +34,8 @@ static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
                                                         APInt Res,
                                                         bool Overflow) {
   // Get the SIL subtypes of the returned tuple type.
-  SILType FuncResType = AI->getSubstCalleeType()->getResult().getSILType();
+  SILType FuncResType
+    = AI->getSubstCalleeType()->getInterfaceResult().getSILType();
   assert(FuncResType.castTo<TupleType>()->getNumElements() == 2);
   SILType ResTy1 = FuncResType.getTupleElementType(0);
   SILType ResTy2 = FuncResType.getTupleElementType(1);

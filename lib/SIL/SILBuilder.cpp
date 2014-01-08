@@ -18,9 +18,15 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
-                                              SILModule &M) {
+                                              SILModule &M,
+                                              ArrayRef<Substitution> subs) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
-  auto params = FTI->getParameters();
+  if (!subs.empty())
+    FTI = FTI->substInterfaceGenericArgs(M, M.getSwiftModule(), subs);
+  
+  assert(!FTI->isPolymorphic()
+         && "must provide substitutions for generic partial_apply");
+  auto params = FTI->getInterfaceParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
@@ -32,7 +38,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
-                                            FTI->getResult(),
+                                            FTI->getInterfaceResult(),
                                             M.getASTContext());
   return SILType::getPrimitiveObjectType(appliedFnType);
 }

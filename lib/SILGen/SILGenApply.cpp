@@ -1241,11 +1241,11 @@ static SILValue emitRawApply(SILGenFunction &gen,
   assert(bool(resultAddr) == substFnType->hasIndirectResult());
   if (substFnType->hasIndirectResult()) {
     assert(resultAddr.getType() ==
-             substFnType->getIndirectResult().getSILType().getAddressType());
+             substFnType->getIndirectInterfaceResult().getSILType().getAddressType());
     argValues.push_back(resultAddr);
   }
 
-  auto inputTypes = substFnType->getParametersWithoutIndirectResult();
+  auto inputTypes = substFnType->getInterfaceParametersWithoutIndirectResult();
   assert(inputTypes.size() == args.size());
   
   // Gather the arguments.
@@ -1268,7 +1268,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
     argValues.push_back(argValue);
   }
 
-  auto resultType = substFnType->getResult().getSILType();
+  auto resultType = substFnType->getInterfaceResult().getSILType();
   auto calleeType = SILType::getPrimitiveObjectType(substFnType);
   SILValue result = gen.B.createApply(loc, fnValue, calleeType,
                                       resultType, subs, argValues,
@@ -1293,7 +1293,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
   auto &formalResultTL = gen.getTypeLowering(substResultType);
   auto loweredFormalResultType = formalResultTL.getLoweredType();
 
-  SILType actualResultType = substFnType->getSemanticResultSILType();
+  SILType actualResultType = substFnType->getSemanticInterfaceResultSILType();
 
   // Check whether there are abstraction differences (beyond just
   // direct vs. indirect) between the lowered formal result type and
@@ -1385,7 +1385,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
   // Otherwise, manage the direct result.
   } else {
-    switch (substFnType->getResult().getConvention()) {
+    switch (substFnType->getInterfaceResult().getConvention()) {
     case ResultConvention::Owned:
       // Already retained.
       break;

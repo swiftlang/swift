@@ -144,12 +144,12 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     // it is passed through @inout arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getSubstCalleeType()
-            ->getParameters()[UI->getOperandNumber()-1].isIndirect())
+            ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
       if (partialApply->getSubstCalleeType()
-            ->getParameters()[UI->getOperandNumber()-1].isIndirect())
+            ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
       
     }

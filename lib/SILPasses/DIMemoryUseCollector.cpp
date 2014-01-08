@@ -591,10 +591,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       auto FTI = Apply->getSubstCalleeType();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
-      auto Param = FTI->getParameters()[ArgumentNumber];
-      assert(Param.isIndirect());
+      auto ParamConvention = FTI->getInterfaceParameters()[ArgumentNumber]
+        .getConvention();
 
-      switch (Param.getConvention()) {
+      switch (ParamConvention) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:

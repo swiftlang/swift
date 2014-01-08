@@ -118,7 +118,8 @@ public:
   //===--------------------------------------------------------------------===//
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
-                                           SILModule &M);
+                                           SILModule &M,
+                                           ArrayRef<Substitution> subs);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation

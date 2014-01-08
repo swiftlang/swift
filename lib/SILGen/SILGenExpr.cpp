@@ -380,9 +380,12 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
     SILFunction *accessorFn = gen.SGM.getFunction(
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor));
     SILValue accessor = gen.B.createFunctionRef(loc, accessorFn);
+    auto accessorTy = accessor.getType().castTo<SILFunctionType>();
+    assert(!accessorTy->isPolymorphic()
+           && "generic global variable accessors not yet implemented");
     SILValue addr = gen.B.createApply(loc, accessor, accessor.getType(),
                               accessor.getType().castTo<SILFunctionType>()
-                                      ->getResult().getSILType(),
+                                      ->getInterfaceResult().getSILType(),
                               {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an address.
     addr = gen.B.createPointerToAddress(loc, addr,
@@ -1766,7 +1769,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   
   SILType closureTy =
     SILBuilder::getPartialApplyResultType(functionRef.getType(),
-                                          capturedArgs.size(), SGM.M);
+                                          capturedArgs.size(), SGM.M,
+                                          forwardSubs);
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
                          forwardSubs, capturedArgs, closureTy);
@@ -2701,7 +2705,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy =
     SILBuilder::getPartialApplyResultType(toFn.getType(), curriedArgs.size(),
-                                          SGM.M);
+                                          SGM.M, subs);
   SILInstruction *toClosure =
     B.createPartialApply(fd, toFn, toTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)

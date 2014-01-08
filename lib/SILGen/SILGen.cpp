@@ -112,16 +112,16 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
     
-    if (funcInfo->getParameters().size() != inputTypes.size()
-        || !std::equal(funcInfo->getParameterSILTypes().begin(),
-                       funcInfo->getParameterSILTypes().end(),
+    if (funcInfo->getInterfaceParameters().size() != inputTypes.size()
+        || !std::equal(funcInfo->getInterfaceParameterSILTypes().begin(),
+                       funcInfo->getInterfaceParameterSILTypes().end(),
                        inputTypes.begin())) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       exit(1);
     }
     
-    if (funcInfo->getResult().getSILType() != outputType) {
+    if (funcInfo->getInterfaceResult().getSILType() != outputType) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       exit(1);

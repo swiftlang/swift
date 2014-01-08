@@ -2306,7 +2306,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
     
     SILType closureTy =
-      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod);
+      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, {});
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
                                      subs, Args, closureTy);
