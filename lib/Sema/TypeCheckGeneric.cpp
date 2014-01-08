@@ -102,7 +102,7 @@ Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
   // parameter.
   // FIXME: When generic parameters can map down to specific types, do so
   // here.
-  auto pa = Builder.resolveType(gp);
+  auto pa = Builder.resolveArchetype(gp);
   assert(pa && "Missing archetype for generic type parameter");
   (void)pa;
 
@@ -117,7 +117,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     Identifier name,
                                     SourceLoc nameLoc) {
   // Resolve the base to a potential archetype.
-  auto basePA = Builder.resolveType(baseTy);
+  auto basePA = Builder.resolveArchetype(baseTy);
   assert(basePA && "Missing potential archetype for base");
   basePA = basePA->getRepresentative();
 
@@ -496,7 +496,7 @@ static Type resolvePotentialArchetypeToType(
   // generic parameter.
   // FIXME: O(n).
   for (auto param : params) {
-    if (builder.resolveType(param) == pa)
+    if (builder.resolveArchetype(param) == pa)
       return param;
   }
 
@@ -515,7 +515,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
   llvm::SmallPtrSet<PotentialArchetype *, 16> knownPAs;
   llvm::SmallVector<GenericTypeParamType *, 8> primary;
   for (auto param : params) {
-    auto pa = builder.resolveType(param);
+    auto pa = builder.resolveArchetype(param);
     assert(pa && "Missing potential archetype for generic parameter");
 
     // We only care about the representative.
@@ -545,7 +545,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
          idx < numPrimary && primary[idx]->getDepth() == depth;
          ++idx, ++lastPrimaryIdx) {
       auto param = primary[idx];
-      auto pa = builder.resolveType(param)->getRepresentative();
+      auto pa = builder.resolveArchetype(param)->getRepresentative();
 
       // Add other requirements.
       addRequirements(builder.getModule(), param, pa, knownPAs,
@@ -555,7 +555,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
     // For each of the primary potential archetypes, add the nested requirements.
     for (unsigned idx = primaryIdx; idx < lastPrimaryIdx; ++idx) {
       auto param = primary[idx];
-      auto pa = builder.resolveType(param)->getRepresentative();
+      auto pa = builder.resolveArchetype(param)->getRepresentative();
       addNestedRequirements(builder.getModule(), param, pa, knownPAs,
                             requirements);
     }

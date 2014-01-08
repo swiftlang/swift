@@ -203,7 +203,7 @@ public:
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveType(Type type);
+  PotentialArchetype *resolveArchetype(Type type);
 
   /// \brief Assign archetypes to each of the generic parameters and all
   /// of their associated types, recursively.

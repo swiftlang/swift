@@ -163,7 +163,7 @@ namespace {
     // Resolve dependent member types.
     if (auto depType = dyn_cast<DependentMemberType>(ty)) {
       // See if the type directly references an associated archetype.
-      auto potentialArchetype = TC.getArchetypes().resolveType(depType);
+      auto potentialArchetype = TC.getArchetypes().resolveArchetype(depType);
       // If so, use it.
       if (potentialArchetype) {
         return CanType(potentialArchetype->getArchetype(nullptr, M));

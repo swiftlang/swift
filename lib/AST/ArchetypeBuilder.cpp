@@ -296,7 +296,7 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     delete PA.second.second;
 }
 
-auto ArchetypeBuilder::resolveType(Type type) -> PotentialArchetype * {
+auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     auto known
       = Impl->PotentialArchetypes.find(GenericTypeParamKey::forType(genericParam));
@@ -307,7 +307,7 @@ auto ArchetypeBuilder::resolveType(Type type) -> PotentialArchetype * {
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolveType(dependentMember->getBase());
+    auto base = resolveArchetype(dependentMember->getBase());
     if (!base)
       return nullptr;
 
@@ -485,7 +485,7 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
 bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   switch (Req.getKind()) {
   case RequirementKind::Conformance: {
-    PotentialArchetype *PA = resolveType(Req.getSubject());
+    PotentialArchetype *PA = resolveArchetype(Req.getSubject());
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -517,7 +517,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   case RequirementKind::SameType: {
     // FIXME: Allow one of the types to not be a potential archetype, e.g.,
     // T.Element == Int?
-    PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
+    PotentialArchetype *FirstPA = resolveArchetype(Req.getFirstType());
     if (!FirstPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -526,7 +526,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
       return true;
     }
 
-    PotentialArchetype *SecondPA = resolveType(Req.getSecondType());
+    PotentialArchetype *SecondPA = resolveArchetype(Req.getSecondType());
     if (!SecondPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -547,7 +547,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
 void ArchetypeBuilder::addRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance: {
-    PotentialArchetype *pa = resolveType(req.getFirstType());
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     assert(pa && "Re-introducing invalid requirement");
 
     if (req.getSecondType()->getClassOrBoundGenericClass()) {
@@ -571,10 +571,10 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
   }
 
   case RequirementKind::SameType: {
-    PotentialArchetype *firstPA = resolveType(req.getFirstType());
+    PotentialArchetype *firstPA = resolveArchetype(req.getFirstType());
     assert(firstPA && "Re-introducing invalid requirement");
 
-    PotentialArchetype *secondPA = resolveType(req.getSecondType());
+    PotentialArchetype *secondPA = resolveArchetype(req.getSecondType());
     assert(secondPA && "Re-introducing invalid requirement");
     addSameTypeRequirement(firstPA, SourceLoc(), secondPA);
     return;
@@ -664,7 +664,7 @@ public:
         auto param = params[i].getAsTypeParam();
 
         // Try to resolve the argument to a potential archetype.
-        auto argPA = Builder.resolveType(arg);
+        auto argPA = Builder.resolveArchetype(arg);
         if (!argPA)
           continue;
 
