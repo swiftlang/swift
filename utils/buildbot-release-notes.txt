@@ -1,4 +1,5 @@
 2014-01-08
+----------
 
 * The "static" keyword changed to "type". One can now define "type
   functions" and "type variables" which are functions and variables
