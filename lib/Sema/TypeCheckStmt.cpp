@@ -825,41 +825,19 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
   SmallVector<ASTNode, 4> memberInitializers;
 
-  // Default-initialize all of the members.
-  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
-    ->getNominalOrBoundGenericNominal();
-  for (auto member : nominalDecl->getMembers()) {
-    // We only care about pattern bindings.
-    auto patternBind = dyn_cast<PatternBindingDecl>(member);
-    if (!patternBind || patternBind->isInvalid() || patternBind->isStatic())
-      continue;
-
-    // If the pattern has an initializer, use it.
-    auto initializer = patternBind->getInit();
-    if (!initializer) continue;
-
-    // Create a tuple expression with the same structure as the
-    // pattern.
-    Expr *dest = createPatternMemberRefExpr(*this,
-                                            ctor->getImplicitSelfDecl(),
-                                            patternBind->getPattern());
-    assert(dest);
-    initializer = new (Context) DefaultValueExpr(initializer);
-    Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                            initializer,
-                                            /*Implicit=*/true);
-    typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
-    memberInitializers.push_back(assign);
-    continue;
-  }
-
   // Construct super.init call to be inserted at the end of the explicit
   // initializer if none has been added by the user.
+  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
+    ->getNominalOrBoundGenericNominal();
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+  bool isDelegating = false;
   if (!ctor->isImplicit()) {
     switch (ctor->getDelegatingOrChainedInitKind(&Diags)) {
-      case ConstructorDecl::BodyInitKind::Chained:
       case ConstructorDecl::BodyInitKind::Delegating:
+        isDelegating = true;
+        break;
+
+      case ConstructorDecl::BodyInitKind::Chained:
       case ConstructorDecl::BodyInitKind::None:
         break;
 
@@ -873,21 +851,49 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     }
   }
 
-  // If this is the implicit default initializer for a class with a superclass,
-  // call the superclass initializer.
-  if (ctor->isImplicit() && ClassD && ClassD->getSuperclass()) {
-    if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD))
-      memberInitializers.push_back(SuperInitCall);
-  }
+  // If this constructor does not delegate, add all of the member initializers.
+  if (!isDelegating) {
+    for (auto member : nominalDecl->getMembers()) {
+      // We only care about pattern bindings.
+      auto patternBind = dyn_cast<PatternBindingDecl>(member);
+      if (!patternBind || patternBind->isInvalid() || patternBind->isStatic())
+        continue;
 
-  // If we added any default initializers, append the rest of the body at
-  // the end.
-  if (!memberInitializers.empty()) {
-    memberInitializers.append(body->getElements().begin(),
-                              body->getElements().end());
+      // If the pattern has an initializer, use it.
+      auto initializer = patternBind->getInit();
+      if (!initializer) continue;
 
-    body = BraceStmt::create(Context, body->getLBraceLoc(), memberInitializers,
-                             body->getRBraceLoc());
+      // Create a tuple expression with the same structure as the
+      // pattern.
+      Expr *dest = createPatternMemberRefExpr(*this,
+                                              ctor->getImplicitSelfDecl(),
+                                              patternBind->getPattern());
+      assert(dest);
+      initializer = new (Context) DefaultValueExpr(initializer);
+      Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
+                                              initializer,
+                                              /*Implicit=*/true);
+      typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
+      memberInitializers.push_back(assign);
+      continue;
+    }
+
+    // If this is the implicit default initializer for a class with a superclass,
+    // call the superclass initializer.
+    if (ctor->isImplicit() && ClassD && ClassD->getSuperclass()) {
+      if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD))
+        memberInitializers.push_back(SuperInitCall);
+    }
+
+    // If we added any default initializers, append the rest of the body at
+    // the end.
+    if (!memberInitializers.empty()) {
+      memberInitializers.append(body->getElements().begin(),
+                                body->getElements().end());
+
+      body = BraceStmt::create(Context, body->getLBraceLoc(), memberInitializers,
+                               body->getRBraceLoc());
+    }
   }
 
   ctor->setBody(body);
