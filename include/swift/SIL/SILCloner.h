@@ -38,6 +38,17 @@ class SILCloner : protected SILVisitor<ImplClass> {
 public:
   explicit SILCloner(SILFunction &F)
     : Builder(F), InsertBeforeBB(nullptr) { }
+  
+  /// Clients of SILCloner who want to know about any newly created
+  /// instructions can install a SmallVector into the builder to collect them.
+  void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
+    getBuilder().setTrackingList(II);
+  }
+  
+  SmallVectorImpl<SILInstruction*> *getTrackingList() {
+    return getBuilder().getTrackingList();
+  }
+
 
 protected:
 #define VALUE(CLASS, PARENT) \
