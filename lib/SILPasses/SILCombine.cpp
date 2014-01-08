@@ -495,6 +495,22 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
 
 SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   SILValue Operand = CI->getOperand();
+
+  // If the copy_value is right before a destroy_value that uses it, remove
+  // both and forward the copy_value's operand to its uses.
+  //
+  // Since the copy_value is right before the destroy_value, there are no flow
+  // issues here. This occurs often with enum values.
+  SILBasicBlock::iterator I = CI;
+  ++I;
+  if (auto *DI = dyn_cast<DestroyValueInst>(&*I))
+    if (DI->getOperand().getDef() == CI ||
+        DI->getOperand() == Operand) {
+      eraseInstFromFunction(*DI);
+      replaceInstUsesWith(*CI, CI->getOperand().getDef(), 0);
+      return eraseInstFromFunction(*CI);
+    }
+
   SILType OperandTy = Operand.getType();
 
   // copy_value of an enum with a trivial payload or no-payload is a no-op +

@@ -439,3 +439,29 @@ bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
   return %3 : $HeapBuffer<T_0_0, T_0_1>
 }
 
+struct S2 {
+  var x : Builtin.ObjectPointer
+}
+
+// CHECK-LABEL: sil @adjacent_copyvalue_destroyvalue_pair
+// CHECK: bb0([[IN1:%[0-9]+]] : $S2, [[IN2:%[0-9]+]] : $S2):
+// CHECK-NEXT: [[IN1Copy:%[0-9]+]] = copy_value [[IN1]]
+// CHECK-NEXT: copy_value [[IN2]]
+// CHECK-NEXT: destroy_value [[IN1Copy]]
+// CHECK-NEXT: return
+sil @adjacent_copyvalue_destroyvalue_pair : $@thin (S2, S2) -> S2 {
+bb0(%0 : $S2, %1 : $S2):
+  // This copy_value, destroy_value pair is not able to be eliminated.
+  %2 = copy_value %0 : $S2
+  copy_value %1 : $S2
+  destroy_value %2 : $S2
+
+  // This copy_value, destroy_value pair is able to be eliminated.
+  %3 = copy_value %0 : $S2
+  destroy_value %3 : $S2
+  // This copy_value, destroy_value pair is able to be eliminated.
+  %4 = copy_value %0 : $S2
+  destroy_value %0 : $S2
+  return %3 : $S2
+}
+
