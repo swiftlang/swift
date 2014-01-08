@@ -78,6 +78,12 @@ public:
   /// Asks the Compilation to perform the Jobs which it knows about.
   /// \returns result code for the Compilation's Jobs; 0 indicates success
   int performJobs();
+
+private:
+  /// \brief Perform the Jobs in \p JL if necessary.
+  ///
+  /// \returns exit code of the first failed Job, or 0 on success
+  int performJobsInList(const JobList &JL);
 };
 
 } // end namespace driver
