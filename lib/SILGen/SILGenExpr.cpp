@@ -431,7 +431,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       return ManagedValue(SILDebugClient->emitReferenceToDecl(loc, declRef,
                                                               ncRefType,
                                                               uncurryLevel, B),
-                          ManagedValue::Unmanaged);
+                          ManagedValue::LValue);
     }
 
     assert(!declRef.isSpecialized() &&
