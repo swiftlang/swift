@@ -174,7 +174,7 @@ ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
 ERROR(decl_not_static,decl_parsing,none,
-      "declaration can not be denoted 'type'", ())
+      "declaration can not be marked 'type'", ())
 ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
@@ -284,7 +284,7 @@ ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(subscript_without_get,decl_parsing,none,
       "subscripting must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
-     "subscript can not be denoted 'type'", ())
+     "subscript can not be marked 'type'", ())
 
 // initializer
 ERROR(initializer_decl_wrong_scope,decl_parsing,none,
