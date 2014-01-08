@@ -44,10 +44,6 @@ protected:
 public:
   virtual ~Job() = default;
 
-  virtual bool needsToRun() = 0;
-
-  virtual int run() = 0;
-
   JobClass getKind() const { return Kind; }
 };
 
@@ -67,10 +63,6 @@ public:
   JobList() : Job(JobListClass), OwnsJobs(true) {};
   virtual ~JobList();
 
-  virtual bool needsToRun();
-
-  virtual int run();
-  
   bool getOwnsJobs() const { return OwnsJobs; }
   void setOwnsJobs(bool Value) { OwnsJobs = Value; }
 
@@ -137,10 +129,6 @@ public:
         Executable(Executable), Arguments(Arguments) {}
   virtual ~Command() = default;
 
-  virtual bool needsToRun();
-
-  virtual int run();
-
   const Action &getSource() const { return Source; }
   const Tool &getCreator() const { return Creator; }
 
@@ -150,11 +138,6 @@ public:
   const JobList &getInputs() const { return *Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
 
-private:
-  virtual int execute(const StringRef **Redirects, std::string *ErrMsg,
-                      bool *ExecutionFailed) const;
-
-public:
   static bool classof(const Job *J) {
     return J->getKind() == CommandClass;
   }
