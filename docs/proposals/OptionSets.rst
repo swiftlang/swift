@@ -170,7 +170,7 @@ For example::
         AlignHeightInward : Bool = false
 
     // convenience combinations
-    static func NSAlignAllEdgesInward() {
+    type func NSAlignAllEdgesInward() {
       return NSAlignmentOptions(AlignMinXInward: true,
                                 AlignMaxXInward: true,
                                 AlignMinYInward: true,
@@ -265,7 +265,7 @@ bitwise operations can be applied to them.
   struct MyOptions : OptionSet {
     var Foo, Bar, Bas : Bool = false
     
-    static func Foobar() -> MyOptions {
+    type func Foobar() -> MyOptions {
       return MyOptions(Foo: true, Bar: true)
     }
   }
@@ -281,14 +281,14 @@ individual option::
     // Stored properties of instances
     var Foo, Bar, Bas : Bool = false
 
-    static func Foobar() -> MyOptions {
+    type func Foobar() -> MyOptions {
       return MyOptions(Foo: true, Bar: true)
     }
 
     // Implicitly-generated static properties?
-    static func Foo() -> MyOptions { return MyOptions(Foo: true) }
-    static func Bar() -> MyOptions { return MyOptions(Bar: true) }
-    static func Bas() -> MyOptions { return MyOptions(Bas: true) }
+    type func Foo() -> MyOptions { return MyOptions(Foo: true) }
+    type func Bar() -> MyOptions { return MyOptions(Bar: true) }
+    type func Bas() -> MyOptions { return MyOptions(Bas: true) }
   }
 
   var x: MyOptions = .Foobar() | .Bas()

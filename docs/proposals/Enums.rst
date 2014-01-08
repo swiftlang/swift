@@ -262,7 +262,7 @@ models the traditional relationship between a C enum and its raw type::
     /// conforming type.
     /// Returns None if the raw value has no corresponding conforming type
     /// value.
-    static func fromRaw(_:RawType) -> Self?
+    type func fromRaw(_:RawType) -> Self?
   }
 
 Any type may manually conform to the RawRepresentable protocol following the above
@@ -330,7 +330,7 @@ methods. The NSChangeDictionaryKey definition behaves as if defined::
       }
     }
 
-    static func fromRaw(s:String) -> NSChangeDictionaryKey? {
+    type func fromRaw(s:String) -> NSChangeDictionaryKey? {
       switch s {
       case "NSKeyValueChangeKindKey":
         return .NSKeyValueChangeKindKey

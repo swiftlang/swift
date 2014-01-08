@@ -267,10 +267,10 @@ namespace {
 /// Build the 'fromMask' or 'fromRaw' method for an option set.
 /// struct NSSomeOptionSet : RawOptionSet {
 ///   var value : RawType
-///   static func fromMask(value: RawType) -> NSSomeOptionSet {
+///   type func fromMask(value: RawType) -> NSSomeOptionSet {
 ///     return NSSomeOptionSet(value)
 ///   }
-///   static func fromRaw(value: RawType) -> NSSomeOptionSet? {
+///   type func fromRaw(value: RawType) -> NSSomeOptionSet? {
 ///     return NSSomeOptionSet(value)
 ///   }
 /// }

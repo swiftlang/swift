@@ -146,7 +146,7 @@ fails, we fall back to qualified lookup into the module::
   import Foo // exports bas
 
   class Foo {
-    static func bar()
+    type func bar()
   }
 
   Foo.bar() // bar method from Foo class

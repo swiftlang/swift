@@ -159,7 +159,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                                 EnumDecl *enumDecl) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
-  //   static func [derived] fromRaw(raw: SomeType) -> SomeEnum? {
+  //   type func [derived] fromRaw(raw: SomeType) -> SomeEnum? {
   //     switch raw {
   //     case 111:
   //       return A
