@@ -1,5 +1,5 @@
 add_swift_executable(swift-ide-test
-  swift-ide-test.cpp
+  swift-ide-test.cpp PrintAsObjC.cpp
   DEPENDS swiftFrontend swiftIDE
   COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
