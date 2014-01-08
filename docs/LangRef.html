@@ -258,7 +258,6 @@
     keyword ::= 'metatype'
     keyword ::= 'enum'
     keyword ::= 'protocol'
-    keyword ::= 'static'
     keyword ::= 'struct'
     keyword ::= 'subscript'
     keyword ::= 'typealias'
@@ -783,7 +782,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
+    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'type'? var' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
 
     decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
 
@@ -872,7 +871,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'static'? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'type'? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -889,13 +888,13 @@ an lvalue unless it has a <code>var-get</code> clause but not
   in other places that are semantically equivalent to an extension) implicitly
   get a 'self' argument with these rules ... [todo]</p>
   
-  <p>'static' functions are only allowed in an <a 
+  <p>'type' functions are only allowed in an <a 
      href="#decl-extension">extension</a> of some type (or in other places
      that are semantically equivalent to an extension).  They indicate that
      the function is actually defined on the <a href="#metatype">metatype</a>
      for the type, not on the 
-     type itself.  Thus it does not implicitly get a first 'self' argument, and
-     can be used with dot syntax on the metatype.</p>
+     type itself.  Thus its implicit 'self' argument is actually of
+     metatype type.</p>
   
   <p>TODO: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
@@ -984,14 +983,14 @@ an lvalue unless it has a <code>var-get</code> clause but not
     struct bankaccount { 
       amount : Int
     
-      static func bankaccount() -> bankaccount {
+     type func bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
       func deposit(arg : Int) {
         amount = amount + arg
       }
     
-      static func someMetatypeMethod() {}
+     type func someMetatypeMethod() {}
     }
     
     <i>// Dot syntax on metatype.</i>
@@ -1209,8 +1208,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
      inheritance list.</p>
 
   <p>The body of a 'class' is a list of decls. Stored (non-computed) 'var' decls
-     declare members with storage in the class. Non-static 'var' and 'func'
-     decls declare instance members; static 'var' and 'func' decls declare
+     declare members with storage in the class. Non-type 'var' and 'func'
+     decls declare instance members;type 'var' and 'func' decls declare
      members of the class itself.  Both class and instance members can
      be overridden by a subclass.</p>
   <p>Type declarations inside a class act essentially the same way as type
@@ -1263,8 +1262,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
   
   <p>'func' members of a protocol define a value of function type that may be
   accessed with dot syntax on a value of the protocol's type.  The function
-  gets an implicit "self" argument of the protocol type and shall not
-  be static.</p>
+  gets an implicit "self" argument of the protocol type or (for a type
+  function) of the metatype of the protocol.</p>
   
  <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-var">'var' protocol elements</h4>
@@ -1689,19 +1688,19 @@ if vec[3] {
   <p id="metatype">Each type has a corresponding <i>metatype</i>, with the same
     name as the type, that is injected into the standard name lookup scope when
     a type is <a href="#decl">declared</a>.  This allows access to '<a 
-    href="#decl-func">static functions</a>' through dot syntax.  For example:</p>
+    href="#decl-func">type functions</a>' through dot syntax.  For example:</p>
   
   <pre class="example">
     // Declares a type 'foo' as well as its metatype.
     struct foo {
-      static func bar() {}
+     type func bar() {}
     }
     
     // Declares x to be of type foo.  A reference to a name in type context
     // refers to the type itself.
     var x : foo
     
-    // Accesses a static function on the foo metatype.  In a value context, the
+    // Accesses a type function on the foo metatype.  In a value context, the
     // name of its type refers to its metatype.
     foo.bar()
   </pre>
@@ -2762,7 +2761,7 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <p>A literal is compatible with its inferred type if that type implements an
      informal protocol required by literals.  This informal protocol requires
-     that the type have an unambiguous "static" function defined whose
+     that the type have an unambiguous "type" function defined whose
      result type is the same as the inferred type, and that takes a single
      argument that is either itself literal compatible, or is a <a
      href="#builtin">builtin</a> integer type.</p>
@@ -2821,12 +2820,12 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
       init() {}
-      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+      type func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
     <i>// Construct an instance of the generic struct.</i>
     var foo = Dict&lt;String, Int&gt;()
-    <i>// Invoke a static method of an instance of the generic struct.</i>
+    <i>// Invoke a type method of an instance of the generic struct.</i>
     var bar = Dict&lt;String, Int&gt;.fromKeysAndValues(
       ["zim", "zang", "zung"],
       [ 123,    456,    789 ])
@@ -2857,7 +2856,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </ul>
 
   <p>These rules assume that, in most cases, generic type names will be used
-  in constructor expressions as in <tt>Foo&lt;T&gt;(x)</tt> or to access static
+  in constructor expressions as in <tt>Foo&lt;T&gt;(x)</tt> or to access type
   members as in <tt>Foo&lt;T&gt;.bar()</tt>. Referring to a generic metatype as a
   value in an expression may require parentheses around the type name.
 
@@ -3010,12 +3009,12 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   
   <p>A delayed identifier expression refers to a case of an <a 
-    href="type-enum">enum</a> type or a static member of a nominal
+    href="type-enum">enum</a> type or a type member of a nominal
     type, without knowing which type it is referring to.  The
     expression is resolved to a member of a concrete type through
     context-sensitive type inference. When it is followed by an <a
     href="#expr-paren">expr-paren</a>, the member must either be an
-    enum case that carries a value or a (static) member function.</p>
+    enum case that carries a value or a (type) member function.</p>
   
   <pre class="example">
     enum Direction { case Up, Down }
