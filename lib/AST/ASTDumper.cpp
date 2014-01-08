@@ -405,7 +405,7 @@ namespace {
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
       if (VD->isStatic())
-        OS << " static";
+        OS << " type";
       if (VD->isLet())
         OS << " let";
       
@@ -550,6 +550,8 @@ namespace {
     
     void visitFuncDecl(FuncDecl *FD) {
       printCommonAFD(FD, "func_decl");
+      if (FD->isStatic())
+        OS << " type";
       if (FD->isGetterOrSetter()) {
         if (FD->getGetterDecl()) {
           OS << " getter";
