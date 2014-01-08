@@ -532,7 +532,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   recordDeclLoc(decl);
   if (decl->isStatic())
-    Printer << "static ";
+    Printer << "type ";
   Printer << "var ";
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
@@ -624,7 +624,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
   if (decl->isStatic())
-    Printer << "static ";
+    Printer << "type ";
   Printer << "var ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
@@ -741,7 +741,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printAttributes(decl->getAttrs());
     printImplicitObjCNote(decl);
     if (decl->isStatic() && !decl->isOperator())
-      Printer << "static ";
+      Printer << "type ";
     Printer << "func ";
     recordDeclLoc(decl);
     if (decl->getName().empty())

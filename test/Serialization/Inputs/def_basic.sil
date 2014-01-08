@@ -199,7 +199,7 @@ protocol Runcible {
 
   func free_method() -> Int
   func associated_method() -> U.metatype
-  static func static_method()
+  type func static_method()
 }
 
 //sil @_TF4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {

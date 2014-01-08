@@ -419,7 +419,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
-    if (isStartOfBindingName(Tok) && peekToken().is(tok::colon)) {
+    if (isAtStartOfBindingName() && peekToken().is(tok::colon)) {
       // Consume the name
       // FIXME: Should the identifier '_' ever be formed?
       Identifier name = Context.getIdentifier(Tok.getText());

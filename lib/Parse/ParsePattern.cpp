@@ -295,7 +295,7 @@ parseSelectorFunctionArguments(Parser &P,
 
   ParserStatus Status;
   for (;;) {
-    if (P.isStartOfBindingName(P.Tok)) {
+    if (P.isAtStartOfBindingName()) {
       Status |= parseSelectorArgument(P, ArgElts, BodyElts, SelectorNames,
                                       DefaultArgs, RParenLoc);
       continue;
@@ -334,7 +334,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
   }
 
   // FIXME: more strict check would be to look for l_paren as well.
-  if (isStartOfBindingName(Tok)) {
+  if (isAtStartOfBindingName()) {
     // This looks like a selector-style argument.  Try to convert the first
     // argument pattern into a single argument type and parse subsequent
     // selector forms.
@@ -429,7 +429,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
     return Params;
   }
 
-  if (!isStartOfBindingName(Tok)) {
+  if (!isAtStartOfBindingName()) {
     // Complain that we expected '(' or a parameter name.
     {
       auto diag = diagnose(Tok, diag::expected_lparen_initializer);
@@ -460,7 +460,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   SmallVector<TuplePatternElt, 4> BodyElts;
   SourceLoc RParenLoc;
   for (;;) {
-    if (isStartOfBindingName(Tok)) {
+    if (isAtStartOfBindingName()) {
       Status |= parseSelectorArgument(*this, ArgElts, BodyElts, selectorNames,
                                       DefaultArgs, RParenLoc);
       continue;
@@ -537,8 +537,9 @@ ParserResult<Pattern> Parser::parsePatternVarOrLet() {
 
 /// \brief Determine whether this token can start a binding name, whether an
 /// identifier or the special discard-value binding '_'.
-bool Parser::isStartOfBindingName(Token tok) {
-  return tok.is(tok::kw__) || tok.is(tok::identifier);
+bool Parser::isAtStartOfBindingName() {
+  return Tok.is(tok::kw__)
+    || (Tok.is(tok::identifier) && !isStartOfDecl(Tok, peekToken()));
 }
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,

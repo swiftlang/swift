@@ -178,7 +178,7 @@ ERROR(decl_not_static,decl_parsing,none,
 
 // Var Name
 ERROR(unimplemented_static_var,decl_parsing,none,
-     "static variables not yet supported in "
+     "type variables not yet supported in "
      "%select{this context|generic types|classes|protocols}0", (unsigned))
 
 // Variable getters/setters
@@ -1077,7 +1077,7 @@ ERROR(invalid_prefix_input,sema_tcd,none,
 ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial @inout argument", ())
 ERROR(static_functions_not_mutating,sema_tcd,none,
-      "static functions may not be declared @mutating", ())
+      "type functions may not be declared @mutating", ())
 ERROR(mutating_invalid,sema_tcd,none,
       "@mutating is not valid on this declaration", ())
 ERROR(conversion_not_function,sema_tcd,none,
@@ -1510,7 +1510,7 @@ ERROR(objc_class_not_top_level,sema_tcd,none,
 ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
       "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(objc_invalid_on_static_var,sema_tcd,none,
-      "static properties can not be declared '@objc'", ())
+      "type properties can not be declared '@objc'", ())
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property can not be marked %select{@objc|@IBOutlet}0 because its type "

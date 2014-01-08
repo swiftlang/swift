@@ -673,9 +673,9 @@ public:
 
   ParserResult<Pattern> parsePattern(bool isLet);
 
-  /// \brief Determine whether this token can start a binding name, whether an
-  /// identifier or the special discard-value binding '_'.
-  bool isStartOfBindingName(Token tok);
+  /// \brief Determine whether the parser is in a state that can start a
+  /// binding name, identifier or the special discard-value binding '_'.
+  bool isAtStartOfBindingName();
 
   /// \brief Parse a tuple pattern element.
   ///

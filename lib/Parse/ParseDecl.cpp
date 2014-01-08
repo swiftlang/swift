@@ -465,7 +465,9 @@ bool Parser::isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
   return Tok.isContextualKeyword("type")
     && (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
         Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
-        Tok2.is(tok::kw_subscript));
+        Tok2.is(tok::kw_subscript) || Tok2.is(tok::kw_struct) ||
+        Tok2.is(tok::kw_enum) || Tok2.is(tok::kw_class) ||
+        Tok2.is(tok::kw_protocol) || Tok2.is(tok::kw_typealias));
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,

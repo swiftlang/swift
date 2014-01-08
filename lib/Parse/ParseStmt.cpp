@@ -628,7 +628,7 @@ ParserResult<Stmt> Parser::parseStmtFor() {
   // pattern, so it is foreach.
   //
   // For error recovery, also parse "for in ..." as foreach.
-  if ((isStartOfBindingName(Tok) &&
+  if ((isAtStartOfBindingName() &&
        (peekToken().is(tok::colon) || peekToken().is(tok::kw_in))) ||
       Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc);
