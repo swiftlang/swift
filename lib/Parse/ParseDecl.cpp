@@ -526,13 +526,20 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   DeclAttributes Attributes;
   parseDeclAttributeList(Attributes);
 
-  // If we see the 'static' keyword or the contextual 'type' keyword followed
-  // by a declaration keyword, parse it now.
+  // If we see the contextual 'type' keyword followed by a declaration
+  // keyword, parse it now.
   SourceLoc StaticLoc;
   bool UnhandledStatic = false;
-  if (Tok.is(tok::kw_static) || isStartOfMetaDecl(Tok, peekToken())) {
+  if (isStartOfMetaDecl(Tok, peekToken())) {
     StaticLoc = consumeToken();
     UnhandledStatic = true;
+  } else if (Tok.is(tok::kw_static)) {
+    // If we see 'static', provide a Fix-It to 'type'.
+    StaticLoc = consumeToken();
+    UnhandledStatic = true;
+
+    diagnose(StaticLoc, diag::static_is_type)
+      .fixItReplace(SourceRange(StaticLoc), "type");
   }
   
   ParserResult<Decl> DeclResult;
