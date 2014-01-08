@@ -428,3 +428,14 @@ bb0(%0 : $C):
   %2 = ref_to_raw_pointer %1 : $Builtin.ObjectPointer to $Builtin.RawPointer
   return %2 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: sil @downcast_upcast_roundtrip
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @downcast_upcast_roundtrip : $@thin <T_0_0, T_0_1> (HeapBuffer<T_0_0, T_0_1>) -> HeapBuffer<T_0_0, T_0_1> {
+bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
+  %2 = upcast %0 : $HeapBuffer<T_0_0, T_0_1> to $RawBuffer // user: %3                                                                                     
+  %3 = unconditional_checked_cast downcast %2 : $RawBuffer to $HeapBuffer<T_0_0, T_0_1>
+  return %3 : $HeapBuffer<T_0_0, T_0_1>
+}
+

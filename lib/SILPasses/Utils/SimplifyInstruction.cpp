@@ -30,6 +30,8 @@ namespace {
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
+    SILValue
+    visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
   };
 } // end anonymous namespace
 
@@ -126,6 +128,19 @@ SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
     RRPI->setOperand(ROPI->getOperand());
     return SILValue();
   }
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
+  if (UCCI->getCastKind() == CheckedCastKind::Downcast)
+    if (auto *Upcast = dyn_cast<UpcastInst>(UCCI->getOperand().getDef()))
+      if (UCCI->getOperand().getType() == Upcast->getType() &&
+          UCCI->getType() == Upcast->getOperand().getType())
+      return Upcast->getOperand();
 
   return SILValue();
 }
