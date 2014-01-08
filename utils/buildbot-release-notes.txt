@@ -1,5 +1,18 @@
 2014-01-08
 
+* The "static" keyword changed to "type". One can now define "type
+  functions" and "type variables" which are functions and variables
+  defined on a type (rather than on an instance of the type), e.g.,
+
+    struct X {
+      type func factory() -> X { ... }
+
+      type var version: Int
+    }
+
+  Note that "type" is a context-sensitive keyword; it can still be
+  used as an identifier.
+
 * Strings have a new native UTF-16 representation that can be
   converted back and forth to NSString at minimal cost. String
   literals are emitted as UTF-16 for string types that support it
