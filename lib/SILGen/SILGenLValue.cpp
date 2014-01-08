@@ -608,6 +608,47 @@ LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
   return visitRec(e->getSubExpr());
 }
 
+LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
+                                            VarDecl *ivar) {
+  SILGenLValue sgl(*this);
+  LValue lv;
+  
+  // Emit a reference to self.
+  auto selfType = selfDecl->getType()->getLValueOrInOutObjectType()
+                    ->getCanonicalType();
+  ManagedValue self = emitReferenceToDecl(loc, selfDecl);
+
+  // If 'self' is a let declaration but we got a boxed lvalue, load
+  // from it.
+  if (selfDecl->isLet() && self.isLValue()) {
+    self = emitLoad(loc, self.getUnmanagedValue(),
+                    getTypeLowering(selfType), SGFContext(), IsNotTake);
+  }
+
+  // Refer to 'self' as the base of the lvalue.
+  auto selfTypeData = getUnsubstitutedTypeData(*this, selfType);
+  lv.add<ValueComponent>(self, selfTypeData);
+
+  auto origFormalType = getOrigFormalRValueType(ivar->getType());
+  auto substFormalType 
+    = selfDecl->getType()->getLValueOrInOutObjectType()->getCanonicalType();
+  LValueTypeData typeData = { origFormalType, substFormalType,
+                              getLoweredType(origFormalType, substFormalType) };
+
+  // Find the substituted storage type.
+  SILType varStorageType =
+    SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(ivar->getType()));
+
+  if (selfDecl->isLet()) {
+    assert(selfDecl->getType()->hasReferenceSemantics());
+    lv.add<RefElementComponent>(ivar, varStorageType, typeData);
+  } else {
+    lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+  }
+
+  return std::move(lv);
+}
+
 /// Load an r-value out of the given address.
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue

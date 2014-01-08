@@ -2179,6 +2179,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // The epilog takes a void return because the return of 'self' is implicit.
   prepareEpilog(Type(), CleanupLocation(ctor));
 
+  // If this is not a delegating constructor, emit member initializers.
+  if (!isDelegating) {
+    auto nominal = ctor->getDeclContext()->getDeclaredTypeInContext()
+                     ->getNominalOrBoundGenericNominal();
+    emitMemberInitializers(selfDecl, nominal);
+  }
+
   // Emit the constructor body.
   visit(ctor->getBody());
 
@@ -2402,7 +2409,7 @@ SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
-  // Always emit physical property accesses in destructors.
+  // Always emit physical property accesses in constructors.
   AlwaysDirectStoredPropertyAccess = true;
 
   // Emit the prolog. Since we're just going to forward our args directly
@@ -2483,7 +2490,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
-  // Always emit physical property accesses in destructors.
+  // Always emit physical property accesses in constructors.
   AlwaysDirectStoredPropertyAccess = true;
 
   // If there's no body, this is the implicit constructor.
@@ -2550,7 +2557,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
 
-   // Emit the constructor body.
+  // If this is not a delegating constructor, emit member initializers.
+  if (!isDelegating)
+    emitMemberInitializers(selfDecl, selfClassDecl);
+
+  // Emit the constructor body.
   visit(ctor->getBody());
 
   // Return 'self' in the epilog.
@@ -2582,6 +2593,76 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Return the final 'self'.
   B.createReturn(returnLoc, selfArg)
     ->setDebugScope(F.getDebugScope());
+}
+
+/// Emit a member initialization for the members described in the
+/// given pattern from the given source value.
+static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, 
+                           Pattern* pattern, RValue &&src) {
+  switch (pattern->getKind()) {
+  case PatternKind::Paren:
+    return emitMemberInit(SGF, selfDecl, 
+                          cast<ParenPattern>(pattern)->getSubPattern(), 
+                          std::move(src));
+
+  case PatternKind::Tuple: {
+    auto tuple = cast<TuplePattern>(pattern);
+    auto fields = tuple->getFields();
+
+    SmallVector<RValue, 4> elements;
+    std::move(src).extractElements(elements);
+    for (unsigned i = 0, n = fields.size(); i != n; ++i) {
+      emitMemberInit(SGF, selfDecl, fields[i].getPattern(), 
+                     std::move(elements[i]));
+    }
+    break;
+  }
+
+  case PatternKind::Named: {
+    auto named = cast<NamedPattern>(pattern);
+    // Form the lvalue referencing this member.
+    SILLocation loc = pattern;
+    LValue memberRef = SGF.emitDirectIVarLValue(loc, selfDecl, named->getDecl());
+
+    // Assign to it.
+    SGF.emitAssignToLValue(loc, {loc, std::move(src)}, memberRef);
+    return;
+  }
+    
+  case PatternKind::Any:
+    return;
+
+  case PatternKind::Typed:
+    return emitMemberInit(SGF, selfDecl, 
+                          cast<TypedPattern>(pattern)->getSubPattern(), 
+                          std::move(src));
+
+  case PatternKind::Var:
+    return emitMemberInit(SGF, selfDecl, 
+                          cast<VarPattern>(pattern)->getSubPattern(), 
+                          std::move(src));
+
+#define PATTERN(Name, Parent)
+#define REFUTABLE_PATTERN(Name, Parent) case PatternKind::Name:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("Refutable pattern in pattern binding");
+  }
+}
+
+void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl, 
+                                            NominalTypeDecl *nominal) {
+  for (auto member : nominal->getMembers()) {
+    // Find pattern binding declarations that have initializers.
+    auto pbd = dyn_cast<PatternBindingDecl>(member);
+    if (!pbd) continue;
+
+    auto init = pbd->getInit();
+    if (!init) continue;
+
+    // Cleanup after this initialization.
+    FullExpr scope(Cleanups, pbd->getPattern());
+    emitMemberInit(*this, selfDecl, pbd->getPattern(), emitRValue(init));
+  }
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,

@@ -719,67 +719,6 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   return HadError;
 }
 
-/// \brief Given a pattern declaring some number of member variables, build an
-/// expression that references the variables relative to 'self' with the same
-/// structure as the pattern.
-///
-/// \param tc The type checker.
-/// \param selfDecl The 'self' declaration.
-/// \param pattern The pattern.
-static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
-                                        Pattern *pattern) {
-  switch (pattern->getKind()) {
-  case PatternKind::Any:
-    // FIXME: Unfortunate case. We have no way to represent 'forget this value'
-    // in the AST.
-    return nullptr;
-
-  case PatternKind::Named:
-    return new (tc.Context) UnresolvedDotExpr(
-             tc.buildRefExpr(selfDecl, SourceLoc(), /*Implicit=*/true),
-             SourceLoc(), 
-             cast<NamedPattern>(pattern)->getDecl()->getName(), 
-             SourceLoc(), /*Implicit=*/true);
-
-  case PatternKind::Paren:
-    return createPatternMemberRefExpr(tc, selfDecl,
-                                  cast<ParenPattern>(pattern)->getSubPattern());
-  case PatternKind::Var:
-    return createPatternMemberRefExpr(tc, selfDecl,
-                                    cast<VarPattern>(pattern)->getSubPattern());
-
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(pattern);
-    SmallVector<Expr *, 4> elements;
-    for (auto elt : tuple->getFields()) {
-      auto sub = createPatternMemberRefExpr(tc, selfDecl, elt.getPattern());
-      if (!sub)
-        return nullptr;
-
-      elements.push_back(sub);
-    }
-
-    if (elements.size() == 1)
-      return elements[0];
-    return new (tc.Context) TupleExpr(SourceLoc(),
-                                      tc.Context.AllocateCopy(elements),
-                                      nullptr,
-                                      SourceLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/true);
-  }
-
-  case PatternKind::Typed:
-    return createPatternMemberRefExpr(tc, selfDecl,
-             cast<TypedPattern>(pattern)->getSubPattern());
-      
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("pattern can't appear in constructor decl!");
-  }
-}
-
 Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                             ClassDecl *ClDecl) {
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
@@ -823,80 +762,37 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckBody(body);
 
-  SmallVector<ASTNode, 4> memberInitializers;
-
-  // Construct super.init call to be inserted at the end of the explicit
-  // initializer if none has been added by the user.
+  // Determine whether we need to introduce a super.init call.
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
     ->getNominalOrBoundGenericNominal();
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
-  bool isDelegating = false;
-  if (!ctor->isImplicit()) {
+  bool wantSuperInitCall;
+  if (ctor->isImplicit()) {
+    wantSuperInitCall = ClassD && ClassD->getSuperclass();
+  } else {
     switch (ctor->getDelegatingOrChainedInitKind(&Diags)) {
-      case ConstructorDecl::BodyInitKind::Delegating:
-        isDelegating = true;
-        break;
+    case ConstructorDecl::BodyInitKind::Delegating:
+    case ConstructorDecl::BodyInitKind::Chained:
+    case ConstructorDecl::BodyInitKind::None:
+      wantSuperInitCall = false;
+      break;
 
-      case ConstructorDecl::BodyInitKind::Chained:
-      case ConstructorDecl::BodyInitKind::None:
-        break;
-
-      case ConstructorDecl::BodyInitKind::ImplicitChained:
-        // Find a definite initializer in the superclass.
-        if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
-          // Store the super.init expression within the constructor declaration
-          // to be emitted during SILGen.
-          ctor->setSuperInitCall(SuperInitCall);
-        }
+    case ConstructorDecl::BodyInitKind::ImplicitChained:
+      wantSuperInitCall = true;
+      break;
     }
   }
 
-  // If this constructor does not delegate, add all of the member initializers.
-  if (!isDelegating) {
-    for (auto member : nominalDecl->getMembers()) {
-      // We only care about pattern bindings.
-      auto patternBind = dyn_cast<PatternBindingDecl>(member);
-      if (!patternBind || patternBind->isInvalid() || patternBind->isStatic())
-        continue;
-
-      // If the pattern has an initializer, use it.
-      auto initializer = patternBind->getInit();
-      if (!initializer) continue;
-
-      // Create a tuple expression with the same structure as the
-      // pattern.
-      Expr *dest = createPatternMemberRefExpr(*this,
-                                              ctor->getImplicitSelfDecl(),
-                                              patternBind->getPattern());
-      assert(dest);
-      initializer = new (Context) DefaultValueExpr(initializer);
-      Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                              initializer,
-                                              /*Implicit=*/true);
-      typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
-      memberInitializers.push_back(assign);
-      continue;
-    }
-
-    // If this is the implicit default initializer for a class with a superclass,
-    // call the superclass initializer.
-    if (ctor->isImplicit() && ClassD && ClassD->getSuperclass()) {
-      if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD))
-        memberInitializers.push_back(SuperInitCall);
-    }
-
-    // If we added any default initializers, append the rest of the body at
-    // the end.
-    if (!memberInitializers.empty()) {
-      memberInitializers.append(body->getElements().begin(),
-                                body->getElements().end());
-
-      body = BraceStmt::create(Context, body->getLBraceLoc(), memberInitializers,
-                               body->getRBraceLoc());
+  // If we want a super.init call...
+  if (wantSuperInitCall) {
+    // Find a default initializer in the superclass.
+    if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
+      // Store the super.init expression within the constructor declaration
+      // to be emitted during SILGen.
+      ctor->setSuperInitCall(SuperInitCall);
     }
   }
 
-  ctor->setBody(body);
   return HadError;
 }
 

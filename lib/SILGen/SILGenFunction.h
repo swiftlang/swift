@@ -360,6 +360,12 @@ public:
   /// initializing entry point. This takes 'self' and the constructor arguments
   /// as parameters and executes the constructor body to initialize 'self'.
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
+  /// Generates code to initialize instance variables from their
+  /// initializers.
+  ///
+  /// \param selfDecl The 'self' declaration within the current function.
+  /// \param nominal The type whose members are being initialized.
+  void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);
@@ -903,6 +909,10 @@ public:
   
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);
+
+  /// Emit an lvalue that directly refers to the given instance
+  /// variable (without going through getters or setters).
+  LValue emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl, VarDecl *ivar);
 
   /// Build an identity substitution map for the given generic parameter list.
   ArrayRef<Substitution>
