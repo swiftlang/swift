@@ -169,6 +169,9 @@ static unsigned instructionInlineCost(SILInstruction &I) {
 ///
 /// TODO: Memoize.
 static unsigned functionInlineCost(SILFunction *F) {
+  if (F->isTransparent() == IsTransparent_t::IsTransparent)
+    return 0;
+
   unsigned i = 0;
   for (auto &BB : *F) {
     for (auto &I : BB) {
