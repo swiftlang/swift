@@ -461,6 +461,13 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
         || Tok2.isContextualKeyword("infix"));
 }
 
+bool Parser::isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
+  return Tok.isContextualKeyword("type")
+    && (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
+        Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
+        Tok2.is(tok::kw_subscript));
+}
+
 void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
                          bool IsTopLevel) {
   backtrackToPosition(BeginParserPosition);
@@ -517,10 +524,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   DeclAttributes Attributes;
   parseDeclAttributeList(Attributes);
 
-  // If we see the 'static' keyword, parse it now.
+  // If we see the 'static' keyword or the contextual 'type' keyword followed
+  // by a declaration keyword, parse it now.
   SourceLoc StaticLoc;
   bool UnhandledStatic = false;
-  if (Tok.is(tok::kw_static)) {
+  if (Tok.is(tok::kw_static) || isStartOfMetaDecl(Tok, peekToken())) {
     StaticLoc = consumeToken();
     UnhandledStatic = true;
   }

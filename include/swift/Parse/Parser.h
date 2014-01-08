@@ -476,6 +476,7 @@ public:
   // Decl Parsing
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
+  static bool isStartOfMetaDecl(const Token &Tok, const Token &Tok2);
 
   bool parseTopLevel();
 
