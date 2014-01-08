@@ -849,6 +849,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     }
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
+    unsigned relativeDepth = ArchetypesDepth - info.Depth;
 
     if (DWARFMangling) {
       Buffer << 'q' << Index(info.Index);
@@ -860,9 +861,10 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       SmallVector<void *, 4> SortedSubsts(Substitutions.size());
       for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
       for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+      for (; relativeDepth > 0; --relativeDepth)
+        DC = DC->getParent();
       ContextMangler.mangleContext(DC, BindGenerics::None);
     } else {
-      unsigned relativeDepth = ArchetypesDepth - info.Depth;
       if (relativeDepth != 0) {
         Buffer << 'd' << Index(relativeDepth - 1);
       }
