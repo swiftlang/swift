@@ -61,6 +61,7 @@ struct SyntaxStructureNode {
   DeclAttributes Attrs;
   CharSourceRange Range;
   CharSourceRange NameRange;
+  CharSourceRange TypeRange;
   std::vector<CharSourceRange> InheritedTypeRanges;
 };
 

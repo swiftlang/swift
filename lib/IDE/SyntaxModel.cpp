@@ -215,6 +215,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SourceLoc NRStart = VD->getNameLoc();
       SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
+      SN.TypeRange = charSourceRangeFromSourceRange(AC.SourceMgr,
+                                        VD->getTypeSourceRangeForDiagnostics());
+
       SN.Kind = SyntaxStructureKind::InstanceVariable;
       SN.Attrs = VD->getAttrs();
       pushStructureNode(SN);
