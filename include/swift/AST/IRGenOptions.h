@@ -46,6 +46,7 @@ public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
   std::string OutputFilename;
+  std::string ModuleName;
   std::string Triple;
   // The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;

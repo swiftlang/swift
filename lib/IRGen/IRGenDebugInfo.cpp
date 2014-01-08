@@ -122,20 +122,6 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                      SplitName);
 }
 
-void IRGenDebugInfo::finalize() {
-  assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
-
-  // The default for a function is to be in the file-level scope.
-  for (auto FVH: Functions) {
-    auto F = llvm::DISubprogram(cast<llvm::MDNode>(FVH.second));
-    auto Scope = F.getContext().resolve(DIRefMap);
-    if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
-      Scope->replaceAllUsesWith(MainFile);
-  }
-
-  DBuilder.finalize();
-}
-
 
 Location getDeserializedLoc(Pattern*) { return {}; }
 Location getDeserializedLoc(Expr*)    { return {}; }
@@ -591,19 +577,23 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
     }
   }
 
-  // Create the imported module.
   StringRef Name = BumpAllocatedString(Printed);
-  Location L = getLoc(SM, D, false);
-  auto Import = DBuilder.createImportedModule(TheCU,
-                                              llvm::DINameSpace(Namespace),
-                                              L.Line, Name);
+  createImportedModule(Name, Mangled, llvm::DINameSpace(Namespace),
+                       getLoc(SM, D, false));
+}
+
+// Create an imported module and import declarations for all functions
+// from that module.
+void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
+                                         llvm::DINameSpace Namespace, Location L) {
+  auto Import = DBuilder.createImportedModule(TheCU, Namespace, L.Line, Name);
 
   // Add all functions that belong to this namespace to it.
   //
   // TODO: Since we have the mangled names anyway, this part is purely
   // cosmetic and we may consider removing it.
   for (auto F = Functions.lower_bound(Mangled); F != Functions.end(); ++F) {
-    if (Mangled != F->first.substr(0, Mangled.length()))
+    if (Mangled != F->first.substr(0, Mangled.size()))
       break;
 
     auto SP = llvm::DISubprogram(cast<llvm::MDNode>(F->second));
@@ -1452,4 +1442,32 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
 
   DITypeCache[DbgTy.getHash()] = llvm::WeakVH(DITy);
   return DITy;
+}
+
+
+void IRGenDebugInfo::finalize() {
+  assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
+
+  // Create an import declaration for the module defined by current
+  // compilation unit so we can record the module name in DWARF.
+  llvm::DINameSpace Namespace(getOrCreateNamespace(MainFile, Opts.ModuleName,
+                                                   MainFile, 1));
+  std::string Mangled("_TF");
+  llvm::raw_string_ostream MS(Mangled);
+  if (Opts.ModuleName == IGM.Context.StdlibModuleName.str())
+    MS << "S";
+  else
+    mangleIdent(MS, Opts.ModuleName);
+  createImportedModule(Opts.ModuleName, MS.str(), Namespace, Location());
+
+  // The default for a function is to be in the file-level scope.
+  for (auto FVH: Functions) {
+    auto F = llvm::DISubprogram(cast<llvm::MDNode>(FVH.second));
+    auto Scope = F.getContext().resolve(DIRefMap);
+    if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
+      Scope->replaceAllUsesWith(MainFile);
+  }
+
+  // Finalize the DIBuilder.
+  DBuilder.finalize();
 }

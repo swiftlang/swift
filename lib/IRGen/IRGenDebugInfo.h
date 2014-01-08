@@ -215,6 +215,9 @@ private:
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);
 
+  void createImportedModule(StringRef Name, StringRef MangledPrefix,
+                            llvm::DINameSpace Namespace, Location L);
+
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
