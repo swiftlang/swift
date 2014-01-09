@@ -478,7 +478,7 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   LoadInst *LI;
   if (match(TEI->getOperand(), m_LoadInst(LI))) {
     // Move our insertion point to the load so we insert the new
-    // struct_element_addr and load there.
+    // tuple_element_addr and load there.
     //
     // This is to ensure that in a situation like the following:
     //
