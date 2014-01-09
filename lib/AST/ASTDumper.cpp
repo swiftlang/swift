@@ -1632,7 +1632,7 @@ void Substitution::dump() const {
 bool Substitution::operator!=(const Substitution &Other) const {
   return Archetype->getCanonicalType() != Other.Archetype->getCanonicalType() ||
     Replacement->getCanonicalType() != Other.Replacement->getCanonicalType() ||
-    Conformance.equals(Other.Conformance);
+    !Conformance.equals(Other.Conformance);
 }
 
 void ProtocolConformance::printName(llvm::raw_ostream &os) const {
