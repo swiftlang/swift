@@ -343,11 +343,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::AllocRefInst: {
     const AllocRefInst *ARI = cast<AllocRefInst>(&SI);
-    unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
-    SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                      (unsigned)SI.getKind(),
-                      S.addTypeRef(ARI->getType().getSwiftRValueType()),
-                      (unsigned)ARI->getType().getCategory());
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
+    ValueID Args[1] = { ARI->isObjC() };
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       (unsigned)SI.getKind(),
+                                       S.addTypeRef(
+                                         ARI->getType().getSwiftRValueType()),
+                                       (unsigned)ARI->getType().getCategory(),
+                                       llvm::makeArrayRef(Args));
     break;
   }
   case ValueKind::AllocStackInst: {

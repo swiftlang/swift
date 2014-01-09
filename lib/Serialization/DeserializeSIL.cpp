@@ -580,7 +580,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
   ONETYPE_INST(AllocBox)
-  ONETYPE_INST(AllocRef)
   ONETYPE_INST(AllocStack)
   ONETYPE_INST(Metatype)
 #undef ONETYPE_INST
@@ -650,6 +649,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
+  case ValueKind::AllocRefInst:
+    assert(RecordKind == SIL_ONE_TYPE_VALUES && 
+           "Layout should be OneTypeValues.");
+    assert(ListOfValues.size() >= 1 && "Not enough values");
+    ResultVal = Builder.createAllocRef(
+                  Loc,
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+                  ListOfValues[0]);
+    break;
   case ValueKind::ApplyInst: {
     // Format: attributes such as transparent, the callee's type, a value for
     // the callee and a list of values for the arguments. Each value in the list

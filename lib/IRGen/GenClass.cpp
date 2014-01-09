@@ -66,27 +66,6 @@ bool irgen::hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
   return hasKnownSwiftImplementation(IGM, getRootClass(theClass));
 }
 
-/// Does the given class use the Swift allocator?
-static bool usesSwiftAllocator(IRGenModule &IGM, ClassDecl *theClass) {
-  while (true) {
-    // If any class in the inheritance hierarchy does not have a
-    // known-Swift implementation, we have to assume that it might
-    // replace the allocator.
-    //
-    // Allocating the instance in Swift is actually easy.  It's
-    // deallocating it that requires cooperation from the superclasses
-    // given the Objective-C deallocation algorithm.
-    if (!hasKnownSwiftImplementation(IGM, theClass))
-      return false;
-
-    // If the entire hierarchy is known-Swift, we use the Swift allocator.
-    if (!theClass->hasSuperclass())
-      return true;
-
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
-  }
-}
-
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.
@@ -565,13 +544,15 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 }
 
 /// Emit an allocation of a class.
-llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
+llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
+                                        bool objc) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   llvm::Value *metadata = emitClassHeapMetadataRef(IGF, selfType);
 
+  // If we need to use Objective-C allocation, do so.
   // If the root class isn't known to use the Swift allocator, we need
   // to call [self alloc].
-  if (!usesSwiftAllocator(IGF.IGM, classTI.getClass())) {
+  if (objc) {
     return emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
   }
 

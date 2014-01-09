@@ -49,7 +49,8 @@ namespace irgen {
   llvm::Constant *emitObjCProtocolData(IRGenModule &IGM, ProtocolDecl *ext);
 
   /// Emit an allocation of a class.
-  llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType);
+  llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
+                                   bool objc);
 
   /// Emit the constant fragile instance size of the class, or null if the class
   /// does not have fixed layout. For resilient classes this does not

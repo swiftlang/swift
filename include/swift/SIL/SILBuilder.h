@@ -167,9 +167,9 @@ public:
     return insert(new (F.getModule()) AllocStackInst(Loc, elementType, F));
   }
 
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType) {
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc){
     Loc.markAsPrologue();
-    return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F));
+    return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F, objc));
   }
   
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {

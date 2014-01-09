@@ -1337,14 +1337,16 @@ alloc_ref
 `````````
 ::
 
-  sil-instruction ::= 'alloc_ref' sil-type
+  sil-instruction ::= 'alloc_ref' ('[' 'objc' ']')? sil-type
 
   %1 = alloc_ref $T
   // $T must be a reference type
   // %1 has type $T
 
 Allocates an object of reference type ``T``. The object will be initialized
-with retain count 1; its state will be otherwise uninitialized.
+with retain count 1; its state will be otherwise uninitialized. The
+optional ``objc`` attribute indicates that the object should be
+allocated using Objective-C's allocation methods (``+allocWithZone:``).
 
 alloc_box
 `````````

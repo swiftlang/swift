@@ -495,7 +495,10 @@ public:
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
-    OS << "alloc_ref " << ARI->getType();
+    OS << "alloc_ref ";
+    if (ARI->isObjC())
+      OS << "[objc] ";
+    OS << ARI->getType();
   }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {

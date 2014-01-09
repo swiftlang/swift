@@ -1554,6 +1554,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AllocStackInst:
   case ValueKind::AllocRefInst:
   case ValueKind::MetatypeInst: {
+    bool IsObjC = false;
+    if (Opcode == ValueKind::AllocRefInst &&
+        parseSILOptional(IsObjC, *this, "objc"))
+      return true;
+
     SILType Ty;
     if (parseSILType(Ty))
       return true;
@@ -1561,7 +1566,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (Opcode == ValueKind::AllocStackInst)
       ResultVal = B.createAllocStack(InstLoc, Ty);
     else if (Opcode == ValueKind::AllocRefInst) {
-      ResultVal = B.createAllocRef(InstLoc, Ty);
+      ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC);
     } else {
       assert(Opcode == ValueKind::MetatypeInst);
       ResultVal = B.createMetatype(InstLoc, Ty);

@@ -207,7 +207,8 @@ void
 SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   doPostProcess(Inst,
     Builder.createAllocRef(getOpLocation(Inst->getLoc()),
-                           getOpType(Inst->getType())));
+                           getOpType(Inst->getType()),
+                           Inst->isObjC()));
 }
 
 template<typename ImplClass>

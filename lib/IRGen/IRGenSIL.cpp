@@ -2244,7 +2244,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType());
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC());
   Explosion e(ExplosionKind::Maximal);
   e.add(alloced);
   setLoweredExplosion(SILValue(i, 0), e);

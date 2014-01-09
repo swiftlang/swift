@@ -256,13 +256,18 @@ public:
 /// of a reference type. Aside from the reference count, the instance is
 /// returned uninitialized.
 class AllocRefInst : public SILInstruction {
+  bool ObjC;
+
 public:
-  AllocRefInst(SILLocation loc, SILType type, SILFunction &F);
+  AllocRefInst(SILLocation loc, SILType type, SILFunction &F, bool objc);
 
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
+  bool isObjC() const { return ObjC; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;

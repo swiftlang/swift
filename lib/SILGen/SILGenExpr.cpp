@@ -2414,6 +2414,28 @@ SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
   return C.AllocateCopy(subs);
 }
 
+/// Should allocation of this class use the Objective-C allocation 
+/// routines?
+static bool usesObjCAllocator(ClassDecl *theClass) {
+  while (true) {
+    // If any class in the inheritance hierarchy does not have a
+    // known-Swift implementation, we have to assume that it might
+    // replace the allocator.
+    //
+    // Allocating the instance in Swift is actually easy.  It's
+    // deallocating it that requires cooperation from the superclasses
+    // given the Objective-C deallocation algorithm.
+    if (theClass->hasClangNode())
+      return true;
+
+    // If the entire hierarchy is known-Swift, we use the Swift allocator.
+    if (!theClass->hasSuperclass())
+      return false;
+
+    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
+  }
+}
+
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Always emit physical property accesses in constructors.
   AlwaysDirectStoredPropertyAccess = true;
@@ -2436,10 +2458,15 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
 
-  // Use alloc_ref to allocate the constructor.
+  // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  SILValue selfValue = B.createAllocRef(Loc, selfTy);
+  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
+  auto selfClassDecl =
+    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+
+  SILValue selfValue = B.createAllocRef(Loc, selfTy,
+                                        usesObjCAllocator(selfClassDecl));
   args.push_back(selfValue);
 
   // Call the initializer.

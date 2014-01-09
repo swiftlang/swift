@@ -408,8 +408,9 @@ VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : SILInstruction(ValueKind::AllocRefInst, loc, elementType) {
+AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
+                           bool objc)
+  : SILInstruction(ValueKind::AllocRefInst, loc, elementType), ObjC(objc) {
 }
 
 
