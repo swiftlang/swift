@@ -37,18 +37,18 @@ public:
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F, TypeSubstitutionMap &Subs,
-                                    StringRef NewName) {
+                                    StringRef NewName, ApplyInst *Caller) {
     // Clone and specialize the function.
-    TypeSubCloner TSC(F, Subs, NewName);
+    TypeSubCloner TSC(F, Subs, NewName, Caller);
     TSC.populateCloned();
     return TSC.getCloned();
   }
 
 private:
-  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, StringRef NewName)
-      : SILCloner(*initCloned(F, Subst, NewName)),
-        SwiftMod(F->getModule().getSwiftModule()), SubsMap(Subst), OrigFunc(F) {
-  }
+  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, StringRef NewName,
+                ApplyInst *Caller) : SILCloner(*initCloned(F, Subst, NewName)),
+        SwiftMod(F->getModule().getSwiftModule()), SubsMap(Subst), OrigFunc(F),
+  CallerInst(Caller) { }
 
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.
@@ -58,10 +58,32 @@ private:
     return SILType::substType(OrigFunc->getModule(), SwiftMod, SubsMap, Ty);
   }
 
+  /// Finds the generic type substitution in the caller substitution list that
+  /// corresponds to a specific generic type.
+  Substitution getCallerSubstitutionForCalleSub(Type T) {
+
+    for (Substitution &CallerSub : CallerInst->getSubstitutions()) {
+      // Find the correct type replacement in the caller ApplyInst
+      if (CallerSub.Archetype->getCanonicalType() == T->getCanonicalType())
+        return CallerSub;
+    }
+
+    // T is not a caller Archetype.
+    return  Substitution{ 0, 0, ArrayRef<ProtocolConformance *>() };
+  }
+
   Substitution remapSubstitution(Substitution sub) {
+    // Find the substitution of type T, in the caller subst list.
+    Substitution S = getCallerSubstitutionForCalleSub(sub.Replacement);
+
+    // If the replacement type is not a caller Archetype then use the existing
+    // conformance list. 
+    if (!S.Archetype)
+      S = sub;
+
     return Substitution{ sub.Archetype,
        sub.Replacement.subst(SwiftMod, SubsMap, true, 0),
-                         ArrayRef<ProtocolConformance *>() };
+      S.Conformance };
   }
 
 
@@ -122,6 +144,8 @@ private:
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
   SILFunction *OrigFunc;
+  /// The ApplyInst that is the caller to the cloned function.
+  ApplyInst *CallerInst;
 };
 
 } // end anonymous namespace.
@@ -184,11 +208,6 @@ static bool canSpecializeFunction(SILFunction *F) {
       if (isa<ArchetypeMethodInst>(&I) || isa<PartialApplyInst>(&I))
         return false;
 
-      // We don't support ApplyInst to instructions with a conformance list.
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I))
-        for (auto &Sub : AI->getSubstitutions())
-          if (Sub.Conformance.size())
-            return false;
     }
 
   return true;
@@ -381,7 +400,8 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     FunctionNameCache.insert(ClonedName);
 
     // Create a new function.
-    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName);
+    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName,
+                                                     Bucket[0]);
 
     // Replace all of the AI functions with the new function.
     for (auto &AI : Bucket)
