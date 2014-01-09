@@ -568,7 +568,7 @@ CanType TypeBase::getCanonicalType() {
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
     Result = cast<id##Type>(this)-> \
-             getDesugaredType()->getCanonicalType().getPointer(); \
+             getSinglyDesugaredType()->getCanonicalType().getPointer(); \
     break;
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -772,32 +772,26 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::WeakStorage:
     // None of these types have sugar at the outer level.
     return this;
-  case TypeKind::Paren:
-    return cast<ParenType>(this)->getDesugaredType();
-  case TypeKind::NameAlias:
-    return cast<NameAliasType>(this)->getDesugaredType();
-  case TypeKind::AssociatedType:
-    return cast<AssociatedTypeType>(this)->getDesugaredType();
-  case TypeKind::ArraySlice:
-  case TypeKind::Optional:
-    return cast<SyntaxSugarType>(this)->getDesugaredType();
-  case TypeKind::Substituted:
-    return cast<SubstitutedType>(this)->getDesugaredType();
+#define SUGARED_TYPE(ID, PARENT) \
+  case TypeKind::ID: \
+    return cast<ID##Type>(this)->getSinglyDesugaredType()->getDesugaredType();
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
   }
 
   llvm_unreachable("Unknown type kind");
 }
 
-TypeBase *ParenType::getDesugaredType() {
-  return getUnderlyingType()->getDesugaredType();
+TypeBase *ParenType::getSinglyDesugaredType() {
+  return getUnderlyingType().getPointer();
 }
 
-TypeBase *NameAliasType::getDesugaredType() {
-  return getDecl()->getUnderlyingType()->getDesugaredType();
+TypeBase *NameAliasType::getSinglyDesugaredType() {
+  return getDecl()->getUnderlyingType().getPointer();
 }
 
-TypeBase *SyntaxSugarType::getDesugaredType() {
-  return getImplementationType()->getDesugaredType();
+TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
+  return getImplementationType().getPointer();
 }
 
 Type SyntaxSugarType::getImplementationType() {
@@ -823,8 +817,8 @@ Type SyntaxSugarType::getImplementationType() {
   return ImplOrContext.get<Type>();
 }
 
-TypeBase *SubstitutedType::getDesugaredType() {
-  return getReplacementType()->getDesugaredType();
+TypeBase *SubstitutedType::getSinglyDesugaredType() {
+  return getReplacementType().getPointer();
 }
 
 unsigned GenericTypeParamType::getDepth() const {
@@ -868,8 +862,8 @@ Identifier GenericTypeParamType::getName() const {
   return name;
 }
 
-TypeBase *AssociatedTypeType::getDesugaredType() {
-  return getDecl()->getArchetype()->getDesugaredType();
+TypeBase *AssociatedTypeType::getSinglyDesugaredType() {
+  return getDecl()->getArchetype();
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {

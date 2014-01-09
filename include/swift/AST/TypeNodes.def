@@ -29,8 +29,8 @@
 
 /// SUGARED_TYPE(id, parent)
 ///   This type is never canonical.  It provides an efficient accessor,
-///   getDesugaredType(), which removes one level of sugar.  This process
-///   does not necessarily converge to the canonical type, however.
+///   getSinglyDesugaredType(), which removes one level of sugar.  This
+///   process does not necessarily converge to the canonical type, however.
 ///   The default behavior is TYPE(id, parent).
 
 /// UNCHECKED_TYPE(id, parent)

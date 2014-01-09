@@ -806,9 +806,8 @@ public:
 
   using TypeBase::setRecursiveProperties;
    
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
+  /// Remove one level of top-level sugar from this type.
+  TypeBase *getSinglyDesugaredType();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -829,9 +828,8 @@ public:
 
   static ParenType *get(const ASTContext &C, Type underlying);
    
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
+  /// Remove one level of top-level sugar from this type.
+  TypeBase *getSinglyDesugaredType();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2270,7 +2268,7 @@ public:
     return Base;
   }
 
-  TypeBase *getDesugaredType();
+  TypeBase *getSinglyDesugaredType();
 
   Type getImplementationType();
 
@@ -2739,9 +2737,8 @@ public:
   /// Retrieve the declaration of the associated type.
   AssociatedTypeDecl *getDecl() const { return AssocType; }
 
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
+  /// Remove one level of top-level sugar from this type.
+  TypeBase *getSinglyDesugaredType();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2783,9 +2780,8 @@ public:
   /// \brief Retrieve the replacement type.
   Type getReplacementType() const { return Replacement; }
   
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
+  /// Remove one level of top-level sugar from this type.
+  TypeBase *getSinglyDesugaredType();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
