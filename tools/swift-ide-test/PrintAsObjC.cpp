@@ -12,6 +12,7 @@
 
 #include "PrintAsObjC.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/Support/Path.h"
@@ -30,7 +31,79 @@ static void writeImports(raw_ostream &os, Module *M) {
 }
 
 namespace {
-class DeclWriter {
+class ObjCPrinter : public DeclVisitor<ObjCPrinter> {
+  raw_ostream &os;
+
+  friend DeclVisitor<ObjCPrinter>;
+
+public:
+  explicit ObjCPrinter(raw_ostream &out) : os(out) {}
+
+  using ASTVisitor::visit;
+
+  void visit(const Decl *D) {
+    visit(const_cast<Decl *>(D));
+  }
+
+private:
+  /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
+  ///
+  /// By default, this method filters out non-ObjC protocols, along with the
+  /// special DynamicLookup protocol. Passing \p printAll will skip this check.
+  void printProtocols(ArrayRef<ProtocolDecl *> protos, bool printAll = false) {
+    SmallVector<ProtocolDecl *, 4> protosToPrint;
+
+    if (!printAll) {
+      std::copy_if(protos.begin(), protos.end(),
+                   std::back_inserter(protosToPrint),
+                   [](const ProtocolDecl *PD) -> bool {
+        if (!PD->isObjC())
+          return false;
+        auto knownProtocol = PD->getKnownProtocolKind();
+        if (!knownProtocol)
+          return true;
+        return *knownProtocol != KnownProtocolKind::DynamicLookup;
+      });
+      protos = protosToPrint;
+    }
+
+    if (protos.empty())
+      return;
+
+    os << " <";
+    interleave(protos,
+               [this](const ProtocolDecl *PD) { os << PD->getName(); },
+               [this] { os << ", "; });
+    os << ">";
+  }
+
+  void visitClassDecl(ClassDecl *CD) {
+    // FIXME: Include members.
+    os << "@interface " << CD->getName();
+
+    if (Type superTy = CD->getSuperclass())
+      os << " : " << superTy->getClassOrBoundGenericClass()->getName();
+    printProtocols(CD->getProtocols());
+    os << "\n@end\n";
+  }
+
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    // FIXME: Include members.
+    auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+    os << "@interface " << baseClass->getName() << " ()";
+    printProtocols(ED->getProtocols());
+    os << "\n@end\n";
+  }
+
+  void visitProtocolDecl(ProtocolDecl *PD) {
+    // FIXME: Include members.
+    os << "@protocol " << PD->getName();
+    printProtocols(PD->getProtocols(), /*printAll=*/true);
+    os << "\n@end\n";
+  }
+};
+
+class ModuleWriter {
   enum class EmissionState {
     DefinitionRequested = 0,
     DefinitionInProgress,
@@ -42,7 +115,7 @@ class DeclWriter {
   raw_ostream &os;
   Module &M;
 public:
-  DeclWriter(raw_ostream &out, Module &mod) : os(out), M(mod) {}
+  ModuleWriter(raw_ostream &out, Module &mod) : os(out), M(mod) {}
 
   bool isLocal(const Decl *D) {
     return D->getModuleContext() == &M;
@@ -84,28 +157,6 @@ public:
     state.second = true;
   }
 
-  void printProtocols(ArrayRef<ProtocolDecl *> protos) {
-    SmallVector<const ProtocolDecl *, 4> protosToPrint;
-    std::copy_if(protos.begin(), protos.end(),
-                 std::back_inserter(protosToPrint),
-                 [](const ProtocolDecl *PD) -> bool {
-      if (!PD->isObjC())
-        return false;
-      auto knownProtocol = PD->getKnownProtocolKind();
-      if (!knownProtocol)
-        return true;
-      return *knownProtocol != KnownProtocolKind::DynamicLookup;
-    });
-    if (protosToPrint.empty())
-      return;
-
-    os << " <";
-    interleave(protosToPrint,
-               [this](const ProtocolDecl *PD) { os << PD->getName(); },
-               [this] { os << ", "; });
-    os << ">";
-  }
-
   bool writeClass(const ClassDecl *CD) {
     if (!isLocal(CD))
       return true;
@@ -128,13 +179,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    // FIXME: Include members.
-    os << "@interface " << CD->getName();
-    if (superclass)
-      os << " : " << superclass->getName();
-    printProtocols(CD->getProtocols());
-    os << "\n@end\n";
-
+    ObjCPrinter(os).visit(CD);
     state = { EmissionState::Defined, true };
     return true;
   }
@@ -161,11 +206,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    // FIXME: Include members.
-    os << "@protocol " << PD->getName();
-    printProtocols(PD->getProtocols());
-    os << "\n@end\n";
-
+    ObjCPrinter(os).visit(PD);
     state = { EmissionState::Defined, true };
     return true;
   }
@@ -181,10 +222,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    // FIXME: Include members.
-    os << "@interface " << CD->getName() << " ()";
-    printProtocols(ED->getProtocols());
-    os << "\n@end\n";
+    ObjCPrinter(os).visit(ED);
     return true;
   }
 
@@ -228,7 +266,7 @@ public:
 static bool writeDecls(raw_ostream &os, Module *M) {
   SmallVector<Decl *, 64> decls;
   M->getTopLevelDecls(decls);
-  return DeclWriter(os, *M).writeDecls(decls);
+  return ModuleWriter(os, *M).writeDecls(decls);
 }
 
 int swift::doPrintAsObjC(const CompilerInvocation &InitInvok) {
