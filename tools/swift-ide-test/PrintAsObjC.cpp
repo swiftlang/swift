@@ -211,9 +211,10 @@ public:
     return true;
   }
 
-  bool writeExtension(const ExtensionDecl *ED, const ClassDecl *CD) {
+  bool writeExtension(const ExtensionDecl *ED) {
     size_t pendingSize = declsToWrite.size();
 
+    const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
     require(CD);
     for (auto proto : ED->getProtocols())
       if (proto->isObjC())
@@ -226,30 +227,106 @@ public:
     return true;
   }
 
-  bool writeDecls(ArrayRef<Decl *> decls = {}) {
-    declsToWrite.reserve(declsToWrite.size() + decls.size());
-    std::copy(decls.rbegin(), decls.rend(), std::back_inserter(declsToWrite));
+  bool writeDecls() {
+    SmallVector<Decl *, 64> decls;
+    M.getTopLevelDecls(decls);
+
+    auto newEnd = std::remove_if(decls.begin(), decls.end(),
+                                 [] (const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        // FIXME: Distinguish IBOutlet/IBAction from true interop.
+        return !VD->isObjC();
+      }
+
+      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+        return !baseClass || !baseClass->isObjC();
+      }
+      return true;
+    });
+    decls.erase(newEnd, decls.end());
+
+    // REVERSE sort the decls, since we are going to copy them onto a stack.
+    llvm::array_pod_sort(decls.begin(), decls.end(),
+                         [](Decl * const *lhs, Decl * const *rhs) -> int {
+      enum : int {
+        Ascending = -1,
+        Equivalent = 0,
+        Descending = 1,
+      };
+
+      assert(*lhs != *rhs && "duplicate top-level decl");
+
+      auto getSortName = [](const Decl *D) -> StringRef {
+        if (auto VD = dyn_cast<ValueDecl>(D))
+          return VD->getName().str();
+
+        if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+          auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+          return baseClass->getName().str();
+        }
+        llvm_unreachable("unknown top-level ObjC decl");
+      };
+
+      // Sort by names.
+      int result = getSortName(*rhs).compare(getSortName(*lhs));
+      if (result != 0)
+        return result;
+
+      // Prefer value decls to extensions.
+      assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
+      if (isa<ValueDecl>(*lhs) && !isa<ValueDecl>(*rhs))
+        return Descending;
+      if (!isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs))
+        return Ascending;
+
+      // Break ties in extensions by putting smaller extensions last (in reverse
+      // order).
+      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
+      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
+      if (lhsMembers.size() != rhsMembers.size())
+        return lhsMembers.size() < rhsMembers.size() ? Descending : Ascending;
+
+      // Or the extension with fewer protocols.
+      auto lhsProtos = cast<ExtensionDecl>(*lhs)->getProtocols();
+      auto rhsProtos = cast<ExtensionDecl>(*rhs)->getProtocols();
+      if (lhsProtos.size() != rhsProtos.size())
+        return lhsProtos.size() < rhsProtos.size() ? Descending : Ascending;
+
+      // If that fails, arbitrarily pick the extension whose protocols are
+      // alphabetically first.
+      auto mismatch =
+        std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
+                      [getSortName] (const ProtocolDecl *nextLHSProto,
+                                     const ProtocolDecl *nextRHSProto) {
+        return nextLHSProto->getName() != nextRHSProto->getName();
+      });
+      if (mismatch.first == lhsProtos.end())
+        return Equivalent;
+      StringRef lhsProtoName = (*mismatch.first)->getName().str();
+      return lhsProtoName.compare((*mismatch.second)->getName().str());
+    });
+
+    assert(declsToWrite.empty());
+    declsToWrite.assign(decls.begin(), decls.end());
 
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
 
-      if (auto VD = dyn_cast<ValueDecl>(D)) {
-        // FIXME: Distinguish IBOutlet/IBAction from true interop.
-        if (VD->isObjC()) {
-          if (auto CD = dyn_cast<ClassDecl>(D))
-            success = writeClass(CD);
-          else if (auto PD = dyn_cast<ProtocolDecl>(D))
-            success = writeProtocol(PD);
-          else
-            llvm_unreachable("unknown top-level ObjC value decl");
-        }
+      if (isa<ValueDecl>(D)) {
+        if (auto CD = dyn_cast<ClassDecl>(D))
+          success = writeClass(CD);
+        else if (auto PD = dyn_cast<ProtocolDecl>(D))
+          success = writeProtocol(PD);
+        else
+          llvm_unreachable("unknown top-level ObjC value decl");
 
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        Type baseTy = ED->getExtendedType();
-        auto theClass = baseTy->getClassOrBoundGenericClass();
-        if (theClass && theClass->isObjC())
-          success = writeExtension(ED, theClass);
+        success = writeExtension(ED);
+
+      } else {
+        llvm_unreachable("unknown top-level ObjC decl");
       }
 
       if (success) {
@@ -264,9 +341,7 @@ public:
 }
 
 static bool writeDecls(raw_ostream &os, Module *M) {
-  SmallVector<Decl *, 64> decls;
-  M->getTopLevelDecls(decls);
-  return ModuleWriter(os, *M).writeDecls(decls);
+  return ModuleWriter(os, *M).writeDecls();
 }
 
 int swift::doPrintAsObjC(const CompilerInvocation &InitInvok) {

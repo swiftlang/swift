@@ -265,6 +265,7 @@ public:
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
   /// Finds all top-level decls that should be displayed to a client of this
@@ -272,6 +273,7 @@ public:
   ///
   /// This includes types, variables, functions, and extensions.
   /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
@@ -418,11 +420,14 @@ public:
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
   /// Adds all top-level decls to the given vector.
   ///
   /// This includes all decls that should be displayed to clients of the module.
+  /// The order of the results is not guaranteed to be meaningful.
+  ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
