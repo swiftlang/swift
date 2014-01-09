@@ -272,6 +272,11 @@ private:
     visit(alias->getUnderlyingType());
   }
 
+  void visitClassType(ClassType *CT) {
+    const ClassDecl *CD = CT->getClassOrBoundGenericClass();
+    os << CD->getName() << " *";
+  }
+
   void visitTupleType(TupleType *TT) {
     assert(TT->getNumElements() == 0);
     os << "void";
