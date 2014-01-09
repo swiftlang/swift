@@ -24,6 +24,7 @@
 using namespace swift;
 
 STATISTIC(NumSpecialized, "Number of functions specialized");
+STATISTIC(NumCMSpecialized, "Number of ClassMethodInst specialized");
 
 namespace {
 
@@ -61,6 +62,20 @@ private:
     return Substitution{ sub.Archetype,
        sub.Replacement.subst(SwiftMod, SubsMap, true, 0),
                          ArrayRef<ProtocolConformance *>() };
+  }
+
+
+  void visitClassMethodInst(ClassMethodInst *Inst) {
+    NumCMSpecialized++;
+    doPostProcess(Inst,
+                  Builder.createClassMethod(getOpLocation(Inst->getLoc()),
+                                            getOpValue(Inst->getOperand()),
+                                            Inst->getMember(),
+                                            // No need to translate the return
+                                            // type because this is the type of
+                                            // the fetched method.
+                                            Inst->getType(),
+                                            Inst->isVolatile()));
   }
 
  void visitApplyInst(ApplyInst *Inst) {
@@ -167,11 +182,6 @@ static bool canSpecializeFunction(SILFunction *F) {
     for (auto &I : BB) {
       // We don't specialize ArchetypeMethod and PartialApply instructions.
       if (isa<ArchetypeMethodInst>(&I) || isa<PartialApplyInst>(&I))
-        return false;
-
-      // We don't specialize generic ClassMethod instructions.
-      if (isa<ClassMethodInst>(&I) &&
-          isGenericType(I.getType(0).getSwiftType()))
         return false;
 
       // We don't support ApplyInst to instructions with a conformance list.
