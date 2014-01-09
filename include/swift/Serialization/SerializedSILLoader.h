@@ -41,7 +41,7 @@ public:
     /// Observe that we deserialized a v-table declaration.
     virtual void didDeserialize(Module *M, SILVTable *vtable) {}
 
-    virtual ~Callback() {}
+    virtual ~Callback() = default;
   private:
     virtual void _anchor();
   };
