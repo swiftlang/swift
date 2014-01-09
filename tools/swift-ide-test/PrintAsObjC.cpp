@@ -16,6 +16,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -28,28 +29,41 @@ static void writeImports(raw_ostream &os, Module *M) {
     // FIXME: Handle submodule imports.
     os << "@import " << import.second->Name << ";\n";
   }
-  os << "\n";
+
+  // Headers required by the printer.
+  os << "\n@import ObjectiveC;\n"
+        "#include <stdint.h>\n"
+        "#include <stddef.h>\n"
+        "#include <stdbool.h>\n"
+        "#if defined(__has_include)\n"
+        "# if __has_include(<uchar.h>)\n"
+        "#  include <uchar.h>\n"
+        "# endif\n"
+        "#endif\n\n";
 }
 
 namespace {
 class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
                     public TypeVisitor<ObjCPrinter> {
+  llvm::DenseMap<Identifier, StringRef> specialNames;
+  ASTContext &ctx;
   raw_ostream &os;
 
   friend ASTVisitor<ObjCPrinter>;
   friend TypeVisitor<ObjCPrinter>;
 
 public:
-  explicit ObjCPrinter(raw_ostream &out) : os(out) {}
+  explicit ObjCPrinter(ASTContext &context, raw_ostream &out)
+    : ctx(context), os(out) {}
 
-  using ASTVisitor::visit;
-  using TypeVisitor::visit;
-
-  void visit(const Decl *D) {
+  void print(const Decl *D) {
     visit(const_cast<Decl *>(D));
   }
 
 private:
+  using ASTVisitor::visit;
+  using TypeVisitor::visit;
+
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
   /// By default, this method filters out non-ObjC protocols, along with the
@@ -168,8 +182,94 @@ private:
     os << ";\n";
   }
 
-  void visitType(TypeBase *) {
-    llvm_unreachable("unable to emit this type as ObjC");
+  /// If "name" is a
+  ///
+  /// This handles typealiases and structs provided by the standard library
+  /// for interfacing with C and Objective-C.
+  bool printIfKnownTypeName(Identifier name) {
+    if (specialNames.empty()) {
+#define MAP(SWIFT_NAME, CLANG_REPR) \
+      specialNames[ctx.getIdentifier(#SWIFT_NAME)] = CLANG_REPR
+
+      MAP(CBool, "bool");
+
+      MAP(CChar, "char");
+      MAP(CWideChar, "wchar_t");
+      MAP(CChar16, "char16_t");
+      MAP(CChar32, "char32_t");
+
+      MAP(CSignedChar, "signed char");
+      MAP(CShort, "short");
+      MAP(CInt, "int");
+      MAP(CLong, "long");
+      MAP(CLongLong, "long long");
+
+      MAP(CUnsignedChar, "unsigned char");
+      MAP(CUnsignedShort, "unsigned short");
+      MAP(CUnsignedInt, "unsigned int");
+      MAP(CUnsignedLong, "unsigned long");
+      MAP(CUnsignedLongLong, "unsigned long long");
+
+      MAP(CFloat, "float");
+      MAP(CDouble, "double");
+
+      MAP(Int8, "int8_t");
+      MAP(Int16, "int16_t");
+      MAP(Int32, "int32_t");
+      MAP(Int64, "int64_t");
+      MAP(UInt8, "uint8_t");
+      MAP(UInt16, "uint16_t");
+      MAP(UInt32, "uint32_t");
+      MAP(UInt64, "uint64_t");
+
+      MAP(Float, "float");
+      MAP(Double, "double");
+      MAP(Float32, "float");
+      MAP(Float64, "double");
+
+      MAP(Int, "NSInteger");
+      MAP(Bool, "BOOL");
+      MAP(String, "NSString *");
+      MAP(AnyObject, "id");
+      MAP(AnyClass, "Class");
+    }
+
+    auto iter = specialNames.find(name);
+    if (iter == specialNames.end())
+      return false;
+    os << iter->second;
+    return true;
+  }
+
+  void visitType(TypeBase *Ty) {
+    os << "/* ";
+    Ty->print(os);
+    os << " */";
+  }
+
+  void visitStructType(StructType *ST) {
+    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    if (SD->getParentModule()->isStdlibModule())
+      if (printIfKnownTypeName(SD->getName()))
+        return;
+
+    // FIXME: Check if we can actually use the name or if we have to tag it with
+    // "struct".
+    os << SD->getName();
+  }
+
+  void visitNameAliasType(NameAliasType *aliasTy) {
+    const TypeAliasDecl *alias = aliasTy->getDecl();
+    if (alias->getModuleContext()->isStdlibModule())
+      if (printIfKnownTypeName(alias->getName()))
+        return;
+
+    if (alias->hasClangNode() || alias->isObjC()) {
+      os << alias->getName();
+      return;
+    }
+
+    visit(alias->getUnderlyingType());
   }
 
   void visitTupleType(TupleType *TT) {
@@ -189,8 +289,10 @@ class ModuleWriter {
   std::vector<const Decl *> declsToWrite;
   raw_ostream &os;
   Module &M;
+  ObjCPrinter printer;
 public:
-  ModuleWriter(raw_ostream &out, Module &mod) : os(out), M(mod) {}
+  ModuleWriter(raw_ostream &out, Module &mod)
+    : os(out), M(mod), printer(M.Ctx, os) {}
 
   bool isLocal(const Decl *D) {
     return D->getModuleContext() == &M;
@@ -254,7 +356,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    ObjCPrinter(os).visit(CD);
+    printer.print(CD);
     state = { EmissionState::Defined, true };
     return true;
   }
@@ -281,7 +383,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    ObjCPrinter(os).visit(PD);
+    printer.print(PD);
     state = { EmissionState::Defined, true };
     return true;
   }
@@ -298,7 +400,7 @@ public:
     if (declsToWrite.size() != pendingSize)
       return false;
 
-    ObjCPrinter(os).visit(ED);
+    printer.print(ED);
     return true;
   }
 
