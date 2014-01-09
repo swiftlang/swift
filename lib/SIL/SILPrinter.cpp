@@ -1270,7 +1270,8 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto &entry : getEntries()) {
     OS << "  ";
     entry.first.print(OS);
-    OS << ": " << entry.second->getName() << "\n";
+    OS << ": " << entry.second->getName()
+       << "\t// " << demangleSymbolAsString(entry.second->getName()) << "\n";
   }
   OS << "}\n\n";
 }
