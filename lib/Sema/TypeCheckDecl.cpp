@@ -2425,7 +2425,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   auto constructorID = context.getIdentifier("init");
   VarDecl *selfDecl
-    = new (context) VarDecl(/*static*/ false, /*IsLet*/false,
+    = new (context) VarDecl(/*static*/ false,
+                            /*IsLet*/isa<ClassDecl>(decl),
                             Loc, context.SelfIdentifier, Type(), decl);
   selfDecl->setImplicit();
   ConstructorDecl *ctor

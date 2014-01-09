@@ -156,6 +156,8 @@ ERROR(decl_redefinition,decl_parsing,none,
       (bool))
 ERROR(let_requires_initializer,decl_parsing,none,
       "'let' declarations require an initializer expression", ())
+ERROR(let_cannot_be_computed_property,decl_parsing,none,
+      "'let' declarations cannot be a computed property", ())
 ERROR(disallowed_stored_var_decl,decl_parsing,none,
       "'var' declarations without getter/setter not allowed here", ())
 ERROR(disallowed_computed_var_decl,decl_parsing,none,

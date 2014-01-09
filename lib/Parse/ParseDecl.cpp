@@ -1474,19 +1474,26 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
     if (pattern.isNull())
       return makeParserError();
 
-    // 'let' declarations require initializers - get/set specifiers are not
-    // allowed.
-    if (isLet && Tok.isNot(tok::equal)) {
-      diagnose(Tok, diag::let_requires_initializer);
-      return makeParserError();
-    }
-
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
+      // Reject getters and setters for lets, but parse them for better
+      // recovery.
+      if (isLet)
+        diagnose(Tok, diag::let_cannot_be_computed_property);
+
       parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType,
                          StaticLoc);
+
+      if (isLet)
+        return makeParserError();
+
       HasGetSet = true;
+    }
+
+    if (isLet && Tok.isNot(tok::equal)) {
+      diagnose(VarLoc, diag::let_requires_initializer);
+      return makeParserError();
     }
 
     // If this is a var in the top-level of script/repl source file,
