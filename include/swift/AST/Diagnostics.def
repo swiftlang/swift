@@ -175,13 +175,13 @@ ERROR(disallowed_enum_element,decl_parsing,none,
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
-ERROR(decl_not_static,decl_parsing,none,
+ERROR(decl_not_type,decl_parsing,none,
       "declaration cannot be marked 'type'", ())
 ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
 // Var Name
-ERROR(unimplemented_static_var,decl_parsing,none,
+ERROR(unimplemented_type_var,decl_parsing,none,
      "type variables not yet supported in "
      "%select{this context|generic types|classes|protocols}0", (unsigned))
 

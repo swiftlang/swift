@@ -174,6 +174,10 @@ namespace {
       return visit(E, SGFContext());
     }
 
+    RValue emitDeclRefRValue(Expr *E, ConcreteDeclRef decl,
+                             Type T, SGFContext C);
+
+
     // These always produce lvalues.
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C) {
       LValue lv = SGF.emitLValue(E->getSubExpr());
@@ -537,22 +541,27 @@ RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
   llvm_unreachable("cannot appear in rvalue");
 }
 
-RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  assert(!E->getType()->is<LValueType>() &&
+RValue RValueEmitter::emitDeclRefRValue(Expr *E,
+                                        ConcreteDeclRef decl, Type ty,
+                                        SGFContext C) {
+  assert(!ty->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
   // Emit the reference to the decl.
-  ManagedValue Reference = SGF.emitReferenceToDecl(E, E->getDeclRef(),
-                                                   E->getType(), 0);
-  
+  ManagedValue Reference = SGF.emitReferenceToDecl(E, decl, ty, 0);
+
   // If it comes back as an LValue-style RValue, emit a load to get a real
   // RValue.
   if (Reference.isLValue()) {
     Reference = SGF.emitLoad(E, Reference.getUnmanagedValue(),
-                             SGF.getTypeLowering(E->getType()), C, IsNotTake);
+                             SGF.getTypeLowering(ty), C, IsNotTake);
     if (!Reference) return RValue();
   }
   return RValue(SGF, E, Reference);
+}
+
+RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
+  return emitDeclRefRValue(E, E->getDeclRef(), E->getType(), C);
 }
 
 
@@ -1241,6 +1250,22 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                           E->getMember().getSubstitutions(),
                           std::move(baseRV), RValueSource(), C);
     return MV ? RValue(SGF, E, MV) : RValue();
+  }
+
+  // For static variables, emit a reference to the global variable backing
+  // them.
+  // FIXME: This has to be dynamically looked up for classes, and
+  // dynamically instantiated for generics.
+  if (FieldDecl->isStatic()) {
+    auto baseMeta = E->getBase()->getType()->castTo<MetatypeType>()
+                            ->getInstanceType(); (void)baseMeta;
+    assert(!baseMeta->is<BoundGenericType>() &&
+           "generic static stored properties not implemented");
+    assert((baseMeta->getStructOrBoundGenericStruct()
+            || baseMeta->getEnumOrBoundGenericEnum()) &&
+           "static stored properties for classes/protocols not implemented");
+
+    return emitDeclRefRValue(E, E->getMember().getDecl(), E->getType(), C);
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
