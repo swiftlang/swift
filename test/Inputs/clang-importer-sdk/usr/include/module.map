@@ -11,6 +11,10 @@ module Foundation {
   header "Foundation.h" 
   export *
 }
+module CoreGraphics {
+  header "CoreGraphics.h" 
+  export *
+}
 module objc_ext { header "objc_ext.h" }
 module macros { header "macros.h" }
 module user_objc { header "user_objc.h" }

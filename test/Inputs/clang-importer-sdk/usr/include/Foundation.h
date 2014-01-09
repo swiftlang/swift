@@ -1,4 +1,5 @@
 @import ObjectiveC;
+@import CoreGraphics;
 
 typedef struct objc_object { void *isa; } *id;
 
@@ -36,6 +37,10 @@ BOOL BOOLtoBOOL(BOOL b);
 typedef struct _NSZone NSZone;
 
 void *allocate(NSZone *zone);
+
+typedef CGPoint NSPoint;
+typedef CGSize NSSize;
+typedef CGRect NSRect;
 
 
 @interface BadCollection
