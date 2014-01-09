@@ -2018,20 +2018,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 
   // Release our members.
-  // FIXME: generic params
-  // FIXME: Can a destructor always consider its fields fragile like this?
-  for (Decl *member : cd->getMembers()) {
-    if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
-      if (vd->isComputed())
-        continue;
-      const TypeLowering &ti = getTypeLowering(vd->getType());
-      if (!ti.isTrivial()) {
-        SILValue addr = B.createRefElementAddr(Loc, selfValue, vd,
-                                          ti.getLoweredType().getAddressType());
-        B.emitDestroyAddr(cleanupLoc, addr);
-      }
-    }
-  }
+  emitClassMemberDestruction(selfValue, cd, Loc, cleanupLoc);
 
   if (computeSimpleResultSelfValue)
     resultSelfValue = B.createRefToObjectPointer(cleanupLoc, selfValue, 
@@ -2439,23 +2426,17 @@ SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
   return C.AllocateCopy(subs);
 }
 
-/// Should allocation of this class use the Objective-C allocation 
-/// routines?
-static bool usesObjCAllocator(ClassDecl *theClass) {
+bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   while (true) {
-    // If any class in the inheritance hierarchy does not have a
-    // known-Swift implementation, we have to assume that it might
-    // replace the allocator.
-    //
-    // Allocating the instance in Swift is actually easy.  It's
-    // deallocating it that requires cooperation from the superclasses
-    // given the Objective-C deallocation algorithm.
-    if (theClass->hasClangNode())
-      return true;
-
-    // If the entire hierarchy is known-Swift, we use the Swift allocator.
-    if (!theClass->hasSuperclass())
+    // If any class in the hierarchy is generic, it's not exported to
+    // Objective-C anyway.
+    if (theClass->getGenericParams())
       return false;
+
+    // If the root class was implemented in Objective-C, use Objective-C's
+    // allocation methods because they may have been overridden.
+    if (!theClass->hasSuperclass())
+      return theClass->hasClangNode();
 
     theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
   }
@@ -2720,6 +2701,24 @@ void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
     // Cleanup after this initialization.
     FullExpr scope(Cleanups, pbd->getPattern());
     emitMemberInit(*this, selfDecl, pbd->getPattern(), emitRValue(init));
+  }
+}
+
+void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
+                                                ClassDecl *cd,
+                                                RegularLocation loc,
+                                                CleanupLocation cleanupLoc) {
+  for (Decl *member : cd->getMembers()) {
+    VarDecl *vd = dyn_cast<VarDecl>(member);
+    if (!vd || vd->isComputed()) continue;
+
+    const TypeLowering &ti = getTypeLowering(vd->getType());
+    if (!ti.isTrivial()) {
+      SILValue addr = B.createRefElementAddr(
+                        loc, selfValue, vd,
+                        ti.getLoweredType().getAddressType());
+      B.emitDestroyAddr(cleanupLoc, addr);
+    }
   }
 }
 

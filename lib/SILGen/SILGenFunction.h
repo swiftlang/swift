@@ -365,6 +365,13 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param nominal The type whose members are being initialized.
   void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
+  /// Generates code to destroy the instance variables of a class.
+  ///
+  /// \param selfValue The 'self' value.
+  /// \param cd The class declaration whose members are being destroyed.
+  void emitClassMemberDestruction(SILValue selfValue, ClassDecl *cd,
+                                  RegularLocation loc,
+                                  CleanupLocation cleanupLoc);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);

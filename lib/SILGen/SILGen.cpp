@@ -540,7 +540,7 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
 
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   SILDeclRef thunk(method, SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*isObjC*/ true);
+                   /*isObjC*/ true);
   
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
