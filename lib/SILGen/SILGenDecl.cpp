@@ -1112,21 +1112,10 @@ class SILGenType : public Lowering::ASTVisitor<SILGenType> {
 public:
   SILGenModule &SGM;
   NominalTypeDecl *theType;
-  DestructorDecl *destructor;
   Optional<SILGenVTable> genVTable;
   
   SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
-    : SGM(SGM), theType(theType), destructor(nullptr) {}
-
-  ~SILGenType() {
-    // Emit the destructor for a class type.
-    if (ClassDecl *theClass = dyn_cast<ClassDecl>(theType)) {
-      assert(destructor && "missing class destructor");
-      SGM.emitDestructor(theClass, destructor);
-    } else {
-      assert(!destructor && "destructor in non-class type?!");
-    }
-  }
+    : SGM(SGM), theType(theType) {}
   
   /// Emit SIL functions for all the members of the type.
   void emitType() {
@@ -1171,10 +1160,8 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
-    // Save the destructor decl so we can use it to generate the destructor
-    // later.
-    assert(!destructor && "more than one destructor decl in type?!");
-    destructor = dd;
+    assert(isa<ClassDecl>(theType) && "destructor in a non-class type");
+    SGM.emitDestructor(cast<ClassDecl>(theType), dd);
   }
   
   void visitEnumElementDecl(EnumElementDecl *ued) {
