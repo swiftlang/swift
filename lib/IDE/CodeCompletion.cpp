@@ -1122,11 +1122,20 @@ public:
     if (IsDynamicLookup)
       Builder.addDynamicLookupMethodCallTail();
 
+    llvm::SmallString<32> TypeStr;
+
     auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
+
+    if (FunctionType->is<ErrorType>()) {
+      llvm::raw_svector_ostream OS(TypeStr);
+      FunctionType.print(OS);
+      Builder.addTypeAnnotation(OS.str());
+      return;
+    }
 
     if (FirstIndex != 0)
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
@@ -1148,7 +1157,6 @@ public:
     FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
 
     // Build type annotation.
-    llvm::SmallString<32> TypeStr;
     {
       llvm::raw_svector_ostream OS(TypeStr);
       for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
