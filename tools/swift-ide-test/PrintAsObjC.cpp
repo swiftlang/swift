@@ -13,6 +13,7 @@
 #include "PrintAsObjC.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/Support/Path.h"
@@ -31,15 +32,18 @@ static void writeImports(raw_ostream &os, Module *M) {
 }
 
 namespace {
-class ObjCPrinter : public DeclVisitor<ObjCPrinter> {
+class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
+                    public TypeVisitor<ObjCPrinter> {
   raw_ostream &os;
 
-  friend DeclVisitor<ObjCPrinter>;
+  friend ASTVisitor<ObjCPrinter>;
+  friend TypeVisitor<ObjCPrinter>;
 
 public:
   explicit ObjCPrinter(raw_ostream &out) : os(out) {}
 
   using ASTVisitor::visit;
+  using TypeVisitor::visit;
 
   void visit(const Decl *D) {
     visit(const_cast<Decl *>(D));
@@ -77,29 +81,100 @@ private:
     os << ">";
   }
 
-  void visitClassDecl(ClassDecl *CD) {
-    // FIXME: Include members.
-    os << "@interface " << CD->getName();
+  /// Prints the members of a class, extension, or protocol.
+  void printMembers(ArrayRef<Decl *> members) {
+    for (auto member : members) {
+      auto VD = dyn_cast<ValueDecl>(member);
+      if (!VD || !VD->isObjC())
+        continue;
+      visit(VD);
+    }
+  }
 
+  void visitClassDecl(ClassDecl *CD) {
+    os << "@interface " << CD->getName();
     if (Type superTy = CD->getSuperclass())
       os << " : " << superTy->getClassOrBoundGenericClass()->getName();
     printProtocols(CD->getProtocols());
-    os << "\n@end\n";
+    os << "\n";
+    printMembers(CD->getMembers());
+    os << "@end\n";
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    // FIXME: Include members.
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
     os << "@interface " << baseClass->getName() << " ()";
     printProtocols(ED->getProtocols());
-    os << "\n@end\n";
+    os << "\n";
+    printMembers(ED->getMembers());
+    os << "@end\n";
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    // FIXME: Include members.
     os << "@protocol " << PD->getName();
     printProtocols(PD->getProtocols(), /*printAll=*/true);
-    os << "\n@end\n";
+    os << "\n";
+    printMembers(PD->getMembers());
+    os << "@end\n";
+  }
+
+  void visitFuncDecl(FuncDecl *FD) {
+    assert(FD->getDeclContext()->isTypeContext() &&
+           "cannot handle free functions right now");
+    if (FD->isStatic())
+      os << "+ (";
+    else
+      os << "- (";
+
+    Type rawMethodTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
+    auto methodTy = rawMethodTy->castTo<FunctionType>();
+    visit(methodTy->getResult());
+    os << ")" << FD->getName();
+
+    auto argPatterns = FD->getArgParamPatterns();
+    assert(argPatterns.size() == 2 && "not an ObjC-compatible method");
+    const TuplePattern *argParams = cast<TuplePattern>(argPatterns.back());
+    assert(!argParams->hasVararg() && "can't handle variadic methods");
+
+    auto bodyPatterns = FD->getBodyParamPatterns();
+    assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
+    const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
+
+    bool isFirst = true;
+    for_each(argParams->getFields(), bodyParams->getFields(),
+             [this, &isFirst] (const TuplePatternElt &argParam,
+                               const TuplePatternElt &bodyParam) {
+      // FIXME: Handle default arguments.
+      if (!isFirst) {
+        auto argPattern = argParam.getPattern()->getSemanticsProvidingPattern();
+        os << " " << cast<NamedPattern>(argPattern)->getBoundName();
+      }
+
+      auto bodyPattern = bodyParam.getPattern()->getSemanticsProvidingPattern();
+      os << ":(";
+      this->visit(bodyPattern->getType());
+      os << ")";
+
+      if (isa<AnyPattern>(bodyPattern)) {
+        // FIXME: Do a better job synthesizing an initial argument name.
+        os << "_";
+      } else {
+        os << cast<NamedPattern>(bodyPattern)->getBoundName();
+      }
+
+      isFirst = false;
+    });
+
+    os << ";\n";
+  }
+
+  void visitType(TypeBase *) {
+    llvm_unreachable("unable to emit this type as ObjC");
+  }
+
+  void visitTupleType(TupleType *TT) {
+    assert(TT->getNumElements() == 0);
+    os << "void";
   }
 };
 
@@ -331,6 +406,7 @@ public:
 
       if (success) {
         assert(declsToWrite.back() == D);
+        os << "\n";
         declsToWrite.pop_back();
       }
     }
