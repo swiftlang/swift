@@ -1078,9 +1078,8 @@ ID SILPrinter::getID(SILValue V) {
   return R;
 }
 
-void swift::WriteAsOperand(raw_ostream &out, SILBasicBlock *BB,
-                           bool printType) {
-  out << SILPrinter(out).getID(BB);
+void SILBasicBlock::printAsOperand(raw_ostream &OS, bool PrintType) {
+  OS << SILPrinter(OS).getID(this);
 }
 
 //===----------------------------------------------------------------------===//

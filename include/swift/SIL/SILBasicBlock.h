@@ -179,6 +179,7 @@ public:
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
+  void printAsOperand(raw_ostream &OS, bool PrintType = true);
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {
@@ -190,9 +191,6 @@ private:
   /// BBArgument's ctor adds it to the argument list of this block.
   void addArgument(SILArgument *Arg) { BBArgList.push_back(Arg); }
 };
-
-void WriteAsOperand(raw_ostream &out, swift::SILBasicBlock *BB,
-                    bool printType = true);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                      const SILBasicBlock &BB) {
