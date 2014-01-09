@@ -105,7 +105,7 @@ private:
 
     // Create a new empty function.
     SILFunction *NewF =
-        SILFunction::create(M, SILLinkage::Internal, NewName, FTy,
+        SILFunction::create(M, SILLinkage::Private, NewName, FTy,
                             Orig->getLocation(), Orig->isBare(),
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());
@@ -367,8 +367,8 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     if (!canSpecializeFunctionWithSubList(F, Subs))
       continue;
 
-    // TODO: We need to mangle the subst types into the new function name.
-    // for now use a running counter. rdar://15658321
+    // TODO: Mangle the subst types into the new function name and
+    // use shared linkage. For now, we use a running counter. rdar://15658321
     unsigned Counter = 0;
     std::string ClonedName;
     do {
@@ -393,7 +393,7 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     Worklist.push_back(NewF);
   }
 
-  if (!F->getRefCount() && F->getLinkage() == SILLinkage::Internal) {
+  if (!F->getRefCount() && !isPossiblyUsedExternally(F->getLinkage())) {
     F->getBlocks().clear();
   }
 

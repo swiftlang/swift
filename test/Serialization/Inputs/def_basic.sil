@@ -5,13 +5,13 @@ import swift
 import Foundation
 
 // Test SIL Global variable.
-// CHECK: sil_global internal @globalinit_token0 : $Builtin.Word
-sil_global internal @globalinit_token0 : $Builtin.Word
+// CHECK: sil_global private @globalinit_token0 : $Builtin.Word
+sil_global private @globalinit_token0 : $Builtin.Word
 
 var staticProp: Int64 = 0
 sil @globalinit_func0 : $@thin () -> ()
 
-// CHECK-LABEL: sil deserialized @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 sil @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
@@ -34,7 +34,7 @@ class Class2 { var b : Class1 }
 
 // Instructions
 
-// CHECK-LABEL: sil deserialized @test1 : $@thin () -> ()
+// CHECK-LABEL: sil public_external @test1 : $@thin () -> ()
 sil @test1 : $@thin () -> () {
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
@@ -48,7 +48,7 @@ bb1:
 }
 
 // Forward referenced values.
-// CHECK-LABEL: sil deserialized @test2 : $@thin (Int64) -> ()
+// CHECK-LABEL: sil public_external @test2 : $@thin (Int64) -> ()
 sil @test2 : $@thin (Int64) -> () {
   // CHECK: bb1:
   // CHECK: %2 = tuple ()
@@ -457,7 +457,7 @@ var x : Int = 0
 sil @global_callee : $@thin (Builtin.Int128, @thin Int64.metatype) -> Int64
 
 // CHECK-LABEL: @global_code : $@thin () -> ()
-sil internal @global_code : $@thin () -> () {
+sil private @global_code : $@thin () -> () {
 bb0:
   // CHECK: global_addr #x : $*Int64
   %0 = global_addr #x : $*Int64
@@ -521,7 +521,7 @@ bb0(%0 : $*SomeProtocol):
   %10 = return %6 : $@thick SomeProtocol.metatype
 }
 
-// CHECK-LABEL: sil deserialized @test_unreachable
+// CHECK-LABEL: sil public_external @test_unreachable
 sil @test_unreachable : $@thin () -> () {
 bb0:
   unreachable
@@ -543,7 +543,7 @@ bb0(%0 : $SomeClass):
   %6 = return %5 : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_basic_block_arguments
+// CHECK-LABEL: sil public_external @test_basic_block_arguments
 sil @test_basic_block_arguments : $@thin (Builtin.Int1) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int1):
   // CHECK: cond_br
@@ -561,7 +561,7 @@ bb3(%6 : $Builtin.Int64):
   return %6 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil deserialized @test_cond_branch_basic_block_args
+// CHECK-LABEL: sil public_external @test_cond_branch_basic_block_args
 sil @test_cond_branch_basic_block_args : $@thin (Int64, Builtin.Int1) -> Int64 {
 bb0(%0 : $Int64, %1 : $Builtin.Int1):
   cond_br %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
@@ -583,7 +583,7 @@ sil @test_super_method : $@cc(method) @thin (Bas) -> Bas
 sil @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
 sil @_TFSSCfMSSFT_SS : $@thin (@thin String.metatype) -> String
 
-// CHECK-LABEL: sil deserialized @test_builtin_func_ref
+// CHECK-LABEL: sil public_external @test_builtin_func_ref
 sil @test_builtin_func_ref : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $Builtin.Int1
@@ -600,7 +600,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   return %10 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil deserialized @test_dealloc_ref
+// CHECK-LABEL: sil public_external @test_dealloc_ref
 sil @test_dealloc_ref : $@thin () -> () {
 bb0:
   %0 = alloc_ref $Class1
@@ -610,7 +610,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_dealloc_box
+// CHECK-LABEL: sil public_external @test_dealloc_box
 sil @test_dealloc_box : $@thin () -> () {
 bb0:
   %0 = alloc_box $Class1
@@ -649,7 +649,7 @@ sil @_TF6switch1aFT_T_ : $@thin () -> ()
 sil @_TF6switch1bFT_T_ : $@thin () -> ()
 sil @_TF6switch1cFT_T_ : $@thin () -> ()
 
-// CHECK-LABEL: sil deserialized @test_switch_union : $@thin (MaybePair) -> ()
+// CHECK-LABEL: sil public_external @test_switch_union : $@thin (MaybePair) -> ()
 sil @test_switch_union : $@thin (MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
@@ -688,7 +688,7 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil deserialized @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
+// CHECK-LABEL: sil public_external @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
 sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
@@ -707,7 +707,7 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_switch_int : $@thin (Builtin.Int64) -> ()
+// CHECK-LABEL: sil public_external @test_switch_int : $@thin (Builtin.Int64) -> ()
 sil @test_switch_int : $@thin (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   // CHECK: switch_int %{{.*}} : $Builtin.Int64, case 1: bb1, case 2: bb2
@@ -733,7 +733,7 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil deserialized @test_init_existential : $@thin (@out Bendable, Spoon) -> ()
+// CHECK-LABEL: sil public_external @test_init_existential : $@thin (@out Bendable, Spoon) -> ()
 sil @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
@@ -749,7 +749,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_existential_ref : $@thin (ConcreteClass) -> ClassP
+// CHECK-LABEL: sil public_external @test_existential_ref : $@thin (ConcreteClass) -> ClassP
 sil @test_existential_ref : $@thin (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
@@ -762,13 +762,13 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil @test_assign : $@thin (Int64, @inout Int64) -> () {    // CHECK-LABEL: sil deserialized @test_assign
+sil @test_assign : $@thin (Int64, @inout Int64) -> () {    // CHECK-LABEL: sil public_external @test_assign
 bb0(%0 : $Int64, %1 : $*Int64):
   assign %0 to %1 : $*Int64                   // CHECK: assign
   unreachable
 }
 
-// CHECK-LABEL: sil deserialized @test_transparent : $@thin () -> () {
+// CHECK-LABEL: sil public_external @test_transparent : $@thin () -> () {
 sil @test_transparent : $@thin () -> () {
 bb0:
   // CHECK: function_ref
@@ -783,7 +783,7 @@ sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int64) -> @callee_owned
 
 sil @takes_int64_float32 : $@thin (Int64, Float32) -> ()
 
-// CHECK-LABEL: sil deserialized @test_partial_apply : $@thin (Float32) -> @callee_owned (Int64) -> () {
+// CHECK-LABEL: sil public_external @test_partial_apply : $@thin (Float32) -> @callee_owned (Int64) -> () {
 sil @test_partial_apply : $@thin Float32 -> @callee_owned Int64 -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@thin (Int64, Float32) -> ()
@@ -796,7 +796,7 @@ class X {
   @objc func f() { }
 }
 
-// CHECK-LABEL: sil deserialized @test_dynamic_lookup_br : $@thin (DynamicLookup) -> ()
+// CHECK-LABEL: sil public_external @test_dynamic_lookup_br : $@thin (DynamicLookup) -> ()
 sil @test_dynamic_lookup_br : $@thin (DynamicLookup) -> () {
 bb0(%0 : $DynamicLookup):
   %1 = alloc_box $DynamicLookup
@@ -820,7 +820,7 @@ bb3:
   return %28 : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_mark_fn_escape
+// CHECK-LABEL: sil public_external @test_mark_fn_escape
 sil @test_mark_fn_escape : $@thin () -> () {
   %b = alloc_box $Int64
   %c = alloc_box $Int64
@@ -832,7 +832,7 @@ sil @test_mark_fn_escape : $@thin () -> () {
   return %28 : $()
 }
 
-// CHECK-LABEL: sil deserialized @test_copy_destroy_value
+// CHECK-LABEL: sil public_external @test_copy_destroy_value
 sil @test_copy_destroy_value : $@thin (Val) -> (Val) {
 bb0(%0 : $Val):
   %1 = copy_value %0 : $Val
@@ -846,7 +846,7 @@ bb0(%0 : $Val):
 func serialize_all() {
 }
 
-// CHECK: sil deserialized @cond_fail_test : $@thin (Builtin.Int1) -> () {
+// CHECK: sil public_external @cond_fail_test : $@thin (Builtin.Int1) -> () {
 sil @cond_fail_test : $@thin Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
@@ -866,8 +866,8 @@ class Foo {
   var y: Int
 }
 
-// CHECK-LABEL: sil deserialized @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
-// CHECK_DECL-LABEL: sil deserialized @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64{{$}} 
+// CHECK-LABEL: sil public_external @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
+// CHECK_DECL-LABEL: sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64{{$}} 
 sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Foo) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   %3 = tuple ()
@@ -887,8 +887,8 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $Foo):
   return %13 : $Int64
 }
 
-// CHECK-LABEL: sil deserialized @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
-// CHECK_DECL-LABEL: sil deserialized @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> (){{$}}
+// CHECK-LABEL: sil public_external @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
+// CHECK_DECL-LABEL: sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> (){{$}}
 sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int64, Int64, Int64, Foo) -> () {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Foo):
   %4 = alloc_stack $Int64  // var value           // users: %16, %5

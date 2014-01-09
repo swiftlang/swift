@@ -252,8 +252,10 @@ public:
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
-  llvm::Constant *getAddrOfObjCProtocolRecord(ProtocolDecl *proto);
-  llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto);
+  llvm::Constant *getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
+                                              ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
+                                           ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr);
 
@@ -364,36 +366,54 @@ public:
   FormalType getTypeOfGetter(ValueDecl *D);
   FormalType getTypeOfSetter(ValueDecl *D);
 
-  Address getAddrOfGlobalVariable(VarDecl *D);
-  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
-  llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
-  llvm::Function *getAddrOfInjectionFunction(EnumElementDecl *D);
-  llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind);
-  llvm::Function *getAddrOfSetter(ValueDecl *D, Mangle::ExplosionKind kind);
-  Address getAddrOfWitnessTableOffset(CodeRef code);
-  Address getAddrOfWitnessTableOffset(VarDecl *field);
+  Address getAddrOfGlobalVariable(VarDecl *D, ForDefinition_t forDefinition);
+  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
+                               ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data,
+                                    ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfInjectionFunction(EnumElementDecl *D,
+                                             ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind,
+                                  ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfSetter(ValueDecl *D, Mangle::ExplosionKind kind,
+                                  ForDefinition_t forDefinition);
+  Address getAddrOfWitnessTableOffset(CodeRef code,
+                                      ForDefinition_t forDefinition);
+  Address getAddrOfWitnessTableOffset(VarDecl *field,
+                                      ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
-                                        ValueWitness index);
+                                        ValueWitness index,
+                                        ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              llvm::Type *definitionType = nullptr);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D,
                                        ConstructorKind kind,
-                                       Mangle::ExplosionKind explosionLevel);
-  llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind);
+                                       Mangle::ExplosionKind explosionLevel,
+                                       ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
+                                      ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
-                                                 llvm::Type *ty = nullptr);
-  llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D);
-  llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
-  llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
-  llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
-  llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
+                                        llvm::Type *definitionType);
+  llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
+                                              ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
+                                     ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D,
+                                         ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D,
+                                              ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
+                                           ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ExplosionKind level);
-  Address getAddrOfSILGlobalVariable(SILGlobalVariable *var);
-  llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType);
+                                       ExplosionKind level,
+                                       ForDefinition_t forDefinition);
+  Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
+                                     ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType,
+                                                  ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
 

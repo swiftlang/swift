@@ -135,6 +135,52 @@ public:
     }
   };
 
+  /// A class for holding a value that can be partially deserialized.
+  ///
+  /// This class assumes that "T()" is not a valid deserialized value.
+  template <typename T>
+  class PartiallySerialized {
+  private:
+    using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
+
+    /// The deserialized value.
+    T Value;
+
+    /// The offset.  Set to 0 when fully deserialized.
+    serialization::BitOffset Offset;
+
+  public:
+    /*implicit*/ PartiallySerialized(serialization::BitOffset offset)
+      : Value(), Offset(offset) {}
+
+    /*implicit*/ PartiallySerialized(RawBitOffset offset)
+      : Value(), Offset(offset) {}
+
+    bool isDeserialized() const {
+      return Value != T();
+    }
+
+    bool isFullyDeserialized() const {
+      return isDeserialized() && Offset == 0;
+    }
+
+    serialization::BitOffset getOffset() const {
+      assert(!isFullyDeserialized());
+      return Offset;
+    }
+
+    T get() const {
+      assert(isDeserialized());
+      return Value;
+    }
+
+    void set(T value, bool isFullyDeserialized) {
+      assert(!isDeserialized() || Value == value);
+      Value = value;
+      if (isFullyDeserialized) Offset = 0;
+    }
+  };
+
 private:
   /// Decls referenced by this module.
   std::vector<Serialized<Decl*>> Decls;
@@ -190,11 +236,18 @@ private:
     Status = issue;
   }
 
+public:
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
     return FileContext->getParentModule()->Ctx;
   }
 
+  Module *getAssociatedModule() const {
+    assert(FileContext && "no associated context yet");
+    return FileContext->getParentModule();
+  }
+
+private:
   /// Read an on-disk decl hash table stored in index_block::DeclListLayout
   /// format.
   std::unique_ptr<SerializedDeclTable>

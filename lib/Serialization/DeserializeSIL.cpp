@@ -39,6 +39,19 @@ fromStableStringEncoding(unsigned value) {
   }
 }
 
+static Optional<SILLinkage>
+fromStableSILLinkage(unsigned value) {
+  switch (value) {
+  case SIL_LINKAGE_PUBLIC: return SILLinkage::Public;
+  case SIL_LINKAGE_HIDDEN: return SILLinkage::Hidden;
+  case SIL_LINKAGE_SHARED: return SILLinkage::Shared;
+  case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
+  case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
+  case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
+  default: return Nothing;
+  }
+}
+
 /// Used to deserialize entries in the on-disk func hash table.
 class SILDeserializer::FuncTableInfo {
 public:
@@ -80,8 +93,10 @@ public:
 };
 
 SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
-                                 ASTContext &Ctx) :
-                                MF(MF), SILMod(M), Ctx(Ctx) {
+                                 ASTContext &Ctx,
+                                 SerializedSILLoader::Callback *callback)
+    : MF(MF), SILMod(M), Ctx(Ctx), Callback(callback) {
+
   SILCursor = MF->getSILCursor();
   SILIndexCursor = MF->getSILIndexCursor();
   // Early return if either sil block or sil index block does not exist.
@@ -261,41 +276,56 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
                                    Category);
 }
 
-/// Helper function to find the SILFunction given name and type.
-static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
-                                        SILModule &SILMod) {
+/// Helper function to create a bogus SILFunction to appease error paths.
+static SILFunction *createBogusSILFunction(SILModule &M,
+                                           Identifier name,
+                                           SILType type) {
+  SourceLoc loc;
+  return SILFunction::create(M, SILLinkage::Private, name.str(),
+                             type.castTo<SILFunctionType>(),
+                             SILFileLocation(loc));
+}
+
+/// Helper function to find a SILFunction, given its name and type.
+SILFunction *SILDeserializer::getFuncForReference(Identifier name,
+                                                  SILType type) {
   // Check to see if we have a function by this name already.
-  if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str()))
-    // FIXME: check for matching types.
-    return FnRef;
+  SILFunction *fn = SILMod.lookUpFunction(name.str());
+  if (!fn) {
+    // Otherwise, look for a function with this name in the module.
+    auto iter = FuncTable->find(name);
+    if (iter != FuncTable->end()) {
+      fn = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+    }
+  }
 
-  // FIXME: check that Ty is a SILFunctionType.
+  // FIXME: check for matching types.
 
-  // If we didn't find a function, create a new one.
-  SourceLoc Loc;
-  auto Fn = SILFunction::create(SILMod, SILLinkage::Internal,
-                                Name.str(), Ty.castTo<SILFunctionType>(),
-                                SILFileLocation(Loc));
-  return Fn;
+  // Always return something of the right type.
+  if (!fn) fn = createBogusSILFunction(SILMod, name, type);
+  return fn;
 }
 
 /// Deserialize a SILFunction if it is not already deserialized. The input
 /// SILFunction can either be an empty declaration or null. If it is an empty
 /// declaration, we fill in the contents. If the input SILFunction is
 /// null, we create a SILFunction.
-SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
-                                              Identifier FuncName) {
-  LastValueID = 0;
+SILFunction *SILDeserializer::readSILFunction(DeclID FID,
+                                              SILFunction *existingFn,
+                                              Identifier name,
+                                              bool declarationOnly) {
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
-  auto &funcOrOffset = Funcs[FID-1];
 
-  if (funcOrOffset.isComplete())
-    return funcOrOffset; 
+  auto &cacheEntry = Funcs[FID-1];
+  if (cacheEntry.isFullyDeserialized() ||
+      (cacheEntry.isDeserialized() && declarationOnly))
+    return cacheEntry.get(); 
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(funcOrOffset);
+  SILCursor.JumpToBit(cacheEntry.getOffset());
+
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
@@ -308,39 +338,81 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
   assert(kind == SIL_FUNCTION && "expect a sil function");
   (void)kind;
 
-  TypeID FuncTyID;
-  unsigned Linkage, Transparent;
-  SILFunctionLayout::readRecord(scratch, Linkage, Transparent, FuncTyID);
-  if (FuncTyID == 0) {
+  TypeID funcTyID;
+  unsigned rawLinkage, isTransparent;
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, funcTyID);
+
+  if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
     return nullptr;
   }
-
-  auto Ty = MF->getType(FuncTyID);
-
-  // Verify that the types match up.
-  if (InFunc &&
-      InFunc->getLoweredType() != getSILType(Ty, SILValueCategory::Object)) {
-    DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+  auto ty = getSILType(MF->getType(funcTyID), SILValueCategory::Object);
+  if (!ty.is<SILFunctionType>()) {
+    DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     return nullptr;
   }
-  if (!InFunc)
-    // Find a declaration from SILModule or create a SILFunction.
-    InFunc = getFuncForReference(FuncName,
-                                 getSILType(Ty, SILValueCategory::Object),
-                                 SILMod);
-  funcOrOffset = InFunc;
-  assert(InFunc->empty() &&
+
+  auto linkage = fromStableSILLinkage(rawLinkage);
+  if (!linkage) {
+    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+                       << " for SILFunction\n");
+    return nullptr;
+  }
+
+  // If we weren't handed a function, check for an existing
+  // declaration in the output module.
+  if (!existingFn) existingFn = SILMod.lookUpFunction(name.str());
+  auto fn = existingFn;
+
+  // TODO: use the correct SILLocation from module.
+  SILLocation loc = SILFileLocation(SourceLoc());
+
+  // If we have an existing function, verify that the types match up.
+  if (fn) {
+    if (fn->getLoweredType() != ty) {
+      DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      return nullptr;
+    }
+
+    // Don't override the transparency or linkage of a function with
+    // an existing declaration.
+
+  // Otherwise, create a new function.
+  } else {
+    fn = SILFunction::create(SILMod, linkage.getValue(), name.str(),
+                             ty.castTo<SILFunctionType>(), loc);
+    fn->setTransparent(IsTransparent_t(isTransparent == 1));
+
+    if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
+  }
+
+  assert(fn->empty() &&
          "SILFunction to be deserialized starts being empty.");
 
-  auto Fn = InFunc;
-  // FIXME: what should we set the linkage to?
-  Fn->setLinkage(SILLinkage::Deserialized);
-  Fn->setBare(IsBare);
-  Fn->setTransparent(IsTransparent_t(Transparent == 1));
-  // FIXME: use the correct SILLocation from module.
-  SourceLoc Loc;
-  Fn->setLocation(SILFileLocation(Loc));
+  fn->setBare(IsBare);
+  if (!fn->hasLocation()) fn->setLocation(loc);
+
+  // If the next entry is the end of the block, then this function has
+  // no contents.
+  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::EndBlock) {
+    cacheEntry.set(fn, /*fully deserialized*/ true);
+    return fn;
+  }
+
+  // Stop here if we're just supposed to parse a declaration.
+  if (declarationOnly) {
+    cacheEntry.set(fn, /*fully deserialized*/ false);
+    return fn;
+  }
+
+  // Set the cache entry now in order to properly handle both forward
+  // declarations and deserialization errors.
+  cacheEntry.set(fn, /*fully deserialized*/ true);
+
+  scratch.clear();
+  kind = SILCursor.readRecord(entry.ID, scratch);
+
   SILBasicBlock *CurrentBB = nullptr;
 
   // Clear up at the beginning of each SILFunction.
@@ -351,37 +423,34 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc,
   LocalValues.clear();
   ForwardMRVLocalValues.clear();
 
-  // Fetch the next record.
-  scratch.clear();
-  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind == llvm::BitstreamEntry::EndBlock)
-    // This function has no contents.
-    return Fn;
-  kind = SILCursor.readRecord(entry.ID, scratch);
-
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR record also means the end of this SILFunction.
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
-      CurrentBB = readSILBasicBlock(Fn, scratch);
+      CurrentBB = readSILBasicBlock(fn, scratch);
     else {
       // Handle a SILInstruction record.
-      if (readSILInstruction(Fn, CurrentBB, kind, scratch)) {
+      if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
-        return Fn;
+        return fn;
       }
     }
 
     // Fetch the next record.
     scratch.clear();
     entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+
+    // EndBlock means the end of this SILFunction.
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
-      // EndBlock means the end of this SILFunction.
-      return Fn;
+      break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
-  return Fn;
+
+  if (Callback) Callback->didDeserializeBody(MF->getAssociatedModule(), fn);
+
+  cacheEntry.set(fn, /*fully deserialized*/ true);
+  return fn;
 }
 
 SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
@@ -705,8 +774,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Identifier FuncName = MF->getIdentifier(ValID);
     ResultVal = Builder.createFunctionRef(Loc,
         getFuncForReference(FuncName,
-                            getSILType(Ty, (SILValueCategory)TyCategory),
-                            SILMod));
+                            getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case ValueKind::IndexAddrInst: {
@@ -1247,7 +1315,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, InFunc, name);
+  auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
   if (Func)
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
@@ -1261,7 +1329,7 @@ SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, nullptr, name);
+  auto Func = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ false);
   if (Func)
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
@@ -1300,19 +1368,27 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
   (void)kind;
 
   TypeID TyID;
-  unsigned Linkage, IsExternal;
-  GlobalVarLayout::readRecord(scratch, Linkage, IsExternal, TyID);
+  unsigned rawLinkage;
+  GlobalVarLayout::readRecord(scratch, rawLinkage, TyID);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;
   }
 
+  auto linkage = fromStableSILLinkage(rawLinkage);
+  if (!linkage) {
+    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+                       << " for SILGlobalVariable\n");
+    return nullptr;
+  }
+
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-                           SILMod, (SILLinkage)Linkage,
-                           Name.str(), getSILType(Ty, SILValueCategory::Object),
-                           !IsExternal);
+                           SILMod, linkage.getValue(),
+                           Name.str(), getSILType(Ty, SILValueCategory::Object));
   globalVarOrOffset = v;
+
+  if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), v);
   return v;
 }
 
@@ -1377,6 +1453,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   }
   SILVTable *vT = SILVTable::create(SILMod, theClass, vtableEntries);
   vTableOrOffset = vT;
+
+  if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), vT);
   return vT;
 }
 

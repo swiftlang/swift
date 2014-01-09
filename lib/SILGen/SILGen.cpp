@@ -217,7 +217,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                         TupleType::getEmpty(C),
                                         extInfo);
   auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
-  return SILFunction::create(M, SILLinkage::Internal,
+  return SILFunction::create(M, SILLinkage::Private,
                              SWIFT_ENTRY_POINT_FUNCTION, loweredType, Loc);
 }
 
@@ -225,25 +225,26 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
-SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
+SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
+                                            ForDefinition_t forDefinition) {
   // Anonymous functions always have internal linkage.
   if (!constant.hasDecl())
-    return SILLinkage::Internal;
+    return SILLinkage::Private;
   
   // Function-local declarations always have internal linkage.
   ValueDecl *d = constant.getDecl();
   DeclContext *dc = d->getDeclContext();
   while (!dc->isModuleScopeContext()) {
     if (dc->isLocalContext())
-      return SILLinkage::Internal;
+      return SILLinkage::Private;
     dc = dc->getParent();
   }
   
-  // Currying and calling convention thunks have thunk linkage.
+  // Currying and calling convention thunks have shared linkage.
   if (constant.isCurried || constant.isForeignThunk())
-    return SILLinkage::Thunk;
+    return SILLinkage::Shared;
   
-  // Declarations imported from Clang modules have thunk linkage.
+  // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
   if(isa<ClangModuleUnit>(dc) &&
      (isa<ConstructorDecl>(d) ||
@@ -252,20 +253,33 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
       (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed()) ||
       (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext())) ||
       (isa<FuncDecl>(d) && isa<StructDecl>(d->getDeclContext()))))
-    return SILLinkage::Thunk;
+    return SILLinkage::Shared;
   
   // Otherwise, we have external linkage.
   // FIXME: access control
-  return SILLinkage::External;
+  return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
 }
 
-SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
+static void updateLinkageForDefinition(SILGenModule &SGM,
+                                       SILFunction *fn, SILDeclRef constant) {
+  // In all the cases where getConstantLinkage returns something
+  // different for ForDefinition, it returns an available-externally
+  // linkage.
+  if (!isAvailableExternally(fn->getLinkage())) return;
+  fn->setLinkage(SGM.getConstantLinkage(constant, ForDefinition));
+}
+
+SILFunction *SILGenModule::getFunction(SILDeclRef constant,
+                                       ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
-  if (found != emittedFunctions.end())
+  if (found != emittedFunctions.end()) {
+    if (forDefinition)
+      updateLinkageForDefinition(*this, found->second, constant);
     return found->second;
+  }
   
   auto constantType = getConstantType(constant).castTo<SILFunctionType>();
-  SILLinkage linkage = getConstantLinkage(constant);
+  SILLinkage linkage = getConstantLinkage(constant, forDefinition);
 
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
@@ -299,7 +313,7 @@ SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode,
   if (Loc.isNull())
     Loc = RegularLocation(astNode);
 
-  SILFunction *f = getFunction(constant);
+  SILFunction *f = getFunction(constant, ForDefinition);
   assert(f->empty() && "already emitted function?!");
 
   // Create a debug scope for the function using astNode as source location.
@@ -479,7 +493,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
   
   auto *f = 
-    SILFunction::create(M, SILLinkage::Internal, funcName,
+    SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, binding, IsNotBare, IsNotTransparent);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding->getInit())));
   f->setLocation(binding);

@@ -61,7 +61,7 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
 static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
                                         ClassDecl *theClass) {
   // Derive a pointer to the Objective-C class.
-  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass);
+  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
   // Fetch the metadata for that class.
   auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFn(),
@@ -126,7 +126,7 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 
   if (auto theClass = dyn_cast<ClassDecl>(theDecl))
     if (!hasKnownSwiftMetadata(IGM, theClass))
-      return IGM.getAddrOfObjCClass(theClass);
+      return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
   if (isMetadataIndirect(IGM, theDecl))
     return nullptr;
@@ -589,7 +589,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type) {
     auto theClass = classType->getDecl();
     if (hasKnownSwiftMetadata(IGF.IGM, theClass))
       return EmitTypeMetadataRef(IGF).visitClassType(classType);
-    return IGF.IGM.getAddrOfObjCClass(theClass);
+    return IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
   }
 
   auto classType = cast<BoundGenericClassType>(type);
@@ -1271,7 +1271,8 @@ namespace {
                     "class metadata kind is non-zero?");
 
       // Get the metaclass pointer as an intptr_t.
-      auto metaclass = IGM.getAddrOfMetaclassObject(TargetClass);
+      auto metaclass = IGM.getAddrOfMetaclassObject(TargetClass,
+                                                    NotForDefinition);
       auto flags = llvm::ConstantExpr::getPtrToInt(metaclass, IGM.IntPtrTy);
       Fields.push_back(flags);
     }
@@ -1289,7 +1290,8 @@ namespace {
 
     void addDestructorFunction() {
       Fields.push_back(IGM.getAddrOfDestructor(TargetClass,
-                                               DestructorKind::Deallocating));
+                                               DestructorKind::Deallocating,
+                                               NotForDefinition));
     }
     
     void addNominalTypeDescriptor() {
@@ -1317,7 +1319,8 @@ namespace {
         // We have to do getAddrOfObjCClass ourselves here because
         // getSwiftRootClass needs to be ObjC-mangled but isn't
         // actually imported from a clang module.
-        Fields.push_back(IGM.getAddrOfObjCClass(IGM.getSwiftRootClass()));
+        Fields.push_back(IGM.getAddrOfObjCClass(IGM.getSwiftRootClass(),
+                                                NotForDefinition));
         return;
       }
 
@@ -1387,7 +1390,7 @@ namespace {
       // If this function is associated with the target class, go
       // ahead and emit the witness offset variable.
       if (fn.getDecl()->getDeclContext() == TargetClass) {
-        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn);
+        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn, ForDefinition);
         auto global = cast<llvm::GlobalVariable>(offsetVar.getAddress());
 
         auto offset = Fields.size() * IGM.getPointerSize();
@@ -1404,7 +1407,8 @@ namespace {
                        fn.getUncurryLevel());
 
       // Add the appropriate method to the module.
-      Fields.push_back(IGM.getAddrOfFunction(fn, ExtraData::None));
+      Fields.push_back(IGM.getAddrOfFunction(fn, ExtraData::None,
+                                             NotForDefinition));
     }
 
     void addGenericArgument(ArchetypeType *archetype, ClassDecl *forClass) {
@@ -2989,8 +2993,10 @@ namespace {
       SmallVector<llvm::Constant*, 4> inheritedDescriptors;
       inheritedDescriptors.push_back(IGM.getSize(Size(inherited.size())));
       
-      for (ProtocolDecl *p : inherited)
-        inheritedDescriptors.push_back(IGM.getAddrOfProtocolDescriptor(p));
+      for (ProtocolDecl *p : inherited) {
+        auto descriptor = IGM.getAddrOfProtocolDescriptor(p, NotForDefinition);
+        inheritedDescriptors.push_back(descriptor);
+      }
       
       auto inheritedInit = llvm::ConstantStruct::getAnon(inheritedDescriptors);
       auto inheritedVar = new llvm::GlobalVariable(IGM.Module,
@@ -3073,7 +3079,8 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   builder.layout();
   auto init = builder.getInit();
 
-  auto var = cast<llvm::GlobalVariable>(getAddrOfProtocolDescriptor(protocol));
+  auto var = cast<llvm::GlobalVariable>(
+                       getAddrOfProtocolDescriptor(protocol, ForDefinition));
   var->setConstant(true);
   var->setInitializer(init);
 }
@@ -3088,9 +3095,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                                               ProtocolDecl *protocol) {
   if (!protocol->isObjC())
-    return IGF.IGM.getAddrOfProtocolDescriptor(protocol);
+    return IGF.IGM.getAddrOfProtocolDescriptor(protocol, NotForDefinition);
   
-  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol);
+  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);
   llvm::Value *val
     = IGF.Builder.CreateLoad(refVar, IGF.IGM.getPointerAlignment());
   val = IGF.Builder.CreateBitCast(val,

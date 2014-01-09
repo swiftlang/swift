@@ -46,9 +46,8 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
 
-  /// ModuleAndLinkage - The SIL module that the function belongs to, and
-  /// the function's linkage.
-  llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
+  /// Module - The SIL module that the function belongs to.
+  SILModule &Module;
   
   /// The mangled name of the SIL function, which will be propagated
   /// to the binary.  A pointer into the module's lookup table.
@@ -79,6 +78,9 @@ private:
 
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
+
+  /// The linkage of the function.
+  unsigned Linkage : NumSILLinkageBits;
   
   /// This is the number of function_ref instructions using this SILFunction.
   friend class FunctionRefInst;
@@ -106,7 +108,7 @@ public:
                              DeclContext *DC = nullptr);
   ~SILFunction();
 
-  SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
+  SILModule &getModule() const { return Module; }
 
   SILType getLoweredType() const {
     return SILType::getPrimitiveObjectType(LoweredType);
@@ -128,10 +130,11 @@ public:
   
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
+  bool isDefinition() const { return !isExternalDeclaration(); }
   
   /// Get this function's linkage attribute.
-  SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
-  void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
+  SILLinkage getLinkage() const { return SILLinkage(Linkage); }
+  void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const { return DeclCtx; }

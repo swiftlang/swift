@@ -18,7 +18,6 @@ using namespace swift;
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              StringRef name,
                                              SILType loweredType,
-                                             bool isDefinition,
                                              Optional<SILLocation> loc) {
   // Get a StringMapEntry for the variable.  As a sop to error cases,
   // allow the name to have an empty string.
@@ -29,8 +28,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto var = new (M) SILGlobalVariable(M, linkage, name, loweredType,
-                                       isDefinition, loc);
+  auto var = new (M) SILGlobalVariable(M, linkage, name, loweredType, loc);
 
   if (entry) entry->setValue(var);
   return var;
@@ -39,13 +37,12 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      StringRef Name, SILType LoweredType,
-                                     bool IsDefinition,
                                      Optional<SILLocation> Loc)
-  : ModuleAndLinkage(&Module, Linkage),
+  : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc),
-    IsDefinition(IsDefinition) {
+    Linkage(unsigned(Linkage)) {
   Module.silGlobals.push_back(this);
 }
 

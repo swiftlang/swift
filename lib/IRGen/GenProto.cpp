@@ -2328,7 +2328,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
  standard:
   llvm::Function *fn =
-    IGM.getAddrOfValueWitness(abstractType, index);
+    IGM.getAddrOfValueWitness(abstractType, index, ForDefinition);
   if (fn->empty())
     buildValueWitnessFunction(IGM, fn, index, packing, abstractType,
                               concreteType, concreteTI);
@@ -2421,7 +2421,7 @@ namespace {
       
       llvm::Constant *witness
         = IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
-                                   ExplosionKind::Minimal);
+                                   ExplosionKind::Minimal, NotForDefinition);
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
       Table.push_back(witness);
       
@@ -4176,7 +4176,7 @@ static llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
   // Get the address of the global variable the protocol reference gets
   // indirected through.
   llvm::Constant *protocolRefAddr
-    = IGF.IGM.getAddrOfObjCProtocolRef(proto);
+    = IGF.IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition);
   
   // Load the protocol reference.
   Address addr(protocolRefAddr, IGF.IGM.getPointerAlignment());

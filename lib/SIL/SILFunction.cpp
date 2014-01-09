@@ -51,7 +51,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          SILFunction *InsertBefore,
                          SILDebugScope *DebugScope,
                          DeclContext *DC)
-  : ModuleAndLinkage(&Module, Linkage),
+  : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
     // FIXME: Context params should be independent of the function type.
@@ -60,7 +60,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     DeclCtx(DC),
     DebugScope(DebugScope),
     Bare(isBareSILFunction),
-    Transparent(isTrans) {
+    Transparent(isTrans),
+    Linkage(unsigned(Linkage)) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else

@@ -50,7 +50,6 @@
 #include "GenEnum.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "ReferenceTypeInfo.h"
 #include "WeakTypeInfo.h"
 
@@ -674,7 +673,8 @@ ExplosionKind LoweredValue::getExplosionKind() const {
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f,
                                    ExplosionKind explosionLevel)
-  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, explosionLevel),
+  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, explosionLevel,
+                                                ForDefinition),
                   f->getDebugScope(), f->getLocation()),
     CurSILFn(f), CurSILFnExplosionLevel(explosionLevel)
 {}
@@ -1148,64 +1148,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-/// Find the entry point for a SIL function.
-llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
-                                                  ExplosionKind level) {
-  // Check whether we've created the function already.
-  // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  llvm::Function *fn = Module.getFunction(f->getName());
-  if (fn) return fn;
-    
-  LinkEntity entity = LinkEntity::forSILFunction(f, level);
-  
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
-                                               level,
-                                               ExtraData::None,
-                                               attrs);
-  
-  auto cc = expandAbstractCC(*this, f->getAbstractCC());
-  LinkInfo link = LinkInfo::get(*this, entity);
-
-  fn = link.createFunction(*this, fnType, cc, attrs);
-
-  // Unless this is an external reference, emit debug info for it.
-  // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
-  // correctly handle the generic parameters of a witness, which can come from
-  // both the requirement and witness contexts.
-  if (DebugInfo && !f->isExternalDeclaration()
-      && f->getAbstractCC() != AbstractCC::WitnessMethod)
-    DebugInfo->emitFunction(f, fn);
-
-  return fn;
-}
-
-Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var) {
-  // Check whether we've created the global variable already.
-  // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
-  if (gvar) return Address(gvar, Alignment(gvar->getAlignment()));
-
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
-  LinkInfo link = LinkInfo::get(*this, entity);
-  auto &ti = getTypeInfo(var->getLoweredType());
-  // TODO: Debug info needs to be able to use a SILGlobalVariable.
-  // We also ought to have a better debug name.
-  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
-                      ti);
-  Optional<SILLocation> loc;
-  if (var->hasLocation())
-    loc = var->getLocation();
-  gvar = link.createVariable(*this, ti.StorageType, DbgTy,
-                             loc, var->getName());
-  
-  // Set the alignment from the TypeInfo.
-  Address gvarAddr = ti.getAddressForPointer(gvar);
-  gvar->setAlignment(gvarAddr.getAlignment().getValue());
-  
-  return gvarAddr;
-}
-
 void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) {
   setLoweredBuiltinValue(SILValue(i, 0), i->getName());
 }
@@ -1214,7 +1156,8 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // FIXME: pick the best available explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   llvm::Function *fnptr =
-    IGM.getAddrOfSILFunction(i->getReferencedFunction(), explosionLevel);
+    IGM.getAddrOfSILFunction(i->getReferencedFunction(), explosionLevel,
+                             NotForDefinition);
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
@@ -1235,7 +1178,7 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   if (type.isKnownEmpty()) {
     addr = type.getUndefAddress();
   } else {
-    addr = IGM.getAddrOfGlobalVariable(global);
+    addr = IGM.getAddrOfGlobalVariable(global, NotForDefinition);
   }
   
   setLoweredAddress(SILValue(i, 0), addr);
@@ -1249,7 +1192,8 @@ void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {
   if (ti.isKnownEmpty()) {
     addr = ti.getUndefAddress();
   } else {
-    addr = IGM.getAddrOfSILGlobalVariable(i->getReferencedGlobal());
+    addr = IGM.getAddrOfSILGlobalVariable(i->getReferencedGlobal(),
+                                          NotForDefinition);
   }
   
   setLoweredAddress(SILValue(i, 0), addr);

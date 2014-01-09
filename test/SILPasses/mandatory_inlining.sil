@@ -176,7 +176,7 @@ bb0(%0 : $*SomeProtocol):
   %3 = return %2 : $@thick SomeProtocol.metatype
 }
 
-sil internal @top_level_code : $() -> () {
+sil private @top_level_code : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -445,7 +445,7 @@ bb3(%16 : $Bool):
   return %16 : $Bool
 }
 
-sil internal @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Bool) -> Bool {
+sil private @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Bool) -> Bool {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Bool):
   %2 = tuple ()
   %3 = load %1 : $*Bool

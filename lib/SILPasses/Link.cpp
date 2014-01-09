@@ -30,6 +30,39 @@ EnableLinking("enable-sil-linking", llvm::cl::Hidden, llvm::cl::init(true));
 
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
+namespace {
+  class Callback : public SerializedSILLoader::Callback {
+    void didDeserialize(Module *M, SILFunction *fn) override {
+      updateLinkage(fn);
+    }
+
+    void didDeserialize(Module *M, SILGlobalVariable *var) override {
+      updateLinkage(var);
+    }
+
+    void didDeserialize(Module *M, SILVTable *vtable) override {
+      // TODO: should vtables get linkage?
+      //updateLinkage(vtable);
+    }
+
+    template <class T> void updateLinkage(T *decl) {
+      switch (decl->getLinkage()) {
+      case SILLinkage::Public:
+        decl->setLinkage(SILLinkage::PublicExternal);
+        return;
+      case SILLinkage::Hidden:
+        decl->setLinkage(SILLinkage::HiddenExternal);
+        return;
+      case SILLinkage::Shared:
+      case SILLinkage::Private: // ?
+      case SILLinkage::PublicExternal:
+      case SILLinkage::HiddenExternal:
+        return;
+      }
+    }
+  };
+}
+
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -37,9 +70,10 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 void swift::performSILLinking(SILModule *M) {
   if (!EnableLinking && !EnableLinkAll)
     return;
- 
+
+  Callback callback;
   SerializedSILLoader *SILLoader = SerializedSILLoader::create(
-                                     M->getASTContext(), M);
+                                     M->getASTContext(), M, &callback);
 
   SILExternalSource *ExternalSource = M->getExternalSource();
 
@@ -106,8 +140,6 @@ void swift::performSILLinking(SILModule *M) {
               continue;
             }
           }
-          // FIXME: Make sure the declaration has external linkage?
-          CalleeFunction->setLinkage(SILLinkage::External);
         }
       }
     }

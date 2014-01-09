@@ -320,7 +320,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       SGM.emitForeignThunk(constant);
   }
   
-  return B.createFunctionRef(loc, SGM.getFunction(constant));
+  return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
 }
 
 SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
@@ -378,7 +378,8 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   if (isGlobalLazilyInitialized(var)) {
     // Call the global accessor to get the variable's address.
     SILFunction *accessorFn = gen.SGM.getFunction(
-                            SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor));
+                            SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
+                                                  NotForDefinition);
     SILValue accessor = gen.B.createFunctionRef(loc, accessorFn);
     auto accessorTy = accessor.getType().castTo<SILFunctionType>();
     assert(!accessorTy->isPolymorphic()
@@ -1197,7 +1198,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILDeclRef methodConstant,
                                      ArrayRef<Substitution> subs) {
   SILValue methodValue = B.createFunctionRef(loc,
-                                             SGM.getFunction(methodConstant));
+                            SGM.getFunction(methodConstant, NotForDefinition));
 
   SILType methodTy = methodValue.getType();
   

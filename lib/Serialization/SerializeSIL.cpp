@@ -44,6 +44,18 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   llvm_unreachable("bad string encoding");
 }
 
+static unsigned toStableSILLinkage(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
+  case SILLinkage::Hidden: return SIL_LINKAGE_HIDDEN;
+  case SILLinkage::Shared: return SIL_LINKAGE_SHARED;
+  case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
+  case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
+  case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
+  }
+  llvm_unreachable("bad linkage");
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -124,9 +136,8 @@ namespace {
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
-    /// SILFunctions that are required by SILVTable.
-    llvm::SmallVector<const SILFunction *, 16> FuncsForVTable;
-    llvm::SmallSet<const SILFunction *, 16> FuncSetForVTable;
+    /// Functions that we've emitted a reference to.
+    llvm::SmallSet<const SILFunction *, 16> FuncsToDeclare;
 
     std::array<unsigned, 256> SILAbbrCodes;
     template <typename Layout>
@@ -189,8 +200,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   DEBUG(llvm::dbgs() << "SILFunction @" << Out.GetCurrentBitNo() <<
         " abbrCode " << abbrCode << " FnID " << FnID << "\n");
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                       (unsigned)F.getLinkage(), (unsigned)F.isTransparent(),
-                       FnID);
+                                toStableSILLinkage(F.getLinkage()),
+                                (unsigned)F.isTransparent(),
+                                FnID);
   if (DeclOnly)
     return;
   
@@ -582,6 +594,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)FRI->getType().getCategory(),
         S.addIdentifierRef(Ctx.getIdentifier(ReferencedFunction->getName())),
         0);
+
+    // Make sure we declare the referenced function.
+    FuncsToDeclare.insert(ReferencedFunction);
     break;
   }
   case ValueKind::IndexAddrInst:
@@ -1167,8 +1182,7 @@ void SILSerializer::writeGlobalVar(const SILGlobalVariable &g) {
   TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
   GlobalVarLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[GlobalVarLayout::Code],
-                              (unsigned)g.getLinkage(),
-                              (unsigned)g.isExternalDeclaration(),
+                              toStableSILLinkage(g.getLinkage()),
                               TyID);
 }
 
@@ -1181,8 +1195,7 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   for (auto &entry : vt.getEntries()) {
     SmallVector<ValueID, 4> ListOfValues;
     handleSILDeclRef(S, entry.first, ListOfValues);
-    FuncsForVTable.push_back(entry.second);
-    FuncSetForVTable.insert(entry.second);
+    FuncsToDeclare.insert(entry.second);
     // Each entry is a pair of SILDeclRef and SILFunction.
     VTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[VTableEntryLayout::Code],
@@ -1238,21 +1251,25 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
         writeVTable(vt);
     }
 
-    // Go through all SILFunctions in SILMod, and if it is transparent,
-    // write out the SILFunction.
+    // Helper function for whether to emit a function body.
+    auto shouldEmitFunctionBody = [&](const SILFunction &F) {
+      return (!F.empty() &&
+              (EnableSerializeAll || F.isTransparent()));
+    };
+
+    // Go through all the SILFunctions in SILMod and write out any
+    // mandatory function bodies.
     for (const SILFunction &F : *SILMod) {
-      if ((EnableSerializeAll || F.isTransparent())
-          && !F.empty()) {
+      if (shouldEmitFunctionBody(F))
         writeSILFunction(F);
-        // If a SILFunction is already serialized, remove it from the set.
-        FuncSetForVTable.erase(&F);
-      }
     }
 
-    // Serialize the declaration only.
-    for (unsigned I = 0, E = FuncsForVTable.size(); I < E; I++)
-      if (FuncSetForVTable.count(FuncsForVTable[I]))
-        writeSILFunction(*FuncsForVTable[I], true);
+    // Now write function declarations for every function we've
+    // emitted a reference to without emitting a function body for.
+    for (const SILFunction &F : *SILMod) {
+      if (!shouldEmitFunctionBody(F) && FuncsToDeclare.count(&F))
+        writeSILFunction(F, true);
+    }
   }
   {
     BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);

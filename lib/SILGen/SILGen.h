@@ -53,6 +53,11 @@ enum HasInOutSelfAbstractionDifference_t : bool {
   DoesNotHaveInOutSelfAbstractionDifference = false,
   HasInOutSelfAbstractionDifference = true,
 };
+
+enum ForDefinition_t : bool {
+  NotForDefinition = false,
+  ForDefinition = true
+};
   
 /// An ASTVisitor for generating SIL from top-level declarations in a module.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
@@ -103,10 +108,12 @@ public:
   }
   
   /// Determine the linkage of a constant.
-  SILLinkage getConstantLinkage(SILDeclRef constant);
+  SILLinkage getConstantLinkage(SILDeclRef constant,
+                                ForDefinition_t forDefinition);
   
   /// Get the function for a SILDeclRef.
-  SILFunction *getFunction(SILDeclRef constant);
+  SILFunction *getFunction(SILDeclRef constant,
+                           ForDefinition_t forDefinition);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
@@ -116,10 +123,6 @@ public:
     return Types.getTypeLowering(t).getLoweredType();
   }
   
-  /// Generate the mangled symbol name for a SILDeclRef.
-  void mangleConstant(SILDeclRef constant,
-                      SILFunction *f);
-
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(SILLocation loc,

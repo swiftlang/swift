@@ -260,7 +260,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     if (Fn->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      Fn = SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                SILFileLocation(Loc));
     }
     
@@ -273,12 +273,12 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    return SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+    return SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                SILFileLocation(Loc));
   }
 
   // Otherwise, this definition is the first use of this name.
-  return SILFunction::create(SILMod, SILLinkage::Internal, Name.str(), Ty,
+  return SILFunction::create(SILMod, SILLinkage::Private, Name.str(), Ty,
                              SILFileLocation(Loc));
 }
 
@@ -296,7 +296,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType());
-      FnRef = SILFunction::create(SILMod, SILLinkage::Internal, "", Ty,
+      FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                   SILFileLocation(Loc));
     }
     return FnRef;
@@ -304,7 +304,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto Fn = SILFunction::create(SILMod, SILLinkage::Internal,
+  auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
                                 Name.str(), Ty, SILFileLocation(Loc));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
@@ -497,26 +497,52 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
 /// parseSILLinkage - Parse a linkage specifier if present.
 ///   sil-linkage:
-///     /*empty*/           // defaults to external linkage.
-///     'internal'
-///     'thunk'
-static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
+///     /*empty*/          // default depends on whether this is a definition
+///     'public'
+///     'hidden'
+///     'shared'
+///     'private'
+///     'public_external'
+///     'hidden_external'
+static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
   if (P.Tok.isNot(tok::identifier)) {
-    Result = SILLinkage::External;
-  } else if (P.Tok.getText() == "internal") {
-    Result = SILLinkage::Internal;
+    Result = Nothing;
+  } else if (P.Tok.getText() == "public") {
+    Result = SILLinkage::Public;
     P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "thunk") {
-    Result = SILLinkage::Thunk;
+  } else if (P.Tok.getText() == "hidden") {
+    Result = SILLinkage::Hidden;
     P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "deserialized") {
-    Result = SILLinkage::Deserialized;
+  } else if (P.Tok.getText() == "shared") {
+    Result = SILLinkage::Shared;
+    P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "private") {
+    Result = SILLinkage::Private;
+    P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "public_external") {
+    Result = SILLinkage::PublicExternal;
+    P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "hidden_external") {
+    Result = SILLinkage::HiddenExternal;
     P.consumeToken(tok::identifier);
   } else {
     P.diagnose(P.Tok, diag::expected_sil_linkage_or_function);
     return true;
   }
   return false;
+}
+
+/// Given whether it's known to be a definition, resolve an optional
+/// SIL linkage to a real one.
+static SILLinkage resolveSILLinkage(Optional<SILLinkage> linkage,
+                                    bool isDefinition) {
+  if (linkage.hasValue()) {
+    return linkage.getValue();
+  } else if (isDefinition) {
+    return SILLinkage::DefaultForDefinition;
+  } else {
+    return SILLinkage::DefaultForDeclaration;
+  }
 }
 
 /// Parse an option attribute ('[' Expected ']')?
@@ -2423,7 +2449,7 @@ bool Parser::parseDeclSIL() {
 
   SILParser FunctionState(*this);
 
-  SILLinkage FnLinkage;
+  Optional<SILLinkage> FnLinkage;
   Identifier FnName;
   SILType FnType;
   SourceLoc FnNameLoc;
@@ -2452,12 +2478,13 @@ bool Parser::parseDeclSIL() {
       FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
-    FunctionState.F->setLinkage(FnLinkage);
 
     // Now that we have a SILFunction parse the body, if present.
 
+    bool isDefinition = false;
     SourceLoc LBraceLoc = Tok.getLoc();
     if (consumeIf(tok::l_brace)) {
+      isDefinition = true;
       // Parse the basic block list.
       do {
         if (FunctionState.parseSILBasicBlock())
@@ -2467,7 +2494,9 @@ bool Parser::parseDeclSIL() {
       SourceLoc RBraceLoc;
       parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                          LBraceLoc);
-    } 
+    }
+
+    FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
   }
 
   if (FunctionState.diagnoseProblems())
@@ -2515,7 +2544,7 @@ bool Parser::parseDeclSILStage() {
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool Parser::parseSILGlobal() {
   consumeToken(tok::kw_sil_global);
-  SILLinkage GlobalLinkage;
+  Optional<SILLinkage> GlobalLinkage;
   Identifier GlobalName;
   SILType GlobalType;
   SourceLoc NameLoc;
@@ -2532,14 +2561,13 @@ bool Parser::parseSILGlobal() {
   if (State.parseSILType(GlobalType))
     return true;
 
-  bool IsExternal = false;
-  if (parseSILOptional(IsExternal, State, "external"))
-    return true;
+  // Non-external global variables are definitions by default.
+  if (!GlobalLinkage.hasValue())
+    GlobalLinkage = SILLinkage::DefaultForDefinition;
 
   // FIXME: check for existing global variable?
-  SILGlobalVariable::create(*SIL->M, GlobalLinkage, GlobalName.str(),
-                            GlobalType, !IsExternal,
-                            SILFileLocation(NameLoc));
+  SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(), GlobalName.str(),
+                            GlobalType, SILFileLocation(NameLoc));
   return false;
 }
 

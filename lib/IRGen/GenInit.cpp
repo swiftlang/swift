@@ -42,7 +42,7 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   }
   
   /// Get the global variable.
-  Address addr = getAddrOfSILGlobalVariable(var);
+  Address addr = getAddrOfSILGlobalVariable(var, ForDefinition);
   
   /// Add a zero initializer.
   auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
@@ -63,7 +63,7 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   }
   
   /// Get the global variable.
-  Address addr = getAddrOfGlobalVariable(var);
+  Address addr = getAddrOfGlobalVariable(var, ForDefinition);
   
   // Add a zero-initializer.
   llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());

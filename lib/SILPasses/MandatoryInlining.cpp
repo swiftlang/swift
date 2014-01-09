@@ -441,7 +441,7 @@ void swift::performSILMandatoryInlining(SILModule *M) {
     // We discard functions that don't have external linkage, e.g. deserialized
     // functions, internal functions, and thunks.  Being marked transparent
     // controls this.
-    if (F.getLinkage() == SILLinkage::External) continue;
+    if (isPossiblyUsedExternally(F.getLinkage())) continue;
     
     // Okay, just erase the function from the module.
     M->getFunctionList().erase(&F);

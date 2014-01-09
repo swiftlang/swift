@@ -269,7 +269,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
 
   // Suffix the function name with "_promoteX", where X is the first integer
-  // that does not result in a conflict
+  // that does not result in a conflict.
+  // TODO: come up with a good mangling for this transformation and
+  // use shared linkage.
   unsigned Counter = 0;
   std::string ClonedName;
   do {
@@ -317,7 +319,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
                          M.getASTContext());
   
   // This inserts the new cloned function before the original function.
-  return SILFunction::create(M, SILLinkage::Internal, ClonedName, ClonedTy,
+  return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
                              Orig->getLocation(), Orig->isBare(),
                              IsNotTransparent, Orig,
                              Orig->getDebugScope());

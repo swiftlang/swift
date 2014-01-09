@@ -1123,27 +1123,32 @@ void SILFunction::dump() const {
   dump(false);
 }
 
-static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage) {
+static StringRef getLinkageString(SILLinkage linkage) {
   switch (linkage) {
-  case SILLinkage::Internal:
-    OS << "internal ";
-    break;
-  case SILLinkage::Thunk:
-    OS << "thunk ";
-    break;
-  case SILLinkage::External:
-    break;
-  case SILLinkage::Deserialized:
-    OS << "deserialized ";
-    break;
+  case SILLinkage::Public: return "public ";
+  case SILLinkage::Hidden: return "hidden ";
+  case SILLinkage::Shared: return "shared ";
+  case SILLinkage::Private: return "private ";
+  case SILLinkage::PublicExternal: return "public_external ";
+  case SILLinkage::HiddenExternal: return "hidden_external ";
   }
+  llvm_unreachable("bad linkage");
+}
+
+static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
+                         bool isDefinition) {
+  if ((isDefinition && linkage == SILLinkage::DefaultForDefinition) ||
+      (!isDefinition && linkage == SILLinkage::DefaultForDeclaration))
+    return;
+
+  OS << getLinkageString(linkage);
 }
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
   OS << "sil ";
-  printLinkage(OS, getLinkage());
+  printLinkage(OS, getLinkage(), isDefinition());
 
   if (isTransparent())
     OS << "[transparent] ";
@@ -1171,13 +1176,10 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
   
   OS << "sil_global ";
-  printLinkage(OS, getLinkage());
+  printLinkage(OS, getLinkage(), isDefinition());
 
   printName(OS);
   OS << " : " << LoweredType;
-  
-  if (isExternalDeclaration())
-    OS << "external";
   
   OS << "\n\n";
 }

@@ -1,4 +1,4 @@
-//===--- DeserializeSIL.h - Read SIL -------------------------------------===//
+//===--- DeserializeSIL.h - Read SIL ---------------------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,6 +13,7 @@
 #include "ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
 
@@ -27,6 +28,7 @@ namespace swift {
     ModuleFile *MF;
     SILModule &SILMod;
     ASTContext &Ctx;
+    SerializedSILLoader::Callback *Callback;
 
     /// The cursor used to lazily load SILFunctions.
     llvm::BitstreamCursor SILCursor;
@@ -36,7 +38,7 @@ namespace swift {
     using SerializedFuncTable = clang::OnDiskChainedHashTable<FuncTableInfo>;
     std::unique_ptr<SerializedFuncTable> FuncTable;
 
-    std::vector<ModuleFile::Serialized<SILFunction*>> Funcs;
+    std::vector<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;
 
     std::unique_ptr<SerializedFuncTable> VTableList;
     std::vector<ModuleFile::Serialized<SILVTable*>> VTables;
@@ -60,7 +62,7 @@ namespace swift {
 
     /// Read a SIL function.
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
-                                 Identifier name);
+                                 Identifier name, bool declarationOnly);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);
@@ -80,6 +82,7 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id, unsigned ResultNum,
                            SILType Type);
 
+    SILFunction *getFuncForReference(Identifier Name, SILType Ty);
     SILFunction *lookupSILFunction(Identifier Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *readGlobalVar(Identifier Name);
@@ -89,7 +92,8 @@ public:
     SILVTable *lookupVTable(Identifier Name);
     /// Deserialize all VTables inside the module and add them to SILMod.
     void getAllVTables();
-    SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx);
+    SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx,
+                    SerializedSILLoader::Callback *callback);
 
     // Out of line to avoid instantiation OnDiskChainedHashTable here.
     ~SILDeserializer();

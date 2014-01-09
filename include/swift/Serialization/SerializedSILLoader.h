@@ -15,8 +15,10 @@
 
 namespace swift {
 class ASTContext;
+class Module;
 class SILDeserializer;
 class SILFunction;
+class SILGlobalVariable;
 class SILModule;
 class SILVTable;
 
@@ -24,15 +26,42 @@ class SILVTable;
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
 /// on each SILDeserializer.
 class SerializedSILLoader {
+public:
+  class Callback {
+  public:
+    /// Observe that we deserialized a function declaration.
+    virtual void didDeserialize(Module *M, SILFunction *fn) {}
+
+    /// Observe that we successfully deserialized a function body.
+    virtual void didDeserializeBody(Module *M, SILFunction *fn) {}
+
+    /// Observe that we deserialized a global variable declaration.
+    virtual void didDeserialize(Module *M, SILGlobalVariable *var) {}
+
+    /// Observe that we deserialized a v-table declaration.
+    virtual void didDeserialize(Module *M, SILVTable *vtable) {}
+
+    virtual ~Callback() {}
+  private:
+    virtual void _anchor();
+  };
+
 private:
   std::vector<std::unique_ptr<SILDeserializer> > LoadedSILSections;
 
-  explicit SerializedSILLoader(ASTContext &ctx, SILModule *SILMod);
+  explicit SerializedSILLoader(ASTContext &ctx, SILModule *SILMod,
+                               Callback *callback);
 
 public:
-  static SerializedSILLoader *create(ASTContext &ctx, SILModule *SILMod) {
-    return new SerializedSILLoader(ctx, SILMod);
+  /// Create a new loader.
+  ///
+  /// \param callback - not owned by the loader
+  static SerializedSILLoader *create(ASTContext &ctx, SILModule *SILMod,
+                                     Callback *callback) {
+    return new SerializedSILLoader(ctx, SILMod, callback);
   }
+  ~SerializedSILLoader();
+
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILVTable *lookupVTable(Identifier Name);
   /// Deserialize all VTables in all SILModules.

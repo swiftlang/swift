@@ -35,6 +35,16 @@ enum SILStringEncoding : uint8_t {
   SIL_UTF16
 };
 
+enum SILLinkageEncoding : uint8_t {
+  SIL_LINKAGE_PUBLIC,
+  SIL_LINKAGE_HIDDEN,
+  SIL_LINKAGE_SHARED,
+  SIL_LINKAGE_PRIVATE,
+  SIL_LINKAGE_PUBLIC_EXTERNAL,
+  SIL_LINKAGE_HIDDEN_EXTERNAL,
+};
+using SILLinkageField = BCFixed<3>;
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID
@@ -103,15 +113,14 @@ namespace sil_block {
 
   using GlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
-    BCFixed<2>,        // linkage
-    BCFixed<1>,        // Optional attributes
+    SILLinkageField,
     TypeIDField
   >;
 
   using SILFunctionLayout = BCRecordLayout<
     SIL_FUNCTION,
-    BCFixed<2>,        // linkage
-    BCFixed<1>,        // Optional attributes
+    SILLinkageField,
+    BCFixed<1>,        // transparent
     TypeIDField
   >;
 

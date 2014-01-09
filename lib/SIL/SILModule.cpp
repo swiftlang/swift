@@ -96,8 +96,7 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   CanSILFunctionType type,
                                                   IsBare_t isBareSILFunction,
                                                 IsTransparent_t isTransparent) {
-  // TODO: use a 'shared' linkage.
-  auto linkage = SILLinkage::Internal;
+  auto linkage = SILLinkage::Shared;
 
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);

@@ -6,7 +6,7 @@ import Builtin
 import swift
 
 // top_level_code
-sil internal @top_level_code : $() -> () {
+sil private @top_level_code : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -71,7 +71,7 @@ bb4:
 }
 
 // closure0
-sil internal @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -80,7 +80,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 // closure1
-sil internal @closure1 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure1 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -147,7 +147,7 @@ bb4:
 }
 
 // closure2
-sil internal @closure2 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure2 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -156,7 +156,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 // closure3
-sil internal @closure3 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure3 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -223,7 +223,7 @@ bb4:
 }
 
 // closure4
-sil internal @closure4 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure4 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -232,7 +232,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 // closure5
-sil internal @closure5 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure5 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -293,7 +293,7 @@ bb3:
 }
 
 // closure6
-sil internal @closure6 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure6 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
@@ -302,7 +302,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
 }
 
 // closure7
-sil internal @closure7 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
+sil private @closure7 : $@thin (@owned Builtin.ObjectPointer, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int64):
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64

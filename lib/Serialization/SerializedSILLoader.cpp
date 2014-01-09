@@ -18,17 +18,22 @@
 using namespace swift;
 
 SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
-                                         SILModule *SILMod) {
+                                         SILModule *SILMod,
+                                         Callback *callback) {
+
   // Get a list of SerializedModules from ASTContext.
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.getValue()->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx);
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx,
+                                       callback);
         LoadedSILSections.emplace_back(Des);
       }
     }
   }
-} 
+}
+
+SerializedSILLoader::~SerializedSILLoader() {}
 
 SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   for (auto &Des : LoadedSILSections) {
@@ -51,3 +56,6 @@ void SerializedSILLoader::getAllVTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllVTables();
 }
+
+// Anchor the SerializedSILLoader v-table.
+void SerializedSILLoader::Callback::_anchor() {}

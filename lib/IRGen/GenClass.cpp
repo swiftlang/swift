@@ -500,7 +500,8 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     }
       
     case FieldAccess::NonConstantDirect: {
-      Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
+      Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false,
+                                                     NotForDefinition);
       auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
       return emitAddressAtOffset(IGF, baseType, base, offset, field);
     }
@@ -514,7 +515,8 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     case FieldAccess::NonConstantIndirect: {
       auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
       Address indirectOffsetA =
-        IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
+        IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true,
+                                     NotForDefinition);
       auto indirectOffset =
         IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
       auto offsetA =
@@ -623,9 +625,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   // Emit the deallocating destructor.
   llvm::Function *deallocator
-    = getAddrOfDestructor(D, DestructorKind::Deallocating);
+    = getAddrOfDestructor(D, DestructorKind::Deallocating, ForDefinition);
   llvm::Function *destroyer
-    = getAddrOfDestructor(D, DestructorKind::Destroying);
+    = getAddrOfDestructor(D, DestructorKind::Destroying, NotForDefinition);
   emitDeallocatingDestructor(*this, D, deallocator, destroyer);
   
   // FIXME: This is mostly copy-paste from emitExtension;
@@ -822,7 +824,7 @@ namespace {
       assert(Layout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
       auto rootClass = Layout->getRootClassForMetaclass();
-      auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass);
+      auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
 
       // The superclass of the metaclass is the metaclass of the
       // superclass.  Note that for metaclass stubs, we can always
@@ -833,7 +835,7 @@ namespace {
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
         auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
-        superPtr = IGM.getAddrOfMetaclassObject(base);
+        superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
       } else {
         superPtr = rootPtr;
       }
@@ -851,7 +853,8 @@ namespace {
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));
       auto metaclass =
-        cast<llvm::GlobalVariable>(IGM.getAddrOfMetaclassObject(getClass()));
+        cast<llvm::GlobalVariable>(
+                     IGM.getAddrOfMetaclassObject(getClass(), ForDefinition));
       metaclass->setInitializer(init);
     }
     
@@ -879,7 +882,7 @@ namespace {
       fields.push_back(IGM.getAddrOfGlobalString(CategoryName));
       //   const class_t *theClass;
       if (getClass()->hasClangNode())
-        fields.push_back(IGM.getAddrOfObjCClass(getClass()));
+        fields.push_back(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
       else {
         auto type = getSelfType(getClass()).getSwiftRValueType();
         llvm::Constant *metadata = tryEmitConstantHeapMetadataRef(IGM, type);
@@ -1140,7 +1143,7 @@ namespace {
     /// typedef uintptr_t protocol_ref_t;  // protocol_t*, but unremapped
     llvm::Constant *buildProtocolRef(ProtocolDecl *protocol) {
       assert(protocol->isObjC());
-      return IGM.getAddrOfObjCProtocolRecord(protocol);
+      return IGM.getAddrOfObjCProtocolRecord(protocol, NotForDefinition);
     }
     
     /// struct protocol_list_t {
@@ -1206,7 +1209,8 @@ namespace {
       llvm::Constant *offsetPtr;
       if (elt.getKind() == ElementLayout::Kind::Fixed) {
         // Emit a field offset variable for the fixed field statically.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false);
+        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
+                                                   ForDefinition);
         auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
         offsetVar->setConstant(false);
         auto offsetVal =

@@ -595,9 +595,6 @@ Functions
                      '{' sil-basic-block+ '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
-  sil-linkage ::= 'internal'
-  sil-linkage ::= 'thunk'
-
 SIL functions are defined with the ``sil`` keyword. SIL function names
 are introduced with the ``@`` sigil and named by an alphanumeric
 identifier. This name will become the LLVM IR name for the function,
@@ -605,20 +602,6 @@ and is usually the mangled name of the originating Swift declaration.
 The ``sil`` syntax declares the function's name and SIL type, and
 defines the body of the function inside braces. The declared type must
 be a function type, which may be generic.
-
-The ``sil`` keyword may be optionally followed by a linkage specifier. By
-default, SIL functions are externally visible from their enclosing module and
-given LLVM ``external`` linkage.
-
-- The ``internal`` specifier indicates that the function is internal
-  to its module. Internal functions may be freely transformed by
-  optimizations that might otherwise break code in other modules. Internal
-  functions are given ``private`` linkage in LLVM IR.
-- The ``thunk`` specifier indicates that the function was generated as
-  an adapter thunk, for example, to provide a Swift-calling-convention interface
-  to a C or Objective-C function, or to partially apply a curried function or
-  method. These thunks are generated lazily and given ``hidden linkonce_odr``
-  linkage in LLVM IR.
 
 Basic Blocks
 ~~~~~~~~~~~~
@@ -731,6 +714,109 @@ both the "self" argument and the method arguments), because uncurry level zero
 represents the application of the method to its "self" argument, as in
 ``foo.method``, which is where the dynamic dispatch semantically occurs
 in Swift.
+
+Linkage
+~~~~~~~
+::
+
+  sil-linkage ::= 'public'
+  sil-linkage ::= 'hidden'
+  sil-linkage ::= 'shared'
+  sil-linkage ::= 'private'
+  sil-linkage ::= 'public_external'
+  sil-linkage ::= 'hidden_external'
+
+A linkage specifier controls the situations in which two objects in
+different SIL modules are *linked*, i.e. treated as the same object.
+
+A linkage is *external* if it ends with the suffix ``external``.  An
+object must be a definition if its linkage is not external.
+
+All functions and global variables have linkage.  The default linkage
+of a definition is ``public``.  The default linkage of a declaration
+is ``public_external``.  (These may eventually change to ``hidden``
+and ``hidden_external``, respectively.)
+
+On a global variable, an external linkage is what indicates that the
+variable is not a definition.  A variable lacking an explicit linkage
+specifier is presumed a definition (and thus gets the default linkage
+for definitions, ``public``.)
+
+Definition of the *linked* relation
+```````````````````````````````````
+
+Two objects are linked if they have the same name and are mutually
+visible:
+
+  - An object with ``public`` or ``public_external`` linkage is always
+    visible.
+
+  - An object with ``hidden``, ``hidden_external``, or ``shared``
+    linkage is visible only to objects in the same Swift module.
+
+  - An object with ``private`` linkage is visible only to objects in
+    the same SIL module.
+
+Note that the *linked* relationship is an equivalence relation: it is
+reflexive, symmetric, and transitive.
+
+Requirements on linked objects
+``````````````````````````````
+
+If two objects are linked, they must have the same type.
+
+If two objects are linked, they must have the same linkage, except:
+
+  - A ``public`` object may be linked to a ``public_external`` object.
+
+  - A ``hidden`` object may be linked to a ``hidden_external`` object.
+
+If two objects are linked, at most one may be a definition, unless:
+
+  - both objects have ``shared`` linkage or
+
+  - at least one of the objects has an external linkage.
+
+If two objects are linked, and both are definitions, then the
+definitions must be semantically equivalent.  This equivalence may
+exist only on the level of user-visible semantics of well-defined
+code; it should not be taken to guarantee that the linked definitions
+are exactly operationally equivalent.  For example, one definition of
+a function might copy a value out of an address parameter, while
+another may have had an analysis applied to prove that said value is
+not needed.
+
+If an object has any uses, then it must be linked to an definition
+with non-external linkage.
+
+Summary
+```````
+
+  - ``public`` definitions are unique and visible everywhere in the
+    program.  In LLVM IR, they will be emitted with ``external``
+    linkage and ``default`` visibility.
+
+  - ``hidden`` definitions are unique and visible only within the
+    current Swift module.  In LLVM IR, they will be emitted with
+    ``external`` linkage and ``hidden`` visibility.
+
+  - ``private`` definitions are unique and visible only within the
+    current SIL module.  In LLVM IR, they will be emitted with
+    ``private`` linkage.
+
+  - ``shared`` definitions are visible only within the current Swift
+    module.  They can be linked only with other ``shared``
+    definitions, which must be equivalent; therefore, they only need
+    to be emitted if actually used.  In LLVM IR, they will be emitted
+    with ``linkonce_odr`` linkage and ``hidden`` visibility.
+
+  - ``public_external`` and ``hidden_external`` objects always have
+    visible definitions somewhere else.  If this object nonetheless
+    has a definition, it's only for the benefit of optimization or
+    analysis.  In LLVM IR, declarations will have ``external`` linkage
+    and definitions (if actually emitted as definitions) will have
+    ``available_externally`` linkage.
+
 
 VTables
 ~~~~~~~

@@ -38,9 +38,8 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
 
-  /// ModuleAndLinkage - The SIL module that the function belongs to, and
-  /// the function's linkage.
-  llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
+  /// The SIL module that the global variable belongs to.
+  SILModule &Module;
   
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
@@ -53,24 +52,21 @@ private:
   /// The variable only gets a location after it's been emitted.
   Optional<SILLocation> Location;
 
-  /// True if the storage for this global variable lies in this module. False
-  /// if this is a reference to storage from a different module.
-  bool IsDefinition;
+  /// The linkage of the global variable.
+  unsigned Linkage : NumSILLinkageBits;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     StringRef mangledName, SILType loweredType,
-                    bool ssDefinition,
                     Optional<SILLocation> loc);
   
 public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    StringRef MangledName, SILType LoweredType,
-                                   bool IsDefinition,
                                    Optional<SILLocation> Loc = Nothing);
 
   ~SILGlobalVariable();
 
-  SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
+  SILModule &getModule() const { return Module; }
 
   SILType getLoweredType() const { return LoweredType; }
   CanSILFunctionType getLoweredFunctionType() const {
@@ -80,14 +76,16 @@ public:
   StringRef getName() const { return Name; }
   
   /// True if this is a declaration of a variable defined in another module.
-  bool isExternalDeclaration() const { return !IsDefinition; }
+  bool isExternalDeclaration() const {
+    return isAvailableExternally(getLinkage());
+  }
+
   /// True if this is a definition of the variable.
-  bool isDefinition() const { return IsDefinition; }
-  void setDefinition(bool b) { IsDefinition = b; }
+  bool isDefinition() const { return !isExternalDeclaration(); }
   
   /// Get this function's linkage attribute.
-  SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
-  void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
+  SILLinkage getLinkage() const { return SILLinkage(Linkage); }
+  void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }

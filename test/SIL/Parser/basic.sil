@@ -5,16 +5,20 @@ sil_stage raw // CHECK: sil_stage raw
 import Builtin
 import swift
 
-// CHECK: sil_global internal @globalinit_token0 : $Builtin.Word
-sil_global internal @globalinit_token0 : $Builtin.Word
+// CHECK: sil_global private @globalinit_token0 : $Builtin.Word
+sil_global private @globalinit_token0 : $Builtin.Word
 
 // Linkage types.
 
-// CHECK-LABEL: sil thunk @clang_thunk : $() -> ()
-sil thunk @clang_thunk : $() -> ()
+// CHECK-LABEL: sil shared @clang_thunk : $() -> ()
+sil shared @clang_thunk : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
 
-// CHECK-LABEL: sil internal @internal_fn : $() -> ()
-sil internal @internal_fn : $() -> () {
+// CHECK-LABEL: sil private @internal_fn : $() -> ()
+sil private @internal_fn : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -511,7 +515,7 @@ var x: Int = 0
 sil @global_callee : $@thin (Builtin.Int128, @thin Int64.metatype) -> Int64
 
 // CHECK: $() -> ()
-sil internal @global_code : $() -> () {
+sil private @global_code : $() -> () {
 bb0:
   // CHECK: global_addr #x : $*Int64
   %0 = global_addr #x : $*Int64
@@ -997,8 +1001,8 @@ entry(%0 : $Builtin.Int1):
 
 var staticProp: Int64 = 0
 
-// CHECK-LABEL: sil internal @globalinit_func0 : $@thin () -> () {
-sil internal @globalinit_func0 : $@thin () -> () {
+// CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
+sil private @globalinit_func0 : $@thin () -> () {
 bb0:
   %0 = global_addr #staticProp : $*Int64
   %1 = mark_uninitialized [globalvar] %0 : $*Int64

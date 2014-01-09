@@ -82,7 +82,7 @@ bb0:
   return %21 : $@callee_owned () -> Int64
 }
 
-// CHECK-LABEL: sil internal @closure0_promote0 : $@thin (@owned Foo, @owned Baz, Int64) -> Int64
+// CHECK-LABEL: sil private @closure0_promote0 : $@thin (@owned Foo, @owned Baz, Int64) -> Int64
 // CHECK: [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@thin (Int64, Int64, Int64) -> Int64
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
@@ -107,7 +107,7 @@ bb0:
 
 // CHECK-NEXT: return [[RETVAL]] : $Int64
 
-sil internal @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Foo, @owned Builtin.ObjectPointer, @inout Baz, @owned Builtin.ObjectPointer, @inout Int64) -> Int64 {
+sil private @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Foo, @owned Builtin.ObjectPointer, @inout Baz, @owned Builtin.ObjectPointer, @inout Int64) -> Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Foo, %2 : $Builtin.ObjectPointer, %3 : $*Baz, %4 : $Builtin.ObjectPointer, %5 : $*Int64):
   %6 = tuple ()
   // function_ref test14.plus (a : swift.Int64, b : swift.Int64, c : swift.Int64) -> swift.Int64
@@ -147,7 +147,7 @@ bb0:
 
 sil @mutate_foo : $@thin (@inout Foo) -> ()
 
-sil internal @closure1 : $@thin (Builtin.ObjectPointer, @inout Foo) -> Int64 {
+sil private @closure1 : $@thin (Builtin.ObjectPointer, @inout Foo) -> Int64 {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Foo):
   %6 = tuple ()
   // function_ref test14.plus (a : swift.Int64, b : swift.Int64, c : swift.Int64) -> swift.Int64

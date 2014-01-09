@@ -435,9 +435,7 @@ public:
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
-  bool isLocalLinkage() const;
-  bool isThunk() const;
-  bool isDeserialized() const;
+  SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
@@ -519,7 +517,8 @@ class LinkInfo {
 
 public:
   /// Compute linkage information for the given 
-  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity);
+  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
+                      ForDefinition_t forDefinition);
 
   StringRef getName() const {
     return Name.str();

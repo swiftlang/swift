@@ -87,7 +87,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "GenFunc.h"
@@ -2323,34 +2322,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   out.add(data);
 }
 
-/// Fetch the declaration of the given block-to-
-llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType)
-{
-  LinkEntity entity
-    = LinkEntity::forBridgeToBlockConverter(blockType);
-  
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return cast<llvm::Function>(entry);
-  
-  // The block converter is a C function with signature
-  // __typeof__(R (^)(A...)) converter(R (*)(A..., swift_refcounted*),
-  //                                   swift_refcounted*)
-  // We simplify that to the llvm type %objc(i8*, %swift.refcounted*)*.
-  llvm::Type *fnParams[] = {Int8PtrTy, RefCountedPtrTy};
-  llvm::FunctionType *fnType = llvm::FunctionType::get(ObjCPtrTy,
-                                                       fnParams,
-                                                       /*isVarArg=*/ false);
-  
-  
-  llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::C);
-  
-  LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
-}
-
 /// Emit a call to convert a Swift closure to an Objective-C block via a
 /// shim function defined in Objective-C.
 void irgen::emitBridgeToBlock(IRGenFunction &IGF,
@@ -2366,7 +2337,8 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   llvm::Value *context = IGF.Builder.CreateBitCast(mContext,
                                                    IGF.IGM.RefCountedPtrTy);
   // Get the shim function we'll call.
-  llvm::Function *converter = IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy);
+  llvm::Function *converter =
+    IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy, NotForDefinition);
   
   // Emit the call.
   outBlock.add(IGF.Builder.CreateCall2(converter, fn, context));

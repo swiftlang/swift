@@ -3,7 +3,7 @@
 import Builtin
 import swift
 
-sil internal @test1 : $() -> () {
+sil private @test1 : $() -> () {
 bb0:
   %5 = integer_literal $Builtin.Int1, 1
   %7 = cond_br %5, bb1, bb2

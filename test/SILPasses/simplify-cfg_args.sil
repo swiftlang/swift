@@ -4,9 +4,9 @@ sil_stage canonical
 import Builtin
 import swift
 
-sil_global internal @globalinit_token11 : $Builtin.Word
+sil_global private @globalinit_token11 : $Builtin.Word
 
-sil_global internal @globalinit_token120 : $Builtin.Word
+sil_global private @globalinit_token120 : $Builtin.Word
 
 sil @globalinit_func11 :  $@thin () -> () 
 

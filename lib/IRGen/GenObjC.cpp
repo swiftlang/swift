@@ -201,7 +201,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
 /// ObjC runtime requires protocol references to be loaded from an
 /// indirect variable, the address of which is given by
 /// getAddrOfObjCProtocolRef.
-llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto) {
+llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
+                                               ForDefinition_t forDefinition) {
   return const_cast<llvm::Constant*>
     (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).record));
 }
@@ -210,7 +211,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto) {
 /// create ObjC protocol_t records for protocols, storing references to the
 /// record into the __objc_protolist and  and __objc_protorefs sections to be
 /// fixed up by the runtime.
-llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto) {
+llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
+                                               ForDefinition_t forDefinition) {
   return const_cast<llvm::Constant*>
     (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).ref));
 }
@@ -402,7 +404,8 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     ClassDecl *searchClassDecl =
       searchClass.castTo<MetatypeType>()->getInstanceType()
         ->getClassOrBoundGenericClass();
-    searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl);
+    searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
+                                                   NotForDefinition);
   }
   searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
   
@@ -842,7 +845,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
                                   uncurryLevel, /*foreign*/ true);
     
-  llvm::Function *swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+  llvm::Function *swiftImpl =
+    IGM.getAddrOfFunction(fnRef, ExtraData::None, NotForDefinition);
 
   return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
                                           swiftImpl, explosionLevel);
@@ -865,7 +869,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   llvm::Function *swiftImpl
     = IGM.getAddrOfConstructor(constructor, ConstructorKind::Initializing,
-                               explosionLevel);
+                               explosionLevel, NotForDefinition);
 
   SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
                                   uncurryLevel, /*foreign*/ true);

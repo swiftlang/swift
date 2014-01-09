@@ -1379,7 +1379,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   
   // Invoke the witness function.
   // TODO: Collect forwarding substitutions from outer context of method.
-  SILFunction *witnessFn = SGM.getFunction(witness);
+  SILFunction *witnessFn = SGM.getFunction(witness, NotForDefinition);
   SILValue witnessFnRef = B.createFunctionRef(loc, witnessFn);
   SILValue witnessResultValue
     = B.createApply(loc, witnessFnRef, witnessSILTy,

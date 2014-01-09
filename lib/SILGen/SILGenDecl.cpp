@@ -1066,7 +1066,7 @@ public:
         do {
           // Replace the overridden member.
           if (entry.first == ref) {
-            entry = {member, SGM.getFunction(member)};
+            entry = {member, SGM.getFunction(member, NotForDefinition)};
             return;
           }
         } while ((ref = ref.getOverridden()));
@@ -1076,7 +1076,7 @@ public:
     
   not_overridden:
     // Otherwise, introduce a new vtable entry.
-    vtableEntries.emplace_back(member, SGM.getFunction(member));
+    vtableEntries.emplace_back(member, SGM.getFunction(member, NotForDefinition));
   }
   
   // Default for members that don't require vtable entries.
@@ -1842,9 +1842,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
   
-  auto onceToken = SILGlobalVariable::create(M, SILLinkage::Internal,
-                                             onceTokenName,
-                                             onceSILTy, /*isDefinition*/ true);
+  auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
+                                             onceTokenName, onceSILTy);
   
   // Emit the initialization code into a function.
   llvm::SmallString<20> onceFuncName;
@@ -2114,6 +2113,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               witnessSubstTy,
                                               requirement.uncurryLevel);
 
+  // TODO: emit with shared linkage if the type and protocol are non-local.
+  SILLinkage linkage = SILLinkage::Private;
+
   // Mangle the name of the witness thunk.
   llvm::SmallString<128> nameBuffer;
   {
@@ -2127,7 +2129,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                          requirement.uncurryLevel);
   }
   
-  auto *f = SILFunction::create(M, SILLinkage::Internal, nameBuffer,
+  auto *f = SILFunction::create(M, linkage, nameBuffer,
                                 witnessSILType.castTo<SILFunctionType>(),
                                 SILLocation(witness.getDecl()),
                                 IsNotBare,
