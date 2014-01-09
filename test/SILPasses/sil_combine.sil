@@ -293,6 +293,24 @@ bb0(%0 : $*UInt8):
   return %5 : $Builtin.Int8
 }
 
+// CHECK-LABEL: sil @tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  store [[LITERAL]] to [[IN_STORE_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+sil @tuple_extract_load_to_load_tuple_element_addr : $@thin (@inout (Builtin.Int8, Builtin.Int8)) -> (Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load %0 : $*(Builtin.Int8, Builtin.Int8)
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+  %4 = store %2 to %3 : $*Builtin.Int8
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  return %5 : $Builtin.Int8
+}
+
 // CHECK-LABEL: sil @destroy_value_test
 // CHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : $Builtin.ObjectPointer):
 // CHECK-NEXT: strong_release [[RELEASE_TARGET]] : $Builtin.ObjectPointer

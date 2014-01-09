@@ -252,6 +252,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
   SILInstruction *visitStructExtractInst(StructExtractInst *V);
+  SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitClassMethodInst(ClassMethodInst *CMI);
@@ -465,6 +466,34 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
     LoadInst *Result = Builder->createLoad(SEI->getLoc(), SEA);
 
     return replaceInstUsesWith(*SEI, Result, 0);
+  }
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
+  // (tuple_extract (load %x) 0)
+  //   ->
+  // (load (tuple_element_addr %x) 0)
+  LoadInst *LI;
+  if (match(TEI->getOperand(), m_LoadInst(LI))) {
+    // Move our insertion point to the load so we insert the new
+    // struct_element_addr and load there.
+    //
+    // This is to ensure that in a situation like the following:
+    //
+    // %y = (load %x)
+    // (do_stuff)
+    // (tuple_extract %y 0)
+    //
+    // if (do_stuff) modifies the memory at %x, we get the original value.
+    Builder->setInsertionPoint(LI);
+    TupleElementAddrInst *TEA =
+      Builder->createTupleElementAddr(TEI->getLoc(), LI->getOperand(),
+                                      TEI->getFieldNo());
+    LoadInst *Result = Builder->createLoad(TEI->getLoc(), TEA);
+
+    return replaceInstUsesWith(*TEI, Result, 0);
   }
 
   return nullptr;
