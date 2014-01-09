@@ -399,10 +399,10 @@
   for nongeneric structs and enums.
 
     struct Foo {
-      type var foo: Int = 2
+      static var foo: Int = 2
     }
     enum Bar {
-      type var bar: Int = 3
+      static var bar: Int = 3
     }
     println(Foo.foo)
     println(Bar.bar)
