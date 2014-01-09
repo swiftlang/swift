@@ -274,15 +274,20 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         if (MemberVD->getKind() != CurDecls[i]->getKind())
           continue;
         bool isTypeEqual = false;
-        Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
+        Type BaseMemberTy =
+          getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
         if (BaseMemberTy->is<ErrorType>())
           continue;
-        if (isa<FuncDecl>(MemberVD)) {
-          AnyFunctionType *MemberFTy =
-              MemberVD->getType()->getAs<AnyFunctionType>();
-          AnyFunctionType *OtherFTy = BaseMemberTy->castTo<AnyFunctionType>();
-          if (MemberFTy && OtherFTy)
-            isTypeEqual = MemberFTy->getResult()->isEqual(OtherFTy->getResult());
+        if (auto MemberFunc = dyn_cast<FuncDecl>(MemberVD)) {
+          auto CurAsFunc = cast<FuncDecl>(CurDecls[i]);
+          if (MemberFunc->isStatic() == CurAsFunc->isStatic()) {
+            AnyFunctionType *MemberFTy =
+                MemberVD->getType()->getAs<AnyFunctionType>();
+            AnyFunctionType *OtherFTy = BaseMemberTy->castTo<AnyFunctionType>();
+            if (MemberFTy && OtherFTy)
+              isTypeEqual =
+                MemberFTy->getResult()->isEqual(OtherFTy->getResult());
+          }
         } else {
           isTypeEqual = MemberVD->getType()->isEqual(BaseMemberTy);
         }
@@ -325,15 +330,17 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         continue;
       bool isSubtype = false;
       Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
-      if (isa<FuncDecl>(MemberVD)) {
-        AnyFunctionType *MemberFTy =
-            MemberVD->getType()->getAs<AnyFunctionType>();
-        AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
-        // FIXME: We should be dealing in interface types here.
-        if (MemberFTy && OtherFTy) {
-          isSubtype = TC.isTrivialSubtypeOf(MemberFTy->getResult(),
-                                            OtherFTy->getResult(),
-                                            CD->getDeclContext());
+      if (auto MemberFunc = dyn_cast<FuncDecl>(MemberVD)) {
+        if (MemberFunc->isStatic() == cast<FuncDecl>(CurDecls[i])->isStatic()) {
+          AnyFunctionType *MemberFTy =
+              MemberVD->getType()->getAs<AnyFunctionType>();
+          AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
+          // FIXME: We should be dealing in interface types here.
+          if (MemberFTy && OtherFTy) {
+            isSubtype = TC.isTrivialSubtypeOf(MemberFTy->getResult(),
+                                              OtherFTy->getResult(),
+                                              CD->getDeclContext());
+          }
         }
       } else {
         isSubtype = TC.isTrivialSubtypeOf(MemberVD->getType(),
