@@ -465,9 +465,8 @@ void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   postEmitFunction(constant, f);
 }
 
-void SILGenModule::emitDestructor(ClassDecl *cd,
-                                  DestructorDecl /*nullable*/ *dd) {
-  if (dd) emitAbstractFuncDecl(dd);
+void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
+  emitAbstractFuncDecl(dd);
 
   // Emit the destroying destructor.
   SILDeclRef destroyer(cd, SILDeclRef::Kind::Destroyer);

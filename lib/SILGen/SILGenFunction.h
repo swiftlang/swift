@@ -339,9 +339,8 @@ public:
   /// \brief Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// emitDestructor - Generates code for a class destroying destructor. This
-  /// emits the body code from the DestructorDecl (if any),
-  /// implicitly releases the elements of the class, and calls the base
-  /// class destructor.
+  /// emits the body code from the DestructorDecl, calls the base class 
+  /// destructor, then implicitly releases the elements of the class.
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
   
   /// Generates code for a struct constructor.

@@ -160,9 +160,8 @@ public:
   void emitConstructor(ConstructorDecl *decl);
   /// Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
-  /// SILDeclRef(cd, Destructor). If a DestructorDecl is provided, it will be
-  /// used, otherwise only the implicit destruction behavior will be emitted.
-  void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
+  /// SILDeclRef(cd, Destructor).
+  void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
   /// Generates the enum constructor for the given
   /// EnumElementDecl under the name SILDeclRef(decl).
   void emitEnumConstructor(EnumElementDecl *decl);
