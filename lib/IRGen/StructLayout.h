@@ -324,8 +324,8 @@ public:
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
-      IsFixedLayout(builder.isFixedLayout()),
       SpareBits(getSpareBitsFromBuilder(builder)),
+      IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isKnownPOD()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
