@@ -20,6 +20,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Token.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <vector>
 
@@ -41,34 +42,63 @@ SyntaxModelContext::SyntaxModelContext(SourceManager &SM, unsigned BufferID,
                                               /*KeepComments=*/true,
                                            /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
+  SourceLoc AttrLoc;
   for (auto &Tok : Tokens) {
     SyntaxNodeKind Kind;
-    switch(Tok.getKind()) {
+    SourceLoc Loc;
+    unsigned Length;
+    if (AttrLoc.isValid()) {
+      // This token is following @, see if it's a known attribute name.
+      bool IsAttr = llvm::StringSwitch<bool>(Tok.getText())
+#define ATTR(X) .Case(#X, true)
+#define TYPE_ATTR(X) .Case(#X, true)
+#define IB_ATTR(X) .Case(#X, true)
+#include "swift/AST/Attr.def"
+      .Default(false);
+      if (IsAttr) {
+        // It's a known attribute, so treat it as a keyword for syntax coloring.
+        Loc = AttrLoc;
+        Length = SM.getByteDistance(Loc, Tok.getLoc()) + Tok.getLength();
+        Kind = SyntaxNodeKind::Keyword;
+      }
+      AttrLoc = SourceLoc();
+    }
+    
+    if (!Loc.isValid()) {
+      Loc = Tok.getLoc();
+      Length = Tok.getLength();
+    
+      switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
-    case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
-    case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
-    case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
-    case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
-    case tok::string_literal: Kind = SyntaxNodeKind::String; break;
-    case tok::character_literal: Kind = SyntaxNodeKind::Character; break;
-    case tok::comment:
-      if (Tok.getText().startswith("//"))
-        Kind = SyntaxNodeKind::CommentLine;
-      else
-        Kind = SyntaxNodeKind::CommentBlock;
-      break;
-
-    default:
-      continue;
+      case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
+      case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
+      case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
+      case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
+      case tok::string_literal: Kind = SyntaxNodeKind::String; break;
+      case tok::character_literal: Kind = SyntaxNodeKind::Character; break;
+      case tok::comment:
+        if (Tok.getText().startswith("//"))
+          Kind = SyntaxNodeKind::CommentLine;
+        else
+          Kind = SyntaxNodeKind::CommentBlock;
+        break;
+      case tok::at_sign:
+        // Set the location of @ and continue. Next token should be the
+        // attribute name.
+        AttrLoc = Tok.getLoc();
+        continue;
+      default:
+        continue;
+      }
     }
 
-    assert(Tok.getLoc().isValid());
+    assert(Loc.isValid());
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
-                                                Tok.getLoc()));
-    Nodes.emplace_back(Kind, CharSourceRange(Tok.getLoc(), Tok.getLength()));
+                                                Loc));
+    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length));
   }
 
   Impl.TokenNodes = std::move(Nodes);
