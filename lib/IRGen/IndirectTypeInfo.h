@@ -56,15 +56,14 @@ public:
   }
 
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                            Address dest, CanType T) const {
+                            Address dest) const {
     Address src = this->getAddressForPointer(params.claimNext());
-    asDerived().Derived::initializeWithTake(IGF, dest, src, T);
+    asDerived().Derived::initializeWithTake(IGF, dest, src);
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                      CanType T) const override {
-    asDerived().Derived::destroy(IGF, dest, T);
-    asDerived().Derived::initializeWithTake(IGF, dest, src, T);
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const override {
+    asDerived().Derived::destroy(IGF, dest);
+    asDerived().Derived::initializeWithTake(IGF, dest, src);
   }
 };
 

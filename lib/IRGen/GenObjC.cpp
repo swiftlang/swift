@@ -488,17 +488,17 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
     }
   } else {
     switch (kind) {
-    case ObjCMessageKind::Normal:
-      messenger = IGF.IGM.getObjCMsgSendFn();
-      break;
+      case ObjCMessageKind::Normal:
+        messenger = IGF.IGM.getObjCMsgSendFn();
+        break;
 
-    case ObjCMessageKind::Peer:
-      messenger = IGF.IGM.getObjCMsgSendSuperFn();
-      break;
+      case ObjCMessageKind::Peer:
+        messenger = IGF.IGM.getObjCMsgSendSuperFn();
+        break;
 
-    case ObjCMessageKind::Super:
-      messenger = IGF.IGM.getObjCMsgSendSuper2Fn();
-      break;
+      case ObjCMessageKind::Super:
+        messenger = IGF.IGM.getObjCMsgSendSuper2Fn();
+        break;
     }
   }
 
@@ -606,9 +606,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                             CanSILFunctionType origMethodType,
                                             CanSILFunctionType resultType,
                                             const HeapLayout &layout,
-                                            SILType selfType) {
-  auto &selfTI = IGM.getTypeInfo(selfType);
-  
+                                            const TypeInfo &selfTI) {
   llvm::AttributeSet attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType,
                                                   ExplosionKind::Minimal,
@@ -701,19 +699,16 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   // TODO: If function context arguments were given objc retain counts,
   // we wouldn't need to create a separate heap object here.
   auto *selfTypeInfo = &IGF.getTypeInfo(selfType);
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal,
-                    selfType.getSwiftRValueType(), selfTypeInfo);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, selfTypeInfo);
   llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure");
   // FIXME: non-fixed offsets
   NonFixedOffsets offsets = Nothing;
   Address dataAddr = layout.emitCastTo(IGF, data);
   auto &fieldLayout = layout.getElements()[0];
-  auto &fieldType = layout.getElementTypes()[0];
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams(ExplosionKind::Minimal);
   selfParams.add(self);
-  fieldLayout.getType().initializeFromParams(IGF, selfParams,
-                                             fieldAddr, fieldType);
+  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr);
 
   // Create the forwarding stub.
   llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
@@ -721,7 +716,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
                                                                 origMethodType,
                                                                 resultType,
                                                                 layout,
-                                                                selfType);
+                                                                *selfTypeInfo);
   llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
                                                           IGF.IGM.Int8PtrTy);
   

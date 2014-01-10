@@ -19,8 +19,6 @@
 #define SWIFT_IRGEN_GENTYPE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/ilist.h"
 #include "swift/AST/ArchetypeBuilder.h"
 
 namespace llvm {
@@ -63,26 +61,16 @@ namespace irgen {
 /// Either a type or a forward-declaration.
 typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
 
-/// A unique archetype arbitrarily chosen as an exemplar for all archetypes with
-/// the same constraints.
-class ExemplarArchetype : public llvm::FoldingSetNode,
-                          public llvm::ilist_node<ExemplarArchetype> {
-public:
-  ArchetypeType * const Archetype;
-  
-  ExemplarArchetype() : Archetype(nullptr) {}
-  ExemplarArchetype(ArchetypeType *t) : Archetype(t) {}
-  
-  void Profile(llvm::FoldingSetNodeID &ID) const;
-};
-  
 /// The helper class for generating types.
 class TypeConverter {
 public:
   IRGenModule &IGM;
 private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
-  const TypeInfo *FirstType;
+  const TypeInfo *FirstIndependentType;
+  const TypeInfo *FirstDependentType;
+  
+  const TypeInfo *&getFirstTypeFor(TypeBase *key);
   
   const ProtocolInfo *FirstProtocol;
   const TypeInfo *WitnessTablePtrTI = nullptr;
@@ -139,17 +127,13 @@ private:
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
-
-    llvm::ilist<ExemplarArchetype> ExemplarArchetypeStorage;
-    llvm::FoldingSet<ExemplarArchetype> ExemplarArchetypes;
-    ArchetypeType *getExemplarArchetype(ArchetypeType *t);
-    
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
     friend void TypeConverter::popGenericContext();
+    
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
   };
   Types_t Types;
   Optional<ArchetypeBuilder> Archetypes;

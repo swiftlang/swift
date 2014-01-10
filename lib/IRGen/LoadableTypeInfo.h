@@ -70,7 +70,7 @@ public:
 
   // We can give this a reasonable default implementation.
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, CanType T) const override;
+                          Address srcAddr) const override;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

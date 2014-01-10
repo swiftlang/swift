@@ -509,8 +509,7 @@ namespace {
       return path.apply(IGF, originTable);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
       auto objPtrTy = dest.getAddress()->getType();
       auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
       auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
@@ -520,8 +519,7 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src,
-                            CanType T) const {
+                            Address dest, Address src) const {
       auto layout = getLayout();
 
       llvm::Value *metadata = layout.loadMetadataRef(IGF, src);
@@ -546,7 +544,7 @@ namespace {
                                                destBuffer, srcBuffer);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+    void destroy(IRGenFunction &IGF, Address addr) const {
       emitDestroyExistential(IGF, addr, getLayout());
     }
   };
@@ -591,8 +589,7 @@ namespace {
                             existential.getAddress()->getName() + ".weakref");
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
@@ -600,8 +597,7 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src,
-                            CanType T) const {
+                            Address dest, Address src) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyInit(destValue, srcValue);
@@ -609,8 +605,7 @@ namespace {
     }
 
     void assignWithTake(IRGenFunction &IGF,
-                        Address dest, Address src,
-                        CanType T) const {
+                        Address dest, Address src) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
@@ -618,16 +613,14 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF,
-                            Address dest, Address src,
-                            CanType T) const {
+                            Address dest, Address src) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeInit(destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address existential,
-                 CanType T) const {
+    void destroy(IRGenFunction &IGF, Address existential) const {
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakDestroy(valueAddr);
     }
@@ -819,7 +812,7 @@ namespace {
       asDerived().emitPayloadRelease(IGF, value);
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr) const override {
       llvm::Value *value = IGF.Builder.CreateLoad(projectValue(IGF, addr));
       asDerived().emitPayloadRelease(IGF, value);
     }
@@ -1038,8 +1031,7 @@ namespace {
                                                     offset);
     }
     
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         CanType T)
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src)
     const override {
       // NB: We assume that the witness table slots are zero if an extra
       // inhabitant is stored in the container.
@@ -1049,7 +1041,7 @@ namespace {
     }
     
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest) const override {
       for (unsigned i = 0; i < NumProtocols; ++i) {
         Address witnessDest = projectWitnessTable(IGF, dest, i);
         IGF.Builder.CreateStore(
@@ -1065,14 +1057,16 @@ namespace {
   /// Common type implementation details for all archetypes.
   class ArchetypeTypeInfoBase {
   protected:
-    unsigned NumProtocols;
+    ArchetypeType *TheArchetype;
     ProtocolEntry *ProtocolsBuffer;
     
-    ArchetypeTypeInfoBase(void *protocolsBuffer,
+    ArchetypeTypeInfoBase(ArchetypeType *archetype,
+                          void *protocolsBuffer,
                           ArrayRef<ProtocolEntry> protocols)
-      : NumProtocols(protocols.size()),
+      : TheArchetype(archetype),
         ProtocolsBuffer(reinterpret_cast<ProtocolEntry*>(protocolsBuffer))
     {
+      assert(protocols.size() == archetype->getConformsTo().size());
       for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
         ::new (&ProtocolsBuffer[i]) ProtocolEntry(protocols[i]);
       }
@@ -1080,19 +1074,28 @@ namespace {
     
   public:
     unsigned getNumProtocols() const {
-      return NumProtocols;
+      return TheArchetype->getConformsTo().size();
     }
     
     ArrayRef<ProtocolEntry> getProtocols() const {
       return llvm::makeArrayRef(ProtocolsBuffer, getNumProtocols());
     }
     
+    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
+      return IGF.getLocalTypeData(CanType(TheArchetype),
+                                  LocalTypeData::Metatype);
+    }
+    
     /// Return the witness table that's been set for this type.
-    llvm::Value *getWitnessTable(IRGenFunction &IGF,
-                                 CanArchetypeType archetype,
-                                 unsigned which) const {
+    llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
       assert(which < getNumProtocols());
-      return IGF.getLocalTypeData(archetype, LocalTypeData(which));
+      return IGF.getLocalTypeData(CanType(TheArchetype),
+                                  LocalTypeData(which));
+    }
+    
+    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
+      auto metadata = getMetadataRef(IGF);
+      return IGF.emitValueWitnessTableRefForMetadata(metadata);
     }
   };
   
@@ -1106,68 +1109,67 @@ namespace {
                               WitnessSizedTypeInfo<OpaqueArchetypeTypeInfo>>,
       public ArchetypeTypeInfoBase
   {
-    OpaqueArchetypeTypeInfo(llvm::Type *type,
-                            ArrayRef<ProtocolEntry> protocols)
+    OpaqueArchetypeTypeInfo(ArchetypeType *archetype, llvm::Type *type,
+                      ArrayRef<ProtocolEntry> protocols)
       : IndirectTypeInfo(type, Alignment(1), IsNotPOD),
-        ArchetypeTypeInfoBase(this + 1, protocols)
+        ArchetypeTypeInfoBase(archetype, this + 1, protocols)
     {}
 
   public:
-    static const OpaqueArchetypeTypeInfo *create(llvm::Type *type,
+    static const OpaqueArchetypeTypeInfo *create(ArchetypeType *archetype,
+                                           llvm::Type *type,
                                            ArrayRef<ProtocolEntry> protocols) {
       void *buffer = operator new(sizeof(OpaqueArchetypeTypeInfo)
                                   + protocols.size() * sizeof(ProtocolEntry));
-      return ::new (buffer) OpaqueArchetypeTypeInfo(type, protocols);
+      return ::new (buffer) OpaqueArchetypeTypeInfo(archetype, type, protocols);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
-      emitAssignWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      emitAssignWithCopyCall(IGF, getMetadataRef(IGF),
                              dest.getAddress(), src.getAddress());
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
-      emitAssignWithTakeCall(IGF, IGF.emitTypeMetadataRef(T),
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      emitAssignWithTakeCall(IGF, getMetadataRef(IGF),
                              dest.getAddress(), src.getAddress());
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const {
-      emitInitializeWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+                            Address dest, Address src) const {
+      emitInitializeWithCopyCall(IGF, getMetadataRef(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
     void initializeWithTake(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const {
-      emitInitializeWithTakeCall(IGF, IGF.emitTypeMetadataRef(T),
+                            Address dest, Address src) const {
+      emitInitializeWithTakeCall(IGF, getMetadataRef(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
-      emitDestroyCall(IGF, IGF.emitTypeMetadataRef(T), addr.getAddress());
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      emitDestroyCall(IGF, getMetadataRef(IGF), addr.getAddress());
     }
 
     std::pair<llvm::Value*,llvm::Value*>
-    getSizeAndAlignment(IRGenFunction &IGF, CanType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
+    getSizeAndAlignment(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
       auto size = emitLoadOfSize(IGF, wtable);
       auto align = emitLoadOfAlignmentMask(IGF, wtable);
       return std::make_pair(size, align);
     }
 
-    llvm::Value *getSize(IRGenFunction &IGF, CanType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
+    llvm::Value *getSize(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
       return emitLoadOfSize(IGF, wtable);
     }
 
-    llvm::Value *getAlignment(IRGenFunction &IGF, CanType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
+    llvm::Value *getAlignment(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
       return emitLoadOfAlignmentMask(IGF, wtable);
     }
 
-    llvm::Value *getStride(IRGenFunction &IGF, CanType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
+    llvm::Value *getStride(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
       return emitLoadOfStride(IGF, wtable);
     }
 
@@ -1176,9 +1178,8 @@ namespace {
     llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
     
     void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            llvm::Value *vwtable,
-                            CanType T) const override {
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
       // Archetypes always refer to an existing type. A witness table should
       // never be independently initialized for one.
       llvm_unreachable("initializing value witness table for archetype?!");
@@ -1188,16 +1189,14 @@ namespace {
       return true;
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src,
-                                         CanType T) const override {
-      auto metadata = IGF.emitTypeMetadataRef(T);
+                                         Address src) const override {
+      auto metadata = getMetadataRef(IGF);
       return emitGetExtraInhabitantIndexCall(IGF, metadata, src.getAddress());
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest,
-                              CanType T) const override {
-      auto metadata = IGF.emitTypeMetadataRef(T);
+                              Address dest) const override {
+      auto metadata = getMetadataRef(IGF);
       emitStoreExtraInhabitantCall(IGF, metadata, index, dest.getAddress());
     }
   };
@@ -1213,18 +1212,20 @@ namespace {
   {
     bool HasSwiftRefcount;
     
-    ClassArchetypeTypeInfo(llvm::PointerType *storageType,
+    ClassArchetypeTypeInfo(ArchetypeType *archetype,
+                           llvm::PointerType *storageType,
                            Size size, llvm::BitVector spareBits,
                            Alignment align,
                            ArrayRef<ProtocolEntry> protocols,
                            bool hasSwiftRefcount)
       : HeapTypeInfo(storageType, size, spareBits, align),
-        ArchetypeTypeInfoBase(this + 1, protocols),
+        ArchetypeTypeInfoBase(archetype, this + 1, protocols),
         HasSwiftRefcount(hasSwiftRefcount)
     {}
     
   public:
-    static const ClassArchetypeTypeInfo *create(llvm::PointerType *storageType,
+    static const ClassArchetypeTypeInfo *create(ArchetypeType *archetype,
+                                           llvm::PointerType *storageType,
                                            Size size, llvm::BitVector spareBits,
                                            Alignment align,
                                            ArrayRef<ProtocolEntry> protocols,
@@ -1232,7 +1233,8 @@ namespace {
       void *buffer = operator new(sizeof(ClassArchetypeTypeInfo)
                                     + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer)
-        ClassArchetypeTypeInfo(storageType, size, spareBits, align,
+        ClassArchetypeTypeInfo(archetype,
+                               storageType, size, spareBits, align,
                                protocols, hasSwiftRefcount);
     }
     
@@ -1336,16 +1338,12 @@ namespace {
     ///
     /// Immediately after this call, there will be an unconditional
     /// branch to the continuation block.
-    virtual void emitForPacking(IRGenFunction &IGF,
-                                CanType T,
-                                const TypeInfo &type,
+    virtual void emitForPacking(IRGenFunction &IGF, const TypeInfo &type,
                                 FixedPacking packing) = 0;
 
     /// Given that we are currently at the beginning of the
     /// continuation block, complete the operation.
-    virtual void complete(IRGenFunction &IGF,
-                          CanType T,
-                          const TypeInfo &type) = 0;
+    virtual void complete(IRGenFunction &IGF, const TypeInfo &type) = 0;
   };
 
   /// A class for merging a particular kind of value across control flow.
@@ -1355,18 +1353,17 @@ namespace {
   template <> class DynamicPackingPHIMapping<llvm::Value*> {
     llvm::PHINode *PHI = nullptr;
   public:
-    void collect(IRGenFunction &IGF, CanType T,
-                 const TypeInfo &type, llvm::Value *value) {
+    void collect(IRGenFunction &IGF, const TypeInfo &type, llvm::Value *value) {
       // Add the result to the phi, creating it (unparented) if necessary.
       if (!PHI) PHI = llvm::PHINode::Create(value->getType(), 2,
                                             "dynamic-packing.result");
       PHI->addIncoming(value, IGF.Builder.GetInsertBlock());
     }
-    void complete(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    void complete(IRGenFunction &IGF, const TypeInfo &type) {
       assert(PHI);
       IGF.Builder.Insert(PHI);
     }
-    llvm::Value *get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    llvm::Value *get(IRGenFunction &IGF, const TypeInfo &type) {
       assert(PHI);
       return PHI;
     }
@@ -1377,16 +1374,14 @@ namespace {
       : private DynamicPackingPHIMapping<llvm::Value*> {
     typedef DynamicPackingPHIMapping<llvm::Value*> super;
   public:
-    void collect(IRGenFunction &IGF, CanType T,
-                 const TypeInfo &type, Address value) {
-      super::collect(IGF, T, type, value.getAddress());
+    void collect(IRGenFunction &IGF, const TypeInfo &type, Address value) {
+      super::collect(IGF, type, value.getAddress());
     }
-    void complete(IRGenFunction &IGF, CanType T,
-                  const TypeInfo &type) {
-      super::complete(IGF, T, type);
+    void complete(IRGenFunction &IGF, const TypeInfo &type) {
+      super::complete(IGF, type);
     }
-    Address get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
-      return type.getAddressForPointer(super::get(IGF, T, type));
+    Address get(IRGenFunction &IGF, const TypeInfo &type) {
+      return type.getAddressForPointer(super::get(IGF, type));
     }
   };
 
@@ -1397,18 +1392,17 @@ namespace {
     DynamicPackingPHIMapping<ResultTy> Mapping;
   public:
     explicit LambdaDynamicPackingOperation(FnTy &&fn) : Fn(fn) {}
-    void emitForPacking(IRGenFunction &IGF, CanType T, const TypeInfo &type,
+    void emitForPacking(IRGenFunction &IGF, const TypeInfo &type,
                         FixedPacking packing) override {
-      Mapping.collect(IGF, T, type, Fn(IGF, T, type, packing));
+      Mapping.collect(IGF, type, Fn(IGF, type, packing));
     }
 
-    void complete(IRGenFunction &IGF, CanType T,
-                  const TypeInfo &type) override {
-      Mapping.complete(IGF, T, type);
+    void complete(IRGenFunction &IGF, const TypeInfo &type) override {
+      Mapping.complete(IGF, type);
     }
 
-    ResultTy get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
-      return Mapping.get(IGF, T, type);
+    ResultTy get(IRGenFunction &IGF, const TypeInfo &type) {
+      return Mapping.get(IGF, type);
     }
   };
 
@@ -1420,13 +1414,12 @@ namespace {
     FnTy Fn;
   public:
     explicit LambdaDynamicPackingOperation(FnTy &&fn) : Fn(fn) {}
-    void emitForPacking(IRGenFunction &IGF, CanType T, const TypeInfo &type,
+    void emitForPacking(IRGenFunction &IGF, const TypeInfo &type,
                         FixedPacking packing) override {
-      Fn(IGF, T, type, packing);
+      Fn(IGF, type, packing);
     }
-    void complete(IRGenFunction &IGF, CanType T,
-                  const TypeInfo &type) override {}
-    void get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {}
+    void complete(IRGenFunction &IGF, const TypeInfo &type) override {}
+    void get(IRGenFunction &IGF, const TypeInfo &type) {}
   };
 }
 
@@ -1434,11 +1427,10 @@ namespace {
 /// packing into a fixed-size buffer, and perform an operation at each
 /// of them.
 static void emitDynamicPackingOperation(IRGenFunction &IGF,
-                                        CanType T,
                                         const TypeInfo &type,
                                         DynamicPackingOperation &operation) {
-  llvm::Value *size = type.getSize(IGF, T);
-  llvm::Value *alignMask = type.getAlignmentMask(IGF, T);
+  llvm::Value *size = type.getSize(IGF);
+  llvm::Value *alignMask = type.getAlignmentMask(IGF);
 
   auto indirectBB = IGF.createBasicBlock("dynamic-packing.indirect");
   auto directBB = IGF.createBasicBlock("dynamic-packing.direct");
@@ -1459,17 +1451,17 @@ static void emitDynamicPackingOperation(IRGenFunction &IGF,
 
   // Emit the indirect path.
   IGF.Builder.emitBlock(indirectBB);
-  operation.emitForPacking(IGF, T, type, FixedPacking::Allocate);
+  operation.emitForPacking(IGF, type, FixedPacking::Allocate);
   IGF.Builder.CreateBr(contBB);
 
   // Emit the direct path.
   IGF.Builder.emitBlock(directBB);
-  operation.emitForPacking(IGF, T, type, FixedPacking::OffsetZero);
+  operation.emitForPacking(IGF, type, FixedPacking::OffsetZero);
   IGF.Builder.CreateBr(contBB);
 
   // Enter the continuation block and add the PHI if required.
   IGF.Builder.emitBlock(contBB);
-  operation.complete(IGF, T, type);
+  operation.complete(IGF, type);
 }
 
 /// A helper function for creating a lambda-based DynamicPackingOperation.
@@ -1483,25 +1475,22 @@ makeLambdaDynamicPackingOperation(FnTy &&fn) {
 template <class ResultTy, class... ArgTys>
 static ResultTy emitForDynamicPacking(IRGenFunction &IGF,
                                       ResultTy (*fn)(IRGenFunction &IGF,
-                                                     CanType T,
                                                      const TypeInfo &type,
                                                      FixedPacking packing,
                                                      ArgTys... args),
-                                      CanType T,
                                       const TypeInfo &type,
                         // using enable_if to block template argument deduction
                         typename std::enable_if<true,ArgTys>::type... args) {
   auto operation = makeLambdaDynamicPackingOperation<ResultTy>(
-    [&](IRGenFunction &IGF, CanType T, const TypeInfo &type, FixedPacking packing) {
-      return fn(IGF, T, type, packing, args...);
+    [&](IRGenFunction &IGF, const TypeInfo &type, FixedPacking packing) {
+      return fn(IGF, type, packing, args...);
     });
-  emitDynamicPackingOperation(IGF, T, type, operation);
-  return operation.get(IGF, T, type);
+  emitDynamicPackingOperation(IGF, type, operation);
+  return operation.get(IGF, type);
 }
                                              
 /// Emit a 'projectBuffer' operation.  Always returns a T*.
 static Address emitProjectBuffer(IRGenFunction &IGF,
-                                 CanType T,
                                  const TypeInfo &type,
                                  FixedPacking packing,
                                  Address buffer) {
@@ -1519,7 +1508,7 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
   }
 
   case FixedPacking::Dynamic:
-    return emitForDynamicPacking(IGF, &emitProjectBuffer, T, type, buffer);
+    return emitForDynamicPacking(IGF, &emitProjectBuffer, type, buffer);
     
   }
   llvm_unreachable("bad packing!");
@@ -1528,13 +1517,12 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
 
 /// Emit an 'allocateBuffer' operation.  Always returns a T*.
 static Address emitAllocateBuffer(IRGenFunction &IGF,
-                                  CanType T,
                                   const TypeInfo &type,
                                   FixedPacking packing,
                                   Address buffer) {
   switch (packing) {
   case FixedPacking::Allocate: {
-    auto sizeAndAlign = type.getSizeAndAlignmentMask(IGF, T);
+    auto sizeAndAlign = type.getSizeAndAlignmentMask(IGF);
     llvm::Value *addr =
       IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
     buffer = IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
@@ -1546,17 +1534,16 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
   }
 
   case FixedPacking::OffsetZero:
-    return emitProjectBuffer(IGF, T, type, packing, buffer);
+    return emitProjectBuffer(IGF, type, packing, buffer);
 
   case FixedPacking::Dynamic:
-    return emitForDynamicPacking(IGF, &emitAllocateBuffer, T, type, buffer);
+    return emitForDynamicPacking(IGF, &emitAllocateBuffer, type, buffer);
   }
   llvm_unreachable("bad packing!");
 }
 
 /// Emit a 'deallocateBuffer' operation.
 static void emitDeallocateBuffer(IRGenFunction &IGF,
-                                 CanType T,
                                  const TypeInfo &type,
                                  FixedPacking packing,
                                  Address buffer) {
@@ -1565,7 +1552,7 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
     Address slot =
       IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
-    IGF.emitDeallocRawCall(addr, type.getSize(IGF, T));
+    IGF.emitDeallocRawCall(addr, type.getSize(IGF));
     return;
   }
 
@@ -1573,46 +1560,42 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
     return;
 
   case FixedPacking::Dynamic:
-    return emitForDynamicPacking(IGF, &emitDeallocateBuffer, T, type, buffer);
+    return emitForDynamicPacking(IGF, &emitDeallocateBuffer, type, buffer);
   }
   llvm_unreachable("bad packing!");
 }
 
 /// Emit a 'destroyBuffer' operation.
 static void emitDestroyBuffer(IRGenFunction &IGF,
-                              CanType T,
                               const TypeInfo &type,
                               FixedPacking packing,
                               Address buffer) {
   // Special-case dynamic packing in order to thread the jumps.
   if (packing == FixedPacking::Dynamic)
-    return emitForDynamicPacking(IGF, &emitDestroyBuffer, T, type, buffer);
+    return emitForDynamicPacking(IGF, &emitDestroyBuffer, type, buffer);
 
-  Address object = emitProjectBuffer(IGF, T, type, packing, buffer);
-  type.destroy(IGF, object, T);
-  emitDeallocateBuffer(IGF, T, type, packing, buffer);
+  Address object = emitProjectBuffer(IGF, type, packing, buffer);
+  type.destroy(IGF, object);
+  emitDeallocateBuffer(IGF, type, packing, buffer);
 }
 
 /// Emit an 'initializeWithCopy' operation.
 static void emitInitializeWithCopy(IRGenFunction &IGF,
-                                   CanType T,
                                    const TypeInfo &type,
                                    Address dest, Address src) {
-  type.initializeWithCopy(IGF, dest, src, T);
+  type.initializeWithCopy(IGF, dest, src);
 }
 
 /// Emit an 'initializeWithTake' operation.
 static void emitInitializeWithTake(IRGenFunction &IGF,
-                                   CanType T,
                                    const TypeInfo &type,
                                    Address dest, Address src) {
-  type.initializeWithTake(IGF, dest, src, T);
+  type.initializeWithTake(IGF, dest, src);
 }
 
 /// Emit an 'initializeBufferWithCopyOfBuffer' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
-                                                    CanType T,
                                                     const TypeInfo &type,
                                                     FixedPacking packing,
                                                     Address dest,
@@ -1620,37 +1603,35 @@ static Address emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
   // Special-case dynamic packing in order to thread the jumps.
   if (packing == FixedPacking::Dynamic)
     return emitForDynamicPacking(IGF, &emitInitializeBufferWithCopyOfBuffer,
-                                 T, type, dest, src);
+                                 type, dest, src);
 
-  Address destObject = emitAllocateBuffer(IGF, T, type, packing, dest);
-  Address srcObject = emitProjectBuffer(IGF, T, type, packing, src);
-  emitInitializeWithCopy(IGF, T, type, destObject, srcObject);
+  Address destObject = emitAllocateBuffer(IGF, type, packing, dest);
+  Address srcObject = emitProjectBuffer(IGF, type, packing, src);
+  emitInitializeWithCopy(IGF, type, destObject, srcObject);
   return destObject;
 }
 
 /// Emit an 'initializeBufferWithCopy' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithCopy(IRGenFunction &IGF,
-                                            CanType T,
                                             const TypeInfo &type,
                                             FixedPacking packing,
                                             Address dest,
                                             Address srcObject) {
-  Address destObject = emitAllocateBuffer(IGF, T, type, packing, dest);
-  emitInitializeWithCopy(IGF, T, type, destObject, srcObject);
+  Address destObject = emitAllocateBuffer(IGF, type, packing, dest);
+  emitInitializeWithCopy(IGF, type, destObject, srcObject);
   return destObject;
 }
 
 /// Emit an 'initializeBufferWithTake' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithTake(IRGenFunction &IGF,
-                                            CanType T,
                                             const TypeInfo &type,
                                             FixedPacking packing,
                                             Address dest,
                                             Address srcObject) {
-  Address destObject = emitAllocateBuffer(IGF, T, type, packing, dest);
-  emitInitializeWithTake(IGF, T, type, destObject, srcObject);
+  Address destObject = emitAllocateBuffer(IGF, type, packing, dest);
+  emitInitializeWithTake(IGF, type, destObject, srcObject);
   return destObject;
 }
 
@@ -1704,7 +1685,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::AllocateBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    Address result = emitAllocateBuffer(IGF, concreteType, type, packing, buffer);
+    Address result = emitAllocateBuffer(IGF, type, packing, buffer);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
@@ -1714,7 +1695,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithCopy(IGF, dest, src, concreteType);
+    type.assignWithCopy(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1724,7 +1705,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithTake(IGF, dest, src, concreteType);
+    type.assignWithTake(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1733,7 +1714,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::DeallocateBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    emitDeallocateBuffer(IGF, concreteType, type, packing, buffer);
+    emitDeallocateBuffer(IGF, type, packing, buffer);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -1741,7 +1722,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::Destroy: {
     Address object = getArgAs(IGF, argv, type, "object");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.destroy(IGF, object, concreteType);
+    type.destroy(IGF, object);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -1749,7 +1730,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::DestroyBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    emitDestroyBuffer(IGF, concreteType, type, packing, buffer);
+    emitDestroyBuffer(IGF, type, packing, buffer);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -1760,8 +1741,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
     Address result =
-      emitInitializeBufferWithCopyOfBuffer(IGF, concreteType,
-                                           type, packing, dest, src);
+      emitInitializeBufferWithCopyOfBuffer(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
@@ -1773,7 +1753,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
     Address result =
-      emitInitializeBufferWithCopy(IGF, concreteType, type, packing, dest, src);
+      emitInitializeBufferWithCopy(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
@@ -1785,7 +1765,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
     Address result =
-      emitInitializeBufferWithTake(IGF, concreteType, type, packing, dest, src);
+      emitInitializeBufferWithTake(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
@@ -1796,7 +1776,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    emitInitializeWithCopy(IGF, concreteType, type, dest, src);
+    emitInitializeWithCopy(IGF, type, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1807,7 +1787,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    emitInitializeWithTake(IGF, concreteType, type, dest, src);
+    emitInitializeWithTake(IGF, type, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1817,7 +1797,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    Address result = emitProjectBuffer(IGF, concreteType, type, packing, buffer);
+    Address result = emitProjectBuffer(IGF, type, packing, buffer);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
@@ -1835,7 +1815,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *index = getArg(argv, "index");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     
-    type.storeExtraInhabitant(IGF, index, dest, concreteType);
+    type.storeExtraInhabitant(IGF, index, dest);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -1844,7 +1824,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     
-    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src, concreteType);
+    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src);
     IGF.Builder.CreateRet(idx);
     return;
   }
@@ -2777,7 +2757,8 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
     
-    return ClassArchetypeTypeInfo::create(reprTy,
+    return ClassArchetypeTypeInfo::create(archetype,
+                                      reprTy,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment(),
@@ -2786,7 +2767,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   
   // Otherwise, for now, always use an opaque indirect type.
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return OpaqueArchetypeTypeInfo::create(storageType, protocols);
+  return OpaqueArchetypeTypeInfo::create(archetype, storageType, protocols);
 }
 
 /// Inform IRGenFunction that the given archetype has the given value
@@ -3419,8 +3400,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
     for (auto proto : archetypeProtos) {
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-      auto wtable = archTI.getWitnessTable(IGF, archetype,
-                                           path.getOriginIndex());
+      auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
       wtable = path.apply(IGF, wtable);
       out.push_back(wtable);
     }
@@ -3562,8 +3542,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
                                         IGF.getTypeInfoForLowered(archetype));
 
         ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
-        auto wtable = archTI.getWitnessTable(IGF, archetype,
-                                             path.getOriginIndex());
+        auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
         wtable = path.apply(IGF, wtable);
         out.add(wtable);
         continue;
@@ -3664,8 +3643,7 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
            && "should not have concrete conformance info for archetype");
     auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
     ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-    llvm::Value *rootTable = archTI.getWitnessTable(IGF, archetype,
-                                                    path.getOriginIndex());
+    llvm::Value *rootTable = archTI.getWitnessTable(IGF, path.getOriginIndex());
     return path.apply(IGF, rootTable);
   }
   
@@ -3905,8 +3883,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                    Alignment(1));
   } else {
     // Otherwise, allocate using what we know statically about the type.
-    return emitAllocateBuffer(IGF, srcType.getSwiftRValueType(),
-                              srcTI, packing, buffer);
+    return emitAllocateBuffer(IGF, srcTI, packing, buffer);
   }
 }
 
@@ -3961,11 +3938,12 @@ irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                        Address addr,
                                        SILType type) {
   auto archetype = type.castTo<ArchetypeType>();
+  auto &archetypeTI = getArchetypeInfo(IGF, archetype,
+                                       IGF.getTypeInfoForLowered(archetype));
   
   // Acquire the archetype's static metadata.
-  llvm::Value *metadata = IGF.getLocalTypeData(archetype,
-                                               LocalTypeData::Metatype);
-
+  llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
+  
   // Call the 'typeof' value witness.
   return emitTypeofCall(IGF, metadata, addr.getAddress());
 }

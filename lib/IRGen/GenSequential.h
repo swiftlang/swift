@@ -132,58 +132,53 @@ public:
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest,
-                      Address src, CanType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+                      Address src) const override {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
       Address destField = field.projectAddress(IGF, dest, offsets);
       Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithCopy(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+      field.getTypeInfo().assignWithCopy(IGF, destField, srcField);
     }
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest,
-                      Address src, CanType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+                      Address src) const override {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
       Address destField = field.projectAddress(IGF, dest, offsets);
       Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithTake(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+      field.getTypeInfo().assignWithTake(IGF, destField, srcField);
     }
   }
 
   void initializeWithCopy(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          CanType T) const override {
+                          Address dest, Address src) const override {
     // If we're POD, use the generic routine.
     if (this->isPOD(ResilienceScope::Local) && isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->
-               LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T);
+               LoadableTypeInfo::initializeWithCopy(IGF, dest, src);
     }
 
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
       Address destField = field.projectAddress(IGF, dest, offsets);
       Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().initializeWithCopy(IGF, destField, srcField,
-                                             field.getType(IGF.IGM, T));
+      field.getTypeInfo().initializeWithCopy(IGF, destField, srcField);
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+  void destroy(IRGenFunction &IGF, Address addr) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isPOD()) continue;
 
-      field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets),
-                                  field.getType(IGF.IGM, T));
+      field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets));
     }
   }
 };
@@ -349,14 +344,13 @@ public:
     bool loadable = true;
 
     unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
-    for (unsigned i : indices(astFields)) {
-      auto &astField = astFields[i];
+    for (auto &astField : astFields) {
       // Compute the field's type info.
       auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
       assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
 
-      fields.push_back(FieldImpl(asImpl()->getFieldInfo(i, astField, fieldTI)));
+      fields.push_back(FieldImpl(asImpl()->getFieldInfo(astField, fieldTI)));
 
       auto loadableFieldTI = dyn_cast<LoadableTypeInfo>(&fieldTI);
       if (!loadableFieldTI) {

@@ -1070,8 +1070,8 @@ end:
   return %v : $()
 }
 
-// CHECK: define void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias sret, %swift.opaque* noalias, %swift.type* %T) {
-// CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
+// CHECK: define void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload.0* noalias sret, %swift.opaque* noalias, %swift.type* %T) {
+// CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload.0* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
 sil @dynamic_single_payload_inject_x : $<T> (@out DynamicSinglePayload<T>, @in T) -> () {
 entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
@@ -1080,8 +1080,8 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   return %v : $()
 }
 
-// CHECK: define void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias sret, %swift.type* %T) {
-// CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
+// CHECK: define void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload.1* noalias sret, %swift.type* %T) {
+// CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload.1* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
 sil @dynamic_single_payload_inject_y : $<T> (@out DynamicSinglePayload<T>) -> () {
 entry(%r : $*DynamicSinglePayload<T>):
@@ -1123,9 +1123,9 @@ end(%z : $()):
   return %z : $()
 }
 
-// CHECK: define i2 @dynamic_single_payload_empty_payload_load(%O4enum20DynamicSinglePayload.0* noalias) {
+// CHECK: define i2 @dynamic_single_payload_empty_payload_load(%O4enum20DynamicSinglePayload.2* noalias) {
 // CHECK: entry:
-// CHECK:   %1 = bitcast %O4enum20DynamicSinglePayload.0* %0 to i2*
+// CHECK:   %1 = bitcast %O4enum20DynamicSinglePayload.2* %0 to i2*
 // CHECK:   %2 = load i2* %1, align 1
 // CHECK:   ret i2 %2
 // CHECK: }
@@ -1135,9 +1135,9 @@ entry(%p : $*DynamicSinglePayload<()>):
   return %x : $DynamicSinglePayload<()>
 }
 
-// CHECK: define void @dynamic_single_payload_empty_payload_store(%O4enum20DynamicSinglePayload.0* noalias, i2) {
+// CHECK: define void @dynamic_single_payload_empty_payload_store(%O4enum20DynamicSinglePayload.2* noalias, i2) {
 // CHECK: entry:
-// CHECK:   %2 = bitcast %O4enum20DynamicSinglePayload.0* %0 to i2*
+// CHECK:   %2 = bitcast %O4enum20DynamicSinglePayload.2* %0 to i2*
 // CHECK:   store i2 %1, i2* %2, align 1
 // CHECK:   ret void
 // CHECK: }

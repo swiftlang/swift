@@ -46,26 +46,23 @@ public:
   bool isIndirectArgument(ExplosionKind kind) const override { return false; }
 
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                            Address dest, CanType T) const override {
+                            Address dest) const override {
     asDerived().Derived::initialize(IGF, params, dest);
   }
 
-  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          CanType T) const {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
     Explosion temp(ExplosionKind::Maximal);
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::initialize(IGF, temp, dest);
   }
 
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      CanType T) const {
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
     Explosion temp(ExplosionKind::Maximal);
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                      CanType T) const {
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
     Explosion temp(ExplosionKind::Maximal);
     asDerived().Derived::loadAsTake(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
@@ -167,7 +164,7 @@ public:
     asDerived().emitScalarRelease(IGF, value);
   }
   
-  void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+  void destroy(IRGenFunction &IGF, Address addr) const {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");

@@ -72,7 +72,7 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   return addr;
 }
 
-ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, CanType T,
+ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF,
                                               const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty()) {
@@ -87,20 +87,19 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, CanType T,
   return { alloca, alloca };
 }
 
-void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
-                                    CanType T) const {
+void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr) const {
   // TODO: lifetime intrinsics?
 }
 
 /// Allocate an object with fixed layout.
-OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
+OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF,
                                         const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty())
     return OwnedAddress(getUndefAddress(), IGF.IGM.RefCountedNull);
 
   // Lay out the type as a heap object.
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, T, this);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);
   assert(!layout.isKnownEmpty() && "non-empty type had empty layout?");
   auto &elt = layout.getElements()[0];
 

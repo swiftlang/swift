@@ -592,7 +592,7 @@ namespace {
       }
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+    void destroy(IRGenFunction &IGF, Address addr) const {
       switch (ExtraDataKind) {
       case ExtraData::None:
         break;
@@ -1122,26 +1122,26 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
-    out->add(valueTI.getSize(IGF, valueTy));
+    out->add(valueTI.getSize(IGF));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
-    out->add(valueTI.getStride(IGF, valueTy));
+    out->add(valueTI.getStride(IGF));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     // The alignof value is one greater than the alignment mask.
-    out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF, valueTy),
+    out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF),
                                    IGF.IGM.getSize(Size(1))));
     return;
   }
@@ -1671,15 +1671,14 @@ void CallEmission::emitToExplosion(Explosion &out) {
   if (LastArgWritten == 1) {
     // FIXME: we might still need to handle abstraction difference here?
 
-    ContainedAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
-                                                         "call.aggresult");
+    ContainedAddress ctemp = substResultTI.allocateStack(IGF, "call.aggresult");
     Address temp = ctemp.getAddress();
     emitToMemory(temp, substResultTI);
  
     // We can use a take.
     substResultTI.loadAsTake(IGF, temp, out);
 
-    substResultTI.deallocateStack(IGF, ctemp.getContainer(), substResultType);
+    substResultTI.deallocateStack(IGF, ctemp.getContainer());
     return;
   }
 
@@ -1837,8 +1836,7 @@ static void externalizeArgument(IRGenFunction &IGF,
   auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     // FIXME: deallocate temporary!
-    Address addr = ti.allocateStack(IGF, ty.getSwiftRValueType(),
-                                    "byval-temporary").getAddress();
+    Address addr = ti.allocateStack(IGF, "byval-temporary").getAddress();
     ti.initialize(IGF, in, addr);
      
     newByvals.push_back({out.size(), addr.getAlignment()});
@@ -2116,11 +2114,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                       subs, origParams, params);
   }
 
-  struct AddressToDeallocate {
-    CanType Type;
-    const TypeInfo &TI;
-    Address Addr;
-  };
+  typedef std::pair<const TypeInfo &, Address> AddressToDeallocate;
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
   // FIXME: support
@@ -2134,29 +2128,26 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     Address data = layout.emitCastTo(subIGF, rawData);
 
     // Perform the loads.
-    for (unsigned i : indices(layout.getElements())) {
-      auto &fieldLayout = layout.getElements()[i];
-      auto &fieldTy = layout.getElementTypes()[i];
+    for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      auto &fieldTI = fieldLayout.getType();
+      auto &fieldType = fieldLayout.getType();
 
       // If the argument is passed indirectly, copy into a temporary.
       // (If it were instead passed "const +0", we could pass a reference
       // to the memory in the data pointer.  But it isn't.)
-      if (fieldTI.isIndirectArgument(explosionLevel)) {
-        auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
-        fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
-                                   fieldTy);
+      if (fieldType.isIndirectArgument(explosionLevel)) {
+        auto caddr = fieldType.allocateStack(subIGF, "arg.temp");
+        fieldType.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr);
         params.add(caddr.getAddressPointer());
 
         // Remember to deallocate later.
         addressesToDeallocate.push_back(
-                  AddressToDeallocate{fieldTy, fieldTI, caddr.getContainer()});
+                       AddressToDeallocate(fieldType, caddr.getContainer()));
         continue;
       }
 
       // Otherwise, just load out.
-      cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, params);
+      cast<LoadableTypeInfo>(fieldType).loadAsCopy(subIGF, fieldAddr, params);
     }
     
     // Kill the allocated data pointer immediately.  The safety of
@@ -2190,7 +2181,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Deallocate everything we allocated above.
   // FIXME: exceptions?
   for (auto &entry : addressesToDeallocate) {
-    entry.TI.deallocateStack(subIGF, entry.Addr, entry.Type);
+    entry.first.deallocateStack(subIGF, entry.second);
   }
   
   if (call->getType()->isVoidTy())
@@ -2220,9 +2211,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   
   // Collect the type infos for the context types.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
-  SmallVector<CanType, 4> argValTypes;
   for (SILType argType : argTypes) {
-    argValTypes.push_back(argType.getSwiftType());
     auto &ti = IGF.getTypeInfoForLowered(argType.getSwiftType());
     argTypeInfos.push_back(&ti);
 
@@ -2252,7 +2241,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Include the context pointer, if any, in the function arguments.
   if (fnContext) {
     args.add(fnContext);
-    argValTypes.push_back(IGF.IGM.Context.TheObjectPointerType);
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheObjectPointerType));
     // If this is the only context argument we end up with, we can just share
@@ -2270,16 +2258,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     const TypeInfo &metatypeTI = IGF.IGM.getTypeMetadataPtrTypeInfo(),
                    &witnessTI = IGF.IGM.getWitnessTablePtrTypeInfo();
     for (llvm::Value *arg : polymorphicArgs.getAll()) {
-      // No type we can push here, but that should be OK, because none
-      // of the TypeInfo operations on type metadata or witness tables
-      // depend on context.
-      if (arg->getType() == IGF.IGM.TypeMetadataPtrTy) {
-        argValTypes.push_back(CanType());
+      if (arg->getType() == IGF.IGM.TypeMetadataPtrTy)
         argTypeInfos.push_back(&metatypeTI);
-      } else if (arg->getType() == IGF.IGM.WitnessTablePtrTy) {
-        argValTypes.push_back(CanType());
+      else if (arg->getType() == IGF.IGM.WitnessTablePtrTy)
         argTypeInfos.push_back(&witnessTI);
-      } else
+      else
         llvm_unreachable("unexpected polymorphic argument");
     }
     
@@ -2305,14 +2288,12 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   if (!staticFn) {
     llvm::Value *fnRawPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     args.add(fnRawPtr);
-    argValTypes.push_back(IGF.IGM.Context.TheRawPointerType);
     argTypeInfos.push_back(
-         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
-
+             &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
   }
 
   // Store the context arguments on the heap.
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypeInfos);
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
@@ -2325,11 +2306,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     NonFixedOffsets offsets = Nothing;
     
     // Perform the store.
-    for (unsigned i : indices(layout.getElements())) {
-      auto &fieldLayout = layout.getElements()[i];
-      auto &fieldTy = layout.getElementTypes()[i];
+    for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-      fieldLayout.getType().initializeFromParams(IGF, args, fieldAddr, fieldTy);
+      fieldLayout.getType().initializeFromParams(IGF, args, fieldAddr);
     }
   }
   assert(args.empty() && "unused args in partial application?!");

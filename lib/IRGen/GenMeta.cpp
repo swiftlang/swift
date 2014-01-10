@@ -2769,9 +2769,7 @@ namespace {
                                 llvm::Value *vwtable) {
       emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
       IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
-        .initializeMetadata(IGF, metadata, vwtable,
-                            Target->getDeclaredTypeInContext()
-                              ->getCanonicalType());
+        .initializeMetadata(IGF, metadata, vwtable);
     }
   };
 }
@@ -2892,9 +2890,7 @@ public:
                               llvm::Value *vwtable) {
     emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
     IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
-      .initializeMetadata(IGF, metadata, vwtable,
-                          Target->getDeclaredTypeInContext()
-                            ->getCanonicalType());
+      .initializeMetadata(IGF, metadata, vwtable);
   }
 };
   
