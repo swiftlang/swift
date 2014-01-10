@@ -42,7 +42,8 @@ public:
   /// The kind of input which this SelectedInput represents.
   InputKind Kind;
 
-  SelectedInput(unsigned Index, InputKind Kind) : Index(Index), Kind(Kind) {}
+  SelectedInput(unsigned Index, InputKind Kind = InputKind::Filename)
+      : Index(Index), Kind(Kind) {}
 };
 
 /// Options for controlling the behavior of the frontend.
