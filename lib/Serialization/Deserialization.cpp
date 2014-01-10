@@ -2670,6 +2670,15 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::UNCHECKED_OPTIONAL_TYPE: {
+    TypeID baseID;
+    decls_block::UncheckedOptionalTypeLayout::readRecord(scratch, baseID);
+
+    auto optionalTy = UncheckedOptionalType::get(getType(baseID));
+    typeOrOffset = optionalTy;
+    break;
+  }
+
   case decls_block::ARRAY_TYPE: {
     TypeID baseID;
     uint64_t size;

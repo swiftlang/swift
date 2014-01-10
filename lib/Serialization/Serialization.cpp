@@ -1789,6 +1789,17 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::UncheckedOptional: {
+    auto sliceTy = cast<UncheckedOptionalType>(ty.getPointer());
+
+    Type base = sliceTy->getBaseType();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[UncheckedOptionalTypeLayout::Code];
+    UncheckedOptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                            addTypeRef(base));
+    break;
+  }
+
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
@@ -1894,6 +1905,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
+    registerDeclTypeAbbr<UncheckedOptionalTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

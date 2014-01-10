@@ -23,6 +23,7 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class ASTWalker;
@@ -54,6 +55,9 @@ public:
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
+
+  /// Is this type grammatically a type-simple?
+  inline bool isSimple() const; // bottom of this file
 
   static bool classof(const TypeRepr *T) { return true; }
 
@@ -454,6 +458,24 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+
+inline bool TypeRepr::isSimple() const {
+  switch (getKind()) {
+  case TypeReprKind::Attributed:
+  case TypeReprKind::Error:
+  case TypeReprKind::Function:
+  case TypeReprKind::Array:
+    return false;
+  case TypeReprKind::Ident:
+  case TypeReprKind::Metatype:
+  case TypeReprKind::Named:
+  case TypeReprKind::Optional:
+  case TypeReprKind::ProtocolComposition:
+  case TypeReprKind::Tuple:
+    return true;
+  }
+  llvm_unreachable("bad TypeRepr kind");
+}
 
 } // end namespace swift
 

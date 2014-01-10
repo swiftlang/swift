@@ -81,6 +81,9 @@ struct ASTContext::Implementation {
   /// func _injectNothingIntoOptional<T>() -> Optional<T>
   FuncDecl *InjectNothingIntoOptionalDecl = nullptr;
 
+  /// The declaration of swift.UncheckedOptional<T>.
+  StructDecl *UncheckedOptionalDecl = nullptr;
+
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
 
@@ -122,6 +125,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
+    llvm::DenseMap<Type, UncheckedOptionalType*> UncheckedOptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -356,6 +360,15 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
     Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), "None");
   return Impl.OptionalNoneDecl;
+}
+
+StructDecl *ASTContext::getUncheckedOptionalDecl() const {
+  if (!Impl.UncheckedOptionalDecl)
+    Impl.UncheckedOptionalDecl
+      = dyn_cast_or_null<StructDecl>(findSyntaxSugarImpl(*this,
+                                                         "UncheckedOptional"));
+
+  return Impl.UncheckedOptionalDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
@@ -1624,6 +1637,18 @@ OptionalType *OptionalType::get(Type base) {
   if (entry) return entry;
 
   return entry = new (C, arena) OptionalType(C, base, properties);
+}
+
+UncheckedOptionalType *UncheckedOptionalType::get(Type base) {
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = base->getASTContext();
+
+  auto *&entry = C.Impl.getArena(arena).UncheckedOptionalTypes[base];
+  if (entry) return entry;
+
+  return entry = new (C, arena) UncheckedOptionalType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {

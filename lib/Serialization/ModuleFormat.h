@@ -461,6 +461,8 @@ namespace decls_block {
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
+  using UncheckedOptionalTypeLayout =
+    SyntaxSugarTypeLayout<UNCHECKED_OPTIONAL_TYPE>;
 
   using ArrayTypeLayout = BCRecordLayout<
     ARRAY_TYPE,

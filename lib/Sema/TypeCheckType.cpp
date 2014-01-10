@@ -745,7 +745,33 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
   }
-  
+
+  // @unchecked should only annotate a ? representation.  Remember
+  // that we saw this and drill into the OptionalTypeRepr.
+  bool isUncheckedOptional = false;
+  if (attrs.has(TAK_unchecked)) {
+    attrs.clearAttribute(TAK_unchecked);
+    if (auto optionalRepr = dyn_cast<OptionalTypeRepr>(repr)) {
+      repr = optionalRepr->getBase();
+    } else {
+      SourceRange range = repr->getSourceRange();
+      auto diagnostic = TC.diagnose(range.Start,
+                                    diag::unchecked_not_optional_type);
+      diagnostic.highlight(range);
+
+      // Add fix-its to add the '?', possibly with parens.
+      if (isa<ErrorTypeRepr>(repr)) {
+        // suppress fix-it
+      } else if (repr->isSimple()) {
+        diagnostic.fixItInsert(range.End, "?");
+      } else {
+        diagnostic.fixItInsert(range.Start, "(");
+        diagnostic.fixItInsert(range.End, ")?");
+      }
+    }
+    isUncheckedOptional = true;
+  }
+
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
@@ -817,6 +843,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (!ty) ty = resolveType(repr, isSILType);
   if (ty->is<ErrorType>())
     return ty;
+
+  // Apply @unchecked first.
+  if (isUncheckedOptional) {
+    ty = UncheckedOptionalType::get(ty);
+  }
 
   // In SIL, handle @sil_self, which extracts the Self type of a protocol.
   if (attrs.has(TAK_sil_self)) {

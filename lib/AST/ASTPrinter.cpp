@@ -1122,6 +1122,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case TypeKind::Function:
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
+    case TypeKind::UncheckedOptional:
       Printer << "(";
       visit(T);
       Printer << ")";
@@ -1289,7 +1290,7 @@ public:
 
   void visitBoundGenericType(BoundGenericType *T) {
     if (Options.SynthesizeSugarOnTypes) {
-      auto *NT = T->getAnyNominal();
+      auto *NT = T->getDecl();
       auto &Ctx = T->getASTContext();
       if (NT == Ctx.getSliceDecl()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
@@ -1297,6 +1298,12 @@ public:
         return;
       }
       if (NT == Ctx.getOptionalDecl()) {
+        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        Printer << "?";
+        return;
+      }
+      if (NT == Ctx.getUncheckedOptionalDecl()) {
+        Printer << "@unchecked ";
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "?";
         return;
@@ -1512,6 +1519,12 @@ public:
   }
 
   void visitOptionalType(OptionalType *T) {
+    printWithParensIfNotSimple(T->getBaseType());
+    Printer << "?";
+  }
+
+  void visitUncheckedOptionalType(UncheckedOptionalType *T) {
+    Printer << "@unchecked ";
     printWithParensIfNotSimple(T->getBaseType());
     Printer << "?";
   }

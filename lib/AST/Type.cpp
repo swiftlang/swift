@@ -356,6 +356,13 @@ Type TypeBase::getOptionalObjectType(const ASTContext &context) {
   return Type();
 }
 
+Type TypeBase::getUncheckedOptionalObjectType(const ASTContext &context) {
+  if (auto boundTy = getAs<BoundGenericType>())
+    if (boundTy->getDecl() == context.getUncheckedOptionalDecl())
+      return boundTy->getGenericArgs()[0];
+  return Type();
+}
+
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   return type.transform([&](Type type) -> Type {
@@ -809,6 +816,9 @@ Type SyntaxSugarType::getImplementationType() {
   } else if (isa<OptionalType>(this)) {
     implDecl = ctx.getOptionalDecl();
     assert(implDecl && "Optional type has not been set yet");
+  } else if (isa<UncheckedOptionalType>(this)) {
+    implDecl = ctx.getUncheckedOptionalDecl();
+    assert(implDecl && "Optional type has not been set yet");
   } else {
     llvm_unreachable("Unhandled syntax sugar type");
   }
@@ -1006,7 +1016,8 @@ bool TypeBase::isSpelledLike(Type other) {
     return pMe->getUnderlyingType()->isSpelledLike(pThem->getUnderlyingType());
   }
   case TypeKind::ArraySlice:
-  case TypeKind::Optional: {
+  case TypeKind::Optional:
+  case TypeKind::UncheckedOptional: {
     auto aMe = cast<SyntaxSugarType>(me);
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
@@ -2012,6 +2023,18 @@ case TypeKind::Id:
     return OptionalType::get(baseTy);
   }
 
+  case TypeKind::UncheckedOptional: {
+    auto optional = cast<UncheckedOptionalType>(base);
+    auto baseTy = optional->getBaseType().transform(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == optional->getBaseType().getPointer())
+      return *this;
+
+    return UncheckedOptionalType::get(baseTy);
+  }
+
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
     auto objectTy = lvalue->getObjectType().transform(fn);
@@ -2201,6 +2224,8 @@ case TypeKind::Id:
 
     case TypeKind::Optional:
       return cast<OptionalType>(base)->getBaseType().findIf(pred);
+    case TypeKind::UncheckedOptional:
+      return cast<UncheckedOptionalType>(base)->getBaseType().findIf(pred);
 
     case TypeKind::LValue:
       return cast<LValueType>(base)->getObjectType().findIf(pred);

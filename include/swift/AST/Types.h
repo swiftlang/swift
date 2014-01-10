@@ -483,6 +483,10 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType(const ASTContext &C);
 
+  /// Return T if this type is UncheckedOptional<T>; otherwise, return
+  /// the null type.
+  Type getUncheckedOptionalObjectType(const ASTContext &C);
+
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
@@ -2306,6 +2310,22 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;
+  }
+};
+
+/// The type @unchecked T?, which is always sugar for a library type.
+class UncheckedOptionalType : public SyntaxSugarType {
+  UncheckedOptionalType(const ASTContext &ctx, Type base,
+                        RecursiveTypeProperties properties)
+    : SyntaxSugarType(TypeKind::UncheckedOptional, ctx, base, properties) {}
+
+public:
+  /// Return a uniqued optional type with the specified base type.
+  static UncheckedOptionalType *get(Type baseTy);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::UncheckedOptional;
   }
 };
 

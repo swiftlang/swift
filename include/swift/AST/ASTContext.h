@@ -346,6 +346,9 @@ public:
   /// Retrieve the declaration of swift._injectNothingIntoOptional.
   FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver) const;
 
+  /// Retrieve the declaration of swift.UncheckedOptional<T>.
+  StructDecl *getUncheckedOptionalDecl() const;
+
   /// Check whether the standary library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
