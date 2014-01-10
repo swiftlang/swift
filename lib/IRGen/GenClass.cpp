@@ -121,7 +121,7 @@ namespace {
     ClassTypeInfo(llvm::PointerType *irType, Size size,
                   llvm::BitVector spareBits, Alignment align,
                   ClassDecl *D, bool hasSwiftRefcount)
-      : HeapTypeInfo(irType, size, spareBits, align), TheClass(D),
+      : HeapTypeInfo(irType, size, std::move(spareBits), align), TheClass(D),
         Layout(nullptr), HasSwiftRefcount(hasSwiftRefcount) {}
 
     bool hasSwiftRefcount() const {

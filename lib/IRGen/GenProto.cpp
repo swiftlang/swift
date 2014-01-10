@@ -883,11 +883,11 @@ namespace {
     
     ClassExistentialTypeInfo(llvm::Type *ty,
                              Size size,
+                             llvm::BitVector spareBits,
                              Alignment align,
                              ArrayRef<ProtocolEntry> protocols)
-      // FIXME: Spare bits.
       : ScalarExistentialTypeInfoBase(protocols.size(), ty, size,
-                                      llvm::BitVector{}, align)
+                                      std::move(spareBits), align)
     {
       for (unsigned i = 0; i != NumProtocols; ++i) {
         new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
@@ -896,13 +896,15 @@ namespace {
     
   public:    
     static const ClassExistentialTypeInfo *
-    create(llvm::Type *ty, Size size, Alignment align,
+    create(llvm::Type *ty, Size size, llvm::BitVector spareBits, Alignment align,
            ArrayRef<ProtocolEntry> protocols)
     {
       void *buffer = operator new(sizeof(ClassExistentialTypeInfo) +
                                   protocols.size() * sizeof(ProtocolEntry));
-      return new (buffer) ClassExistentialTypeInfo(ty, size, align,
-                                                          protocols);
+      return new (buffer) ClassExistentialTypeInfo(ty, size,
+                                                   std::move(spareBits),
+                                                   align,
+                                                   protocols);
     }
 
     /// Returns the protocols that values of this type are known to
@@ -2712,8 +2714,28 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     Alignment align = IGM.getPointerAlignment();
     Size size = ClassFields.size() * IGM.getPointerSize();
     
-    return ClassExistentialTypeInfo::create(type, size, align,
-                                                   entries);
+    llvm::BitVector spareBits;
+    // BitVector doesn't have an append method...
+    auto append = [](llvm::BitVector &b, const llvm::BitVector &x) {
+      auto bSize = b.size(), xSize = x.size();
+      b.resize(bSize + xSize);
+      
+      for (unsigned i = 0; i < xSize; ++i) {
+        b[bSize + i] = x[i];
+      }
+    };
+    
+    // The witness table fields are pointers and have pointer spare bits.
+    for (unsigned i = 0, e = ClassFields.size() - 1; i < e; ++i) {
+      append(spareBits, IGM.TargetInfo.PointerSpareBits);
+    }
+    // The class pointer is a heap object reference and has heap object spare
+    // bits.
+    append(spareBits, IGM.getHeapObjectSpareBits());
+    
+    return ClassExistentialTypeInfo::create(type,
+                                            size, std::move(spareBits), align,
+                                            entries);
   }
 
   OpaqueExistentialLayout layout(entries.size());

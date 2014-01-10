@@ -71,6 +71,8 @@ import Builtin
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ [8 x i8] }>
 
+// CHECK: %O4enum15StringOwnerLike = type <{ [8 x i8] }>
+
 // CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8], [1 x i8] }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
@@ -1971,6 +1973,62 @@ end:
   return undef : $()
 }
 
+// <rdar://problem/15787975> part 1: Make sure String's Owner union is
+// efficiently packed. It comprises a class existential, a class handle, and
+// an empty case.
+@objc, @class_protocol protocol CP {}
+
+enum StringOwnerLike {
+  case x(C)
+  case y(CP)
+  case z
+  case w
+}
+
+// CHECK: define void @string_owner_like_switch(i64) {
+// CHECK:   %1 = lshr i64 %0, 1
+// CHECK:   %2 = trunc i64 %1 to i18
+// CHECK:   %3 = and i18 %2, 3
+// CHECK:   %4 = lshr i64 %0, 45
+// CHECK:   %5 = trunc i64 %4 to i18
+// CHECK:   %6 = and i18 %5, -4
+// CHECK:   %7 = or i18 %3, %6
+// CHECK:   switch i18 %7, label {{%.*}} [
+// CHECK:     i18 0, label {{%.*}}
+// CHECK:     i18 1, label {{%.*}}
+// CHECK:     i18 2, label {{%.*}}
+// CHECK:   ]
+// CHECK:   switch i64 %0, label {{%.*}} [
+// CHECK:     i64 4, label {{%.*}}
+// CHECK:     i64 5, label {{%.*}}
+// CHECK:   ]
+// -- Extract x(C)
+// CHECK:   inttoptr i64 %0 to %C4enum1C*
+// -- Extract y(CP)
+// --                                     0x80007ffffffffff9
+// CHECK:   [[MASKED:%.*]] = and i64 %0, -9223231299366420487
+// CHECK:   inttoptr i64 [[MASKED]] to %objc_object*
+
+sil @string_owner_like_switch : $(StringOwnerLike) -> () {
+entry(%c : $StringOwnerLike):
+  switch_enum %c : $StringOwnerLike, case #StringOwnerLike.x!enumelt.1: x_dest, case #StringOwnerLike.y!enumelt.1: y_dest, case #StringOwnerLike.z!enumelt: z_dest, case #StringOwnerLike.w!enumelt: w_dest
+
+x_dest(%x : $C):
+  br end
+
+y_dest(%y : $CP):
+  br end
+
+z_dest:
+  br end
+
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
 // <rdar://problem/15759464>
 enum MultiPayloadInner {
   case A(Builtin.Int64)
@@ -2041,6 +2099,7 @@ typealias AllConcreteTestEnums = (
   MultiPayloadNoSpareBits,
   MultiPayloadOneSpareBit,
   MultiPayloadTwoSpareBits,
+  StringOwnerLike,
   MultiPayloadNested)
 
 var x : AllConcreteTestEnums
