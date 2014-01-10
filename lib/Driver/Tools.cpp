@@ -14,6 +14,7 @@
 #include "ToolChains.h"
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Range.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
@@ -27,20 +28,6 @@ using namespace swift::driver::tools;
 using namespace llvm::opt;
 
 /// Swift Tool
-
-namespace swift {
-static void addInputArgumentsForInputJob(const Job *J, ArgStringList Arguments){
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
-    Arguments.push_back(Cmd->getOutput().getFilename().data());
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (const Job *J : *JL) {
-      addInputArgumentsForInputJob(J, Arguments);
-    }
-  } else {
-    llvm_unreachable("Unable to add input arguments for unknown Job class");
-  }
-}
-}
 
 std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
                                          std::unique_ptr<JobList> Inputs,
@@ -89,15 +76,27 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   
   Arguments.push_back(OutputOption);
   
-  for (const Job *J : *Inputs) {
-    addInputArgumentsForInputJob(J, Arguments);
-  }
-  
-  for (const Action *A : InputActions) {
-    assert(isa<InputAction>(A) && "Only InputActions may be passed");
-    const InputAction *IA = cast<InputAction>(A);
-    
-    Arguments.push_back(IA->getInputArg().getValue());
+  assert(Inputs->empty() &&
+         "The Swift frontend does not expect to be fed any input Jobs!");
+  assert(InputActions.size() == 1 &&
+         "The Swift frontend expects exactly one input (the primary file)!");
+
+  const InputAction *IA = dyn_cast<InputAction>(InputActions[0]);
+  assert(IA && "Only InputActions can be passed as inputs!");
+  const Arg &PrimaryInputArg = IA->getInputArg();
+  bool FoundPrimaryInput = false;
+
+  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_INPUT),
+                                 Args.filtered_end())) {
+    Option Opt = A->getOption();
+    if (A->getOption().matches(options::OPT_INPUT)) {
+      // See if this input should be passed with -primary-file.
+      if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
+        Arguments.push_back("-primary-file");
+        FoundPrimaryInput = true;
+      }
+      Arguments.push_back(A->getValue());
+    }
   }
 
   if (Args.hasArg(options::OPT_module_name)) {
