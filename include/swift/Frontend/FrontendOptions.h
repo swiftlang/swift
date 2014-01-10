@@ -44,6 +44,12 @@ public:
 
   SelectedInput(unsigned Index, InputKind Kind = InputKind::Filename)
       : Index(Index), Kind(Kind) {}
+
+  /// \returns true if the SelectedInput's Kind is a filename
+  bool isFilename() const { return Kind == InputKind::Filename; }
+
+  /// \returns true if the SelectedInput's Kind is a buffer
+  bool isBuffer() const { return Kind == InputKind::Buffer; }
 };
 
 /// Options for controlling the behavior of the frontend.
