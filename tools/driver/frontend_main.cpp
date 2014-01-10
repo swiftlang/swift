@@ -77,21 +77,30 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::Parse)
     return false;
 
+  SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
+
   // We've been told to dump the AST (either after parsing or type-checking,
   // which is already differentiated in CompilerInstance::performParse()),
   // so dump the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST) {
-    SourceFileKind Kind = Invocation.getInputKind();
-    Instance.getMainModule()->getMainSourceFile(Kind).dump();
+    SourceFile *SF = PrimarySourceFile;
+    if (!SF) {
+      SourceFileKind Kind = Invocation.getInputKind();
+      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+    }
+    SF->dump();
     return false;
   }
 
   // We've been told to pretty print the AST, so do that and return.
   if (Action == FrontendOptions::PrintAST) {
-    SourceFileKind Kind = Invocation.getInputKind();
-    SourceFile &SF = Instance.getMainModule()->getMainSourceFile(Kind);
-    SF.print(llvm::outs(), PrintOptions::printEverything());
+    SourceFile *SF = PrimarySourceFile;
+    if (!SF) {
+      SourceFileKind Kind = Invocation.getInputKind();
+      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+    }
+    SF->print(llvm::outs(), PrintOptions::printEverything());
     return false;
   }
 
