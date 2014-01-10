@@ -24,8 +24,12 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes)
+DebugTypeInfo::DebugTypeInfo(Type Ty,
+                             uint64_t SizeInBytes,
+                             uint32_t AlignInBytes,
+                             DeclContext *DC)
   : DeclOrType(Ty.getPointer()),
+    DeclCtx(DC),
     StorageType(nullptr),
     size(SizeInBytes),
     align(AlignInBytes),
@@ -33,8 +37,9 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInByte
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align)
+DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align, DeclContext *DC)
   : DeclOrType(Ty.getPointer()),
+    DeclCtx(DC),
     StorageType(nullptr),
     size(size),
     align(align),
@@ -57,8 +62,9 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
+DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info, DeclContext *DC)
   : DeclOrType(Ty.getPointer()),
+    DeclCtx(DC),
     DebugScope(nullptr) {
   initFromTypeInfo(size, align, StorageType, Info);
 }
@@ -66,6 +72,7 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                              SILDebugScope *DS)
   : DeclOrType(Decl),
+    DeclCtx(nullptr),
     DebugScope(DS) {
   initFromTypeInfo(size, align, StorageType, Info);
 }
@@ -73,6 +80,7 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
                              SILDebugScope *DS)
   : DeclOrType(Decl),
+    DeclCtx(nullptr),
     StorageType(nullptr),
     size(size),
     align(align),

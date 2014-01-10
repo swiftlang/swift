@@ -133,10 +133,6 @@ class LinkEntity {
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
-    
-    /// A type which is being mangled for the DWARF debug info.
-    /// The pointer is a ValueDecl*.
-    DebuggerDeclTypeMangling,
 
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
@@ -184,10 +180,6 @@ class LinkEntity {
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
-
-    /// A type which is being mangled for the DWARF debug info.
-    /// The pointer is a canonical TypeBase*.
-    DebuggerTypeMangling,
 
     /// A Swift-to-ObjC block converter function.
     /// The pointer is a canonical TypeBase*.
@@ -391,19 +383,6 @@ public:
     return entity;
   }
 
-  static LinkEntity forDebuggerTypeMangling(CanType type) {
-    LinkEntity entity;
-    entity.setForType(Kind::DebuggerTypeMangling, type);
-    return entity;
-  }
-
-  static LinkEntity forDebuggerTypeMangling(ValueDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::DebuggerDeclTypeMangling, decl,
-                      Mangle::ExplosionKind(0), 0);
-    return entity;
-  }
-  
   static LinkEntity forBridgeToBlockConverter(SILType type) {
     LinkEntity entity;
     entity.setForType(Kind::BridgeToBlockConverter, type.getSwiftRValueType());

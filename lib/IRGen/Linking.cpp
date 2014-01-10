@@ -86,8 +86,7 @@ void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
 void LinkEntity::mangle(raw_ostream &buffer) const {
   // Almost everything below gets the common prefix:
   //   mangled-name ::= '_T' global
-
-  Mangler mangler(buffer, getKind() == Kind::DebuggerDeclTypeMangling);
+  Mangler mangler(buffer);
   switch (getKind()) {
   // FIXME: Mangle a more descriptive symbol name for anonymous funcs.
   case Kind::AnonymousFunction:
@@ -109,15 +108,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
 
   //   global ::= 't' type
-  case Kind::DebuggerDeclTypeMangling:
-    buffer << "_Tt";
-    mangler.mangleDeclTypeForDebugger(getDecl());
-    return;
-
-  case Kind::DebuggerTypeMangling:
-    buffer << "_Tt";
-    SWIFT_FALLTHROUGH;
-
   // Abstract type manglings just follow <type>.
   case Kind::TypeMangling:
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);

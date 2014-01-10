@@ -2305,7 +2305,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),
        Decl ? DebugTypeInfo(Decl, type, i->getDebugScope())
-            : DebugTypeInfo(i->getElementType().getSwiftType(), type),
+       : DebugTypeInfo(i->getElementType().getSwiftType(), type, nullptr),
        Name, i, Indirection);
   }
 }

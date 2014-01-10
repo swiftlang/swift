@@ -132,6 +132,7 @@ public:
   void addSubstitution(void *ptr);
 
   void mangleDeclTypeForDebugger(ValueDecl *decl);
+  void mangleTypeForDebugger(Type decl, DeclContext *DC);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,

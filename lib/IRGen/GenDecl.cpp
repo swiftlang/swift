@@ -504,7 +504,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
   case Kind::TypeMangling:
-  case Kind::DebuggerTypeMangling:
     return getSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   // ...but we don't actually expose individual value witnesses (right now).
@@ -522,7 +521,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
-  case Kind::DebuggerDeclTypeMangling:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
@@ -792,8 +790,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   auto &ti = getTypeInfo(var->getLoweredType());
   // TODO: Debug info needs to be able to use a SILGlobalVariable.
   // We also ought to have a better debug name.
-  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
-                      ti);
+  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti, nullptr);
   Optional<SILLocation> loc;
   if (var->hasLocation())
     loc = var->getLocation();
@@ -1178,7 +1175,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   auto DbgTy = ObjCClass 
     ? DebugTypeInfo(ObjCClass, getPointerSize(), getPointerAlignment())
-    : DebugTypeInfo(MetatypeType::get(concreteType, Context), 0, 1);
+    : DebugTypeInfo(MetatypeType::get(concreteType, Context), 0, 1, nullptr);
 
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     definitionType, defaultVarTy,
@@ -1317,7 +1314,8 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
 llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                                   llvm::Type *definitionType) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
-  DebugTypeInfo DbgTy(concreteType, getPointerSize(), getPointerAlignment());
+  DebugTypeInfo DbgTy(concreteType, getPointerSize(), getPointerAlignment(),
+                      nullptr);
   return getAddrOfLLVMVariable(*this, GlobalVars, entity, definitionType,
                                WitnessTableTy, WitnessTablePtrTy, DbgTy);
 }

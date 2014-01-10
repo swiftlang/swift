@@ -37,8 +37,9 @@ namespace swift {
     /// decide on what type of debug info we want to emit for types.
     class DebugTypeInfo {
     public:
-      /// Every Decl also has a type, but is otherwise preferred.
+      /// Type info is stored in the form of a Decl or a Type+DeclContext.
       PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
+      DeclContext *DeclCtx;
       llvm::Type *StorageType;
       Size size;
       Alignment align;
@@ -47,11 +48,11 @@ namespace swift {
       DebugTypeInfo()
         : StorageType(nullptr), size(0), align(1), DebugScope(nullptr) {
       }
-      // FIXME: retire the Type versions, they were useful for
-      // bootstrapping, but don't work for generics.
-      DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes);
-      DebugTypeInfo(Type Ty, Size size, Alignment align);
-      DebugTypeInfo(Type Ty, const TypeInfo &Info);
+      DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes,
+                    DeclContext *DC);
+      DebugTypeInfo(Type Ty, Size size, Alignment align,
+                    DeclContext *DC);
+      DebugTypeInfo(Type Ty, const TypeInfo &Info, DeclContext *DC);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                     SILDebugScope *DS = nullptr);
       DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
@@ -70,6 +71,11 @@ namespace swift {
         return DeclOrType.dyn_cast<ValueDecl*>();
       }
       SILDebugScope *getDebugScope() const { return DebugScope; }
+      DeclContext *getDeclContext() const {
+        if (auto Decl = getDecl())
+          return Decl->getDeclContext();
+        return DeclCtx;
+      }
       inline bool isNull() const { return DeclOrType.isNull(); }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;
@@ -88,7 +94,7 @@ namespace llvm {
     }
     static swift::irgen::DebugTypeInfo getTombstoneKey() {
       return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::TypeBase*>
-                                         ::getTombstoneKey(), 0, 0);
+                                         ::getTombstoneKey(), 0, 0, 0);
     }
     static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
       return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

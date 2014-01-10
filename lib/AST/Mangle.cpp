@@ -412,27 +412,46 @@ static void bindAllGenericParameters(Mangler &mangler,
   mangler.bindGenericParameters(generics, /*mangle*/ false);
 }
 
-void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
+void Mangler::mangleTypeForDebugger(Type Ty, DeclContext *DC) {
   assert(DWARFMangling);
 
-  // It's not clear that this makes any sense as a special case here.
-  if (isa<TypeAliasDecl>(decl)) {
-    // For the DWARF output we want to mangle the type alias + context,
-    // unless the type alias references a builtin type.
-    assert(decl->getModuleContext() !=
-           decl->getASTContext().TheBuiltinModule);
-    ContextStack context(*this);
-    Buffer << 'a';
-    mangleContextOf(decl, BindGenerics::None);
-    mangleIdentifier(decl->getName());
+  if (auto NameAliasTy = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    TypeAliasDecl *decl = NameAliasTy->getDecl();
+    assert(decl);
+
+    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+      // It's not possible to mangle the context of the builtin module.
+      Buffer << decl->getName().str();
+    } else {
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
+      assert(decl->getModuleContext() !=
+             decl->getASTContext().TheBuiltinModule);
+      ContextStack context(*this);
+      Buffer << "_Tta";
+      mangleContextOf(decl, BindGenerics::None);
+      mangleIdentifier(decl->getName());
+    }
     return;
   }
+
+  Buffer << "_Tt";
+  // Move up to the innermost generic context.
+  while (DC && !DC->isInnermostContextGeneric()) DC = DC->getParent();
+  if (DC) bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
+  DeclCtx = DC;
+
+  mangleType(Ty->getCanonicalType(), ExplosionKind::Minimal, /*uncurry*/ 0);
+}
+
+void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
+  assert(DWARFMangling);
+  Buffer << "_Tt";
 
   typedef std::pair<bool, BindGenerics> result_t;
   struct ClassifyDecl : swift::DeclVisitor<ClassifyDecl, result_t> {
 
-    /// TypeAliasDecls need to be mangled, but only if we are mangling
-    /// for DWARF.
+    /// TypeAliasDecls need to be mangled.
     result_t visitTypeAliasDecl(TypeDecl *D) {
       llvm_unreachable("filtered out above");
     }

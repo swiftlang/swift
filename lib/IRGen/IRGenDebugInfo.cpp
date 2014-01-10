@@ -409,17 +409,9 @@ createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
                     SILType type,
                     llvm::DIDescriptor Scope,
                     DeclContext* DeclCtx) {
-  // FIXME: these uses of getSwiftType() are extremely suspect.
-  if (DeclCtx) {
-    VarDecl VD(/*static*/ false, /*IsLet*/ false,
-               SourceLoc(), Identifier::getEmptyKey(),
-               type.getSwiftType(), DeclCtx);
-    DebugTypeInfo DTy(&VD, IGM.getTypeInfo(type));
-    Parameters.push_back(getOrCreateType(DTy, Scope));
-  } else {
-    DebugTypeInfo DTy(type.getSwiftType(), IGM.getTypeInfo(type));
-    Parameters.push_back(getOrCreateType(DTy, Scope));
-  }
+  // FIXME: This use of getSwiftType() is extremely suspect.
+  DebugTypeInfo DTy(type.getSwiftType(), IGM.getTypeInfo(type), DeclCtx);
+  Parameters.push_back(getOrCreateType(DTy, Scope));
 }
 
 /// Create the array of function parameters for FnTy. SIL Version.
@@ -806,21 +798,12 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
 /// Return the mangled name of any nominal type, including the global
 /// _Tt prefix, which marks the Swift namespace for types in DWARF.
-StringRef IRGenDebugInfo::getMangledName(TypeAliasDecl *Decl) {
-  llvm::SmallString<160> Buffer;
-  LinkEntity::forDebuggerTypeMangling(Decl).mangle(Buffer);
-  return BumpAllocatedString(Buffer);
-}
-
-/// Return the mangled name of any nominal type, including the global
-/// _Tt prefix, which marks the Swift namespace for types in DWARF.
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
   llvm::SmallString<160> Buffer;
-  if (auto Decl = DTI.getDecl()) {
-    LinkEntity::forDebuggerTypeMangling(Decl).mangle(Buffer);
-  } else {
-    auto CanTy = DTI.getType()->getCanonicalType();
-    LinkEntity::forDebuggerTypeMangling(CanTy).mangle(Buffer);
+  {
+    llvm::raw_svector_ostream S(Buffer);
+    Mangle::Mangler M(S, /* DWARF */ true);
+    M.mangleTypeForDebugger(DTI.getType(), DTI.getDeclContext());
   }
   return BumpAllocatedString(Buffer);
 }
@@ -854,11 +837,7 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
-    // Wrap the type in a fake VarDecl so we cann pass the DeclContext
-    // to the Mangler.
-    VarDecl VD(/*static*/ false, /*IsLet*/ false, SourceLoc(),
-               Identifier::getEmptyKey(), ElemTy, DeclContext);
-    DebugTypeInfo DTI(&VD, IGM.getTypeInfoForUnlowered(ElemTy));
+    DebugTypeInfo DTI(ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), DeclContext);
     Elements.push_back(createMemberType(DTI, StringRef(), OffsetInBits,
                                         Scope, File, Flags));
   }
@@ -965,12 +944,8 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                       DebugTypeInfo DbgTy,
                                                       llvm::DIDescriptor Scope)
 {
-  if (auto Decl = DbgTy.getDecl()) {
-    VarDecl VD(/*static*/ false, /*IsLet*/ false, SourceLoc(),
-               Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
-    return getOrCreateType(DebugTypeInfo(&VD, DbgTy.size, DbgTy.align), Scope);
-  }
-  return getOrCreateType(DebugTypeInfo(Ty, DbgTy.size, DbgTy.align), Scope);
+  DebugTypeInfo DTI(Ty, DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+  return getOrCreateType(DTI, Scope);
 }
 
 uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
@@ -1227,12 +1202,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                        SizeInBits, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
                        getTupleElements(TupleTy, Scope, File, Flags,
-                                        Decl ? Decl->getDeclContext() : nullptr),
+                                        DbgTy.getDeclContext()),
                        DW_LANG_Swift);
   }
 
   case TypeKind::InOut: {
-    // This is a @inout type.
+    // This is an @inout type.
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy, Scope);
     return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
@@ -1283,10 +1258,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
                                     .castTo<SILFunctionType>();
     }
-    DeclContext *DC = nullptr;
-    if (auto Decl = DbgTy.getDecl())
-      DC = Decl->getDeclContext();
-    auto Params = createParameterTypes(FunctionTy, Scope, DC);
+    auto Params = createParameterTypes(FunctionTy, Scope, DbgTy.getDeclContext());
     auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
@@ -1323,8 +1295,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     (void)Name; // FIXME emit the name somewhere.
     auto BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-    auto DTI = DebugTypeInfo(BuiltinVectorTy->getElementType(),
-                             DbgTy.size, DbgTy.align);
+    DebugTypeInfo DTI(BuiltinVectorTy->getElementType(),
+                      DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
     auto Subscripts = llvm::DIArray();
     return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
                                      AlignInBits,
@@ -1347,24 +1319,16 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // Sugared types.
 
   case TypeKind::NameAlias: {
-    // We cannot use BaseTy->castTo<>(), because it will use the desugared type!
+    Name = getMangledName(DbgTy);
+
     auto NameAliasTy = cast<NameAliasType>(BaseTy);
     if (auto Decl = NameAliasTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      if (Decl->getModuleContext() == IGM.Context.TheBuiltinModule)
-        // It's not possible to mangle the context of a builtin module.
-        Name = Decl->getName().str();
-      else
-        Name = getMangledName(Decl);
-
       auto AliasedTy = Decl->getUnderlyingType();
       auto File = getOrCreateFile(L.Filename);
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
-      VarDecl VD(/*static*/ false, /*IsLet*/ false,
-                 SourceLoc(), Identifier::getEmptyKey(), AliasedTy,
-                 Decl->getDeclContext());
-      DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);
+      DebugTypeInfo DTI(AliasedTy, DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
       return DBuilder.createTypedef(getOrCreateType(DTI, Scope),
                                     Name, File, L.Line, File);
     }
@@ -1383,8 +1347,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                   Name, File, L.Line, File);
   }
 
-  case TypeKind::Paren:
-  {
+  case TypeKind::Paren: {
     Name = getMangledName(DbgTy);
     auto ParenTy = cast<ParenType>(BaseTy);
     auto Ty = ParenTy->getUnderlyingType();
@@ -1397,18 +1360,24 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // SyntaxSugarType derivations.
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
-  case TypeKind::UncheckedOptional:
-  {
+  case TypeKind::UncheckedOptional: {
     auto SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
     auto CanTy = SyntaxSugarTy->getDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy, Scope);
   }
 
-  default:
-    DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
+  case TypeKind::Array:
+  case TypeKind::AssociatedType:
+  case TypeKind::DependentMember:
+  case TypeKind::Error:
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::LValue:
+  case TypeKind::Module:
+  case TypeKind::TypeVariable:
+   DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
           llvm::errs() << "\n");
-    Name = "<unknown>";
-    llvm_unreachable("Debug info: Unhandled type");
+   Name = "<unknown>";
   }
   return DBuilder.createBasicType(Name, SizeInBits, AlignInBits, Encoding);
 }
