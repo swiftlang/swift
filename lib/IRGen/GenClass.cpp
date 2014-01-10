@@ -508,41 +508,6 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   llvm_unreachable("bad field-access strategy");
 }
 
-
-/// Emit the deallocating destructor for a class in terms of its destroying
-/// destructor.
-void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
-                                       ClassDecl *theClass,
-                                       llvm::Function *deallocator,
-                                       llvm::Function *destroyer) {
-  IRGenFunction IGF(IGM, deallocator);
-  if (IGM.DebugInfo)
-      IGM.DebugInfo->emitArtificialFunction(IGF, deallocator);
-
-  SILType selfType = getSelfType(theClass);
-  auto &info = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  
-  llvm::Value *obj = deallocator->getArgumentList().begin();
-  obj = IGF.Builder.CreateBitCast(obj, info.getStorageType());
-  // The destroying destructor returns the pointer back as a %swift.refcounted,
-  // so we don't need to keep it live across the call.
-  obj = IGF.Builder.CreateCall(destroyer, obj);
-
-  // Emit the deallocation.
-  auto &layout = info.getLayout(IGM);
-  // FIXME: Dynamic-layout deallocation size.
-  llvm::Value *size, *alignMask;
-  if (layout.isFixedLayout()) {
-    size = info.getLayout(IGM).emitSize(IGF.IGM);
-  } else {
-    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, obj, selfType);
-    std::tie(size, alignMask)
-      = emitClassFragileInstanceSizeAndAlignMask(IGF, theClass, metadata);
-  }
-  emitDeallocateHeapObject(IGF, obj, size);
-  IGF.Builder.CreateRetVoid();
-}
-
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc) {
@@ -626,13 +591,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   // Emit the class metadata.
   emitClassMetadata(*this, D, layout);
-
-  // Emit the deallocating destructor.
-  llvm::Function *deallocator
-    = getAddrOfDestructor(D, DestructorKind::Deallocating, ForDefinition);
-  llvm::Function *destroyer
-    = getAddrOfDestructor(D, DestructorKind::Destroying, NotForDefinition);
-  emitDeallocatingDestructor(*this, D, deallocator, destroyer);
   
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 

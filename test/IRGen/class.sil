@@ -5,8 +5,8 @@ import Builtin
 // CHECK: [[OBJCCLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[REF:%swift.refcounted]] = type
 // CHECK: [[C_CLASS:%C5class1C]] = type
+// CHECK: [[REF:%swift.refcounted]] = type
 // CHECK: [[OBJCOBJ:%objc_object]] = type
 
 class C {}
@@ -29,7 +29,7 @@ class C {}
 // \ CHECK: }
 
 //   CHECK: @_TMdC5class1C = global { {{.*}} } {
-// \ CHECK:   void ([[REF]]*)* @_TFC5class1CD,
+// \ CHECK:   void ([[C_CLASS]]*)* @_TFC5class1CD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
 // \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",
@@ -37,6 +37,35 @@ class C {}
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_C to i64), i64 1)
 // \ CHECK: }
+
+// Destroying destructor
+// CHECK: define [[REF]]* @_TFC5class1Cd([[C_CLASS]]*) {
+// CHECK-NEXT: entry:
+// CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
+// CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
+sil @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer {
+bb0(%0 : $C):
+  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer // user: %2
+  return %1 : $Builtin.ObjectPointer              // id: %2
+}
+
+// Deallocating destructor
+// CHECK: define void @_TFC5class1CD([[C_CLASS]]*)
+sil @_TFC5class1CD : $@cc(method) @thin (@owned C) -> () {
+bb0(%0 : $C):
+  // CHECK-NEXT: entry
+  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call [[REF]]* @_TFC5class1Cd([[C_CLASS]]* %0)
+  // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
+  %1 = function_ref @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer // user: %3
+  %3 = object_pointer_to_ref %2 : $Builtin.ObjectPointer to $C // user: %4
+  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
+  // CHECK-NEXT: call void @swift_deallocObject([[REF]]* [[SELF]], i64 16)
+  dealloc_ref %3 : $C                             // id: %4
+  // CHECK-NEXT: ret void   
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+}
 
 // CHECK: define [[REF]]* @ref_to_object_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* {{%.*}} to [[REF]]*

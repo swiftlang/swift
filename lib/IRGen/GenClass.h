@@ -73,13 +73,6 @@ namespace irgen {
   llvm::Constant *tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
                                                          ClassDecl *theClass,
                                                          VarDecl *field);
-
-  /// Emit the deallocating destructor for a class in terms of its destroying
-  /// destructor.
-  void emitDeallocatingDestructor(IRGenModule &IGM,
-                                  ClassDecl *theClass,
-                                  llvm::Function *deallocator,
-                                  llvm::Function *destroyer);
   
   /// True if the value is of class type, or of a type that is bridged to class
   /// type in the ObjC world.

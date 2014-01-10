@@ -338,10 +338,14 @@ public:
   void emitFunction(FuncDecl *fd);
   /// \brief Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
-  /// emitDestructor - Generates code for a class destroying destructor. This
+  /// Generates code for a class destroying destructor. This
   /// emits the body code from the DestructorDecl, calls the base class 
   /// destructor, then implicitly releases the elements of the class.
-  void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
+  void emitDestroyingDestructor(DestructorDecl *dd);
+
+  /// Generates code for a class deallocating destructor. This
+  /// calls the destroying destructor and then deallocates 'self'.
+  void emitDeallocatingDestructor(DestructorDecl *dd);
   
   /// Generates code for a struct constructor.
   /// This allocates the new 'self' value, emits the

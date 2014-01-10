@@ -67,7 +67,7 @@ import gizmo
 // CHECK: }
 
 // CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} i64 } {
-// CHECK:   void (%swift.refcounted*)* @_TFC15generic_classes14RootNonGenericD,
+// CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
 // CHECK:   %swift.type* @"OBJC_CLASS_$_SwiftObject",
@@ -301,18 +301,6 @@ entry(%c : $NonGenericInheritsGeneric):
   %w = load %p : $*Int
   return %w : $Int
 }
-
-// -- RootGeneric deallocating destructor
-// CHECK: define void @_TFC15generic_classes11RootGenericD(%swift.refcounted*)
-// CHECK:   [[DESTROYED:%.*]] = call %swift.refcounted* @_TFC15generic_classes11RootGenericd
-// CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %swift.refcounted* [[DESTROYED]], i32 0, i32 0
-// CHECK:   [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]], align 8
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_ARRAY]], i64 6
-// CHECK:   [[SIZE_PTR:%.*]] = load i8*** [[SIZE_ADDR]], align 8
-// CHECK:   [[SIZE:%.*]] = ptrtoint i8** [[SIZE_PTR]] to i64
-// CHECK:   call void @swift_deallocObject(%swift.refcounted* [[DESTROYED]], i64 [[SIZE]])
-
 // CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})

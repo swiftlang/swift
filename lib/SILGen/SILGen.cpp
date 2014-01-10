@@ -469,11 +469,22 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
 
   // Emit the destroying destructor.
-  SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
-  SILFunction *f = preEmitFunction(destroyer, dd, dd);
-  PrettyStackTraceSILFunction X("silgen emitDestructor", f);
-  SILGenFunction(*this, *f).emitDestructor(cd, dd);
-  postEmitFunction(destroyer, f);
+  {
+    SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
+    SILFunction *f = preEmitFunction(destroyer, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestroyingDestructor", f);
+    SILGenFunction(*this, *f).emitDestroyingDestructor(dd);
+    postEmitFunction(destroyer, f);
+  }
+
+  // Emit the deallocating destructor.
+  {
+    SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
+    SILFunction *f = preEmitFunction(deallocator, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
+    SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
+    postEmitFunction(deallocator, f);
+  }
 
   // If the class would use the Objective-C allocator, emit -dealloc.
   if (usesObjCAllocator(cd)) {
