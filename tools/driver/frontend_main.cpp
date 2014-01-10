@@ -27,6 +27,8 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/Path.h"
@@ -109,7 +111,10 @@ static bool performCompile(CompilerInstance &Instance,
 
   std::unique_ptr<SILModule> SM = Instance.takeSILModule();
   if (!SM) {
-    SM = performSILGeneration(Instance.getMainModule());
+    if (PrimarySourceFile)
+      SM = performSILGeneration(*PrimarySourceFile);
+    else
+      SM = performSILGeneration(Instance.getMainModule());
     performSILLinking(SM.get());
   }
 
@@ -185,7 +190,18 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
-  performIRGeneration(IRGenOpts, nullptr, Instance.getMainModule(), SM.get());
+  if (PrimarySourceFile) {
+    // FIXME: We shouldn't need to use the global context here, but something
+    // is persisting across calls to performIRGeneration.
+    std::unique_ptr<llvm::Module> LLVMModule{
+      new llvm::Module(Invocation.getFrontendOptions().OutputFilename,
+                       llvm::getGlobalContext())
+    };
+    performIRGeneration(IRGenOpts, LLVMModule.get(), *PrimarySourceFile,
+                        SM.get());
+  } else {
+    performIRGeneration(IRGenOpts, nullptr, Instance.getMainModule(), SM.get());
+  }
 
   return false;
 }
