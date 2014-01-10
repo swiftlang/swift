@@ -13,7 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/Optional.h"
 
 #include <string>
 #include <vector>
@@ -57,7 +57,7 @@ public:
 
   /// The input for which output should be generated. If not set, output will
   /// be generated for the whole module.
-  llvm::Optional<SelectedInput> PrimaryInput;
+  Optional<SelectedInput> PrimaryInput;
 
   /// The name of the primary output file which should be created
   /// by the frontend.
