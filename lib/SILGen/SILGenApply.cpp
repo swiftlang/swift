@@ -842,9 +842,51 @@ public:
   }
 
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    ManagedValue existential =
-      gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
-    
+    ManagedValue existential;
+
+    // We have four cases to deal with here:
+    //
+    //  1) for a "static" / "type" method, the base is a metatype.
+    //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
+    //     which is loadable.
+    //  3) for an @mutating method, the base has @inout type.
+    //  4) for a @!mutating method, the base is a general protocol rvalue, which
+    //     is address-only.  The base is passed at +0, so it isn't consumed.
+    //
+    // In the last case, the AST has this call typed as being applied to an
+    // rvalue, but the witness is actually expecting a pointer to the +0 value
+    // in memory.  We access this with the project_existential instruction.
+    //
+    // As an important optimization, if we are in case #4 and we can avoid doing
+    // the +0 load, we do that.  We know that the invoked method won't modify
+    // the memory passed in, so we can pass in any pointer we have conveniently
+    // available which is guaranteed not to be modifiable in the call.
+    //
+    if (!e->getBase()->getType()->hasReferenceSemantics() &&
+        !e->getBase()->getType()->is<MetatypeType>() &&
+        !e->getBase()->getType()->is<InOutType>()) {
+
+      if (auto *LE = dyn_cast<LoadExpr>(e->getBase())) {
+        LValue lv = gen.emitLValue(LE->getSubExpr());
+
+        // If this is a load of a physical lvalue, we can just us the value
+        // already plunked into memory.
+        if (lv.isLastComponentPhysical()) {
+          existential = gen.emitAddressOfLValue(e, lv);
+        } else {
+          // Otherwise, we really do have to perform a load.
+          existential = gen.emitLoadOfLValue(e, lv, SGFContext());
+        }
+      }
+    }
+
+    // If the optimization wasn't relevant, or didn't work out, just emit the
+    // base as an rvalue, which is always correct.
+    if (!existential.getValue()) {
+      existential =
+        gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
+    }
+
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
 
@@ -895,7 +937,7 @@ public:
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setSelfParam(gen.emitRValue(e->getBase()), e);
-    
+
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
 

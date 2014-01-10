@@ -196,8 +196,18 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
     // If 'self' is an @inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
-    if (selfTy->is<InOutType>())
+    if (selfTy->is<InOutType>()) {
+      // Unless we're looking at a non-@mutating existential member.  In which
+      // case, the member will be modeled as an @inout, but ExistentialMemberRef
+      // and ArchetypeMemberRef want to take the base as an rvalue.
+      if (baseObjectTy->isExistentialType()/* ||
+          baseObjectTy->is<ArchetypeType>()*/)
+        if (auto *fd = dyn_cast<FuncDecl>(func))
+          if (!fd->isMutating())
+            return baseObjectTy;
+      
       return InOutType::get(baseObjectTy);
+    }
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;

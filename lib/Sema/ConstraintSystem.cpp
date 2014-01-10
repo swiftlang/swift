@@ -979,7 +979,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
-                                       OverloadChoice choice){
+                                       OverloadChoice choice) {
   // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
