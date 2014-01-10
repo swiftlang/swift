@@ -294,6 +294,7 @@ class CompilerInstance {
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
+  unsigned PrimaryBufferID = NO_SUCH_BUFFER;
 
   void createSILModule();
 

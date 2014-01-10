@@ -86,9 +86,13 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   bool MainMode = (Invocation.getInputKind() == SourceFileKind::Main);
   bool SILMode = (Invocation.getInputKind() == SourceFileKind::SIL);
 
+  const Optional<SelectedInput> &PrimaryInput =
+    Invocation.getFrontendOptions().PrimaryInput;
+
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
-  for (auto Buf : Invocation.getInputBuffers()) {
+  for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
+    auto Buf = Invocation.getInputBuffers()[i];
     unsigned BufferID = SourceMgr.addNewSourceBuffer(
       llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
                                            Buf->getBufferIdentifier()));
@@ -98,9 +102,14 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
     if (SILMode)
       MainBufferID = BufferID;
+
+    if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
+      PrimaryBufferID = BufferID;
   }
 
-  for (auto &File : Invocation.getInputFilenames()) {
+  for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
+    auto &File = Invocation.getInputFilenames()[i];
+
     // FIXME: Working with filenames is fragile, maybe use the real path
     // or have some kind of FileManager.
     using namespace llvm::sys::path;
@@ -110,6 +119,10 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       if (ExistingBufferID.hasValue()) {
         if (SILMode || (MainMode && filename(File) == "main.swift"))
           MainBufferID = ExistingBufferID.getValue();
+
+        if (PrimaryInput && PrimaryInput->isFilename() &&
+            PrimaryInput->Index == i)
+          PrimaryBufferID = ExistingBufferID.getValue();
 
         continue; // replaced by a memory buffer.
       }
@@ -131,6 +144,9 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
     if (SILMode || (MainMode && filename(File) == "main.swift"))
       MainBufferID = BufferID;
+
+    if (PrimaryInput && PrimaryInput->isFilename() && PrimaryInput->Index == i)
+      PrimaryBufferID = BufferID;
   }
 
   if (MainMode && MainBufferID == NO_SUCH_BUFFER && BufferIDs.size() == 1)
