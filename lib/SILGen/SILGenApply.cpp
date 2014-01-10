@@ -957,8 +957,9 @@ public:
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
     //  3) for an @mutating method, the base has @inout type.
-    //  4) for a @!mutating method, the base is a general archetype rvalue, which
-    //     is address-only.  The base is passed at +0, so it isn't consumed.
+    //  4) for a @!mutating method, the base is a general archetype rvalue,
+    //     which is address-only.  The base is passed at +0, so it isn't
+    //     consumed.
     //
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value

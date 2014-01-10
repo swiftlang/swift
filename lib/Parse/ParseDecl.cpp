@@ -1771,7 +1771,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   //
   // This turns an instance function "(int)->int" on FooTy into
   // "(this: @inout FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(this: [inout] FooTy.metatype)->(int)->int".
+  // "(int)->int" on FooTy into "(this: @inout FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc);
