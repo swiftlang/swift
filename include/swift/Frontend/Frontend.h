@@ -61,8 +61,6 @@ class CompilerInvocation {
   bool Immediate = false;
   SourceFileKind InputKind = SourceFileKind::Main;
 
-  std::vector<llvm::MemoryBuffer *> InputBuffers;
-
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
   /// \brief Code completion offset in bytes from the beginning of the main
@@ -220,18 +218,20 @@ public:
   }
 
   void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    InputBuffers.push_back(Buf);
+    FrontendOpts.InputBuffers.push_back(Buf);
   }
 
   void clearInputs() {
     FrontendOpts.InputFilenames.clear();
-    InputBuffers.clear();
+    FrontendOpts.InputBuffers.clear();
   }
 
   ArrayRef<std::string> getInputFilenames() const {
     return FrontendOpts.InputFilenames;
   }
-  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const { return InputBuffers; }
+  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
+    return FrontendOpts.InputBuffers;
+  }
 
   void setOutputFilename(StringRef Filename) {
     FrontendOpts.OutputFilename = Filename;

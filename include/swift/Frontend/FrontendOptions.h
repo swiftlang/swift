@@ -16,6 +16,10 @@
 #include <string>
 #include <vector>
 
+namespace llvm {
+  class MemoryBuffer;
+}
+
 namespace swift {
 
 /// Options for controlling the behavior of the frontend.
@@ -23,6 +27,9 @@ class FrontendOptions {
 public:
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
+
+  /// Input buffers which may override the file contents of input files.
+  std::vector<llvm::MemoryBuffer *> InputBuffers;
 
   /// The name of the primary output file which should be created
   /// by the frontend.
