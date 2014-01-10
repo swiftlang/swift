@@ -841,6 +841,45 @@ public:
     return subs.slice(innerIdx);
   }
 
+  /// getExistentialOrArchetypeRValueAddress - Return a SILValue of address type
+  /// for the specified rvalue of existential or archetype type.  This attempts
+  /// to avoid emitting a load (and thus, a an extra copy of the abstracted
+  /// value) for the rvalue in cases where we can find an underlying address we
+  /// can use.
+  ManagedValue getExistentialOrArchetypeRValueAddress(Expr *e) {
+    // If this is a load of a physical lvalue, we can just use the address
+    // available within the lvalue.
+    if (auto *LE = dyn_cast<LoadExpr>(e)) {
+      LValue lv = gen.emitLValue(LE->getSubExpr());
+
+      // If this is a load of a physical lvalue, we can just us the value
+      // already plunked into memory.
+      if (lv.isLastComponentPhysical())
+        return gen.emitAddressOfLValue(e, lv);
+
+      // Otherwise, for logic lvalues we really do have to perform a load.
+      return gen.emitLoadOfLValue(e, lv, SGFContext());
+    }
+
+    // If this is a reference to a 'let' value or global, then it is sitting in
+    // memory.
+    if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
+      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
+        if (VD->isLet() ||
+            (!VD->getDeclContext()->isLocalContext() &&
+             !VD->isComputed())) {
+              auto Reference =
+                gen.emitReferenceToDecl(e, DRE->getDeclRef(), e->getType(), 0);
+              assert(Reference.isLValue() && "Should have got an lvalue back");
+
+              // Return the lvalue as a non-lvalue address.
+              return ManagedValue::forUnmanaged(Reference.getValue());
+            }
+    }
+
+    return gen.emitRValue(e).getAsSingleValue(gen, e);
+  }
+
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential;
 
@@ -856,36 +895,12 @@ public:
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory.  We access this with the project_existential instruction.
-    //
-    // As an important optimization, if we are in case #4 and we can avoid doing
-    // the +0 load, we do that.  We know that the invoked method won't modify
-    // the memory passed in, so we can pass in any pointer we have conveniently
-    // available which is guaranteed not to be modifiable in the call.
-    //
-    if (!e->getBase()->getType()->hasReferenceSemantics() &&
-        !e->getBase()->getType()->is<MetatypeType>() &&
-        !e->getBase()->getType()->is<InOutType>()) {
-
-      if (auto *LE = dyn_cast<LoadExpr>(e->getBase())) {
-        LValue lv = gen.emitLValue(LE->getSubExpr());
-
-        // If this is a load of a physical lvalue, we can just us the value
-        // already plunked into memory.
-        if (lv.isLastComponentPhysical()) {
-          existential = gen.emitAddressOfLValue(e, lv);
-        } else {
-          // Otherwise, we really do have to perform a load.
-          existential = gen.emitLoadOfLValue(e, lv, SGFContext());
-        }
-      }
-    }
-
-    // If the optimization wasn't relevant, or didn't work out, just emit the
-    // base as an rvalue, which is always correct.
-    if (!existential.getValue()) {
+    if (e->getBase()->getType()->is<ProtocolType>() &&
+        !e->getBase()->getType()->castTo<ProtocolType>()->requiresClass())
+      existential = getExistentialOrArchetypeRValueAddress(e->getBase());
+    else
       existential =
         gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
-    }
 
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
@@ -949,37 +964,11 @@ public:
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory (since the archetype is address-only).
     //
-    // As an important optimization, if we are in case #4 and we can avoid doing
-    // the +0 load, we do that.  We know that the invoked method won't modify
-    // the memory passed in, so we can pass in any pointer we have conveniently
-    // available which is guaranteed not to be modifiable in the call.
-    //
-    if (!e->getBase()->getType()->hasReferenceSemantics() &&
-        !e->getBase()->getType()->is<MetatypeType>() &&
-        !e->getBase()->getType()->is<InOutType>()) {
-      assert(e->getBase()->getType()->is<ArchetypeType>() && "Unknown case");
-
-      ManagedValue archetype;
-      if (auto *LE = dyn_cast<LoadExpr>(e->getBase())) {
-        LValue lv = gen.emitLValue(LE->getSubExpr());
-
-        // If this is a load of a physical lvalue, we can just us the value
-        // already plunked into memory.
-        if (lv.isLastComponentPhysical()) {
-          archetype = gen.emitAddressOfLValue(e, lv);
-        } else {
-          // Otherwise, we really do have to perform a load.
-          archetype = gen.emitLoadOfLValue(e, lv, SGFContext());
-        }
-      }
-
-      if (!archetype.getValue())
-        archetype = gen.emitRValue(e->getBase())
-          .getAsSingleValue(gen, e->getBase());
-
+    if (e->getBase()->getType()->is<ArchetypeType>() &&
+        !e->getBase()->getType()->castTo<ArchetypeType>()->requiresClass()) {
+      auto archetype = getExistentialOrArchetypeRValueAddress(e->getBase());
       setSelfParam(RValue(gen, e->getBase(), archetype.getType().getSwiftType(),
                           archetype), e);
-
     } else {
       setSelfParam(gen.emitRValue(e->getBase()), e);
     }
