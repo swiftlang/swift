@@ -202,7 +202,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   entity ::= context 'd'                     // non-deallocating destructor
   case Kind::Destructor:
     buffer << "_T";
-    mangler.mangleDestructorEntity(cast<ClassDecl>(getDecl()->getDeclContext()),
+    mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                    isDeallocating(getDestructorKind()));
     return;
 

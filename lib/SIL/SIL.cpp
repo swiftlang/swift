@@ -330,16 +330,14 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   //   entity ::= context 'D'                     // deallocating destructor
   case SILDeclRef::Kind::Deallocator:
     buffer << introducer;
-    mangler.mangleDestructorEntity(cast<ClassDecl>(
-                                     c.getDecl()->getDeclContext()),
+    mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ true);
     return;
 
   //   entity ::= context 'd'                     // destroying destructor
   case SILDeclRef::Kind::Destroyer:
     buffer << introducer;
-    mangler.mangleDestructorEntity(cast<ClassDecl>(
-                                     c.getDecl()->getDeclContext()),
+    mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ false);
     return;
 

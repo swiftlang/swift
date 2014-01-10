@@ -276,8 +276,7 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
                                      ExplosionKind::Minimal,
                                      /*uncurry*/ 0);
     } else if (auto dtor = dyn_cast<DestructorDecl>(fn)) {
-      return mangleDestructorEntity(cast<ClassDecl>(dtor->getParent()),
-                                    /*deallocating*/ false);
+      return mangleDestructorEntity(dtor, /*deallocating*/ false);
     } else if (auto func = dyn_cast<FuncDecl>(fn)) {
       if (auto value = func->getGetterDecl()) {
         return mangleGetterEntity(value, ExplosionKind::Minimal);
@@ -1095,9 +1094,10 @@ void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
   mangleDeclType(ctor, explosion, uncurryLevel);
 }
 
-void Mangler::mangleDestructorEntity(ClassDecl *theClass,
+void Mangler::mangleDestructorEntity(DestructorDecl *dtor,
                                      bool isDeallocating) {
   Buffer << 'F';
+  auto theClass = cast<ClassDecl>(dtor->getDeclContext());
   mangleContext(theClass, BindGenerics::Enclosing);
   Buffer << (isDeallocating ? 'D' : 'd');
 }
