@@ -17,6 +17,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/AST/ASTContext.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
@@ -61,31 +62,54 @@ private:
   /// Finds the generic type substitution in the caller substitution list that
   /// corresponds to a specific generic type.
   Substitution getCallerSubstitutionForCalleSub(Type T) {
-
-    for (Substitution &CallerSub : CallerInst->getSubstitutions()) {
-      // Find the correct type replacement in the caller ApplyInst
+    // Find the correct type replacement in the caller ApplyInst
+    for (Substitution &CallerSub : CallerInst->getSubstitutions())
       if (CallerSub.Archetype->getCanonicalType() == T->getCanonicalType())
         return CallerSub;
-    }
 
-    // T is not a caller Archetype.
+    // T is not a caller Archetype, return an empty subst list.
     return  Substitution{ 0, 0, ArrayRef<ProtocolConformance *>() };
   }
 
-  Substitution remapSubstitution(Substitution sub) {
-    // Find the substitution of type T, in the caller subst list.
-    Substitution S = getCallerSubstitutionForCalleSub(sub.Replacement);
+  Substitution remapSubstitution(Substitution Ap) {
+    // Find this substitution in the caller subst list.
+    Substitution C = getCallerSubstitutionForCalleSub(Ap.Replacement);
 
-    // If the replacement type is not a caller Archetype then use the existing
-    // conformance list. 
-    if (!S.Archetype)
-      S = sub;
+    // The new conformance list.
+    SmallVector<ProtocolConformance*, 4> NewConf;
 
-    return Substitution{ sub.Archetype,
-       sub.Replacement.subst(SwiftMod, SubsMap, true, 0),
-      S.Conformance };
+    // If we found this substitution in the caller apply inst:
+    if (C.Archetype) {
+      // If the replacement type is a caller archetype then we need to find
+      // the subset of the protocol that applies to the Calle subst list
+      // and also to this substitution. Notice that we preserve the order of
+      // protocols that the Archetype conforms to.
+      //
+      // For all protocol that our Archetype conforms to:
+      for (auto PC : Ap.Archetype->getConformsTo()) {
+        bool Found = false;
+        for (auto CallerCon : C.Conformance) {
+          if (CallerCon->getProtocol() == PC) {
+            NewConf.push_back(CallerCon);
+            Found = true;
+            break;
+          }
+        }
+        assert(Found && "Unable to find Caller conformance for archetype con.");
+      }
+    } else {
+      // If the replacement type is not a caller Archetype then use the
+      // unmodified _caller_ conformance list.
+      NewConf.append(Ap.Conformance.begin(), Ap.Conformance.end());
+    }
+
+    // Copy the conformance list to a permanent location.
+    ArrayRef<ProtocolConformance*> NewConfArray =
+    SwiftMod->getASTContext(). AllocateCopy(NewConf);
+
+    Type SubstTy = Ap.Replacement.subst(SwiftMod, SubsMap, true, 0);
+    return Substitution{ Ap.Archetype, SubstTy, NewConfArray };
   }
-
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
     NumCMSpecialized++;
