@@ -226,8 +226,7 @@ private:
       MAP(Int, "NSInteger");
       MAP(Bool, "BOOL");
       MAP(String, "NSString *");
-      MAP(AnyObject, "id");
-      MAP(AnyClass, "Class");
+      MAP(COpaquePointer, "void *");
     }
 
     auto iter = specialNames.find(name);
