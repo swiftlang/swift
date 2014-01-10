@@ -296,6 +296,8 @@ class CompilerInstance {
   unsigned MainBufferID = NO_SUCH_BUFFER;
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
 
+  SourceFile *PrimarySourceFile = nullptr;
+
   void createSILModule();
 
 public:
@@ -341,6 +343,10 @@ public:
   ArrayRef<LinkLibrary> getLinkLibraries() const {
     return Invocation.getLinkLibraries();
   }
+
+  /// Gets the SourceFile which is the primary input for this CompilerInstance.
+  /// \returns the primary SourceFile, or nullptr if there is no primary input
+  SourceFile *getPrimarySourceFile() { return PrimarySourceFile; };
 
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);

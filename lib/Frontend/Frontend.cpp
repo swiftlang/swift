@@ -199,6 +199,9 @@ void CompilerInstance::performParse() {
       new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
                                 Invocation.getParseStdlib());
     MainModule->addFile(*SingleInputFile);
+
+    if (MainBufferID == PrimaryBufferID)
+      PrimarySourceFile = SingleInputFile;
   }
 
   bool hadLoadError = false;
@@ -225,6 +228,9 @@ void CompilerInstance::performParse() {
                                                 BufferID,
                                                 Invocation.getParseStdlib());
     MainModule->addFile(*NextInput);
+
+    if (BufferID == PrimaryBufferID)
+      PrimarySourceFile = NextInput;
 
     bool Done;
     parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
