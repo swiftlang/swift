@@ -1397,6 +1397,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // SyntaxSugarType derivations.
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
+  case TypeKind::UncheckedOptional:
   {
     auto SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
     auto CanTy = SyntaxSugarTy->getDesugaredType();
