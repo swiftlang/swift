@@ -89,20 +89,31 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (auto Buf : Invocation.getInputBuffers()) {
-    if (SILMode)
-      MainBufferIndex = BufferIDs.size();
+    unsigned BufferID = SourceMgr.addNewSourceBuffer(
+      llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
+                                           Buf->getBufferIdentifier()));
 
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(
-        llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
-                                             Buf->getBufferIdentifier())));
+    BufferIDs.push_back(BufferID);
+
+    if (SILMode)
+      MainBufferID = BufferID;
   }
 
   for (auto &File : Invocation.getInputFilenames()) {
     // FIXME: Working with filenames is fragile, maybe use the real path
     // or have some kind of FileManager.
-    if (SourceMgr.getIDForBufferIdentifier(File).hasValue())
-      continue; // replaced by a memory buffer.
+    using namespace llvm::sys::path;
+    {
+      Optional<unsigned> ExistingBufferID =
+        SourceMgr.getIDForBufferIdentifier(File);
+      if (ExistingBufferID.hasValue()) {
+        if (SILMode || (MainMode && filename(File) == "main.swift"))
+          MainBufferID = ExistingBufferID.getValue();
+
+        continue; // replaced by a memory buffer.
+      }
+    }
 
     // Open the input file.
     llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -113,16 +124,17 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       return true;
     }
 
-    using namespace llvm::sys::path;
-    if (SILMode || (MainMode && filename(File) == "main.swift"))
-      MainBufferIndex = BufferIDs.size();
+    unsigned BufferID = SourceMgr.addNewSourceBuffer(InputFile.take());
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    BufferIDs.push_back(SourceMgr.addNewSourceBuffer(InputFile.take()));
+    BufferIDs.push_back(BufferID);
+
+    if (SILMode || (MainMode && filename(File) == "main.swift"))
+      MainBufferID = BufferID;
   }
 
-  if (MainMode && MainBufferIndex == NO_SUCH_BUFFER && BufferIDs.size() == 1)
-    MainBufferIndex = 0;
+  if (MainMode && MainBufferID == NO_SUCH_BUFFER && BufferIDs.size() == 1)
+    MainBufferID = BufferIDs.front();
 
   return false;
 }
@@ -135,7 +147,7 @@ void CompilerInstance::performParse() {
 
   if (Kind == SourceFileKind::SIL) {
     assert(BufferIDs.size() == 1);
-    assert(MainBufferIndex != NO_SUCH_BUFFER);
+    assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
   }
 
@@ -161,15 +173,14 @@ void CompilerInstance::performParse() {
   // a source file, or it may be a SIL file, which requires pumping the parser.
   // We parse it last, though, to make sure that it can use decls from other
   // files in the module.
-  if (MainBufferIndex != NO_SUCH_BUFFER) {
+  if (MainBufferID != NO_SUCH_BUFFER) {
     assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::SIL);
 
-    unsigned BufferID = BufferIDs[MainBufferIndex];
     if (Kind == SourceFileKind::Main)
-      SourceMgr.setHashbangBufferID(BufferID);
+      SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, BufferID,
+      new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
                                 Invocation.getParseStdlib());
     MainModule->addFile(*SingleInputFile);
   }
@@ -178,9 +189,9 @@ void CompilerInstance::performParse() {
 
   // Parse all the library files first.
   for (size_t i = 0, e = BufferIDs.size(); i < e; ++i) {
-    if (i == MainBufferIndex)
-      continue;
     auto BufferID = BufferIDs[i];
+    if (BufferID == MainBufferID)
+      continue;
 
     auto Buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(BufferID);
     if (SerializedModuleLoader::isValidSerializedAST(*Buffer)) {
@@ -212,7 +223,7 @@ void CompilerInstance::performParse() {
     return;
 
   // Parse the main file last.
-  if (MainBufferIndex != NO_SUCH_BUFFER) {
+  if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
     SILParserState SILContext(TheSILModule.get());
 

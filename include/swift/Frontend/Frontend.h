@@ -293,7 +293,7 @@ class CompilerInstance {
   std::vector<unsigned> BufferIDs;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
-  unsigned MainBufferIndex = NO_SUCH_BUFFER;
+  unsigned MainBufferID = NO_SUCH_BUFFER;
 
   void createSILModule();
 
