@@ -396,6 +396,9 @@ public:
   /// Generate an ObjC-compatible setter for a subscript.
   void emitObjCSubscriptSetter(SILDeclRef setter);
 
+  /// Generate an ObjC-compatible destructor (-dealloc).
+  void emitObjCDestructor(SILDeclRef dtor, DestructorDecl *dd);
+
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding);
   

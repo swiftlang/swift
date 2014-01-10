@@ -474,6 +474,18 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   PrettyStackTraceSILFunction X("silgen emitDestructor", f);
   SILGenFunction(*this, *f).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
+
+  // If the class would use the Objective-C allocator, emit -dealloc.
+  if (usesObjCAllocator(cd)) {
+    SILDeclRef dealloc(cd, SILDeclRef::Kind::Destroyer,
+                       SILDeclRef::ConstructAtNaturalUncurryLevel,
+                       /*isForeign=*/true);
+    SILFunction *f = preEmitFunction(dealloc, dd, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
+    SILGenFunction(*this, *f).emitObjCDestructor(dealloc, dd);
+    postEmitFunction(dealloc, f);
+
+  }
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {

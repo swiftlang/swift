@@ -1068,6 +1068,16 @@ namespace {
         InstanceMethods.push_back(entry);
     }
 
+    /// Destructors need to be collected into the instance methods
+    /// list 
+    void visitDestructorDecl(DestructorDecl *destructor) {
+      auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
+      if (Lowering::usesObjCAllocator(classDecl)) {
+        llvm::Constant *entry = emitObjCMethodDescriptor(IGM, destructor);
+        InstanceMethods.push_back(entry);
+      }
+    }
+
   private:
     StringRef chooseNamePrefix(StringRef forClass,
                                StringRef forCategory,
@@ -1435,10 +1445,6 @@ namespace {
           InstanceMethods.push_back(getter_setter.second);
       }
     }
-
-    /// The destructor doesn't really require any special
-    /// representation here.
-    void visitDestructorDecl(DestructorDecl *dtor) {}
   };
 }
 

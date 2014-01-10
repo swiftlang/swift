@@ -753,7 +753,9 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign)
-    return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
+    return c.hasDecl() && 
+      (isClassOrProtocolMethod(c.getDecl()) || 
+       c.kind == SILDeclRef::Kind::Destroyer)
       ? AbstractCC::ObjCMethod
       : AbstractCC::C;
   

@@ -921,8 +921,12 @@ public:
     require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
     
-    Type methodClass = CMI->getMember().getDecl()->getDeclContext()
-      ->getDeclaredTypeInContext();
+    Type methodClass;
+    auto decl = CMI->getMember().getDecl();
+    if (auto classDecl = dyn_cast<ClassDecl>(decl))
+      methodClass = classDecl->getDeclaredTypeInContext();
+    else
+      methodClass = decl->getDeclContext()->getDeclaredTypeInContext();
     
     require(methodClass->getClassOrBoundGenericClass(),
             "super_method must look up a class method");

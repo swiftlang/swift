@@ -291,10 +291,6 @@ struct Materialize {
   /// the buffer.
   ManagedValue claim(SILGenFunction &gen, SILLocation loc);
 };
-  
-/// Should allocation of this class use the Objective-C allocation
-/// routines?
-LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 
 } // end namespace Lowering
 } // end namespace swift

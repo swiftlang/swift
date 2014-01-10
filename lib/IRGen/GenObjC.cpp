@@ -294,11 +294,13 @@ namespace {
       ctor->getObjCSelector(Text);
     }
     
-    Selector(ValueDecl *methodOrCtor) {
-      if (auto *method = dyn_cast<FuncDecl>(methodOrCtor)) {
+    Selector(ValueDecl *methodOrCtorOrDtor) {
+      if (auto *method = dyn_cast<FuncDecl>(methodOrCtorOrDtor)) {
         method->getObjCSelector(Text);
-      } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtor)) {
+      } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtorOrDtor)) {
         ctor->getObjCSelector(Text);
+      } else if (isa<DestructorDecl>(methodOrCtorOrDtor)) {
+        Text = "dealloc";
       } else {
         llvm_unreachable("property or subscript selector should be generated "
                          "using ForGetter or ForSetter constructors");
@@ -325,11 +327,14 @@ namespace {
       switch (ref.kind) {
       case SILDeclRef::Kind::Allocator:
       case SILDeclRef::Kind::DefaultArgGenerator:
-      case SILDeclRef::Kind::Destroyer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
         llvm_unreachable("Method does not have a selector");
 
+      case SILDeclRef::Kind::Destroyer:
+        Text = "dealloc";
+        break;
+          
       case SILDeclRef::Kind::Func:
         cast<FuncDecl>(ref.getDecl())->getObjCSelector(Text);
         break;
@@ -454,7 +459,8 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Func
           || method.kind == SILDeclRef::Kind::Getter
-          || method.kind == SILDeclRef::Kind::Setter)
+          || method.kind == SILDeclRef::Kind::Setter
+          || method.kind == SILDeclRef::Kind::Destroyer)
          && "objc method call must be to a func/initializer/getter/setter");
 
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
@@ -524,9 +530,11 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   Selector selector(method);
     
   // super.constructor references an instance method (even though the
-  // decl is really a 'static' member).
+  // decl is really a 'static' member). Similarly, destructors refer
+  // to the instance method -dealloc.
   bool isInstanceMethod
     = method.kind == SILDeclRef::Kind::Initializer
+      || method.kind == SILDeclRef::Kind::Destroyer
       || method.getDecl()->isInstanceMember();
 
   if (searchType) {
@@ -878,6 +886,29 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                           swiftImpl, explosionLevel);
 }
 
+/// Produce a function pointer, suitable for invocation by
+/// objc_msgSend, for the given destructor implementation.
+///
+/// Returns a value of type i8*.
+static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
+                                            const Selector &selector,
+                                            DestructorDecl *destructor) {
+  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, destructor);
+  unsigned uncurryLevel = absCallee.getMaxUncurryLevel();
+  auto explosionLevel = absCallee.getBestExplosionLevel();
+
+  auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
+  llvm::Function *swiftImpl
+    = IGM.getAddrOfDestructor(classDecl, DestructorKind::Destroying,
+                              NotForDefinition);
+
+  SILDeclRef declRef = SILDeclRef(classDecl, SILDeclRef::Kind::Destroyer,
+                                  uncurryLevel, /*foreign*/ true);
+
+  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
+                                          swiftImpl, explosionLevel);
+}
+
 /// True if the value is of class type, or of a type that is bridged to class
 /// type.
 bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
@@ -926,8 +957,11 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The second element is the type @encoding. Handle some simple cases, and
   /// leave the rest as null for now.
   AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
-  // Account for the 'self' pointer being curried.
-  methodType = methodType->getResult()->castTo<AnyFunctionType>();
+
+  if (!isa<DestructorDecl>(method)) {
+    // Account for the 'self' pointer being curried.
+    methodType = methodType->getResult()->castTo<AnyFunctionType>();
+  }
   
   if (isObjCGetterSignature(IGM, methodType))
     atEncoding = IGM.getAddrOfGlobalString(GetterMethodSignature);
@@ -939,8 +973,10 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The third element is the method implementation pointer.
   if (auto func = dyn_cast<FuncDecl>(method))
     impl = getObjCMethodPointer(IGM, selector, func);
+  else if (auto ctor = dyn_cast<ConstructorDecl>(method))
+    impl = getObjCMethodPointer(IGM, selector, ctor);
   else
-    impl = getObjCMethodPointer(IGM, selector, cast<ConstructorDecl>(method));
+    impl = getObjCMethodPointer(IGM, selector, cast<DestructorDecl>(method));
 }
 
 /// Emit the components of an Objective-C method descriptor for a

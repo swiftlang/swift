@@ -131,6 +131,9 @@ unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
   if (isa<ConstructorDecl>(val) || isa<EnumElementDecl>(val)) {
     return 1;
   }
+  if (isa<DestructorDecl>(val)) {
+    return 0;
+  }
   llvm_unreachable("Unexpected ValueDecl");
 }
 

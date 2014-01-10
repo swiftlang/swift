@@ -349,6 +349,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   return OS;
 }
 
+namespace Lowering {
+  /// Determine whether the given class will be allocated/deallocated
+  /// using the Objective-C runtime, i.e., +alloc and -dealloc.
+  LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
+}
 
 } // end swift namespace
 

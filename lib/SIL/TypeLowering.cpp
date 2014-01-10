@@ -1316,10 +1316,23 @@ static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
   return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
 }
 
-/// Get the type of a destructor function, This -> ().
+/// Get the type of a destructor function.
+///
+/// The type is This -> BuiltinObjectPointer for native entry points
+/// and This -> () for Objective-C's -dealloc.
 static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
-                                                      ASTContext &C) {
+                                                      ASTContext &C,
+                                                      bool isForeign) {
   auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
+
+  if (isForeign) {
+    auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
+                                            /*thin*/ true,
+                                            /*noreturn*/ false);
+    return CanFunctionType::get(classType,
+                                TupleType::getEmpty(C)->getCanonicalType(),
+                                extInfo);
+  }
 
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
                                           /*thin*/ true,
@@ -1508,7 +1521,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
                                    ->getInitializerType()->getCanonicalType());
   
   case SILDeclRef::Kind::Destroyer:
-    return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
+    return getDestroyingDestructorType(cast<ClassDecl>(vd), Context,
+                                       c.isForeign);
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
