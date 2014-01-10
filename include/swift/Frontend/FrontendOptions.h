@@ -13,6 +13,8 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "llvm/ADT/Optional.h"
+
 #include <string>
 #include <vector>
 
@@ -22,6 +24,27 @@ namespace llvm {
 
 namespace swift {
 
+class SelectedInput {
+public:
+  /// The index of the input, in either FrontendOptions::InputFilenames or
+  /// FrontendOptions::InputBuffers, depending on this SelectedInput's
+  /// InputKind.
+  unsigned Index;
+
+  enum class InputKind {
+    /// Denotes a file input, in FrontendOptions::InputFilenames
+    Filename,
+
+    /// Denotes a buffer input, in FrontendOptions::InputBuffers
+    Buffer,
+  };
+
+  /// The kind of input which this SelectedInput represents.
+  InputKind Kind;
+
+  SelectedInput(unsigned Index, InputKind Kind) : Index(Index), Kind(Kind) {}
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
 public:
@@ -30,6 +53,10 @@ public:
 
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
+
+  /// The input for which output should be generated. If not set, output will
+  /// be generated for the whole module.
+  llvm::Optional<SelectedInput> PrimaryInput;
 
   /// The name of the primary output file which should be created
   /// by the frontend.
