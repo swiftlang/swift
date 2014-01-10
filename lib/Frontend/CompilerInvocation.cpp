@@ -98,9 +98,35 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT),
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
+                                                     OPT_primary_file),
                                  Args.filtered_end())) {
-    Opts.InputFilenames.push_back(A->getValue());
+    if (A->getOption().matches(OPT_INPUT)) {
+      Opts.InputFilenames.push_back(A->getValue());
+    } else if (A->getOption().matches(OPT_primary_file)) {
+      Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
+    } else {
+      llvm_unreachable("Unknown input-related argument!");
+    }
+  }
+
+  if (Opts.PrimaryInput.hasValue()) {
+    // Validate PrimaryInput.
+    bool isValid = true;
+    switch (Opts.PrimaryInput->Kind) {
+      case SelectedInput::InputKind::Filename:
+        if (Opts.PrimaryInput->Index >= Opts.InputFilenames.size())
+          isValid = false;
+        break;
+      case SelectedInput::InputKind::Buffer:
+        if (Opts.PrimaryInput->Index >= Opts.InputBuffers.size())
+          isValid = false;
+        break;
+    }
+    if (!isValid) {
+      // TODO: emit diagnostic
+      return true;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {

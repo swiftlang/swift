@@ -20,6 +20,9 @@ def delayed_function_body_parsing :
   Flag<["-"], "delayed-function-body-parsing">,
   HelpText<"Delay function body parsing until the end of all files">;
 
+def primary_file : Flag<["-"], "primary-file">,
+  HelpText<"Produce output for the next input, not the whole module">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
