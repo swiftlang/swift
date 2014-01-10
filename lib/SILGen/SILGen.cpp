@@ -488,7 +488,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
   // If the class would use the Objective-C allocator, emit -dealloc.
   if (usesObjCAllocator(cd)) {
-    SILDeclRef dealloc(dd, SILDeclRef::Kind::Destroyer,
+    SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator,
                        SILDeclRef::ConstructAtNaturalUncurryLevel,
                        /*isForeign=*/true);
     SILFunction *f = preEmitFunction(dealloc, dd, dd);

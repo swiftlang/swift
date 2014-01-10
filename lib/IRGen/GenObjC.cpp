@@ -540,7 +540,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   // to the instance method -dealloc.
   bool isInstanceMethod
     = method.kind == SILDeclRef::Kind::Initializer
-      || method.kind == SILDeclRef::Kind::Destroyer
       || method.kind == SILDeclRef::Kind::Deallocator
       || method.getDecl()->isInstanceMember();
 
@@ -911,10 +910,10 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
   llvm::Function *swiftImpl
-    = IGM.getAddrOfDestructor(classDecl, DestructorKind::Destroying,
+    = IGM.getAddrOfDestructor(classDecl, DestructorKind::Deallocating,
                               NotForDefinition);
 
-  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Destroyer,
+  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
                                   uncurryLevel, /*foreign*/ true);
 
   return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,

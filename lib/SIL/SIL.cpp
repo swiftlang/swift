@@ -93,7 +93,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
     assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
-           && "can only create destroyer/deallocator SILDeclRef for destructor");
+           && "can only create destroyer/deallocator SILDeclRef for dtor");
     naturalUncurryLevel = 0;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter

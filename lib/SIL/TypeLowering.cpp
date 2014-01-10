@@ -1325,6 +1325,7 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
                      ->getCanonicalType();
 
   if (isForeign) {
+    assert(isDeallocating && "There are no foreign destroying destructors");
     auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
                                             /*thin*/ true,
                                             /*noreturn*/ false);

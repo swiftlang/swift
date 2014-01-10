@@ -1774,7 +1774,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();
   SILDeclRef superclassDtor(superclassDtorDecl, 
-                            SILDeclRef::Kind::Destroyer,
+                            SILDeclRef::Kind::Deallocator,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             /*isForeign=*/true);
   auto superclassDtorType = SGM.getConstantType(superclassDtor);
