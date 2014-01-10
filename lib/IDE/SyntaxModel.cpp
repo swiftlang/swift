@@ -59,7 +59,7 @@ SyntaxModelContext::SyntaxModelContext(SourceManager &SM, unsigned BufferID,
         // It's a known attribute, so treat it as a keyword for syntax coloring.
         Loc = AttrLoc;
         Length = SM.getByteDistance(Loc, Tok.getLoc()) + Tok.getLength();
-        Kind = SyntaxNodeKind::Keyword;
+        Kind = SyntaxNodeKind::Attribute;
       }
       AttrLoc = SourceLoc();
     }

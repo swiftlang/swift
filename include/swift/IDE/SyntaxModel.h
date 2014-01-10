@@ -34,7 +34,8 @@ enum class SyntaxNodeKind : uint8_t {
   Character,
   CommentLine,
   CommentBlock,
-  TypeId
+  TypeId,
+  Attribute
 };
 
 struct SyntaxNode {
