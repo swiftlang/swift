@@ -1772,12 +1772,8 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   Type superclassTy = cd->getSuperclass();
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
-  // FIXME: Lame "destructor"
-  auto dtorName = getASTContext().getIdentifier("destructor");
-  auto superclassDtorArray = superclass->lookupDirect(dtorName);
-  assert(!superclassDtorArray.empty() && "Class without destructor?");
-  assert(superclassDtorArray.size() == 1 && "More than one destructor?");
-  SILDeclRef superclassDtor(superclassDtorArray.front(), 
+  auto superclassDtorDecl = superclass->getDestructor();
+  SILDeclRef superclassDtor(superclassDtorDecl, 
                             SILDeclRef::Kind::Destroyer,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             /*isForeign=*/true);

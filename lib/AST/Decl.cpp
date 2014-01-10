@@ -916,6 +916,14 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
 }
 
+DestructorDecl *ClassDecl::getDestructor() {
+  auto name = getASTContext().getIdentifier("destructor");
+  auto results = lookupDirect(name);
+  assert(!results.empty() && "Class without destructor?");
+  assert(results.size() == 1 && "More than one destructor?");
+  return cast<DestructorDecl>(results.front());
+}
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {

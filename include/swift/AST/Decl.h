@@ -46,6 +46,7 @@ namespace swift {
   class ASTContext;
   class ASTPrinter;
   class ASTWalker;
+  class DestructorDecl;
   class DiagnosticEngine;
   class Type;
   class Expr;
@@ -2154,6 +2155,9 @@ public:
   void setCircularityCheck(CircularityCheck circularity) {
     ClassDeclBits.Circularity = static_cast<unsigned>(circularity);
   }
+
+  /// Retrieve the destructor for this class.
+  DestructorDecl *getDestructor();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
