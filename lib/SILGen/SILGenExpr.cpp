@@ -1998,8 +1998,13 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     if (superclass->hasClangNode() && superclass->isObjC()) {
       computeSimpleResultSelfValue = true;
     } else {
+      // FIXME: Lame "destructor"
+      auto dtorName = getASTContext().getIdentifier("destructor");
+      auto superclassDtorArray = superclass->lookupDirect(dtorName);
+      assert(!superclassDtorArray.empty() && "Class without destructor?");
+      assert(superclassDtorArray.size() == 1 && "More than one destructor?");
       SILDeclRef dtorConstant =
-        SILDeclRef(superclass, SILDeclRef::Kind::Destroyer);
+        SILDeclRef(superclassDtorArray.front(), SILDeclRef::Kind::Destroyer);
       SILType baseSILTy = getLoweredLoadableType(superclassTy);
       SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
       ManagedValue dtorValue;

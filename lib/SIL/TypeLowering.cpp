@@ -1320,10 +1320,11 @@ static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
 ///
 /// The type is This -> BuiltinObjectPointer for native entry points
 /// and This -> () for Objective-C's -dealloc.
-static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
+static CanAnyFunctionType getDestroyingDestructorType(DestructorDecl *dd,
                                                       ASTContext &C,
                                                       bool isForeign) {
-  auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
+  auto classType = dd->getDeclContext()->getDeclaredTypeInContext()
+                     ->getCanonicalType();
 
   if (isForeign) {
     auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
@@ -1338,10 +1339,10 @@ static CanAnyFunctionType getDestroyingDestructorType(ClassDecl *cd,
                                           /*thin*/ true,
                                           /*noreturn*/ false);
 
-  if (cd->getGenericParams())
+  if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
     return CanPolymorphicFunctionType::get(classType,
                                            CanType(C.TheObjectPointerType),
-                                           cd->getGenericParams(),
+                                           params,
                                            extInfo);
 
   return CanFunctionType::get(classType, CanType(C.TheObjectPointerType),
@@ -1521,7 +1522,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
                                    ->getInitializerType()->getCanonicalType());
   
   case SILDeclRef::Kind::Destroyer:
-    return getDestroyingDestructorType(cast<ClassDecl>(vd), Context,
+    return getDestroyingDestructorType(cast<DestructorDecl>(vd), Context,
                                        c.isForeign);
   
   case SILDeclRef::Kind::GlobalAccessor: {

@@ -907,7 +907,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
     = IGM.getAddrOfDestructor(classDecl, DestructorKind::Destroying,
                               NotForDefinition);
 
-  SILDeclRef declRef = SILDeclRef(classDecl, SILDeclRef::Kind::Destroyer,
+  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Destroyer,
                                   uncurryLevel, /*foreign*/ true);
 
   return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,

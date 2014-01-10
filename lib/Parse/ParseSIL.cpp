@@ -205,6 +205,9 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::identifier:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
+  case tok::kw_destructor:
+    Result = P.Context.getIdentifier("destructor");
+    break;
   case tok::kw_init:
     Result = P.Context.getIdentifier("init");
     break;
@@ -641,7 +644,11 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 /// Find the ValueDecl given a type and a member name.
 static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
-  P.SF.lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
+  unsigned options = NL_QualifiedDefault;
+  // FIXME: a bit of a hack.
+  if (Name.str().equals("destructor") || Name.str().equals("init"))
+    options = options & ~NL_VisitSupertypes;
+  P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
   assert(Lookup.size() == 1);
   return Lookup[0];
 }

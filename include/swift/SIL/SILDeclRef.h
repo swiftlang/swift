@@ -77,7 +77,7 @@ struct SILDeclRef {
     EnumElement,
     
     /// Destroyer - this constant references the destroying destructor for the
-    /// ClassDecl in loc.
+    /// DestructorDecl in loc.
     Destroyer,
     
     /// GlobalAccessor - this constant references the lazy-initializing
