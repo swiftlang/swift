@@ -176,13 +176,14 @@ public:
     return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
   }
 
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src)
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       CanType T)
   const override {
     return getHeapObjectExtraInhabitantIndex(IGF, src);
   }
 
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                            Address dest) const override {
+                            Address dest, CanType T) const override {
     return storeHeapObjectExtraInhabitant(IGF, index, dest);
   }
 };

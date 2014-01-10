@@ -32,10 +32,6 @@ namespace irgen {
 /// An abstract CRTP class designed for types whose storage size,
 /// alignment, and stride need to be fetched from the value witness
 /// table for the type.
-///
-/// The implementation class should implement:
-///   llvm::Value *getMetadataRef(IRGenFunction &IGF) const;
-///   llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const;
 template <class Impl>
 class WitnessSizedTypeInfo : public IndirectTypeInfo<Impl, TypeInfo> {
 private:
@@ -61,15 +57,17 @@ public:
   static bool isFixed() { return false; }
 
   OwnedAddress allocateBox(IRGenFunction &IGF,
+                           CanType T,
                            const llvm::Twine &name) const override {
     // Allocate a new object using the allocBox runtime call.
-    llvm::Value *metadata = asImpl().getMetadataRef(IGF);
+    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
     llvm::Value *box, *address;
     IGF.emitAllocBoxCall(metadata, box, address);
     return OwnedAddress(getAsBitCastAddress(IGF, address), box);
   }
 
   ContainedAddress allocateStack(IRGenFunction &IGF,
+                                 CanType T,
                                  const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
     Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
@@ -77,14 +75,15 @@ public:
                                       name);
 
     // Allocate an object of the appropriate type within it.
-    llvm::Value *metadata = asImpl().getMetadataRef(IGF);
+    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
     llvm::Value *address =
       emitAllocateBufferCall(IGF, metadata, buffer);
     return { buffer, getAsBitCastAddress(IGF, address) };
   }
 
-  void deallocateStack(IRGenFunction &IGF, Address buffer) const override {
-    llvm::Value *metadata = asImpl().getMetadataRef(IGF);
+  void deallocateStack(IRGenFunction &IGF, Address buffer,
+                       CanType T) const override {
+    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
     emitDeallocateBufferCall(IGF, metadata, buffer);
   }
 
@@ -92,51 +91,56 @@ public:
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const override {
-    return IGF.emitMemCpy(destAddr, srcAddr, asImpl().Impl::getSize(IGF));
+                          Address srcAddr, CanType T) const override {
+    return IGF.emitMemCpy(destAddr, srcAddr, asImpl().Impl::getSize(IGF, T));
+  }
+
+  llvm::Value *getValueWitnessTable(IRGenFunction &IGF, CanType T) const {
+    auto metadata = IGF.emitTypeMetadataRef(T);
+    return IGF.emitValueWitnessTableRefForMetadata(metadata);
   }
 
   std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF) const override {
-    auto wtable = asImpl().getValueWitnessTable(IGF);
+  getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
     auto size = emitLoadOfSize(IGF, wtable);
     auto align = emitLoadOfAlignmentMask(IGF, wtable);
     return { size, align };
   }
 
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const override {
-    auto wtable = asImpl().getValueWitnessTable(IGF);
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
     auto size = emitLoadOfSize(IGF, wtable);
     auto align = emitLoadOfAlignmentMask(IGF, wtable);
     auto stride = emitLoadOfStride(IGF, wtable);
     return std::make_tuple(size, align, stride);
   }
 
-  llvm::Value *getSize(IRGenFunction &IGF) const override {
-    auto wtable = asImpl().getValueWitnessTable(IGF);
+  llvm::Value *getSize(IRGenFunction &IGF, CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfSize(IGF, wtable);
   }
 
-  llvm::Value *getAlignmentMask(IRGenFunction &IGF) const override {
-    auto wtable = asImpl().getValueWitnessTable(IGF);
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfAlignmentMask(IGF, wtable);
   }
 
-  llvm::Value *getStride(IRGenFunction &IGF) const override {
-    auto wtable = asImpl().getValueWitnessTable(IGF);
+  llvm::Value *getStride(IRGenFunction &IGF, CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfStride(IGF, wtable);
   }
 
   /// FIXME: Dynamic extra inhabitant lookup.
   bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src) const override {
+                                       Address src, CanType T) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest) const override {
+                            Address dest, CanType T) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
 

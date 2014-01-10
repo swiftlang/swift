@@ -449,7 +449,8 @@ namespace {
       // Otherwise, we need to make a temporary.
       // FIXME: this temporary has to get cleaned up!
       auto &substTI = IGF.getTypeInfo(loweredTy);
-      auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
+      auto addr = substTI.allocateStack(IGF, substTy,
+                                        "substitution.temp").getAddress();
 
       // Initialize into it.
       initIntoTemporary(substTy, substTI, addr);
@@ -484,7 +485,7 @@ namespace {
       // Otherwise, just copy over.
       } else {
         Address src = substTI.getAddressForPointer(In.claimNext());
-        substTI.initializeWithTake(IGF, dest, src);
+        substTI.initializeWithTake(IGF, dest, src, substTy);
       }
     }
 
@@ -522,7 +523,8 @@ namespace {
       // to a temporary.
       if (origIndirect && !substIndirect) {
         auto &substTI = IGF.getTypeInfo(substSILTy);
-        auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
+        auto addr = substTI.allocateStack(IGF, substTy,
+                                          "substitution.temp").getAddress();
         initIntoTemporary(substTy, substTI, addr);
         addr = IGF.Builder.CreateBitCast(addr, origIndirect);
         Out.add(addr.getAddress());

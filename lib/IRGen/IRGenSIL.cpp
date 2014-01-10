@@ -2225,7 +2225,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 # endif
     "";
 
-  auto addr = type.allocateStack(*this, dbgname);
+  auto addr = type.allocateStack(*this,
+                                 i->getElementType().getSwiftRValueType(),
+                                 dbgname);
   if (IGM.DebugInfo && Decl) {
     auto AddrIR = addr.getAddressPointer();
     auto DTI = DebugTypeInfo(Decl, type, i->getDebugScope());
@@ -2253,7 +2255,8 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   const TypeInfo &type = getTypeInfo(i->getOperand().getType());
   Address addr = getLoweredAddress(i->getOperand());
-  type.deallocateStack(*this, addr);
+  type.deallocateStack(*this, addr,
+                       i->getOperand().getType().getSwiftRValueType());
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -2277,7 +2280,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # else
     "";
 # endif
-  OwnedAddress addr = type.allocateBox(*this, DbgName);
+  OwnedAddress addr = type.allocateBox(*this,
+                                       i->getElementType().getSwiftRValueType(),
+                                       DbgName);
   
   Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());
@@ -2594,14 +2599,15 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   // The stride of a Swift type may not match its LLVM size. If we know we have
   // a fixed stride different from our size, or we have a dynamic size,
   // do a byte-level GEP with the proper stride.
-  auto &ti = getTypeInfo(i->getBase().getType());
+  auto baseTy = i->getBase().getType();
+  auto &ti = getTypeInfo(baseTy);
   const FixedTypeInfo *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   
   Address dest;
   if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
     llvm::Value *byteAddr = Builder.CreateBitCast(base.getAddress(),
                                                   IGM.Int8PtrTy);
-    llvm::Value *size = ti.getStride(*this);
+    llvm::Value *size = ti.getStride(*this, baseTy.getSwiftRValueType());
     if (size->getType() != index->getType())
       size = Builder.CreateZExtOrTrunc(size, index->getType());
     llvm::Value *distance = Builder.CreateMul(index, size, "",
@@ -2756,6 +2762,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc().getType();
+  CanType valTy = addrTy.getSwiftRValueType();
   Address src = getLoweredAddress(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
   const TypeInfo &addrTI = getTypeInfo(addrTy);
@@ -2766,16 +2773,16 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   
   switch (takeAndOrInitialize) {
   case ASSIGN | COPY:
-    addrTI.assignWithCopy(*this, dest, src);
+    addrTI.assignWithCopy(*this, dest, src, valTy);
     break;
   case INITIALIZE | COPY:
-    addrTI.initializeWithCopy(*this, dest, src);
+    addrTI.initializeWithCopy(*this, dest, src, valTy);
     break;
   case ASSIGN | TAKE:
-    addrTI.assignWithTake(*this, dest, src);
+    addrTI.assignWithTake(*this, dest, src, valTy);
     break;
   case INITIALIZE | TAKE:
-    addrTI.initializeWithTake(*this, dest, src);
+    addrTI.initializeWithTake(*this, dest, src, valTy);
     break;
   default:
     llvm_unreachable("unexpected take/initialize attribute combination?!");
@@ -2784,9 +2791,10 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand().getType();
+  CanType valTy = addrTy.getSwiftRValueType();
   Address base = getLoweredAddress(i->getOperand());
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  addrTI.destroy(*this, base);
+  addrTI.destroy(*this, base, valTy);
 }
 
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {

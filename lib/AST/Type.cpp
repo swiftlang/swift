@@ -546,7 +546,8 @@ void ProtocolType::canonicalizeProtocols(
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
   assert(this != 0 &&
-         "Cannot call getCanonicalType before name binding is complete");
+         "Cannot call getCanonicalType before name binding is complete "
+         "or on a null pointer");
 
   // If the type is itself canonical, return it.
   if (isCanonical())

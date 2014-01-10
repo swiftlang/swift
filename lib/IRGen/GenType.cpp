@@ -46,11 +46,6 @@ TypeConverter::Types_t::getCacheFor(TypeBase *t) {
   return t->isDependentType() ? DependentCache : IndependentCache;
 }
 
-const TypeInfo *&
-TypeConverter::getFirstTypeFor(TypeBase *t) {
-  return t->isDependentType() ? FirstDependentType : FirstIndependentType;
-}
-
 bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
 }
@@ -116,7 +111,8 @@ bool TypeInfo::isKnownEmpty() const {
 /// move-initialization, except the old object will not be destroyed.
 void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        Address destAddr,
-                                       Address srcAddr) const {
+                                       Address srcAddr,
+                                       CanType T) const {
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
   ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
@@ -136,10 +132,11 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
 /// default implementation.
 void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
                                           Address destAddr,
-                                          Address srcAddr) const {
+                                          Address srcAddr,
+                                          CanType T) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceScope::Local)) {
-    return initializeWithTake(IGF, destAddr, srcAddr);
+    return initializeWithTake(IGF, destAddr, srcAddr, T);
   }
 
   // Otherwise explode and re-implode.
@@ -154,31 +151,35 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
 
 /// Return the size and alignment of this type.
 std::pair<llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF) const {
-  return {FixedTypeInfo::getSize(IGF), FixedTypeInfo::getAlignmentMask(IGF)};
+FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF,
+                                       CanType T) const {
+  return {FixedTypeInfo::getSize(IGF, T),
+          FixedTypeInfo::getAlignmentMask(IGF, T)};
 }
 std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const {
-  return std::make_tuple(FixedTypeInfo::getSize(IGF),
-                         FixedTypeInfo::getAlignmentMask(IGF),
-                         FixedTypeInfo::getStride(IGF));
+FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
+                                                CanType T) const {
+  return std::make_tuple(FixedTypeInfo::getSize(IGF, T),
+                         FixedTypeInfo::getAlignmentMask(IGF, T),
+                         FixedTypeInfo::getStride(IGF, T));
 }
 
-llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {
+llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, CanType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedSize());
 }
 
-llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF) const {
+llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
+                                             CanType T) const {
   return FixedTypeInfo::getStaticAlignmentMask(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
   return asSizeConstant(IGM, Size(getFixedAlignment().getValue() - 1));
 }
 
-llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF) const {
+llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, CanType T) const {
   return FixedTypeInfo::getStaticStride(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
@@ -481,7 +482,7 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void consume(IRGenFunction &IGF, Explosion &src) const {}
-    void destroy(IRGenFunction &IGF, Address addr) const {}
+    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {}
     llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
@@ -516,21 +517,17 @@ static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
-    FirstIndependentType(invalidTypeInfo()),
-    FirstDependentType(invalidTypeInfo()),
+    FirstType(invalidTypeInfo()),
     FirstProtocol(invalidProtocolInfo()) {}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
-  for (const TypeInfo *I = FirstIndependentType; I != invalidTypeInfo(); ) {
+  for (const TypeInfo *I = FirstType; I != invalidTypeInfo(); ) {
     const TypeInfo *Cur = I;
     I = Cur->NextConverted;
     delete Cur;
   }
   
-  assert(FirstDependentType == invalidTypeInfo()
-         && "generic context not popped?!");
-
   for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
     const ProtocolInfo *Cur = I;
     I = Cur->NextConverted;
@@ -555,13 +552,6 @@ void TypeConverter::popGenericContext() {
   if (!Archetypes.hasValue())
     return;
   
-  // Delete converted TypeInfos for dependent types.
-  for (const TypeInfo *I = FirstDependentType; I != invalidTypeInfo(); ) {
-    const TypeInfo *Cur = I;
-    I = Cur->NextConverted;
-    delete Cur;
-  }
-  FirstDependentType = invalidTypeInfo();
   Types.DependentCache.clear();
   Archetypes.reset();
 }
@@ -583,8 +573,8 @@ const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   WitnessTablePtrTI = createPrimitive(IGM.WitnessTablePtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getPointerAlignment());
-  WitnessTablePtrTI->NextConverted = FirstIndependentType;
-  FirstIndependentType = WitnessTablePtrTI;
+  WitnessTablePtrTI->NextConverted = FirstType;
+  FirstType = WitnessTablePtrTI;
   return *WitnessTablePtrTI;
 }
 
@@ -597,8 +587,8 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   TypeMetadataPtrTI = createPrimitive(IGM.TypeMetadataPtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getPointerAlignment());
-  TypeMetadataPtrTI->NextConverted = FirstIndependentType;
-  FirstIndependentType = TypeMetadataPtrTI;
+  TypeMetadataPtrTI->NextConverted = FirstType;
+  FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
 }
 
@@ -724,29 +714,109 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
   return &ti;
 }
 
+/// Profile the archetype constraints that may affect type layout into a
+/// folding set node ID.
+static void profileArchetypeConstraints(ArchetypeType *arch,
+                                        llvm::FoldingSetNodeID &ID) {
+  // Is the archetype class-constrained?
+  ID.AddBoolean(arch->requiresClass());
+  // The archetype's superclass constraint.
+  auto superclass = arch->getSuperclass();
+  ID.AddPointer(superclass ? superclass->getCanonicalType().getPointer()
+                           : nullptr);
+  // The archetype's protocol constraints.
+  for (auto proto : arch->getConformsTo())
+    ID.AddPointer(proto);
+}
+
+void ExemplarArchetype::Profile(llvm::FoldingSetNodeID &ID) const {
+  profileArchetypeConstraints(Archetype, ID);
+}
+
+ArchetypeType *TypeConverter::Types_t::getExemplarArchetype(ArchetypeType *t) {
+  // Check the folding set to see whether we already have an exemplar matching
+  // this archetype.
+  llvm::FoldingSetNodeID ID;
+  profileArchetypeConstraints(t, ID);
+  void *insertPos;
+  ExemplarArchetype *existing
+    = ExemplarArchetypes.FindNodeOrInsertPos(ID, insertPos);
+  if (existing)
+    return existing->Archetype;
+  
+  // Otherwise, use this archetype as the exemplar for future similar
+  // archetypes.
+  ExemplarArchetypeStorage.push_back({t});
+  ExemplarArchetypes.InsertNode(&ExemplarArchetypeStorage.back(), insertPos);
+  return t;
+}
+
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
+  // Cache this entry in the dependent or independent cache appropriate to it.
   auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
+
   auto it = Cache.find(canonicalTy.getPointer());
-  if (it != Cache.end())
+  if (it != Cache.end()) {
     return it->second;
+  }
+  
+  // If the type is dependent, substitute it into our current context.
+  auto contextTy = canonicalTy;
+  if (contextTy->isDependentType())
+    contextTy = Archetypes->substDependentType(contextTy)
+                            ->getCanonicalType();
+  
+  // Fold archetypes to unique exemplars. Any archetype with the same
+  // constraints is equivalent for type lowering purposes.
+  CanType exemplarTy;
+  // FIXME: A generic SILFunctionType should not contain any nondependent
+  // archetypes.
+  if (isa<SILFunctionType>(contextTy)
+      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+    exemplarTy = contextTy;
+  else
+    exemplarTy = CanType(contextTy.transform([&](Type t) -> Type {
+      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
+        return Types.getExemplarArchetype(arch);
+      return t;
+    }));
+  
+  // See whether we lowered a type equivalent to this one.
+  if (exemplarTy != contextTy) {
+    auto it = Cache.find(exemplarTy.getPointer());
+    if (it != Cache.end()) {
+      // Record the object under the original type.
+      auto result = it->second;
+      Cache[canonicalTy.getPointer()] = result;
+      return result;
+    }
+  }
 
   // Convert the type.
-  TypeCacheEntry convertedEntry = convertType(canonicalTy);
+  TypeCacheEntry convertedEntry = convertType(exemplarTy);
   auto convertedTI = convertedEntry.dyn_cast<const TypeInfo*>();
 
   // If that gives us a forward declaration (which can happen with
   // bound generic types), don't propagate that into the cache here,
   // because we won't know how to clear it later.
-  if (!convertedTI) return convertedEntry;
+  if (!convertedTI) {
+    return convertedEntry;
+  }
 
-  auto &entry = Cache[canonicalTy.getPointer()];
-  assert(entry == TypeCacheEntry() ||
-         (entry.is<llvm::Type*>() &&
-          entry.get<llvm::Type*>() == convertedTI->getStorageType()));
-  entry = convertedTI;
-
+  // Cache the entry under the original type and the exemplar type, so that
+  // we can avoid relowering equivalent types.
+  auto insertEntry = [&](CanType ty) {
+    auto &entry = Cache[ty.getPointer()];
+    assert(entry == TypeCacheEntry() ||
+           (entry.is<llvm::Type*>() &&
+            entry.get<llvm::Type*>() == convertedTI->getStorageType()));
+    entry = convertedTI;
+  };
+  insertEntry(canonicalTy);
+  if (exemplarTy != canonicalTy)
+    insertEntry(exemplarTy);
+  
   // If the type info hasn't been added to the list of types, do so.
-  auto &FirstType = getFirstTypeFor(canonicalTy.getPointer());
   if (!convertedTI->NextConverted) {
     convertedTI->NextConverted = FirstType;
     FirstType = convertedTI;
