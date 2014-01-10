@@ -332,6 +332,7 @@ namespace {
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
+      case SILDeclRef::Kind::Deallocator:
         Text = "dealloc";
         break;
           
@@ -460,8 +461,9 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Func
           || method.kind == SILDeclRef::Kind::Getter
           || method.kind == SILDeclRef::Kind::Setter
-          || method.kind == SILDeclRef::Kind::Destroyer)
-         && "objc method call must be to a func/initializer/getter/setter");
+          || method.kind == SILDeclRef::Kind::Destroyer
+          || method.kind == SILDeclRef::Kind::Deallocator)
+         && "objc method call must be to a func/initializer/getter/setter/dtor");
 
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
@@ -535,6 +537,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   bool isInstanceMethod
     = method.kind == SILDeclRef::Kind::Initializer
       || method.kind == SILDeclRef::Kind::Destroyer
+      || method.kind == SILDeclRef::Kind::Deallocator
       || method.getDecl()->isInstanceMember();
 
   if (searchType) {

@@ -79,6 +79,10 @@ struct SILDeclRef {
     /// Destroyer - this constant references the destroying destructor for the
     /// DestructorDecl in loc.
     Destroyer,
+
+    /// Deallocator - this constant references the deallocating
+    /// destructor for the DestructorDecl in loc.
+    Deallocator,
     
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.

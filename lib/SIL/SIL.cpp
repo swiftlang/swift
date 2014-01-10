@@ -92,8 +92,8 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            && "can only create EnumElement SILDeclRef for enum element");
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
-    assert(kind == Kind::Destroyer
-           && "can only create Destructor SILDeclRef for destructor");
+    assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
+           && "can only create destroyer/deallocator SILDeclRef for destructor");
     naturalUncurryLevel = 0;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
@@ -175,12 +175,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
       }
       naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
     }
-    // Map DestructorDecls to Destroyer SILDeclRefs of the constructor.
-    else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
-      loc = dd;
-      kind = Kind::Destroyer;
-      naturalUncurryLevel = 0;
-    }
     // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
     else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
       loc = cd;
@@ -199,6 +193,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
     // VarDecl constants require an explicit kind.
     else if (isa<VarDecl>(vd)) {
       llvm_unreachable("must create SILDeclRef for VarDecl with explicit kind");
+    }
+    // DestructorDecl constants require an explicit kind.
+    else if (isa<DestructorDecl>(vd)) {
+      llvm_unreachable("must create SILDeclRef for DestructorDecl with kind");
     }
     else {
       llvm_unreachable("invalid loc decl for SILDeclRef!");
@@ -330,8 +328,14 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
+  case SILDeclRef::Kind::Deallocator:
+    buffer << introducer;
+    mangler.mangleDestructorEntity(cast<ClassDecl>(
+                                     c.getDecl()->getDeclContext()),
+                                   /*isDeallocating*/ true);
+    return;
+
   //   entity ::= context 'd'                     // destroying destructor
-  // FIXME: Only the destroying destructor is currently emitted in SIL.
   case SILDeclRef::Kind::Destroyer:
     buffer << introducer;
     mangler.mangleDestructorEntity(cast<ClassDecl>(

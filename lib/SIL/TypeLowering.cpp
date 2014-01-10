@@ -1522,6 +1522,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
                                    ->getInitializerType()->getCanonicalType());
   
   case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
     return getDestroyingDestructorType(cast<DestructorDecl>(vd), Context,
                                        c.isForeign);
   

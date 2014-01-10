@@ -630,6 +630,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   /// These constants don't correspond to method families we care about yet.
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
