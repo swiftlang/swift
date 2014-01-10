@@ -2978,27 +2978,14 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   if (fromType->isEqual(toType))
     return expr;
 
-  auto &ctx = cs.getTypeChecker().Context;
-
   // If we're coercing to an rvalue type, just do it.
-  if (!toType->is<InOutType>() && !toType->is<LValueType>())
+  if (!toType->is<InOutType>())
     return coerceToType(expr, toType, locator);
 
-  // If we have an rvalue that we are coercing, wrap it up in a materialize
-  // first.
-  if (!fromType->is<LValueType>()) {
-    // If the object types are different, coerce to the container type.
-    expr = coerceToType(expr, toType->getLValueOrInOutObjectType(), locator);
+  assert(fromType->is<LValueType>() && "Can only convert lvalues to @inout");
 
-    // If the source is not an lvalue, materialize it.
-    expr = new (ctx) MaterializeExpr(expr, LValueType::get(expr->getType()));
-  }
-  
-  // Member data accesses can be performed with lvalues, they don't require
-  // or want an @inout type.
-  if (expr->getType()->isEqual(toType))
-    return expr;
-  
+  auto &ctx = cs.getTypeChecker().Context;
+
   // Use AddressOfExpr to convert it to an explicit @inout argument for the
   // receiver.
   return new (ctx) AddressOfExpr(expr->getStartLoc(), expr,
