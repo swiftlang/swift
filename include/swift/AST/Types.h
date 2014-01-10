@@ -355,6 +355,14 @@ public:
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
+  /// Gather all of the substitutions used to produce the given specialized type
+  /// from its unspecialized type.
+  ///
+  /// Note that the resulting array may be ASTContext-allocted by this
+  /// routine.
+  ArrayRef<Substitution> gatherAllSubstitutions(Module *module,
+                                                LazyResolver *resolver);
+
   /// \brief Determine whether the given type is "generic", meaning that
   /// it involves generic types for which generic arguments have not been
   /// provided.

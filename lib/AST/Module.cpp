@@ -456,44 +456,6 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   return permanentSubs;
 }
 
-/// Gather the set of substitutions required to map from the generic form of
-/// the given type to the specialized form.
-static ArrayRef<Substitution> gatherSubstitutions(Module *module, Type type,
-                                                  LazyResolver *resolver) {
-  assert(type->isSpecialized() && "Type is not specialized");
-  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
-
-  while (type) {
-    // Record the substitutions in a bound generic type.
-    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
-                                                                resolver));
-      type = boundGeneric->getParent();
-      continue;
-    }
-
-    // Skip to the parent of a nominal type.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      continue;
-    }
-
-    llvm_unreachable("Not a nominal or bound generic type");
-  }
-  assert(!allSubstitutions.empty() && "No substitutions?");
-
-  // If there is only one list of substitutions, return it. There's no
-  // need to copy it.
-  if (allSubstitutions.size() == 1)
-    return allSubstitutions.front();
-
-  SmallVector<Substitution, 4> flatSubstitutions;
-  for (auto substitutions : allSubstitutions)
-    flatSubstitutions.append(substitutions.begin(), substitutions.end());
-  auto &ctx = module->getASTContext();
-  return ctx.AllocateCopy(flatSubstitutions);
-}
-
 /// Retrieve the explicit conformance of the given nominal type declaration
 /// to the given protocol.
 static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
@@ -755,7 +717,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto substitutions = gatherSubstitutions(this, type, resolver);
+      auto substitutions = type->gatherAllSubstitutions(this, resolver);
 
       // Create the specialized conformance entry.
       ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);

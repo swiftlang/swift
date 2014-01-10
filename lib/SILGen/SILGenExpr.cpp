@@ -2002,9 +2002,8 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
       ManagedValue dtorValue;
       SILType dtorTy;
-      ArrayRef<Substitution> subs;
-      if (auto bgt = superclassTy->getAs<BoundGenericType>())
-        subs = bgt->getSubstitutions(SGM.M.getSwiftModule(), nullptr);
+      ArrayRef<Substitution> subs
+        = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
       std::tie(dtorValue, dtorTy, subs)
         = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
       resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), 

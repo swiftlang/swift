@@ -172,6 +172,46 @@ bool TypeBase::isSpecialized() {
   });
 }
 
+ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
+                                                        LazyResolver *resolver) {
+  Type type(this);
+  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
+
+  while (type) {
+    // Record the substitutions in a bound generic type.
+    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+      allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
+                                                                resolver));
+      type = boundGeneric->getParent();
+      continue;
+    }
+
+    // Skip to the parent of a nominal type.
+    if (auto nominal = type->getAs<NominalType>()) {
+      type = nominal->getParent();
+      continue;
+    }
+
+    llvm_unreachable("Not a nominal or bound generic type");
+  }
+
+  // If there are no substitutions, return an empty array.
+  if (allSubstitutions.empty())
+    return { };
+
+  // If there is only one list of substitutions, return it. There's no
+  // need to copy it.
+  if (allSubstitutions.size() == 1)
+    return allSubstitutions.front();
+
+  SmallVector<Substitution, 4> flatSubstitutions;
+  for (auto substitutions : allSubstitutions)
+    flatSubstitutions.append(substitutions.begin(), substitutions.end());
+  auto &ctx = module->getASTContext();
+  return ctx.AllocateCopy(flatSubstitutions);
+}
+
+
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
   if (CT.getPointer() != this)
