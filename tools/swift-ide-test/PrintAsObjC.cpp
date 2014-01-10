@@ -66,30 +66,26 @@ private:
 
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
-  /// By default, this method filters out non-ObjC protocols, along with the
-  /// special DynamicLookup protocol. Passing \p printAll will skip this check.
-  void printProtocols(ArrayRef<ProtocolDecl *> protos, bool printAll = false) {
+  /// This method filters out non-ObjC protocols, along with the special
+  /// DynamicLookup protocol.
+  void printProtocols(ArrayRef<ProtocolDecl *> protos) {
     SmallVector<ProtocolDecl *, 4> protosToPrint;
+    std::copy_if(protos.begin(), protos.end(),
+                 std::back_inserter(protosToPrint),
+                 [](const ProtocolDecl *PD) -> bool {
+      if (!PD->isObjC())
+        return false;
+      auto knownProtocol = PD->getKnownProtocolKind();
+      if (!knownProtocol)
+        return true;
+      return *knownProtocol != KnownProtocolKind::DynamicLookup;
+    });
 
-    if (!printAll) {
-      std::copy_if(protos.begin(), protos.end(),
-                   std::back_inserter(protosToPrint),
-                   [](const ProtocolDecl *PD) -> bool {
-        if (!PD->isObjC())
-          return false;
-        auto knownProtocol = PD->getKnownProtocolKind();
-        if (!knownProtocol)
-          return true;
-        return *knownProtocol != KnownProtocolKind::DynamicLookup;
-      });
-      protos = protosToPrint;
-    }
-
-    if (protos.empty())
+    if (protosToPrint.empty())
       return;
 
     os << " <";
-    interleave(protos,
+    interleave(protosToPrint,
                [this](const ProtocolDecl *PD) { os << PD->getName(); },
                [this] { os << ", "; });
     os << ">";
@@ -126,7 +122,7 @@ private:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     os << "@protocol " << PD->getName();
-    printProtocols(PD->getProtocols(), /*printAll=*/true);
+    printProtocols(PD->getProtocols());
     os << "\n";
     printMembers(PD->getMembers());
     os << "@end\n";
@@ -275,6 +271,45 @@ private:
   void visitClassType(ClassType *CT) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
     os << CD->getName() << " *";
+  }
+
+  void visitProtocolType(ProtocolType *PT, bool isMetatype = false) {
+    os << (isMetatype ? "Class" : "id");
+
+    auto proto = PT->getDecl();
+    if (auto knownKind = proto->getKnownProtocolKind())
+      if (*knownKind == KnownProtocolKind::DynamicLookup)
+        return;
+
+    printProtocols(proto);
+  }
+
+  void visitProtocolCompositionType(ProtocolCompositionType *PCT,
+                                    bool isMetatype = false) {
+    CanType canonicalComposition = PCT->getCanonicalType();
+    if (auto singleProto = dyn_cast<ProtocolType>(canonicalComposition))
+      return visitProtocolType(singleProto, isMetatype);
+    PCT = cast<ProtocolCompositionType>(canonicalComposition);
+
+    os << (isMetatype ? "Class" : "id");
+
+    SmallVector<ProtocolDecl *, 4> protos;
+    std::transform(PCT->getProtocols().begin(), PCT->getProtocols().end(),
+                   std::back_inserter(protos),
+                   [] (Type ty) -> ProtocolDecl * {
+      return ty->castTo<ProtocolType>()->getDecl();
+    });
+    printProtocols(protos);
+  }
+
+  void visitMetatypeType(MetatypeType *MT) {
+    Type instanceTy = MT->getInstanceType();
+    if (auto protoTy = instanceTy->getAs<ProtocolType>())
+      visitProtocolType(protoTy, /*isMetatype=*/true);
+    else if (auto compositionTy = instanceTy->getAs<ProtocolCompositionType>())
+      visitProtocolCompositionType(compositionTy);
+    else
+      llvm_unreachable("Arbitrary metatypes are not ObjC-compatible");
   }
 
   void visitTupleType(TupleType *TT) {
