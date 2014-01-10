@@ -683,6 +683,7 @@ entity discriminators:
 - ``initializer``: a ``class``\ 's *initializing constructor*
 - ``enumelt``: a member of a ``enum`` type.
 - ``destroyer``: a class's destroying destructor
+- ``deallocator``: a class's deallocating destructor
 - ``globalaccessor``: the addressor function for a global variable
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
