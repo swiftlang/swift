@@ -23,7 +23,9 @@ using namespace swift;
 using namespace swift::sys;
 
 // Include the correct TaskQueue implementation.
-#if LLVM_ON_UNIX
+// TODO: re-enable Unix implementation once output buffering works correctly
+// (<rdar://problem/15795234>).
+#if 0 && LLVM_ON_UNIX
 #include "Unix/TaskQueue.inc"
 #else
 #include "Default/TaskQueue.inc"
