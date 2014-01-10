@@ -59,25 +59,25 @@ public:
   /// Whether this type is known to be empty.
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF,
+  ContainedAddress allocateStack(IRGenFunction &IGF, CanType T,
                                  const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, Address addr) const override;
+  void deallocateStack(IRGenFunction &IGF, Address addr, CanType T) const override;
 
-  OwnedAddress allocateBox(IRGenFunction &IGF,
+  OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
                            const llvm::Twine &name) const override;
 
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const override;
+                          Address srcAddr, CanType T) const override;
 
   std::pair<llvm::Value*, llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF) const override;
+  getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T) const override;
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const override;
-  llvm::Value *getSize(IRGenFunction &IGF) const override;
-  llvm::Value *getAlignmentMask(IRGenFunction &IGF) const override;
-  llvm::Value *getStride(IRGenFunction &IGF) const override;
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, CanType T) const override;
+  llvm::Value *getSize(IRGenFunction &IGF, CanType T) const override;
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const override;
+  llvm::Value *getStride(IRGenFunction &IGF, CanType T) const override;
 
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
   llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;
@@ -141,7 +141,7 @@ public:
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src) const override {
+                                       Address src, CanType T) const override {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
   
@@ -154,7 +154,7 @@ public:
   /// to memory.
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest) const override {
+                            Address dest, CanType T) const override {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
   
@@ -191,8 +191,9 @@ public:
   
   /// Fixed-size types never need dynamic value witness table instantiation.
   void initializeMetadata(IRGenFunction &IGF,
-                                   llvm::Value *metadata,
-                                   llvm::Value *vwtable) const override {}
+                          llvm::Value *metadata,
+                          llvm::Value *vwtable,
+                          CanType T) const override {}
   
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }

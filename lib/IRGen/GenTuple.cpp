@@ -45,16 +45,27 @@ using namespace irgen;
 namespace {
   class TupleFieldInfo : public SequentialField<TupleFieldInfo> {
   public:
-    TupleFieldInfo(const TupleTypeElt &field, const TypeInfo &type)
-      : SequentialField(type), Field(field) {}
+    TupleFieldInfo(unsigned index, StringRef name, const TypeInfo &type)
+      : SequentialField(type), Index(index), Name(name)
+    {}
 
-    /// The field.
-    const TupleTypeElt &Field;
+    /// The field index.
+    const unsigned Index;
+    const StringRef Name;
 
     StringRef getFieldName() const {
-      if (Field.hasName())
-        return Field.getName().str();
-      return "elt";
+      return Name;
+    }
+    
+    const TupleTypeElt &getField(CanType t) const {
+      auto tup = cast<TupleType>(t);
+      
+      return tup->getFields()[Index];
+    }
+    
+    CanType getType(IRGenModule&, CanType t) const {
+      auto tup = cast<TupleType>(t);
+      return tup.getElementType(Index);
     }
   };
 
@@ -95,12 +106,13 @@ namespace {
     /// single element.
     Address projectElementAddress(IRGenFunction &IGF,
                                   Address tuple,
+                                  CanType T,
                                   unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
         return field.getTypeInfo().getUndefAddress();
 
-      auto offsets = asImpl().getNonFixedOffsets(IGF);
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return field.projectAddress(IGF, tuple, offsets);
     }
 
@@ -108,7 +120,7 @@ namespace {
       llvm_unreachable("unexploded tuple as argument?");
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address src) const override {
+                              Address src, CanType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
   };
@@ -124,6 +136,8 @@ namespace {
       {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
+                                 CanType T) const { return Nothing; }
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
@@ -140,6 +154,8 @@ namespace {
     {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
+                                 CanType T) const { return Nothing; }
   };
 
   /// An accessor for the non-fixed offsets for a tuple type.
@@ -176,28 +192,20 @@ namespace {
       public TupleTypeInfoBase<NonFixedTupleTypeInfo,
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
-    CanType TheType;
   public:
-    NonFixedTupleTypeInfo(unsigned numFields, llvm::Type *T, CanType type,
+    NonFixedTupleTypeInfo(unsigned numFields, llvm::Type *T,
                           Alignment minAlign, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, T, minAlign, isPOD), TheType(type) {}
+      : TupleTypeInfoBase(numFields, T, minAlign, isPOD) {}
 
-    TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF) const {
-      return TupleNonFixedOffsets(TheType);
-    }
-
-    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
-      return IGF.emitTypeMetadataRef(TheType);
-    }
-
-    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
-      auto metadata = getMetadataRef(IGF);
-      return IGF.emitValueWitnessTableRefForMetadata(metadata);
+    TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
+                                            CanType T) const {
+      return TupleNonFixedOffsets(T);
     }
 
     void initializeMetadata(IRGenFunction &IGF,
-                                     llvm::Value *metadata,
-                                     llvm::Value *vwtable) const override {
+                            llvm::Value *metadata,
+                            llvm::Value *vwtable,
+                            CanType T) const override {
       // Tuple value witness tables are instantiated by the runtime along with
       // their metadata. We should never try to initialize one in the compiler.
       llvm_unreachable("initializing value witness table for tuple?!");
@@ -231,14 +239,16 @@ namespace {
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
                                           const StructLayout &layout) {
-      return create<NonFixedTupleTypeInfo>(fields, layout.getType(), TheTuple,
+      return create<NonFixedTupleTypeInfo>(fields, layout.getType(),
                                            layout.getAlignment(),
                                            layout.isKnownPOD());
     }
 
-    TupleFieldInfo getFieldInfo(const TupleTypeElt &field,
+    TupleFieldInfo getFieldInfo(unsigned index,
+                                const TupleTypeElt &field,
                                 const TypeInfo &fieldTI) {
-      return TupleFieldInfo(field, fieldTI);
+      StringRef name = field.hasName() ? field.getName().str() : "elt";
+      return TupleFieldInfo(index, name, fieldTI);
     }
 
     SILType getType(const TupleTypeElt &field) {
@@ -284,5 +294,6 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           Address tuple,
                                           SILType tupleType,
                                           unsigned fieldNo) {
-  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple, fieldNo);
+  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple,
+                 tupleType.getSwiftRValueType(), fieldNo);
 }

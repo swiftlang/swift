@@ -33,11 +33,19 @@ namespace irgen {
 /// A heap layout is the result of laying out a complete structure for
 /// heap-allocation.
 class HeapLayout : public StructLayout {
+  SmallVector<CanType, 8> ElementTypes;
+  
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-             ArrayRef<const TypeInfo *> fields,
+             ArrayRef<CanType> elementTypes,
+             ArrayRef<const TypeInfo *> elementTypeInfos,
              llvm::StructType *typeToFill = 0);
 
+  /// Get the types of the elements.
+  ArrayRef<CanType> getElementTypes() const {
+    return ElementTypes;
+  }
+  
   /// Build a size function for this layout.
   llvm::Constant *createSizeFn(IRGenModule &IGM) const;
 
@@ -48,12 +56,14 @@ public:
 
 /// A class to manage allocating a reference-counted array on the heap.
 class HeapArrayInfo {
+  CanType ElementType;
   const TypeInfo &ElementTI;
   NecessaryBindings Bindings;
 
 public:
   HeapArrayInfo(IRGenFunction &IGF, CanType T);
 
+  CanType getElementType() const { return ElementType; }
   const TypeInfo &getElementTypeInfo() const { return ElementTI; }
 
   struct Layout {

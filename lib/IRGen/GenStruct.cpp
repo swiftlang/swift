@@ -45,10 +45,16 @@ namespace {
       : SequentialField(type), Field(field) {}
 
     /// The field.
-    VarDecl *Field;
+    VarDecl * const Field;
 
     StringRef getFieldName() const {
       return Field->getName().str();
+    }
+    
+    CanType getType(IRGenModule &IGM, CanType T) const {
+      return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
+                                Field, nullptr)
+        ->getCanonicalType();
     }
   };
 
@@ -96,12 +102,13 @@ namespace {
     /// single element.
     Address projectFieldAddress(IRGenFunction &IGF,
                                 Address addr,
+                                CanType T,
                                 VarDecl *field) const {
       const StructFieldInfo &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
         return fieldInfo.getTypeInfo().getUndefAddress();
 
-      auto offsets = asImpl().getNonFixedOffsets(IGF);
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
     }
        
@@ -131,10 +138,15 @@ namespace {
 
     bool isIndirectArgument(ExplosionKind kind) const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address addr) const override {
+                              Address addr, CanType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+      return Nothing;
+    }
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return Nothing;
+    }
   };
 
   /// A type implementation for non-loadable but fixed-size struct types.
@@ -148,7 +160,9 @@ namespace {
                         Alignment align, IsPOD_t isPOD)
       : StructTypeInfoBase(numFields, T, size, llvm::BitVector{}, align, isPOD)
     {}
-
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+      return Nothing;
+    }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };
   
@@ -217,11 +231,10 @@ namespace {
       : public StructTypeInfoBase<NonFixedStructTypeInfo,
                                   WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
   {
-    CanType TheType;
   public:
-    NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T, CanType theType,
+    NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T,
                            Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, align, isPOD), TheType(theType) {
+      : StructTypeInfoBase(numFields, T, align, isPOD) {
     }
 
     // We have an indirect schema.
@@ -231,31 +244,23 @@ namespace {
     }
 
     StructNonFixedOffsets
-    getNonFixedOffsets(IRGenFunction &IGF) const {
-      return StructNonFixedOffsets(TheType);
+    getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+      return StructNonFixedOffsets(T);
     }
 
-    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
-      return IGF.emitTypeMetadataRef(TheType);
-    }
-
-    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
-      auto metadata = getMetadataRef(IGF);
-      return IGF.emitValueWitnessTableRefForMetadata(metadata);
-    }
-                                    
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
-                            llvm::Value *vwtable) const override {
+                            llvm::Value *vwtable,
+                            CanType T) const override {
       // Get the field offset vector.
       llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    TheType->getStructOrBoundGenericStruct(),
+                                    T->getStructOrBoundGenericStruct(),
                                     metadata).getAddress();
 
       // Collect the stored properties of the type.
       llvm::SmallVector<VarDecl*, 4> storedProperties;
-      for (auto prop : TheType->getStructOrBoundGenericStruct()
-                              ->getStoredProperties()) {
+      for (auto prop : T->getStructOrBoundGenericStruct()
+                        ->getStoredProperties()) {
         storedProperties.push_back(prop);
       }
       // Fill out an array with the field type metadata records.
@@ -314,12 +319,12 @@ namespace {
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
                                            const StructLayout &layout) {
       return create<NonFixedStructTypeInfo>(fields, layout.getType(),
-                                            TheStruct,
                                             layout.getAlignment(),
                                             layout.isKnownPOD());
     }
 
-    StructFieldInfo getFieldInfo(VarDecl *field, const TypeInfo &fieldTI) {
+    StructFieldInfo getFieldInfo(unsigned index,
+                                 VarDecl *field, const TypeInfo &fieldTI) {
       return StructFieldInfo(field, fieldTI);
     }
 
@@ -353,7 +358,8 @@ Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   Address base,
                                                   SILType baseType,
                                                   VarDecl *field) {
-  FOR_STRUCT_IMPL(IGF, baseType, projectFieldAddress, base, field);
+  FOR_STRUCT_IMPL(IGF, baseType, projectFieldAddress, base,
+                  baseType.getSwiftRValueType(), field);
 }
 
 void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
