@@ -18,9 +18,12 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
 
+#include "clang/AST/ASTContext.h"
+
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
@@ -30,6 +33,7 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FormalType.h"
+#include "GenClangType.h"
 #include "FunctionRef.h"
 #include "GenClass.h"
 #include "GenFunc.h"
@@ -950,6 +954,30 @@ static const char * const GetterMethodSignature = "@@:";
 /// - (void)setFoo:(SomeClass*);
 static const char * const SetterMethodSignature = "v@:@";
 
+static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
+                                               Type T) {
+  ASTContext &Context = IGM.Context;
+  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  auto &clangASTContext = CI->getClangASTContext();
+  
+  // TODO. encode types 'T'.
+  GenClangType CTG;
+  auto clangType = CTG.visit(T->getCanonicalType());
+  if (!clangType.isNull()) {
+    std::string TypeStr;
+    clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+    return IGM.getAddrOfGlobalString(TypeStr.c_str());
+  }
+  return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+}
+
+static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
+                                                     AnyFunctionType *T) {
+  // TODO. encode types 'T'.
+  return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+}
+
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
 void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
@@ -976,7 +1004,7 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   else if (isObjCSetterSignature(IGM, methodType))
     atEncoding = IGM.getAddrOfGlobalString(SetterMethodSignature);
   else
-    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    atEncoding = GetObjCEncodingForMethodType(IGM, methodType);
   
   /// The third element is the method implementation pointer.
   if (auto func = dyn_cast<FuncDecl>(method))
@@ -1000,7 +1028,7 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   atEncoding = isClassProperty
    ? IGM.getAddrOfGlobalString(GetterMethodSignature)
-   : llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+   : GetObjCEncodingForType(IGM, property->getType());
   impl = getObjCGetterPointer(IGM, getterSel, property);
 }
 
@@ -1032,7 +1060,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   atEncoding = isClassProperty
      ? IGM.getAddrOfGlobalString(SetterMethodSignature)
-     : llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+     : GetObjCEncodingForType(IGM, property->getType());
   impl = getObjCSetterPointer(IGM, setterSel, property);
 }
 
