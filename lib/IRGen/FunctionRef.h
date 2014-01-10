@@ -73,6 +73,12 @@ public:
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
+  static CodeRef forDestructor(DestructorDecl *fn,
+                               ExplosionKind explosionLevel,
+                               unsigned uncurryLevel) {
+    return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
+  }
+
   static CodeRef forGetter(ValueDecl *value,
                            ExplosionKind explosionLevel,
                            unsigned uncurryLevel) {

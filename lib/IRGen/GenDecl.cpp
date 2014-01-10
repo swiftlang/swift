@@ -947,6 +947,14 @@ static SILDeclRef::Kind getSILDeclRefKind(ConstructorKind ctorKind) {
   llvm_unreachable("bad constructor kind");
 }
 
+static SILDeclRef::Kind getSILDeclRefKind(DestructorKind dtorKind) {
+  switch (dtorKind) {
+  case DestructorKind::Destroying: return SILDeclRef::Kind::Destroyer;
+  case DestructorKind::Deallocating: return SILDeclRef::Kind::Deallocator;
+  }
+  llvm_unreachable("bad denstructor kind");
+}
+
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *ctor,
                                                   ConstructorKind ctorKind,
@@ -1249,7 +1257,9 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
 llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
                                                  DestructorKind kind,
                                                 ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forDestructor(cd, kind);
+  auto dd = cd->getDestructor();
+  auto codeRef = CodeRef::forDestructor(dd, Mangle::ExplosionKind::Minimal, 0);
+  LinkEntity entity = LinkEntity::forDestructor(codeRef, kind);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -1258,21 +1268,18 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
     return cast<llvm::Function>(entry);
   }
 
+  SILDeclRef silFn = SILDeclRef(dd, getSILDeclRefKind(kind),
+                                0, /*foreign*/ false);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
+
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Method);
+  llvm::FunctionType *fnType =
+    getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None, attrs);
+
+  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  llvm::FunctionType *dtorTy;
-  if (kind == DestructorKind::Deallocating) {
-    dtorTy = DeallocatingDtorTy;
-  } else {
-    auto &info = getTypeInfoForLowered(CanType(cd->getDeclaredTypeInContext()));
-    dtorTy = llvm::FunctionType::get(RefCountedPtrTy,
-                                     info.getStorageType(),
-                                     /*isVarArg*/ false);
-  }
-  
-  entry = link.createFunction(*this, dtorTy, cc, attrs);
+  entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
 }
 

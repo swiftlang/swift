@@ -1317,12 +1317,10 @@ static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
 }
 
 /// Get the type of a destructor function.
-///
-/// The type is This -> BuiltinObjectPointer for native entry points
-/// and This -> () for Objective-C's -dealloc.
-static CanAnyFunctionType getDestroyingDestructorType(DestructorDecl *dd,
-                                                      ASTContext &C,
-                                                      bool isForeign) {
+static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
+                                            bool isDeallocating,
+                                            ASTContext &C,
+                                            bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredTypeInContext()
                      ->getCanonicalType();
 
@@ -1338,15 +1336,13 @@ static CanAnyFunctionType getDestroyingDestructorType(DestructorDecl *dd,
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
                                           /*thin*/ true,
                                           /*noreturn*/ false);
+  CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
+                                   : CanType(C.TheObjectPointerType);
 
   if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
-    return CanPolymorphicFunctionType::get(classType,
-                                           CanType(C.TheObjectPointerType),
-                                           params,
-                                           extInfo);
+    return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
 
-  return CanFunctionType::get(classType, CanType(C.TheObjectPointerType),
-                              extInfo);
+  return CanFunctionType::get(classType, resultTy, extInfo);
 }
 
 GenericParamList *
@@ -1523,8 +1519,10 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-    return getDestroyingDestructorType(cast<DestructorDecl>(vd), Context,
-                                       c.isForeign);
+    return getDestructorType(cast<DestructorDecl>(vd), 
+                             c.kind == SILDeclRef::Kind::Deallocator,
+                             Context,
+                             c.isForeign);
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);

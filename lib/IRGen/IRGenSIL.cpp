@@ -2260,7 +2260,11 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
-  //llvm_unreachable("not implemented");
+  // Lower the operand.
+  Explosion self = getLoweredExplosion(i->getOperand());
+  auto selfValue = self.claimNext();
+  auto classType = i->getOperand()->getType(0);
+  emitClassDeallocation(*this, classType, selfValue);
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {

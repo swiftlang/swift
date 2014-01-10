@@ -320,9 +320,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forDestructor(ClassDecl *decl, DestructorKind kind) {
+  static LinkEntity forDestructor(CodeRef fn, DestructorKind kind) {
     LinkEntity entity;
-    entity.setForDecl(Kind::Destructor, decl, Mangle::ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::Destructor, fn.getDecl(), 
+                      fn.getExplosionLevel(), fn.getUncurryLevel());
     entity.Data |= LINKENTITY_SET_FIELD(DtorKind, unsigned(kind));
     return entity;
   }

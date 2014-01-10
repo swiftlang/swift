@@ -570,6 +570,29 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
+void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
+                                  llvm::Value *selfValue) {
+  auto *theClass = selfType.getSwiftType()->getClassOrBoundGenericClass();
+
+  // Determine the size of the object we're deallocating.
+  // FIXME: We should get this value dynamically!
+  auto &info = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &layout = info.getLayout(IGF.IGM);
+  // FIXME: Dynamic-layout deallocation size.
+  llvm::Value *size, *alignMask;
+  if (layout.isFixedLayout()) {
+    size = info.getLayout(IGF.IGM).emitSize(IGF.IGM);
+  } else {
+    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, selfValue, 
+                                                             selfType);
+    std::tie(size, alignMask)
+      = emitClassFragileInstanceSizeAndAlignMask(IGF, theClass, metadata);
+  }
+
+  selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
+  emitDeallocateHeapObject(IGF, selfValue, size);
+}
+
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
                                                         IRGenModule &IGM,
                                                         ClassDecl *Class) {
