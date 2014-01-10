@@ -1229,11 +1229,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitMaterializeExpr(MaterializeExpr *E) {
-    printCommon(E, "materialize_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
     printCommon(E, "metatype_conversion_expr") << '\n';
     printRec(E->getSubExpr());

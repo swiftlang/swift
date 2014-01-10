@@ -183,9 +183,6 @@ namespace {
       LValue lv = SGF.emitLValue(E->getSubExpr());
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }
-    RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
-      abort();
-    }
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
@@ -746,7 +743,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   auto &lowering = getTypeLowering(v.getType().getSwiftType());
   
   // We don't use getBufferForExprResult here because the result of a
-  // MaterializeExpr is *not* the value, but an lvalue reference to the value.
+  // materialization is *not* the value, but an address of the value.
   SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
   v.forwardInto(*this, loc, tmpMem);
   

@@ -121,7 +121,6 @@ public:
   // Nodes that form the root of lvalue paths
 
   LValue visitDeclRefExpr(DeclRefExpr *e);
-  LValue visitMaterializeExpr(MaterializeExpr *e);
 
   // Nodes that make up components of lvalue paths
   
@@ -502,22 +501,6 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   return emitLValueForDecl(*this, e, e->getDecl(), getSubstFormalRValueType(e));
-}
-
-LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
-
-  LValueTypeData typeData = getUnsubstitutedTypeData(gen,
-                                e->getSubExpr()->getType()->getCanonicalType());
-
-  // Evaluate the value, then use it to initialize a new temporary and return
-  // the temp's address.
-  ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen,
-                                                              e->getSubExpr());
-  auto addrMat = gen.emitMaterialize(e, v);
-  LValue lv;
-  lv.add<ValueComponent>(ManagedValue(addrMat.address, ManagedValue::LValue),
-                         typeData);
-  return std::move(lv);
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){

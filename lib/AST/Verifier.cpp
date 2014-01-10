@@ -638,13 +638,6 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(MaterializeExpr *E) {
-      Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
-      checkSameType(obj, E->getSubExpr()->getType(),
-                    "result and operand of MaterializeExpr");
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(TupleElementExpr *E) {
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();

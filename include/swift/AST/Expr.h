@@ -1638,18 +1638,6 @@ public:
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
-
-/// MaterializeExpr - Turn an r-value into an l-value by placing it in
-/// temporary memory.
-class MaterializeExpr : public ImplicitConversionExpr {
-public:
-  MaterializeExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::Materialize, subExpr, ty) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Materialize;
-  }
-};
   
 /// FunctionConversionExpr - Convert a function to another function type,
 /// which might involve renaming the parameters or handling substitutions
