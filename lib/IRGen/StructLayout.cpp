@@ -80,12 +80,14 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     assert(!builder.empty() == requiresHeapHeader(layoutKind));
     MinimumAlign = Alignment(1);
     MinimumSize = Size(0);
+    SpareBits.clear();
     IsFixedLayout = true;
     IsKnownPOD = IsPOD;
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
+    SpareBits = getSpareBitsFromBuilder(builder);
     IsFixedLayout = builder.isFixedLayout();
     IsKnownPOD = builder.isKnownPOD();
     if (typeToFill) {
@@ -211,20 +213,23 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
       = eltAlignment.getValue() - offsetFromAlignment.getValue();
     assert(paddingRequired != 0);
 
+    // Regardless, the storage size goes up.
+    CurSize += Size(paddingRequired);
+
+    // Add the padding to the fixed layout.
     if (isFixedLayout()) {
       auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
       StructFields.push_back(paddingTy);
+      
+      // The padding can be used as spare bits by enum layout.
+      CurSpareBits.resize(CurSize.getValueInBits(), true);
     }
-
-    // Regardless, the storage size goes up.
-    CurSize += Size(paddingRequired);
   }
 
   // If the overall structure so far has a fixed layout, then add
   // this as a field to the layout.
   if (isFixedLayout()) {
     addElementAtFixedOffset(elt);
-
   // Otherwise, just remember the next non-fixed offset index.
   } else {
     addElementAtNonFixedOffset(elt);
@@ -261,11 +266,21 @@ void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
 /// aggregate.
 void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
-  assert(isa<FixedTypeInfo>(elt.getType()));
+  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
   elt.completeFixed(elt.getType().isPOD(ResilienceScope::Local),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
+  
+  // Carry over the spare bits from the element.
+  unsigned startBit = CurSize.getValueInBits();
+  unsigned eltBits = eltTI.getFixedSize().getValueInBits();
+  CurSpareBits.resize(startBit + eltBits);
+  if (!eltTI.getSpareBits().empty()) {
+    for (unsigned i = 0; i < eltBits; ++i) {
+      CurSpareBits[startBit + i] = eltTI.getSpareBits()[i];
+    }
+  }
 }
 
 /// Add an element at a non-fixed offset to the aggregate.
@@ -273,6 +288,7 @@ void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
   elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Local),
                        NextNonFixedOffsetIndex);
+  CurSpareBits.clear();
 }
 
 /// Add a non-fixed-size element to the aggregate at offset zero.
@@ -281,6 +297,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
   elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Local));
+  CurSpareBits.clear();
 }
 
 /// Produce the current fields as an anonymous structure.

@@ -3738,7 +3738,7 @@ llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
   unsigned usedBits = resultLowBit;
   llvm::Value *result = nullptr;
   
-  for (int i = spareBitMask.find_first(); i != -1;
+  for (int i = spareBitMask.find_first(); i != -1 && usedBits < resultBitWidth;
        i = spareBitMask.find_next(i)) {
     assert(i >= 0);
     unsigned u = i;
@@ -3758,7 +3758,11 @@ llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
     // See how many consecutive bits we have.
     unsigned numBits = 1;
     ++u;
-    for (unsigned e = spareBitMask.size(); u < e && spareBitMask[u]; ++u)
+    // We don't need more bits than the size of the result.
+    unsigned maxBits = resultBitWidth - usedBits;
+    for (unsigned e = spareBitMask.size();
+         u < e && numBits < maxBits && spareBitMask[u];
+         ++u)
       ++numBits;
     
     // Mask out the selected bits.

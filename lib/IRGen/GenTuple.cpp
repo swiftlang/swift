@@ -131,13 +131,23 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     LoadableTupleTypeInfo(unsigned numFields, llvm::Type *ty,
-                          Size size, Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, ty, size, llvm::BitVector{}, align, isPOD)
+                          Size size, llvm::BitVector spareBits,
+                          Alignment align, IsPOD_t isPOD)
+      : TupleTypeInfoBase(numFields, ty, size, std::move(spareBits), align,
+                          isPOD)
       {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
                                  CanType T) const { return Nothing; }
+    
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through tuple metadata.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
@@ -149,13 +159,23 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(unsigned numFields, llvm::Type *ty,
-                       Size size, Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, ty, size, llvm::BitVector{}, align, isPOD)
+                       Size size, llvm::BitVector spareBits, Alignment align,
+                       IsPOD_t isPOD)
+      : TupleTypeInfoBase(numFields, ty, size, std::move(spareBits), align,
+                          isPOD)
     {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
                                  CanType T) const { return Nothing; }
+    
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through tuple metadata.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// An accessor for the non-fixed offsets for a tuple type.
@@ -225,6 +245,7 @@ namespace {
                                     const StructLayout &layout) {
       return create<FixedTupleTypeInfo>(fields, layout.getType(),
                                         layout.getSize(),
+                                        layout.getSpareBits(),
                                         layout.getAlignment(),
                                         layout.isKnownPOD());
     }
@@ -233,6 +254,7 @@ namespace {
                                           const StructLayout &layout) {
       return create<LoadableTupleTypeInfo>(fields, layout.getType(),
                                            layout.getSize(),
+                                           layout.getSpareBits(),
                                            layout.getAlignment(),
                                            layout.isKnownPOD());
     }

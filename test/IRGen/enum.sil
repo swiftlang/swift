@@ -73,6 +73,8 @@ import Builtin
 
 // CHECK: %O4enum15StringOwnerLike = type <{ [8 x i8] }>
 
+// CHECK: %O4enum30MultiPayloadSpareBitAggregates = type <{ [16 x i8] }>
+
 // CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8], [1 x i8] }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
@@ -2029,6 +2031,64 @@ end:
   return undef : $()
 }
 
+struct S {
+  var a: CharLike
+  var b: IntLike
+}
+
+enum MultiPayloadSpareBitAggregates {
+  // Has spare bits in the padding between Int32 and Int64
+  case x(Builtin.Int32, Builtin.Int64)
+  // Has spare bits in the object pointers
+  case y(C, C)
+  // Has spare bits in the padding between struct fields
+  case z(S)
+}
+
+// CHECK: define void @multi_payload_spare_bit_aggregate_switch(i128) {
+// CHECK:   [[T0:%.*]] = lshr i128 %0, 47
+// CHECK:   [[TAG:%.*]] = trunc i128 [[T0]] to i16
+// CHECK:   switch i16 [[TAG]], label {{%.*}} [
+// CHECK:     i16 0, label %[[X_DEST:[0-9]+]]
+// CHECK:     i16 1, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i16 2, label %[[Z_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   [[X_0:%.*]] = trunc i128 %0 to i32
+// CHECK:   [[T1:%.*]] = lshr i128 %0, 64
+// CHECK:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
+// CHECK: ; <label>:[[Y_DEST]]
+// --                                        0x80007fffffffffff
+// CHECK:   [[Y_MASKED:%.*]] = and i128 %0, -9223231299366420481
+// CHECK:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i64
+// CHECK:   [[Y_0:%.*]] = inttoptr i64 [[T2]] to %C4enum1C*
+// CHECK:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 64
+// CHECK:   [[T4:%.*]] = trunc i128 [[T3]] to i64
+// CHECK:   [[Y_1:%.*]] = inttoptr i64 [[T4]] to %C4enum1C*
+// CHECK: ; <label>:[[Z_DEST]]
+// --                                        0x80007fffffffffff
+// CHECK:   [[Z_MASKED:%.*]] = and i128 %0, -9223231299366420481
+// CHECK:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
+// CHECK:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
+// CHECK:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
+
+sil @multi_payload_spare_bit_aggregate_switch : $(MultiPayloadSpareBitAggregates) -> () {
+entry(%c : $MultiPayloadSpareBitAggregates):
+  switch_enum %c : $MultiPayloadSpareBitAggregates, case #MultiPayloadSpareBitAggregates.x!enumelt.1: x_dest, case #MultiPayloadSpareBitAggregates.y!enumelt.1: y_dest, case #MultiPayloadSpareBitAggregates.z!enumelt.1: z_dest
+
+x_dest(%x : $(Builtin.Int32, Builtin.Int64)):
+  br end
+
+y_dest(%y : $(C, C)):
+  br end
+
+z_dest(%z : $S):
+  br end
+
+end:
+  return undef : $()
+}
+
 // <rdar://problem/15759464>
 enum MultiPayloadInner {
   case A(Builtin.Int64)
@@ -2100,6 +2160,7 @@ typealias AllConcreteTestEnums = (
   MultiPayloadOneSpareBit,
   MultiPayloadTwoSpareBits,
   StringOwnerLike,
+  MultiPayloadSpareBitAggregates,
   MultiPayloadNested)
 
 var x : AllConcreteTestEnums

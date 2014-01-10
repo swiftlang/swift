@@ -132,8 +132,10 @@ namespace {
   public:
     // FIXME: Spare bits between struct members.
     LoadableStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
+                           llvm::BitVector spareBits,
                            Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, size, llvm::BitVector{}, align, isPOD)
+      : StructTypeInfoBase(numFields, T, size, std::move(spareBits),
+                           align, isPOD)
     {}
 
     bool isIndirectArgument(ExplosionKind kind) const override { return false; }
@@ -147,6 +149,14 @@ namespace {
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
       return Nothing;
     }
+        
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through generic structs.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// A type implementation for non-loadable but fixed-size struct types.
@@ -157,13 +167,23 @@ namespace {
   public:
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
+                        llvm::BitVector spareBits,
                         Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, size, llvm::BitVector{}, align, isPOD)
+      : StructTypeInfoBase(numFields, T, size, std::move(spareBits), align,
+                           isPOD)
     {}
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
       return Nothing;
     }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+                                                     
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through generic structs.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
   
   /// Find the beginning of the field offset vector in a struct's metadata.
@@ -304,6 +324,7 @@ namespace {
                                            const StructLayout &layout) {
       return create<LoadableStructTypeInfo>(fields, layout.getType(),
                                             layout.getSize(),
+                                            layout.getSpareBits(),
                                             layout.getAlignment(),
                                             layout.isKnownPOD());
     }
@@ -312,6 +333,7 @@ namespace {
                                      const StructLayout &layout) {
       return create<FixedStructTypeInfo>(fields, layout.getType(),
                                          layout.getSize(),
+                                         layout.getSpareBits(),
                                          layout.getAlignment(),
                                          layout.isKnownPOD());
     }

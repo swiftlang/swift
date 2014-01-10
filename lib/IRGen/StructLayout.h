@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_STRUCTLAYOUT_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "swift/Basic/Optional.h"
@@ -218,6 +219,7 @@ private:
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
+  llvm::BitVector CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
@@ -254,6 +256,9 @@ public:
 
   /// Return the alignment of the structure built so far.
   Alignment getAlignment() const { return CurAlignment; }
+  
+  /// Return the spare bit mask of the structure built so far.
+  const llvm::BitVector &getSpareBits() const { return CurSpareBits; }
 
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
@@ -278,6 +283,9 @@ class StructLayout {
 
   /// The statically-known minimum bound on the size.
   Size MinimumSize;
+  
+  /// The statically-known spare bit mask.
+  llvm::BitVector SpareBits;
 
   /// Whether this layout is fixed in size.  If so, the size and
   /// alignment are exact.
@@ -289,6 +297,14 @@ class StructLayout {
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
+  /// Use the spare bit mask from the builder if there are any fixed spare bits to
+  /// speak of.
+  static llvm::BitVector getSpareBitsFromBuilder(const StructLayoutBuilder &b) {
+    return b.isFixedLayout() && b.getSpareBits().any()
+      ? b.getSpareBits()
+      : llvm::BitVector{};
+  }
+  
 public:
   /// Create a structure layout.
   ///
@@ -309,6 +325,7 @@ public:
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
       IsFixedLayout(builder.isFixedLayout()),
+      SpareBits(getSpareBitsFromBuilder(builder)),
       IsKnownPOD(builder.isKnownPOD()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
@@ -319,6 +336,7 @@ public:
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }
+  const llvm::BitVector &getSpareBits() const { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
 
