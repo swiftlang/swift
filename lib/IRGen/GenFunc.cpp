@@ -59,9 +59,6 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILModule.h"
-#include "clang/AST/CanonicalType.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/Type.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -76,6 +73,7 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FunctionRef.h"
+#include "GenClangType.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -743,33 +741,6 @@ namespace {
   };
 }
 
-/// Given a Swift type, attempt to return an appropriate Clang
-/// CanQualType for the purpose of generating correct code for the
-/// ABI.
-class ClangTypeGen : public CanTypeVisitor<ClangTypeGen, clang::CanQualType> {
-  public:
-
-  /// Return the Clang struct type which was imported and resulted in
-  /// this Swift struct type. We do not currently handle generating a
-  /// new Clang struct type for Swift struct types that are created
-  /// independently of importing a Clang module.
-  clang::CanQualType visitStructType(CanStructType type) {
-    if (auto *clangDecl = type->getDecl()->getClangDecl()) {
-      auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-      return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
-    }
-
-    // FIXME: For parameters, we need to be able to generate a Clang
-    // type for all Swift types that can appear in an @objc parameter
-    // list.
-    return clang::CanQualType();
-  }
-
-  clang::CanQualType visitType(CanType type) {
-    return clang::CanQualType();
-  }
-};
-
 llvm::Type *SignatureExpansion::addIndirectResult() {
   auto resultType = FnType->getResult().getSILType();
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
@@ -795,8 +766,8 @@ llvm::Type *SignatureExpansion::expandResult() {
     if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
       return addIndirectResult();
 
-    ClangTypeGen CTG;
-    auto clangType = CTG.visit(resultType.getSwiftRValueType());
+    GenClangType GCT;
+    auto clangType = GCT.visit(resultType.getSwiftRValueType());
 
     // Fall back on native Swift type lowering for things that we
     // cannot generate a Clang type from.
@@ -1801,8 +1772,8 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   }
 
   auto resultTy = fnType->getResult().getSILType();
-  ClangTypeGen CTG;
-  auto clangTy = CTG.visit(resultTy.getSwiftRValueType());
+  GenClangType GCT;
+  auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
 
   // We are unable to produce an appropriate Clang type in some cases,
   // so fall back on the test used for native Swift types.
