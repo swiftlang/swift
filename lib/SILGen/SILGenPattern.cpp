@@ -250,8 +250,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                         SwitchStmt *stmt) {
   assert(!patterns.empty() && "no patterns to dispatch on?!");
   
-  const Pattern *headPattern = patterns[0].pattern;
-  PatternKind kind = headPattern->getSemanticsProvidingPattern()->getKind();
+  const Pattern *headPattern = patterns[0].pattern->getSemanticsProvidingPattern();
+  PatternKind kind = headPattern->getKind();
   CanType type = headPattern->getType()->getCanonicalType();
   
   switch (kind) {
