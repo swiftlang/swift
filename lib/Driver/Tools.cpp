@@ -118,6 +118,9 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
   // Pass through the values passed to -Xfrontend.
   Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
 
+  Args.AddLastArg(Arguments, options::OPT_parse_as_library);
+
+  Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
   // Add the output file argument if necessary.
   if (Output->getType() != types::TY_Nothing) {
