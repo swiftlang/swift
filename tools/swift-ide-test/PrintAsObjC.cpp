@@ -243,25 +243,6 @@ private:
     os << " */";
   }
 
-  void visitStructType(StructType *ST) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
-    if (SD->getParentModule()->isStdlibModule())
-      if (printIfKnownTypeName(SD->getName()))
-        return;
-
-    // FIXME: Check if we can actually use the name or if we have to tag it with
-    // "struct".
-    os << SD->getName();
-  }
-
-  void visitEnumType(EnumType *ET) {
-    const EnumDecl *ED = ET->getDecl();
-
-    // FIXME: Check if we can actually use the name or if we have to tag it with
-    // "enum".
-    os << ED->getName();
-  }
-
   void visitNameAliasType(NameAliasType *aliasTy) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (alias->getModuleContext()->isStdlibModule())
@@ -274,6 +255,48 @@ private:
     }
 
     visit(alias->getUnderlyingType());
+  }
+
+  void visitStructType(StructType *ST) {
+    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    if (SD->getParentModule()->isStdlibModule())
+      if (printIfKnownTypeName(SD->getName()))
+        return;
+
+    // FIXME: Check if we can actually use the name or if we have to tag it with
+    // "struct".
+    os << SD->getName();
+  }
+
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT) {
+    StructDecl *SD = BGT->getDecl();
+    if (!SD->getModuleContext()->isStdlibModule())
+      return false;
+
+    if (unsafePointerID.empty())
+      unsafePointerID = ctx.getIdentifier("UnsafePointer");
+    if (SD->getName() != unsafePointerID)
+      return false;
+
+    auto args = BGT->getGenericArgs();
+    assert(args.size() == 1);
+    visit(args.front());
+    os << " *";
+    return true;
+  }
+
+  void visitBoundGenericStructType(BoundGenericStructType *BGT) {
+    if (printIfKnownGenericStruct(BGT))
+      return;
+    visitBoundGenericType(BGT);
+  }
+
+  void visitEnumType(EnumType *ET) {
+    const EnumDecl *ED = ET->getDecl();
+
+    // FIXME: Check if we can actually use the name or if we have to tag it with
+    // "enum".
+    os << ED->getName();
   }
 
   void visitClassType(ClassType *CT) {
@@ -335,29 +358,6 @@ private:
 
   void visitSyntaxSugarType(SyntaxSugarType *SST) {
     visit(SST->getSinglyDesugaredType());
-  }
-
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT) {
-    StructDecl *SD = BGT->getDecl();
-    if (!SD->getModuleContext()->isStdlibModule())
-      return false;
-
-    if (unsafePointerID.empty())
-      unsafePointerID = ctx.getIdentifier("UnsafePointer");
-    if (SD->getName() != unsafePointerID)
-      return false;
-
-    auto args = BGT->getGenericArgs();
-    assert(args.size() == 1);
-    visit(args.front());
-    os << " *";
-    return true;
-  }
-
-  void visitBoundGenericStructType(BoundGenericStructType *BGT) {
-    if (printIfKnownGenericStruct(BGT))
-      return;
-    visitBoundGenericType(BGT);
   }
 };
 
