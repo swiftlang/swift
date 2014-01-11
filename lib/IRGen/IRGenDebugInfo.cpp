@@ -578,7 +578,15 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 // from that module.
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
                                          llvm::DINameSpace Namespace, Location L) {
-  auto Import = DBuilder.createImportedModule(TheCU, Namespace, L.Line, Name);
+  llvm::DIScope File(TheCU);
+  if (Name == IGM.Context.StdlibModuleName.str())
+    // FIXME: This is a hack to anchor a reference to the stdlib
+    // swiftmodule in the line table so LLDB can find it even if
+    // nothing in the CU references it.
+    // rdar://problem/15796201
+    File = getOrCreateFile(IGM.Context.TheStdlibModule->getModuleFilename().data());
+
+  auto Import = DBuilder.createImportedModule(File, Namespace, L.Line, Name);
 
   // Add all functions that belong to this namespace to it.
   //
