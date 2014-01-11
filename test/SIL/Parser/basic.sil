@@ -1028,6 +1028,22 @@ bb0:
 // CHECK-LABEL: sil @thin_metatype : $@thin (@thin Int64.metatype) -> @thick Int64.metatype
 sil @thin_metatype : $@thin (@thin Int64.metatype) -> @thick Int64.metatype
 
+sil @undef_value : $() -> () {
+bb0:
+  store undef to undef : $*Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @debug_value
+sil @debug_value : $@thin (Int, @in P) -> () {
+bb0(%0 : $Int, %1 : $*P):
+  debug_value %0 : $Int        // CHECK: debug_value %0 : $Int
+  debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
+  unreachable
+}
+
+
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
@@ -1036,17 +1052,3 @@ sil_vtable Foo {
   #Foo.subscript!getter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
   #Foo.subscript!setter.2: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
 }
-
-sil @undef_value : $() -> () {
-bb0:
-  store undef to undef : $*Builtin.Int1
-  unreachable
-}
-
-sil @debug_value : $@thin (Int, @in P) -> () {
-bb0(%0 : $Int, %1 : $*P):
-  debug_value %0 : $Int        // CHECK: debug_value %0 : $Int64
-  debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
-  unreachable
-}
-
