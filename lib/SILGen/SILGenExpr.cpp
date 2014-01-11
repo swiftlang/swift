@@ -1987,40 +1987,28 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // If we have a superclass, invoke its destructor.
   SILValue resultSelfValue;
   SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
-  bool computeSimpleResultSelfValue;
   if (Type superclassTy = cd->getSuperclass()) {
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
-    
-    // FIXME: We can't sensibly call up to ObjC dealloc methods right now
-    // because they aren't really destroying destructors.
-    if (superclass->hasClangNode() && superclass->isObjC()) {
-      computeSimpleResultSelfValue = true;
-    } else {
-      auto superclassDtorDecl = superclass->getDestructor();
-      SILDeclRef dtorConstant =
-        SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
-      SILType baseSILTy = getLoweredLoadableType(superclassTy);
-      SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
-      ManagedValue dtorValue;
-      SILType dtorTy;
-      ArrayRef<Substitution> subs
-        = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
-      std::tie(dtorValue, dtorTy, subs)
-        = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
-      resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), 
-                                      dtorTy, objectPtrTy, subs, baseSelf);
-      computeSimpleResultSelfValue = false;
-    }
+    auto superclassDtorDecl = superclass->getDestructor();
+    SILDeclRef dtorConstant =
+      SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
+    SILType baseSILTy = getLoweredLoadableType(superclassTy);
+    SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
+    ManagedValue dtorValue;
+    SILType dtorTy;
+    ArrayRef<Substitution> subs
+      = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
+    std::tie(dtorValue, dtorTy, subs)
+      = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
+    resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), 
+                                    dtorTy, objectPtrTy, subs, baseSelf);
   } else {
-    computeSimpleResultSelfValue = true;
+    resultSelfValue = B.createRefToObjectPointer(cleanupLoc, selfValue,
+                                                 objectPtrTy);
   }
 
   // Release our members.
   emitClassMemberDestruction(selfValue, cd, Loc, cleanupLoc);
-
-  if (computeSimpleResultSelfValue)
-    resultSelfValue = B.createRefToObjectPointer(cleanupLoc, selfValue, 
-                                                 objectPtrTy);
 
   B.createReturn(returnLoc, resultSelfValue);
 }

@@ -1291,7 +1291,8 @@ namespace {
     void addDestructorFunction() {
       Fields.push_back(IGM.getAddrOfDestructor(TargetClass,
                                                DestructorKind::Deallocating,
-                                               NotForDefinition));
+                                               NotForDefinition,
+                                               /*isForeign=*/false));
     }
     
     void addNominalTypeDescriptor() {

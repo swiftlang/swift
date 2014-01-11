@@ -391,7 +391,8 @@ public:
                                        Mangle::ExplosionKind explosionLevel,
                                        ForDefinition_t forDefinition);
   llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
-                                      ForDefinition_t forDefinition);
+                                      ForDefinition_t forDefinition,
+                                      bool isForeign);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);

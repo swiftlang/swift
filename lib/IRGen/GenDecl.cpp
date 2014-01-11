@@ -1253,7 +1253,8 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
                                                  DestructorKind kind,
-                                                ForDefinition_t forDefinition) {
+                                                 ForDefinition_t forDefinition,
+                                                 bool isForeign) {
   auto dd = cd->getDestructor();
   auto codeRef = CodeRef::forDestructor(dd, Mangle::ExplosionKind::Minimal, 0);
   LinkEntity entity = LinkEntity::forDestructor(codeRef, kind);
@@ -1265,10 +1266,10 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
     return cast<llvm::Function>(entry);
   }
 
-  SILDeclRef silFn = SILDeclRef(dd, getSILDeclRefKind(kind),
-                                0, /*foreign*/ false);
-  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
 
+  SILDeclRef silFn = SILDeclRef(dd, getSILDeclRefKind(kind),
+                                0, isForeign);
+  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
     getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None, attrs);

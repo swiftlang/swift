@@ -911,7 +911,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
   llvm::Function *swiftImpl
     = IGM.getAddrOfDestructor(classDecl, DestructorKind::Deallocating,
-                              NotForDefinition);
+                              NotForDefinition, /*isForeign=*/true);
 
   SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
                                   uncurryLevel, /*foreign*/ true);

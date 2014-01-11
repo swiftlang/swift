@@ -468,6 +468,22 @@ void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
 
+  // If the class would use the Objective-C allocator, only emit -dealloc.
+  if (usesObjCAllocator(cd)) {
+    // Emit the native deallocating destructor for -dealloc.
+    {
+      SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
+      SILFunction *f = preEmitFunction(dealloc, dd, dd);
+      PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
+      SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
+      postEmitFunction(dealloc, f);
+    }
+
+    // Emit the Objective-C thunk for -dealloc.
+    emitObjCDestructorThunk(dd);
+    return;
+  }
+
   // Emit the destroying destructor.
   {
     SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
@@ -484,18 +500,6 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
     postEmitFunction(deallocator, f);
-  }
-
-  // If the class would use the Objective-C allocator, emit -dealloc.
-  if (usesObjCAllocator(cd)) {
-    SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator,
-                       SILDeclRef::ConstructAtNaturalUncurryLevel,
-                       /*isForeign=*/true);
-    SILFunction *f = preEmitFunction(dealloc, dd, dd);
-    PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
-    SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
-    postEmitFunction(dealloc, f);
-
   }
 }
 
@@ -654,6 +658,22 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
     return;
   SILFunction *f = preEmitFunction(thunk, constructor, constructor);
   PrettyStackTraceSILFunction X("silgen objc constructor thunk", f);
+  f->setBare(IsBare);
+  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
+  postEmitFunction(thunk, f);
+}
+
+void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
+  SILDeclRef thunk(destructor,
+                   SILDeclRef::Kind::Deallocator,
+                   SILDeclRef::ConstructAtNaturalUncurryLevel,
+                   /*isObjC*/ true);
+
+  // Don't emit the thunk if it already exists.
+  if (hasFunction(thunk))
+    return;
+  SILFunction *f = preEmitFunction(thunk, destructor, destructor);
+  PrettyStackTraceSILFunction X("silgen objc destructor thunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);

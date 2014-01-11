@@ -200,6 +200,9 @@ public:
   /// Emit the ObjC-compatible entry point for a constructor.
   void emitObjCConstructorThunk(ConstructorDecl *constructor);
 
+  /// Emit the ObjC-compatible entry point for a destructor (i.e., -dealloc).
+  void emitObjCDestructorThunk(DestructorDecl *destructor);
+
   /// Emit the ObjC-compatible getter and setter for a subscript
   /// declaration.
   void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
