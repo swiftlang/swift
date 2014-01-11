@@ -38,7 +38,7 @@
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_box" "alloc_array"
-                    "dealloc_stack" "dealloc_box" "dealloc_ref")
+                    "dealloc_stack" "dealloc_box" "dealloc_ref" "debug_value")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
