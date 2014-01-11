@@ -92,6 +92,7 @@ if [ \! "$SKIP_BUILD_SWIFT_TOOLS" ]; then
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_BUILD_STDLIB="NO" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
+      -DLLVM_CONFIG="$WORKSPACE/llvm/build/bin/llvm-config" \
       .. &&
     make -j8) || exit 1
 fi
@@ -127,6 +128,8 @@ function build_stdlib()
       -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
       -DMODULES_SDK="$SDKROOT" \
+      -DCMAKE_C_FLAGS="-isysroot $SDKROOT" \
+      -DCMAKE_CXX_FLAGS="-isysroot $SDKROOT" \
       -DSWIFT_DEPLOYMENT_OS="$SDK" \
       -DSWIFT_DEPLOYMENT_TARGET="$VERS" \
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -142,6 +145,7 @@ function build_stdlib()
       -DSWIFT_OPTIMIZED="$SWIFT_OPTIMIZED" \
       -DSWIFT_ASSERTS="$SWIFT_ASSERTS" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
+      -DLLVM_CONFIG="$WORKSPACE/llvm/build/bin/llvm-config" \
       ../../.. &&
     make -j8 ) || exit 1
 }
