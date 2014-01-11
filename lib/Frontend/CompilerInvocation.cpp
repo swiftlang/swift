@@ -111,6 +111,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  if (Args.hasArg(OPT_parse_stdlib)) {
+    Opts.ParseStdlib = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {
     Opts.ModuleSourceListPath = A->getValue();
   }
@@ -409,10 +413,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     switch (InputArg->getOption().getID()) {
     case OPT_parse_as_library:
       setInputKind(SourceFileKind::Library);
-      break;
-
-    case OPT_parse_stdlib:
-      setParseStdlib();
       break;
     }
   }

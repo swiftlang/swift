@@ -57,7 +57,6 @@ class CompilerInvocation {
   DiagnosticOptions DiagnosticOpts;
   IRGenOptions IRGenOpts;
 
-  bool ParseStdlib = false;
   bool Immediate = false;
   SourceFileKind InputKind = SourceFileKind::Main;
 
@@ -182,11 +181,11 @@ public:
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
 
   void setParseStdlib() {
-    ParseStdlib = true;
+    FrontendOpts.ParseStdlib = true;
   }
 
   bool getParseStdlib() const {
-    return ParseStdlib;
+    return FrontendOpts.ParseStdlib;
   }
 
   void setParseOnly() {

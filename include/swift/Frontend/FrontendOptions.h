@@ -98,6 +98,9 @@ public:
   /// Indicates that type-checking should be disabled.
   bool ParseOnly = false;
 
+  /// Indicates that the input(s) should be parsed as the Swift stdlib.
+  bool ParseStdlib = false;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
