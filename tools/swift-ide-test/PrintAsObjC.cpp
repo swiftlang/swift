@@ -30,7 +30,7 @@ static void writeImports(raw_ostream &os, Module *M) {
     os << "@import " << import.second->Name << ";\n";
   }
 
-  // Headers required by the printer.
+  // Headers and predefines required by the printer.
   os << "\n@import ObjectiveC;\n"
         "#include <stdint.h>\n"
         "#include <stddef.h>\n"
@@ -39,7 +39,9 @@ static void writeImports(raw_ostream &os, Module *M) {
         "# if __has_include(<uchar.h>)\n"
         "#  include <uchar.h>\n"
         "# endif\n"
-        "#endif\n\n";
+        "#endif\n"
+        "\n"
+        "#define SWIFT_METATYPE(X) Class\n";
 }
 
 namespace {
@@ -348,12 +350,16 @@ private:
 
   void visitMetatypeType(MetatypeType *MT) {
     Type instanceTy = MT->getInstanceType();
-    if (auto protoTy = instanceTy->getAs<ProtocolType>())
+    if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
       visitProtocolType(protoTy, /*isMetatype=*/true);
-    else if (auto compositionTy = instanceTy->getAs<ProtocolCompositionType>())
+    } else if (auto compositionTy = instanceTy->getAs<ProtocolCompositionType>()) {
       visitProtocolCompositionType(compositionTy, /*isMetatype=*/true);
-    else
-      llvm_unreachable("Arbitrary metatypes are not ObjC-compatible");
+    } else {
+      auto classTy = instanceTy->castTo<ClassType>();
+      os << "SWIFT_METATYPE("
+         << classTy->getClassOrBoundGenericClass()->getName()
+         << ")";
+    }
   }
 
   void visitFunctionType(FunctionType *FT) {
