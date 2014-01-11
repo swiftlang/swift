@@ -120,6 +120,8 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
 
   Args.AddLastArg(Arguments, options::OPT_parse_as_library);
 
+  Args.AddLastArg(Arguments, options::OPT_parse_sil);
+
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
   // Add the output file argument if necessary.

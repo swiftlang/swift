@@ -150,6 +150,9 @@ def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
 def parse_as_library : Flag<["-"], "parse-as-library">,
   Flags<[DriverOption, FrontendOption]>,
   HelpText<"Parse the input file(s) as libraries, not scripts">;
+def parse_sil : Flag<["-"], "parse-sil">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   Flags<[DriverOption, FrontendOption, HelpHidden]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
