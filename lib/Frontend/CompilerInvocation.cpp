@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "swift/Subsystems.h"
 #include "swift/Driver/Options.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
@@ -113,10 +114,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ParseStdlib = true;
   }
 
-  if (Args.hasArg(OPT_parse_as_library)) {
-    Opts.InputKind = SourceFileKind::Library;
-  }
-
   if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {
     Opts.ModuleSourceListPath = A->getValue();
   }
@@ -173,6 +170,17 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
   Opts.RequestedAction = Action;
+
+  if (Args.hasArg(OPT_parse_sil) ||
+      (Opts.InputFilenames.size() == 1 &&
+       llvm::sys::path::extension(Opts.InputFilenames[0]) == SIL_EXTENSION))
+    Opts.InputKind = SourceFileKind::SIL;
+  else if (Args.hasArg(OPT_parse_as_library))
+    Opts.InputKind = SourceFileKind::Library;
+  else if (Action == FrontendOptions::REPL)
+    Opts.InputKind = SourceFileKind::REPL;
+  else
+    Opts.InputKind = SourceFileKind::Main;
 
   {
     const Arg *A = Args.getLastArg(OPT_module_name);
