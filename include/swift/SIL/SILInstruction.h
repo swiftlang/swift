@@ -870,6 +870,10 @@ class DebugValueInst : public UnaryInstructionBase<ValueKind::DebugValueInst> {
 public:
   DebugValueInst(SILLocation Loc, SILValue Operand)
    : UnaryInstructionBase(Loc, Operand) {}
+
+  /// getDecl - Return the underlying variable declaration that this denotes,
+  /// or null if we don't have one.
+  VarDecl *getDecl() const;
 };
 
 /// Define the start or update to a symbolic variable value (for address-only
@@ -879,6 +883,11 @@ class DebugValueAddrInst
 public:
   DebugValueAddrInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
+
+
+  /// getDecl - Return the underlying variable declaration that this denotes,
+  /// or null if we don't have one.
+  VarDecl *getDecl() const;
 };
 
 

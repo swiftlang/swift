@@ -436,11 +436,21 @@ VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
+
+
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
                                SILValue NumElements, SILFunction &F)
   : SILInstruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
     Operands(this, NumElements) {
 }
+
+VarDecl *DebugValueInst::getDecl() const {
+  return getLoc().getAsASTNode<VarDecl>();
+}
+VarDecl *DebugValueAddrInst::getDecl() const {
+  return getLoc().getAsASTNode<VarDecl>();
+}
+
 
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,

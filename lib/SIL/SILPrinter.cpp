@@ -632,11 +632,17 @@ public:
 
   void visitDebugValueInst(DebugValueInst *DVI) {
     OS << "debug_value " << getIDAndType(DVI->getOperand());
+
+    if (VarDecl *vd = DVI->getDecl())
+      OS << "  // " << (vd->isLet() ? "let " : "var ") << vd->getName();
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     OS << "debug_value_addr " << getIDAndType(DVAI->getOperand());
-  }
+
+    if (VarDecl *vd = DVAI->getDecl())
+      OS << "  // " << (vd->isLet() ? "let " : "var ") << vd->getName();
+}
 
   void visitLoadWeakInst(LoadWeakInst *LI) {
     OS << "load_weak ";
