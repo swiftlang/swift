@@ -20,7 +20,7 @@
 
 namespace swift {
   class Module;
-  class SourceManager;
+  class SourceFile;
 
 namespace ide {
 
@@ -95,10 +95,9 @@ public:
 class SyntaxModelContext {
   struct Implementation;
   Implementation &Impl;
-  Module &M;
 
 public:
-  SyntaxModelContext(SourceManager &SM, unsigned BufferID, Module &M);
+  explicit SyntaxModelContext(SourceFile &SrcFile);
   ~SyntaxModelContext();
 
   bool walk(SyntaxModelWalker &Walker);

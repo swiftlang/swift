@@ -30,14 +30,21 @@ using namespace ide;
 void SyntaxModelWalker::anchor() {}
 
 struct SyntaxModelContext::Implementation {
+  SourceFile &SrcFile;
+  const SourceManager &SrcMgr;
   std::vector<SyntaxNode> TokenNodes;
+
+  Implementation(SourceFile &SrcFile)
+    : SrcFile(SrcFile),
+      SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
-SyntaxModelContext::SyntaxModelContext(SourceManager &SM, unsigned BufferID,
-                                       Module &M)
-  : Impl(*new Implementation()),
-    M(M) {
-  std::vector<Token> Tokens = swift::tokenize(SM, BufferID, /*Offset=*/0,
+SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
+  : Impl(*new Implementation(SrcFile)) {
+  const SourceManager &SM = Impl.SrcMgr;
+  std::vector<Token> Tokens = swift::tokenize(SM,
+                                              *Impl.SrcFile.getBufferID(),
+                                              /*Offset=*/0,
                                               /*EndOffset=*/0,
                                               /*KeepComments=*/true,
                                            /*TokenizeInterpolatedString=*/true);
@@ -122,7 +129,7 @@ public:
   ModelASTWalker(const SourceManager &SM, SyntaxModelWalker &Walker)
       : SM(SM), Walker(Walker) { }
 
-  void visitModule(Module &M, ArrayRef<SyntaxNode> Tokens);
+  void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPost(Decl *D) override;
@@ -167,14 +174,15 @@ CharSourceRange charSourceRangeFromSourceRange(SourceManager &SM,
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
-  ModelASTWalker ASTWalk(M.Ctx.SourceMgr, Walker);
-  ASTWalk.visitModule(M, Impl.TokenNodes);
+  ModelASTWalker ASTWalk(Impl.SrcMgr, Walker);
+  ASTWalk.visitSourceFile(Impl.SrcFile, Impl.TokenNodes);
   return true;
 }
 
-void ModelASTWalker::visitModule(Module &M, ArrayRef<SyntaxNode> Tokens) {
+void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
+                                     ArrayRef<SyntaxNode> Tokens) {
   TokenNodes = Tokens;
-  M.walk(*this);
+  SrcFile.walk(*this);
 
   // Pass the rest of the token nodes.
   for (auto &TokNode : TokenNodes)
