@@ -999,10 +999,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   unsigned Flags = 0;
 
   TypeBase* BaseTy = DbgTy.getType();
-  // In here, we actually want the sugared version of the type, if there is one.
-  if (auto Decl = DbgTy.getDecl())
-    if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-      BaseTy = AliasDecl->getAliasType();
 
   if (!BaseTy) {
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();

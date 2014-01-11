@@ -65,11 +65,18 @@ namespace swift {
         if (auto Ty = DeclOrType.dyn_cast<TypeBase*>())
           return Ty;
 
-        return DeclOrType.get<ValueDecl*>()->getType().getPointer();
+        auto Decl = DeclOrType.get<ValueDecl*>();
+        TypeBase* BaseTy = Decl->getType().getPointer();
+        // Return the sugared version of the type, if there is one.
+        if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
+          BaseTy = AliasDecl->getAliasType();
+        return BaseTy;
       }
+
       inline ValueDecl* getDecl() const {
         return DeclOrType.dyn_cast<ValueDecl*>();
       }
+
       SILDebugScope *getDebugScope() const { return DebugScope; }
       DeclContext *getDeclContext() const {
         if (auto Decl = getDecl())
