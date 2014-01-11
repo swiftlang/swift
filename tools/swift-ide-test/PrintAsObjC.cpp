@@ -46,6 +46,7 @@ namespace {
 class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
                     public TypeVisitor<ObjCPrinter> {
   llvm::DenseMap<Identifier, StringRef> specialNames;
+  Identifier unsafePointerID;
   ASTContext &ctx;
   raw_ostream &os;
 
@@ -334,6 +335,29 @@ private:
 
   void visitSyntaxSugarType(SyntaxSugarType *SST) {
     visit(SST->getSinglyDesugaredType());
+  }
+
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT) {
+    StructDecl *SD = BGT->getDecl();
+    if (!SD->getModuleContext()->isStdlibModule())
+      return false;
+
+    if (unsafePointerID.empty())
+      unsafePointerID = ctx.getIdentifier("UnsafePointer");
+    if (SD->getName() != unsafePointerID)
+      return false;
+
+    auto args = BGT->getGenericArgs();
+    assert(args.size() == 1);
+    visit(args.front());
+    os << " *";
+    return true;
+  }
+
+  void visitBoundGenericStructType(BoundGenericStructType *BGT) {
+    if (printIfKnownGenericStruct(BGT))
+      return;
+    visitBoundGenericType(BGT);
   }
 };
 
