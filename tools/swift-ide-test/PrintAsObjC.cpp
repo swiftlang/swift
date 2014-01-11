@@ -253,6 +253,14 @@ private:
     os << SD->getName();
   }
 
+  void visitEnumType(EnumType *ET) {
+    const EnumDecl *ED = ET->getDecl();
+
+    // FIXME: Check if we can actually use the name or if we have to tag it with
+    // "enum".
+    os << ED->getName();
+  }
+
   void visitNameAliasType(NameAliasType *aliasTy) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (alias->getModuleContext()->isStdlibModule())
