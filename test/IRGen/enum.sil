@@ -75,7 +75,9 @@ import Builtin
 
 // CHECK: %O4enum30MultiPayloadSpareBitAggregates = type <{ [16 x i8] }>
 
-// CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8], [1 x i8] }>
+// CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8] }>
+
+// CHECK: %O4enum27MultiPayloadNestedSpareBits = type <{ [8 x i8] }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
@@ -150,7 +152,7 @@ import Builtin
 // CHECK:   i8* null
 
 // CHECK: @_TWVO4enum18MultiPayloadNested = constant [16 x i8*] [
-// CHECK:   i8* inttoptr (i64 10 to i8*),
+// CHECK:   i8* inttoptr (i64 9 to i8*),
 // CHECK:   i8* inttoptr (i64 7 to i8*),
 // CHECK:   i8* inttoptr (i64 16 to i8*)
 // CHECK: ]
@@ -2101,10 +2103,14 @@ enum MultiPayloadNested {
 }
 
 // CHECK-LABEL: define void @multi_payload_nested_switch
-// CHECK:  [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum18MultiPayloadNested* %0, i32 0, i32 1
-// CHECK:  [[TAG_BIT_ADDR:%.*]] = bitcast [1 x i8]* [[TAG_ADDR]] to i1*
-// CHECK:  [[TAG_BIT:%.*]] = load i1* [[TAG_BIT_ADDR]], align 1
-// CHECK:  switch i1 [[TAG_BIT]]
+// CHECK:   %1 = bitcast %O4enum18MultiPayloadNested* %0 to i72*
+// CHECK:   %2 = load i72* %1, align 8
+// CHECK:   %3 = lshr i72 %2, 65
+// CHECK:   %4 = trunc i72 %3 to i7
+// CHECK:   switch i7 %4, label {{%.*}} [
+// CHECK:     i7 0, label {{%.*}}
+// CHECK:     i7 1, label {{%.*}}
+// CHECK:   ]
 sil @multi_payload_nested_switch : $(@in MultiPayloadNested) -> () {
 entry(%c : $*MultiPayloadNested):
   switch_enum_addr %c : $*MultiPayloadNested, case #MultiPayloadNested.A!enumelt.1: a_dest, case #MultiPayloadNested.B!enumelt.1: b_dest
@@ -2118,6 +2124,43 @@ b_dest:
 end:
   return undef : $()
 }
+
+enum MultiPayloadInnerSpareBits {
+  case A(Builtin.ObjectPointer)
+  case B(Builtin.ObjectPointer)
+  case C(Builtin.ObjectPointer)
+  case D(Builtin.ObjectPointer)
+}
+
+enum MultiPayloadNestedSpareBits {
+  case A(MultiPayloadInnerSpareBits)
+  case B(MultiPayloadInnerSpareBits)
+}
+
+// CHECK-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits* noalias) {
+// CHECK: entry:
+// CHECK:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to i64*
+// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   %3 = lshr i64 %2, 47
+// CHECK:   %4 = trunc i64 %3 to i16
+// CHECK:   switch i16 %4, label {{%.*}} [
+// CHECK:     i16 0, label {{%.*}}
+// CHECK:     i16 1, label {{%.*}}
+// CHECK:   ]
+sil @multi_payload_nested_spare_bits_switch : $(@in MultiPayloadNestedSpareBits) -> () {
+entry(%c : $*MultiPayloadNestedSpareBits):
+  switch_enum_addr %c : $*MultiPayloadNestedSpareBits, case #MultiPayloadNestedSpareBits.A!enumelt.1: a_dest, case #MultiPayloadNestedSpareBits.B!enumelt.1: b_dest
+
+a_dest:
+  br end
+
+b_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
 
 // -- test for a switch_enum bug for multi-payload, no-empty-case enums
 //    uncovered by Chris
@@ -2161,7 +2204,8 @@ typealias AllConcreteTestEnums = (
   MultiPayloadTwoSpareBits,
   StringOwnerLike,
   MultiPayloadSpareBitAggregates,
-  MultiPayloadNested)
+  MultiPayloadNested,
+  MultiPayloadNestedSpareBits)
 
 var x : AllConcreteTestEnums
 

@@ -838,8 +838,8 @@ public:
     }
   };
   
-  /// Implementation strategy for no-payload enums with C-compatible
-  /// enums where none of the cases have data.
+  /// Implementation strategy for C-compatible enums, where none of the cases
+  /// have data but they all have fixed integer associated values.
   class CCompatibleEnumImplStrategy final
     : public NoPayloadEnumImplStrategyBase
   {
@@ -3378,10 +3378,23 @@ namespace {
     // The enum has the alignment of the payload. The size includes the added
     // tag bits.
     auto sizeWithTag = payloadTI.getFixedSize().getValue();
-    sizeWithTag += (ExtraTagBitCount+7U)/8U;
+    unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
+    sizeWithTag += extraTagByteCount;
     
-    /// FIXME: Spare bits.
-    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), {},
+    // FIXME: We don't have enough semantic understanding of extra inhabitant
+    // sets to be able to reason about how many spare bits from the payload type
+    // we can forward. If we spilled tag bits, however, we can offer the unused
+    // bits we have in that byte.
+    llvm::BitVector spareBits;
+    if (ExtraTagBitCount > 0 && ExtraTagBitCount < extraTagByteCount * 8) {
+      spareBits.resize(payloadTI.getFixedSize().getValueInBits()
+                         + ExtraTagBitCount,
+                       false);
+      spareBits.resize(payloadTI.getFixedSize().getValueInBits()
+                         + extraTagByteCount * 8,
+                       true);
+    }
+    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                             payloadTI.getFixedAlignment(),
                             payloadTI.isPOD(ResilienceScope::Component));
   }
@@ -3478,9 +3491,31 @@ namespace {
     // The enum has the worst alignment of its payloads. The size includes the
     // added tag bits.
     auto sizeWithTag = (CommonSpareBits.size() + 7U)/8U;
-    sizeWithTag += (ExtraTagBitCount+7U)/8U;
+    unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
+    sizeWithTag += extraTagByteCount;
     
-    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), {},
+    // Determine spare bits.
+    llvm::BitVector spareBits;
+    // We may have bits left over that we didn't use in the payload.
+    if (numTagBits < commonSpareBitCount) {
+      assert(ExtraTagBitCount == 0
+             && "spilled extra tag bits with spare bits available?!");
+      spareBits = CommonSpareBits;
+      // Mark the bits we'll use as occupied.
+      int bit;
+      unsigned i;
+      for (i = 0, bit = spareBits.find_first(); i < numTagBits;
+           ++i, bit = spareBits.find_next(bit)) {
+        assert(bit != -1 && "ran out of spare bits?!");
+        spareBits[bit] = false;
+      }
+    // If we spilled into extra tag bits, there may be spare bits in that
+    // byte.
+    } else if (ExtraTagBitCount < extraTagByteCount*8) {
+      spareBits.resize(CommonSpareBits.size() + ExtraTagBitCount, false);
+      spareBits.resize(CommonSpareBits.size() + extraTagByteCount*8, true);
+    }
+    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                                 worstAlignment, isPOD);
   }
 }
