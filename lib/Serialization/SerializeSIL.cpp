@@ -570,7 +570,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:
   case ValueKind::UnownedReleaseInst:
-  case ValueKind::ReturnInst: {
+  case ValueKind::ReturnInst:
+  case ValueKind::DebugValueInst:
+  case ValueKind::DebugValueAddrInst: {
     unsigned Attr = 0;
     if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
       Attr = LWI->isTake();

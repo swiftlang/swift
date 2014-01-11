@@ -538,6 +538,12 @@ public:
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
+  void visitDebugValueInst(DebugValueInst *i) {
+    // FIXME: Noop
+  }
+  void visitDebugValueAddrInst(DebugValueAddrInst *i) {
+    // FIXME: Noop
+  }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitCopyValueInst(CopyValueInst *i);

@@ -354,6 +354,20 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
                Builder.createMarkFunctionEscape(getOpLocation(Inst->getLoc()),
                                                 Elements));
 }
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
+  doPostProcess(Inst,
+                Builder.createDebugValue(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand())));
+}
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+  doPostProcess(Inst,
+                Builder.createDebugValueAddr(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand())));
+}
 
 
 template<typename ImplClass>

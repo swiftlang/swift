@@ -697,6 +697,7 @@ MarkFunctionEscapeInst::MarkFunctionEscapeInst(SILLocation Loc,
 
 
 
+
 StoreWeakInst::StoreWeakInst(SILLocation loc, SILValue value, SILValue dest,
                              IsInitialization_t isInit)
   : SILInstruction(ValueKind::StoreWeakInst, loc),

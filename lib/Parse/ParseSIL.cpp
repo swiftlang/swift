@@ -925,6 +925,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
+    .Case("debug_value", ValueKind::DebugValueInst)
+    .Case("debug_value_addr", ValueKind::DebugValueAddrInst)
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("destroy_value", ValueKind::DestroyValueInst)
@@ -1331,6 +1333,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(CopyValue)
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(CondFail)
+  UNARY_INSTRUCTION(DebugValue)
+  UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
 
   case ValueKind::LoadWeakInst: {

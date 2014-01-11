@@ -864,8 +864,26 @@ public:
   }
 };
 
+/// Define the start or update to a symbolic variable value (for loadable
+/// types).
+class DebugValueInst : public UnaryInstructionBase<ValueKind::DebugValueInst> {
+public:
+  DebugValueInst(SILLocation Loc, SILValue Operand)
+   : UnaryInstructionBase(Loc, Operand) {}
+};
 
-/// Represents a load from a [weak] memory location.
+/// Define the start or update to a symbolic variable value (for address-only
+/// types) .
+class DebugValueAddrInst
+  : public UnaryInstructionBase<ValueKind::DebugValueAddrInst> {
+public:
+  DebugValueAddrInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
+};
+
+
+
+/// Represents a load from a @weak memory location.
 class LoadWeakInst
   : public UnaryInstructionBase<ValueKind::LoadWeakInst>
 {
@@ -889,7 +907,7 @@ public:
   IsTake_t isTake() const { return IsTake_t(IsTake); }
 };
 
-/// Represents a store to a [weak] memory location.
+/// Represents a store to a @weak memory location.
 class StoreWeakInst : public SILInstruction {
   enum { Src, Dest };
   FixedOperandList<2> Operands;

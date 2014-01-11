@@ -1043,3 +1043,10 @@ bb0:
   unreachable
 }
 
+sil @debug_value : $@thin (Int, @in P) -> () {
+bb0(%0 : $Int, %1 : $*P):
+  debug_value %0 : $Int        // CHECK: debug_value %0 : $Int64
+  debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
+  unreachable
+}
+

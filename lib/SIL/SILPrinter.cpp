@@ -629,6 +629,15 @@ public:
                },
                [&] { OS << ", "; });
   }
+
+  void visitDebugValueInst(DebugValueInst *DVI) {
+    OS << "debug_value " << getIDAndType(DVI->getOperand());
+  }
+
+  void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
+    OS << "debug_value_addr " << getIDAndType(DVAI->getOperand());
+  }
+
   void visitLoadWeakInst(LoadWeakInst *LI) {
     OS << "load_weak ";
     if (LI->isTake())

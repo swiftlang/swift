@@ -292,6 +292,12 @@ public:
                                                    ArrayRef<SILValue> vars) {
     return insert(MarkFunctionEscapeInst::create(loc, vars, F));
   }
+  DebugValueInst *createDebugValue(SILLocation loc, SILValue src) {
+    return insert(new (F.getModule()) DebugValueInst(loc, src));
+  }
+  DebugValueAddrInst *createDebugValueAddr(SILLocation loc, SILValue src) {
+    return insert(new (F.getModule()) DebugValueAddrInst(loc, src));
+  }
 
   LoadWeakInst *createLoadWeak(SILLocation loc, SILValue src, IsTake_t isTake) {
     return insert(new (F.getModule()) LoadWeakInst(loc, src, isTake));
