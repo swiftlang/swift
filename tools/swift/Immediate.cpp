@@ -607,10 +607,11 @@ public:
       }
       while (isspace(*--p) && p >= s);
       // FIXME: Unicode operators
-      if (Identifier::isOperatorStartCodePoint(*p)) {
-        while (Identifier::isOperatorContinuationCodePoint(*p) && --p >= s);
-        if (*p == ' ' || *p == '\t')
-          UnfinishedInfixExpr = true;
+      // scan backwards to the start of the operator if it is there
+      while (Identifier::isOperatorContinuationCodePoint(*p) && --p >= s);
+      if (*p == '.') --p;
+      if (isspace(*p) && Identifier::isOperatorStartCodePoint(p[1])) {
+        UnfinishedInfixExpr = true;
       }
     } while (BraceCount > 0 || HadLineContinuation || UnfinishedInfixExpr);
 
