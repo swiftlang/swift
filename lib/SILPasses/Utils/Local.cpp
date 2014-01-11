@@ -18,8 +18,8 @@
 
 using namespace swift;
 
-static bool
-isSideEffectFree(BuiltinFunctionRefInst *FR) {
+bool
+swift::isSideEffectFree(BuiltinFunctionRefInst *FR) {
 
   // First, check if we are dealing with a swift builtin.
   const BuiltinInfo &BInfo = FR->getBuiltinInfo();
