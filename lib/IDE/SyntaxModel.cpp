@@ -165,7 +165,7 @@ SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
   }
 }
 
-CharSourceRange charSourceRangeFromSourceRange(SourceManager &SM,
+CharSourceRange charSourceRangeFromSourceRange(const SourceManager &SM,
                                                const SourceRange &SR) {
   SourceLoc SRE = Lexer::getLocForEndOfToken(SM, SR.End);
   return CharSourceRange(SM, SR.Start, SRE);
@@ -210,9 +210,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       }
       else
         SN.Kind = SyntaxStructureKind::FreeFunction;
-      ASTContext &AC = AFD->getASTContext();
-      SN.Range = charSourceRangeFromSourceRange(AC.SourceMgr,
-                                                          AFD->getSourceRange());
+      SN.Range = charSourceRangeFromSourceRange(SM, AFD->getSourceRange());
       SourceLoc NRStart = AFD->getNameLoc();
       SourceLoc NREnd = NRStart.getAdvancedLoc(AFD->getName().getLength());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -223,15 +221,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
     SN.Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
-    ASTContext &AC = NTD->getASTContext();
-    SN.Range = charSourceRangeFromSourceRange(AC.SourceMgr,
-                                                  NTD->getSourceRange());
+    SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
     SourceLoc NRStart = NTD->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
 
     for (const TypeLoc &TL : NTD->getInherited()) {
-      CharSourceRange TR = charSourceRangeFromSourceRange(AC.SourceMgr,
+      CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);
     }
@@ -248,12 +244,11 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SR = PD->getSourceRange();
       else
         SR = VD->getSourceRange();
-      ASTContext &AC = VD->getASTContext();
-      SN.Range = charSourceRangeFromSourceRange(AC.SourceMgr, SR);
+      SN.Range = charSourceRangeFromSourceRange(SM, SR);
       SourceLoc NRStart = VD->getNameLoc();
       SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
-      SN.TypeRange = charSourceRangeFromSourceRange(AC.SourceMgr,
+      SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
 
       SN.Kind = SyntaxStructureKind::InstanceVariable;
