@@ -19,12 +19,14 @@
 #ifndef SWIFT_IRGEN_GENCLANGTYPE_H
 #define SWIFT_IRGEN_GENCLANGTYPE_H
 
+#include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "clang/AST/CanonicalType.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/Type.h"
 
 namespace swift {
 namespace irgen {
+
 /// Given a Swift type, attempt to return an appropriate Clang
 /// CanQualType for the purpose of generating correct code for the
 /// ABI.
@@ -34,21 +36,8 @@ public:
   /// this Swift struct type. We do not currently handle generating a
   /// new Clang struct type for Swift struct types that are created
   /// independently of importing a Clang module.
-  clang::CanQualType visitStructType(CanStructType type) {
-    if (auto *clangDecl = type->getDecl()->getClangDecl()) {
-      auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-      return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
-    }
-
-    // FIXME: For parameters, we need to be able to generate a Clang
-    // type for all Swift types that can appear in an @objc parameter
-    // list.
-    return clang::CanQualType();
-  }
-
-  clang::CanQualType visitType(CanType type) {
-    return clang::CanQualType();
-  }
+  clang::CanQualType visitStructType(CanStructType type);
+  clang::CanQualType visitType(CanType type);
 };
 
 } // end namespace irgen
