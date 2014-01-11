@@ -539,7 +539,21 @@ public:
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
   void visitDebugValueInst(DebugValueInst *i) {
-    // FIXME: Noop
+    if (IGM.DebugInfo) {
+      VarDecl *Decl = i->getDecl();
+      assert(Decl);
+      StringRef Name = Decl->getName().str();
+      auto SILVal = i->getOperand();
+
+      auto Vals = getLoweredExplosion(SILVal).claimAll();
+      // See also comment for SILArgument.
+      if (Vals.size() == 1)
+        IGM.DebugInfo->emitStackVariableDeclaration
+          (Builder,
+           Vals[0],
+           DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
+           Name, i);
+  }
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
     // FIXME: Noop
