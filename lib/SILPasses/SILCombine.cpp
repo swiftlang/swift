@@ -257,6 +257,7 @@ public:
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitClassMethodInst(ClassMethodInst *CMI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -803,6 +804,26 @@ SILInstruction *SILCombiner::visitClassMethodInst(ClassMethodInst *CMI) {
       break;
   }
 
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
+  // Delete dead closures of this form:
+  //
+  // %X = partial_apply %x(...)    // has 1 use.
+  // strong_release %X;
+
+  // Only handle PartialApplyInst with one use.
+  if (!PAI->hasOneUse())
+    return nullptr;
+
+  // The single user must be the StrongReleaseInst.
+  if (auto *SRI = dyn_cast<StrongReleaseInst>(PAI->use_begin()->getUser())) {
+    // Delete the strong_release.
+    SRI->eraseFromParent();
+    // Delete the partial_apply.
+    return eraseInstFromFunction(*PAI);
+  }
   return nullptr;
 }
 
