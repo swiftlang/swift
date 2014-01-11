@@ -315,6 +315,18 @@ private:
     assert(TT->getNumElements() == 0);
     os << "void";
   }
+
+  void visitParenType(ParenType *PT) {
+    visit(PT->getSinglyDesugaredType());
+  }
+
+  void visitSubstitutedType(SubstitutedType *ST) {
+    visit(ST->getSinglyDesugaredType());
+  }
+
+  void visitSyntaxSugarType(SyntaxSugarType *SST) {
+    visit(SST->getSinglyDesugaredType());
+  }
 };
 
 class ModuleWriter {
