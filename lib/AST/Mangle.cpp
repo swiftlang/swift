@@ -1097,8 +1097,7 @@ void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
 void Mangler::mangleDestructorEntity(DestructorDecl *dtor,
                                      bool isDeallocating) {
   Buffer << 'F';
-  auto theClass = cast<ClassDecl>(dtor->getDeclContext());
-  mangleContext(theClass, BindGenerics::Enclosing);
+  mangleContextOf(dtor, BindGenerics::Enclosing);
   Buffer << (isDeallocating ? 'D' : 'd');
 }
 
