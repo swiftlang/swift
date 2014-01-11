@@ -63,10 +63,12 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #include "swift/AST/Attr.def"
       .Default(false);
       if (IsAttr) {
-        // It's a known attribute, so treat it as a keyword for syntax coloring.
+        // It's a known attribute, so treat it as a syntactic attribute node for
+        // syntax coloring. If swift gets user attributes then all identifiers
+        // will be treated as syntactic attribute nodes.
         Loc = AttrLoc;
         Length = SM.getByteDistance(Loc, Tok.getLoc()) + Tok.getLength();
-        Kind = SyntaxNodeKind::Attribute;
+        Kind = SyntaxNodeKind::AttributeId;
       }
       AttrLoc = SourceLoc();
     }
@@ -119,6 +121,7 @@ namespace {
 
 class ModelASTWalker : public ASTWalker {
   const SourceManager &SM;
+  unsigned BufferID;
   std::vector<SyntaxStructureNode> SubStructureStack;
   SourceLoc LastLoc;
 
@@ -126,8 +129,9 @@ public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
 
-  ModelASTWalker(const SourceManager &SM, SyntaxModelWalker &Walker)
-      : SM(SM), Walker(Walker) { }
+  ModelASTWalker(const SourceManager &SM, unsigned BufferID,
+                 SyntaxModelWalker &Walker)
+      : SM(SM), BufferID(BufferID), Walker(Walker) { }
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
@@ -136,6 +140,10 @@ public:
   bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
+  bool handleAttrs(const DeclAttributes &Attrs);
+  bool handleAttrs(const TypeAttributes &Attrs);
+  bool handleAttrLocs(SourceLoc AtLoc, ArrayRef<SourceLoc> Locs);
+
   enum PassNodesBehavior {
     /// Pass all nodes up to but not including the location.
     ExcludeNodeAtLocation,
@@ -174,7 +182,7 @@ CharSourceRange charSourceRangeFromSourceRange(const SourceManager &SM,
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
-  ModelASTWalker ASTWalk(Impl.SrcMgr, Walker);
+  ModelASTWalker ASTWalk(Impl.SrcMgr, *Impl.SrcFile.getBufferID(), Walker);
   ASTWalk.visitSourceFile(Impl.SrcFile, Impl.TokenNodes);
   return true;
 }
@@ -190,6 +198,9 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
+  if (!handleAttrs(D->getAttrs()))
+    return false;
+
   if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isGetterOrSetter()) {
@@ -279,7 +290,11 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
 }
 
 bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
-  if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
+  if (auto AttrT = dyn_cast<AttributedTypeRepr>(T)) {
+    if (!handleAttrs(AttrT->getAttrs()))
+      return false;
+
+  } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
     for (auto &comp : IdT->Components) {
       if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
                               CharSourceRange(comp.getIdLoc(),
@@ -288,6 +303,80 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
         return false;
     }
   }
+  return true;
+}
+
+bool ModelASTWalker::handleAttrs(const DeclAttributes &Attrs) {
+  SmallVector<SourceLoc, 4> Locs;
+  Attrs.getAttrLocs(Locs);
+  if (Locs.empty())
+    return true;
+
+  return handleAttrLocs(Attrs.AtLoc, Locs);
+}
+
+bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
+  SmallVector<SourceLoc, 4> Locs;
+  Attrs.getAttrLocs(Locs);
+  if (Locs.empty())
+    return true;
+
+  return handleAttrLocs(Attrs.AtLoc, Locs);
+}
+bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
+                                    ArrayRef<SourceLoc> Locs) {
+  if (BeginLoc.isInvalid() || Locs.empty())
+    return true;
+
+  SmallVector<SourceLoc, 6> SortedLocs(Locs.begin(), Locs.end());
+  std::sort(SortedLocs.begin(), SortedLocs.end(),
+      [&](SourceLoc LHS, SourceLoc RHS) {
+        return SM.isBeforeInBuffer(LHS, RHS);
+      }
+  );
+  Locs = SortedLocs;
+
+  std::vector<Token> Toks =
+      swift::tokenize(SM, BufferID,
+                      SM.getLocOffsetInBuffer(BeginLoc, BufferID),
+                      SM.getLocOffsetInBuffer(SortedLocs.back(), BufferID),
+                      /*KeepComments=*/true,
+                      /*TokenizeInterpolatedString=*/false);
+
+  auto passAttrNode = [&](SourceLoc AtLoc, SourceLoc AttrLoc) -> bool {
+    SourceRange Range;
+    if (AtLoc.isValid())
+      Range = SourceRange(AtLoc, AttrLoc);
+    else
+      Range = AttrLoc;
+    if (!passNonTokenNode({ SyntaxNodeKind::AttributeBuiltin,
+                            charSourceRangeFromSourceRange(SM, Range) }))
+      return false;
+
+    if (TokenNodes.front().Range.getStart() == AttrLoc)
+      TokenNodes = TokenNodes.slice(1);
+    return true;
+  };
+
+  SourceLoc AtLoc;
+  for (auto Tok : Toks) {
+    if (Tok.getLoc() == Locs.front()) {
+      Locs = Locs.slice(1);
+      if (!passAttrNode(AtLoc, Tok.getLoc()))
+        return false;
+    }
+
+    if (Tok.is(tok::at_sign))
+      AtLoc = Tok.getLoc();
+    else if (Tok.isNot(tok::exclaim_postfix))
+      AtLoc = SourceLoc();
+  }
+
+  if (!Locs.empty()) {
+    if (!passAttrNode(AtLoc, Locs.front()))
+      return false;
+  }
+
   return true;
 }
 

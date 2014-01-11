@@ -20,6 +20,7 @@
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Ownership.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -167,7 +168,14 @@ public:
     assert(!L.isInvalid() && "Cannot clear attribute with this method");
     AttrLocs[A] = L;
   }
-  
+
+  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+    for (auto Loc : AttrLocs) {
+      if (Loc.isValid())
+        Locs.push_back(Loc);
+    }
+  }
+
   // This attribute list is empty if no attributes are specified.  Note that
   // the presence of the leading @ is not enough to tell, because we want
   // clients to be able to remove attributes they process until they get to
@@ -234,6 +242,12 @@ public:
     HasAttr[A] = true;
   }
 
+  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+    for (auto Loc : AttrLocs) {
+      if (Loc.isValid())
+        Locs.push_back(Loc);
+    }
+  }
   
   // This attribute list is empty if no attributes are specified.  Note that
   // the presence of the leading @ is not enough to tell, because we want

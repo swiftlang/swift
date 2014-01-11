@@ -35,7 +35,10 @@ enum class SyntaxNodeKind : uint8_t {
   CommentLine,
   CommentBlock,
   TypeId,
-  Attribute
+  /// Any occurence of '@<attribute-name>' anywhere.
+  AttributeId,
+  /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.
+  AttributeBuiltin
 };
 
 struct SyntaxNode {
