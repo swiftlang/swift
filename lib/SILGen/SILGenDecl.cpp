@@ -333,7 +333,16 @@ public:
   ~LetValueInitialization() override {
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
-  
+
+  void emitDebugValue(SILValue v, SILGenFunction &gen) {
+    // Emit a debug_value[_addr] instruction to record the start of this value's
+    // lifetime.
+    if (!v.getType().isAddress())
+      gen.B.createDebugValue(vd, v);
+    else
+      gen.B.createDebugValueAddr(vd, v);
+  }
+
   SILValue getAddressOrNull() override {
     // We only have an address for address-only lets.
     return address;
@@ -347,6 +356,8 @@ public:
 
     assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
     gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
+
+    emitDebugValue(value, gen);
   }
 
   void bindArgument(SILValue value, SILGenFunction &gen) {
@@ -356,6 +367,7 @@ public:
       assert(!gen.VarLocs.count(vd) &&
              "Already bound a location to this argument");
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
+      emitDebugValue(value, gen);
     }
   }
 
