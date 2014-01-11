@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/Module.h"
 #include "swift/Basic/Optional.h"
 
 #include <string>
@@ -64,6 +65,9 @@ public:
   /// The input for which output should be generated. If not set, output will
   /// be generated for the whole module.
   Optional<SelectedInput> PrimaryInput;
+
+  /// The kind of input on which the frontend should operate.
+  SourceFileKind InputKind = SourceFileKind::Main;
 
   /// The name of the primary output file which should be created
   /// by the frontend.

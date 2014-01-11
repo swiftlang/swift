@@ -58,7 +58,6 @@ class CompilerInvocation {
   IRGenOptions IRGenOpts;
 
   bool Immediate = false;
-  SourceFileKind InputKind = SourceFileKind::Main;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
@@ -197,11 +196,11 @@ public:
   }
 
   void setInputKind(SourceFileKind K) {
-    InputKind = K;
+    FrontendOpts.InputKind = K;
   }
 
   SourceFileKind getInputKind() const {
-    return InputKind;
+    return FrontendOpts.InputKind;
   }
 
   void setModuleName(StringRef Name) {

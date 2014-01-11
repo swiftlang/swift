@@ -62,10 +62,8 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
   updateRuntimeImportPath();
 }
 
-// TODO: remove InputKind param once we support storing it in FrontendOptions
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags,
-                              SourceFileKind InputKind) {
+                              DiagnosticEngine &Diags) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_o)) {
@@ -113,6 +111,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_parse_stdlib)) {
     Opts.ParseStdlib = true;
+  }
+
+  if (Args.hasArg(OPT_parse_as_library)) {
+    Opts.InputKind = SourceFileKind::Library;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {
@@ -197,7 +199,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     if (!Lexer::isIdentifier(ModuleName)) {
       if (!Opts.actionHasOutput() ||
-          (InputKind == SourceFileKind::Main &&
+          (Opts.InputKind == SourceFileKind::Main &&
            Opts.InputFilenames.size() == 1)) {
         ModuleName = "main";
       } else {
@@ -409,15 +411,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  for (auto InputArg : *ParsedArgs) {
-    switch (InputArg->getOption().getID()) {
-    case OPT_parse_as_library:
-      setInputKind(SourceFileKind::Library);
-      break;
-    }
-  }
-
-  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags, InputKind)) {
+  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
     return true;
   }
 
