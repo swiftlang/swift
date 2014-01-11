@@ -518,7 +518,6 @@ public:
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
     int BraceCount = 0;
-    bool HadLineContinuation = false;
     bool UnfinishedInfixExpr = false;
     unsigned CurChunkLines = 0;
     wchar_t TotalLine[4096] = L"";
@@ -532,8 +531,7 @@ public:
     do {
       // Read one line.
       PromptContinuationLevel = BraceCount;
-      NeedPromptContinuation = BraceCount != 0 || HadLineContinuation ||
-                               UnfinishedInfixExpr;
+      NeedPromptContinuation = BraceCount != 0 || UnfinishedInfixExpr;
       PromptedForLine = false;
       Outdented = false;
       int LineCount;
@@ -553,15 +551,6 @@ public:
       
       convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
                     CurrentLines);
-      
-      // Special-case backslash for line continuations in the REPL.
-      if (CurrentLines.size() > 2 &&
-          CurrentLines.end()[-1] == '\n' && CurrentLines.end()[-2] == '\\') {
-        HadLineContinuation = true;
-        CurrentLines.erase(CurrentLines.end() - 2);
-      } else {
-        HadLineContinuation = false;
-      }
 
       wcslcat(TotalLine, WLine, sizeof(TotalLine) / sizeof(*TotalLine));
 
@@ -613,7 +602,7 @@ public:
       if (isspace(*p) && Identifier::isOperatorStartCodePoint(p[1])) {
         UnfinishedInfixExpr = true;
       }
-    } while (BraceCount > 0 || HadLineContinuation || UnfinishedInfixExpr);
+    } while (BraceCount > 0 || UnfinishedInfixExpr);
 
     // Enter the line into the line history.
     HistEventW ev;
