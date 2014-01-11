@@ -1449,6 +1449,43 @@ This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
+Debug Information
+~~~~~~~~~~~~~~~~~
+
+Debug information is generally associated with allocations (alloc_stack or
+alloc_box) by having a Decl node attached to the allocation with a SILLocation.
+For declarations that have no allocation we have explicit instructions for
+doing this.  This is used by 'let' declarations, which bind a value to a name
+and for var decls who are promoted into registers.  The decl they refer to is
+attached to the instruction with a SILLocation.
+
+debug_value
+```````````
+
+::
+  sil-instruction ::= debug_value sil-operand
+  
+  debug_value %1 : $Int
+  
+This indicates that the value of a declaration with loadable type has changed
+value to the specified operand.  The declaration in question is identified by
+the SILLocation attached to the debug_value instruction.
+
+The operand must have loadable type.
+
+debug_value_addr
+````````````````
+
+::
+  sil-instruction ::= debug_value_addr sil-operand
+  
+  debug_value_addr %7 : $*SomeProtocol
+  
+This indicates that the value of a declaration with addres-only type has changed
+value to the specified operand.  The declaration in question is identified by
+the SILLocation attached to the debug_value_addr instruction.
+
+
 Accessing Memory
 ~~~~~~~~~~~~~~~~
 
