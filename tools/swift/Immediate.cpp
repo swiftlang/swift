@@ -65,6 +65,7 @@
 
 #include <cmath>
 #include <thread>
+#include <wchar.h>
 #include <histedit.h>
 #include <dlfcn.h>
 
@@ -520,6 +521,7 @@ public:
     bool HadLineContinuation = false;
     bool UnfinishedInfixExpr = false;
     unsigned CurChunkLines = 0;
+    wchar_t TotalLine[4096] = L"";
 
     CurrentLines.clear();
 
@@ -560,15 +562,11 @@ public:
       } else {
         HadLineContinuation = false;
       }
-      
-      // Enter the line into the line history.
-      // FIXME: We should probably be a bit more clever here about which lines
-      // we put into the history and when we put them in.
-      HistEventW ev;
-      history_w(h, &ev, H_ENTER, WLine);
-      
+
+      wcslcat(TotalLine, WLine, sizeof(TotalLine) / sizeof(*TotalLine));
+
       ++CurChunkLines;
-      
+
       // If we detect a line starting with a colon, treat it as a special
       // REPL escape.
       char const *s = CurrentLines.data() + LineStart;
@@ -615,6 +613,10 @@ public:
           UnfinishedInfixExpr = true;
       }
     } while (BraceCount > 0 || HadLineContinuation || UnfinishedInfixExpr);
+
+    // Enter the line into the line history.
+    HistEventW ev;
+    history_w(h, &ev, H_ENTER, TotalLine);
 
     Result.clear();
     Result.append(CurrentLines.begin(), CurrentLines.end());
