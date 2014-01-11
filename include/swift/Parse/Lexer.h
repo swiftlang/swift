@@ -29,7 +29,7 @@ namespace swift {
   template<typename ...T> struct Diag;
 
 class Lexer {
-  SourceManager &SourceMgr;
+  const SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
   const unsigned BufferID;
 
@@ -93,8 +93,8 @@ private:
   /// The principal constructor used by public constructors below.
   /// Don't use this constructor for other purposes, it does not initialize
   /// everything.
-  Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags, unsigned BufferID,
-        bool InSILMode, bool KeepComments);
+  Lexer(const SourceManager &SourceMgr, DiagnosticEngine *Diags,
+        unsigned BufferID, bool InSILMode, bool KeepComments);
 
   /// @{
   /// Helper routines used in Lexer constructors.
@@ -104,14 +104,14 @@ private:
 
 public:
   /// \brief Create a normal lexer that scans the whole source buffer.
-  Lexer(SourceManager &SourceMgr, unsigned BufferID,
+  Lexer(const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
       : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
     primeLexer();
   }
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
-  Lexer(SourceManager &SourceMgr, unsigned BufferID,
+  Lexer(const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments,
         unsigned Offset, unsigned EndOffset)
       : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
@@ -190,7 +190,7 @@ public:
   /// resides.
   ///
   /// \param Loc The source location of the beginning of a token.
-  static SourceLoc getLocForEndOfToken(SourceManager &SM, SourceLoc Loc);
+  static SourceLoc getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc);
 
   /// Return the start location of the token that the offset in the given buffer
   /// points to.

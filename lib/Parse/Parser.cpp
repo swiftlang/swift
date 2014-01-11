@@ -151,7 +151,7 @@ void swift::performDelayedParsing(
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.
-static void getStringPartTokens(const Token &Tok, SourceManager &SM,
+static void getStringPartTokens(const Token &Tok, const SourceManager &SM,
                                 int BufID, const llvm::MemoryBuffer *Buffer,
                                 std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
@@ -210,7 +210,7 @@ static void getStringPartTokens(const Token &Tok, SourceManager &SM,
   }
 }
 
-std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
+std::vector<Token> swift::tokenize(const SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString) {

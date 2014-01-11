@@ -159,7 +159,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
+Lexer::Lexer(const SourceManager &SourceMgr, DiagnosticEngine *Diags,
              unsigned BufferID, bool InSILMode, bool KeepComments)
     : SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
       InSILMode(InSILMode), KeepComments(KeepComments) {
@@ -1458,7 +1458,7 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(SourceManager &SM, SourceLoc Loc) {
+SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
     return Loc;
