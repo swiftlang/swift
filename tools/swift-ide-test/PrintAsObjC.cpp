@@ -306,7 +306,7 @@ private:
     if (auto protoTy = instanceTy->getAs<ProtocolType>())
       visitProtocolType(protoTy, /*isMetatype=*/true);
     else if (auto compositionTy = instanceTy->getAs<ProtocolCompositionType>())
-      visitProtocolCompositionType(compositionTy);
+      visitProtocolCompositionType(compositionTy, /*isMetatype=*/true);
     else
       llvm_unreachable("Arbitrary metatypes are not ObjC-compatible");
   }
