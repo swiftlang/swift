@@ -105,27 +105,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Opts.InputFilenames.push_back(A->getValue());
     } else if (A->getOption().matches(OPT_primary_file)) {
       Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
+      Opts.InputFilenames.push_back(A->getValue());
     } else {
       llvm_unreachable("Unknown input-related argument!");
-    }
-  }
-
-  if (Opts.PrimaryInput.hasValue()) {
-    // Validate PrimaryInput.
-    bool isValid = true;
-    switch (Opts.PrimaryInput->Kind) {
-      case SelectedInput::InputKind::Filename:
-        if (Opts.PrimaryInput->Index >= Opts.InputFilenames.size())
-          isValid = false;
-        break;
-      case SelectedInput::InputKind::Buffer:
-        if (Opts.PrimaryInput->Index >= Opts.InputBuffers.size())
-          isValid = false;
-        break;
-    }
-    if (!isValid) {
-      // TODO: emit diagnostic
-      return true;
     }
   }
 
