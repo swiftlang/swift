@@ -47,8 +47,11 @@ class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
                     public TypeVisitor<ObjCPrinter> {
   llvm::DenseMap<Identifier, StringRef> specialNames;
   Identifier unsafePointerID;
+
   ASTContext &ctx;
   raw_ostream &os;
+
+  SmallVector<const FunctionType *, 4> openFunctionTypes;
 
   friend ASTVisitor<ObjCPrinter>;
   friend TypeVisitor<ObjCPrinter>;
@@ -63,7 +66,6 @@ public:
 
 private:
   using ASTVisitor::visit;
-  using TypeVisitor::visit;
 
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
@@ -139,7 +141,7 @@ private:
 
     Type rawMethodTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
-    visit(methodTy->getResult());
+    print(methodTy->getResult());
     os << ")" << FD->getName();
 
     auto argPatterns = FD->getArgParamPatterns();
@@ -163,7 +165,7 @@ private:
 
       auto bodyPattern = bodyParam.getPattern()->getSemanticsProvidingPattern();
       os << ":(";
-      this->visit(bodyPattern->getType());
+      this->print(bodyPattern->getType());
       os << ")";
 
       if (isa<AnyPattern>(bodyPattern)) {
@@ -179,7 +181,16 @@ private:
     os << ";\n";
   }
 
-  /// If "name" is a
+  /// Visit part of a type, such as the base of a pointer type.
+  ///
+  /// If a full type is being printed, use print() instead.
+  void visitPart(Type ty) {
+    TypeVisitor::visit(ty);
+  }
+
+  /// If "name" is one of the standard library types used to map in Clang
+  /// primitives and basic types, print out the appropriate spelling and
+  /// return true.
   ///
   /// This handles typealiases and structs provided by the standard library
   /// for interfacing with C and Objective-C.
@@ -254,7 +265,7 @@ private:
       return;
     }
 
-    visit(alias->getUnderlyingType());
+    visitPart(alias->getUnderlyingType());
   }
 
   void visitStructType(StructType *ST) {
@@ -268,6 +279,8 @@ private:
     os << SD->getName();
   }
 
+  /// If \p BGT represents a generic struct used to import Clang types, print
+  /// it out.
   bool printIfKnownGenericStruct(const BoundGenericStructType *BGT) {
     StructDecl *SD = BGT->getDecl();
     if (!SD->getModuleContext()->isStdlibModule())
@@ -280,7 +293,7 @@ private:
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    visit(args.front());
+    visitPart(args.front());
     os << " *";
     return true;
   }
@@ -343,21 +356,69 @@ private:
       llvm_unreachable("Arbitrary metatypes are not ObjC-compatible");
   }
 
+  void visitFunctionType(FunctionType *FT) {
+    assert(!FT->isThin() && "can't handle bare function pointers");
+    visitPart(FT->getResult());
+    os << " (^";
+    openFunctionTypes.push_back(FT);
+  }
+
+  /// Print the part of a function type that appears after where the variable
+  /// name would go.
+  ///
+  /// This is necessary to handle C's awful declarator syntax.
+  /// "(A) -> ((B) -> C)" becomes "C (^ (^)(A))(B)".
+  void finishFunctionType(const FunctionType *FT) {
+    os << ")(";
+    Type paramsTy = FT->getInput();
+    if (auto parenTy = dyn_cast<ParenType>(paramsTy.getPointer())) {
+      print(parenTy->getSinglyDesugaredType());
+    } else {
+      auto tupleTy = cast<TupleType>(paramsTy.getPointer());
+      if (tupleTy->getNumElements() == 0) {
+        os << "void";
+      } else {
+        interleave(tupleTy->getElementTypes(),
+                   [this](Type ty) { print(ty); },
+                   [this] { os << ", "; });
+      }
+    }
+    os << ")";
+  }
+
   void visitTupleType(TupleType *TT) {
     assert(TT->getNumElements() == 0);
     os << "void";
   }
 
   void visitParenType(ParenType *PT) {
-    visit(PT->getSinglyDesugaredType());
+    visitPart(PT->getSinglyDesugaredType());
   }
 
   void visitSubstitutedType(SubstitutedType *ST) {
-    visit(ST->getSinglyDesugaredType());
+    visitPart(ST->getSinglyDesugaredType());
   }
 
   void visitSyntaxSugarType(SyntaxSugarType *SST) {
-    visit(SST->getSinglyDesugaredType());
+    visitPart(SST->getSinglyDesugaredType());
+  }
+
+  /// Print a full type.
+  ///
+  /// This will properly handle nested function types (see
+  /// finishFunctionType()). If only a part of a type is being printed, use
+  /// visitPart().
+  void print(Type ty) {
+    decltype(openFunctionTypes) savedFunctionTypes;
+    savedFunctionTypes.swap(openFunctionTypes);
+
+    visitPart(ty);
+    while (!openFunctionTypes.empty()) {
+      const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
+      finishFunctionType(openFunctionTy);
+    }
+
+    openFunctionTypes = std::move(savedFunctionTypes);
   }
 };
 
