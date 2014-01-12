@@ -494,8 +494,10 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       postEmitFunction(dealloc, f);
     }
 
-    // Emit the Objective-C thunk for -dealloc.
-    emitObjCDestructorThunk(dd);
+    // Emit the Objective-C -dealloc entry point if it has
+    // something to do beyond messaging the superclass's -dealloc.
+    if (!dd->getBody()->getElements().empty())
+      emitObjCDestructorThunk(dd);
 
     // Emit the ivar destroyer, if needed.
     if (requiresIVarDestruction(*this, cd)) {

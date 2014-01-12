@@ -1052,11 +1052,38 @@ namespace {
         InstanceMethods.push_back(entry);
     }
 
+    /// Determine whether the given destructor has an Objective-C
+    /// definition.
+    bool hasObjCDeallocDefinition(DestructorDecl *destructor) {
+      // If we have the destructor body, we know whether SILGen
+      // generated a -dealloc body.
+      if (auto braceStmt = destructor->getBody())
+        return !braceStmt->getElements().empty();
+
+      // We don't have a destructor body, so hunt for the SIL function
+      // for it.
+      // FIXME: Linear search is awful.
+      SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
+                         SILDeclRef::ConstructAtNaturalUncurryLevel,
+                         /*isForeign=*/true);
+      llvm::SmallString<64> dtorNameBuffer;
+      auto dtorName = dtorRef.mangle(dtorNameBuffer);
+      for (auto &silFn : IGM.SILMod->getFunctions()) {
+        if (silFn.getName() == dtorName) {
+          return silFn.isDefinition();
+        }
+      }
+
+      // The Objective-C thunk was never even declared, so it is not defined.
+      return false;
+    }
+
     /// Destructors need to be collected into the instance methods
     /// list 
     void visitDestructorDecl(DestructorDecl *destructor) {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
-      if (Lowering::usesObjCAllocator(classDecl)) {
+      if (Lowering::usesObjCAllocator(classDecl) &&
+          hasObjCDeallocDefinition(destructor)) {
         llvm::Constant *entry = emitObjCMethodDescriptor(IGM, destructor);
         InstanceMethods.push_back(entry);
       }
