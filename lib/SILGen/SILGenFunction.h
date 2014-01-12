@@ -369,6 +369,10 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param nominal The type whose members are being initialized.
   void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
+
+  /// Emit a method that destroys the ivars of a class.
+  void emitIVarDestroyer(SILDeclRef ivarDestroyer);
+
   /// Generates code to destroy the instance variables of a class.
   ///
   /// \param selfValue The 'self' value.

@@ -1250,7 +1250,7 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
   return entry;
 }
 
-/// Fetch the declaration of the given known function.
+/// Fetch the declaration of the given known destructor.
 llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
                                                  DestructorKind kind,
                                                  ForDefinition_t forDefinition,
@@ -1281,6 +1281,25 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   return entry;
 }
 
+/// Fetch the declaration of the ivar destroyer for the given class.
+llvm::Function *IRGenModule::getAddrOfIVarDestroyer(
+                               ClassDecl *cd,
+                               ForDefinition_t forDefinition) {
+  SILDeclRef silRef(cd, SILDeclRef::Kind::IVarDestroyer, 
+                    SILDeclRef::ConstructAtNaturalUncurryLevel, 
+                    /*isForeign=*/false);
+  llvm::SmallString<64> ivarDestroyerNameBuffer;
+  auto ivarDestroyerName = silRef.mangle(ivarDestroyerNameBuffer);
+  // Find the SILFunction for the ivar destroyer.
+  // FIXME: This linear scan is awful. Fortunately, it only happens
+  // once per definition of an Objective-C-derived class.
+  for (auto &silFn : SILMod->getFunctions()) {
+    if (silFn.getName() == ivarDestroyerName)
+      return getAddrOfSILFunction(&silFn, ExplosionKind::Minimal,
+                                  forDefinition);
+  }
+  llvm_unreachable("Unable to find ivar destroyer SIL function");
+}
 
 /// Returns the address of a value-witness function.
 llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,

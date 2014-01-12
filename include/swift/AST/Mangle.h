@@ -114,6 +114,7 @@ public:
   void mangleConstructorEntity(ConstructorDecl *ctor, bool isAllocating,
                                ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDestructorEntity(DestructorDecl *decl, bool isDeallocating);
+  void mangleIVarDestroyerEntity(ClassDecl *decl);
   void mangleGetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
   void mangleSetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
   void mangleAddressorEntity(ValueDecl *decl);

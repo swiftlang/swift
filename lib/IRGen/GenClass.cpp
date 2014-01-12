@@ -715,6 +715,9 @@ namespace {
     {
       visitConformances(theClass->getProtocols());
       visitMembers(theClass);
+
+      if (Lowering::usesObjCAllocator(theClass))
+        addIVarDestroyer(); 
     }
     
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
@@ -1057,6 +1060,11 @@ namespace {
         llvm::Constant *entry = emitObjCMethodDescriptor(IGM, destructor);
         InstanceMethods.push_back(entry);
       }
+    }
+
+    void addIVarDestroyer() {
+      llvm::Constant *entry = emitObjCIVarDestroyerDescriptor(IGM, getClass());
+      InstanceMethods.push_back(entry);
     }
 
   private:

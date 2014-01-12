@@ -1772,13 +1772,9 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     return;
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
-
-  // Release our members early.
-  // FIXME: Because Objective-C's -dealloc is a deallocating destructor,
-  // rather than a destroying destructor, we don't get a change to release
-  // the members after our superclass dealloc runs. This will eventually be
-  // handled by .cxx_destruct.
-  emitClassMemberDestruction(selfValue, cd, loc, cleanupLoc);
+  
+  // Note: the ivar destroyer is responsible for destroying the
+  // instance variables before the object is actually deallocated.
 
   // Form a reference to the superclass -dealloc.
   Type superclassTy = cd->getSuperclass();

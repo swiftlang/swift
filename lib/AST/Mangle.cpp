@@ -1101,6 +1101,12 @@ void Mangler::mangleDestructorEntity(DestructorDecl *dtor,
   Buffer << (isDeallocating ? 'D' : 'd');
 }
 
+void Mangler::mangleIVarDestroyerEntity(ClassDecl *decl) {
+  Buffer << 'F';
+  mangleContext(decl, BindGenerics::Enclosing);
+  Buffer << 'E';
+}
+
 void Mangler::mangleGetterEntity(ValueDecl *decl, ExplosionKind explosion) {
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);

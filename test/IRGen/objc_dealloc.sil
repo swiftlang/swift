@@ -98,3 +98,19 @@ bb0(%0 : $SwiftGizmo):
   return %8 : $()                                 // id: %9
 }
 
+// ObjectiveC.SwiftGizmo.__ivar_destroyer
+sil @_TFCSo10SwiftGizmoE : $@cc(method) @thin (@owned SwiftGizmo) -> () {
+bb0(%0 : $SwiftGizmo):
+  %1 = tuple ()                                   // user: %2
+  return %1 : $()                                 // id: %2
+}
+
+// @objc ObjectiveC.SwiftGizmo.__ivar_destroyer
+sil @_TToFCSo10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> () {
+bb0(%0 : $SwiftGizmo):
+  strong_retain %0 : $SwiftGizmo                  // id: %1
+  // function_ref ObjectiveC.SwiftGizmo.__ivar_destroyer
+  %2 = function_ref @_TFCSo10SwiftGizmoE : $@cc(method) @thin (@owned SwiftGizmo) -> () // user: %3
+  %3 = apply %2(%0) : $@cc(method) @thin (@owned SwiftGizmo) -> () // user: %4
+  return %3 : $()                                 // id: %4
+}

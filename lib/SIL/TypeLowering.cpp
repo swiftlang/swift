@@ -1340,10 +1340,31 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
                                    : CanType(C.TheObjectPointerType);
 
+  auto selfType = classType;
   if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
-    return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
+    return CanPolymorphicFunctionType::get(selfType, resultTy, params, extInfo);
 
-  return CanFunctionType::get(classType, resultTy, extInfo);
+  return CanFunctionType::get(selfType, resultTy, extInfo);
+}
+
+/// Retrieve the type of the ivar initializer or destroyer method for
+/// a class.
+static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd, 
+                                                   bool isObjC,
+                                                   ASTContext &ctx) {
+  auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
+
+  auto emptyTupleTy = TupleType::getEmpty(ctx)->getCanonicalType();
+  auto extInfo = AnyFunctionType::ExtInfo(isObjC? AbstractCC::ObjCMethod
+                                                : AbstractCC::Method,
+                                          /*thin*/ true,
+                                          /*noreturn*/ false);
+  
+  auto resultType = CanFunctionType::get(emptyTupleTy, emptyTupleTy, extInfo);
+  if (auto params = cd->getGenericParams())
+    return CanPolymorphicFunctionType::get(classType, resultType, params, 
+                                           extInfo);
+  return CanFunctionType::get(classType, resultType, extInfo);
 }
 
 GenericParamList *
@@ -1533,6 +1554,9 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   case SILDeclRef::Kind::DefaultArgGenerator: {
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
+  }
+  case SILDeclRef::Kind::IVarDestroyer: {
+    return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign, Context);
   }
   }
 }

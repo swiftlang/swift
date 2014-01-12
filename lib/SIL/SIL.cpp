@@ -95,6 +95,10 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
            && "can only create destroyer/deallocator SILDeclRef for dtor");
     naturalUncurryLevel = 0;
+  } else if (isa<ClassDecl>(vd)) {
+    assert(kind == Kind::IVarDestroyer
+           && "can only create ivar destroyer SILDeclRef for class decl");
+    naturalUncurryLevel = 1;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
             || kind == Kind::Setter
@@ -357,6 +361,12 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
                                     /*allocating*/ false,
                                     ExplosionKind::Minimal,
                                     c.uncurryLevel);
+    return;
+
+  //   entity ::= declaration 'E'                 // ivar destroyer
+  case SILDeclRef::Kind::IVarDestroyer:
+    buffer << introducer;
+    mangler.mangleIVarDestroyerEntity(cast<ClassDecl>(c.getDecl()));
     return;
 
   //   entity ::= declaration 'g'                 // getter

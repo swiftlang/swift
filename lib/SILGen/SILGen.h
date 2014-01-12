@@ -203,6 +203,10 @@ public:
   /// Emit the ObjC-compatible entry point for a destructor (i.e., -dealloc).
   void emitObjCDestructorThunk(DestructorDecl *destructor);
 
+  /// Emit the ObjC-compatible entry point for an ivar destroyer
+  /// (i.e., -.cxx_destruct).
+  void emitObjCIVarDestroyerThunk(ClassDecl *cd);
+
   /// Emit the ObjC-compatible getter and setter for a subscript
   /// declaration.
   void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);

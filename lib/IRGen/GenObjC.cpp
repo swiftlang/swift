@@ -355,6 +355,10 @@ namespace {
         cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Text);
         break;
 
+      case SILDeclRef::Kind::IVarDestroyer:
+        Text = ".cxx_destruct";
+        break;
+
       case SILDeclRef::Kind::Setter:
         if (auto var = dyn_cast<VarDecl>(ref.getDecl()))
           var->getObjCSetterSelector(Text);
@@ -1090,6 +1094,29 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   emitObjCMethodDescriptorParts(IGM, method,
                                 selectorRef, atEncoding, impl);
   
+  llvm::Constant *fields[] = { selectorRef, atEncoding, impl };
+  return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
+}
+
+llvm::Constant *irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM,
+                                                       ClassDecl *cd) {
+  /// The first element is the selector.
+  SILDeclRef declRef = SILDeclRef(cd, SILDeclRef::Kind::IVarDestroyer,
+                                  1, /*foreign*/ true);
+  Selector selector(declRef);
+  llvm::Constant *selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
+  
+  /// The second element is the type @encoding.
+  llvm::Constant *atEncoding
+    = GetObjCEncodingForType(IGM, cd->getDestructor()->getType());
+
+  /// The third element is the method implementation pointer.
+  llvm::Function *swiftImpl = IGM.getAddrOfIVarDestroyer(cd, NotForDefinition);
+  llvm::Constant *impl
+    = getObjCMethodPointerForSwiftImpl(IGM, selector, declRef, swiftImpl, 
+                                       ExplosionKind::Minimal);
+
+  // Form the method_t instance.
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }
