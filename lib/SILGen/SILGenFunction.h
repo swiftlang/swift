@@ -502,10 +502,9 @@ public:
   /// \param IsAutoGen Flags if the prolog is auto-generated.
   void emitEpilog(SILLocation TopLevelLoc, bool IsAutoGen = false);
   
-  /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
-  /// a normal function, the destructor does not consume a reference to its
-  /// argument. Returns the 'self' argument SILValue.
-  SILValue emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
+  /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
+  /// up debug info, etc.  This returns the 'self' value.
+  SILValue emitSelfDecl(VarDecl *selfDecl);
   
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
