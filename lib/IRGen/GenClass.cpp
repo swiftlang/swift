@@ -1063,8 +1063,8 @@ namespace {
     }
 
     void addIVarDestroyer() {
-      llvm::Constant *entry = emitObjCIVarDestroyerDescriptor(IGM, getClass());
-      InstanceMethods.push_back(entry);
+      if (auto entry = emitObjCIVarDestroyerDescriptor(IGM, getClass()))
+        InstanceMethods.push_back(*entry);
     }
 
   private:

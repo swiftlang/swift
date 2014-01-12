@@ -1098,8 +1098,14 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }
 
-llvm::Constant *irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM,
-                                                       ClassDecl *cd) {
+Optional<llvm::Constant*> 
+irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM, ClassDecl *cd) {
+  // Check whether we have 
+  Optional<llvm::Function*> objcImpl 
+    = IGM.getAddrOfObjCIVarDestroyer(cd, NotForDefinition);
+  if (!objcImpl)
+    return Nothing;
+
   /// The first element is the selector.
   SILDeclRef declRef = SILDeclRef(cd, SILDeclRef::Kind::IVarDestroyer,
                                   1, /*foreign*/ true);
@@ -1111,9 +1117,8 @@ llvm::Constant *irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM,
     = GetObjCEncodingForType(IGM, cd->getDestructor()->getType());
 
   /// The third element is the method implementation pointer.
-  llvm::Function *objcImpl 
-    = IGM.getAddrOfObjCIVarDestroyer(cd, NotForDefinition);
-  llvm::Constant *impl = llvm::ConstantExpr::getBitCast(objcImpl,IGM.Int8PtrTy);
+  llvm::Constant *impl = llvm::ConstantExpr::getBitCast(*objcImpl,
+                                                        IGM.Int8PtrTy);
 
   // Form the method_t instance.
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };

@@ -465,6 +465,21 @@ void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   postEmitFunction(constant, f);
 }
 
+/// Determine whether the given class has any instance variables that
+/// need to be destroyed.
+static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
+  for (Decl *member : cd->getMembers()) {
+    VarDecl *vd = dyn_cast<VarDecl>(member);
+    if (!vd || vd->isComputed()) continue;
+
+    const TypeLowering &ti = SGM.Types.getTypeLowering(vd->getType());
+    if (!ti.isTrivial())
+      return true;
+  }
+
+  return false;
+}
+
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
 
@@ -482,8 +497,8 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     // Emit the Objective-C thunk for -dealloc.
     emitObjCDestructorThunk(dd);
 
-    // Emit the ivar destroyer.
-    {
+    // Emit the ivar destroyer, if needed.
+    if (requiresIVarDestruction(*this, cd)) {
       SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
                                SILDeclRef::ConstructAtNaturalUncurryLevel,
                                /*isForeign=*/true);
@@ -492,9 +507,6 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
       postEmitFunction(ivarDestroyer, f);
     }
-
-    // Emit the Objective-C thunk for the ivar destroyer (.cxx_destruct).
-    // emitObjCIVarDestroyerThunk(cd);
     
     return;
   }

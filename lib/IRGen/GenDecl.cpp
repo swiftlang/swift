@@ -1282,9 +1282,9 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
 }
 
 /// Fetch the declaration of the ivar destroyer for the given class.
-llvm::Function *IRGenModule::getAddrOfObjCIVarDestroyer(
-                               ClassDecl *cd,
-                               ForDefinition_t forDefinition) {
+Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarDestroyer(
+                            ClassDecl *cd,
+                            ForDefinition_t forDefinition) {
   SILDeclRef silRef(cd, SILDeclRef::Kind::IVarDestroyer, 
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
                     /*isForeign=*/true);
@@ -1298,7 +1298,8 @@ llvm::Function *IRGenModule::getAddrOfObjCIVarDestroyer(
       return getAddrOfSILFunction(&silFn, ExplosionKind::Minimal,
                                   forDefinition);
   }
-  llvm_unreachable("Unable to find ivar destroyer SIL function");
+
+  return Nothing;
 }
 
 /// Returns the address of a value-witness function.
