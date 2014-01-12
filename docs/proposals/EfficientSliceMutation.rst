@@ -83,13 +83,159 @@ underlying buffer.
 Our Solution
 ============
 
-We propose to create a special ``@inout`` subscript operations that
-can be used to treat slices specially in the presence of writeback,
-with labels ``inout_set:`` and ``inout_get:``.
+This optimization can be implemented by maintaining an **inout reference
+count** for value backing store objects that tracks the number of active
+``@inout`` references that are allowed to mutate the buffer without copying.
+A container value and all in-place ``@inout`` slices retain strong references
+to the backing store, as usual, but also bump this inout reference count while
+they are allowed to mutate the backing store in-place.
+The logic for deciding whether to copy a buffer prior to a
+mutation changes from the current "strong refcount equals one" criterion into
+"strong refcount is less than or equal to inout refcount".
 
-We propose that for arrays created natively in Swift, the underlying
-buffer's "weak" reference should be repurposed to count ``@inout``
-references.  When all strong references but one are accounted for by
-``@inout`` references, there is no need to copy the underlying buffer
-prior to modification.
+Because this optimization benefits a relatively small set of slicing subscript
+properties, we think it is reasonable to expose it as a manual optimization for
+the library. To expose this implementation strategy to the library, we propose
+to create a special pair of property operations that can be used to
+treat slice-like properties specially in the presence of writeback, with labels
+``enter_inout:`` and ``exit_inout:``. Copy-on-write containers can then use
+these labels to maintain the inout reference count of their backing stores and
+optimize in-place mutation of ``@inout`` slices.
 
+Other Considered Solutions
+--------------------------
+
+Move optimization seemed like a potential solution when we first considered
+this problem--given that it is already unspecified to reference a property
+while an active ``@inout`` reference can modify it, it seems natural to move
+ownership of the value to the ``@inout`` when entering writeback and move it
+back to the original value when exiting writeback. We do not think it is viable
+for the following reasons:
+
+- In general, relying on optimizations to provide performance semantics is
+  brittle.
+- Move optimization would not be memory safe if either the original value or
+  ``@inout`` slice were modified to give up ownership of the original backing
+  store.  Although observing a value while it has inout aliases is unspecified,
+  it should remain memory-safe to do so. This should remain memory safe, albeit
+  unspecified::
+
+    var arr = [1,2,3]
+    func mutate(x: @inout Int[]) -> Int[] {
+      x = [3..4]
+      return arr[0..2]
+    }
+    mutate(&arr[0..2])
+
+  Inout slices thus require strong ownership of the backing store independent
+  of the original object, which must also keep strong ownership of the backing
+  store.
+- Move optimization requires unique referencing and would fail when there are
+  multiple concurrent, non-overlapping ``@inout`` slices. ``swap(&x.a, &x.b)``
+  is well-defined if ``x.a`` and ``x.b`` do not access overlapping state, and
+  so should ``swap(&x[0..50], &x[50..100])``.  More generally, we would like to
+  use inout slicing to implement divide-and- conquer parallel algorithms, as
+  in::
+
+    async { mutate(&arr[0..50]) }
+    async { mutate(&arr[50..100]) }
+
+enter_inout and exit_inout
+==========================
+
+We propose making an optional pair of labels to computed property definitions,
+``enter_inout`` and ``exit_inout``. When a property has these labels defined
+and is referenced in a context that requires writeback, the ``enter_inout``
+method is applied immediately after ``get``, and the ``exit_inout`` method is
+applied **to the value at the time of get** immediately before ``set``.
+This operation::
+
+  mutate(&arr[a..b])
+
+thus behaves as if by the following sequence of calls when
+``enter_inout`` and ``exit_inout`` are present for the property::
+
+  var slice = arr.subscript(a..b).get()
+  var arr_orig = arr
+  arr_orig.subscript(a..b).enter_inout()
+  mutate(&slice)
+  arr_orig.subscript(a..b).exit_inout()
+  arr.subscript(a..b).set(slice)
+
+TODO: Copying the original value ``arr`` to ``arr_orig`` creates another strong
+reference to the backing store!
+
+``enter_inout`` and ``exit_inout`` are only applied when the computed property
+is used in a writeback context, such as when used as an ``inout`` parameter or
+when a ``mutating`` method or property of the value is accessed. In cases where
+the property is simply loaded or stored to, such as when reading or assigning
+the property, they are not applied.
+
+``enter_inout`` and ``exit_inout`` must appear together. They are
+non-\ ``@mutating`` by default.
+
+Using enter_inout and exit_inout to Optimize Slice Mutation
+===========================================================
+
+``enter_inout`` and ``exit_inout`` expose enough mechanism for a container
+author to maintain an inout reference count for the container's
+backing store object. For example::
+
+  /// Backing store for a copy-on-write Array type.
+  class ArrayBuffer<T> {
+    /// The number of inout references to this backing store. Includes a count
+    /// for the originating non-@inout value.
+    var inoutRefcount: Word = 1
+
+    func _getStrongReferenceCount() -> Word {
+      // Use a (currently nonexistent) builtin to access the strong reference
+      // count.
+      return Word(Builtin.getStrongReferenceCount(self))
+    }
+
+    func _needsToBeCopied() -> Bool {
+      // Compare the strong reference count to the inout reference count.
+      return _getStrongReferenceCount(self) <= inoutRefcount
+    }
+  }
+
+  struct Array<T> {
+    var buffer: ArrayBuffer<T>
+    var start, count: Int
+    
+    subscript(indexes: Range<Int>) -> Array<T> {
+    get:
+      return slice(indexes)
+    enter_inout:
+      buffer.inoutRefcount++
+    exit_inout:
+      buffer.inoutRefcount--
+    set(value: Array<T>):
+      // If the slice remains in-place, we're done.
+      if (value.start === start && value.count == count) {
+        return
+      }
+
+      // Otherwise, we need to splice it in.
+      setSliceSlow(indexes, value)
+    }
+  }
+  
+
+The backing store object ``ArrayBuffer`` carries the inout reference count and
+uses it to decide whether it needs to be copied, and the ``enter_inout`` and
+``exit_inout`` methods of the property update the reference count to allow
+slices to mutate the backing store in-place for the duration of an ``inout``
+reference to the slice. The setter for the slice can then short-circuit out
+in the case when the mutation happens completely in-place.
+
+Thread Safety
+=============
+
+In our current uniqueness-based COW model, thread safety falls out naturally:
+if you have a singly-referenced backing store, the value itself must also be
+unique, and the backing store cannot be written concurrently without there
+being a race on that value. This also holds for the case of multiple inout
+references. If the inout reference count matches the strong reference count,
+the active inout slices cannot observe each other's referenced slices without
+fundamentally racing.
