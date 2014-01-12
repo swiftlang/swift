@@ -2830,6 +2830,16 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
+  if (Attrs.isIBInspectable()) {
+    // Only instance properties can be IBInspectables.
+    auto *VD = dyn_cast<VarDecl>(D);
+    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
+      TC.diagnose(Attrs.getLoc(AK_IBInspectable), diag::invalid_ibinspectable);
+      D->getMutableAttrs().clearAttribute(AK_IBInspectable);
+      return;
+    }
+  }
+
   if (Attrs.isIBAction()) {
     // Only instance methods returning () can be IBActions.
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);

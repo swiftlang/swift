@@ -1104,6 +1104,8 @@ ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_iboutlet,sema_tcd,none,
       "only properties can be declared 'IBOutlet'", ())
+ERROR(invalid_ibinspectable,sema_tcd,none,
+      "only properties can be declared 'IBInspectable'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
       "only methods can be declared 'IBAction'", ())
 ERROR(invalid_ibaction_result,sema_tcd,none,
