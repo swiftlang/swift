@@ -2585,6 +2585,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
 
+  if (!NeedsBoxForSelf)
+    B.createDebugValue(selfDecl, selfArg);
+  
   // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
   // on ivars.
   MarkUninitializedInst::Kind MUKind;
