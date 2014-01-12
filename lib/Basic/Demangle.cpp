@@ -891,6 +891,9 @@ private:
     } else if (Mangled.nextIf('d')) {
       entityKind = Node::Kind::Destructor;
       hasType = false;
+    } else if (Mangled.nextIf('e')) {
+      entityKind = Node::Kind::IVarInitializer;
+      hasType = false;
     } else if (Mangled.nextIf('E')) {
       entityKind = Node::Kind::IVarDestroyer;
       hasType = false;
@@ -2129,6 +2132,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::Deallocator:
     printEntity(false, false, "__deallocating_destructor");
+    return;
+  case Node::Kind::IVarInitializer:
+    printEntity(false, false, "__ivar_initializer");
     return;
   case Node::Kind::IVarDestroyer:
     printEntity(false, false, "__ivar_destroyer");

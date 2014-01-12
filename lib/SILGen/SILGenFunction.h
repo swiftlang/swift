@@ -370,6 +370,9 @@ public:
   /// \param nominal The type whose members are being initialized.
   void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
 
+  /// Emit a method that initializes the ivars of a class.
+  void emitIVarInitializer(SILDeclRef ivarInitializer);
+
   /// Emit a method that destroys the ivars of a class.
   void emitIVarDestroyer(SILDeclRef ivarDestroyer);
 

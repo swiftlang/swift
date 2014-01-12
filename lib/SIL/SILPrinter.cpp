@@ -225,6 +225,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::Deallocator:
     OS << "!deallocator";
     break;
+  case SILDeclRef::Kind::IVarInitializer:
+    OS << "!ivarinitializer";
+    break;
   case SILDeclRef::Kind::IVarDestroyer:
     OS << "!ivardestroyer";
     break;

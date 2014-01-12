@@ -666,8 +666,9 @@ Declaration References
   sil-decl-subref-part ::= 'enumelt'
   sil-decl-subref-part ::= 'destroyer'
   sil-decl-subref-part ::= 'deallocator'
-  sil-decl-subref-part ::= 'ivardestroyer'
   sil-decl-subref-part ::= 'globalaccessor'
+  sil-decl-subref-part ::= 'ivardestroyer'
+  sil-decl-subref-part ::= 'ivarinitializer'
   sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
   sil-decl-uncurry-level ::= [0-9]+
   sil-decl-lang ::= 'foreign'
@@ -686,8 +687,9 @@ entity discriminators:
 - ``enumelt``: a member of a ``enum`` type.
 - ``destroyer``: a class's destroying destructor
 - ``deallocator``: a class's deallocating destructor
-- ``ivardestroyer``: a class's ivar destroyer
 - ``globalaccessor``: the addressor function for a global variable
+- ``ivardestroyer``: a class's ivar destroyer
+- ``ivarinitializer``: a class's ivar initializer
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
 - ``foreign``: a specific entry point for C/objective-C interoperability

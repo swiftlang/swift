@@ -466,6 +466,20 @@ void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
 }
 
 /// Determine whether the given class has any instance variables that
+/// need to be initialized.
+static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
+  for (Decl *member : cd->getMembers()) {
+    auto pbd = dyn_cast<PatternBindingDecl>(member);
+    if (!pbd) continue;
+
+    if (pbd->getInit())
+      return true;
+  }
+
+  return false;
+}
+
+/// Determine whether the given class has any instance variables that
 /// need to be destroyed.
 static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
   for (Decl *member : cd->getMembers()) {
@@ -498,6 +512,17 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     // something to do beyond messaging the superclass's -dealloc.
     if (!dd->getBody()->getElements().empty())
       emitObjCDestructorThunk(dd);
+
+    // Emit the ivar initializer, if needed.
+    if (requiresIVarInitialization(*this, cd)) {
+      SILDeclRef ivarInitializer(cd, SILDeclRef::Kind::IVarInitializer,
+                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                 /*isForeign=*/true);
+      SILFunction *f = preEmitFunction(ivarInitializer, dd, dd);
+      PrettyStackTraceSILFunction X("silgen emitDestructor ivar initializer", f);
+      SILGenFunction(*this, *f).emitIVarInitializer(ivarInitializer);
+      postEmitFunction(ivarInitializer, f);
+    }
 
     // Emit the ivar destroyer, if needed.
     if (requiresIVarDestruction(*this, cd)) {

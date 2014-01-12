@@ -1281,20 +1281,23 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   return entry;
 }
 
-/// Fetch the declaration of the ivar destroyer for the given class.
-Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarDestroyer(
+/// Fetch the declaration of the ivar initializer for the given class.
+Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
                             ClassDecl *cd,
+                            bool isDestroyer,
                             ForDefinition_t forDefinition) {
-  SILDeclRef silRef(cd, SILDeclRef::Kind::IVarDestroyer, 
+  SILDeclRef silRef(cd, 
+                    isDestroyer? SILDeclRef::Kind::IVarDestroyer
+                               : SILDeclRef::Kind::IVarInitializer, 
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
                     /*isForeign=*/true);
-  llvm::SmallString<64> ivarDestroyerNameBuffer;
-  auto ivarDestroyerName = silRef.mangle(ivarDestroyerNameBuffer);
-  // Find the SILFunction for the ivar destroyer.
+  llvm::SmallString<64> ivarInitDestroyNameBuffer;
+  auto ivarInitDestroyName = silRef.mangle(ivarInitDestroyNameBuffer);
+  // Find the SILFunction for the ivar initializer or destroyer.
   // FIXME: This linear scan is awful. Fortunately, it only happens
   // once per definition of an Objective-C-derived class.
   for (auto &silFn : SILMod->getFunctions()) {
-    if (silFn.getName() == ivarDestroyerName)
+    if (silFn.getName() == ivarInitDestroyName)
       return getAddrOfSILFunction(&silFn, ExplosionKind::Minimal,
                                   forDefinition);
   }

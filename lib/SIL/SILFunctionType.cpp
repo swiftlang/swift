@@ -632,6 +632,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
@@ -757,6 +758,7 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   if (c.isForeign)
     return c.hasDecl() && 
       (isClassOrProtocolMethod(c.getDecl()) || 
+       c.kind == SILDeclRef::Kind::IVarInitializer ||
        c.kind == SILDeclRef::Kind::IVarDestroyer)
       ? AbstractCC::ObjCMethod
       : AbstractCC::C;
@@ -774,6 +776,7 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   
   if (c.getDecl()->isInstanceMember() ||
       c.kind == SILDeclRef::Kind::Initializer ||
+      c.kind == SILDeclRef::Kind::IVarInitializer ||
       c.kind == SILDeclRef::Kind::IVarDestroyer)
     return AbstractCC::Method;
   return AbstractCC::Freestanding;

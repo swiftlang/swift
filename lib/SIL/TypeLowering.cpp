@@ -1555,6 +1555,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
   }
+  case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer: {
     return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign, Context);
   }

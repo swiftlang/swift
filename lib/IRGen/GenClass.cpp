@@ -716,8 +716,10 @@ namespace {
       visitConformances(theClass->getProtocols());
       visitMembers(theClass);
 
-      if (Lowering::usesObjCAllocator(theClass))
+      if (Lowering::usesObjCAllocator(theClass)) {
+        addIVarInitializer(); 
         addIVarDestroyer(); 
+      }
     }
     
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
@@ -1089,8 +1091,13 @@ namespace {
       }
     }
 
+    void addIVarInitializer() {
+      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(), false))
+        InstanceMethods.push_back(*entry);
+    }
+
     void addIVarDestroyer() {
-      if (auto entry = emitObjCIVarDestroyerDescriptor(IGM, getClass()))
+      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(), true))
         InstanceMethods.push_back(*entry);
     }
 

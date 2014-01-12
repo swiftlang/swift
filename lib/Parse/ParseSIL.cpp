@@ -803,6 +803,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
       } else if (!ParseState && Id.str() == "ivardestroyer") {
         Kind = SILDeclRef::Kind::IVarDestroyer;
         ParseState = 1;
+      } else if (!ParseState && Id.str() == "ivarinitializer") {
+        Kind = SILDeclRef::Kind::IVarInitializer;
+        ParseState = 1;
       } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;

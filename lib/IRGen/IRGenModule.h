@@ -393,8 +393,9 @@ public:
   llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
                                       ForDefinition_t forDefinition,
                                       bool isForeign);
-  Optional<llvm::Function*> getAddrOfObjCIVarDestroyer(
+  Optional<llvm::Function*> getAddrOfObjCIVarInitDestroy(
                               ClassDecl *cd,
+                              bool isDestroyer,
                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,

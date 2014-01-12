@@ -126,10 +126,14 @@ namespace irgen {
   llvm::Constant *emitObjCMethodDescriptor(IRGenModule &IGM,
                                            AbstractFunctionDecl *method);
 
-  /// Build an Objective-C method descriptor for the ivar destroyer of
-  /// a class (-.cxx_destruct).
-  Optional<llvm::Constant*> emitObjCIVarDestroyerDescriptor(IRGenModule &IGM,
-                                                            ClassDecl *cd);
+  /// Build an Objective-C method descriptor for the ivar initializer
+  /// or destroyer of a class (-.cxx_construct or -.cxx_destruct).
+  ///
+  /// \returns the method destructor, or an empty optional if there is
+  /// no corresponding SIL function.
+  Optional<llvm::Constant*> emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
+                                                              ClassDecl *cd,
+                                                              bool isDestroyer);
   
   /// Build an Objective-C method descriptor for the given property's
   /// getter and setter methods.

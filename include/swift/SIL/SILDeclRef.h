@@ -91,6 +91,13 @@ struct SILDeclRef {
     /// References the generator for a default argument of a function.
     DefaultArgGenerator,
 
+    /// References the ivar initializer for the ClassDecl in loc.
+    ///
+    /// Only classes that are allocated using Objective-C's allocation
+    /// routines have an ivar initializer, which is emitted as
+    /// .cxx_construct.
+    IVarInitializer,
+
     /// References the ivar destroyer for the ClassDecl in loc.
     ///
     /// Only classes that are allocated using Objective-C's allocation

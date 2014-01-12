@@ -355,6 +355,10 @@ namespace {
         cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Text);
         break;
 
+      case SILDeclRef::Kind::IVarInitializer:
+        Text = ".cxx_construct";
+        break;
+
       case SILDeclRef::Kind::IVarDestroyer:
         Text = ".cxx_destruct";
         break;
@@ -1099,16 +1103,20 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
 }
 
 Optional<llvm::Constant*> 
-irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM, ClassDecl *cd) {
-  // Check whether we have 
+irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
+                                         bool isDestroyer) {
+  // Check whether we have an implementation.
   Optional<llvm::Function*> objcImpl 
-    = IGM.getAddrOfObjCIVarDestroyer(cd, NotForDefinition);
+    = IGM.getAddrOfObjCIVarInitDestroy(cd, isDestroyer, NotForDefinition);
   if (!objcImpl)
     return Nothing;
 
   /// The first element is the selector.
-  SILDeclRef declRef = SILDeclRef(cd, SILDeclRef::Kind::IVarDestroyer,
-                                  1, /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(cd, 
+                                  isDestroyer? SILDeclRef::Kind::IVarDestroyer
+                                             : SILDeclRef::Kind::IVarInitializer,
+                                  1, 
+                                  /*foreign*/ true);
   Selector selector(declRef);
   llvm::Constant *selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
