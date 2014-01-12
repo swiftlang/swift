@@ -1282,12 +1282,12 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
 }
 
 /// Fetch the declaration of the ivar destroyer for the given class.
-llvm::Function *IRGenModule::getAddrOfIVarDestroyer(
+llvm::Function *IRGenModule::getAddrOfObjCIVarDestroyer(
                                ClassDecl *cd,
                                ForDefinition_t forDefinition) {
   SILDeclRef silRef(cd, SILDeclRef::Kind::IVarDestroyer, 
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
-                    /*isForeign=*/false);
+                    /*isForeign=*/true);
   llvm::SmallString<64> ivarDestroyerNameBuffer;
   auto ivarDestroyerName = silRef.mangle(ivarDestroyerNameBuffer);
   // Find the SILFunction for the ivar destroyer.

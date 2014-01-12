@@ -1111,10 +1111,9 @@ llvm::Constant *irgen::emitObjCIVarDestroyerDescriptor(IRGenModule &IGM,
     = GetObjCEncodingForType(IGM, cd->getDestructor()->getType());
 
   /// The third element is the method implementation pointer.
-  llvm::Function *swiftImpl = IGM.getAddrOfIVarDestroyer(cd, NotForDefinition);
-  llvm::Constant *impl
-    = getObjCMethodPointerForSwiftImpl(IGM, selector, declRef, swiftImpl, 
-                                       ExplosionKind::Minimal);
+  llvm::Function *objcImpl 
+    = IGM.getAddrOfObjCIVarDestroyer(cd, NotForDefinition);
+  llvm::Constant *impl = llvm::ConstantExpr::getBitCast(objcImpl,IGM.Int8PtrTy);
 
   // Form the method_t instance.
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };

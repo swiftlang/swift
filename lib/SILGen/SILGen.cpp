@@ -484,7 +484,9 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
     // Emit the ivar destroyer.
     {
-      SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer);
+      SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
+                               SILDeclRef::ConstructAtNaturalUncurryLevel,
+                               /*isForeign=*/true);
       SILFunction *f = preEmitFunction(ivarDestroyer, dd, dd);
       PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
       SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
@@ -492,7 +494,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     }
 
     // Emit the Objective-C thunk for the ivar destroyer (.cxx_destruct).
-    emitObjCIVarDestroyerThunk(cd);
+    // emitObjCIVarDestroyerThunk(cd);
     
     return;
   }
@@ -687,22 +689,6 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
     return;
   SILFunction *f = preEmitFunction(thunk, destructor, destructor);
   PrettyStackTraceSILFunction X("silgen objc destructor thunk", f);
-  f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
-  postEmitFunction(thunk, f);
-}
-
-void SILGenModule::emitObjCIVarDestroyerThunk(ClassDecl *cd) {
-  SILDeclRef thunk(cd,
-                   SILDeclRef::Kind::IVarDestroyer,
-                   SILDeclRef::ConstructAtNaturalUncurryLevel,
-                   /*isObjC*/ true);
-
-  // Don't emit the thunk if it already exists.
-  if (hasFunction(thunk))
-    return;
-  SILFunction *f = preEmitFunction(thunk, cd, cd);
-  PrettyStackTraceSILFunction X("silgen objc ivar destroyer thunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);

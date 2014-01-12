@@ -2736,7 +2736,6 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
   auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
   emitClassMemberDestruction(selfValue, cd, loc, cleanupLoc);
-  B.emitStrongRelease(cleanupLoc, selfValue);
   B.createReturn(loc, emitEmptyTuple(loc));
   emitEpilog(loc);
 }
