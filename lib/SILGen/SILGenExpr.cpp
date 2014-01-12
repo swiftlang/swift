@@ -2616,6 +2616,14 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
 
   // If this is not a delegating constructor, emit member initializers.
+
+  // FIXME: If this class uses Objective-C's allocation, i.e.,
+  // usesObjCAllocator(selfClassDecl), then we should not emit the
+  // member initializers. Rather, we should note that every instance
+  // variable that shows up in a PatternBindingDecl with an
+  // initializer has already been initialized, because those instance
+  // variables were initialized by the ivar initializer
+  // (-.cxx_construct).
   if (!isDelegating)
     emitMemberInitializers(selfDecl, selfClassDecl);
 
