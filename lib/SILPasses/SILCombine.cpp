@@ -819,6 +819,26 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
   // The single user must be the StrongReleaseInst.
   if (auto *SRI = dyn_cast<StrongReleaseInst>(PAI->use_begin()->getUser())) {
+    SILFunctionType *ClosureTy =
+      dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+    if (!ClosureTy)
+      return nullptr;
+
+    int ArgNum = 0;
+    // For each parameter of the closure function:
+    for (auto Param : ClosureTy->getInterfaceParameters()) {
+      // The partial_apply takes the ownership of @In arguments. When we delete
+      // the closure then we need to increase the ref-count of @In arguments
+      // manually.
+      if (Param.isIndirect() && Param.isConsumed()) {
+        SILLocation Loc = PAI->getLoc();
+        SILValue Ld = Builder->createLoad(Loc, PAI->getArguments()[ArgNum]);
+        Builder->createStrongRelease(Loc, Ld);
+      }
+
+      ArgNum++;
+    }
+
     // Delete the strong_release.
     SRI->eraseFromParent();
     // Delete the partial_apply.
