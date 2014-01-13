@@ -465,9 +465,12 @@ void SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   postEmitFunction(constant, f);
 }
 
-/// Determine whether the given class has any instance variables that
-/// need to be initialized.
+/// Determine whether the given class requires a separate instance
+/// variable initialization method.
 static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
+  if (!cd->requiresStoredPropertyInits())
+    return false;
+
   for (Decl *member : cd->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;

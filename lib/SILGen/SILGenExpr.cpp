@@ -2618,17 +2618,23 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
 
-  // If this is not a delegating constructor, emit member initializers.
+  // Handle member initializers.
+  if (isDelegating) {
+    // A delegating initializer does not initialize instance
+    // variables.
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator(selfClassDecl)) {
+    // When the class requires all stored properties to have initial
+    // values and we're using Objective-C's allocation, stored
+    // properties are initialized via the .cxx_construct method, which
+    // will be called by the runtime.
 
-  // FIXME: If this class uses Objective-C's allocation, i.e.,
-  // usesObjCAllocator(selfClassDecl), then we should not emit the
-  // member initializers. Rather, we should note that every instance
-  // variable that shows up in a PatternBindingDecl with an
-  // initializer has already been initialized, because those instance
-  // variables were initialized by the ivar initializer
-  // (-.cxx_construct).
-  if (!isDelegating)
+    // FIXME: Note that 'self' has been fully initialized at this
+    // point.
+  } else {
+    // Emit the member initializers.
     emitMemberInitializers(selfDecl, selfClassDecl);
+  }
 
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -2750,8 +2756,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
 
   // Emit the initializers.
-  // FIXME: Actually do this.
-  // emitMemberInitializers(cd->getDestructor()->getImplicitSelfDecl(), cd);
+  emitMemberInitializers(cd->getDestructor()->getImplicitSelfDecl(), cd);
 
   B.createReturn(loc, emitEmptyTuple(loc));
   emitEpilog(loc);
