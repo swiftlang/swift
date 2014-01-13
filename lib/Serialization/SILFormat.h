@@ -203,7 +203,7 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<3>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

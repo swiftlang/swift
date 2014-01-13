@@ -109,6 +109,24 @@ public:
            cast<MarkUninitializedInst>(MemoryInst)->isDerivedClassSelf();
   }
 
+  /// isDerivedClassSelfOnly - Return true if this memory object is the 'self'
+  /// of a derived class init method for which we can assume that all ivars
+  /// have been initialized.
+  bool isDerivedClassSelfOnly() const {
+    return IsSelfOfNonDelegatingInitializer &&
+           cast<MarkUninitializedInst>(MemoryInst)->isDerivedClassSelfOnly();
+  }
+
+  /// True if this memory object is the 'self' of a derived class init method,
+  /// regardless of whether we're tracking ivar initializations or not.
+  bool isAnyDerivedClassSelf() const {
+    if (!IsSelfOfNonDelegatingInitializer)
+      return false;
+
+    auto Inst = cast<MarkUninitializedInst>(MemoryInst);
+    return Inst->isDerivedClassSelf() || Inst->isDerivedClassSelfOnly();
+  }
+
   /// isDelegatingInit - True if this is a delegating initializer, one that
   /// calls 'self.init'.
   bool isDelegatingInit() const {

@@ -804,6 +804,10 @@ public:
     /// DerivedSelf designates "self" in a derived (non-root) class.
     DerivedSelf,
 
+    /// Designates "self" in a derived (non-root) class whose stored properties
+    /// have already been initialized.
+    DerivedSelfOnly,
+
     /// DelegatingSelf designates "self" on a struct, enum, or class
     /// in a delegating constructor (one that calls self.init).
     DelegatingSelf,
@@ -824,6 +828,9 @@ public:
   }
   bool isDerivedClassSelf() const {
     return ThisKind == DerivedSelf;
+  }
+  bool isDerivedClassSelfOnly() const {
+    return ThisKind == DerivedSelfOnly;
   }
   bool isDelegatingSelf() const {
     return ThisKind == DelegatingSelf;

@@ -1491,11 +1491,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       Kind = MarkUninitializedInst::RootSelf;
     else if (KindId.str() == "derivedself")
       Kind = MarkUninitializedInst::DerivedSelf;
+    else if (KindId.str() == "derivedselfonly")
+      Kind = MarkUninitializedInst::DerivedSelfOnly;
     else if (KindId.str() == "delegatingself")
       Kind = MarkUninitializedInst::DelegatingSelf;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
-                 "globalvar, rootself, derivedself, or delegatingself");
+                 "globalvar, rootself, derivedself, derivedselfonly, "
+                 "or delegatingself");
       return true;
     }
 

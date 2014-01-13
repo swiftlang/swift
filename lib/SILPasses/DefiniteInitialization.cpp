@@ -1454,7 +1454,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
   if (SuperInitDone) {
     *SuperInitDone = true;
     if (Use.FirstElement+Use.NumElements == TheMemory.NumElements &&
-        TheMemory.isDerivedClassSelf() &&
+        TheMemory.isAnyDerivedClassSelf() &&
         Liveness.get(Liveness.size()-1) != DIKind::Yes)
       *SuperInitDone = false;
   }

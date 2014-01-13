@@ -2588,18 +2588,25 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!NeedsBoxForSelf)
     B.createDebugValue(selfDecl, selfArg);
   
-  // Mark 'self' as uninitialized so that DI knows to enforce its DI properties
-  // on ivars.
+  // If needed, mark 'self' as uninitialized so that DI knows to enforce its DI
+  // properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
   
   if (isDelegating)
     MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->hasSuperclass())
+  else if (selfClassDecl->requiresStoredPropertyInits() &&
+           usesObjCAllocator(selfClassDecl)) {
+    // Stored properties will be initialized in a separate .cxx_construct method
+    // called by the Objective-C runtime.
+    assert(selfClassDecl->hasSuperclass() &&
+           "Cannot use ObjC allocation without a superclass");
+    MUKind = MarkUninitializedInst::DerivedSelfOnly;
+  } else if (selfClassDecl->hasSuperclass())
     MUKind = MarkUninitializedInst::DerivedSelf;
   else
     MUKind = MarkUninitializedInst::RootSelf;
-  selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
 
+  selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
 
   if (NeedsBoxForSelf) {

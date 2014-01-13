@@ -78,7 +78,14 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
     NumElements = 1;
     return;
   }
-  
+
+  // If this is a derived class init method for which stored properties are
+  // separately initialized, track an element for the super.init call.
+  if (isDerivedClassSelfOnly()) {
+    NumElements = 1;
+    return;
+  }
+
   // Otherwise, we break down the initializer.
   NumElements = getElementCountRec(getType(), IsSelfOfNonDelegatingInitializer);
 
