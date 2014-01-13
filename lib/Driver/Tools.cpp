@@ -124,6 +124,12 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
 
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
+  if (Args.hasArg(options::OPT_serialize_diagnostics)) {
+    Arguments.push_back("-serialize-diagnostics");
+    // TODO: pass -serialized-diagnostics-path with user-specified path,
+    // if present. (This requires an output file map.)
+  }
+
   // Add the output file argument if necessary.
   if (Output->getType() != types::TY_Nothing) {
     Arguments.push_back("-o");
