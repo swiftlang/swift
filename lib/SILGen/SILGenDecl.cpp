@@ -613,7 +613,7 @@ namespace {
 /// SILArguments, and initializing the local value for each pattern variable
 /// in a function argument list.
 struct ArgumentInitVisitor :
-  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ SILValue,
+  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ void,
                         /*Args...=*/ Initialization*>
 {
   SILGenFunction &gen;
@@ -622,14 +622,14 @@ struct ArgumentInitVisitor :
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(gen.B) {}
 
-  SILValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
+  RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
-    return RValue::emitBBArguments(ty->getCanonicalType(),
-                                   gen, parent, l).forwardAsSingleValue(gen, l);
+    return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l);
   }
   
-  void storeArgumentInto(Type ty, SILValue arg, SILLocation loc,
+  void storeArgumentInto(Type ty, RValue argrv, SILLocation loc,
                          Initialization *I) {
+    SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
     assert(ty && "no type?!");
     if (!I) return;
     switch (I->kind) {
@@ -669,27 +669,25 @@ struct ArgumentInitVisitor :
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  SILValue makeArgumentInto(Type ty, SILBasicBlock *parent,
+  void makeArgumentInto(Type ty, SILBasicBlock *parent,
                             SILLocation loc, Initialization *I) {
     assert(ty && "no type?!");
     loc.markAsPrologue();
-    SILValue arg = makeArgument(ty, parent, loc);
-    storeArgumentInto(ty, arg, loc, I);
-    return arg;
+    storeArgumentInto(ty, makeArgument(ty, parent, loc), loc, I);
   }
     
   // Paren, Typed, and Var patterns are no-ops. Just look through them.
-  SILValue visitParenPattern(ParenPattern *P, Initialization *I) {
-    return visit(P->getSubPattern(), I);
+  void visitParenPattern(ParenPattern *P, Initialization *I) {
+    visit(P->getSubPattern(), I);
   }
-  SILValue visitTypedPattern(TypedPattern *P, Initialization *I) {
-    return visit(P->getSubPattern(), I);
+  void visitTypedPattern(TypedPattern *P, Initialization *I) {
+    visit(P->getSubPattern(), I);
   }
-  SILValue visitVarPattern(VarPattern *P, Initialization *I) {
-    return visit(P->getSubPattern(), I);
+  void visitVarPattern(VarPattern *P, Initialization *I) {
+    visit(P->getSubPattern(), I);
   }
 
-  SILValue visitTuplePattern(TuplePattern *P, Initialization *I) {
+  void visitTuplePattern(TuplePattern *P, Initialization *I) {
     // If the tuple is empty, so should be our initialization. Just pass an
     // empty tuple upwards.
     if (P->getFields().empty()) {
@@ -713,8 +711,7 @@ struct ArgumentInitVisitor :
                && "empty tuple pattern with non-empty-tuple initializer?!");
         break;
       }
-
-      return initB.createTuple(P, gen.getLoweredType(P->getType()), {});
+      return;
     }
     
     // Destructure the initialization into per-element Initializations.
@@ -727,10 +724,9 @@ struct ArgumentInitVisitor :
            "TupleInitialization size does not match tuple pattern size!");
     for (size_t i = 0, size = P->getFields().size(); i < size; ++i)
       visit(P->getFields()[i].getPattern(), subInits[i].get());
-    return SILValue();
   }
 
-  SILValue visitAnyPattern(AnyPattern *P, Initialization *I) {
+  void visitAnyPattern(AnyPattern *P, Initialization *I) {
     // A value bound to _ is unused and can be immediately released.
     assert(I->kind == Initialization::Kind::Ignored &&
            "any pattern should match a black-hole Initialization");
@@ -742,18 +738,18 @@ struct ArgumentInitVisitor :
                                AC.getIdentifier("_"), P->getType(),
                                f.getDeclContext());
 
-    SILValue arg = makeArgument(P->getType(), f.begin(), VD);
+    SILValue arg =
+      makeArgument(P->getType(), f.begin(), VD).forwardAsSingleValue(gen, VD);
     lowering.emitDestroyRValue(gen.B, P, arg);
-    return arg;
   }
 
-  SILValue visitNamedPattern(NamedPattern *P, Initialization *I) {
-    return makeArgumentInto(P->getType(), f.begin(), P->getDecl(), I);
+  void visitNamedPattern(NamedPattern *P, Initialization *I) {
+    makeArgumentInto(P->getType(), f.begin(), P->getDecl(), I);
   }
   
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) \
-  SILValue visit##Id##Pattern(Id##Pattern *, Initialization *) { \
+  void visit##Id##Pattern(Id##Pattern *, Initialization *) { \
     llvm_unreachable("pattern not valid in argument binding"); \
   }
 #include "swift/AST/PatternNodes.def"
