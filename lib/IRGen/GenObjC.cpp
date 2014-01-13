@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
 
@@ -981,8 +982,61 @@ static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
 
 static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
                                                      AnyFunctionType *T) {
-  // TODO. encode types 'T'.
-  return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  ASTContext &Context = IGM.Context;
+  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  auto &clangASTContext = CI->getClangASTContext();
+  GenClangType CTG;
+  llvm::Constant *cnull = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  
+  // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
+  Type Result = T->getResult();
+  Type Input = T->getInput();
+  std::string TypeStr;
+  auto clangType = CTG.visit(Result->getCanonicalType());
+  if (clangType.isNull())
+    return cnull;
+  
+  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  
+  
+  Size PtrSize = IGM.getPointerSize();
+  Size::int_type ParmOffset = 2 * PtrSize.getValue();
+
+  if (auto tuple = dyn_cast<TupleType>(Input->getCanonicalType())) {
+    for (unsigned i = 0; i < tuple->getNumElements(); i++) {
+      Type ArgType = tuple->getElementType(i);
+      clangType = CTG.visit(ArgType->getCanonicalType());
+      if (clangType.isNull())
+        return cnull;
+      clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
+      if (sz.isZero())
+        continue;
+      ParmOffset += sz.getQuantity();
+    }
+    TypeStr += llvm::itostr(ParmOffset);
+    TypeStr += "@0:";
+    TypeStr += llvm::itostr(PtrSize.getValue());
+    
+    // Argument types.
+    Size::int_type ParmOffset = 2 * PtrSize.getValue();
+    for (unsigned i = 0; i < tuple->getNumElements(); i++) {
+      Type ArgType = tuple->getElementType(i);
+      auto PType = CTG.visit(ArgType->getCanonicalType());
+      if (PType.isNull())
+        return cnull;
+      
+      // TODO. Some stuff related to Array and Function type is missing.
+      // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
+      clangASTContext.getObjCEncodingForType(PType, TypeStr);
+      TypeStr += llvm::itostr(ParmOffset);
+      clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(PType);
+      ParmOffset += sz.getQuantity();
+    }
+    return IGM.getAddrOfGlobalString(TypeStr.c_str());
+  }
+
+  return cnull;
 }
 
 /// Emit the components of an Objective-C method descriptor: its selector,
