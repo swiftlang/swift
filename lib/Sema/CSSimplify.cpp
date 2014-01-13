@@ -896,20 +896,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // A value of type T can be converted to type U? if T is convertible to U.
   // A value of type T? can be converted to type U? if T is convertible to U.
+  // The above conversions also apply to unchecked optional types, except
+  // that there is no implicit conversion from T? to @unchecked T?.
   {
     BoundGenericType *boundGenericType2;
     if (concrete && kind >= TypeMatchKind::Conversion &&
         (boundGenericType2 = type2->getAs<BoundGenericType>())) {
-      if (boundGenericType2->getDecl() == TC.Context.getOptionalDecl()) {
+      auto decl2 = boundGenericType2->getDecl();
+      if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
         assert(boundGenericType2->getGenericArgs().size() == 1);
         
-        BoundGenericType *boundGenericType1
-          = type1->getAs<BoundGenericType>();
-        if (boundGenericType1
-            && boundGenericType1->getDecl() == TC.Context.getOptionalDecl()) {
-          assert(boundGenericType1->getGenericArgs().size() == 1);
-          potentialConversions.push_back(
-                                 ConversionRestrictionKind::OptionalToOptional);
+        BoundGenericType *boundGenericType1 = type1->getAs<BoundGenericType>();
+        if (boundGenericType1) {
+          auto decl1 = boundGenericType1->getDecl();
+          if (decl1 == decl2) {
+            assert(boundGenericType1->getGenericArgs().size() == 1);
+            potentialConversions.push_back(
+                                ConversionRestrictionKind::OptionalToOptional);
+          } else if (optionalKind2 == OTK_Optional &&
+                     decl1 == TC.Context.getUncheckedOptionalDecl()) {
+            assert(boundGenericType1->getGenericArgs().size() == 1);
+            potentialConversions.push_back(
+                       ConversionRestrictionKind::UncheckedOptionalToOptional);
+          }
         }
         
         potentialConversions.push_back(
@@ -999,24 +1008,22 @@ commit_to_conversions:
 
   case ConversionRestrictionKind::ValueToOptional: {
     auto boundGenericType2 = type2->castTo<BoundGenericType>();
-    (void)boundGenericType2;
-    assert(boundGenericType2->getDecl() == TC.Context.getOptionalDecl());
+    assert(boundGenericType2->getDecl()->classifyAsOptionalType());
     assert(boundGenericType2->getGenericArgs().size() == 1);
-    return matchTypes(type1,
-                      type2->castTo<BoundGenericType>()->getGenericArgs()[0],
+    return matchTypes(type1, boundGenericType2->getGenericArgs()[0],
                       kind, subFlags, locator);
   }
       
+  case ConversionRestrictionKind::UncheckedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     auto boundGenericType1 = type1->castTo<BoundGenericType>();
     auto boundGenericType2 = type2->castTo<BoundGenericType>();
-    (void)boundGenericType1; (void)boundGenericType2;
-    assert(boundGenericType1->getDecl() == TC.Context.getOptionalDecl());
+    assert(boundGenericType1->getDecl()->classifyAsOptionalType());
     assert(boundGenericType1->getGenericArgs().size() == 1);
-    assert(boundGenericType2->getDecl() == TC.Context.getOptionalDecl());
+    assert(boundGenericType2->getDecl()->classifyAsOptionalType());
     assert(boundGenericType2->getGenericArgs().size() == 1);
-    return matchTypes(type1->castTo<BoundGenericType>()->getGenericArgs()[0],
-                      type2->castTo<BoundGenericType>()->getGenericArgs()[0],
+    return matchTypes(boundGenericType1->getGenericArgs()[0],
+                      boundGenericType2->getGenericArgs()[0],
                       kind, subFlags, locator);
   }
       
@@ -1840,31 +1847,28 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                        constraint.getLocator());
         break;
 
-      case ConversionRestrictionKind::ValueToOptional:
-        assert(constraint.getSecondType()->castTo<BoundGenericType>()->getDecl()
-                 == TC.Context.getOptionalDecl());
+      case ConversionRestrictionKind::ValueToOptional: {
+        auto generic2 = constraint.getSecondType()->castTo<BoundGenericType>();
+        assert(generic2->getDecl()->classifyAsOptionalType());
         result = matchTypes(constraint.getFirstType(),
-                            constraint.getSecondType()
-                              ->castTo<BoundGenericType>()
-                              ->getGenericArgs()[0],
+                            generic2->getGenericArgs()[0],
                             matchKind, TMF_GenerateConstraints,
                             constraint.getLocator());
         break;
+      }
 
-      case ConversionRestrictionKind::OptionalToOptional:
-        assert(constraint.getFirstType()->castTo<BoundGenericType>()->getDecl()
-                 == TC.Context.getOptionalDecl());
-        assert(constraint.getSecondType()->castTo<BoundGenericType>()->getDecl()
-                 == TC.Context.getOptionalDecl());
-        result = matchTypes(constraint.getFirstType()
-                              ->castTo<BoundGenericType>()
-                              ->getGenericArgs()[0],
-                            constraint.getSecondType()
-                              ->castTo<BoundGenericType>()
-                              ->getGenericArgs()[0],
+      case ConversionRestrictionKind::UncheckedOptionalToOptional:
+      case ConversionRestrictionKind::OptionalToOptional: {
+        auto generic1 = constraint.getFirstType()->castTo<BoundGenericType>();
+        auto generic2 = constraint.getSecondType()->castTo<BoundGenericType>();
+        assert(generic1->getDecl()->classifyAsOptionalType());
+        assert(generic2->getDecl()->classifyAsOptionalType());
+        result = matchTypes(generic1->getGenericArgs()[0],
+                            generic2->getGenericArgs()[0],
                             matchKind, TMF_GenerateConstraints,
                             constraint.getLocator());
         break;
+      }
           
       case ConversionRestrictionKind::User:
         assert(constraint.getKind() >= ConstraintKind::Conversion);

@@ -333,6 +333,7 @@ RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
                ManagedValue v)
   : type(formalType), elementsToBeAdded(0)
 {
+  assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, gen).visit(type, v, l);
   assert(values.size() == getRValueSize(type));
 }
@@ -340,6 +341,7 @@ RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
 RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
   : type(expr->getType()->getCanonicalType()), elementsToBeAdded(0)
 {
+  assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, gen).visit(type, v, expr);
   assert(values.size() == getRValueSize(type));
 }
@@ -356,6 +358,7 @@ RValue RValue::emitBBArguments(CanType type,
 }
 
 void RValue::addElement(RValue &&element) & {
+  assert(!element.isUsed() && "adding consumed value to r-value");
   assert(!isComplete() && "rvalue already complete");
   assert(!isUsed() && "rvalue already used");
   --elementsToBeAdded;
@@ -368,6 +371,7 @@ void RValue::addElement(RValue &&element) & {
 
 void RValue::addElement(SILGenFunction &gen, ManagedValue element,
                         CanType formalType, SILLocation l) & {
+  assert(element && "adding consumed value to r-value");
   assert(!isComplete() && "rvalue already complete");
   assert(!isUsed() && "rvalue already used");
   --elementsToBeAdded;

@@ -1824,6 +1824,19 @@ public:
                                          
 };
 
+/// Kinds of optional types.
+enum OptionalTypeKind : unsigned {
+  /// The type is not an optional type.
+  OTK_None,
+
+  /// The type is Optional<T>.
+  OTK_Optional,
+
+  /// The type is UncheckedOptional<T>.
+  OTK_UncheckedOptional
+};
+enum { NumOptionalTypeKinds = 2 };
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
@@ -1978,6 +1991,10 @@ public:
   }
 
   using TypeDecl::getDeclaredInterfaceType;
+
+  /// classifyAsOptionalType - Decide whether this declaration is one
+  /// of the library-intrinsic Optional<T> or UncheckedOptional<T> types.
+  OptionalTypeKind classifyAsOptionalType() const;
   
 private:
   /// Predicate used to filter StoredPropertyRange.

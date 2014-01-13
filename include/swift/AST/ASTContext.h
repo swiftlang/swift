@@ -71,6 +71,7 @@ namespace swift {
   class NominalTypeDecl;
   class TupleTypeElt;
   class EnumElementDecl;
+  enum OptionalTypeKind : unsigned;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -327,6 +328,9 @@ public:
 
   /// Retrieve the declaration of swift.Optional<T>.
   EnumDecl *getOptionalDecl() const;
+
+  /// Retrieve the declaration of swift.UncheckedOptional<T>.
+  StructDecl *getUncheckedOptionalDecl() const;
   
   /// Retrieve the declaration of swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
@@ -334,20 +338,21 @@ public:
   /// Retrieve the declaration of swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
-  /// Retrieve the declaration of swift._doesOptionalHaveValue.
-  FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver) const;
+  /// Retrieve the declaration of swift._does{,Unchecked}OptionalHaveValue.
+  FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
+                                         OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._getOptionalValue.
-  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver) const;
+  /// Retrieve the declaration of swift._get{,Unchecked}OptionalValue.
+  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
+                                    OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._injectValueIntoOptional.
-  FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver) const;
+  /// Retrieve the declaration of swift._injectValueInto{,Unchecked}Optional.
+  FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver,
+                                           OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._injectNothingIntoOptional.
-  FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver) const;
-
-  /// Retrieve the declaration of swift.UncheckedOptional<T>.
-  StructDecl *getUncheckedOptionalDecl() const;
+  /// Retrieve the declaration of swift._injectNothingInto{,Unchecked}Optional.
+  FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
+                                             OptionalTypeKind kind) const;
 
   /// Check whether the standary library provides all the correct
   /// intrinsic support for Optional<T>.

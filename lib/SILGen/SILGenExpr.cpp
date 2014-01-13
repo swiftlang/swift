@@ -3469,8 +3469,9 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
 
   // If so, get that value as the result of our expression.
   SGF.B.emitBlock(hasValueBB);
-  auto result = temp->getManagedAddress();
-  return RValue(SGF, E, SGF.emitGetOptionalValueFrom(E, result, optTL, C));
+  auto optValue = temp->getManagedAddress();
+  auto resultValue = SGF.emitGetOptionalValueFrom(E, optValue, optTL, C);
+  return (resultValue ? RValue(SGF, E, resultValue) : RValue());
 }
 
 namespace {

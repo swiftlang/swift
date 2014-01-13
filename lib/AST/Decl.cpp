@@ -827,6 +827,17 @@ void NominalTypeDecl::getImplicitProtocols(
   }
 }
 
+OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
+  const ASTContext &ctx = getASTContext();
+  if (this == ctx.getOptionalDecl()) {
+    return OTK_Optional;
+  } else if (this == ctx.getUncheckedOptionalDecl()) {
+    return OTK_UncheckedOptional;
+  } else {
+    return OTK_None;
+  }
+}
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              DeclContext *DC)

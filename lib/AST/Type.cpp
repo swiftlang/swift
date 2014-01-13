@@ -403,6 +403,14 @@ Type TypeBase::getUncheckedOptionalObjectType(const ASTContext &context) {
   return Type();
 }
 
+Type TypeBase::getAnyOptionalObjectType(const ASTContext &context) {
+  if (auto boundTy = getAs<BoundGenericType>())
+    if (boundTy->getDecl()->classifyAsOptionalType())
+      return boundTy->getGenericArgs()[0];
+  return Type();
+}
+
+
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   return type.transform([&](Type type) -> Type {

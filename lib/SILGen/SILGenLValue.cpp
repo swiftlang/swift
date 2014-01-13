@@ -692,9 +692,12 @@ static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
   return getSimpleSubstitution(polyFnType->getGenericParams(), typeArg);
 }
 
-static CanType getOptionalValueType(SILType optType) {
-  return cast<BoundGenericType>(optType.getSwiftRValueType())
-           .getGenericArgs()[0];
+static CanType getOptionalValueType(SILType optType,
+                                    OptionalTypeKind &optionalKind) {
+  auto generic = cast<BoundGenericType>(optType.getSwiftRValueType());
+  optionalKind = generic->getDecl()->classifyAsOptionalType();
+  assert(optionalKind);
+  return generic.getGenericArgs()[0];
 }
 
 /// Emit code to convert the given possibly-null reference value into
@@ -832,9 +835,11 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                                  SILValue dest,
                                                  const TypeLowering &optTL) {
   SILType optType = optTL.getLoweredType();
-  CanType valueType = getOptionalValueType(optType);
+  OptionalTypeKind optionalKind;
+  CanType valueType = getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl(nullptr);
+  FuncDecl *fn =
+    getASTContext().getInjectValueIntoOptionalDecl(nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   // Materialize the r-value into a temporary.
@@ -852,9 +857,11 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
   SILType optType = optTL.getLoweredType();
-  CanType valueType = getOptionalValueType(optType);
+  OptionalTypeKind optionalKind;
+  CanType valueType = getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl(nullptr);
+  FuncDecl *fn =
+    getASTContext().getInjectNothingIntoOptionalDecl(nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
@@ -866,9 +873,11 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc, 
                                                    SILValue addr) {
   SILType optType = addr.getType().getObjectType();
-  CanType valueType = getOptionalValueType(optType);
+  OptionalTypeKind optionalKind;
+  CanType valueType = getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn = getASTContext().getDoesOptionalHaveValueDecl(nullptr);
+  FuncDecl *fn =
+    getASTContext().getDoesOptionalHaveValueDecl(nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   // The argument to _doesOptionalHaveValue is passed by reference.
@@ -883,9 +892,10 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
   SILType optType = src.getType().getObjectType();
-  CanType valueType = getOptionalValueType(optType);
+  OptionalTypeKind optionalKind;
+  CanType valueType = getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr);
+  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);

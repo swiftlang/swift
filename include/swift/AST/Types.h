@@ -495,6 +495,10 @@ public:
   /// the null type.
   Type getUncheckedOptionalObjectType(const ASTContext &C);
 
+  /// Return T if this type is Optional<T> or UncheckedOptional<T>;
+  /// otherwise, return the null type.
+  Type getAnyOptionalObjectType(const ASTContext &C);
+
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;

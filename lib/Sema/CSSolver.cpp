@@ -1127,7 +1127,8 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint) {
   // Non-optional conversions are better than optional-to-optional
   // conversions.
   if (auto restriction = constraint->getRestriction()) {
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
+        *restriction == ConversionRestrictionKind::UncheckedOptionalToOptional)
       return true;
   }
 
