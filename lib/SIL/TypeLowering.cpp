@@ -1351,16 +1351,17 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
 /// a class.
 static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd, 
                                                    bool isObjC,
-                                                   ASTContext &ctx) {
+                                                   ASTContext &ctx,
+                                                   bool isDestroyer) {
   auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
 
   auto emptyTupleTy = TupleType::getEmpty(ctx)->getCanonicalType();
+  CanType resultType = isDestroyer? emptyTupleTy : classType;
   auto extInfo = AnyFunctionType::ExtInfo(isObjC? AbstractCC::ObjCMethod
                                                 : AbstractCC::Method,
                                           /*thin*/ true,
                                           /*noreturn*/ false);
-  
-  auto resultType = CanFunctionType::get(emptyTupleTy, emptyTupleTy, extInfo);
+  resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   if (auto params = cd->getGenericParams())
     return CanPolymorphicFunctionType::get(classType, resultType, params, 
                                            extInfo);
@@ -1555,9 +1556,13 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
   }
-  case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarInitializer: {
+      return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
+                                      Context, false);
+  }
   case SILDeclRef::Kind::IVarDestroyer: {
-    return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign, Context);
+    return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
+                                    Context, true);
   }
   }
 }

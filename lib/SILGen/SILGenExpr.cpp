@@ -2771,7 +2771,9 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   // Emit the initializers.
   emitMemberInitializers(cd->getDestructor()->getImplicitSelfDecl(), cd);
 
-  B.createReturn(loc, emitEmptyTuple(loc));
+  // Return 'self'.
+  B.createReturn(loc, selfArg);
+
   emitEpilog(loc);
 }
 

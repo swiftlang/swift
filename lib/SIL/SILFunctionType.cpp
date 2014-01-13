@@ -613,6 +613,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     return getSelectorFamily(c.getDecl()->getName());
 
   case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
 
   case SILDeclRef::Kind::Getter:
@@ -632,7 +633,6 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
@@ -675,10 +675,22 @@ namespace {
     }
 
     ResultConvention getResult(CanType type) const override {
-      if (Family != SelectorFamily::None)
+      switch (Family) {
+      case SelectorFamily::Alloc:
+      case SelectorFamily::Copy:
+      case SelectorFamily::Init:
+      case SelectorFamily::MutableCopy:
+      case SelectorFamily::New:
         return ResultConvention::Owned;
+
+      case SelectorFamily::None:
+        // Defaults below.
+        break;
+      }
+
       if (type.hasReferenceSemantics())
         return ResultConvention::Autoreleased;
+
       return ResultConvention::Unowned;
     }
   };
