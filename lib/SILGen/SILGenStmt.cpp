@@ -151,7 +151,7 @@ public:
   IndirectReturnInitialization(SILValue address)
     : address(address) {}
   
-  SILValue getAddressOrNull() override { return address; }
+  SILValue getAddressOrNull() const override { return address; }
 };
 
 } // end anonymous namespace
@@ -360,7 +360,7 @@ public:
   NextForEachValueInitialization(SILValue address)
     : address(address) {}
   
-  SILValue getAddressOrNull() override { return address; }
+  SILValue getAddressOrNull() const override { return address; }
 };
 
 } // end anonymous namespace

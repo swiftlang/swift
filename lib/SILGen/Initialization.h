@@ -73,12 +73,12 @@ public:
   /// Return true if we can get the addresses of elements with the
   /// 'getSubInitializationsForTuple' method.
   bool canSplitIntoSubelementAddresses() const {
-    return kind != Kind::LetValue;
+    return kind != Kind::LetValue || hasAddress();
   }
   
   /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
-  virtual SILValue getAddressOrNull() = 0;
+  virtual SILValue getAddressOrNull() const = 0;
   
   /// Binds an address value to this initialization. Called only on
   /// initializations with Kind::AddressBinding.
@@ -99,7 +99,7 @@ public:
   }
   
   /// Returns true if this initialization represents a single contiguous buffer.
-  bool hasAddress() { return getAddressOrNull().isValid(); }
+  bool hasAddress() const { return getAddressOrNull().isValid(); }
 
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
@@ -162,7 +162,7 @@ public:
 
   void finishInitialization(SILGenFunction &gen) override;
 
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     return Addr;
   }
 

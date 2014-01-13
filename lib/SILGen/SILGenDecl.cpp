@@ -38,7 +38,7 @@ namespace {
       : Initialization(Initialization::Kind::Ignored)
     {}
     
-    SILValue getAddressOrNull() override { return SILValue(); }
+    SILValue getAddressOrNull() const override { return SILValue(); }
     ArrayRef<InitializationPtr> getSubInitializations() override {
       return {};
     }
@@ -54,7 +54,7 @@ namespace {
       : ElementAddr(addr)
     {}
     
-    SILValue getAddressOrNull() override { return ElementAddr; }
+    SILValue getAddressOrNull() const override { return ElementAddr; }
 
     void finishInitialization(SILGenFunction &gen) override {}
   };
@@ -76,6 +76,7 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
       buf.push_back(InitializationPtr(new BlackHoleInitialization()));
     }
     return buf;
+  case Kind::LetValue:
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
     SILValue baseAddr = getAddress();
@@ -98,8 +99,6 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     llvm_unreachable("cannot destructure a translating initialization");
   case Kind::AddressBinding:
     llvm_unreachable("cannot destructure an address binding initialization");
-  case Kind::LetValue:
-    llvm_unreachable("cannot destructure a let-value initialization");
   }
   llvm_unreachable("bad initialization kind");
 }
@@ -160,7 +159,7 @@ public:
 
   TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
   
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     if (subInitializations.size() == 1)
       return subInitializations[0]->getAddressOrNull();
     else
@@ -279,7 +278,7 @@ public:
     assert(DidFinish && "did not call VarInit::finishInitialization!");
   }
   
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     assert(Gen.VarLocs.count(Var) && "did not emit var?!");
     return Gen.VarLocs[Var].getAddress();
   }
@@ -312,11 +311,22 @@ public:
   LetValueInitialization(VarDecl *vd, bool isArgument, SILGenFunction &gen)
     : Initialization(Initialization::Kind::LetValue), vd(vd) {
 
+    auto &lowering = gen.getTypeLowering(vd->getType());
+
     // If this is an address-only let declaration for a real let declaration
     // (not a function argument), create a buffer to bind the expression value
     // assigned into this slot.
-    auto &lowering = gen.getTypeLowering(vd->getType());
-    if (lowering.isAddressOnly() && !isArgument) {
+    bool needsTemporaryBuffer = lowering.isAddressOnly();
+
+    // If this is a function argument, we don't usually need a temporary buffer
+    // because the incoming pointer can be directly bound as our let buffer.
+    // However, if this VarDecl has tuple type, then it will be passed to the
+    // SILFunction as multiple SILArguments, and those *do* need to be rebound
+    // into a temporary buffer.
+    if (isArgument && !vd->getType()->is<TupleType>())
+      needsTemporaryBuffer = false;
+
+    if (needsTemporaryBuffer) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
       gen.enterDormantTemporaryCleanup(address, lowering);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(address);
@@ -343,7 +353,7 @@ public:
       gen.B.createDebugValueAddr(vd, v);
   }
 
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     // We only have an address for address-only lets.
     return address;
   }
@@ -376,7 +386,7 @@ public:
   GlobalInitialization(SILValue address) : address(address)
   {}
   
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     return address;
   }
   
@@ -413,7 +423,7 @@ public:
   InOutInitialization(VarDecl *vd)
     : Initialization(Initialization::Kind::AddressBinding), vd(vd) {}
   
-  SILValue getAddressOrNull() override {
+  SILValue getAddressOrNull() const override {
     llvm_unreachable("inout argument should be bound by bindAddress");
   }
   ArrayRef<InitializationPtr> getSubInitializations() override {
@@ -447,7 +457,7 @@ public:
       VarInit(std::move(subInit)) {}
 
   ArrayRef<InitializationPtr> getSubInitializations() override { return {}; }
-  SILValue getAddressOrNull() override { return SILValue(); }
+  SILValue getAddressOrNull() const override { return SILValue(); }
 
   void translateValue(SILGenFunction &gen, SILLocation loc,
                       ManagedValue value) override {

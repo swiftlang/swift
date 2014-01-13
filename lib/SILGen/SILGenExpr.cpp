@@ -824,7 +824,7 @@ namespace {
       : valueAddr(valueAddr)
     {}
     
-    SILValue getAddressOrNull() override {
+    SILValue getAddressOrNull() const override {
       return valueAddr;
     }
     
@@ -2086,7 +2086,7 @@ namespace {
   public:
     ImplicitValueInitialization(SILValue slot) : slot(slot) {}
     
-    SILValue getAddressOrNull() override {
+    SILValue getAddressOrNull() const override {
       return slot;
     };
   };
@@ -3161,7 +3161,7 @@ namespace {
       : valueAddr(valueAddr)
     {}
     
-    SILValue getAddressOrNull() override {
+    SILValue getAddressOrNull() const override {
       return valueAddr;
     }
     
