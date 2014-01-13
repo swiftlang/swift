@@ -80,6 +80,25 @@ SILInstruction *findMetaType(SILValue S) {
   }
 }
 
+/// \brief Recursively searches the ClassDecl for the type of \p S, or null.
+ClassDecl *findClassTypeForOperand(SILValue S) {
+  // Look for an instruction that defines a class type.
+  SILInstruction *Meta = findMetaType(S);
+  if (!Meta)
+    return nullptr;
+
+  // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
+  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(Meta)) {
+    return ARI->getType().getClassOrBoundGenericClass();
+  } else if (MetatypeInst *MTI = dyn_cast<MetatypeInst>(Meta)) {
+    CanType MetaTy = MTI->getType().getSwiftRValueType();
+    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
+    return T->getClassOrBoundGenericClass();
+  } else {
+    return nullptr;
+  }
+}
+
 void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   // Optimize a class_method and alloc_ref pair into a direct function
   // reference:
@@ -95,24 +114,9 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   //  into
   //
   //  %YY = function_ref @...
-
-  // Look for an instruction that defines a class type.
-  SILInstruction *Meta = findMetaType(CMI->getOperand());
-  if (!Meta)
+  ClassDecl *Class = findClassTypeForOperand(CMI->getOperand());
+  if (!Class)
     return;
-
-  ClassDecl *Class = nullptr;
-
-  // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
-  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(Meta)) {
-    Class = ARI->getType().getClassOrBoundGenericClass();
-  } else if (MetatypeInst *MTI = dyn_cast<MetatypeInst>(Meta)) {
-    CanType MetaTy = MTI->getType().getSwiftRValueType();
-    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
-    Class = T->getClassOrBoundGenericClass();
-  } else {
-    return;
-  }
 
   // Walk up the class hierarchy and scan all members.
   // TODO: There has to be a faster way of doing this scan.
