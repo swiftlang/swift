@@ -13,8 +13,8 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/Dominance.h"
-#include "llvm/Analysis/Dominators.h"
-#include "llvm/Analysis/DominatorInternals.h"
+#include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 
 using namespace swift;
 

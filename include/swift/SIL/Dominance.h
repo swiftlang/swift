@@ -18,7 +18,7 @@
 #ifndef SWIFT_SIL_DOMINANCE_H
 #define SWIFT_SIL_DOMINANCE_H
 
-#include "llvm/Analysis/Dominators.h"
+#include "llvm/Support/GenericDomTree.h"
 #include "swift/SIL/CFG.h"
 
 extern template class llvm::DominatorTreeBase<swift::SILBasicBlock>;
