@@ -247,8 +247,22 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
   return initFn;
 }
 
+namespace {
+class PrettySourceFileEmission : public llvm::PrettyStackTraceEntry {
+  const SourceFile &SF;
+public:
+  explicit PrettySourceFileEmission(const SourceFile &SF) : SF(SF) {}
+
+  virtual void print(raw_ostream &os) const override {
+    os << "While emitting IR for source file " << SF.getFilename() << '\n';
+  }
+};
+} // end anonymous namespace
+
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
+  PrettySourceFileEmission StackEntry(SF);
+
   // Emit types and other global decls.
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
     emitGlobalDecl(SF.Decls[i]);
