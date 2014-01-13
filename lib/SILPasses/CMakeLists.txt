@@ -17,6 +17,7 @@ add_swift_library(swiftSILPasses
   SILCombine.cpp
   SILMem2Reg.cpp
   Specializer.cpp
+  Devirtualizer.cpp
   SimplifyCFG.cpp
   PerformanceInliner.cpp
   SILLowerAggregateInstrs.cpp

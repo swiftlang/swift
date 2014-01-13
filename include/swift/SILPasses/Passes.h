@@ -66,6 +66,10 @@ namespace swift {
   /// abstract type with the concrete type.
   bool performSILSpecialization(SILModule *M);
 
+  /// \brief Devirtualize virtual function calls into direct
+  /// function calls.
+  bool performSILDevirtualization(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   void performSILLinking(SILModule *M);

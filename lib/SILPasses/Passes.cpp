@@ -81,6 +81,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     performSILCSE(&Module);
     performSILCombine(&Module);
     performSimplifyCFG(&Module);
+    performSILDevirtualization(&Module);
 
     // Stats
     NumOptzIter++;
