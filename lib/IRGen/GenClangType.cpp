@@ -17,8 +17,11 @@
 
 #include "GenClangType.h"
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Type.h"
@@ -32,9 +35,19 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
     return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
   }
 
-  // FIXME: For parameters, we need to be able to generate a Clang
-  // type for all Swift types that can appear in an @objc parameter
-  // list.
+  // FIXME: Handle structs resulting from non-struct Clang types.
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
+  if (type->getNumElements() == 0) {
+    auto &swiftCtx = type->getASTContext();
+    auto *CI = static_cast<ClangImporter*>(&*swiftCtx.getClangModuleLoader());
+    auto &clangCtx = CI->getClangASTContext();
+    return clangCtx.VoidTy;
+  }
+
+  llvm_unreachable("Unexpected tuple type in Clang type generation!");
   return clang::CanQualType();
 }
 

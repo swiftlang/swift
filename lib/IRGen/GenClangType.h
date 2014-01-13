@@ -37,6 +37,7 @@ public:
   /// new Clang struct type for Swift struct types that are created
   /// independently of importing a Clang module.
   clang::CanQualType visitStructType(CanStructType type);
+  clang::CanQualType visitTupleType(CanTupleType type);
   clang::CanQualType visitType(CanType type);
 };
 
