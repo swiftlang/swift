@@ -1775,12 +1775,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBLiveView;
+    bool isImplicit, isObjC, isIBLiveView, attrRequiresStoredPropertyInits;
+    bool requiresStoredPropertyInits;
     TypeID superclassID;
     unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC, isIBLiveView,
-                                         resilienceKind, superclassID);
+                                         resilienceKind, 
+                                         attrRequiresStoredPropertyInits,
+                                         requiresStoredPropertyInits,
+                                         superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1806,6 +1810,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->getMutableAttrs().setAttr(AK_born_fragile, SourceLoc());
     else if ((Resilience)resilienceKind == Resilience::Resilient)
       theClass->getMutableAttrs().setAttr(AK_resilient, SourceLoc());
+    if (attrRequiresStoredPropertyInits)
+      theClass->getMutableAttrs().setAttr(AK_requires_stored_property_inits, 
+                                          SourceLoc());
+    if (requiresStoredPropertyInits)
+      theClass->setRequiresStoredPropertyInits(true);
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {

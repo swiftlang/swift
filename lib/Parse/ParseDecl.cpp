@@ -132,6 +132,7 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 ///     'noreturn'
 ///     'optional'
 ///     '!'? 'mutating'
+///     'requires_stored_property_inits'
 /// \endverbatim
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   SourceLoc InversionLoc = Tok.getLoc();

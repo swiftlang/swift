@@ -264,8 +264,12 @@ class alignas(8) Decl {
 
     /// The stage of the inheritance circularity check for this class.
     unsigned Circularity : 2;
+
+    /// Whether this class requires all of its instance variables to
+    /// have in-class initializers.
+    unsigned RequiresStoredPropertyInits : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 2 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 3 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2154,6 +2158,18 @@ public:
   /// Record the current stage of circularity checking.
   void setCircularityCheck(CircularityCheck circularity) {
     ClassDeclBits.Circularity = static_cast<unsigned>(circularity);
+  }
+
+  //// Whether this class requires all of its stored properties to
+  //// have initializers in the class definition.
+  bool requiresStoredPropertyInits() const { 
+    return ClassDeclBits.RequiresStoredPropertyInits;
+  }
+
+  /// Set whether this class requires all of its stored properties to
+  /// have initializers in the class definition.
+  void setRequiresStoredPropertyInits(bool requiresInits) {
+    ClassDeclBits.RequiresStoredPropertyInits = requiresInits;
   }
 
   /// Retrieve the destructor for this class.

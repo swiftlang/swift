@@ -1218,6 +1218,8 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isObjC(),
                             theClass->getAttrs().isIBLiveView(),
                             (unsigned)theClass->getAttrs().getResilienceKind(),
+                            theClass->getAttrs().requiresStoredPropertyInits(),
+                            theClass->requiresStoredPropertyInits(),
                             addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());

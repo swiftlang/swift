@@ -67,6 +67,7 @@ ATTR(optional)
 ATTR(transparent)
 ATTR(unowned)
 ATTR(weak)
+ATTR(requires_stored_property_inits)
 
 IB_ATTR(IBOutlet)
 IB_ATTR(IBAction)

@@ -1455,6 +1455,73 @@ public:
       checkObjCConformance(protocols[i], conformances[i]);
   }
 
+  /// Check that all stored properties have in-class initializers.
+  void checkRequiredInClassInits(ClassDecl *cd) {
+    ClassDecl *source = nullptr;
+    for (auto member : cd->getMembers()) {
+      auto pbd = dyn_cast<PatternBindingDecl>(member);
+      if (!pbd || pbd->hasInit() || pbd->isInvalid()) continue;
+
+      // The variables in this pattern have not been
+      // initialized. Diagnose the lack of initial value.
+      pbd->setInvalid();
+      SmallVector<VarDecl *, 4> vars;
+      pbd->getPattern()->collectVariables(vars);
+      switch (vars.size()) {
+      case 0:
+        llvm_unreachable("should have been marked invalid");
+
+      case 1:
+        TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_1,
+                    vars[0]->getName());
+        break;
+
+      case 2:
+        TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_2,
+                    vars[0]->getName(), vars[1]->getName());
+        break;
+
+      case 3:
+        TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
+                    vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
+                    false);
+        break;
+
+      default:
+        TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
+                    vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
+                    true);
+        break;
+      }
+
+      // Figure out where this requirement came from.
+      if (!source) {
+        source = cd;
+        while (true) {
+          // If this class had the 'requires_stored_property_inits'
+          // attribute, diagnose here.
+          if (source->getAttrs().requiresStoredPropertyInits())
+            break;
+
+          // If the superclass doesn't require in-class initial
+          // values, the requirement was introduced at this point, so
+          // stop here.
+          auto superclass = cast<ClassDecl>(
+                              source->getSuperclass()->getAnyNominal());
+          if (!superclass->requiresStoredPropertyInits())
+            break;
+
+          // Keep looking.
+          source = superclass;
+        }
+      }
+
+      // Add a note describing why we need an initializer.
+      TC.diagnose(source, diag::requires_stored_property_inits_here,
+                  source->getDeclaredType(), cd == source);
+    }
+  }
+
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       TC.validateDecl(CD);
@@ -1472,6 +1539,12 @@ public:
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
+
+    // If this class requires all of its stored properties to have
+    // in-class initializers, diagnose this now.
+    if (CD->requiresStoredPropertyInits()) {
+      checkRequiredInClassInits(CD);
+    }
 
     if (!IsSecondPass) {
       TC.addImplicitConstructors(CD);
@@ -2272,6 +2345,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       CD->setIsObjC(CD->getAttrs().isObjC() ||
                     (superclassDecl && superclassDecl->isObjC()));
+
+      // Determine whether we require in-class initializers.
+      if (CD->getAttrs().requiresStoredPropertyInits() ||
+          (superclassDecl && superclassDecl->requiresStoredPropertyInits()))
+        CD->setRequiresStoredPropertyInits(true);
     }
 
     ValidatedTypes.push_back(nominal);
@@ -3015,6 +3093,14 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         D->getMutableAttrs().clearAttribute(AK_transparent);
       }
     }
+  }
+
+  // The requires_stored_property_inits attribute only applies to
+  // classes.
+  if (Attrs.requiresStoredPropertyInits() && !isa<ClassDecl>(D)) {
+    TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
+                diag::requires_stored_property_inits_nonclass);
+    D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
   }
 
   static const AttrKind InvalidAttrs[] = {

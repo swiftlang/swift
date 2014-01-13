@@ -276,6 +276,7 @@ public:
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
   bool isOptional() const { return has(AK_optional); }
+  bool requiresStoredPropertyInits() const { return has(AK_requires_stored_property_inits); }
 
   bool hasMutating() const { return has(AK_mutating); }
   Optional<bool> getMutating() const {

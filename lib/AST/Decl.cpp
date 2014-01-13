@@ -914,6 +914,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     ClassLoc(ClassLoc) {
   ClassDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+  ClassDeclBits.RequiresStoredPropertyInits = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {

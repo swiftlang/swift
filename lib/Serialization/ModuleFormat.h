@@ -544,6 +544,8 @@ namespace decls_block {
     BCFixed<1>,        // explicitly objc?
     BCFixed<1>,        // IBLiveView?
     BCFixed<2>,        // Resilience kind
+    BCFixed<1>,        // requires stored property initial values (attribute)
+    BCFixed<1>,        // requires stored property initial values
     TypeIDField        // superclass
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.

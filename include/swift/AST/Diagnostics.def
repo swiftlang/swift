@@ -880,6 +880,10 @@ ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have Optional type %0", (Type))
 
+// requires_stored_property_inits
+ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
+      "'requires_stored_property_inits' attribute can only be applied to a class", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1126,6 +1130,17 @@ ERROR(optional_attribute_non_protocol,sema_tcd,none,
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
       "'optional' attribute can only be applied to members of an @objc protocol", 
       ())
+ERROR(missing_in_class_init_1,sema_tcd,none,
+      "stored property %0 requires an initial value", (Identifier))
+ERROR(missing_in_class_init_2,sema_tcd,none,
+      "stored properties %0 and %1 require initial values", 
+      (Identifier, Identifier))
+ERROR(missing_in_class_init_3plus,sema_tcd,none,
+      "stored properties %0, %1, %select{and %2|%2, and others}3 "
+      "require initial values", (Identifier, Identifier, Identifier, bool))
+NOTE(requires_stored_property_inits_here,sema_tcd,none,
+     "%select{superclass|class}1 %0 requires all stored properties to have "
+     "initial values", (Type, bool))
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
