@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "devirtualization"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -26,6 +27,8 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
+static const unsigned RecursionMaxDepth = 8;
 
 STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
@@ -61,20 +64,86 @@ struct SILDevirtualizer {
 
 } // end anonymous namespace.
 
+/// \brief Returns the index of the argument that the function returns or -1
+/// if the return value is not always an argument.
+static int functionReturnsArgument(SILFunction *F) {
+  if (F->getBlocks().size() != 1)
+    return -1;
+
+  // Check if there is a single terminator which is a ReturnInst.
+  ReturnInst *RI = dyn_cast<ReturnInst>(F->begin()->getTerminator());
+  if (!RI)
+    return -1;
+
+  // Check that the single return instruction that we found returns the
+  // correct argument. Scan all of the argument and check if the return inst
+  // returns them.
+  ValueBase *ReturnedVal = RI->getOperand().getDef();
+  for (int i = 0, e = F->begin()->getNumBBArg(); i != e; ++i)
+    if (F->begin()->getBBArg(i) == ReturnedVal)
+      return i;
+
+  // The function does not return an argument.
+  return -1;
+}
+
+/// \brief Returns the single return value if there is one.
+static SILValue functionSingleReturn(SILFunction *F) {
+  if (F->getBlocks().size() != 1)
+    return SILValue();
+
+  // Check if there is a single terminator which is a ReturnInst.
+  ReturnInst *RI = dyn_cast<ReturnInst>(F->begin()->getTerminator());
+  if (!RI)
+    return SILValue();
+  return RI->getOperand();
+}
+
 /// \brief Scan the use-def chain and skip cast instructions that don't change
 /// the value of the class. Stop on classes that define a class type.
-SILInstruction *findMetaType(SILValue S) {
+SILInstruction *findMetaType(SILValue S, unsigned Depth = 0) {
   SILInstruction *Inst = dyn_cast<SILInstruction>(S);
   if (!Inst)
     return nullptr;
 
+    if (Depth == RecursionMaxDepth) {
+      DEBUG(llvm::dbgs() << "findMetaType: Max recursion depth.\n");
+      return nullptr;
+    }
+
   switch (Inst->getKind()) {
+  case ValueKind::ApplyInst: {
+    // C'tors often return the last argument that is the allocation of the
+    // object. Try to find functions that return one of their arguments and
+    // check what that argument is.
+    ApplyInst *AI = cast<ApplyInst>(Inst);
+    FunctionRefInst *FR = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+    if (!FR)
+      return nullptr;
+
+    SILFunction *F = FR->getReferencedFunction();
+    if (!F->size())
+      return nullptr;
+
+    // Does this function return one of its arguments ?
+    int RetArg = functionReturnsArgument(F);
+    if (RetArg != -1) {
+      SILValue Operand = AI->getOperand(1 /* 1st operand is Callee */ + RetArg);
+      return findMetaType(Operand, Depth + 1);
+    }
+
+    SILValue V = functionSingleReturn(F);
+    if (V.isValid())
+      return findMetaType(V, Depth + 1);
+
+    return nullptr;
+  }
   case ValueKind::AllocRefInst:
   case ValueKind::MetatypeInst:
     return Inst;
   case ValueKind::UpcastInst:
   case ValueKind::UnconditionalCheckedCastInst:
-    return findMetaType(Inst->getOperand(0));
+    return findMetaType(Inst->getOperand(0), Depth + 1);
   default:
     return nullptr;
   }

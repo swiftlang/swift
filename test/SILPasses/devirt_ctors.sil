@@ -1,0 +1,49 @@
+// RUN: %sil-opt %s -devirtualize -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import swift
+
+class ABC {
+ init(y : Int)
+ func member()
+ func member2()
+}
+
+
+// This is our c'tor.
+sil @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC {
+bb0(%0 : $Int64, %1 : $ABC):
+  return %1 : $ABC                                // id: %38
+}
+
+sil @_TFC4main3ABC6memberfS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
+sil @_TFC4main3ABC7member2fS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
+sil @_TFC4main3ABCCfMS0_FT1ySi_S0_ : $@thin (Int64, @thick ABC.metatype) -> @owned ABC
+
+//CHECK:@_TF4main3fooFT_T_
+//CHECK-NOT: class_method
+//CHECK: return
+sil @_TF4main3fooFT_T_ : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 7          // user: %1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)        // user: %4
+  %2 = alloc_ref $ABC                             // user: %4
+  // function_ref main.ABC.init (main.ABC.metatype)(y : swift.Int64) -> main.ABC
+  %3 = function_ref @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // user: %4
+  %4 = apply %3(%1, %2) : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // users: %7, %6, %5, %10, %9, %8, %11
+  strong_retain %4 : $ABC                         // id: %5
+  %6 = class_method %4 : $ABC, #ABC.member!1 : $@cc(method) @thin (@owned ABC) -> () // user: %7
+  %7 = apply %6(%4) : $@cc(method) @thin (@owned ABC) -> ()
+  strong_retain %4 : $ABC                         // id: %8
+  %9 = class_method %4 : $ABC, #ABC.member2!1 : $@cc(method) @thin (@owned ABC) -> () // user: %10
+  %10 = apply %9(%4) : $@cc(method) @thin (@owned ABC) -> ()
+  strong_release %4 : $ABC                        // id: %11
+  %12 = tuple ()                                  // user: %13
+  return %12 : $()                                // id: %13
+}
+
+sil_vtable ABC {
+  #ABC.member!1: _TFC4main3ABC6memberfS0_FT_T_  // main.ABC.member (main.ABC)() -> ()
+  #ABC.member2!1: _TFC4main3ABC7member2fS0_FT_T_  // main.ABC.member2 (main.ABC)() -> ()
+}
