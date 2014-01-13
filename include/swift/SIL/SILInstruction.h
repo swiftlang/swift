@@ -1031,15 +1031,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// CoerceInst - Convert a value to a type with an explicit T(x) cast.
-class CoerceInst
-  : public UnaryInstructionBase<ValueKind::CoerceInst, ConversionInst>
-{
-public:
-  CoerceInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
 class UpcastInst
   : public UnaryInstructionBase<ValueKind::UpcastInst, ConversionInst>

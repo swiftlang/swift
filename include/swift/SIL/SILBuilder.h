@@ -320,10 +320,6 @@ public:
     return insert(new (F.getModule()) ConvertFunctionInst(Loc, Op, Ty));
   }
 
-  CoerceInst *createCoerce(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) CoerceInst(Loc, Op, Ty));
-  }
-  
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new (F.getModule()) UpcastInst(Loc, Op, Ty));
   }

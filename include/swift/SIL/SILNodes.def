@@ -155,7 +155,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
-    INST(CoerceInst, ConversionInst, None)
     INST(UpcastInst, ConversionInst, None)
     INST(ArchetypeRefToSuperInst, ConversionInst, None)
     INST(AddressToPointerInst, ConversionInst, None)
@@ -170,7 +169,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(BridgeToBlockInst, ConversionInst, None)
     INST(ThinToThickFunctionInst, ConversionInst, None)
     INST(UnconditionalCheckedCastInst, ConversionInst, None)
-    VALUE_RANGE(ConversionInst, CoerceInst, UnconditionalCheckedCastInst)
+    VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
 
   // Runtime failure

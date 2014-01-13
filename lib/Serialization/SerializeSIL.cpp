@@ -725,7 +725,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:
-  case ValueKind::CoerceInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
   case ValueKind::ObjectPointerToRefInst:
@@ -749,10 +748,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::UpcastInst:
       operand = cast<UpcastInst>(&SI)->getOperand();
       Ty = cast<UpcastInst>(&SI)->getType();
-      break;
-    case ValueKind::CoerceInst:
-      operand = cast<CoerceInst>(&SI)->getOperand();
-      Ty = cast<CoerceInst>(&SI)->getType();
       break;
     case ValueKind::AddressToPointerInst:
       operand = cast<AddressToPointerInst>(&SI)->getOperand();

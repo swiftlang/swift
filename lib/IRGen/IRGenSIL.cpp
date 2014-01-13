@@ -609,7 +609,6 @@ public:
   void visitCondFailInst(CondFailInst *i);
   
   void visitConvertFunctionInst(ConvertFunctionInst *i);
-  void visitCoerceInst(CoerceInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
@@ -2598,11 +2597,6 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   Explosion out(ExplosionKind::Maximal);
   out.add(result);
   setLoweredExplosion(SILValue(i, 0), out);
-}
-
-void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
-  Explosion from = getLoweredExplosion(i->getOperand());
-  setLoweredExplosion(SILValue(i, 0), from);
 }
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {

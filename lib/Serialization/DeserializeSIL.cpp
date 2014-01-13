@@ -614,7 +614,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(RefToObjectPointer)
   ONEOPERAND_ONETYPE_INST(Upcast)
-  ONEOPERAND_ONETYPE_INST(Coerce)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToAddress)
   ONEOPERAND_ONETYPE_INST(ObjectPointerToRef)

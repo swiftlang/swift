@@ -411,15 +411,6 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitCoerceInst(CoerceInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createCoerce(getOpLocation(Inst->getLoc()),
-                         getOpValue(Inst->getOperand()),
-                         getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
   doPostProcess(Inst,
     Builder.createUpcast(getOpLocation(Inst->getLoc()),

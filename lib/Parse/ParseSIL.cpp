@@ -922,7 +922,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
-    .Case("coerce", ValueKind::CoerceInst)
     .Case("cond_br", ValueKind::CondBranchInst)
     .Case("cond_fail", ValueKind::CondFailInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
@@ -1356,7 +1355,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:
-  case ValueKind::CoerceInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
   case ValueKind::ObjectPointerToRefInst:
@@ -1393,9 +1391,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::ConvertFunctionInst:
       ResultVal = B.createConvertFunction(InstLoc, Val, Ty);
-      break;
-    case ValueKind::CoerceInst:
-      ResultVal = B.createCoerce(InstLoc, Val, Ty);
       break;
     case ValueKind::AddressToPointerInst:
       ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);

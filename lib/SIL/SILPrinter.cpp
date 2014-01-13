@@ -720,9 +720,6 @@ public:
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
   }
-  void visitCoerceInst(CoerceInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "coerce");
-  }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "upcast");
   }
