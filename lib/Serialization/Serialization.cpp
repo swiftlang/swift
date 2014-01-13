@@ -1206,7 +1206,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto theClass = cast<ClassDecl>(D);
     checkAllowedAttributes<
       AK_IBLiveView, AK_objc, AK_resilient, AK_fragile,
-      AK_born_fragile>(theClass);
+      AK_born_fragile, AK_requires_stored_property_inits>(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
