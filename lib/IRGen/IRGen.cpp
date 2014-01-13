@@ -26,7 +26,7 @@
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/PrintModulePass.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO.h"
@@ -259,7 +259,7 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssembly:
-    EmitPasses.add(createPrintModulePass(&FormattedOS));
+    EmitPasses.add(createPrintModulePass(FormattedOS));
     break;
   case IRGenOutputKind::LLVMBitcode:
     EmitPasses.add(createBitcodeWriterPass(*RawOS));
