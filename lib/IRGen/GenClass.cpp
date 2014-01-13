@@ -1092,13 +1092,21 @@ namespace {
     }
 
     void addIVarInitializer() {
-      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(), false))
+      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(),
+                                                         false)) {
         InstanceMethods.push_back(*entry);
+
+        HasNonTrivialConstructor = true;
+      }
     }
 
     void addIVarDestroyer() {
-      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(), true))
+      if (auto entry = emitObjCIVarInitDestroyDescriptor(IGM, getClass(),
+                                                         true)) {
         InstanceMethods.push_back(*entry);
+
+        HasNonTrivialDestructor = true;
+      }
     }
 
   private:
@@ -1199,9 +1207,6 @@ namespace {
       SILType fieldType =
         IGM.getLoweredType(AbstractionPattern(var->getType()), var->getType());
       Ivars.push_back(buildIvar(var, fieldType));
-      if (!IGM.isPOD(fieldType, ResilienceScope::Local)) {
-        HasNonTrivialDestructor = true;
-      }
 
       // Build property accessors for the ivar if necessary.
       visitProperty(var);
