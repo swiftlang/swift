@@ -2611,8 +2611,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
         diagnose(Tok, diag::expected_lbrace_initializer);
       }
 
-      // FIXME: This is brutal. Can't we at least return the declaration?
-      return nullptr;
+      return makeParserResult(CD);
     }
   } else {
     // Parse the body.
