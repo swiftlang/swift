@@ -613,52 +613,29 @@ struct ArgumentInitVisitor :
     assert(ty && "no type?!");
     return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l);
   }
-  
-  void storeArgumentInto(Type ty, RValue argrv, SILLocation loc,
-                         Initialization *I) {
+
+
+  /// Create a SILArgument and store its value into the given Initialization,
+  /// if not null.
+  void makeArgumentInto(Type ty, SILBasicBlock *parent,
+                        SILLocation loc, Initialization *I) {
+    assert(I && "no initialization?");
     assert(ty && "no type?!");
-    if (!I) return;
-    switch (I->kind) {
-    case Initialization::Kind::AddressBinding: {
+    loc.markAsPrologue();
+
+    RValue argrv = makeArgument(ty, parent, loc);
+
+    if (I->kind == Initialization::Kind::AddressBinding) {
       SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
       I->bindAddress(arg, gen, loc);
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
       if (!ty->is<InOutType>())
         gen.Cleanups.pushCleanup<DestroyAddr>(arg);
-      break;
-    }
-
-    case Initialization::Kind::Translating: {
-      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
-      I->translateValue(gen, loc, gen.emitManagedRValueWithCleanup(arg));
-      break;
-    }
-
-    case Initialization::Kind::SingleBuffer: {
-      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
-      gen.emitSemanticStore(loc, arg, I->getAddress(),
-                            gen.getTypeLowering(ty), IsInitialization);
-      break;
-    }
-
-    case Initialization::Kind::Ignored:
-    case Initialization::Kind::LetValue:
-    case Initialization::Kind::Tuple:
+      I->finishInitialization(gen);
+    } else {
       std::move(argrv).forwardInto(gen, I, loc);
-      return;
     }
-
-    I->finishInitialization(gen);
-  }
-
-  /// Create a SILArgument and store its value into the given Initialization,
-  /// if not null.
-  void makeArgumentInto(Type ty, SILBasicBlock *parent,
-                            SILLocation loc, Initialization *I) {
-    assert(ty && "no type?!");
-    loc.markAsPrologue();
-    storeArgumentInto(ty, makeArgument(ty, parent, loc), loc, I);
   }
     
   // Paren, Typed, and Var patterns are no-ops. Just look through them.
