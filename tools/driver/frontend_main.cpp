@@ -25,6 +25,7 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -225,6 +226,32 @@ int frontend_main(ArrayRef<const char *>Args,
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
     return 1;
+  }
+
+  // TODO: reorder, if possible, so that diagnostics emitted during
+  // CompilerInvocation::parseArgs are included in the serialized file.
+  std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
+  {
+    const std::string &SerializedDiagnosticsPath =
+      Invocation.getFrontendOptions().SerializedDiagnosticsPath;
+    if (!SerializedDiagnosticsPath.empty()) {
+      std::string ErrorInfo;
+      std::unique_ptr<llvm::raw_fd_ostream> OS;
+      OS.reset(new llvm::raw_fd_ostream(SerializedDiagnosticsPath.c_str(),
+                                        ErrorInfo,
+                                        llvm::sys::fs::F_Binary));
+
+      if (!ErrorInfo.empty()) {
+        Instance.getDiags().diagnose(SourceLoc(),
+                                     diag::cannot_open_serialized_file,
+                                     SerializedDiagnosticsPath, ErrorInfo);
+        return 1;
+      }
+
+      SerializedConsumer.reset(
+        serialized_diagnostics::createConsumer(OS.release()));
+      Instance.addDiagnosticConsumer(SerializedConsumer.get());
+    }
   }
 
   if (Invocation.getFrontendOptions().PrintHelp ||

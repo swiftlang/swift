@@ -71,10 +71,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.OutputFilename = A->getValue();
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_serialize_diagnostics)) {
-    Opts.SerializedDiagnosticsPath = A->getValue();
-  }
-
   if (Args.hasArg(OPT_emit_verbose_sil)) {
     Opts.EmitVerboseSIL = true;
   }
@@ -218,6 +214,33 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
 
     Opts.ModuleName = ModuleName;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_serialized_diagnostics_path)) {
+    // Claim -serialize-diagnostics, if present.
+    Args.ClaimAllArgs(OPT_serialize_diagnostics);
+    Opts.SerializedDiagnosticsPath = A->getValue();
+  } else if (Args.hasArg(OPT_serialize_diagnostics)) {
+    // -serialize-diagnostics has been passed without
+    // -serialized-diagnostics-path, so determine a path based on other inputs.
+    static const char *const DiagnosticsFilePathExtension = "dia";
+    StringRef OriginalPath;
+    if (!Opts.OutputFilename.empty() && Opts.OutputFilename != "-")
+      // Put the serialized diagnostics file next to the output file.
+      OriginalPath = Opts.OutputFilename;
+    else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename())
+      // We have a primary input, so use that as the basis for the name of the
+      // serialized diagnostics file.
+      OriginalPath = llvm::sys::path::filename(
+        Opts.InputFilenames[Opts.PrimaryInput->Index]);
+    else
+      // We don't have any better indication of name, so fall back on the
+      // module name.
+      OriginalPath = Opts.ModuleName;
+
+    llvm::SmallString<128> Path(OriginalPath);
+    llvm::sys::path::replace_extension(Path, DiagnosticsFilePathExtension);
+    Opts.SerializedDiagnosticsPath = Path.str();
   }
 
   return false;

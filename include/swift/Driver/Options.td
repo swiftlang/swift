@@ -107,11 +107,9 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
   Alias<I>;
 
-def serialize_diagnostics : Separate<["-"], "serialize-diagnostics">,
+def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[DriverOption, FrontendOption]>,
-  HelpText<"File for serializing diagnostics in a binary format">;
-def serialize_diagnostics_EQ : Joined<["-"], "serialize-diagnostics=">,
-  Flags<[DriverOption, FrontendOption]>, Alias<serialize_diagnostics>;
+  HelpText<"Serialize diagnostics in a binary format">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[DriverOption, FrontendOption]>,
