@@ -169,6 +169,7 @@ ClassDecl *findClassTypeForOperand(SILValue S) {
 }
 
 void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
+  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *CMI);
   // Optimize a class_method and alloc_ref pair into a direct function
   // reference:
   //
@@ -200,8 +201,8 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
       if (SILFunction *F = Vtbl.getImplementation(CMI->getModule(), Member)) {
         // Create a direct reference to the method.
         SILInstruction *FRI = new (*M) FunctionRefInst(CMI->getLoc(), F);
+        DEBUG(llvm::dbgs() << " *** Devirtualized : " << *CMI);
         CMI->getParent()->getInstList().insert(CMI, FRI);
-
         CMI->replaceAllUsesWith(FRI);
         CMI->eraseFromParent();
         NumDevirtualized++;
@@ -298,6 +299,7 @@ static void replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
 }
 
 void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
+  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AI);
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
   //
