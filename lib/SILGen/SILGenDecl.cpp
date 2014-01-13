@@ -352,23 +352,10 @@ public:
   }
   
   void bindValue(SILValue value, SILGenFunction &gen) override {
-    assert(!address && "Shouldn't bind a value to an address-only let");
-
     assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
     gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
 
     emitDebugValue(value, gen);
-  }
-
-  void bindArgument(SILValue value, SILGenFunction &gen) {
-    if (!value.getType().isAddress())
-      bindValue(value, gen);
-    else {
-      assert(!gen.VarLocs.count(vd) &&
-             "Already bound a location to this argument");
-      gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
-      emitDebugValue(value, gen);
-    }
   }
 
   void finishInitialization(SILGenFunction &gen) override {
@@ -629,39 +616,37 @@ struct ArgumentInitVisitor :
   
   void storeArgumentInto(Type ty, RValue argrv, SILLocation loc,
                          Initialization *I) {
-    SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
     assert(ty && "no type?!");
     if (!I) return;
     switch (I->kind) {
-    case Initialization::Kind::AddressBinding:
+    case Initialization::Kind::AddressBinding: {
+      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
       I->bindAddress(arg, gen, loc);
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
       if (!ty->is<InOutType>())
         gen.Cleanups.pushCleanup<DestroyAddr>(arg);
       break;
+    }
 
-    case Initialization::Kind::Translating:
+    case Initialization::Kind::Translating: {
+      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
       I->translateValue(gen, loc, gen.emitManagedRValueWithCleanup(arg));
-      break;
-
-    case Initialization::Kind::SingleBuffer:
-      gen.emitSemanticStore(loc, arg, I->getAddress(),
-                            gen.getTypeLowering(ty), IsInitialization);
-      break;
-
-    case Initialization::Kind::Ignored:
-      break;
-    case Initialization::Kind::LetValue: {
-      // If this is a 'let' value being used as a constant, lower it as the
-      // value itself.
-      ((LetValueInitialization*)I)->bindArgument(arg, gen);
       break;
     }
 
+    case Initialization::Kind::SingleBuffer: {
+      SILValue arg = std::move(argrv).forwardAsSingleValue(gen, loc);
+      gen.emitSemanticStore(loc, arg, I->getAddress(),
+                            gen.getTypeLowering(ty), IsInitialization);
+      break;
+    }
+
+    case Initialization::Kind::Ignored:
+    case Initialization::Kind::LetValue:
     case Initialization::Kind::Tuple:
-      llvm_unreachable("tuple initializations should be destructured before "
-                       "reaching here");
+      std::move(argrv).forwardInto(gen, I, loc);
+      return;
     }
 
     I->finishInitialization(gen);
