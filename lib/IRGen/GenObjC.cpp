@@ -982,6 +982,7 @@ static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
 
 static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
                                                      AnyFunctionType *T) {
+#if 0
   ASTContext &Context = IGM.Context;
   auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
   assert(CI && "no clang module loader");
@@ -1037,6 +1038,8 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
   }
 
   return cnull;
+#endif
+  return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 }
 
 /// Emit the components of an Objective-C method descriptor: its selector,
