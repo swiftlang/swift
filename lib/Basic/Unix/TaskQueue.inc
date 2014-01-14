@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 
 #include <string>
 #include <cerrno>
@@ -25,6 +26,8 @@
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+#include <poll.h>
 
 #if !defined(__APPLE__)
 extern char **environ;
@@ -49,6 +52,9 @@ class Task {
   /// Context which should be associated with this task.
   void *Context;
 
+  /// The pid of this Task when executing.
+  pid_t Pid;
+
   /// A pipe for reading output from the child process.
   int Pipe;
 
@@ -66,7 +72,7 @@ public:
   Task(const char *ExecPath, ArrayRef<const char *> Args,
        ArrayRef<const char *> Env, void *Context)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
-        State(Preparing) {
+        Pid(-1), Pipe(-1), State(Preparing) {
     assert((Env.empty() || Env.back() == nullptr) &&
            "Env must either be empty or null-terminated!");
   }
@@ -75,10 +81,16 @@ public:
   ArrayRef<const char *> getArgs() const { return Args; }
   StringRef getOutput() const { return Output; }
   void *getContext() const { return Context; }
+  pid_t getPid() const { return Pid; }
+  int getPipe() const { return Pipe; }
 
   /// \brief Begins execution of this Task.
-  /// \returns the Task's pid on success, or 0 on failure
-  pid_t execute();
+  /// \returns true on error, false on success
+  bool execute();
+
+  /// \brief Reads data from the pipe, if any is available.
+  /// \returns true on error, false on success
+  bool readFromPipe();
 
   /// \brief Performs any post-execution work for this Task, such as reading
   /// piped output and closing the pipe.
@@ -88,7 +100,7 @@ public:
 } // end namespace sys
 } // end namespace swift
 
-pid_t Task::execute() {
+bool Task::execute() {
   assert(State < Executing && "This Task cannot be executed twice!");
   State = Executing;
 
@@ -102,8 +114,6 @@ pid_t Task::execute() {
   int FullPipe[2];
   pipe(FullPipe);
   Pipe = FullPipe[0];
-
-  pid_t Pid;
 
   // Get the environment to pass down to the subtask.
   const char *const *envp = Env.empty() ? nullptr : Env.data();
@@ -136,7 +146,7 @@ pid_t Task::execute() {
   if (spawnErr != 0 || Pid == 0) {
     close(FullPipe[0]);
     State = Finished;
-    return 0;
+    return true;
   }
 #else
   Pid = fork();
@@ -168,9 +178,29 @@ pid_t Task::execute() {
   }
 
   close(FullPipe[1]);
+
+  if (Pid == 0)
+    return true;
 #endif
   
-  return Pid;
+  return false;
+}
+
+bool Task::readFromPipe() {
+  char outputBuffer[1024];
+  ssize_t readBytes = 0;
+  while ((readBytes = read(Pipe, outputBuffer, sizeof(outputBuffer))) != 0) {
+    if (readBytes < 0) {
+      if (errno == EINTR)
+        // read() was interrupted, so try again.
+        continue;
+      return true;
+    }
+
+    Output.append(outputBuffer, readBytes);
+  }
+
+  return false;
 }
 
 void Task::finishExecution() {
@@ -180,11 +210,7 @@ void Task::finishExecution() {
   State = Finished;
 
   // Read the output of the command, so we can use it later.
-  char outputBuffer[1024];
-  ssize_t readBytes = 0;
-  while ((readBytes = read(Pipe, outputBuffer, sizeof(outputBuffer))) != 0) {
-    Output.append(outputBuffer, readBytes);
-  }
+  readFromPipe();
 
   close(Pipe);
 }
@@ -207,7 +233,13 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
 
 bool TaskQueue::execute(TaskBeganCallback Began,
                         TaskFinishedCallback Finished) {
-  llvm::DenseMap<pid_t, std::unique_ptr<Task>> ExecutingTasks;
+  typedef llvm::DenseMap<pid_t, std::unique_ptr<Task>> PidToTaskMap;
+
+  // Stores the current executing Tasks, organized by pid.
+  PidToTaskMap ExecutingTasks;
+
+  // Maintains the current fds we're checking with poll.
+  std::vector<struct pollfd> PollFds;
 
   bool SubtaskFailed = false;
 
@@ -226,65 +258,108 @@ bool TaskQueue::execute(TaskBeganCallback Began,
            ExecutingTasks.size() < MaxNumberOfParallelTasks) {
       std::unique_ptr<Task> T(QueuedTasks.front().release());
       QueuedTasks.pop();
-      pid_t Pid = T->execute();
-      if (Pid == 0) {
+      if (T->execute())
         return true;
-      }
+
+      pid_t Pid = T->getPid();
+
       if (Began) {
         Began(Pid, T->getContext());
       }
+
+      PollFds.push_back({ T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0 });
       ExecutingTasks[Pid] = std::move(T);
     }
 
-    // Wait for the next subtask to finish execution.
-    int Status;
-    pid_t Pid = waitpid(-1, &Status, 0);
-    assert(Pid != 0 && "We do not pass WNOHANG, so we should always get a pid");
-
-    if (Pid < 0) {
-      int err = errno;
-      switch (err) {
-      case ECHILD:
-        // There was no child to wait for, which is an error.
-        break;
-      case EINVAL:
-        // We passed invalid arguments to waitpid, which is an error.
-        break;
-      case EINTR:
-        // The call to waitpid was interrupted; continue so we wait again.
+    assert(PollFds.size() > 0 &&
+           "We should only call poll() if we have fds to watch!");
+    int ReadyFdCount = poll(PollFds.data(), PollFds.size(), -1);
+    if (ReadyFdCount == -1) {
+      // Recover from error, if possible.
+      if (errno == EAGAIN || errno == EINTR)
         continue;
-      }
       return true;
     }
 
-    auto iter = ExecutingTasks.find(Pid);
-    if (iter != ExecutingTasks.end()) {
-      Task &T = *iter->second;
+    // Holds all fds which have finished during this loop iteration.
+    std::vector<int> FinishedFds;
 
-      T.finishExecution();
+    for (struct pollfd &fd : PollFds) {
+      if (fd.revents & POLLIN || fd.revents & POLLPRI || fd.revents & POLLHUP ||
+          fd.revents & POLLERR) {
+        // An event which we care about occurred. Find the appropriate Task.
+        auto predicate = [&fd] (PidToTaskMap::value_type &value) -> bool {
+          return value.second->getPipe() == fd.fd;
+        };
 
-      int Result = 0;
-      if (WIFEXITED(Status)) {
-        Result = WEXITSTATUS(Status);
-
-        if (Finished &&
-            Finished(Pid, Result, T.getOutput(), T.getContext()) ==
-            TaskFinishedResponse::StopExecution) {
-          // If we have a TaskFinishedCallback, only set SubtaskFailed to true
-          // if the callback returns StopExecution.
-          SubtaskFailed = true;
-        } else if (Result != 0) {
-          // Since we don't have a TaskFinishedCallback, treat a subtask which
-          // returned a nonzero exit code as having failed.
-          SubtaskFailed = true;
+        auto iter = std::find_if(ExecutingTasks.begin(), ExecutingTasks.end(),
+                                 predicate);
+        assert(iter != ExecutingTasks.end() &&
+               "All outstanding fds must be associated with an executing Task");
+        Task &T = *iter->second;
+        if (fd.revents & POLLIN || fd.revents & POLLPRI) {
+          // There's data available to read.
+          T.readFromPipe();
         }
+
+        if (fd.revents & POLLHUP || fd.revents & POLLERR) {
+          // This fd was "hung up" or had an error, so we need to wait for the
+          // Task and then clean up.
+          pid_t Pid;
+          int Status;
+          do {
+            Status = 0;
+            Pid = waitpid(T.getPid(), &Status, 0);
+            assert(Pid != 0 &&
+                   "We do not pass WNOHANG, so we should always get a pid");
+            if (Pid < 0 && (errno == ECHILD || errno == EINVAL))
+              return true;
+          } while (Pid < 0);
+
+          assert(Pid == T.getPid() &&
+                 "We asked to wait for this Task, but we got another Pid!");
+
+          T.finishExecution();
+
+          if (WIFEXITED(Status)) {
+            int Result = WEXITSTATUS(Status);
+
+            if (Finished &&
+                Finished(T.getPid(), Result, T.getOutput(), T.getContext()) ==
+                TaskFinishedResponse::StopExecution) {
+              // If we have a TaskFinishedCallback, only set SubtaskFailed to
+              // true if the callback returns StopExecution.
+              SubtaskFailed = true;
+            } else if (Result != 0) {
+              // Since we don't have a TaskFinishedCallback, treat a subtask
+              // which returned a nonzero exit code as having failed.
+              SubtaskFailed = true;
+            }
+          }
+
+          ExecutingTasks.erase(Pid);
+          FinishedFds.push_back(fd.fd);
+        }
+      } else if (fd.revents & POLLNVAL) {
+        // We passed an invalid fd; this should never happen,
+        // since we always mark fds as finished after calling
+        // Task::finishExecution() (which closes the Task's fd).
+        llvm_unreachable("Asked poll() to watch a closed fd");
       }
 
-      // We can't reuse the existing iterator, since ExecutingTasks may change
-      // due to the call to Finished. Instead, erase the Pid directly.
-      ExecutingTasks.erase(Pid);
+      fd.revents = 0;
     }
-    
+
+    // Remove any fds which we've closed from PollFds.
+    for (int fd : FinishedFds) {
+      auto predicate = [&fd] (struct pollfd &i) {
+        return i.fd == fd;
+      };
+
+      auto iter = std::find_if(PollFds.begin(), PollFds.end(), predicate);
+      assert(iter != PollFds.end() && "The finished fd must be in PollFds!");
+      PollFds.erase(iter);
+    }
   }
 
   return SubtaskFailed;
