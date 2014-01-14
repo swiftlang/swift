@@ -544,7 +544,6 @@ public:
       assert(Decl);
       StringRef Name = Decl->getName().str();
       auto SILVal = i->getOperand();
-
       auto Vals = getLoweredExplosion(SILVal).claimAll();
       // See also comment for SILArgument.
       if (Vals.size() == 1)
@@ -553,10 +552,21 @@ public:
            Vals[0],
            DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
            Name, i);
-  }
+    }
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    // FIXME: Noop
+    if (IGM.DebugInfo) {
+      VarDecl *Decl = i->getDecl();
+      assert(Decl);
+      StringRef Name = Decl->getName().str();
+      auto SILVal = i->getOperand();
+      auto Val = getLoweredAddress(SILVal).getAddress();
+      IGM.DebugInfo->emitStackVariableDeclaration
+        (Builder, Val,
+         DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
+         Name, i);
+    }
+
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
