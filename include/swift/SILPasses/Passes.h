@@ -104,9 +104,6 @@ namespace swift {
   /// \brief Replace aggregate allocations with scalar allocations.
   void performSILSROA(SILModule *M);
 
-  /// \brief Remove redundent ARC memory operations.
-  void performSILARCOpts(SILModule *M);
-
 } // end namespace swift
 
 #endif

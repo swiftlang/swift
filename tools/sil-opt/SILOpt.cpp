@@ -45,8 +45,7 @@ enum class PassKind {
   SimplifyCFG,
   PerformanceInlining,
   LowerAggregateInstrs,
-  SROA,
-  ARCOpts,
+  SROA
 };
 
 static llvm::cl::opt<std::string>
@@ -119,10 +118,6 @@ Passes(llvm::cl::desc("Passes:"),
                                    "sroa",
                                    "Perform SIL scalar replacement of "
                                    "aggregates."),
-                        clEnumValN(PassKind::ARCOpts,
-                                   "arc-opts",
-                                   "Perform automatic reference counting "
-                                   "optimizations."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -247,9 +242,6 @@ int main(int argc, char **argv) {
       break;
     case PassKind::SROA:
       performSILSROA(CI.getSILModule());
-      break;
-    case PassKind::ARCOpts:
-      performSILARCOpts(CI.getSILModule());
       break;
     }
 
