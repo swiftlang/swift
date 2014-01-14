@@ -22,5 +22,6 @@ add_swift_library(swiftSILPasses
   PerformanceInliner.cpp
   SILLowerAggregateInstrs.cpp
   SILSROA.cpp
+  SILARCOpts.cpp
   DEPENDS swiftSILPassesUtils)
 
