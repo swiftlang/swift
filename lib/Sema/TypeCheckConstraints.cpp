@@ -903,15 +903,15 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     destTy = destLV->getObjectType();
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     // The destination is a type variable. This type variable must be an
-    // lvalue type, which we enforce via a subtyping relationship with
-    // [inout(implicit, settable)] T, where T is a fresh type variable that
+    // lvalue type, which we enforce via an equality relationship with
+    // @lvalue T, where T is a fresh type variable that
     // will be the object type of this particular expression type.
     auto objectTv = createTypeVariable(
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
-                      TVO_CanBindToLValue);
+                      /*options=*/0);
     auto refTv = LValueType::get(objectTv);
-    addConstraint(ConstraintKind::Subtype, typeVar, refTv);
+    addConstraint(ConstraintKind::Bind, typeVar, refTv);
     destTy = objectTv;
   } else {
     if (!destTy->is<ErrorType>())

@@ -1010,10 +1010,10 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       // '_' is only allowed in assignments, so give it an AssignDest locator.
-      return CS.createTypeVariable(
-         CS.getConstraintLocator(expr,
-                                 ConstraintLocator::AssignDest),
-         TVO_CanBindToLValue);
+      auto locator = CS.getConstraintLocator(expr, 
+                                             ConstraintLocator::AssignDest);
+      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
+      return LValueType::get(typeVar);
     }
     
     Type visitAssignExpr(AssignExpr *expr) {
