@@ -1713,11 +1713,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::Constant: {
       // let declarations.
       auto Entry = VarLocs[cast<VarDecl>(capture)];
+
+#if 0
       assert(Entry.isConstant() && cast<VarDecl>(capture)->isLet() &&
              "only let decls captured by constant");
       SILValue Val = Entry.getConstant();
-
-#if 0
       // FIXME: This should work for both paths.  partial_apply hasn't been
       // taught how to work with @in address only values yet.
       auto MV = ManagedValue::forUnmanaged(Entry.getConstant())
@@ -1732,7 +1732,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 #endif
 
       // Non-address-only constants are passed at +1.
-      if (!Val.getType().isAddress()) {
+      if (Entry.isConstant() && !Entry.getConstant().getType().isAddress()) {
+        SILValue Val = Entry.getConstant();
         Val = B.createCopyValue(loc, Val);
         
         // Use an RValue to explode Val if it is a tuple.
@@ -1741,6 +1742,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         std::move(RV).forwardAll(*this, capturedArgs);
         break;
       }
+      
+      SILValue Val =
+        Entry.isConstant() ? Entry.getConstant() : Entry.getAddress();
+      assert(Val.getType().isAddress());
 
       // Address only values are passed by box.  This isn't great, in that a
       // variable captured by multiple closures will be boxed for each one, 
