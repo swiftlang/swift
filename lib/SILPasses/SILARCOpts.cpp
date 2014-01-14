@@ -15,6 +15,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -98,32 +99,26 @@ namespace {
 
     /// The specific retain or copy_value that we are attempting to eliminate
     /// and or move down the cfg.
-    SILInstruction &Inst;
+    llvm::PointerUnion<StrongRetainInst *, CopyValueInst *> Inst;
 
   public:
 
     LocalRetainMotionVisitor(StrongRetainInst &Retain)
-      : M(Retain.getModule()), Inst(Retain) { }
+      : M(Retain.getModule()), Inst(&Retain) { }
 
     LocalRetainMotionVisitor(CopyValueInst &CopyValue)
-      : M(CopyValue.getModule()), Inst(CopyValue) { }
+      : M(CopyValue.getModule()), Inst(&CopyValue) { }
 
     ExitType visitValueBase(ValueBase *V) {
       llvm_unreachable("This should never be hit.");
     }
 
-    /// Returns the strong_retain we are tracking or null if we are tracking a
-    /// copy_value.
-    StrongRetainInst *getRetain() { return dyn_cast<StrongRetainInst>(&Inst); }
-
-    /// Returns the copy_value we are tracking or null if we are tracking a
-    /// strong_release.
-    CopyValueInst *getCopyValue() const {
-      return dyn_cast<CopyValueInst>(&Inst);
-    }
-
     /// Returns the instruction we are tracking.
-    SILInstruction *getInstruction() const { return &Inst; }
+    SILInstruction *getInstruction() const {
+      if (Inst.is<StrongRetainInst *>())
+        return Inst.get<StrongRetainInst *>();
+      return Inst.get<CopyValueInst *>();
+    }
 
     /// Currently MayHaveSideEffects has a broader definition than we
     /// require. The following x-macro handles simple cases of instructions that
@@ -173,7 +168,7 @@ LocalRetainMotionVisitor::visitStrongRetainInst(StrongRetainInst *InputRetain) {
   // don't move past it since no "progress" has been made. If we remove any
   // pairs in this basic block, we will process it again to allow for this
   // retain to be removed as well.
-  if (auto *Retain = getRetain())
+  if (auto *Retain = Inst.dyn_cast<StrongRetainInst *>())
     if (Retain->getOperand() == InputRetain->getOperand())
       return ExitType::PerformCodeMotion;
   return ExitType::CommuteWithoutMotion;
@@ -188,7 +183,7 @@ LocalRetainMotionVisitor::visitCopyValueInst(CopyValueInst *InputCV) {
   // don't move past it since no "progress" has been made. If we remove any
   // pairs in this basic block, we will process it again to allow for this
   // retain to be removed as well.
-  if (auto *CV = getCopyValue())
+  if (auto *CV = Inst.dyn_cast<CopyValueInst *>())
     if (CV->getOperand() == InputCV->getOperand())
       return ExitType::PerformCodeMotion;
   return ExitType::CommuteWithoutMotion;
@@ -228,7 +223,7 @@ LocalRetainMotionVisitor::visitStrongReleaseInst(StrongReleaseInst *Release) {
   // Otherwise if we have a retain and the input release is naively on the same
   // pointer, eliminate the pair. Otherwise do nothing since the release could
   // affect our retain count indirectly via a destructor.
-  StrongRetainInst *Retain = getRetain();
+  auto *Retain = Inst.dyn_cast<StrongRetainInst *>();
   if (!Retain || Retain->getOperand() != Release->getOperand())
     return ExitType::PerformCodeMotion;
 
@@ -250,7 +245,7 @@ LocalRetainMotionVisitor::visitDestroyValueInst(DestroyValueInst *DV) {
   // Otherwise if we have a retain and the input release is naively on the same
   // pointer, eliminate the pair. Otherwise do nothing since the release could
   // affect our retain count indirectly via a destructor.
-  CopyValueInst* CV = getCopyValue();
+  auto* CV = Inst.dyn_cast<CopyValueInst *>();
   if (!CV || (CV->getOperand() != DV->getOperand() &&
               CV != DV->getOperand().getDef()))
     return ExitType::PerformCodeMotion;
