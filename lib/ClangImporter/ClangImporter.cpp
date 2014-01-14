@@ -335,8 +335,8 @@ static clang::Module *getBestOwningModule(const clang::Decl *D) {
     // Put the Objective-C class into the module that contains the @interface
     // definition, not just @class forward declaration.
     D = OID->getDefinition();
-  else if (auto RD = dyn_cast<clang::RecordDecl>(D))
-    D = RD->getDefinition();
+  else if (auto TD = dyn_cast<clang::TagDecl>(D))
+    D = TD->getDefinition();
   else
     D = D->getCanonicalDecl();
 

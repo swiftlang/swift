@@ -6,5 +6,9 @@ int redeclaredInMultipleModulesFunc1(int a);
 - (void) barInstanceFunc0;
 @end
 
+enum BarForwardDeclaredEnum {
+  BarForwardDeclaredEnumValue = 42
+};
+
 #define BAR_MACRO_1 0
 

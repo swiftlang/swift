@@ -34,6 +34,7 @@ int redeclaredInMultipleModulesFunc1(int a);
 @end
 
 @class BarForwardDeclaredClass;
+enum BarforwardDeclaredEnum;
 
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1
