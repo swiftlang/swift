@@ -47,6 +47,10 @@ ill-formed.
 Type-Checking
 =============
 
+The types of all parameters and the return type of a func marked
+``@public`` (including the implicit ``self`` of methods) must also be
+``@public``.
+
 All parameters to a ``func`` marked ``@public`` (including the
 implicit ``self`` of methods) must also be ``@public``::
 
@@ -64,47 +68,75 @@ A ``typealias`` marked ``@public`` must refer to a type marked
   @public typealias XXX = X     // Ill-formed; public typealias refers to non-public type
 
 There is a straightforward and obvious rule for composing the
-``@public``\ -ness of a tuple type, which extends naturally to
-function types: a tuple type is ``@public`` if all of its components
-are ``@public``.  An instance of a generic type is ``@public`` if the
-generic type itself, and all of its arguments, are declared
-``@public``.  If the types involved come from different modules, all
-of the modules concerned must be imported (directly or via re-export)
-in order to make the result accessible.
+``@public``\ -ness of any compound type, including function types,
+tuple types and instances of generic types: The compound type is
+public if and only if all of the component types, are ``@public`` and
+either defined in this module or re-exported from this module.
 
-Public Conformances
-===================
+Enums
+=====
 
-[It's our expectation that in the near term, and probably for v1.0,
-the language will *only* support ``@public`` conformances, and
-conformances that would otherwise be non-public will be diagnosed as
-ill-formed/unsupported.]
+The cases of an ``enum`` are ``@public`` if and only if the ``enum``
+is declared ``@public``.
 
-We don't think it's necessary to allow conformances to be explicitly
-declared ``@public`` other than via the public extension mechanism
-described in the next section.  However, there is a language rule
-associated with ``@public`` conformances: all of the API required to
-satisfy a ``@public`` conformance must also be declared ``@public``.
+Derived Classes
+===============
 
+A method that overrides an ``@public`` method must be declared
+``@public``, even if the enclosing class is non-``@public``.
 
-Public Extensions
-=================
+Protocols
+=========
 
-When an extension is declared ``@public``, all conformances and
-functions declared therein are implicitly ``@public``::
+A ``@public`` protocol can have ``@public`` and non-``@public``
+requirements.  ``@public`` requirements can only be satisfied by
+``@public`` declarations. Non-``@public`` requirements can be
+satisfied by ``@public`` or non-``@public`` declarations.
 
-  @public struct X {
-    func helper()  {...}         // Only accessible within this module
+Conformances
+============
+
+The conformance of a type to a protocol is ``@public`` if that
+conformance is part of an ``@public`` declaration.  The program is
+ill-formed if any declaration required to satisfy a ``@public``
+conformance is not also declared ``@public``.::
+
+  @public protocol P {
+    @public func f() { g() }
+    func g()
   }
 
-  @public extension X : Stream { // X's conformance to Stream
-    func next() -> T? { ... }    // and its next() method are visible
-  }                              // wherever this module is imported
+  struct X : P { // OK, X is not @public, so neither is its 
+    func f() {}  // conformance to P, and therefore f
+    func g() {}  // can be non-@public
+  }
 
-Yes, that makes extensions different from ``class``, ``struct``, and
-``enum``, but we think it's the right tradeoff.
+  protocol P1 {}
 
-Future Extensions
+  @public struct Y : P1 {} // Y is @public so its 
+                           // conformance to P1 is, too.
+
+  @public
+  extension Y : P {     // This extension is @public, so
+    @public func f() {} // Y's conformance to P is also, and
+    func g() {}         // thus f must be @public too
+  }
+
+  protocol P2 {}
+
+  extension Y : P2 {}   // Y's conformance to P2 is non-@public
+
+.. Note:: It's our expectation that in the near term, and probably for
+  v1.0, non-``@public`` conformances on ``@public`` types will be
+  diagnosed as ill-formed/unsupported.
+
+A Related Naming Change
+=======================
+
+The existing ``@exported`` attribute for imports should be renamed
+``@public`` with no change in functionality.
+          
+Future Directions
 =================
 
 Some obvious directions to go in this feature space, which we are not
