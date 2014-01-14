@@ -447,6 +447,9 @@ namespace {
                                               context),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
+        if (!base)
+          return nullptr;
+
         base = tc.coerceToRValue(base);
       }
       assert(base && "Unable to convert base?");
