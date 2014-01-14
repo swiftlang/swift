@@ -1440,6 +1440,9 @@ NOTE(indent_expression_to_silence,tce_sema,none,
 ERROR(value_of_module_type,tce_sema,none,
       "expected module member name after module name", ())
 
+ERROR(unhandled_metatype_conversion,sema_tcd,none,
+      "unsupported conversion from %0 to %1", (Type, Type))
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------
