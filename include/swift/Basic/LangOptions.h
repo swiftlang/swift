@@ -23,6 +23,9 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
+    
+    bool LetArguments = false;
+    
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
