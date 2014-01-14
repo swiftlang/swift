@@ -2650,21 +2650,6 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   return coerceToType(expr, toType, locator);
 }
 
-/// Determine whether the the given metatype is "trivial", meaning that
-/// it only requires a single pointer's worth of storage.
-static bool isTrivialMetatype(MetatypeType *type) {
-  auto instanceTy = type->getInstanceType();
-
-  // Class metatypes are trivial.
-  if (instanceTy->getClassOrBoundGenericClass())
-    return true;
-
-  // FIXME: We'd like metatypes of @objc protocols and DynamicLookup to be
-  // trivial, but they aren't because Swift metatype pointers aren't equivalent
-  // to Objective-C metatype pointers.
-
-  return false;
-}
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
@@ -2977,16 +2962,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (auto fromMeta = fromType->getAs<MetatypeType>()) {
+  if (fromType->is<MetatypeType>()) {
     if (auto toMeta = toType->getAs<MetatypeType>()) {
-      // Check whether we can represent this conversion trivially.
-      // FIXME: Teach SILGen to represent the remaining conversions.
-      if (isTrivialMetatype(fromMeta) && isTrivialMetatype(toMeta))
-        return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
-
-      tc.diagnose(expr->getLoc(), diag::unhandled_metatype_conversion,
-                  fromType, toType);
-      return nullptr;
+      return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
     }
   }
 

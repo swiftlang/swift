@@ -612,6 +612,7 @@ struct ASTNodeBase {};
         abort();
       }
 
+      checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
       verifyCheckedBase(E);
     }
 
@@ -633,6 +634,7 @@ struct ASTNodeBase {};
         abort();
       }
 
+      checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
       verifyCheckedBase(E);
     }
 
@@ -1597,6 +1599,56 @@ struct ASTNodeBase {};
       T0.print(Out);
       Out << " vs. ";
       T1.print(Out);
+      Out << "\n";
+      abort();
+    }
+
+    void checkTrivialSubtype(Type srcTy, Type destTy, const char *what) {
+      if (srcTy->isEqual(destTy)) return;
+
+      if (auto srcMetatype = srcTy->getAs<MetatypeType>()) {
+        if (auto destMetatype = destTy->getAs<MetatypeType>()) {
+          return checkTrivialSubtype(srcMetatype->getInstanceType(),
+                                     destMetatype->getInstanceType(),
+                                     what);
+        }
+        goto fail;
+      }
+
+      {
+        ClassDecl *srcClass = srcTy->getClassOrBoundGenericClass();
+        ClassDecl *destClass = destTy->getClassOrBoundGenericClass();
+
+        if (!srcClass || !destClass) {
+          Out << "subtype conversion in " << what
+              << " doesn't involve class types: ";
+          srcTy.print(Out);
+          Out << " to ";
+          destTy.print(Out);
+          Out << "\n";
+          abort();
+        }
+
+        for (Type srcSuperTy = srcTy->getSuperclass(nullptr);
+             srcSuperTy;
+             srcSuperTy = srcSuperTy->getSuperclass(nullptr)) {
+          if (srcSuperTy->isEqual(destTy))
+            return;
+        }
+
+        Out << "subtype conversion in " << what << " is not to super class: ";
+        srcTy.print(Out);
+        Out << " to ";
+        destTy.print(Out);
+        Out << "\n";
+        abort();
+      }
+
+    fail:
+      Out << "subtype conversion in " << what << " is invalid: ";
+      srcTy.print(Out);
+      Out << " to ";
+      destTy.print(Out);
       Out << "\n";
       abort();
     }
