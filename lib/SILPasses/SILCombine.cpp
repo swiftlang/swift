@@ -392,9 +392,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       // Should we replace the old instruction with a new one?
       if (Result != I) {
         // Insert the new instruction into the basic block.
-        SILBasicBlock *InstParent = I->getParent();
-        SILBasicBlock::iterator InsertPos = I;
-        InstParent->getInstList().insert(InsertPos, Result);
+        I->getParent()->getInstList().insert(I, Result);
 
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
                            << "    New = " << *Result << '\n');
