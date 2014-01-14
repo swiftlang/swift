@@ -275,8 +275,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
   // Library files have no entry point.
   if (!SF.isScriptMode()) {
-    assert(!Module.getFunction(SWIFT_ENTRY_POINT_FUNCTION)
-           && "libraries should not have an entry point");
     return;
   }
   
