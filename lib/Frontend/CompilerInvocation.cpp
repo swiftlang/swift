@@ -160,6 +160,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (Opts.InputFilenames.empty()) {
       // We don't have any input files, so default to the REPL.
       Action = FrontendOptions::REPL;
+    } else if (Args.hasArg(OPT_emit_module, OPT_module_output_path)) {
+      // We've been told to emit a module, but have no other mode indicators.
+      // As a result, put the frontend into EmitModuleOnly mode.
+      // (Setting up module output will be handled below.)
+      Action = FrontendOptions::EmitModuleOnly;
     } else {
       // In the absence of any other mode indicators, parse the inputs.
       Action = FrontendOptions::Parse;
@@ -216,14 +221,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleName = ModuleName;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_serialized_diagnostics_path)) {
-    // Claim -serialize-diagnostics, if present.
-    Args.ClaimAllArgs(OPT_serialize_diagnostics);
-    Opts.SerializedDiagnosticsPath = A->getValue();
-  } else if (Args.hasArg(OPT_serialize_diagnostics)) {
-    // -serialize-diagnostics has been passed without
-    // -serialized-diagnostics-path, so determine a path based on other inputs.
-    static const char *const DiagnosticsFilePathExtension = "dia";
+  auto determineOutputFilename = [&] (const char *Extension) -> std::string {
     StringRef OriginalPath;
     if (!Opts.OutputFilename.empty() && Opts.OutputFilename != "-")
       // Put the serialized diagnostics file next to the output file.
@@ -239,8 +237,42 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       OriginalPath = Opts.ModuleName;
 
     llvm::SmallString<128> Path(OriginalPath);
-    llvm::sys::path::replace_extension(Path, DiagnosticsFilePathExtension);
-    Opts.SerializedDiagnosticsPath = Path.str();
+    llvm::sys::path::replace_extension(Path, Extension);
+    return Path.str();
+  };
+
+  if (const Arg *A = Args.getLastArg(OPT_serialized_diagnostics_path)) {
+    // Claim -serialize-diagnostics, if present.
+    Args.ClaimAllArgs(OPT_serialize_diagnostics);
+    Opts.SerializedDiagnosticsPath = A->getValue();
+  } else if (Args.hasArg(OPT_serialize_diagnostics)) {
+    // -serialize-diagnostics has been passed without
+    // -serialized-diagnostics-path, so determine a path based on other inputs.
+    static const char *const DiagnosticsFilePathExtension = "dia";
+    Opts.SerializedDiagnosticsPath =
+      determineOutputFilename(DiagnosticsFilePathExtension);
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_module_output_path)) {
+    // Claim -emit-module, if present.
+    Args.ClaimAllArgs(OPT_emit_module);
+    Opts.ModuleOutputPath = A->getValue();
+  } else if (Args.hasArg(OPT_emit_module)) {
+    // -emit-module has been passed without -module-output-path, so determine
+    // a path based on other inputs.
+    if (Opts.RequestedAction == FrontendOptions::EmitModuleOnly &&
+        !Opts.OutputFilename.empty())
+      // We're in EmitModuleOnly mode, so use OutputFilename if we have one.
+      Opts.ModuleOutputPath = Opts.OutputFilename;
+    else
+      // We're either not in EmitModuleOnly mode, or we don't have an
+      // OutputFilename, so determine an output path based on other inputs.
+      Opts.ModuleOutputPath =
+        determineOutputFilename(SERIALIZED_MODULE_EXTENSION);
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
+    Opts.ModuleLinkName = A->getValue();
   }
 
   return false;

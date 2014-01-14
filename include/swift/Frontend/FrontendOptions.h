@@ -76,6 +76,12 @@ public:
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
+  /// The path to which we should emit a serialized module.
+  std::string ModuleOutputPath;
+
+  /// The name of the library to link against when using this module.
+  std::string ModuleLinkName;
+
   enum ActionType {
     Parse, ///< Parse and type-check only
     DumpParse, ///< Parse only and dump AST

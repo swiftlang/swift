@@ -125,9 +125,22 @@ def module_source_list_EQ : Joined<["-"], "module-source-list=">,
 
 def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
   HelpText<"Name of the module to build">;
-
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
+
+def module_link_name : Separate<["-"], "module-link-name">,
+  Flags<[FrontendOption]>,
+  HelpText<"Library to link against when using this module">;
+def module_link_name_EQ : Joined<["-"], "module-link-name=">,
+  Flags<[FrontendOption]>, Alias<module_link_name>;
+
+def emit_module : Flag<["-"], "emit-module">, Flags<[FrontendOption]>,
+  HelpText<"Emit an importable module">;
+def module_output_path : Separate<["-"], "module-output-path">,
+  Flags<[FrontendOption]>, HelpText<"Emit an importable module to <path>">,
+  MetaVarName<"<path>">;
+def module_output_path_EQ : Joined<["-"], "module-output-path=">,
+  Flags<[FrontendOption]>, Alias<module_output_path>;
 
 // Linker inputs
 
