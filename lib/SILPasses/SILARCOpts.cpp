@@ -1,4 +1,4 @@
-//===-------- SILARCOpts.cpp ----------------------------------------------===//
+//===-------- SILARCOpts.cpp - Perform SIL ARC Optimizations --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -144,9 +144,8 @@ namespace {
 
 } // end anonymous namespace
 
-/// Skip over instructions that are guaranteed to not decrement ref
-/// counts. In SIL, this is gauranteed by an instruction not having side
-/// effects.
+/// Skip over instructions that are guaranteed to not decrement ref counts. In
+/// SIL, this is guaranteed by an instruction not having side effects.
 ExitType LocalRetainMotionVisitor::visitSILInstruction(SILInstruction *I) {
   // If the instruction does not have any side effects, the retain/copy value
   // and the instruction commute.
@@ -176,13 +175,13 @@ LocalRetainMotionVisitor::visitStrongRetainInst(StrongRetainInst *InputRetain) {
 
 ExitType
 LocalRetainMotionVisitor::visitCopyValueInst(CopyValueInst *InputCV) {
-  // If we see a retain, skip over it since a retain can never cause a release
-  // to occur.
+  // If we see a copy_value, skip over it since a copy_value can never cause a
+  // release to occur.
   //
-  // On the other hand, if we have a retain that is naively on the same pointer,
-  // don't move past it since no "progress" has been made. If we remove any
-  // pairs in this basic block, we will process it again to allow for this
-  // retain to be removed as well.
+  // On the other hand, if we have a copy_value that is naively on the same
+  // pointer, don't move past it since no "progress" has been made. If we remove
+  // any pairs in this basic block, we will process it again to allow for this
+  // copy_value to be removed as well.
   if (auto *CV = Inst.dyn_cast<CopyValueInst *>())
     if (CV->getOperand() == InputCV->getOperand())
       return ExitType::PerformCodeMotion;
@@ -205,10 +204,7 @@ LocalRetainMotionVisitor::visitApplyInst(ApplyInst *AI) {
       return ExitType::CommuteWithMotion;
     }
 
-  // If our apply inst has no arguments, skip over it. Plug in alias analysis
-  // here.
-  if (AI->getNumOperands() == 1)
-    return ExitType::CommuteWithMotion;
+  // Plug in alias analysis here.
 
   // Otherwise exit, performing any code motion that we can.
   return ExitType::PerformCodeMotion;
