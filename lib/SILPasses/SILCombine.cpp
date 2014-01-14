@@ -587,7 +587,7 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     }
 
     // Delete the strong_release.
-    SRI->eraseFromParent();
+    eraseInstFromFunction(*SRI);
     // Delete the partial_apply.
     return eraseInstFromFunction(*PAI);
   }
