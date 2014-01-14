@@ -255,6 +255,7 @@ public:
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
+  SILInstruction *visitCondFailInst(CondFailInst *CFI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -625,7 +626,16 @@ void deleteDeadFunctions(SILModule *M) {
   // can generate more opportunities.
   for (int i = Order.size() - 1; i >= 0; i--)
     tryToRemoveFunction(Order[i]);
- }
+}
+
+SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
+  // Erase. (cond_fail 0)
+  if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand()))
+    if (!I->getValue().getBoolValue())
+      return eraseInstFromFunction(*CFI);
+
+  return nullptr;
+}
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver

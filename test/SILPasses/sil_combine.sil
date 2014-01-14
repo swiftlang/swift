@@ -456,3 +456,17 @@ bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
   return %3 : $HeapBuffer<T_0_0, T_0_1>
 }
 
+// CHECK-LABEL: sil @cond_fail_applied_to_zero_removal
+// CHECK: bb0
+// CHECK-NEXT: cond_fail
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @cond_fail_applied_to_zero_removal : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_fail %0 : $Builtin.Int1
+  %1 = integer_literal $Builtin.Int1, 0
+  cond_fail %1 : $Builtin.Int1
+  %2 = tuple ()
+  return %2 : $()
+}
+
