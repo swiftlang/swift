@@ -357,15 +357,17 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
+  // Since we want the debug info to survive, we do not remap the location here.
   doPostProcess(Inst,
-                Builder.createDebugValue(getOpLocation(Inst->getLoc()),
+                Builder.createDebugValue(Inst->getLoc(),
                                          getOpValue(Inst->getOperand())));
 }
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+  // Do not remap the location for a debug instruction.
   doPostProcess(Inst,
-                Builder.createDebugValueAddr(getOpLocation(Inst->getLoc()),
+                Builder.createDebugValueAddr(Inst->getLoc(),
                                              getOpValue(Inst->getOperand())));
 }
 
