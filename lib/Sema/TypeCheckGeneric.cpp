@@ -656,8 +656,11 @@ static Type computeSelfType(AbstractFunctionDecl *func,
   if (containerTy->hasReferenceSemantics())
     return selfTy;
 
+  // 'self' is passed by value if it is a type method or a non-mutating,
+  // non-protocol instance method.
   if (auto *FD = dyn_cast<FuncDecl>(func)) {
-    if (FD->isStatic() || !FD->isMutating())
+    if (FD->isStatic()
+        || (!FD->isMutating() && !isa<ProtocolDecl>(FD->getDeclContext())))
       return selfTy;
   } else if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
     return selfTy;

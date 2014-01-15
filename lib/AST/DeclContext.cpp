@@ -118,14 +118,13 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
   // effect.
   //
   // With non-mutating methods on value types, we generally pass the value
-  // directly in at +1.  The exception is for methods with an archetype base
-  // (i.e., the formal type of protocol methods), which we pass @inout at +0.
-  // We handle the abstraction difference in the witness thunk for the received
-  // method, where we know the concrete receiver type.  We do this by having
-  // existential_member_ref and archetype_member_ref take the 'self' base object
-  // as an rvalue for @!mutating protocol members, even though that doesn't
-  // match the type of the protocol requirement.
-  if (isMutatingFunc || containerTy->is<ArchetypeType>())
+  // directly in at +1.  The exception is for protocol methods, which we pass
+  // @inout at +0. We handle the abstraction difference in the witness thunk for
+  // the received method, where we know the concrete receiver type.  We do this
+  // by having existential_member_ref and archetype_member_ref take the 'self'
+  // base object as an rvalue for @!mutating protocol members, even though that
+  // doesn't match the type of the protocol requirement.
+  if (isMutatingFunc || isa<ProtocolDecl>(dc))
     return InOutType::get(containerTy);
 
   // Non-mutating methods on structs and enums pass the receiver by value.
