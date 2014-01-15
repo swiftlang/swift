@@ -32,6 +32,8 @@
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
+STATISTIC(NumCSEDeadStores, "Number of dead stores removed");
+STATISTIC(NumCSEDupLoads,   "Number of dup loads removed");
 
 using namespace swift;
 
@@ -397,6 +399,73 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   return Changed;
 }
 
+/// \brief Promote stored values to loads, remove dead stores and merge
+/// duplicated loads.
+void promoteMemoryOperationsInBlock(SILBasicBlock*BB) {
+  StoreInst  *PrevStore = 0;
+  llvm::SmallVector<LoadInst*, 8> Loads;
+
+  auto II = BB->begin(), E = BB->end();
+  while (II != E) {
+    SILInstruction *Inst = II++;
+
+    // This is a StoreInst. Let's see if we can remove the previous stores.
+    if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+      // Invalidate all previous loads.
+      Loads.clear();
+
+      // If we are storing to the previously stored address then delete the old
+      // store.
+      if (PrevStore && PrevStore->getDest() == SI->getDest()) {
+        recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
+        PrevStore = SI;
+        NumCSEDeadStores++;
+        continue;
+      }
+      PrevStore = SI;
+      continue;
+    }
+
+    if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
+      // If we are loading a value that we just saved then use the saved value.
+      if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
+        SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
+        recursivelyDeleteTriviallyDeadInstructions(LI, true);
+        NumCSEDupLoads++;
+        continue;
+      }
+
+      // Search the previous loads and replace the current load with one of the
+      // previous loads.
+      for (auto PrevLd : Loads) {
+        if (PrevLd->getOperand() == LI->getOperand()) {
+          SILValue(LI, 0).replaceAllUsesWith(PrevLd);
+          recursivelyDeleteTriviallyDeadInstructions(LI, true);
+          LI = 0;
+          NumCSEDupLoads++;
+          break;
+        }
+      }
+
+      if (LI)
+        Loads.push_back(LI);
+      continue;
+    }
+
+    // Retains write to memory but they don't affect loads and stores.
+    if (isa<StrongRetainInst>(Inst))
+      continue;
+
+    // All other instructions that read from memory invalidate the store.
+    if (Inst->mayReadFromMemory())
+      PrevStore = 0;
+
+    // All other instructions that write to memory invalidate the loads.
+    if (Inst->mayWriteToMemory())
+      Loads.clear();
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -409,6 +478,11 @@ void swift::performSILCSE(SILModule *M) {
     if (F.empty())
       continue;
 
+    // Perform CSE.
     C.runOnFunction(F);
+
+    // Remove dead stores and merge duplicate loads.
+    for (auto &BB : F)
+      promoteMemoryOperationsInBlock(&BB);
   }
 }
