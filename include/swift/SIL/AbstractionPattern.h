@@ -84,7 +84,7 @@ public:
     return AbstractionPattern(OrigType);
   }
 
-  void dump() const { OrigType.dump(); }
+  void dump() const LLVM_ATTRIBUTE_USED { OrigType.dump(); }
   void print(raw_ostream &OS) const { OrigType.print(OS); }
 };
 

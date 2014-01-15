@@ -1548,6 +1548,12 @@ static AbstractionPattern claimNextParamClause(AbstractionPattern &type) {
   return result;
 }
 
+static CanType claimNextParamClause(CanAnyFunctionType &type) {
+  auto result = type.getInput();
+  type = dyn_cast<AnyFunctionType>(type.getResult());
+  return result;
+}
+
 namespace {
   class ArgEmitter {
     SILGenFunction &SGF;
@@ -1862,6 +1868,7 @@ namespace {
       bool transparent;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
+      CanAnyFunctionType formalType = callee.getSubstFormalType();
 
       // Check for a specialized emitter.
       auto maybeEmitter = callee.getSpecializedEmitter(gen.SGM, uncurryLevel);
@@ -1870,7 +1877,6 @@ namespace {
 
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
-        auto formalType = callee.getSubstFormalType();
         origFormalType = AbstractionPattern(formalType);
         substFnType = gen.getLoweredType(formalType, uncurryLevel)
           .castTo<SILFunctionType>();
@@ -1932,6 +1938,7 @@ namespace {
       
       // If there are remaining call sites, apply them to the result function.
       // Each chained call gets its own writeback scope.
+      claimNextParamClause(formalType);
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
         WritebackScope scope(gen);
 
@@ -1940,7 +1947,9 @@ namespace {
 
         uncurriedArgs.clear();
 
-        AbstractionPattern origParamType = claimNextParamClause(origFormalType);
+        // The result function has already been reabstracted to the substituted
+        // type.
+        AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
                                       uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext::Ungeneralized;
