@@ -134,10 +134,10 @@ static ParserStatus parseDefaultArgument(Parser &P,
 /// Given a pattern "P" based on a pattern atom (either an identifer or _
 /// pattern), rebuild and return the nested pattern around another root that
 /// replaces the atom.
-static Pattern *rebuildImplicitPatternAround(Pattern *P, Pattern *NewRoot,
+static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
                                              ASTContext &C) {
   // We'll return a cloned copy of the pattern.
-  P = P->clone(C, /*isImplicit*/true);
+  Pattern *Result = P->clone(C, /*isImplicit*/true);
 
   class ReplaceRoot : public ASTWalker {
     Pattern *NewRoot;
@@ -164,7 +164,7 @@ static Pattern *rebuildImplicitPatternAround(Pattern *P, Pattern *NewRoot,
     }
   };
   
-  return P->walk(ReplaceRoot(NewRoot));
+  return Result->walk(ReplaceRoot(NewRoot));
 }
 
 
@@ -242,15 +242,11 @@ parseSelectorArgument(Parser &P,
 
 static Pattern *getFirstSelectorPattern(ASTContext &Context,
                                         const Pattern *argPattern,
-                                        SourceLoc loc)
-{
-  Pattern *pattern = new (Context) AnyPattern(loc, /*Implicit=*/true);
-  if (auto typed = dyn_cast<TypedPattern>(argPattern)) {
-    pattern = new (Context) TypedPattern(pattern, typed->getTypeLoc(),
-                                         /*Implicit=*/true);
-  }
-  return pattern;
+                                        SourceLoc loc) {
+  Pattern *any = new (Context) AnyPattern(loc, /*Implicit=*/true);
+  return rebuildImplicitPatternAround(argPattern, any, Context);
 }
+
 
 static ParserStatus
 parseSelectorFunctionArguments(Parser &P,
