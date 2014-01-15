@@ -2081,9 +2081,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
   
   Explosion origParams = subIGF.collectParameters(explosionLevel);
+
+  // Create a new explosion for potentially reabstracted parameters.
+  Explosion params(explosionLevel);
+
+  // Forward the indirect return value, if we have one.
+  auto &resultTI = IGM.getTypeInfo(outType->getResult().getSILType());
+  if (resultTI.getSchema(explosionLevel).requiresIndirectResult(IGM))
+    params.add(origParams.claimNext());
   
   // Reemit the parameters as unsubstituted.
-  Explosion params(explosionLevel);
   for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
     emitApplyArgument(subIGF, origType->getParameters()[i],
                       outType->getParameters()[i],
@@ -2167,6 +2174,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     entry.TI.deallocateStack(subIGF, entry.Addr, entry.Type);
   }
   
+  // FIXME: Reabstract the result value as substituted.
+
   if (call->getType()->isVoidTy())
     subIGF.Builder.CreateRetVoid();
   else
