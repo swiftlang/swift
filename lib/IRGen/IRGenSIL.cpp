@@ -1784,10 +1784,6 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
 }
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
-  // TODO: When we have "checked"/"unchecked" mode support, drop the trap.
-  llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
-                                                    llvm::Intrinsic::ID::trap);
-  Builder.CreateCall(trapIntrinsic);
   Builder.CreateUnreachable();
 }
 
