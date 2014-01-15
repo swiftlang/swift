@@ -12,3 +12,7 @@ execute_process(COMMAND xcrun -sdk iphonesimulator -find clang++
 
 CMAKE_FORCE_C_COMPILER("${cc_path}" Clang)
 CMAKE_FORCE_CXX_COMPILER("${cxx_path}" Clang)
+
+# Compiler forcing leaves the compiler version unset, which the llvm 
+# build machinery doesn't like. Pacify it.
+set(LLVM_FORCE_USE_OLD_TOOLCHAIN ON)
