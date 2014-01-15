@@ -1353,6 +1353,9 @@ ERROR(init_delegates_and_chains,sema_tce,none,
       "superclass initializer ('super.init')", ())
 NOTE(init_delegation_or_chain,sema_tce,none,
       "previous %select{delegation|chaining}0 call is here", (bool))
+ERROR(non_delegating_init_outside_module,sema_tce,none,
+      "initializer for %0 defined outside module %1 must delegate "
+      "(with 'self.init')", (Type, Identifier))
 
 // Operators
 ERROR(unknown_binop,sema_tce,none,

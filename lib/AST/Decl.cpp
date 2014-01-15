@@ -1834,8 +1834,12 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
 }
 
 ConstructorDecl::BodyInitKind
-ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags) {
+ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
+                                                Expr **init) {
   assert(hasBody() && "Constructor does not have a definition");
+
+  if (init)
+    *init = nullptr;
 
   // If we already computed the result, return it.
   if (ConstructorDeclBits.ComputedBodyInitKind) {
@@ -1909,6 +1913,9 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags) {
   // Cache the result.
   ConstructorDeclBits.ComputedBodyInitKind
     = static_cast<unsigned>(finder.Kind) + 1;
+  if (init)
+    *init = finder.InitExpr;
+
   return finder.Kind;
 }
 

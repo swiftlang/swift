@@ -770,8 +770,13 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (ctor->isImplicit()) {
     wantSuperInitCall = ClassD && ClassD->getSuperclass();
   } else {
-    switch (ctor->getDelegatingOrChainedInitKind(&Diags)) {
+    bool isDelegating = false;
+    Expr *initExpr = nullptr;
+    switch (ctor->getDelegatingOrChainedInitKind(&Diags, &initExpr)) {
     case ConstructorDecl::BodyInitKind::Delegating:
+      isDelegating = true;
+      SWIFT_FALLTHROUGH;
+
     case ConstructorDecl::BodyInitKind::Chained:
     case ConstructorDecl::BodyInitKind::None:
       wantSuperInitCall = false;
@@ -780,6 +785,23 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     case ConstructorDecl::BodyInitKind::ImplicitChained:
       wantSuperInitCall = true;
       break;
+    }
+
+    // A non-delegating constructor can only be declared within the
+    // same module as the class itself, so that it is guaranteed to
+    // see all of the stored properties.
+    // FIXME: Should actually query to see whether we are guaranteed to
+    // see all ivars, regardless of whether this is a class/struct/enum.
+    // That requires at least an access control model.
+    if (!isDelegating && ClassD) {
+      auto myModule = ctor->getParentModule();
+      auto classModule = ClassD->getParentModule();
+      if (myModule != classModule) {
+        diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(), 
+                 diag::non_delegating_init_outside_module,
+                 ctor->getDeclContext()->getDeclaredTypeOfContext(),
+                 classModule->Name);
+      }
     }
   }
 

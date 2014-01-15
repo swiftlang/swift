@@ -3213,7 +3213,12 @@ public:
   /// \param diags If non-null, this check will ensure that the constructor
   /// body is consistent in its use of delegation vs. chaining and emit any
   /// diagnostics through the given diagnostic engine.
-  BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags);
+  ///
+  /// \param init If non-null and there is an explicit \c self.init or
+  /// \c super.init within the body, will be set to point at that
+  /// initializer.
+  BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
+                                              Expr **init = nullptr);
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
