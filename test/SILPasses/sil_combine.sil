@@ -310,6 +310,50 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   return %5 : $Builtin.Int8
 }
 
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil @multiple_use_struct_extract_load_to_load_struct_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @multiple_use_struct_extract_load_to_load_struct_element_addr : $@thin (@inout UInt8) -> (UInt8, Builtin.Int8) {
+bb0(%0 : $*UInt8):
+  %1 = load %0 : $*UInt8
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = struct_element_addr %0 : $*UInt8, #value
+  %4 = store %2 to %3 : $*Builtin.Int8
+  %5 = struct_extract %1 : $UInt8, #value
+  %6 = tuple (%1 : $UInt8, %5 : $Builtin.Int8)
+  return %6 : $(UInt8, Builtin.Int8)
+}
+
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil @multiple_use_tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @multiple_use_tuple_extract_load_to_load_tuple_element_addr : $@thin (@inout (Builtin.Int8, Builtin.Int8)) -> ((Builtin.Int8, Builtin.Int8), Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load %0 : $*(Builtin.Int8, Builtin.Int8)
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+  %4 = store %2 to %3 : $*Builtin.Int8
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  %6 = tuple (%1 : $(Builtin.Int8, Builtin.Int8), %5 : $Builtin.Int8)
+  return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
+}
+
 // CHECK-LABEL: sil @destroy_value_test
 // CHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : $Builtin.ObjectPointer):
 // CHECK-NEXT: strong_release [[RELEASE_TARGET]] : $Builtin.ObjectPointer

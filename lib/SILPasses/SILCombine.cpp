@@ -445,7 +445,7 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
   //   ->
   // (load (struct_element_addr %x), #vardecl)
   LoadInst *LI;
-  if (match(SEI->getOperand(), m_LoadInst(LI))) {
+  if (match(SEI->getOperand(), m_OneUse(m_LoadInst(LI)))) {
     // Move our insertion point to the load so we insert the new
     // struct_element_addr and load there.
     //
@@ -473,7 +473,7 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   //   ->
   // (load (tuple_element_addr %x) 0)
   LoadInst *LI;
-  if (match(TEI->getOperand(), m_LoadInst(LI))) {
+  if (match(TEI->getOperand(), m_OneUse(m_LoadInst(LI)))) {
     // Move our insertion point to the load so we insert the new
     // tuple_element_addr and load there.
     //
