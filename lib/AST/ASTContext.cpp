@@ -1713,8 +1713,8 @@ LValueType *LValueType::get(Type objectTy) {
 InOutType *InOutType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
          "can not have ErrorType wrapped inside InOutType");
-//  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
-//         "can not have @inout or @lvalue wrapped inside an @inout");
+  assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
+         "can not have @inout or @lvalue wrapped inside an @inout");
   
   auto properties = objectTy->getRecursiveProperties()
                     + RecursiveTypeProperties::IsNotMaterializable;
