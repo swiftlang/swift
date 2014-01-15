@@ -305,6 +305,17 @@ namespace {
     Expr *coerceViaUserConversion(Expr *expr, Type toType,
                                   ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce an expression of (possibly unchecked) optional
+    /// type to have a different (possibly unchecked) optional type.
+    Expr *coerceOptionalToOptional(Expr *expr, Type toType,
+                                   ConstraintLocatorBuilder locator);
+
+    /// \brief Coerce an expression of unchecked optional type to its
+    /// underlying value type, in the correct way for an implicit
+    /// look-through.
+    Expr *coerceUncheckedOptionalToValue(Expr *expr, Type objTy,
+                                         ConstraintLocatorBuilder locator);
+
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
@@ -355,9 +366,17 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
+      Type baseTy = base->getType()->getRValueType();
+
+      // Handle accesses that implicitly look through UncheckedOptional<T>.
+      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
+        base = coerceUncheckedOptionalToValue(base, objTy, locator);
+        if (!base) return nullptr;
+        baseTy = objTy;
+      }
+
       // Figure out the actual base type, and whether we have an instance of
       // that type or its metatype.
-      Type baseTy = base->getType()->getRValueType();
       bool baseIsInstance = true;
       if (auto baseMeta = baseTy->getAs<MetatypeType>()) {
         baseIsInstance = false;
@@ -676,6 +695,12 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = base->getType()->getRValueType();
+
+      // Handle accesses that implicitly look through UncheckedOptional<T>.
+      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
+        base = coerceUncheckedOptionalToValue(base, objTy, locator);
+        if (!base) return nullptr;
+      }
 
       // Figure out the index and result types.
       auto containerTy
@@ -1490,13 +1515,22 @@ namespace {
                                      selected.openedType,
                                      cs.getConstraintLocator(expr, { }));
 
-      case OverloadChoiceKind::TupleIndex:
+      case OverloadChoiceKind::TupleIndex: {
+        auto base = expr->getBase();
+        auto baseTy = base->getType()->getRValueType();
+        if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
+          base = coerceUncheckedOptionalToValue(base, objTy,
+                                         cs.getConstraintLocator(base, { }));
+          if (!base) return nullptr;
+        }
+
         return new (cs.getASTContext()) TupleElementExpr(
-                                          expr->getBase(),
+                                          base,
                                           expr->getDotLoc(),
                                           selected.choice.getTupleIndex(),
                                           expr->getNameLoc(),
                                           simplifyType(expr->getType()));
+      }
 
       case OverloadChoiceKind::BaseType: {
         // FIXME: Losing ".0" sugar here.
@@ -1617,6 +1651,16 @@ namespace {
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
+      // Handle accesses that implicitly look through UncheckedOptional<T>.
+      auto base = expr->getBase();
+      auto baseTy = base->getType()->getRValueType();
+      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
+        base = coerceUncheckedOptionalToValue(base, objTy,
+                                              cs.getConstraintLocator(base, { }));
+        if (!base) return nullptr;
+        expr->setBase(base);
+      }
+
       simplifyExprType(expr);
       return expr;
     }
@@ -2653,6 +2697,47 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   return coerceToType(expr, toType, locator);
 }
 
+Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
+                                             ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+  Type fromType = expr->getType();
+  
+  auto fromGenericType = fromType->castTo<BoundGenericType>();
+  auto toGenericType = toType->castTo<BoundGenericType>();
+  assert(fromGenericType->getDecl()->classifyAsOptionalType());
+  assert(toGenericType->getDecl()->classifyAsOptionalType());
+  tc.requireOptionalIntrinsics(expr->getLoc());
+
+  Type fromValueType = fromGenericType->getGenericArgs()[0];
+  Type toValueType = toGenericType->getGenericArgs()[0];
+
+  expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
+                                           fromValueType);
+  expr->setImplicit(true);
+  expr = coerceToType(expr, toValueType, locator);
+  if (!expr) return nullptr;
+      
+  expr = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      
+  expr = new (tc.Context) OptionalEvaluationExpr(expr, toType);
+  expr->setImplicit(true);
+  return expr;
+}
+
+Expr *ExprRewriter::coerceUncheckedOptionalToValue(Expr *expr, Type objTy,
+                                            ConstraintLocatorBuilder locator) {
+  // Coerce to an r-value.
+  auto rvalueTy = expr->getType()->getRValueType();
+  assert(rvalueTy->getUncheckedOptionalObjectType()->isEqual(objTy));
+
+  expr = coerceToType(expr, rvalueTy, /*bogus?*/ locator);
+  if (!expr) return nullptr;
+
+  expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr, expr->getEndLoc());
+  expr->setType(objTy);
+  expr->setImplicit();
+  return expr;
+}
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
@@ -2763,28 +2848,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::UncheckedOptionalToOptional:
-    case ConversionRestrictionKind::OptionalToOptional: {
-      auto fromGenericType = fromType->castTo<BoundGenericType>();
-      auto toGenericType = toType->castTo<BoundGenericType>();
-      assert(fromGenericType->getDecl()->classifyAsOptionalType());
-      assert(toGenericType->getDecl()->classifyAsOptionalType());
-      tc.requireOptionalIntrinsics(expr->getLoc());
-
-      Type fromValueType = fromGenericType->getGenericArgs()[0];
-      Type toValueType = toGenericType->getGenericArgs()[0];
-      
-      expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
-                                               fromValueType);
-      expr->setImplicit(true);
-      expr = coerceToType(expr, toValueType, locator);
-      if (!expr) return nullptr;
-      
-      expr = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
-      
-      expr = new (tc.Context) OptionalEvaluationExpr(expr, toType);
-      expr->setImplicit(true);
-      return expr;
-    }
+    case ConversionRestrictionKind::OptionalToOptional:
+      return coerceOptionalToOptional(expr, toType, locator);
 
     case ConversionRestrictionKind::User:
       return coerceViaUserConversion(expr, toType, locator);

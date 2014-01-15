@@ -1055,6 +1055,45 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
+/// Given that we're accessing a member of an UncheckedOptional<T>, is
+/// the DC one of the special cases where we should not instead look at T?
+static bool isPrivilegedAccessToUncheckedOptional(DeclContext *DC,
+                                                  NominalTypeDecl *D) {
+  assert(D == DC->getASTContext().getUncheckedOptionalDecl());
+
+  // Walk up through the chain of current contexts.
+  for (; ; DC = DC->getParent()) {
+    assert(DC && "ran out of contexts before finding a module scope?");
+
+    // Look through local contexts.
+    if (DC->isLocalContext()) {
+      continue;
+
+    // If we're in a type context that's defining or extending
+    // UncheckedOptional<T>, we're privileged.
+    } else if (DC->isTypeContext()) {
+      if (DC->getDeclaredTypeInContext()->getAnyNominal() == D)
+        return true;
+
+    // Otherwise, we're privileged if we're within the same file that
+    // defines UncheckedOptional<T>.
+    } else {
+      assert(DC->isModuleScopeContext());
+      return (DC == D->getModuleScopeContext());
+    }
+  }
+}
+
+Type ConstraintSystem::lookThroughUncheckedOptionalType(Type type) {
+  if (auto boundTy = type->getAs<BoundGenericStructType>()) {
+    auto boundDecl = boundTy->getDecl();
+    if (boundDecl == TC.Context.getUncheckedOptionalDecl() &&
+        !isPrivilegedAccessToUncheckedOptional(DC, boundDecl))
+      return boundTy->getGenericArgs()[0];
+  }
+  return Type();
+}
+
 Type ConstraintSystem::simplifyType(Type type,
        llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
   return type.transform([&](Type type) -> Type {
