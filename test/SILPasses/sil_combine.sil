@@ -396,6 +396,18 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   return %7 : $(Builtin.Word, Builtin.RawPointer)
 }
 
+// CHECK-LABEL: sil @a2p_p2a_fail
+// CHECK: address_to_pointer
+// CHECK: pointer_to_address
+// CHECK: return
+sil @a2p_p2a_fail : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+  bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
+  %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
+  %4 = load %3 : $*Int32
+  return %4 : $Int32
+}
+
 struct StringData {
   var size: Builtin.Word
 }
