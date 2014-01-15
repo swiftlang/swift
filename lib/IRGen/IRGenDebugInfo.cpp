@@ -1138,7 +1138,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                        llvm::DIType(), // DerivedFrom
                        llvm::DIArray(),
                        DW_LANG_Swift);
-    break;
   }
 
   case TypeKind::UnboundGeneric: {
@@ -1256,12 +1255,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::PolymorphicFunction:
   {
     CanSILFunctionType FunctionTy;
-    if (auto SILFnTy = dyn_cast<SILFunctionType>(BaseTy)) {
+    if (auto SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
       FunctionTy = CanSILFunctionType(SILFnTy);
-    } else {
+    else
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
                                     .castTo<SILFunctionType>();
-    }
     auto Params = createParameterTypes(FunctionTy, Scope, DbgTy.getDeclContext());
     auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
@@ -1380,7 +1378,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Module:
   case TypeKind::TypeVariable:
    DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-          llvm::errs() << "\n");
+         llvm::errs() << "\n");
    Name = "<unknown>";
   }
   return DBuilder.createBasicType(Name, SizeInBits, AlignInBits, Encoding);
