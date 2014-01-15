@@ -376,19 +376,55 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   return false;
 }
 
+// Lifted from the clang driver.
+static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
+  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
+
+  if (!Quote && !Escape) {
+    OS << Arg;
+    return;
+  }
+
+  // Quote and escape. This isn't really complete, but good enough.
+  OS << '"';
+  while (const char c = *Arg++) {
+    if (c == '"' || c == '\\' || c == '$')
+      OS << '\\';
+    OS << c;
+  }
+  OS << '"';
+}
+
+void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
+                                              const ArrayRef<const char*> &Args,
+                                              StringRef SDKPath) {
+  llvm::raw_string_ostream OS(Output);
+  interleave(Args,
+             [&](const char *Argument) { PrintArg(OS, Argument, false); },
+             [&] { OS << " "; });
+
+  // Inject the SDK path if it is missing.
+  for (auto A : Args) {
+    if (StringRef(A).startswith("-sdk="))
+      return;
+  }
+  OS << " -sdk=";
+  PrintArg(OS, SDKPath.data(), false);
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
-                           const FrontendOptions &FrontendOpts) {
+                           const FrontendOptions &FrontendOpts,
+                           StringRef SDKPath) {
   using namespace options;
 
   if (Args.hasArg(OPT_g)) {
     Opts.DebugInfo = true;
-    llvm::raw_string_ostream Flags(Opts.DWARFDebugFlags);
-    interleave(Args,
-               [&](const Arg *Argument) {
-                 Flags << Argument->getAsString(Args);
-               },
-               [&] { Flags << " "; });
+    ArgStringList RenderedArgs;
+    for (auto A : Args)
+      A->render(Args, RenderedArgs);
+    CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
+                                             RenderedArgs, SDKPath);
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
@@ -494,7 +530,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
   
-  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts)) {
+  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts,
+                     getSDKPath())) {
     return true;
   }
 

@@ -36,6 +36,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 
 #include <memory>
@@ -75,6 +76,12 @@ public:
   /// \brief Initializes the compiler invocation for the list of arguments.
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
+
+  /// \brief Serialize the command line arguments for emitting them
+  /// to DWARF and inject SDKPath if necessary.
+  static void buildDWARFDebugFlags(std::string &Output,
+                                   const ArrayRef<const char*> &Args,
+                                   StringRef SDKPath);
 
   void setTargetTriple(StringRef Triple);
 
