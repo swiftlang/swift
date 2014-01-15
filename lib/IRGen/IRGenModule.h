@@ -363,20 +363,11 @@ public:
 
   llvm::Constant *getSize(Size size);
 
-  FormalType getTypeOfGetter(ValueDecl *D);
-  FormalType getTypeOfSetter(ValueDecl *D);
-
   Address getAddrOfGlobalVariable(VarDecl *D, ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data,
                                     ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfInjectionFunction(EnumElementDecl *D,
-                                             ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind,
-                                  ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfSetter(ValueDecl *D, Mangle::ExplosionKind kind,
-                                  ForDefinition_t forDefinition);
   Address getAddrOfWitnessTableOffset(CodeRef code,
                                       ForDefinition_t forDefinition);
   Address getAddrOfWitnessTableOffset(VarDecl *field,

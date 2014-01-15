@@ -797,6 +797,13 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
+static unsigned getNaturalUncurryLevel(ValueDecl *property) {
+  assert(property->getDeclContext()->isTypeContext());
+  if (isa<SubscriptDecl>(property))
+    return 2;
+  return 1;
+}
+
 /// Produce a function pointer, suitable for invocation by
 /// objc_msgSend, for the given property's getter method implementation.
 ///
@@ -811,12 +818,12 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
-  FormalType getterType = IGM.getTypeOfGetter(property);
+  unsigned uncurryLevel = getNaturalUncurryLevel(property);
   llvm::SmallString<32> swiftName;
   
   // Find the ObjC thunk for the property.
-  CodeRef getterCode = CodeRef::forGetter(property, explosionLevel,
-                                        getterType.getNaturalUncurryLevel());
+  CodeRef getterCode =
+    CodeRef::forGetter(property, explosionLevel, uncurryLevel);
   LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
   getterEntity.mangle(swiftName);
   
@@ -840,12 +847,12 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
-  FormalType setterType = IGM.getTypeOfSetter(property);
+  unsigned uncurryLevel = getNaturalUncurryLevel(property);
   llvm::SmallString<32> swiftName;
   
   // Generate the name of the ObjC thunk for the setter.
-  CodeRef setterCode = CodeRef::forSetter(property, explosionLevel,
-                                          setterType.getNaturalUncurryLevel());
+  CodeRef setterCode =
+    CodeRef::forSetter(property, explosionLevel, uncurryLevel);
   LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
   setterEntity.mangle(swiftName);
   
