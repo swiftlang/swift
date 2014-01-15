@@ -179,6 +179,9 @@ enum TypeCheckFlags {
 
   /// Whether the pattern is variadic.
   TC_Variadic = 0x02,
+
+  /// Whether the given type can override the type of a typed pattern.
+  TC_OverrideType = 0x04,
 };
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
@@ -615,16 +618,13 @@ public:
   /// \param P The pattern, which may be modified by this coercion.
   /// \param dc The context in which this pattern occurs.
   /// \param type the type to coerce the pattern to.
-  /// \param allowOverride Whether to allow the type to override a typed
-  /// pattern.
-  /// \param isVararg Whether this the pattern for a variadic tuple element.
+  /// \param options Options describing how to perform this coercion.
   /// \param resolver The generic resolver to use.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coerceToType(Pattern *&P, DeclContext *dc, Type type,
-                    bool allowOverride,
-                    bool isVararg = false,
-                    GenericTypeResolver *resolver = nullptr);
+  bool coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
+                           unsigned options, 
+                           GenericTypeResolver *resolver = nullptr);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 

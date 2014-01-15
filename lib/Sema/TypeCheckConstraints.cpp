@@ -829,8 +829,8 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
       // Apply the solution to the pattern as well.
       Pattern *pattern = Binding->getPattern();
-      if (tc.coerceToType(pattern, Binding->getDeclContext(),
-                          expr->getType(), /*allowOverride=*/true)) {
+      if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
+                                 expr->getType(), TC_OverrideType)) {
         return nullptr;
       }
       Binding->setPattern(pattern);

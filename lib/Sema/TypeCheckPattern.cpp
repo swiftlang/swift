@@ -519,9 +519,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     Pattern *subPattern = TP->getSubPattern();
-    bool allowUnknownTypes = options & TC_AllowUnspecifiedTypes;
-    if (coerceToType(subPattern, dc, P->getType(), allowUnknownTypes, false,
-                     resolver))
+    if (coercePatternToType(subPattern, dc, P->getType(),  options, resolver))
       hadError = true;
     else
       TP->setSubPattern(subPattern);
@@ -594,16 +592,17 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
-                               bool allowOverride, bool isVararg,
-                               GenericTypeResolver *resolver) {
+bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
+                                      unsigned options,
+                                      GenericTypeResolver *resolver) {
+  unsigned subOptions = options &~ TC_Variadic;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
     auto PP = cast<ParenPattern>(P);
     PP->setType(type);
     Pattern *sub = PP->getSubPattern();
-    if (coerceToType(sub, dc, type, allowOverride, false, resolver))
+    if (coercePatternToType(sub, dc, type, subOptions, resolver))
       return true;
     PP->setSubPattern(sub);
     return false;
@@ -613,7 +612,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     VP->setType(type);
     
     Pattern *sub = VP->getSubPattern();
-    if (coerceToType(sub, dc, type, allowOverride, false, resolver))
+    if (coercePatternToType(sub, dc, type, subOptions, resolver))
       return true;
     VP->setSubPattern(sub);
     return false;
@@ -623,16 +622,10 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    unsigned patternOptions = 0;
-    if (allowOverride) 
-      patternOptions |= TC_AllowUnspecifiedTypes;
-    if (isVararg)
-      patternOptions |= TC_Variadic;
-    bool hadError = validateTypedPattern(*this, dc, TP, patternOptions, 
-                                         resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
-        if (allowOverride) {
+        if (options & TC_OverrideType) {
           TP->overwriteType(type);
         } else {
           // Complain if the types don't match exactly.
@@ -644,8 +637,8 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     }
 
     Pattern *sub = TP->getSubPattern();
-    hadError |= coerceToType(sub, dc, TP->getType(), allowOverride, false,
-                             resolver);
+    hadError |= coercePatternToType(sub, dc, TP->getType(), subOptions, 
+                                    resolver);
     if (!hadError)
       TP->setSubPattern(sub);
     return hadError;
@@ -681,7 +674,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
     auto decayToParen = [&]() -> bool {
       assert(canDecayToParen);
       Pattern *sub = TP->getFields()[0].getPattern();
-      if (this->coerceToType(sub, dc, type, allowOverride, false, resolver))
+      if (this->coercePatternToType(sub, dc, type, subOptions, resolver))
         return true;
       
       if (TP->getLParenLoc().isValid()) {
@@ -730,8 +723,11 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      hadError |= coerceToType(pattern, dc, CoercionType, allowOverride,
-                               isVararg, resolver);
+      unsigned subOptions = options & ~TC_Variadic;
+      if (isVararg)
+        subOptions |= TC_Variadic;
+      hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
+                                      resolver);
       if (!hadError)
         elt.setPattern(pattern);
 
@@ -840,7 +836,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
       else
         elementType = TupleType::getEmpty(Context);
       Pattern *sub = OP->getSubPattern();
-      if (coerceToType(sub, dc, elementType, allowOverride, false, resolver))
+      if (coercePatternToType(sub, dc, elementType, subOptions, resolver))
         return true;
       OP->setSubPattern(sub);
     }
@@ -934,7 +930,7 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
       Type propTy = type->getTypeOfMember(dc->getParentModule(),
                                           elt.getProperty(),
                                           this);
-      if (coerceToType(sub, dc, propTy, allowOverride, false, resolver))
+      if (coercePatternToType(sub, dc, propTy, subOptions, resolver))
         return true;
       elt.setSubPattern(sub);
     }
