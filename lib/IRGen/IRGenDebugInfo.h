@@ -93,10 +93,12 @@ class IRGenDebugInfo {
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
   llvm::DIFile MainFile;
+  llvm::DIScope EntryPointFn; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
 
   FullLocation LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
+  bool IsLibrary; /// Are emitting debug info for a libary or a top level module?
 
   SmallVector<std::pair<FullLocation, SILDebugScope*>, 8>
   LocationStack; /// Used by pushLoc.
@@ -190,7 +192,7 @@ public:
                                   IndirectionKind = DirectValue,
                                   ArtificialKind = RealValue);
 
-  /// Emit debug metadata for a global variable.
+  /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
                                      StringRef Name,
                                      StringRef LinkageName,

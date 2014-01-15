@@ -115,11 +115,19 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   // FIXME.
   unsigned RuntimeVersion = 1;
 
-  // FIXME.
+  // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
   TheCU = DBuilder.createCompileUnit(Lang, Filename, Dir, Producer,
                                      IsOptimized, Flags, RuntimeVersion,
                                      SplitName);
+
+  if (IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
+    IsLibrary = false;
+    EntryPointFn =
+      DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
+                                 SWIFT_ENTRY_POINT_FUNCTION,
+                                 MainFile, MainFile, 0);
+  }
 }
 
 
@@ -466,8 +474,8 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   auto Line = L.Line;
 
   // We know that top_level_code always comes from MainFile.
-  if (!L.Filename && LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    File = MainFile;
+  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
+    if (!L.Filename) File = MainFile;
     Line = 1;
   }
 
@@ -516,6 +524,10 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = llvm::WeakVH(SP);
   Functions[LinkageName] = llvm::WeakVH(SP);
+
+  // RAUW the entry point function forward declaration with the real thing.
+  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION)
+    EntryPointFn->replaceAllUsesWith(SP);
 }
 
 void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {
@@ -795,12 +807,14 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    DebugTypeInfo DebugType,
                                                    Optional<SILLocation> Loc) {
   Location L = getLocation(SM, Loc).Loc;
-  llvm::DIFile Unit = getOrCreateFile(L.Filename);
 
-  // FIXME: Can there be nested types?
-  llvm::DIDescriptor DContext = Unit;
-  DBuilder.createStaticVariable(DContext, Name, LinkageName, Unit,
-                                L.Line, getOrCreateType(DebugType, Unit),
+  // Global variables in the top level compilation unit are emitted as
+  // local static variables of SWIFT_ENTRY_POINT_FUNCTION so they
+  // won't get confused with addressors.
+  auto Unit = getOrCreateFile(L.Filename);
+  llvm::DIScope Context = IsLibrary ? Unit : EntryPointFn;
+  DBuilder.createStaticVariable(Context, Name, LinkageName, Unit,
+                                L.Line, getOrCreateType(DebugType, Context),
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
