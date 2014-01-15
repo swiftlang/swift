@@ -171,6 +171,16 @@ public:
   virtual bool suppressDiagnostics() const;
 };
 
+/// Flags that describe the context of type checking a pattern or
+/// type.
+enum TypeCheckFlags {
+  /// Whether to allow unspecified types within a pattern.
+  TC_AllowUnspecifiedTypes = 0x01,
+
+  /// Whether the pattern is variadic.
+  TC_Variadic = 0x02,
+};
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker : public ASTMutationListener, public LazyResolver {
@@ -589,9 +599,15 @@ public:
   /// name lookup information. Must be done before type-checking the pattern.
   Pattern *resolvePattern(Pattern *P, DeclContext *dc);
   
-  bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        bool allowUnknownTypes,
-                        bool isVararg = false,
+  /// Type check the given pattern.
+  ///
+  /// \param P The pattern to type check.
+  /// \param dc The context in which type checking occurs.
+  /// \param options A combination of the flags in \c TypeCheckFlags.
+  /// \param resolver A generic type resolver.
+  ///
+  /// \returns true if any errors occurred during type checking.
+  bool typeCheckPattern(Pattern *P, DeclContext *dc, unsigned options,
                         GenericTypeResolver *resolver = nullptr);
 
   /// Coerce a pattern to the given type.

@@ -458,19 +458,19 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
 
 static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
                                  TypedPattern *TP,
-                                 bool allowUnknownTypes,
-                                 bool isVararg,
+                                 unsigned options,
                                  GenericTypeResolver *resolver) {
   if (TP->hasType())
     return TP->getType()->is<ErrorType>();
 
   bool hadError = false;
   TypeLoc &TL = TP->getTypeLoc();
+  bool allowUnknownTypes = options & TC_AllowUnspecifiedTypes;
   if (TC.validateType(TL, DC, allowUnknownTypes, resolver))
     hadError = true;
   Type Ty = TL.getType();
 
-  if (isVararg && !hadError) {
+  if ((options & TC_Variadic) && !hadError) {
     // FIXME: Use ellipsis loc for diagnostic.
     Ty = TC.getArraySliceType(TP->getLoc(), Ty);
     if (Ty.isNull())
@@ -485,19 +485,15 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
   return hadError;
 }
 
-/// Perform bottom-up type-checking on a pattern.  If this returns
-/// false, the type of the pattern will have been set.  If allowUnknownTypes is
-/// true, then this accepts "any" and "named" patterns, setting their type to
-/// UnresolvedType.
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
-                                   bool allowUnknownTypes,
-                                   bool isVararg,
+                                   unsigned options,
                                    GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
 
+  unsigned subOptions = options & ~TC_Variadic;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -508,7 +504,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, allowUnknownTypes, false, resolver)) {
+    if (typeCheckPattern(SP, dc, subOptions, resolver)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -521,9 +517,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, allowUnknownTypes,
-                                         isVararg, resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     Pattern *subPattern = TP->getSubPattern();
+    bool allowUnknownTypes = options & TC_AllowUnspecifiedTypes;
     if (coerceToType(subPattern, dc, P->getType(), allowUnknownTypes, false,
                      resolver))
       hadError = true;
@@ -538,7 +534,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Named:
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
-    if (allowUnknownTypes) {
+    if (options & TC_AllowUnspecifiedTypes) {
       return false;
     }
       
@@ -561,7 +557,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       TuplePatternElt &elt = tuplePat->getFields()[i];
       Pattern *pattern = elt.getPattern();
       bool isVararg = tuplePat->hasVararg() && i == e-1;
-      if (typeCheckPattern(pattern, dc, allowUnknownTypes, isVararg, resolver)){
+      unsigned eltOptions = subOptions;
+      if (isVararg)
+        eltOptions |= TC_Variadic;
+      if (typeCheckPattern(pattern, dc, eltOptions, resolver)){
         hadError = true;
         continue;
       }
@@ -580,7 +579,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    if (!missingType && !allowUnknownTypes)
+    if (!missingType && !(options & TC_AllowUnspecifiedTypes))
       P->setType(TupleType::get(typeElts, Context));
     return false;
   }
@@ -624,8 +623,13 @@ bool TypeChecker::coerceToType(Pattern *&P, DeclContext *dc, Type type,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, allowOverride,
-                                         isVararg, resolver);
+    unsigned patternOptions = 0;
+    if (allowOverride) 
+      patternOptions |= TC_AllowUnspecifiedTypes;
+    if (isVararg)
+      patternOptions |= TC_Variadic;
+    bool hadError = validateTypedPattern(*this, dc, TP, patternOptions, 
+                                         resolver);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
         if (allowOverride) {

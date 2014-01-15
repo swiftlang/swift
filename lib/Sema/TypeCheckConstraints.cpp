@@ -384,7 +384,8 @@ namespace {
       // we've determine the complete function type.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         // Validate the parameters.
-        if (TC.typeCheckPattern(closure->getParams(), DC, true)) {
+        if (TC.typeCheckPattern(closure->getParams(), DC, 
+                                TC_AllowUnspecifiedTypes)) {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
         }

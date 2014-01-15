@@ -594,8 +594,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
   for (auto pattern : argPatterns) {
     // Check the pattern.
-    if (tc.typeCheckPattern(pattern, func, /*allowUnboundGenerics=*/false,
-                            /*isVararg=*/false, &resolver))
+    if (tc.typeCheckPattern(pattern, func, 0, &resolver))
       badType = true;
 
     // Infer requirements from the pattern.

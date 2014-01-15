@@ -1141,6 +1141,8 @@ ERROR(missing_in_class_init_3plus,sema_tcd,none,
 NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values", (Type, bool))
+ERROR(inout_attribute_non_parameter,sema_tcd,none,
+      "'inout' attribute can only be applied to function parameters", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
