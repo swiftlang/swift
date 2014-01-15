@@ -89,12 +89,6 @@ public:
   ///
   /// \param name The name we're searching for.
   void lookupValue(Identifier name, VisibleDeclConsumer &consumer);
-  
-  /// \brief Look for visible declarations in the Clang translation unit.
-  ///
-  /// \param consumer The VisibleDeclConsumer that will be fed decls as they
-  ///   are found.
-  void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const;
 
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.

@@ -536,14 +536,6 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   }
 }
 
-void
-ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
-  auto &sema = Impl.Instance->getSema();
-  sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
-                          clang::Sema::LookupNameKind::LookupAnyName,
-                          consumer);
-}
-
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const ValueDecl *VD) {
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
@@ -599,26 +591,24 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
 
 namespace {
-class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
-  ClangImporter::Implementation &Impl;
-  swift::VisibleDeclConsumer &NextConsumer;
-
+class ClangVectorDeclConsumer : public clang::VisibleDeclConsumer {
+  std::vector<clang::NamedDecl *> results;
 public:
-  ImportingVisibleDeclConsumer(ClangImporter::Implementation &Impl,
-                               swift::VisibleDeclConsumer &NextConsumer)
-      : Impl(Impl), NextConsumer(NextConsumer) {}
+  ClangVectorDeclConsumer() = default;
 
   void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
-                 clang::DeclContext *Ctx,
-                 bool InBaseClass) override {
+                 clang::DeclContext *Ctx, bool InBaseClass) override {
     if (!ND->getIdentifier())
       return;
 
     if (ND->isModulePrivate())
       return;
 
-    if (auto Imported = cast_or_null<ValueDecl>(Impl.importDeclReal(ND)))
-      NextConsumer.foundDecl(Imported, DeclVisibilityKind::VisibleAtTopLevel);
+    results.push_back(ND);
+  }
+
+  llvm::MutableArrayRef<clang::NamedDecl *> getResults() {
+    return results;
   }
 };
 
@@ -656,13 +646,29 @@ public:
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
   if (!Impl.CacheIsValid) {
-    VectorDeclConsumer CacheConsumer(Impl.CachedVisibleDecls);
-    ImportingVisibleDeclConsumer ImportingConsumer(Impl, CacheConsumer);
+    ClangVectorDeclConsumer clangConsumer;
 
     auto &sema = Impl.getClangSema();
     sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
                             clang::Sema::LookupNameKind::LookupAnyName,
-                            ImportingConsumer);
+                            clangConsumer);
+
+    // Sort all the Clang decls we find, so that we process them
+    // deterministically. This *shouldn't* be necessary, but the importer
+    // definitely still has ordering dependencies.
+    auto results = clangConsumer.getResults();
+    llvm::array_pod_sort(results.begin(), results.end(),
+                         [](clang::NamedDecl * const *lhs,
+                            clang::NamedDecl * const *rhs) -> int {
+      return clang::DeclarationName::compare((*lhs)->getDeclName(),
+                                             (*rhs)->getDeclName());
+    });
+
+    for (const clang::NamedDecl *clangDecl : results) {
+      if (Decl *imported = Impl.importDeclReal(clangDecl))
+        Impl.CachedVisibleDecls.push_back(cast<ValueDecl>(imported));
+    }
+
     Impl.CacheIsValid = true;
   }
 
