@@ -40,3 +40,8 @@ module UsesSubmodule {
   header "UsesSubmodule.h"
   export *
 }
+
+module CoreData {
+  header "NSManagedObject.h"
+  export *
+}

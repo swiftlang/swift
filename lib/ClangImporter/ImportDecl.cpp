@@ -36,6 +36,14 @@
 
 using namespace swift;
 
+namespace swift {
+namespace inferred_attributes {
+  enum {
+    requires_stored_property_inits = 0x01
+  };
+}
+}
+
 /// \brief Set the declaration context of each variable within the given
 /// patterns to \p dc.
 static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
@@ -2756,6 +2764,16 @@ namespace {
       return result;
     }
 
+    // Add inferred attributes.
+    void addInferredAttributes(Decl *decl, unsigned attributes) {
+      using namespace inferred_attributes;
+      if (attributes & requires_stored_property_inits) {
+        decl->getMutableAttrs().setAttr(AK_requires_stored_property_inits,
+                                        SourceLoc());
+        cast<ClassDecl>(decl)->setRequiresStoredPropertyInits(true);
+      }
+    }
+
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
@@ -2799,7 +2817,16 @@ namespace {
 
       // Note that this is an Objective-C class.
       result->setIsObjC(true);
-      
+
+      // Add inferred attributes.
+#define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)        \
+      if (name.str().equals(#ClassName) &&                              \
+          result->getParentModule()->Name.str().equals(#ModuleName)) {  \
+        using namespace inferred_attributes;                            \
+        addInferredAttributes(result, AttributeSet);                    \
+      }
+#include "InferredAttributes.def"
+
       // Import each of the members.
       SmallVector<Decl *, 4> members;
       importObjCMembers(decl, result, members);
