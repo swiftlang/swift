@@ -40,7 +40,6 @@ enum class TaskFinishedResponse {
 
 /// \brief A class encapsulating the execution of multiple tasks in parallel.
 class TaskQueue {
-private:
   /// Tasks which have not begun execution.
   std::queue<std::unique_ptr<Task>> QueuedTasks;
 
@@ -54,7 +53,7 @@ public:
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
   /// number of parallel tasks for the current system.
   TaskQueue(unsigned NumberOfParallelTasks = 0);
-  ~TaskQueue();
+  virtual ~TaskQueue();
 
   // TODO: remove once -Wdocumentation stops warning for \param, \returns on
   // std::function (<rdar://problem/15665132>).
@@ -105,9 +104,9 @@ public:
   /// \param Env the environment which should be used for the task;
   /// must be null-terminated. If empty, inherits the parent's environment.
   /// \param Context an optional context which will be associated with the task
-  void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-               ArrayRef<const char *> Env = llvm::None,
-               void *Context = nullptr);
+  virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
+                       ArrayRef<const char *> Env = llvm::None,
+                       void *Context = nullptr);
 
   /// \brief Synchronously executes the tasks in the TaskQueue.
   ///
@@ -115,8 +114,38 @@ public:
   /// \param Finished a callback which will be called when a task finishes
   ///
   /// \returns true if all tasks did not execute successfully
-  bool execute(TaskBeganCallback Began = TaskBeganCallback(),
-               TaskFinishedCallback Finished = TaskFinishedCallback());
+  virtual bool execute(TaskBeganCallback Began = TaskBeganCallback(),
+                       TaskFinishedCallback Finished = TaskFinishedCallback());
+};
+
+/// \brief A class which simulates execution of tasks with behavior similar to
+/// TaskQueue.
+class DummyTaskQueue : public TaskQueue {
+  class DummyTask {
+  public:
+    const char *ExecPath;
+    ArrayRef<const char *> Args;
+    ArrayRef<const char *> Env;
+    void *Context;
+
+    DummyTask(const char *ExecPath, ArrayRef<const char *> Args,
+              ArrayRef<const char *> Env = llvm::None, void *Context = nullptr)
+      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context) {}
+  };
+
+  std::queue<std::unique_ptr<DummyTask>> QueuedTasks;
+
+public:
+  /// \brief Create a new DummyTaskQueue instance.
+  DummyTaskQueue(unsigned NumberOfParallelTasks = 0);
+  virtual ~DummyTaskQueue();
+
+  virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
+                       ArrayRef<const char *> Env = llvm::None,
+                       void *Context = nullptr);
+
+  virtual bool execute(TaskBeganCallback Began = TaskBeganCallback(),
+                       TaskFinishedCallback Finished = TaskFinishedCallback());
 };
 
 } // end namespace sys
