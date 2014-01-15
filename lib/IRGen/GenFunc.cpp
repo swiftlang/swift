@@ -1990,7 +1990,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
 
   // The typical case - the result IR type used within the function
   // matches the ABI result type of the function.
-  auto *ABIType = cast<llvm::StructType>(CurFn->getReturnType());
+  auto *ABIType = CurFn->getReturnType();
   if (bodyType == ABIType) {
     Builder.CreateRet(resultAgg);
     return;
