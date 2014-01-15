@@ -119,11 +119,9 @@ static bool isWildcardPattern(const Pattern *p) {
   
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
-    return isWildcardPattern(cast<ParenPattern>(p)->getSubPattern());
   case PatternKind::Typed:
-    return isWildcardPattern(cast<TypedPattern>(p)->getSubPattern());
   case PatternKind::Var:
-    return isWildcardPattern(cast<VarPattern>(p)->getSubPattern());
+    return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
 }
 
@@ -1097,11 +1095,9 @@ static const ExprPattern *getAsExprPattern(const Pattern *p) {
 
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
-    return getAsExprPattern(cast<ParenPattern>(p)->getSubPattern());
   case PatternKind::Typed:
-    return getAsExprPattern(cast<TypedPattern>(p)->getSubPattern());
   case PatternKind::Var:
-    return getAsExprPattern(cast<VarPattern>(p)->getSubPattern());
+    return getAsExprPattern(p->getSemanticsProvidingPattern());
   }
 }
 

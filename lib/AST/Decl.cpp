@@ -1045,9 +1045,10 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
     return getSourceRange();
 
   auto *Pat = getParentPattern()->getPattern();
-  if (auto *TP = dyn_cast<TypedPattern>(Pat)) {
+  if (auto *VP = dyn_cast<VarPattern>(Pat))
+    Pat = VP->getSubPattern();
+  if (auto *TP = dyn_cast<TypedPattern>(Pat))
     return TP->getTypeLoc().getTypeRepr()->getSourceRange();
-  }
   return getSourceRange();
 }
 
@@ -1277,12 +1278,10 @@ VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
     return nullptr;
 
   // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  auto TP = dyn_cast<TypedPattern>(ArgParamPatterns[0]);
-  if (!TP)
-    return nullptr;
+  const Pattern *P = ArgParamPatterns[0]->getSemanticsProvidingPattern();
 
   // The decl should be named 'self' and be implicit.
-  auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  auto NP = dyn_cast<NamedPattern>(P);
   if (NP && NP->getBoundName().str() == "self" && NP->isImplicit())
     return NP->getDecl();
   return nullptr;

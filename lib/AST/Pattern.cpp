@@ -123,29 +123,19 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   case PatternKind::Var:
     return getSemanticsProvidingPattern()->collectVariables(variables);
 
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(this);
-    for (auto elt : tuple->getFields()) {
+  case PatternKind::Tuple:
+    for (auto elt : cast<TuplePattern>(this)->getFields())
       elt.getPattern()->collectVariables(variables);
-    }
     return;
-  }
 
-    return cast<TypedPattern>(this)->getSubPattern()
-             ->collectVariables(variables);
-      
   case PatternKind::Isa:
     return;
   
-  case PatternKind::NominalType: {
-    auto ntp = cast<NominalTypePattern>(this);
-      
-    for (auto elt : ntp->getElements()) {
+  case PatternKind::NominalType:
+    for (auto elt : cast<NominalTypePattern>(this)->getElements())
       elt.getSubPattern()->collectVariables(variables);
-    }
     return;
-  }
-      
+
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(this);
     if (OP->hasSubPattern())
@@ -288,15 +278,7 @@ void *Pattern::operator new(size_t numBytes, ASTContext &C) {
 /// tuple element in a function signature, such names become part of
 /// the type.
 Identifier Pattern::getBoundName() const {
-  const Pattern *P = this;
-  
-  if (auto *VP = dyn_cast<VarPattern>(P))
-    P = VP->getSubPattern();
-  
-  if (auto *TP = dyn_cast<TypedPattern>(P))
-    P = TP->getSubPattern();
-
-  if (auto *NP = dyn_cast<NamedPattern>(P))
+  if (auto *NP = dyn_cast<NamedPattern>(getSemanticsProvidingPattern()))
     return NP->getBoundName();
   return Identifier();
 }
