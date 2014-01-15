@@ -2741,7 +2741,7 @@ void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
   for (auto member : nominal->getMembers()) {
     // Find pattern binding declarations that have initializers.
     auto pbd = dyn_cast<PatternBindingDecl>(member);
-    if (!pbd) continue;
+    if (!pbd || pbd->isStatic()) continue;
 
     auto init = pbd->getInit();
     if (!init) continue;
