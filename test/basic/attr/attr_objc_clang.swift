@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %swift %s -verify -I %S/Inputs/custom-modules -module-cache-path=%t/clang-module-cache
+// RUN: %swift %s -parse -verify -I %S/Inputs/custom-modules -module-cache-path=%t/clang-module-cache
 // RUN: %swift-ide-test -print-ast-typechecked -source-filename %s -I %S/Inputs/custom-modules -module-cache-path=%t/clang-module-cache | FileCheck %s
 
 import AttrObjc_FooClangModule
