@@ -329,6 +329,9 @@ public:
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   llvm::DenseMap<const VarDecl *, unsigned> ArgNo;
   
+  // Shared destination basic block for condfail traps.
+  llvm::BasicBlock *FailBB = nullptr;
+  
   SILFunction *CurSILFn;
   ExplosionKind CurSILFnExplosionLevel;
   Address IndirectReturn;
@@ -502,6 +505,25 @@ public:
       return Source.getAddress();
   }
 
+  /// Emit the shared trap block for condfail instructions, or reuse one we
+  /// already emitted.
+  llvm::BasicBlock *getFailBB() {
+    if (FailBB)
+      return FailBB;
+    
+    FailBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+    return FailBB;
+  }
+  
+  void emitFailBB() {
+    assert(FailBB && "no failure BB");
+    CurFn->getBasicBlockList().push_back(FailBB);
+    Builder.SetInsertPoint(FailBB);
+    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
+                                                    llvm::Intrinsic::ID::trap);
+    Builder.CreateCall(trapIntrinsic);
+    Builder.CreateUnreachable();
+  }
   
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
@@ -706,6 +728,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
 {}
 
 IRGenSILFunction::~IRGenSILFunction() {
+  assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");
+  // Emit the fail BB if we have one.
+  if (FailBB)
+    emitFailBB();
   DEBUG(CurFn->print(llvm::dbgs()));
 }
 
@@ -2821,7 +2847,11 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
-  Builder.CreateCall(IGM.getConditionalFailureFn(), cond);
+  llvm::BasicBlock *failBB = getFailBB();
+  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  
+  Builder.CreateCondBr(cond, failBB, contBB);
+  Builder.emitBlock(contBB);
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {

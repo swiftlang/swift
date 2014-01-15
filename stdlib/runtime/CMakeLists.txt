@@ -17,7 +17,6 @@ add_swift_library(swift_runtime INSTALL
   Stubs.cpp
   SwiftObject.mm
   Enum.cpp
-  Failure.cpp
   Once.cpp
   Init.cpp
   BlockShims.mm)

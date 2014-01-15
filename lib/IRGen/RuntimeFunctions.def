@@ -461,13 +461,6 @@ FUNCTION(DynamicCastObjCProtocolConditional,
          ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
          
-// void swift_conditionalFailure(bool didFail);
-// FIXME: Stronger attributes?
-FUNCTION(ConditionalFailure, swift_conditionalFailure, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(Int1Ty),
-         ATTRS())
-
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),
 //                 RefCounted *context);
