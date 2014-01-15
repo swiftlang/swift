@@ -68,6 +68,17 @@ static void addSwiftExpandPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCExpandPass());
 }
 
+// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
+// These should be moved to a single definition shared by clang and swift.
+enum ImageInfoFlags {
+  eImageInfo_FixAndContinue      = (1 << 0),
+  eImageInfo_GarbageCollected    = (1 << 1),
+  eImageInfo_GCOnly              = (1 << 2),
+  eImageInfo_OptimizedByDyld     = (1 << 3),
+  eImageInfo_CorrectedSynthesize = (1 << 4),
+  eImageInfo_ImageIsSimulated    = (1 << 5)
+};
+
 static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 swift::Module *M, SILModule *SILMod,
                                 SourceFile *SF = nullptr,
@@ -180,7 +191,14 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
 
   Module->addModuleFlag(llvm::Module::Override,
                         "Objective-C Garbage Collection", (uint32_t)0);
-  // FIXME: Simulator flag.
+
+  // Mark iOS simulator images.
+  const llvm::Triple Triple(Opts.Triple);
+  if (Triple.isiOS() &&
+      (Triple.getArch() == llvm::Triple::x86 ||
+       Triple.getArch() == llvm::Triple::x86_64))
+    Module->addModuleFlag(llvm::Module::Error, "Objective-C Is Simulated",
+                          eImageInfo_ImageIsSimulated);
 
   DEBUG(llvm::dbgs() << "module before passes:\n";
         IGM.Module.dump());
