@@ -71,6 +71,7 @@ namespace {
       case ValueKind::TupleExtractInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::MetatypeInst:
+      case ValueKind::RefElementAddrInst:
         return true;
       default:
         return false;
@@ -126,6 +127,12 @@ namespace {
       return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
                                 X->getType(),
                                 X->getBits());
+    }
+
+    hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
+      return llvm::hash_combine(unsigned(ValueKind::RefElementAddrInst),
+                                X->getOperand(),
+                                X->getField());
     }
 
     hash_code visitStringLiteralInst(StringLiteralInst *X) {

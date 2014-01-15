@@ -197,6 +197,15 @@ namespace {
       return true;
     }
 
+    bool visitRefElementAddrInst(RefElementAddrInst *RHS) {
+      auto *X = cast<RefElementAddrInst>(LHS);
+      if (X->getField() != RHS->getField())
+        return false;
+      if (X->getOperand() != RHS->getOperand())
+        return false;
+      return true;
+    }
+
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
       // We have already checked that the operands of our struct_element_addrs
       // match. Thus we only need to check the field/struct decl which are not
