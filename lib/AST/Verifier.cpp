@@ -890,7 +890,7 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(InjectIntoOptionalExpr *expr) {
-      auto valueType = expr->getType()->getAnyOptionalObjectType(Ctx);
+      auto valueType = expr->getType()->getAnyOptionalObjectType();
       if (!valueType) {
         Out << "InjectIntoOptionalExpr is not of Optional type";
         abort();
@@ -924,7 +924,7 @@ struct ASTNodeBase {};
     void verifyChecked(ForceValueExpr *E) {
       auto valueTy = E->getType();
       auto optValueTy =
-        E->getSubExpr()->getType()->getAnyOptionalObjectType(Ctx);
+        E->getSubExpr()->getType()->getAnyOptionalObjectType();
       checkSameType(valueTy, optValueTy, "optional value type");
       verifyCheckedBase(E);
     }

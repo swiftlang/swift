@@ -389,21 +389,21 @@ NominalTypeDecl *TypeBase::getAnyNominal() {
   return nullptr;
 }
 
-Type TypeBase::getOptionalObjectType(const ASTContext &context) {
+Type TypeBase::getOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericType>())
-    if (boundTy->getDecl() == context.getOptionalDecl())
+    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
-Type TypeBase::getUncheckedOptionalObjectType(const ASTContext &context) {
+Type TypeBase::getUncheckedOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericType>())
-    if (boundTy->getDecl() == context.getUncheckedOptionalDecl())
+    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_UncheckedOptional)
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
-Type TypeBase::getAnyOptionalObjectType(const ASTContext &context) {
+Type TypeBase::getAnyOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericType>())
     if (boundTy->getDecl()->classifyAsOptionalType())
       return boundTy->getGenericArgs()[0];

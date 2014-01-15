@@ -2856,7 +2856,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     // A [weak] variable must have type R? for some ownership-capable type R.
     if (Attrs.isWeak()) {
-      Type objType = type->getOptionalObjectType(TC.Context);
+      Type objType = type->getOptionalObjectType();
 
       // Use this special diagnostic if it's actually a reference type
       // but just isn't Optional.
