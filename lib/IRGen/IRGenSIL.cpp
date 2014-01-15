@@ -539,10 +539,31 @@ public:
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
   void visitDebugValueInst(DebugValueInst *i) {
-    // FIXME: Noop
+    if (!IGM.DebugInfo) return;
+    VarDecl *Decl = i->getDecl();
+    if (!Decl) return;
+    StringRef Name = Decl->getName().str();
+    auto SILVal = i->getOperand();
+    auto Vals = getLoweredExplosion(SILVal).claimAll();
+    // See also comment for SILArgument; it would be nice of
+    // DW_OP_piece larger values together.
+    if (Vals.size() == 1)
+      IGM.DebugInfo->emitStackVariableDeclaration
+        (Builder, Vals[0],
+         DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
+         Name, i);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    // FIXME: Noop
+    if (!IGM.DebugInfo) return;
+    VarDecl *Decl = i->getDecl();
+    if (!Decl) return;
+    StringRef Name = Decl->getName().str();
+    auto SILVal = i->getOperand();
+    auto Val = getLoweredAddress(SILVal).getAddress();
+    IGM.DebugInfo->emitStackVariableDeclaration
+      (Builder, Val,
+       DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
+       Name, i);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
