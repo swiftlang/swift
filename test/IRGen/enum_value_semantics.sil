@@ -190,9 +190,9 @@ enum MultiPayloadNontrivialSpareBits {
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics31MultiPayloadNontrivialSpareBits*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[ADDR]] to i128*
 // CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
-// CHECK:   switch i18 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
-// CHECK:     i18 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
-// CHECK:     i18 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
+// CHECK:   switch i2 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
+// CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
+// CHECK:     i2 -2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[PAYLOAD1_DESTROY]]
 // CHECK:   [[PAYLOAD1_TRUNC:%.*]] = trunc i128 [[PAYLOAD]] to i64
