@@ -65,6 +65,8 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@postfix ";
   if (isObjC())
     Printer << "@objc ";
+  if (requiresStoredPropertyInits())
+    Printer << "@requires_stored_property_inits ";
   if (isIBOutlet())
     Printer << "@IBOutlet ";
   if (isIBAction())
