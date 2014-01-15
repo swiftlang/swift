@@ -26,10 +26,12 @@ using namespace llvm::opt;
 Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
-                         unsigned NumberOfParallelCommands)
+                         unsigned NumberOfParallelCommands,
+                         bool SkipTaskExecution)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Jobs(new JobList),
     InputArgs(std::move(InputArgs)), TranslatedArgs(std::move(TranslatedArgs)),
-    NumberOfParallelCommands(NumberOfParallelCommands) {
+    NumberOfParallelCommands(NumberOfParallelCommands),
+    SkipTaskExecution(SkipTaskExecution) {
 };
 
 Compilation::~Compilation() = default;
@@ -39,8 +41,12 @@ void Compilation::addJob(Job *J) {
 }
 
 int Compilation::performJobsInList(const JobList &JL) {
-  // Create a TaskQueue for execution, if possible.
-  TaskQueue TQ(NumberOfParallelCommands);
+  // Create a TaskQueue for execution.
+  std::unique_ptr<TaskQueue> TQ;
+  if (SkipTaskExecution)
+    TQ.reset(new DummyTaskQueue(NumberOfParallelCommands));
+  else
+    TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
   // Store pointers to the Commands which have already been scheduled
   // to execute.
@@ -49,7 +55,7 @@ int Compilation::performJobsInList(const JobList &JL) {
   // Set up scheduleCommandIfNecessary and supportsBufferingOutput.
   auto scheduleCommandIfNecessary = [&] (const Command *Cmd) {
     if (ScheduledCommands.insert(Cmd).second) {
-      TQ.addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
+      TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                  (void *)Cmd);
     }
   };
@@ -137,7 +143,7 @@ int Compilation::performJobsInList(const JobList &JL) {
   };
 
   // Ask the TaskQueue to execute.
-  TQ.execute(taskBegan, taskFinished);
+  TQ->execute(taskBegan, taskFinished);
 
   return Result;
 }

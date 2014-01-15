@@ -68,6 +68,9 @@ def driver_print_bindings : Flag<["-"], "driver-print-bindings">,
   InternalDebugOpt, HelpText<"Dump list of bindings">;
 def driver_print_jobs : Flag<["-"], "driver-print-jobs">, InternalDebugOpt,
   HelpText<"Dump list of jobs to execute">;
+def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
+  InternalDebugOpt,
+  HelpText<"Skip execution of subtasks when performing compilation">;
 
 def help : Flag<["-", "--"], "help">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Display available options">;

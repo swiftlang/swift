@@ -70,6 +70,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
   bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
+  bool DriverSkipExecution =
+    ArgList->hasArg(options::OPT_driver_skip_execution);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -107,7 +109,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   std::unique_ptr<Compilation> C(new Compilation(*this, TC, std::move(ArgList),
                                                  std::move(TranslatedArgList),
-                                                 NumberOfParallelCommands));
+                                                 NumberOfParallelCommands,
+                                                 DriverSkipExecution));
 
   buildJobs(*C, Actions);
   if (DriverPrintBindings) {
