@@ -200,7 +200,11 @@ public:
   // FIXME: An extra level of caching of visible decls, since lookup needs to
   // be filtered by module after the fact.
   SmallVector<ValueDecl *, 0> CachedVisibleDecls;
-  bool CacheIsValid = false;
+  enum class CacheState {
+    Invalid,
+    InProgress,
+    Valid
+  } CurrentCacheState = CacheState::Invalid;
 
 private:
   /// \brief Generation number that is used for crude versioning.

@@ -273,7 +273,7 @@ Module *ClangImporter::loadModule(
   ++Impl.Generation;
   Impl.SwiftContext.bumpGeneration();
   Impl.CachedVisibleDecls.clear();
-  Impl.CacheIsValid = false;
+  Impl.CurrentCacheState = Implementation::CacheState::Invalid;
 
   auto &cacheEntry = Impl.ModuleWrappers[clangModule];
   if (ClangModuleUnit *cached = cacheEntry.getPointer()) {
@@ -645,31 +645,42 @@ public:
 } // unnamed namespace
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
-  if (!Impl.CacheIsValid) {
-    ClangVectorDeclConsumer clangConsumer;
+  if (Impl.CurrentCacheState != Implementation::CacheState::Valid) {
+    do {
+      Impl.CurrentCacheState = Implementation::CacheState::InProgress;
+      Impl.CachedVisibleDecls.clear();
 
-    auto &sema = Impl.getClangSema();
-    sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
-                            clang::Sema::LookupNameKind::LookupAnyName,
-                            clangConsumer);
+      ClangVectorDeclConsumer clangConsumer;
+      auto &sema = Impl.getClangSema();
+      sema.LookupVisibleDecls(sema.getASTContext().getTranslationUnitDecl(),
+                              clang::Sema::LookupNameKind::LookupAnyName,
+                              clangConsumer);
 
-    // Sort all the Clang decls we find, so that we process them
-    // deterministically. This *shouldn't* be necessary, but the importer
-    // definitely still has ordering dependencies.
-    auto results = clangConsumer.getResults();
-    llvm::array_pod_sort(results.begin(), results.end(),
-                         [](clang::NamedDecl * const *lhs,
-                            clang::NamedDecl * const *rhs) -> int {
-      return clang::DeclarationName::compare((*lhs)->getDeclName(),
-                                             (*rhs)->getDeclName());
-    });
+      // Sort all the Clang decls we find, so that we process them
+      // deterministically. This *shouldn't* be necessary, but the importer
+      // definitely still has ordering dependencies.
+      auto results = clangConsumer.getResults();
+      llvm::array_pod_sort(results.begin(), results.end(),
+                           [](clang::NamedDecl * const *lhs,
+                              clang::NamedDecl * const *rhs) -> int {
+        return clang::DeclarationName::compare((*lhs)->getDeclName(),
+                                               (*rhs)->getDeclName());
+      });
 
-    for (const clang::NamedDecl *clangDecl : results) {
-      if (Decl *imported = Impl.importDeclReal(clangDecl))
-        Impl.CachedVisibleDecls.push_back(cast<ValueDecl>(imported));
-    }
+      for (const clang::NamedDecl *clangDecl : results) {
+        if (Impl.CurrentCacheState != Implementation::CacheState::InProgress)
+          break;
+        if (Decl *imported = Impl.importDeclReal(clangDecl))
+          Impl.CachedVisibleDecls.push_back(cast<ValueDecl>(imported));
+      }
+      
+      // If we changed things /while/ we were caching, we need to start over
+      // and try again. Fortunately we record a map of decls we've already
+      // imported, so most of the work is just the lookup and then going
+      // through the list.
+    } while (Impl.CurrentCacheState != Implementation::CacheState::InProgress);
 
-    Impl.CacheIsValid = true;
+    Impl.CurrentCacheState = Implementation::CacheState::Valid;
   }
 
   for (auto VD : Impl.CachedVisibleDecls)
