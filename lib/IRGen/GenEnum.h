@@ -32,10 +32,11 @@
 
 namespace llvm {
   class BasicBlock;
-  class Value;
-  class Type;
-  
   class BitVector;
+  class ConstantInt;
+  class StructType;
+  class Type;
+  class Value;
 }
 
 namespace swift {
@@ -349,12 +350,7 @@ public:
   }
   
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address dest, CanType T) const {
-    if (TIK >= Loadable)
-      return initialize(IGF, params, dest);
-    Address src = TI->getAddressForPointer(params.claimNext());
-    TI->initializeWithTake(IGF, dest, src, T);
-  }
+                                    Address dest, CanType T) const;
   
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
                               Address src, CanType T) const = 0;

@@ -25,6 +25,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenEnum.h"
+
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
@@ -41,7 +43,6 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "GenEnum.h"
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
 
@@ -60,6 +61,16 @@ llvm::BitVector getBitVectorFromAPInt(const APInt &bits,
   }
   
   return result;
+}
+
+void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
+                                                   Explosion &params,
+                                                   Address dest,
+                                                   CanType T) const {
+  if (TIK >= Loadable)
+    return initialize(IGF, params, dest);
+  Address src = TI->getAddressForPointer(params.claimNext());
+  TI->initializeWithTake(IGF, dest, src, T);
 }
 
 namespace {
