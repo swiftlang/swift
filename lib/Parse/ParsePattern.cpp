@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -130,6 +131,43 @@ static ParserStatus parseDefaultArgument(Parser &P,
   return ParserStatus();
 }
 
+/// Given a pattern "P" based on a pattern atom (either an identifer or _
+/// pattern), rebuild and return the nested pattern around another root that
+/// replaces the atom.
+static Pattern *rebuildImplicitPatternAround(Pattern *P, Pattern *NewRoot,
+                                             ASTContext &C) {
+  // We'll return a cloned copy of the pattern.
+  P = P->clone(C, /*isImplicit*/true);
+
+  class ReplaceRoot : public ASTWalker {
+    Pattern *NewRoot;
+  public:
+    ReplaceRoot(Pattern *NewRoot) : NewRoot(NewRoot) {}
+
+    // If we find a typed pattern, replace its subpattern with the NewRoot and
+    // return.
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        TP->setSubPattern(NewRoot);
+        return { false, TP };
+      }
+      
+      return { true, P };
+    }
+
+    // If we get down to a named pattern "x" or any pattern "_", replace it
+    // with our root.
+    Pattern *walkToPatternPost(Pattern *P) override {
+      if (isa<NamedPattern>(P) || isa<AnyPattern>(P))
+        return NewRoot;
+      return P;
+    }
+  };
+  
+  return P->walk(ReplaceRoot(NewRoot));
+}
+
+
 static ParserStatus
 parseSelectorArgument(Parser &P,
                       SmallVectorImpl<TuplePatternElt> &argElts,
@@ -142,8 +180,6 @@ parseSelectorArgument(Parser &P,
          "selector argument did not start with an identifier!");
   Pattern *ArgPattern = ArgPatternRes.get();
   ArgPattern->setImplicit();
-
-  unsigned defaultArgIndex = defaultArgs.claimNextIndex();
   
   // Check that a selector name isn't used multiple times, which would
   // lead to the function type having multiple arguments with the same name.
@@ -163,63 +199,44 @@ parseSelectorArgument(Parser &P,
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
   }
-  P.consumeToken(tok::l_paren);
 
-  if (P.Tok.is(tok::r_paren)) {
-    P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    rp = P.consumeToken(tok::r_paren);
-    return makeParserError();
-  }
-
-  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom(true);
-  if (BodyPatternRes.isNull()) {
-    recoverFromBadSelectorArgument(P);
-    return makeParserError();
-  }
-  Pattern *BodyPattern = BodyPatternRes.get();
-  
-  if (P.consumeIf(tok::colon)) {
-    ParserResult<TypeRepr> type = P.parseTypeAnnotation();
-    ParserStatus Status = type;
-
-    if (type.isNull()) {
-      type = makeParserErrorResult(
-          new (P.Context) ErrorTypeRepr(P.PreviousLoc));
-    }
-    if (type.isParseError()) {
+  ParserResult<Pattern> PatternRes =
+    P.parsePatternTuple(/*DefArgs=*/&defaultArgs, /*IsLet*/true);
+  if (PatternRes.isNull()) {
+    if (PatternRes.isParseError())
       recoverFromBadSelectorArgument(P);
+    return PatternRes;
+  }
+  
+  // The result of parsing a '(' pattern is either a ParenPattern or a
+  // TuplePattern.
+  if (auto *PP = dyn_cast<ParenPattern>(PatternRes.get())) {
+    bodyElts.push_back(TuplePatternElt(PP->getSubPattern(), /*init*/nullptr,
+                                       DefaultArgumentKind::None));
+    // Return the ')' location.
+    rp = PP->getRParenLoc();
+  } else {
+    auto *TP = cast<TuplePattern>(PatternRes.get());
+    
+    // Reject tuple patterns that aren't a single argument.
+    if (TP->getNumFields() != 1 || TP->hasVararg()) {
+      P.diagnose(TP->getLParenLoc(), diag::func_selector_with_not_one_argument);
+      return makeParserError();
     }
 
-    ArgPattern = new (P.Context) TypedPattern(ArgPattern, type.get(),
-                                              /*Implicit=*/true);
-    BodyPattern = new (P.Context) TypedPattern(BodyPattern, type.get());
-    if (Status.isError())
-      return Status;
-  }
+    bodyElts.push_back(TP->getFields()[0]);
 
-  ExprHandle *init = nullptr;
-  if (P.Tok.is(tok::equal)) {
-    auto status = parseDefaultArgument(P, &defaultArgs, defaultArgIndex, init);
-    if (status.shouldStopParsing())
-      return status;
+    // Return the ')' location.
+    rp = TP->getRParenLoc();
   }
   
-  if (P.Tok.is(tok::comma)) {
-    P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    recoverFromBadSelectorArgument(P);
-    return makeParserError();
-  }
+
+  TuplePatternElt &TPE = bodyElts.back();
+  ArgPattern = rebuildImplicitPatternAround(TPE.getPattern(), ArgPattern,
+                                            P.Context);
   
-  if (P.Tok.isNot(tok::r_paren)) {
-    P.diagnose(P.Tok, diag::expected_rparen_tuple_pattern_list);
-    return makeParserError();
-  }
-  
-  rp = P.consumeToken(tok::r_paren);
-  argElts.push_back(TuplePatternElt(ArgPattern, init,
-                                    getDefaultArgKind(init)));
-  bodyElts.push_back(TuplePatternElt(BodyPattern, init,
-                                     getDefaultArgKind(init)));
+  argElts.push_back(TuplePatternElt(ArgPattern, TPE.getInit(),
+                                    getDefaultArgKind(TPE.getInit())));
   return makeParserSuccess();
 }
 
