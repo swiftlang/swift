@@ -1,3 +1,14 @@
+2014-01-15
+----------
+
+* TODO: destructors call -dealloc in Objective-C bases.
+
+* TODO: NSManagedObject should work.
+
+* 'let' declarations are continuing to make slow progress. Curried
+   and selector-style arguments are now immutable by default, and
+   'let' declarations now get proper debug information.
+
 2014-01-08
 ----------
 
