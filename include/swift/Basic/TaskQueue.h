@@ -94,6 +94,10 @@ public:
   /// current system.
   static bool supportsParallelExecution();
 
+  /// \returns the maximum number of tasks which this TaskQueue will execute in
+  /// parallel
+  unsigned getNumberOfParallelTasks() const;
+
   /// \brief Adds a task to the TaskQueue.
   ///
   /// \param ExecPath the path to the executable which the task should execute

@@ -225,6 +225,13 @@ bool TaskQueue::supportsParallelExecution() {
   return true;
 }
 
+unsigned TaskQueue::getNumberOfParallelTasks() const {
+  // TODO: add support for choosing a better default value for
+  // MaxNumberOfParallelTasks if NumberOfParallelTasks is 0. (Optimally, this
+  // should choose a value > 1 tailored to the current system.)
+  return NumberOfParallelTasks > 0 ? NumberOfParallelTasks : 1;
+}
+
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context) {
   std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
@@ -243,10 +250,8 @@ bool TaskQueue::execute(TaskBeganCallback Began,
 
   bool SubtaskFailed = false;
 
-  unsigned MaxNumberOfParallelTasks = NumberOfParallelTasks;
-  // TODO: add support for choosing a better default value for
-  // MaxNumberOfParallelTasks if NumberOfParallelTasks is 0. (Optimally, this
-  // should choose a value > 1 tailored to the current system.)
+  unsigned MaxNumberOfParallelTasks = getNumberOfParallelTasks();
+
   if (MaxNumberOfParallelTasks == 0)
     MaxNumberOfParallelTasks = 1;
 

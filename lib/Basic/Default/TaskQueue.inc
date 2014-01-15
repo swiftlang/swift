@@ -62,6 +62,11 @@ bool TaskQueue::supportsParallelExecution() {
   return false;
 }
 
+unsigned TaskQueue::getNumberOfParallelTasks() const {
+  // The default implementation does not support parallel execution.
+  return 1;
+}
+
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context) {
   std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
