@@ -1,9 +1,17 @@
 2014-01-15
 ----------
 
-* TODO: destructors call -dealloc in Objective-C bases.
+* Improved deallocation of Swift classes that inherit from Objective-C
+  classes: Swift destructors are implemented as -dealloc methods that
+  automatically call the superclass's -daelloc. Stored properties are
+  released right before the object is deallocated (using the same
+  mechanism as ARC), allowing properties to be safely used in
+  destructors.
 
-* TODO: NSManagedObject should work.
+* Subclasses of NSManagedObject are now required to provide initial
+  values for each of their stored properties. This permits
+  initialization of these stored properties directly after +alloc to
+  provide memory safety with CoreData's dynamic subclassing scheme.
 
 * 'let' declarations are continuing to make slow progress. Curried
    and selector-style arguments are now immutable by default, and
