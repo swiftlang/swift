@@ -938,13 +938,6 @@ public:
   void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
   void printRec(TypeRepr *T);
 
-  void printSubstitutions(ArrayRef<Substitution> Substitutions) {
-    for (auto S : Substitutions) {
-      OS.indent(Indent + 2) << "(with " << S.Archetype->getFullName()
-                            << " = " << S.Replacement << ")\n";
-    }
-  }
-
   raw_ostream &printCommon(Expr *E, const char *C) {
     OS.indent(Indent) << '(' << C;
     if (E->isImplicit())
