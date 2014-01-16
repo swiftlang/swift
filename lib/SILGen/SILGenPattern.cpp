@@ -200,7 +200,7 @@ static SILValue emitGetStoredPropertyFromValueTypeRValue(SILGenFunction &gen,
     SILValue field = gen.B.createStructExtract(loc, aggregate, property,
                                                propTL.getLoweredType());
     // FIXME: Make unowned field strong.
-    auto value = gen.B.createCopyValue(loc, field);
+    auto value = gen.B.emitCopyValueOperation(loc, field);
     result = gen.emitManagedRValueWithCleanup(value, propTL);
   }
 

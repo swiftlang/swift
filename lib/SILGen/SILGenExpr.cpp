@@ -1763,7 +1763,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       // Non-address-only constants are passed at +1.
       if (Entry.isConstant() && !Entry.getConstant().getType().isAddress()) {
         SILValue Val = Entry.getConstant();
-        Val = B.createCopyValue(loc, Val);
+        Val = B.emitCopyValueOperation(loc, Val);
         
         // Use an RValue to explode Val if it is a tuple.
         RValue RV(*this, loc, capture->getType()->getCanonicalType(),
