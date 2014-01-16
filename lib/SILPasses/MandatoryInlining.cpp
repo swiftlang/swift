@@ -130,10 +130,13 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // Look through remaining uses of the partial apply inst to find at most one
     // strong release instruction.
     StrongReleaseInst *SRI = nullptr;
+    DebugValueInst *DVI = nullptr;
     for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ++UI) {
       if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
         SRI = cast<StrongReleaseInst>(UI.getUser());
         assert(SRI->getOperand() == SILValue(PAI, 0));
+      } else if (DVI == nullptr && isa<DebugValueInst>(UI.getUser())) {
+        DVI = cast<DebugValueInst>(UI.getUser());
       } else
         return;
     }
@@ -147,6 +150,10 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
           B.emitDestroyValueOperation(SRI->getLoc(), CaptureArg);
       SRI->eraseFromParent();
     }
+
+    // Remove a debug_value if present.
+    if (DVI)
+      DVI->eraseFromParent();
 
     CalleeValue = PAI->getCallee();
     assert(PAI->use_empty());
