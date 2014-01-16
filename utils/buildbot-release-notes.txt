@@ -3,7 +3,7 @@
 
 * Improved deallocation of Swift classes that inherit from Objective-C
   classes: Swift destructors are implemented as -dealloc methods that
-  automatically call the superclass's -daelloc. Stored properties are
+  automatically call the superclass's -dealloc. Stored properties are
   released right before the object is deallocated (using the same
   mechanism as ARC), allowing properties to be safely used in
   destructors.
