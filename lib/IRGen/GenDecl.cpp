@@ -1271,15 +1271,14 @@ Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
                                : SILDeclRef::Kind::IVarInitializer, 
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
                     /*isForeign=*/true);
+
+  auto expansion = ResilienceExpansion::Minimal;
+
   llvm::SmallString<64> ivarInitDestroyNameBuffer;
-  auto ivarInitDestroyName = silRef.mangle(ivarInitDestroyNameBuffer);
+  auto name = silRef.mangle(ivarInitDestroyNameBuffer, expansion);
   // Find the SILFunction for the ivar initializer or destroyer.
-  // FIXME: This linear scan is awful. Fortunately, it only happens
-  // once per definition of an Objective-C-derived class.
-  for (auto &silFn : SILMod->getFunctions()) {
-    if (silFn.getName() == ivarInitDestroyName)
-      return getAddrOfSILFunction(&silFn, ResilienceExpansion::Minimal,
-                                  forDefinition);
+  if (auto silFn = SILMod->lookUpFunction(name)) {
+    return getAddrOfSILFunction(silFn, expansion, forDefinition);
   }
 
   return Nothing;

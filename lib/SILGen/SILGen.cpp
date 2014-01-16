@@ -16,6 +16,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -283,8 +284,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
 
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal; /*TODO*/
+
   SmallVector<char, 128> buffer;
-  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
+  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer, expansion),
                                 constantType, Nothing, IsNotBare, IsTrans);
   
   ValueDecl *VD = nullptr;

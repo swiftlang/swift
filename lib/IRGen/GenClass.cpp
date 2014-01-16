@@ -1064,17 +1064,13 @@ namespace {
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
-      // FIXME: Linear search is awful.
       SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          /*isForeign=*/true);
       llvm::SmallString<64> dtorNameBuffer;
-      auto dtorName = dtorRef.mangle(dtorNameBuffer);
-      for (auto &silFn : IGM.SILMod->getFunctions()) {
-        if (silFn.getName() == dtorName) {
-          return silFn.isDefinition();
-        }
-      }
+      auto dtorName = dtorRef.mangle(dtorNameBuffer, ResilienceExpansion::Minimal);
+      if (auto silFn = IGM.SILMod->lookUpFunction(dtorName))
+        return silFn->isDefinition();
 
       // The Objective-C thunk was never even declared, so it is not defined.
       return false;

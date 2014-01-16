@@ -36,6 +36,7 @@ namespace swift {
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
+  enum class ResilienceExpansion : unsigned;
   class SILFunctionType;
   class SILModule;
 
@@ -181,7 +182,8 @@ struct SILDeclRef {
   }
 
   /// Produce a mangled form of this constant.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer) const;
+  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
+                         ResilienceExpansion expansion) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

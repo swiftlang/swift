@@ -274,7 +274,8 @@ bool SILDeclRef::isForeignThunk() const {
   return false;
 }
 
-static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
+static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
+                           ResilienceExpansion expansion) {
   using namespace Mangle;
   Mangler mangler(buffer);
 
@@ -294,7 +295,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     if (!c.hasDecl()) {
       buffer << introducer;
       mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
-                                  ResilienceExpansion::Minimal,
+                                  expansion,
                                   c.uncurryLevel);
       return;
     }
@@ -328,7 +329,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     }
 
     buffer << introducer;
-    mangler.mangleEntity(c.getDecl(), ResilienceExpansion::Minimal, c.uncurryLevel);
+    mangler.mangleEntity(c.getDecl(), expansion, c.uncurryLevel);
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
@@ -350,7 +351,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     buffer << introducer;
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ true,
-                                    ResilienceExpansion::Minimal,
+                                    expansion,
                                     c.uncurryLevel);
     return;
 
@@ -359,7 +360,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     buffer << introducer;
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ false,
-                                    ResilienceExpansion::Minimal,
+                                    expansion,
                                     c.uncurryLevel);
     return;
 
@@ -376,13 +377,13 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
     buffer << introducer;
-    mangler.mangleGetterEntity(c.getDecl(), ResilienceExpansion::Minimal);
+    mangler.mangleGetterEntity(c.getDecl(), expansion);
     return;
 
   //   entity ::= declaration 's'                 // setter
   case SILDeclRef::Kind::Setter:
     buffer << introducer;
-    mangler.mangleSetterEntity(c.getDecl(), ResilienceExpansion::Minimal);
+    mangler.mangleSetterEntity(c.getDecl(), expansion);
     return;
 
   //   entity ::= declaration 'a'                 // addressor
@@ -402,10 +403,11 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   llvm_unreachable("bad entity kind!");
 }
 
-StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer) const {
+StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer,
+                             ResilienceExpansion expansion) const {
   assert(buffer.empty());
   llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(*this, stream);
+  mangleConstant(*this, stream, expansion);
   return stream.str();
 }
 
