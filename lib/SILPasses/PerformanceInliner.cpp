@@ -197,19 +197,18 @@ static unsigned functionInlineCost(SILFunction *F) {
 /// TODO: This should be refactored to use a worklist approach so we process any
 /// additional functions that we may uncover via inlining. If we have a bunch of
 /// extra cost in our budget, we may be able to inline those.
-static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
-  SILInliner Inliner(*F, SILInliner::InlineKind::PerformanceInline);
+static void inlineCallsIntoFunction(SILFunction *Caller, AIList &ApplyInstList) {
+  SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
   // Get the initial cost of the function in question.
-  unsigned CurrentCost = functionInlineCost(F);
-  DEBUG(llvm::dbgs() << "Visiting Function: " << F->getName() << ". Initial "
-        "Cost: " << CurrentCost << "\n");
+  unsigned CurrentCost = functionInlineCost(Caller);
+  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() <<
+        ". Initial Cost: " << CurrentCost << "\n");
 
   bool HitCostLimit = false;
 
   // For each apply in our list...
   for (ApplyInst *AI : ApplyInstList) {
-
     DEBUG(llvm::dbgs() << "  Visiting Apply Inst " << *AI);
 
     // Get its callee.
@@ -217,9 +216,9 @@ static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
     assert(Callee && "We already know at this point that callees are valid for "
            "inlining.");
 
-    // If the Callee is F, skip it to prevent circular inlining...
-    if (Callee == F) {
-      DEBUG(llvm::dbgs() << "    Recursive Call... Skipping...\n");
+    // Prevent circular inlining.
+    if (Callee == Caller) {
+      DEBUG(llvm::dbgs() << "  Recursive Call... Skipping...\n");
       continue;
     }
 
@@ -234,8 +233,8 @@ static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
     // caller...
     unsigned NewCost = CalleeCost + CurrentCost;
 
-    DEBUG(llvm::dbgs() << "    Old Cost = " << CurrentCost << "; CalleeCost = "
-                 << CalleeCost << "; New Cost: " << NewCost << "\n");
+    DEBUG(llvm::dbgs() << "  Old Cost = " << CurrentCost << "; CalleeCost = "
+          << CalleeCost << "; New Cost: " << NewCost << "\n");
 
     // If we would go over our threshold, continue. There may be other functions
     // of less weight further on.
@@ -250,10 +249,9 @@ static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
       Args.push_back(Arg);
 
     // Ok, we are within budget. Attempt to inline.
-    DEBUG(llvm::dbgs() << "    Everything Looks Good! Inlining...");
+    DEBUG(llvm::dbgs() << " Inlining...");
     Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
 
-    // Perform book keeping.
     CurrentCost = NewCost;
     NumApplyInlined++;
     CostIncrease += CalleeCost;
