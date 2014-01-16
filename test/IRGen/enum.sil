@@ -939,6 +939,8 @@ end:
 
 class C {}
 
+sil @_TFC4enum1CD : $@cc(method) @thin (C) -> ()
+
 enum SinglePayloadClass {
   case x(C)
   case y
@@ -1925,6 +1927,8 @@ entry:
 }
 
 class D {}
+
+sil @_TFC4enum1DD : $@cc(method) @thin (D) -> ()
 
 enum MultiPayloadClasses {
   case x(C)

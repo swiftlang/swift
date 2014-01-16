@@ -52,12 +52,6 @@ public:
     return CodeRef(fn, explosionLevel, uncurryLevel);
   }
 
-  static CodeRef forDestructor(DestructorDecl *fn,
-                               ResilienceExpansion explosionLevel,
-                               unsigned uncurryLevel) {
-    return CodeRef(fn, explosionLevel, uncurryLevel);
-  }
-
   ValueDecl *getDecl() const { return TheDecl; }
   unsigned getUncurryLevel() const { return UncurryLevel; }
   ResilienceExpansion getExplosionLevel() const {

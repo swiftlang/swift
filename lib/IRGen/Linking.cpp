@@ -27,14 +27,6 @@ using namespace swift;
 using namespace irgen;
 using namespace Mangle;
 
-static bool isDeallocating(DestructorKind kind) {
-  switch (kind) {
-  case DestructorKind::Deallocating: return true;
-  case DestructorKind::Destroying: return false;
-  }
-  llvm_unreachable("bad destructor kind");
-}
-
 static StringRef mangleValueWitness(ValueWitness witness) {
   // The ones with at least one capital are the composite ops, and the
   // capitals correspond roughly to the positions of buffers (as
@@ -184,14 +176,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing
-
-  //   entity ::= context 'D'                     // deallocating destructor
-  //   entity ::= context 'd'                     // non-deallocating destructor
-  case Kind::Destructor:
-    buffer << "_T";
-    mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                   isDeallocating(getDestructorKind()));
-    return;
 
   //   entity ::= declaration                     // other declaration
   case Kind::Function:

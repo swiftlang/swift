@@ -11,6 +11,8 @@ class C {}
   func explode()
 }
 
+sil @_TFC7unowned1CD : $@cc(method) @thin (C) -> ()
+
 struct A {
   @unowned var x : C
 }

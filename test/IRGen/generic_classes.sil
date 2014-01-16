@@ -165,18 +165,21 @@ class RootGeneric<T> {
 
   func bas()
 }
+sil @_TFC15generic_classes11RootGenericD : $@cc(method) @thin <T> (RootGeneric<T>) -> ()
 
 class RootGenericFixedLayout<T> {
   var x : UInt8
   var y : T[]
   var z : UInt8
 }
+sil @_TFC15generic_classes22RootGenericFixedLayoutD : $@cc(method) @thin <T> (RootGenericFixedLayout<T>) -> ()
 
 class RootNonGeneric {
   var x : UInt8
   var y : Int
   var z : UInt8
 }
+sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
 class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
   var w : Int
@@ -184,6 +187,7 @@ class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
   func zim()
   func zang()
 }
+sil @_TFC15generic_classes25NonGenericInheritsGenericD : $@cc(method) @thin (NonGenericInheritsGeneric) -> ()
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
@@ -192,20 +196,24 @@ class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   func doo()
   func dah()
 }
+sil @_TFC15generic_classes22GenericInheritsGenericD : $@cc(method) @thin <T,U> (GenericInheritsGeneric<T,U>) -> ()
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
   var w : UInt8
 }
+sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
 
 class GenericInheritsObjC<D> : Gizmo {
   var x : D
 }
+sil @_TFCSo19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
   var y : E
   var z : UInt8
 }
+sil @_TFCSo20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
 
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA:%.*]] to i8***

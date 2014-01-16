@@ -373,9 +373,6 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              llvm::Type *definitionType = nullptr);
-  llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
-                                      ForDefinition_t forDefinition,
-                                      bool isForeign);
   Optional<llvm::Function*> getAddrOfObjCIVarInitDestroy(
                               ClassDecl *cd,
                               bool isDestroyer,
@@ -396,6 +393,9 @@ public:
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
+                                       ResilienceExpansion level,
+                                       ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfSILFunction(SILDeclRef fn,
                                        ResilienceExpansion level,
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,

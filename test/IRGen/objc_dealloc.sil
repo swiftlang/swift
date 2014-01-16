@@ -11,6 +11,7 @@ import swift
 import gizmo
 
 class X { }
+sil @_TFC12objc_dealloc1XD : $@cc(method) @thin (X) -> ()
 
 func onDestruct() { }
 
@@ -18,6 +19,7 @@ class SwiftGizmo : Gizmo {
   var x : X
   destructor()
 }
+sil @_TFCSo10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
 
 sil @_TF12objc_dealloc10onDestructFT_T_ : $@thin () -> () {
 bb0:

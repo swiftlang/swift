@@ -1289,10 +1289,11 @@ namespace {
     }
 
     void addDestructorFunction() {
-      Fields.push_back(IGM.getAddrOfDestructor(TargetClass,
-                                               DestructorKind::Deallocating,
-                                               NotForDefinition,
-                                               /*isForeign=*/false));
+      auto expansion = ResilienceExpansion::Minimal;
+      auto dtorRef = SILDeclRef(TargetClass->getDestructor(),
+                                SILDeclRef::Kind::Deallocator);
+      Fields.push_back(IGM.getAddrOfSILFunction(dtorRef, expansion,
+                                                NotForDefinition));
     }
     
     void addNominalTypeDescriptor() {

@@ -13,6 +13,8 @@ sil_stage canonical
 import swift
 
 class C {}
+sil @_TFC4weak1CD : $@cc(method) @thin (C) -> ()
+
 @class_protocol protocol P {
   func explode()
 }

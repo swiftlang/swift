@@ -523,7 +523,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getNonUniqueSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   case Kind::WitnessTableOffset:
-  case Kind::Destructor:
   case Kind::Function:
   case Kind::Other:
   case Kind::ObjCClass:
@@ -841,6 +840,23 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
   return result;
 }
 
+/// Find the entry point for a SIL function, which we assume exists in
+/// the module.
+llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
+                                                  ResilienceExpansion expansion,
+                                                  ForDefinition_t forDefinition) {
+  llvm::SmallString<32> name;
+  fnRef.mangle(name, expansion);
+  SILFunction *fn = SILMod->lookUpFunction(name);
+#ifndef NDEBUG
+  if (!fn) {
+    llvm::errs() << "function not declared in module: " << name << '\n';
+    abort();
+  }
+#endif
+  return getAddrOfSILFunction(fn, expansion, forDefinition);
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ResilienceExpansion level,
@@ -908,14 +924,6 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
-}
-
-static SILDeclRef::Kind getSILDeclRefKind(DestructorKind dtorKind) {
-  switch (dtorKind) {
-  case DestructorKind::Destroying: return SILDeclRef::Kind::Destroyer;
-  case DestructorKind::Deallocating: return SILDeclRef::Kind::Deallocator;
-  }
-  llvm_unreachable("bad denstructor kind");
 }
 
 /// Get or create a llvm::GlobalVariable.
@@ -1180,37 +1188,6 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
   llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::C);
   
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
-}
-
-/// Fetch the declaration of the given known destructor.
-llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
-                                                 DestructorKind kind,
-                                                 ForDefinition_t forDefinition,
-                                                 bool isForeign) {
-  auto dd = cd->getDestructor();
-  auto codeRef = CodeRef::forDestructor(dd, ResilienceExpansion::Minimal, 0);
-  LinkEntity entity = LinkEntity::forDestructor(codeRef, kind);
-
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(entry, entity);
-    return cast<llvm::Function>(entry);
-  }
-
-
-  SILDeclRef silFn = SILDeclRef(dd, getSILDeclRefKind(kind),
-                                0, isForeign);
-  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType =
-    getFunctionType(silFnType, ResilienceExpansion::Minimal, ExtraData::None, attrs);
-
-  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
-
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;

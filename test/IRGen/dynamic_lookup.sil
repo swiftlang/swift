@@ -16,6 +16,8 @@ class X {
   }
 }
 
+sil @_TFC14dynamic_lookup1XD : $@cc(method) @thin (X) -> ()
+
 // [objc] t.X.f (t.X)() -> ()
 sil @_TToFC14dynamic_lookup1X1ffS0_FT_T_ : $@cc(objc_method) @thin (X) -> () {
 bb0(%0 : $X):

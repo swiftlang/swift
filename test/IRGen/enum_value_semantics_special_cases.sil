@@ -106,6 +106,9 @@ enum NullableObjCRefcounted {
 class C {}
 class D {}
 
+sil @_TFC34enum_value_semantics_special_cases1CD : $@cc(method) @thin (C) -> ()
+sil @_TFC34enum_value_semantics_special_cases1DD : $@cc(method) @thin (D) -> ()
+
 enum AllRefcounted {
   case Ref(Builtin.ObjectPointer)
   case CRef(C)

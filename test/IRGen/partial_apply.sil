@@ -11,6 +11,7 @@ import gizmo
   
   func initFamily() -> ObjCClass { return self }
 }
+sil @_TFCSo9ObjCClassD : $@cc(method) @thin (ObjCClass) -> ()
 
 sil @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
@@ -149,6 +150,7 @@ done(%f : $@callee_owned Int64 -> ()):
 }
 
 class SwiftClass {}
+sil @_TFC13partial_apply10SwiftClassD : $@cc(method) @thin (SwiftClass) -> ()
 
 sil @partially_applyable_to_class : $@thin SwiftClass -> ()
 
