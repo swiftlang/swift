@@ -51,6 +51,7 @@ static const clang::CanQualType getClangBuiltinTypeFromKind(
   }
 }
 
+
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   // First attempt a lookup in our map of imported structs.
   auto *decl = type->getDecl();
@@ -72,6 +73,23 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   }
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 #undef MAP_BUILTIN_TYPE
+
+  // Handle other imported types.
+
+#define CHECK_CLANG_TYPE_MATCH(TYPE, NAME, FIELD)                         \
+  if (auto lookupTy = getNamedSwiftType(TYPE->getDecl()->getDeclContext(),\
+                                        NAME))                            \
+    if (lookupTy->isEqual(type))                                          \
+      return clangCtx.FIELD;
+
+  CHECK_CLANG_TYPE_MATCH(type, "COpaquePointer", VoidPtrTy);
+  CHECK_CLANG_TYPE_MATCH(type, "CUnicodeScalar", IntTy);
+  CHECK_CLANG_TYPE_MATCH(type, "Bool", SignedCharTy);
+  CHECK_CLANG_TYPE_MATCH(type, "ObjCBool", ObjCBuiltinBoolTy);
+  // FIXME: This is sufficient for ABI type generation, but should probably
+  //        be const char* for type encoding.
+  CHECK_CLANG_TYPE_MATCH(type, "CString", VoidPtrTy);
+#undef CHECK_CLANG_TYPE_MATCH
 
   // FIXME: Handle other structs resulting from imported non-struct Clang types.
   return clang::CanQualType();
