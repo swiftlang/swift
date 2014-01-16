@@ -104,15 +104,3 @@ bb0(%0 : $SwiftGizmo):
   %3 = tuple ()
   return %3 : $()                                 // id: %4
 }
-
-// ObjectiveC.SwiftGizmo.init (ObjectiveC.SwiftGizmo.metatype)() -> ObjectiveC.SwiftGizmo
-// CHECK-LABEL: define {{.*}} @_TFCSo10SwiftGizmocfMS_FT_S_
-sil @_TFCSo10SwiftGizmocfMS_FT_S_ : $@cc(method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
-bb0(%0 : $SwiftGizmo):
-  // CHECK: [[SELF_GIZMO:%[0-9A-Za-z_.]+]] = bitcast [[SGIZMO]]* %0 to [[GIZMO]]*
-  %1 = upcast %0 : $SwiftGizmo to $Gizmo
-  // CHECK-NEXT: bitcast {{.*}} to i8*
-  // CHECK-NEXT: call i8* @swift_dynamicCastClassUnconditional
-  %7 = self_downcast %1 : $Gizmo to $SwiftGizmo
-  return %7 : $SwiftGizmo
-}

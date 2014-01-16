@@ -2579,28 +2579,6 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
 }
 
 void IRGenSILFunction::visitSelfDowncastInst(swift::SelfDowncastInst *i) {
-  auto cd = i->getType().getSwiftRValueType()->getClassOrBoundGenericClass();
-  assert(cd && "Result of self_downcast is not a class?");
-  
-  // A self downcast for a Swift-rooted class hierarchy never fails.
-  if (!Lowering::usesObjCAllocator(cd)) {
-    Explosion from = getLoweredExplosion(i->getOperand());
-    llvm::Value *fromValue = from.claimNext();
-    
-    // Just bitcast the result.
-    llvm::Type *toTy = getTypeInfo(i->getType()).StorageType;
-    llvm::Value *toValue;
-    if (fromValue->getType() != toTy)
-      toValue = Builder.CreateBitCast(fromValue, toTy);
-    else
-      toValue = fromValue;
-
-    Explosion result(ResilienceExpansion::Maximal);
-    result.add(toValue);
-    setLoweredExplosion(SILValue(i, 0), result);
-    return;
-  }
-
   Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
                                 CheckedCastKind::Downcast,
                                 CheckedCastMode::Unconditional);
