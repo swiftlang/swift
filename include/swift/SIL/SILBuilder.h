@@ -396,6 +396,11 @@ public:
                     UnconditionalCheckedCastInst(loc, kind, op, destTy));
   }
   
+  SelfDowncastInst *createSelfDowncast(SILLocation loc, SILValue op, 
+                                       SILType destTy) {
+    return insert(new (F.getModule()) SelfDowncastInst(loc, op, destTy));
+  }
+
   CopyValueInst *createCopyValue(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) CopyValueInst(loc, operand));
   }

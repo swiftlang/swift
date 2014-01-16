@@ -626,6 +626,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ArchetypeRefToSuper)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(UpcastExistentialRef)
+  ONEOPERAND_ONETYPE_INST(SelfDowncast)
 #undef ONEOPERAND_ONETYPE_INST
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {

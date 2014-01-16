@@ -1182,6 +1182,16 @@ public:
   CheckedCastKind getCastKind() const { return CastKind; }
 };
   
+/// SelfDowncastInst - Perform a conversion of "self" within an
+/// initializer to its subclass.
+class SelfDowncastInst
+  : public UnaryInstructionBase<ValueKind::SelfDowncastInst, ConversionInst>
+{
+public:
+  SelfDowncastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;

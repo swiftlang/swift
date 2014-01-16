@@ -651,6 +651,7 @@ public:
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
+  void visitSelfDowncastInst(swift::SelfDowncastInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
 
@@ -2566,6 +2567,20 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                                        swift::UnconditionalCheckedCastInst *i) {
   Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
                                 i->getCastKind(),
+                                CheckedCastMode::Unconditional);
+  
+  if (i->getType().isAddress()) {
+    setLoweredAddress(SILValue(i,0), val);
+  } else {
+    Explosion ex(ResilienceExpansion::Maximal);
+    ex.add(val.getAddress());
+    setLoweredExplosion(SILValue(i,0), ex);
+  }
+}
+
+void IRGenSILFunction::visitSelfDowncastInst(swift::SelfDowncastInst *i) {
+  Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
+                                CheckedCastKind::Downcast,
                                 CheckedCastMode::Unconditional);
   
   if (i->getType().isAddress()) {

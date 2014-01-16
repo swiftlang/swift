@@ -1235,6 +1235,20 @@ public:
     }
   }
   
+  void checkSelfDowncastInst(SelfDowncastInst *UI) {
+    require(UI->getType() != UI->getOperand().getType(),
+            "can't self_downcast to same type");
+    
+    require(UI->getOperand().getType().getSwiftType()
+              ->getClassOrBoundGenericClass(),
+            "self_downcast operand must be a class or class metatype instance");
+    require(UI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+            "self_downcast must convert a class instance to a class type");
+    require(UI->getOperand().getType().getSwiftType()
+              ->isSuperclassOf(UI->getType().getSwiftType(), nullptr),
+            "self_downcast must cast to a superclass");
+  }
+
   void checkIsNonnullInst(IsNonnullInst *II) {
     require(II->getOperand().getType().getSwiftType()
               ->mayHaveSuperclass(),

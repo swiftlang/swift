@@ -736,7 +736,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ArchetypeRefToSuperInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst: {
+  case ValueKind::UpcastExistentialRefInst: 
+  case ValueKind::SelfDowncastInst: {
     SILValue operand;
     SILType Ty;
     switch (SI.getKind()) {
@@ -796,6 +797,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::UpcastExistentialRefInst:
       operand = cast<UpcastExistentialRefInst>(&SI)->getOperand();
       Ty = cast<UpcastExistentialRefInst>(&SI)->getType();
+      break;
+    case ValueKind::SelfDowncastInst:
+      operand = cast<SelfDowncastInst>(&SI)->getOperand();
+      Ty = cast<SelfDowncastInst>(&SI)->getType();
       break;
     }
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,

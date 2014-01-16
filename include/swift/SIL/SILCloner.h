@@ -540,6 +540,15 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitSelfDowncastInst(SelfDowncastInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createSelfDowncast(getOpLocation(Inst->getLoc()),
+                               getOpValue(Inst->getOperand()),
+                               getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
   doPostProcess(Inst,
     Builder.createCopyValue(getOpLocation(Inst->getLoc()),
