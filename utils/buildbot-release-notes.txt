@@ -16,7 +16,7 @@
   visible in the caller:
   
     func setTo4(a : @inout Double[]) {
-      a[10] = 4.0     // error: 'a' isn't mutable
+      a[10] = 4.0     // ok: 'a' is a mutable reference
     }
     ...
     setTo4(&someArray)
