@@ -1,3 +1,36 @@
+2014-01-22
+----------
+
+* The immutability model for structs and enums is complete, and arguments are
+  immutable by default.  This allows the compiler to reject mutations of
+  temporary objects, catching common bugs.  For example, this is rejected:
+  
+    func setTo4(a : Double[]) {
+      a[10] = 4.0     // error: 'a' isn't mutable
+    }
+    ...
+    setTo4(someArray)
+
+  since "a" is semantically a copy of the array passed into the function.  The
+  proper fix in this case is to mark the argument is @inout, so the effect is
+  visible in the caller:
+  
+    func setTo4(a : @inout Double[]) {
+      a[10] = 4.0     // error: 'a' isn't mutable
+    }
+    ...
+    setTo4(&someArray)
+
+  Alternatively, if you really just want a local copy of the argument, you can
+  mark it var.  The effects aren't visible in the caller, but this can be
+  convenient in some cases:
+  
+    func doStringStuff(var s : String) {
+      s += "foo"
+      print(s)
+    }
+
+
 2014-01-15
 ----------
 
