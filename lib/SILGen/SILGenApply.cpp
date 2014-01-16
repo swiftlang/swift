@@ -707,9 +707,17 @@ public:
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
+    // This marks all calls to auto closure typed variables as transparent.
+    // As of writing, local variable auto closures are currently allowed by
+    // the parser, but the plan is that they will be disallowed, so this will
+    // actually only apply to auto closure parameters, which is what we want
+    auto *t = e->getType()->castTo<AnyFunctionType>();
+    bool isTransparent = t->getExtInfo().isAutoClosure();
+
     ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), false, e));
+    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), isTransparent,
+                                  e));
   }
 
   void visitLoadExpr(LoadExpr *e) {
