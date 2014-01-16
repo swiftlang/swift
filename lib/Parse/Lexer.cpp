@@ -1339,6 +1339,13 @@ Restart:
   case ' ':
   case '\t':
     goto Restart;  // Skip whitespace.
+
+  case -1:
+  case -2:
+    diagnose(CurPtr-1, diag::lex_utf16_bom_marker);
+    CurPtr = BufferEnd;
+    return formToken(tok::unknown, TokStart);
+
   case 0:
     if (CurPtr-1 == CodeCompletionPtr)
       return formToken(tok::code_complete, TokStart);
