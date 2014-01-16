@@ -139,6 +139,8 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
     } else {
       diagnose(ID->getLoc(), diag::sema_no_import_submodule);
     }
+    if (Context.SearchPathOpts.SDKPath.empty())
+      diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
     return Nothing;
   }
 
