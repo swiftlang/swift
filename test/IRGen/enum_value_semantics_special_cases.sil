@@ -84,3 +84,28 @@ enum MultipleEmptyRefcounted {
 // CHECK: ; <label>:5                                       ; preds = %3, %entry, %entry
 // CHECK:   ret void
 // CHECK: }
+
+// Enums consisting of all retainable pointers and at most one empty case
+// use tagged pointer value semantics—we mask off the tag bits and pass the
+// pointer to the r/r functions.
+
+class C {}
+class D {}
+
+enum AllRefcounted {
+  case Ref(Builtin.ObjectPointer)
+  case CRef(C)
+  case DRef(D)
+  case None
+}
+
+// CHECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases13AllRefcounted(%swift.opaque* %object, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases13AllRefcounted*
+// CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases13AllRefcounted* %0 to i64*
+// CHECK:   %2 = load i64* %1, align 8
+// CHECK:   %3 = and i64 %2, -7
+// CHECK:   %4 = inttoptr i64 %3 to %swift.refcounted*
+// CHECK:   call void @swift_release(%swift.refcounted* %4) #0
+// CHECK:   ret void
+// CHECK: }

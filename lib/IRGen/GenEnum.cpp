@@ -992,7 +992,8 @@ namespace {
       NullableSwiftRefcounted,
       /// The payload is a single unknown-reference-counted value, and we have
       /// a single no-payload case which uses the null extra inhabitant, so
-      /// copy and destroy can pass through to swift_retain/swift_release.
+      /// copy and destroy can pass through to
+      /// swift_unknownRetain/swift_unknownRelease.
       ///TODO: NullableUnknownRefcounted,
     };
     
@@ -2052,6 +2053,27 @@ namespace {
     // The number of tag values used for no-payload cases.
     unsigned NumEmptyElementTags = ~0u;
 
+    /// More efficient value semantics implementations for certain enum layouts.
+    enum CopyDestroyStrategy {
+      /// No special behavior.
+      Normal,
+      /// The payloads are all POD, so copying is bitwise, and destruction is a
+      /// noop.
+      POD,
+      /// The payloads are all Swift-reference-counted values, and there is at
+      /// most one no-payload case with the tagged-zero representation. Copy
+      /// and destroy can just mask out the tag bits and pass the result to
+      /// swift_retain/swift_release.
+      TaggedSwiftRefcounted,
+      /// The payloads are all reference-counted values, and there is at
+      /// most one no-payload case with the tagged-zero representation. Copy
+      /// and destroy can just mask out the tag bits and pass the result to
+      /// swift_unknownRetain/swift_unknownRelease.
+      ///TODO: TaggedUnknownRefcounted,
+    };
+    
+    CopyDestroyStrategy CopyDestroyKind;
+
   public:
     MultiPayloadEnumImplStrategy(IRGenModule &IGM,
                                  TypeInfoKind tik, unsigned NumElements,
@@ -2061,9 +2083,29 @@ namespace {
       : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                      std::move(WithPayload),
                                      std::move(WithRecursivePayload),
-                                     std::move(WithNoPayload))
+                                     std::move(WithNoPayload)),
+        CopyDestroyKind(Normal)
     {
       assert(ElementsWithPayload.size() > 1);
+      
+      // Check the payloads to see if we can take advantage of common layout to
+      // optimize our value semantics.
+      bool allPOD = true;
+      bool allSingleSwiftRefcount = true;
+      for (auto &elt : ElementsWithPayload) {
+        if (!elt.ti->isPOD(ResilienceScope::Component))
+          allPOD = false;
+        if (!elt.ti->isSingleRetainablePointer(ResilienceScope::Component))
+          allSingleSwiftRefcount = false;
+      }
+      
+      if (allPOD) {
+        assert(!allSingleSwiftRefcount && "pod *and* single-refcounted?!");
+        CopyDestroyKind = POD;
+      } else if (allSingleSwiftRefcount
+                 && WithNoPayload.size() <= 1) {
+        CopyDestroyKind = TaggedSwiftRefcounted;
+      }
     }
     
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
@@ -2406,6 +2448,16 @@ namespace {
       IGF.Builder.emitBlock(endBB);
     }
     
+    llvm::Value *maskTagBitsFromPayload(IRGenFunction &IGF,
+                                        llvm::Value *payload) const {
+      if (PayloadTagBits.none())
+        return payload;
+      
+      APInt mask = ~getAPIntFromBitVector(PayloadTagBits);
+      auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), mask);
+      return IGF.Builder.CreateAnd(payload, maskVal);
+    }
+    
   public:
     void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
@@ -2429,94 +2481,149 @@ namespace {
     
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
-      if (isPOD(ResilienceScope::Local)) {
+      assert(TIK >= Loadable);
+      
+      switch (CopyDestroyKind) {
+      case POD:
         reexplode(IGF, src, dest);
         return;
+
+      case Normal: {
+        llvm::Value *payload = src.claimNext();
+        llvm::Value *extraTagBits = ExtraTagBitCount > 0
+          ? src.claimNext() : nullptr;
+        
+        forNontrivialPayloads(IGF, payload, extraTagBits,
+          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+            auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+            Explosion value(ResilienceExpansion::Minimal);
+            projectPayloadValue(IGF, payload, tagIndex, lti, value);
+
+            Explosion tmp(value.getKind());
+            lti.copy(IGF, value, tmp);
+            tmp.claimAll(); // FIXME: repack if not bit-identical
+          });
+        
+        dest.add(payload);
+        if (extraTagBits)
+          dest.add(extraTagBits);
+        return;
+      }
+          
+      case TaggedSwiftRefcounted: {
+        llvm::Value *payload = src.claimNext();
+        llvm::Value *extraTagBits = ExtraTagBitCount > 0
+          ? src.claimNext() : nullptr;
+        
+        // Mask the tag bits out of the payload, if any.
+        llvm::Value *ptrVal
+          = maskTagBitsFromPayload(IGF, payload);
+        
+        // Pass the pointer to swift_retain.
+        auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
+                                              IGF.IGM.RefCountedPtrTy);
+        IGF.emitRetainCall(ptr);
+        
+        dest.add(payload);
+        if (extraTagBits)
+          dest.add(extraTagBits);
+        return;
+      }
       }
       
-      llvm::Value *payload = src.claimNext();
-      llvm::Value *extraTagBits = ExtraTagBitCount > 0
-        ? src.claimNext() : nullptr;
-      
-      forNontrivialPayloads(IGF, payload, extraTagBits,
-        [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
-          auto &lti = cast<LoadableTypeInfo>(*elt.ti);
-          Explosion value(ResilienceExpansion::Minimal);
-          projectPayloadValue(IGF, payload, tagIndex, lti, value);
-
-          Explosion tmp(value.getKind());
-          lti.copy(IGF, value, tmp);
-          tmp.claimAll(); // FIXME: repack if not bit-identical
-        });
-      
-      dest.add(payload);
-      if (extraTagBits)
-        dest.add(extraTagBits);
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
-      if (isPOD(ResilienceScope::Local)) {
+      assert(TIK >= Loadable);
+      
+      switch (CopyDestroyKind) {
+      case POD:
         src.claim(getExplosionSize(src.getKind()));
         return;
-      }
-      
-      llvm::Value *payload = src.claimNext();
-      llvm::Value *extraTagBits = ExtraTagBitCount > 0
-        ? src.claimNext() : nullptr;
-      
-      forNontrivialPayloads(IGF, payload, extraTagBits,
-        [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
-          auto &lti = cast<LoadableTypeInfo>(*elt.ti);
-          Explosion value(ResilienceExpansion::Minimal);
-          projectPayloadValue(IGF, payload, tagIndex, lti, value);
+          
+      case Normal: {
+        llvm::Value *payload = src.claimNext();
+        llvm::Value *extraTagBits = ExtraTagBitCount > 0
+          ? src.claimNext() : nullptr;
+        
+        forNontrivialPayloads(IGF, payload, extraTagBits,
+          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+            auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+            Explosion value(ResilienceExpansion::Minimal);
+            projectPayloadValue(IGF, payload, tagIndex, lti, value);
 
-          lti.consume(IGF, value);
-        });
+            lti.consume(IGF, value);
+          });
+        return;
+      }
+          
+      case TaggedSwiftRefcounted: {
+        llvm::Value *payload = src.claimNext();
+        if (ExtraTagBitCount > 0)
+          src.claimNext();
+
+        // Mask the tag bits out of the payload, if any.
+        llvm::Value *ptrVal
+          = maskTagBitsFromPayload(IGF, payload);
+
+        // Pass the pointer to swift_retain.
+        auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
+                                              IGF.IGM.RefCountedPtrTy);
+        IGF.emitRelease(ptr);
+        return;
+      }
+      }
     }
   
   private:
-    /// Emit an reassignment sequence from an enum at one address to another.
+    /// Emit a reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
                             Address dest, Address src, CanType T,
                             IsTake_t isTake) const {
       auto &C = IGF.IGM.getLLVMContext();
       
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
       
-      // If the enum is loadable, it's better to do this directly using values,
-      // so we don't need to RMW tag bits in place.
-      if (TI->isLoadable()) {
-        Explosion tmpSrc(ResilienceExpansion::Minimal),
-                  tmpOld(ResilienceExpansion::Minimal);
-        if (isTake)
-          loadAsTake(IGF, src, tmpSrc);
-        else
-          loadAsCopy(IGF, src, tmpSrc);
+      case TaggedSwiftRefcounted:
+      case Normal: {
+        // If the enum is loadable, it's better to do this directly using values,
+        // so we don't need to RMW tag bits in place.
+        if (TI->isLoadable()) {
+          Explosion tmpSrc(ResilienceExpansion::Minimal),
+                    tmpOld(ResilienceExpansion::Minimal);
+          if (isTake)
+            loadAsTake(IGF, src, tmpSrc);
+          else
+            loadAsCopy(IGF, src, tmpSrc);
+          
+          loadAsTake(IGF, dest, tmpOld);
+          initialize(IGF, tmpSrc, dest);
+          consume(IGF, tmpOld);
+          return;
+        }
         
-        loadAsTake(IGF, dest, tmpOld);
-        initialize(IGF, tmpSrc, dest);
-        consume(IGF, tmpOld);
+        auto *endBB = llvm::BasicBlock::Create(C);
+        
+        // Sanity-check whether the source and destination alias.
+        llvm::Value *alias = IGF.Builder.CreateICmpEQ(dest.getAddress(),
+                                                      src.getAddress());
+        auto *noAliasBB = llvm::BasicBlock::Create(C);
+        IGF.Builder.CreateCondBr(alias, endBB, noAliasBB);
+        IGF.Builder.emitBlock(noAliasBB);
+        
+        // Destroy the old value.
+        destroy(IGF, dest, T);
+        
+        // Reinitialize with the new value.
+        emitIndirectInitialize(IGF, dest, src, T, isTake);
+        
+        IGF.Builder.CreateBr(endBB);
+        IGF.Builder.emitBlock(endBB);
         return;
       }
-      
-      auto *endBB = llvm::BasicBlock::Create(C);
-      
-      // Sanity-check whether the source and destination alias.
-      llvm::Value *alias = IGF.Builder.CreateICmpEQ(dest.getAddress(),
-                                                    src.getAddress());
-      auto *noAliasBB = llvm::BasicBlock::Create(C);
-      IGF.Builder.CreateCondBr(alias, endBB, noAliasBB);
-      IGF.Builder.emitBlock(noAliasBB);
-      
-      // Destroy the old value.
-      destroy(IGF, dest, T);
-      
-      // Reinitialize with the new value.
-      emitIndirectInitialize(IGF, dest, src, T, isTake);
-      
-      IGF.Builder.CreateBr(endBB);
-      IGF.Builder.emitBlock(endBB);
+      }
     }
     
     void emitIndirectInitialize(IRGenFunction &IGF,
@@ -2525,85 +2632,90 @@ namespace {
                                 IsTake_t isTake) const{
       auto &C = IGF.IGM.getLLVMContext();
 
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
-      
-      // If the enum is loadable, it's better to do this directly using values,
-      // so we don't need to RMW tag bits in place.
-      if (TI->isLoadable()) {
-        Explosion tmpSrc(ResilienceExpansion::Minimal);
-        if (isTake)
-          loadAsTake(IGF, src, tmpSrc);
-        else
-          loadAsCopy(IGF, src, tmpSrc);
-        initialize(IGF, tmpSrc, dest);
-        return;
-      }
 
-      llvm::Value *payload, *extraTagBits;
-      std::tie(payload, extraTagBits)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
-
-      auto *endBB = llvm::BasicBlock::Create(C);
-
-      /// Switch out nontrivial payloads.
-      auto *trivialBB = llvm::BasicBlock::Create(C);
-      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
-      auto *swi = IGF.Builder.CreateSwitch(tag, trivialBB);
-      auto *tagTy = cast<llvm::IntegerType>(tag->getType());
-      
-      unsigned tagIndex = 0;
-      for (auto &payloadCasePair : ElementsWithPayload) {
-        CanType PayloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
-                                payloadCasePair.decl, nullptr,
-                                payloadCasePair.decl->getArgumentType())
-          ->getCanonicalType();
-        auto &payloadTI = *payloadCasePair.ti;
-        // Trivial payloads can all share the default path.
-        if (payloadTI.isPOD(ResilienceScope::Local)) {
-          ++tagIndex;
-          continue;
+      case TaggedSwiftRefcounted:
+      case Normal: {
+        // If the enum is loadable, it's better to do this directly using values,
+        // so we don't need to RMW tag bits in place.
+        if (TI->isLoadable()) {
+          Explosion tmpSrc(ResilienceExpansion::Minimal);
+          if (isTake)
+            loadAsTake(IGF, src, tmpSrc);
+          else
+            loadAsCopy(IGF, src, tmpSrc);
+          initialize(IGF, tmpSrc, dest);
+          return;
         }
-        
-        // For nontrivial payloads, we need to copy/take the payload using its
-        // value semantics.
-        auto *caseBB = llvm::BasicBlock::Create(C);
-        swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
-        IGF.Builder.emitBlock(caseBB);
 
-        // Temporarily clear the tag bits from the source so we can use the
-        // data.
-        preparePayloadForLoad(IGF, src, tagIndex);
+        llvm::Value *payload, *extraTagBits;
+        std::tie(payload, extraTagBits)
+          = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
+
+        auto *endBB = llvm::BasicBlock::Create(C);
+
+        /// Switch out nontrivial payloads.
+        auto *trivialBB = llvm::BasicBlock::Create(C);
+        llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
+        auto *swi = IGF.Builder.CreateSwitch(tag, trivialBB);
+        auto *tagTy = cast<llvm::IntegerType>(tag->getType());
         
-        // Do the take/copy of the payload.
-        Address srcData = IGF.Builder.CreateBitCast(src,
-                                payloadTI.getStorageType()->getPointerTo());
-        Address destData = IGF.Builder.CreateBitCast(dest,
+        unsigned tagIndex = 0;
+        for (auto &payloadCasePair : ElementsWithPayload) {
+          CanType PayloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
+                                  payloadCasePair.decl, nullptr,
+                                  payloadCasePair.decl->getArgumentType())
+            ->getCanonicalType();
+          auto &payloadTI = *payloadCasePair.ti;
+          // Trivial payloads can all share the default path.
+          if (payloadTI.isPOD(ResilienceScope::Local)) {
+            ++tagIndex;
+            continue;
+          }
+          
+          // For nontrivial payloads, we need to copy/take the payload using its
+          // value semantics.
+          auto *caseBB = llvm::BasicBlock::Create(C);
+          swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
+          IGF.Builder.emitBlock(caseBB);
+
+          // Temporarily clear the tag bits from the source so we can use the
+          // data.
+          preparePayloadForLoad(IGF, src, tagIndex);
+          
+          // Do the take/copy of the payload.
+          Address srcData = IGF.Builder.CreateBitCast(src,
                                   payloadTI.getStorageType()->getPointerTo());
+          Address destData = IGF.Builder.CreateBitCast(dest,
+                                    payloadTI.getStorageType()->getPointerTo());
 
-        if (isTake) {
-          payloadTI.initializeWithTake(IGF, destData, srcData, PayloadT);
-          // We don't need to preserve the old value.
-        } else {
-          payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT);
-          // Replant the tag bits, if any, in the source.
-          storePayloadTag(IGF, src, tagIndex);
+          if (isTake) {
+            payloadTI.initializeWithTake(IGF, destData, srcData, PayloadT);
+            // We don't need to preserve the old value.
+          } else {
+            payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT);
+            // Replant the tag bits, if any, in the source.
+            storePayloadTag(IGF, src, tagIndex);
+          }
+          
+          // Plant spare bit tag bits, if any, into the new value.
+          storePayloadTag(IGF, dest, tagIndex);
+          IGF.Builder.CreateBr(endBB);
+          
+          ++tagIndex;
         }
         
-        // Plant spare bit tag bits, if any, into the new value.
-        storePayloadTag(IGF, dest, tagIndex);
+        // For trivial payloads (including no-payload cases), we can just
+        // primitive-store to the destination.
+        IGF.Builder.emitBlock(trivialBB);
+        emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTagBits);
         IGF.Builder.CreateBr(endBB);
         
-        ++tagIndex;
+        IGF.Builder.emitBlock(endBB);
       }
-      
-      // For trivial payloads (including no-payload cases), we can just
-      // primitive-store to the destination.
-      IGF.Builder.emitBlock(trivialBB);
-      emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTagBits);
-      IGF.Builder.CreateBr(endBB);
-      
-      IGF.Builder.emitBlock(endBB);
+      }
     }
     
   public:
@@ -2656,36 +2768,42 @@ namespace {
     
     void destroy(IRGenFunction &IGF, Address addr, CanType T)
     const override {
-      if (isPOD(ResilienceScope::Local))
+      switch (CopyDestroyKind) {
+      case POD:
         return;
-      
-      // If loadable, it's better to do this directly to the value than
-      // in place, so we don't need to RMW out the tag bits in memory.
-      if (TI->isLoadable()) {
-        Explosion tmp(ResilienceExpansion::Minimal);
-        loadAsTake(IGF, addr, tmp);
-        consume(IGF, tmp);
+          
+      case Normal:
+      case TaggedSwiftRefcounted: {
+        // If loadable, it's better to do this directly to the value than
+        // in place, so we don't need to RMW out the tag bits in memory.
+        if (TI->isLoadable()) {
+          Explosion tmp(ResilienceExpansion::Minimal);
+          loadAsTake(IGF, addr, tmp);
+          consume(IGF, tmp);
+          return;
+        }
+        
+        llvm::Value *payload, *extraTagBits;
+        std::tie(payload, extraTagBits)
+          = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
+        
+        forNontrivialPayloads(IGF, payload, extraTagBits,
+          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+            // Clear tag bits out of the payload area, if any.
+            preparePayloadForLoad(IGF, addr, tagIndex);
+            // Destroy the data.
+            Address dataAddr = IGF.Builder.CreateBitCast(addr,
+                                        elt.ti->getStorageType()->getPointerTo());
+            CanType payloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
+                                                  elt.decl, nullptr,
+                                                  elt.decl->getArgumentType())
+              ->getCanonicalType();
+            
+            elt.ti->destroy(IGF, dataAddr, payloadT);
+          });
         return;
       }
-      
-      llvm::Value *payload, *extraTagBits;
-      std::tie(payload, extraTagBits)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
-      
-      forNontrivialPayloads(IGF, payload, extraTagBits,
-        [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
-          // Clear tag bits out of the payload area, if any.
-          preparePayloadForLoad(IGF, addr, tagIndex);
-          // Destroy the data.
-          Address dataAddr = IGF.Builder.CreateBitCast(addr,
-                                      elt.ti->getStorageType()->getPointerTo());
-          CanType payloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
-                                                elt.decl, nullptr,
-                                                elt.decl->getArgumentType())
-            ->getCanonicalType();
-          
-          elt.ti->destroy(IGF, dataAddr, payloadT);
-        });
+      }
     }
     
     Address projectDataForStore(IRGenFunction &IGF,
