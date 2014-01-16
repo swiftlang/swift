@@ -393,7 +393,8 @@ std::unique_ptr<Job> Driver::buildJobsForAction(const Compilation &C,
   }
 
   // 2. Select the right tool for the job.
-  const JobAction *JA = cast<JobAction>(A);
+  const JobAction *JA = dyn_cast<JobAction>(A);
+  assert(JA && "All Actions at this point must be JobActions!");
   const Tool *T = TC.selectTool(*JA);
   if (!T)
     return nullptr;
