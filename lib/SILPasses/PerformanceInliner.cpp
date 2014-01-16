@@ -159,6 +159,8 @@ static unsigned instructionInlineCost(SILInstruction &I) {
     case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
+    case ValueKind::DebugValueInst:
+    case ValueKind::DebugValueAddrInst:
       return 0;
     default:
       return 1;
@@ -198,7 +200,7 @@ static unsigned functionInlineCost(SILFunction *F) {
 /// additional functions that we may uncover via inlining. If we have a bunch of
 /// extra cost in our budget, we may be able to inline those.
 static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
-  SILInliner Inliner(*F);
+  SILInliner Inliner(*F, SILInliner::InlineKind::PerformanceInline);
 
   // Get the initial cost of the function in question.
   unsigned CurrentCost = functionInlineCost(F);
@@ -251,8 +253,7 @@ static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
 
     // Ok, we are within budget. Attempt to inline.
     DEBUG(llvm::dbgs() << "    Everything Looks Good! Inlining...");
-    Inliner.inlineFunction(SILInliner::InlineKind::PerformanceInline, AI,
-                           Callee, ArrayRef<Substitution>(), Args);
+    Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
 
     // Perform book keeping.
     CurrentCost = NewCost;

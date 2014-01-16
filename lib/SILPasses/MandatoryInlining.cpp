@@ -324,7 +324,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
-  SILInliner Inliner(*F);
+  SILInliner Inliner(*F, SILInliner::InlineKind::MandatoryInline);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     auto I = FI->begin(), E = FI->end();
     while (I != E) {
@@ -379,8 +379,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         --I;
       else
         I = ApplyBlock->end();
-      if (!Inliner.inlineFunction(SILInliner::InlineKind::MandatoryInline,
-                                  InnerAI, CalleeFunction,
+      if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
                                   InnerAI->getSubstitutions(), FullArgs)) {
         I = InnerAI;
         ++I;

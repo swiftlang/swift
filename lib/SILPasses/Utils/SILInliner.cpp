@@ -23,8 +23,7 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(InlineKind IKind,
-                                SILBasicBlock::iterator &I,
+bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
                                 SILFunction *CalleeFunction,
                                 ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
@@ -145,6 +144,22 @@ bool SILInliner::inlineFunction(InlineKind IKind,
 
   return true;
 }
+
+void SILInliner::visitDebugValueInst(DebugValueInst *Inst) {
+  // The mandatory inliner drops debug_value instructions when inlining, as if
+  // it were a "nodebug" function in C.
+  if (IKind == InlineKind::MandatoryInline) return;
+  
+  return SILCloner<SILInliner>::visitDebugValueInst(Inst);
+}
+void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+  // The mandatory inliner drops debug_value_addr instructions when inlining, as
+  // if it were a "nodebug" function in C.
+  if (IKind == InlineKind::MandatoryInline) return;
+  
+  return SILCloner<SILInliner>::visitDebugValueAddrInst(Inst);
+}
+
 
 // \brief Recursively visit a callee's BBs in depth-first preorder (only
 /// processing blocks on the first visit), mapping newly visited BBs to new BBs

@@ -27,15 +27,16 @@ class SILInliner : public SILCloner<SILInliner> {
 public:
   friend class SILVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
-
-  explicit SILInliner(SILFunction &F)
-    : SILCloner<SILInliner>(F), CalleeEntryBB(nullptr), DebugScope(nullptr) {
-  }
-
+  
   enum class InlineKind {
     MandatoryInline,
     PerformanceInline
   };
+
+  explicit SILInliner(SILFunction &F, InlineKind IKind)
+    : SILCloner<SILInliner>(F), IKind(IKind),
+      CalleeEntryBB(nullptr), DebugScope(nullptr) {
+  }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
   /// is called with the given arguments, into the caller at a given instruction
@@ -48,20 +49,25 @@ public:
   /// (for any reason). If successful, I now points to the first inlined
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
-  bool inlineFunction(InlineKind IKind, SILBasicBlock::iterator &I,
+  bool inlineFunction(SILBasicBlock::iterator &I,
                       SILFunction *CalleeFunction, ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args);
 
-  bool inlineFunction(InlineKind IKind, SILInstruction *AI,
+  bool inlineFunction(SILInstruction *AI,
                       SILFunction *CalleeFunction, ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args) {
     assert(AI->getParent() && "Inliner called on uninserted instruction");
     SILBasicBlock::iterator I(AI);
-    return inlineFunction(IKind, I, CalleeFunction, Subs, Args);
+    return inlineFunction(I, CalleeFunction, Subs, Args);
   }
 
 private:
   void visitSILBasicBlock(SILBasicBlock* BB);
+  
+  void visitDebugValueInst(DebugValueInst *Inst);
+  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
+
+  
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     if (DebugScope)
@@ -75,6 +81,8 @@ private:
     return Loc.hasValue() ? Loc.getValue() : InLoc;
   }
 
+  InlineKind IKind;
+  
   SILBasicBlock *CalleeEntryBB;
 
   /// \brief The location representing the inlined instructions.
