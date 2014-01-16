@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
@@ -29,13 +30,50 @@
 using namespace swift;
 using namespace irgen;
 
+static Type getNamedSwiftType(DeclContext *DC, StringRef name) {
+  assert(DC && "Unexpected null declaration context!");
+
+  auto &astContext = DC->getASTContext();
+  UnqualifiedLookup lookup(astContext.getIdentifier(name), DC, nullptr);
+  if (auto type = lookup.getSingleTypeResult())
+    return type->getDeclaredType();
+
+  return Type();
+}
+
+static const clang::CanQualType getClangBuiltinTypeFromKind(
+  const clang::ASTContext &context,
+  clang::BuiltinType::Kind kind) {
+  switch (kind) {
+#define BUILTIN_TYPE(Id, SingletonId) \
+  case clang::BuiltinType::Id: return context.SingletonId;
+#include "clang/AST/BuiltinTypes.def"
+  }
+}
+
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
-  if (auto *clangDecl = type->getDecl()->getClangDecl()) {
+  // First attempt a lookup in our map of imported structs.
+  auto *decl = type->getDecl();
+  if (auto *clangDecl = decl->getClangDecl()) {
     auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
     return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
   }
 
-  // FIXME: Handle structs resulting from non-struct Clang types.
+  auto &swiftCtx = type->getASTContext();
+  auto *CI = static_cast<ClangImporter*>(&*swiftCtx.getClangModuleLoader());
+  auto const &clangCtx = CI->getClangASTContext();
+
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) {                \
+    auto lookupTy = getNamedSwiftType(decl->getDeclContext(),                  \
+                                      #SWIFT_TYPE_NAME);                       \
+    if (lookupTy && lookupTy->isEqual(type))                                   \
+      return getClangBuiltinTypeFromKind(clangCtx,                             \
+                                      clang::BuiltinType::CLANG_BUILTIN_KIND); \
+  }
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+#undef MAP_BUILTIN_TYPE
+
+  // FIXME: Handle other structs resulting from imported non-struct Clang types.
   return clang::CanQualType();
 }
 
