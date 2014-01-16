@@ -1,6 +1,12 @@
 2014-01-22
 ----------
 
+* The swift binary no longer has an SDK set by default. Instead, you must do
+  one of the following:
+    - pass an explicit "-sdk /path/to/sdk"
+    - set SDKROOT in your environment
+    - run swift through xcrun, which sets SDKROOT for you
+
 * The immutability model for structs and enums is complete, and arguments are
   immutable by default.  This allows the compiler to reject mutations of
   temporary objects, catching common bugs.  For example, this is rejected:
